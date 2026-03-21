@@ -11,7 +11,7 @@ export default function QuestsDashboardWidget() {
     ]).then(([p, c]) => {
       setPendingCount(p);
       setCompletedToday(c);
-    });
+    }).catch(console.error);
   }, []);
 
   return (

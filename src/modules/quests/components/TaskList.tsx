@@ -26,14 +26,18 @@ export default function TaskList() {
   const [todayCount, setTodayCount] = useState(0);
 
   const loadTasks = useCallback(async () => {
-    const [allTasks, cats, count] = await Promise.all([
-      window.api.questsGetTasks(),
-      window.api.questsGetCategories(),
-      window.api.questsCountCompletedToday(),
-    ]);
-    setTasks(allTasks as Task[]);
-    setCategories(cats);
-    setTodayCount(count);
+    try {
+      const [allTasks, cats, count] = await Promise.all([
+        window.api.questsGetTasks(),
+        window.api.questsGetCategories(),
+        window.api.questsCountCompletedToday(),
+      ]);
+      setTasks(allTasks as Task[]);
+      setCategories(cats);
+      setTodayCount(count);
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
@@ -67,12 +71,12 @@ export default function TaskList() {
       const xp = Math.round(XP_MAP[task.tier] * comboMult * bonus.multiplier);
 
       await window.api.questsSetTaskStatus(task.id, true);
-      await window.api.processRpgEvent({
+      const result = await window.api.processRpgEvent({
         type: 'TASK_COMPLETED', moduleId: 'quests',
         payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
         timestamp: Date.now(),
       });
-      setToastData({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult });
+      setToastData({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null });
     } else {
       await window.api.questsSetTaskStatus(task.id, false);
       await window.api.processRpgEvent({
@@ -86,6 +90,8 @@ export default function TaskList() {
 
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
+    const confirmed = window.confirm(`Delete ${selectedIds.size} quest(s)? This cannot be undone.`);
+    if (!confirmed) return;
     await window.api.questsDeleteTasks(Array.from(selectedIds));
     setSelectedIds(new Set());
     await loadTasks();

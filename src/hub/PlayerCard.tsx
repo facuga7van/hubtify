@@ -31,6 +31,15 @@ export default function PlayerCard({ stats }: PlayerCardProps) {
         <HpBar hp={stats.hp} maxHp={stats.maxHp} />
         <XpBar xp={stats.xp} xpToNextLevel={stats.xpToNextLevel} level={stats.level} />
       </div>
+
+      {stats.dailyCombo > 0 && (
+        <div style={{
+          marginTop: 6, textAlign: 'center', fontSize: '0.75rem',
+          color: 'var(--rpg-gold-light)', fontFamily: 'Fira Code, monospace',
+        }}>
+          Combo x{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(stats.dailyCombo, 4)]} ({stats.dailyCombo})
+        </div>
+      )}
     </div>
   );
 }

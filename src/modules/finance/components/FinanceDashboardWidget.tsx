@@ -11,7 +11,7 @@ export default function FinanceDashboardWidget() {
     ]).then(([total, loans]) => {
       setMonthlyTotal(total);
       setActiveLoans(loans);
-    });
+    }).catch(console.error);
   }, []);
 
   return (

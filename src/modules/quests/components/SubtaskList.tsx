@@ -48,13 +48,13 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
       const xp = Math.round(XP_MAP[tier] * comboMult * bonus.multiplier);
 
       await window.api.questsSetSubtaskStatus(subtask.id, true, today);
-      await window.api.processRpgEvent({
+      const result = await window.api.processRpgEvent({
         type: 'SUBTASK_COMPLETED', moduleId: 'quests',
         payload: { xp, hp: 0, subtaskId: subtask.id, tier },
         timestamp: Date.now(),
       });
 
-      onShowToast({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: null });
+      onShowToast({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null });
     } else {
       await window.api.questsSetSubtaskStatus(subtask.id, false);
       await window.api.processRpgEvent({

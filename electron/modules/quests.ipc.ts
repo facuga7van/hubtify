@@ -27,6 +27,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const id = task.id || genId();
     const now = new Date().toISOString();
+    const validTier = [1, 2, 3].includes(task.tier ?? 2) ? (task.tier ?? 2) : 2;
 
     if (task.id) {
       // Update
@@ -35,7 +36,7 @@ export function registerQuestsIpcHandlers(): void {
                due_date = ?, task_order = ?, status = ?, updated_at = ?
         WHERE id = ?
       `).run(
-        task.name, task.description ?? '', task.tier ?? 2, task.category ?? '',
+        task.name, task.description ?? '', validTier, task.category ?? '',
         task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now, id
       );
     } else {
@@ -44,7 +45,7 @@ export function registerQuestsIpcHandlers(): void {
       db.prepare(`
         INSERT INTO tasks (id, name, description, tier, category, due_date, task_order, status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-      `).run(id, task.name, task.description ?? '', task.tier ?? 2, task.category ?? '',
+      `).run(id, task.name, task.description ?? '', validTier, task.category ?? '',
         task.dueDate ?? null, task.order ?? maxOrder.next, now, now);
     }
     return id;

@@ -9,8 +9,8 @@ export default function CharacterPage() {
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
 
   useEffect(() => {
-    window.api.getRpgStats().then(setStats);
-    window.api.getRpgHistory(20).then(setHistory);
+    window.api.getRpgStats().then(setStats).catch(console.error);
+    window.api.getRpgHistory(20).then(setHistory).catch(console.error);
   }, []);
 
   if (!stats) return <div style={{ padding: 24, opacity: 0.5 }}>Loading...</div>;

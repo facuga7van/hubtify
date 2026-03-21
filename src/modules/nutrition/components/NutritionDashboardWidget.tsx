@@ -11,7 +11,7 @@ export default function NutritionDashboardWidget() {
     ]).then(([c, t]) => {
       setCalories(c);
       setTarget(t);
-    });
+    }).catch(console.error);
   }, []);
 
   const pct = target && target > 0 ? Math.round((calories / target) * 100) : 0;
