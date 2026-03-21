@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { TaskTier, Subtask } from '../types';
+import { TierBadge } from '../utils';
 
 interface Props {
   editing?: Subtask | null;
@@ -59,9 +60,9 @@ export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) 
         onKeyDown={handleKeyDown}
       />
       <div className="subtask-tier-buttons">
-        <button type="button" className={`subtask-tier-btn ${tier === 1 ? 'tierActive' : ''}`} onClick={() => setTier(1)}>&#x26A1;</button>
-        <button type="button" className={`subtask-tier-btn ${tier === 2 ? 'tierActive' : ''}`} onClick={() => setTier(2)}>&#x2694;&#xFE0F;</button>
-        <button type="button" className={`subtask-tier-btn ${tier === 3 ? 'tierActive' : ''}`} onClick={() => setTier(3)}>&#x1F409;</button>
+        <button type="button" className={`subtask-tier-btn ${tier === 1 ? 'tierActive' : ''}`} onClick={() => setTier(1)}><TierBadge tier={1} size={14} /></button>
+        <button type="button" className={`subtask-tier-btn ${tier === 2 ? 'tierActive' : ''}`} onClick={() => setTier(2)}><TierBadge tier={2} size={14} /></button>
+        <button type="button" className={`subtask-tier-btn ${tier === 3 ? 'tierActive' : ''}`} onClick={() => setTier(3)}><TierBadge tier={3} size={14} /></button>
       </div>
       <div className="subtask-form-actions">
         <button className="rpg-button" onClick={handleSubmit}>Save</button>

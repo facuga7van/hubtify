@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { TaskTier, Task } from '../types';
+import { TierBadge, TIER_LABEL } from '../utils';
 
 interface Props {
   editingTask: Task | null;
@@ -86,7 +87,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
                 fontWeight: tier === t ? 'bold' : 'normal',
               }}
             >
-              {t === 1 ? '\u26A1 Quick' : t === 2 ? '\u2694\uFE0F Normal' : '\uD83D\uDC09 Epic'}
+              <TierBadge tier={t} size={14} /> {TIER_LABEL[t]}
             </button>
           ))}
         </div>
