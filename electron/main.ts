@@ -22,7 +22,7 @@ function createWindow(): void {
     titleBarStyle: 'hidden',
     icon: path.join(__dirname, '../../assets/icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, '../preload/preload.js'),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
