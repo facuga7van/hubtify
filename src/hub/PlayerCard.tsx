@@ -25,7 +25,7 @@ export default function PlayerCard({ stats }: PlayerCardProps) {
         position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: hpGlow,
       }}>
-        <img src={new URL('../../assets/frame.png', import.meta.url).href}
+        <img src={new URL('../assets/frame.png', import.meta.url).href}
           alt="" style={{ position: 'absolute', inset: -8, width: 'calc(100% + 16px)', height: 'calc(100% + 16px)', objectFit: 'contain' }} />
         <span style={{ fontSize: '1.8rem', zIndex: 1 }}>⚔</span>
       </div>
