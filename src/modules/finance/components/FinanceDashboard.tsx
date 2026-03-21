@@ -82,7 +82,7 @@ export default function FinanceDashboard() {
 
   return (
     <div>
-      <PageHeader title="Finance" subtitle="Track expenses and manage loans" />
+      <PageHeader title="Coinify" subtitle="Track expenses and manage loans" />
 
       {/* Monthly total */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>

@@ -35,7 +35,7 @@ export default function NutritionCharts() {
 
   return (
     <div>
-      <PageHeader title="Nutrition Dashboard" subtitle="Last 30 days overview" />
+      <PageHeader title="Nutrify Dashboard" subtitle="Last 30 days overview" />
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>

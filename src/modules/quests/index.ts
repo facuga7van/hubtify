@@ -5,7 +5,7 @@ import QuestsDashboardWidget from './components/QuestsDashboardWidget';
 
 export const questsModule: ModuleDefinition = {
   id: 'quests',
-  name: 'Quests',
+  name: 'Questify',
   icon: () => null,
   routes: [
     { path: '/quests', component: TaskList },

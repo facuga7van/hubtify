@@ -29,9 +29,9 @@ function NavIcon({ name }: { name: string }) {
 
 const navItems = [
   { path: '/', label: 'Home', icon: 'home' },
-  { path: '/quests', label: 'Quests', icon: 'sword' },
-  { path: '/nutrition', label: 'Nutrition', icon: 'goblet' },
-  { path: '/finance', label: 'Finance', icon: 'coins' },
+  { path: '/quests', label: 'Questify', icon: 'sword' },
+  { path: '/nutrition', label: 'Nutrify', icon: 'goblet' },
+  { path: '/finance', label: 'Coinify', icon: 'coins' },
   { path: '/character', label: 'Character', icon: 'shield' },
 ];
 

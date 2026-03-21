@@ -117,7 +117,7 @@ export default function TaskList() {
 
   return (
     <div>
-      <PageHeader title="Quests" subtitle="Manage your daily adventures" />
+      <PageHeader title="Questify" subtitle="Manage your daily adventures" />
       <TaskForm editingTask={editingTask} categories={categories} onSaved={() => { setEditingTask(null); loadTasks(); }} />
 
       {/* Tabs */}

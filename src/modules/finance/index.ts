@@ -5,7 +5,7 @@ import FinanceDashboardWidget from './components/FinanceDashboardWidget';
 
 export const financeModule: ModuleDefinition = {
   id: 'finance',
-  name: 'Finance',
+  name: 'Coinify',
   icon: () => null,
   routes: [
     { path: '/finance', component: FinanceDashboard },

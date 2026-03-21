@@ -5,7 +5,7 @@ import NutritionDashboardWidget from './components/NutritionDashboardWidget';
 
 export const nutritionModule: ModuleDefinition = {
   id: 'nutrition',
-  name: 'Nutrition',
+  name: 'Nutrify',
   icon: () => null,
   routes: [
     { path: '/nutrition', component: Today },

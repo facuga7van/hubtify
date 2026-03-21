@@ -17,7 +17,7 @@ export default function Dashboard() {
           style={{ cursor: 'pointer' }}
           onClick={() => navigate('/quests')}
         >
-          <div className="rpg-card-title">&#x2694; Quests</div>
+          <div className="rpg-card-title">&#x2694; Questify</div>
           <QuestsDashboardWidget />
         </div>
         <div
@@ -25,7 +25,7 @@ export default function Dashboard() {
           style={{ cursor: 'pointer' }}
           onClick={() => navigate('/nutrition')}
         >
-          <div className="rpg-card-title">&#x1F356; Nutrition</div>
+          <div className="rpg-card-title">&#x1F356; Nutrify</div>
           <NutritionDashboardWidget />
         </div>
         <div
@@ -33,7 +33,7 @@ export default function Dashboard() {
           style={{ cursor: 'pointer' }}
           onClick={() => navigate('/finance')}
         >
-          <div className="rpg-card-title">&#x1F4B0; Finance</div>
+          <div className="rpg-card-title">&#x1F4B0; Coinify</div>
           <FinanceDashboardWidget />
         </div>
         <div

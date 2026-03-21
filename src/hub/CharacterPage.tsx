@@ -62,15 +62,15 @@ export default function CharacterPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.totalTasks}</div>
-          <div className="rpg-stat-label">Quests Completed</div>
+          <div className="rpg-stat-label">Questify Completed</div>
         </div>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.totalMeals}</div>
-          <div className="rpg-stat-label">Meals Logged</div>
+          <div className="rpg-stat-label">Nutrify Logged</div>
         </div>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.totalExpenses}</div>
-          <div className="rpg-stat-label">Expenses Tracked</div>
+          <div className="rpg-stat-label">Coinify Tracked</div>
         </div>
       </div>
 

@@ -111,7 +111,7 @@ export default function Today() {
   return (
     <div>
       <PageHeader
-        title="Nutrition"
+        title="Nutrify"
         subtitle="Track your daily intake"
         actions={
           <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
