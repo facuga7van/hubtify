@@ -3,9 +3,9 @@ import { getDb } from '../ipc/db';
 import { estimate } from './nutrition/estimator';
 import { searchFoodDatabase } from './nutrition/food-db';
 import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
-import { FOOD_SEED_DATA } from './nutrition/food-db-seed';
+import { seedFoodDatabase } from './nutrition/food-db-seed';
 
-/** Seed the food_database table if it's empty */
+/** Seed the food_database table if it's empty or missing entries */
 export function seedFoodDatabaseIfEmpty(): void {
   const db = getDb();
   // Ensure table exists
@@ -19,18 +19,7 @@ export function seedFoodDatabaseIfEmpty(): void {
       category TEXT NOT NULL
     )
   `);
-  const count = (db.prepare('SELECT COUNT(*) AS cnt FROM food_database').get() as { cnt: number }).cnt;
-  if (count === 0) {
-    console.log('[Nutrition] Seeding food database with', FOOD_SEED_DATA.length, 'entries...');
-    const insert = db.prepare('INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)');
-    const insertMany = db.transaction(() => {
-      for (const entry of FOOD_SEED_DATA) {
-        insert.run(entry.name, entry.keywords, entry.calories, entry.serving_size, entry.category);
-      }
-    });
-    insertMany();
-    console.log('[Nutrition] Food database seeded successfully.');
-  }
+  seedFoodDatabase(db);
 }
 
 export function registerNutritionIpcHandlers(): void {

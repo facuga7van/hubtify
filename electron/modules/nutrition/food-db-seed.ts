@@ -1,3 +1,5 @@
+import type Database from 'better-sqlite3';
+
 export interface FoodSeedEntry {
   name: string;
   keywords: string;
@@ -452,4 +454,37 @@ export const FOOD_SEED_DATA: FoodSeedEntry[] = [
   { name: 'Queso untable entero', keywords: 'queso untable,casancrem,finlandia,queso philadelphia', calories: 60, serving_size: 'cucharada', category: 'extras' },
   { name: 'Salsa de soja', keywords: 'salsa de soja,soja,salsa soja', calories: 10, serving_size: 'cucharada', category: 'extras' },
 ];
+
+export function seedFoodDatabase(db: Database.Database): void {
+  const existing = db.prepare('SELECT COUNT(*) as count FROM food_database').get() as { count: number };
+
+  if (existing.count === 0) {
+    // Fresh DB: insert all
+    const insert = db.prepare(
+      'INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)'
+    );
+    const tx = db.transaction(() => {
+      for (const entry of FOOD_SEED_DATA) {
+        insert.run(entry.name, entry.keywords, entry.calories, entry.serving_size, entry.category);
+      }
+    });
+    tx();
+  } else if (existing.count < FOOD_SEED_DATA.length) {
+    // DB has fewer entries than seed: add missing ones by name
+    const existingNames = new Set(
+      (db.prepare('SELECT name FROM food_database').all() as { name: string }[]).map(r => r.name)
+    );
+    const insert = db.prepare(
+      'INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)'
+    );
+    const tx = db.transaction(() => {
+      for (const entry of FOOD_SEED_DATA) {
+        if (!existingNames.has(entry.name)) {
+          insert.run(entry.name, entry.keywords, entry.calories, entry.serving_size, entry.category);
+        }
+      }
+    });
+    tx();
+  }
+}
 
