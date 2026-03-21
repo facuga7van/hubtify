@@ -61,11 +61,8 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           placeholder="Quest name..."
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{
-            flex: 1, padding: '8px 12px', border: '1px solid var(--rpg-wood)',
-            borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)',
-            fontFamily: 'inherit', fontSize: '0.95rem',
-          }}
+          className="rpg-input"
+          style={{ flex: 1 }}
           autoFocus
         />
         <button type="submit" className="rpg-button">
@@ -100,22 +97,15 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           placeholder="Description (optional)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          style={{
-            flex: 1, minWidth: 150, padding: '4px 8px',
-            border: '1px solid var(--rpg-wood)', borderRadius: 'var(--rpg-radius)',
-            background: 'var(--rpg-parchment)', fontSize: '0.85rem',
-          }}
+          className="rpg-input"
+          style={{ flex: 1, minWidth: 150 }}
         />
 
         {/* Category */}
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          style={{
-            padding: '4px 8px', border: '1px solid var(--rpg-wood)',
-            borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)',
-            fontSize: '0.85rem',
-          }}
+          className="rpg-select"
         >
           <option value="">No category</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -128,8 +118,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
         </label>
         {useDate && (
           <input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
-            style={{ padding: '4px 8px', border: '1px solid var(--rpg-wood)', borderRadius: 'var(--rpg-radius)',
-              background: 'var(--rpg-parchment)', fontSize: '0.85rem' }} />
+            className="rpg-input" />
         )}
       </div>
     </form>

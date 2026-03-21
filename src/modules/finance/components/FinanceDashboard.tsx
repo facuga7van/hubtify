@@ -94,7 +94,7 @@ export default function FinanceDashboard() {
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            style={{ background: 'var(--rpg-dark)', color: 'var(--rpg-parchment)', border: '1px solid var(--rpg-wood)', padding: '4px 8px', borderRadius: 4 }}
+            className="rpg-input"
           />
         </div>
       </div>

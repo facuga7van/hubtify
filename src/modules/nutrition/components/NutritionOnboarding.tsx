@@ -17,26 +17,20 @@ export default function NutritionOnboarding({ onComplete }: Props) {
     onComplete();
   };
 
-  const inputStyle = {
-    padding: '6px 10px', border: '1px solid var(--rpg-wood)',
-    borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)',
-    fontFamily: 'inherit', fontSize: '0.9rem', width: '100%',
-  };
-
   return (
     <div className="rpg-card" style={{ maxWidth: 420, margin: '40px auto', padding: 24 }}>
       <h3 style={{ marginBottom: 16, textAlign: 'center' }}>Nutrition Setup</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label>Age<input type="number" value={age} onChange={(e) => setAge(+e.target.value)} style={inputStyle} /></label>
+        <label>Age<input type="number" value={age} onChange={(e) => setAge(+e.target.value)} className="rpg-input" style={{ width: '100%' }} /></label>
         <label>Sex
-          <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} style={inputStyle}>
+          <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} className="rpg-select" style={{ width: '100%' }}>
             <option value="M">Male</option><option value="F">Female</option>
           </select>
         </label>
-        <label>Height (cm)<input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} style={inputStyle} /></label>
-        <label>Weight (kg)<input type="number" value={weight} onChange={(e) => setWeight(+e.target.value)} style={inputStyle} /></label>
+        <label>Height (cm)<input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} className="rpg-input" style={{ width: '100%' }} /></label>
+        <label>Weight (kg)<input type="number" value={weight} onChange={(e) => setWeight(+e.target.value)} className="rpg-input" style={{ width: '100%' }} /></label>
         <label>Activity Level
-          <select value={activity} onChange={(e) => setActivity(e.target.value)} style={inputStyle}>
+          <select value={activity} onChange={(e) => setActivity(e.target.value)} className="rpg-select" style={{ width: '100%' }}>
             <option value="sedentary">Sedentary</option><option value="light">Light</option>
             <option value="moderate">Moderate</option><option value="active">Active</option>
           </select>

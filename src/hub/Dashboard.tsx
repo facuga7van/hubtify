@@ -9,7 +9,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 16 }}>Dashboard</h2>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: '1.4rem', marginBottom: 4 }}>Welcome, Adventurer</h2>
+        <p style={{ fontSize: '0.9rem', opacity: 0.6 }}>Your quest log awaits</p>
+      </div>
       <div className="dashboard-grid">
         <div
           className="rpg-card dashboard-widget"

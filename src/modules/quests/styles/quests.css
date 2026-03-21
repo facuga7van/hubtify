@@ -107,3 +107,8 @@
 }
 
 .subtask-form-actions { display: flex; gap: 6px; }
+
+/* ── Task card enhancements ───────────────────────── */
+.rpg-card + .rpg-card {
+  margin-top: 8px;
+}

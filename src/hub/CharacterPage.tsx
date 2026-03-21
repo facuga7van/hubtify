@@ -47,39 +47,33 @@ export default function CharacterPage() {
 
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-        <div className="rpg-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
-            {stats.xp}
-          </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Total XP</div>
+        <div className="rpg-card rpg-stat-card">
+          <div className="rpg-stat-number">{stats.xp}</div>
+          <div className="rpg-stat-label">Total XP</div>
         </div>
-        <div className="rpg-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
-            {stats.streak}
-          </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Day Streak 🔥</div>
+        <div className="rpg-card rpg-stat-card">
+          <div className="rpg-stat-number">{stats.streak}</div>
+          <div className="rpg-stat-label">Day Streak 🔥</div>
         </div>
-        <div className="rpg-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
-            {stats.dailyCombo}
-          </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Today's Combo</div>
+        <div className="rpg-card rpg-stat-card">
+          <div className="rpg-stat-number">{stats.dailyCombo}</div>
+          <div className="rpg-stat-label">Today's Combo</div>
         </div>
       </div>
 
       {/* Module stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-        <div className="rpg-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.2rem', fontFamily: 'Fira Code, monospace' }}>{stats.totalTasks}</div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Quests Completed</div>
+        <div className="rpg-card rpg-stat-card">
+          <div className="rpg-stat-number">{stats.totalTasks}</div>
+          <div className="rpg-stat-label">Quests Completed</div>
         </div>
-        <div className="rpg-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.2rem', fontFamily: 'Fira Code, monospace' }}>{stats.totalMeals}</div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Meals Logged</div>
+        <div className="rpg-card rpg-stat-card">
+          <div className="rpg-stat-number">{stats.totalMeals}</div>
+          <div className="rpg-stat-label">Meals Logged</div>
         </div>
-        <div className="rpg-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.2rem', fontFamily: 'Fira Code, monospace' }}>{stats.totalExpenses}</div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Expenses Tracked</div>
+        <div className="rpg-card rpg-stat-card">
+          <div className="rpg-stat-number">{stats.totalExpenses}</div>
+          <div className="rpg-stat-label">Expenses Tracked</div>
         </div>
       </div>
 

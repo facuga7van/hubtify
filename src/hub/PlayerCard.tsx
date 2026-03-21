@@ -9,13 +9,21 @@ export default function PlayerCard({ stats }: PlayerCardProps) {
     return <div style={{ padding: '16px', textAlign: 'center', opacity: 0.6 }}>Loading...</div>;
   }
 
+  const hpGlow = stats.hp > 75
+    ? '0 0 12px rgba(201, 168, 76, 0.4)'
+    : stats.hp > 50
+    ? '0 0 8px rgba(45, 90, 39, 0.3)'
+    : stats.hp > 25
+    ? '0 0 8px rgba(230, 126, 34, 0.3)'
+    : '0 0 8px rgba(139, 32, 32, 0.4)';
+
   return (
     <div style={{ padding: '12px 14px' }}>
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
         background: 'rgba(244,228,193,0.2)', border: '2px solid rgba(212,160,23,0.5)',
         margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.5rem',
+        fontSize: '1.5rem', boxShadow: hpGlow,
       }}>&#x2694;</div>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>

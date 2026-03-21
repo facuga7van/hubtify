@@ -32,7 +32,14 @@ export default function Sidebar({ stats }: SidebarProps) {
       </nav>
       <div className="sidebar-divider" />
       <div className="sidebar-footer">
-        {stats && stats.streak > 0 && <span>Racha: {stats.streak} dias 🔥</span>}
+        {stats && stats.streak > 0 && (
+          <div style={{ marginBottom: 6 }}>
+            <span style={{ fontSize: '0.9rem' }}>🔥 {stats.streak} day streak</span>
+          </div>
+        )}
+        <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>
+          Hubtify v0.1.0
+        </div>
       </div>
     </aside>
   );

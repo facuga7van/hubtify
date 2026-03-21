@@ -106,11 +106,6 @@ export default function Today() {
     !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
   );
 
-  const inputStyle = {
-    padding: '6px 10px', border: '1px solid var(--rpg-wood)',
-    borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)',
-    fontFamily: 'inherit', fontSize: '0.9rem',
-  };
 
   return (
     <div>
@@ -141,9 +136,9 @@ export default function Today() {
         <div className="rpg-card-title">Log Food</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input type="text" placeholder="Description" value={manualDesc}
-            onChange={(e) => setManualDesc(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+            onChange={(e) => setManualDesc(e.target.value)} className="rpg-input" style={{ flex: 1 }} />
           <input type="number" placeholder="kcal" value={manualCals}
-            onChange={(e) => setManualCals(e.target.value)} style={{ ...inputStyle, width: 80 }}
+            onChange={(e) => setManualCals(e.target.value)} className="rpg-input" style={{ width: 80 }}
             onKeyDown={(e) => e.key === 'Enter' && handleManualLog()} />
           <button className="rpg-button" onClick={handleManualLog}>Log</button>
         </div>
@@ -154,7 +149,7 @@ export default function Today() {
         <div className="rpg-card" style={{ marginBottom: 16 }}>
           <div className="rpg-card-title">Frequent Foods</div>
           <input type="text" placeholder="Search..." value={frequentSearch}
-            onChange={(e) => setFrequentSearch(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 8 }} />
+            onChange={(e) => setFrequentSearch(e.target.value)} className="rpg-input" style={{ width: '100%', marginBottom: 8 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {filteredFrequent.slice(0, 12).map((f) => (
               <button key={f.id} className="rpg-button" onClick={() => handleLogFrequent(f)}
@@ -174,7 +169,7 @@ export default function Today() {
             Steps:
             <input type="number" value={metrics.steps ?? ''} placeholder="0"
               onChange={(e) => handleMetrics('steps', e.target.value ? parseInt(e.target.value) : null)}
-              style={{ ...inputStyle, width: 80 }} />
+              className="rpg-input" style={{ width: 80 }} />
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input type="checkbox" checked={metrics.gym}
