@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
+import NutritionOnboarding from './NutritionOnboarding';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -94,7 +95,6 @@ export default function Today() {
 
   // Show onboarding inline if no profile
   if (!hasProfile) {
-    const NutritionOnboarding = require('./NutritionOnboarding').default;
     return <NutritionOnboarding onComplete={() => loadData(date)} />;
   }
 
