@@ -79,7 +79,8 @@
     "aiEstimate": "Estimacion IA",
     "aiPlaceholder": "Describe lo que comiste...",
     "estimate": "Estimar",
-    "confirmLog": "Confirmar y registrar"
+    "confirmLog": "Confirmar y registrar",
+    "today": "Hoy"
   },
   "coinify": {
     "title": "Coinify",
@@ -103,7 +104,12 @@
     "noLoans": "Sin prestamos activos",
     "activeLoans": "prestamos activos",
     "thisMonth": "este mes",
-    "dollarRates": "Cotizacion Dolar"
+    "dollarRates": "Cotizacion Dolar",
+    "balance": "Balance",
+    "byCategory": "Por Categoria",
+    "editTransaction": "Editar",
+    "saveTransaction": "Guardar",
+    "cancelEdit": "Cancelar"
   },
   "character": {
     "title": "Personaje",

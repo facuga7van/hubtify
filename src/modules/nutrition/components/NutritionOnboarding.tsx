@@ -10,6 +10,9 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   const [activity, setActivity] = useState('moderate');
 
   const handleSubmit = async () => {
+    if (age < 10 || age > 120) return;
+    if (height < 100 || height > 250) return;
+    if (weight < 30 || weight > 300) return;
     await window.api.nutritionSaveProfile({
       age, sex, heightCm: height, initialWeightKg: weight,
       activityLevel: activity, deficitTargetKcal: 500, gymCalories: 300, stepCaloriesFactor: 0.04,
@@ -21,14 +24,14 @@ export default function NutritionOnboarding({ onComplete }: Props) {
     <div className="rpg-card" style={{ maxWidth: 420, margin: '40px auto', padding: 24 }}>
       <h3 style={{ marginBottom: 16, textAlign: 'center' }}>Nutrition Setup</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label>Age<input type="number" value={age} onChange={(e) => setAge(+e.target.value)} className="rpg-input" style={{ width: '100%' }} /></label>
+        <label>Age<input type="number" value={age} onChange={(e) => setAge(+e.target.value)} min={10} max={120} className="rpg-input" style={{ width: '100%' }} /></label>
         <label>Sex
           <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} className="rpg-select" style={{ width: '100%' }}>
             <option value="M">Male</option><option value="F">Female</option>
           </select>
         </label>
-        <label>Height (cm)<input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} className="rpg-input" style={{ width: '100%' }} /></label>
-        <label>Weight (kg)<input type="number" value={weight} onChange={(e) => setWeight(+e.target.value)} className="rpg-input" style={{ width: '100%' }} /></label>
+        <label>Height (cm)<input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} min={100} max={250} className="rpg-input" style={{ width: '100%' }} /></label>
+        <label>Weight (kg)<input type="number" value={weight} onChange={(e) => setWeight(+e.target.value)} min={30} max={300} className="rpg-input" style={{ width: '100%' }} /></label>
         <label>Activity Level
           <select value={activity} onChange={(e) => setActivity(e.target.value)} className="rpg-select" style={{ width: '100%' }}>
             <option value="sedentary">Sedentary</option><option value="light">Light</option>

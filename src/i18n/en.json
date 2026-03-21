@@ -79,7 +79,8 @@
     "aiEstimate": "AI Estimation",
     "aiPlaceholder": "Describe what you ate...",
     "estimate": "Estimate",
-    "confirmLog": "Confirm & Log"
+    "confirmLog": "Confirm & Log",
+    "today": "Today"
   },
   "coinify": {
     "title": "Coinify",
@@ -103,7 +104,12 @@
     "noLoans": "No active loans",
     "activeLoans": "active loans",
     "thisMonth": "this month",
-    "dollarRates": "Dollar Exchange Rates"
+    "dollarRates": "Dollar Exchange Rates",
+    "balance": "Balance",
+    "byCategory": "By Category",
+    "editTransaction": "Edit",
+    "saveTransaction": "Save",
+    "cancelEdit": "Cancel"
   },
   "character": {
     "title": "Character",

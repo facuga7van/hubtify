@@ -27,6 +27,9 @@ export default function Today() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [target, setTarget] = useState(0);
 
+  // Log confirmation toast
+  const [logMessage, setLogMessage] = useState('');
+
   // Manual entry
   const [manualDesc, setManualDesc] = useState('');
   const [manualCals, setManualCals] = useState('');
@@ -75,6 +78,8 @@ export default function Today() {
     });
 
     setManualDesc(''); setManualCals('');
+    setLogMessage(`+${manualCals} kcal`);
+    setTimeout(() => setLogMessage(''), 2000);
     loadData(date);
   };
 
@@ -88,6 +93,8 @@ export default function Today() {
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
+    setLogMessage(`+${food.calories} kcal`);
+    setTimeout(() => setLogMessage(''), 2000);
     loadData(date);
   };
 
@@ -115,6 +122,8 @@ export default function Today() {
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
+    setLogMessage(`+${estimateResult.totalCalories} kcal`);
+    setTimeout(() => setLogMessage(''), 2000);
     setEstimateDesc('');
     setEstimateResult(null);
     loadData(date);
@@ -161,13 +170,17 @@ export default function Today() {
       />
 
       {/* Date navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}>
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 1L1 6l5 5M1 6h14"/>
           </svg>
         </button>
-        <h3 style={{ textAlign: 'center' }}>{date}</h3>
+        <button className="rpg-button" onClick={() => setDate(new Date().toLocaleDateString('en-CA'))}
+          style={{ padding: '4px 8px', fontSize: '0.75rem', opacity: date === new Date().toLocaleDateString('en-CA') ? 0.5 : 1 }}>
+          {t('nutrify.today')}
+        </button>
+        <h3 style={{ flex: 1, textAlign: 'center' }}>{date}</h3>
         <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}>
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10 1l5 5-5 5M15 6H1"/>
@@ -181,7 +194,10 @@ export default function Today() {
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.foodLog')}</div>
         {foods.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('nutrify.noFood')}</p>}
-        {foods.map((f) => <FoodLogItem key={f.id} entry={f} onDelete={handleDelete} />)}
+        {foods.map((f) => <FoodLogItem key={f.id} entry={f} onDelete={handleDelete} onUpdate={async (id, fields) => {
+          await window.api.nutritionUpdateFood(id, fields);
+          loadData(date);
+        }} />)}
       </div>
 
       {/* Manual entry */}
@@ -277,6 +293,19 @@ export default function Today() {
           </label>
         </div>
       </div>
+
+      {logMessage && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, padding: '8px 16px',
+          background: 'var(--rpg-wood)', color: 'var(--rpg-gold-light)',
+          border: '1px solid var(--rpg-gold)', borderRadius: 'var(--rpg-radius)',
+          fontFamily: 'Fira Code, monospace', fontSize: '0.9rem',
+          animation: 'contentFadeIn 0.2s ease', zIndex: 1000,
+          boxShadow: 'var(--rpg-shadow)',
+        }}>
+          {logMessage}
+        </div>
+      )}
     </div>
   );
 }
