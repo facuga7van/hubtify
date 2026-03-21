@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { registerAllIpcHandlers } from './ipc/registry';
+import { closeDb } from './ipc/db';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -46,7 +48,12 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  registerAllIpcHandlers();
   createWindow();
+});
+
+app.on('before-quit', () => {
+  closeDb();
 });
 
 app.on('window-all-closed', () => {
