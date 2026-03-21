@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
+import { useAuthContext } from '../shared/AuthContext';
 import './styles/layout.css';
 
 interface SidebarProps { stats: PlayerStats | null; }
@@ -46,15 +46,7 @@ const navKeys = [
 
 export default function Sidebar({ stats }: SidebarProps) {
   const { t, i18n } = useTranslation();
-  const [authUser, setAuthUser] = useState<{ uid: string; email: string | null } | null>(null);
-
-  useEffect(() => {
-    window.api.authGetUser().then(u => setAuthUser(u));
-    const unsub = window.api.onAuthStateChanged((u) => {
-      setAuthUser(u as { uid: string; email: string | null } | null);
-    });
-    return unsub;
-  }, []);
+  const { user: authUser, logout } = useAuthContext();
 
   return (
     <aside className="sidebar">
@@ -110,7 +102,7 @@ export default function Sidebar({ stats }: SidebarProps) {
                 {' '}{t('auth.sync')}
               </button>
               <button className="rpg-button" onClick={async () => {
-                await window.api.authLogout();
+                await logout();
               }} style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
                 {t('auth.logout')}
               </button>

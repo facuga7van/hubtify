@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
 import type { PlayerStats } from '../../shared/types';
+import { useAuthContext } from '../shared/AuthContext';
 import './styles/layout.css';
 import './styles/components.css';
 import { playLevelUp } from '../shared/audio';
@@ -15,6 +16,8 @@ export default function Layout() {
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const prevLevelRef = useRef<number>(0);
   const location = useLocation();
+
+  const { user: authUser } = useAuthContext();
 
   useKeyboardShortcuts();
 
@@ -28,20 +31,18 @@ export default function Layout() {
 
   // Auto-sync every 5 minutes if logged in
   useEffect(() => {
+    if (!authUser) return;
     const interval = setInterval(async () => {
       try {
-        const user = await window.api.authGetUser();
-        if (user) {
-          await window.api.syncPush(user.uid);
-          console.log('[AutoSync] Pushed data to cloud');
-        }
+        await window.api.syncPush(authUser.uid);
+        console.log('[AutoSync] Pushed data to cloud');
       } catch {
         // Silent fail — auto-sync is best-effort
       }
     }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, []);
+  }, [authUser]);
 
   // Enable reminders if previously set
   useEffect(() => {
@@ -52,19 +53,17 @@ export default function Layout() {
 
   // Initial sync on mount — pull latest data if logged in
   useEffect(() => {
+    if (!authUser) return;
     (async () => {
       try {
-        const user = await window.api.authGetUser();
-        if (user) {
-          await window.api.syncPull(user.uid);
-          refreshStats();
-          console.log('[AutoSync] Initial pull complete');
-        }
+        await window.api.syncPull(authUser.uid);
+        refreshStats();
+        console.log('[AutoSync] Initial pull complete');
       } catch {
         // Silent fail
       }
     })();
-  }, []);
+  }, [authUser, refreshStats]);
 
   useEffect(() => {
     if (stats && prevLevelRef.current > 0 && stats.level > prevLevelRef.current) {

@@ -102,13 +102,6 @@ export interface HubtifyApi {
   nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
   onEstimateProgress: (callback: (stage: string) => void) => () => void;
 
-  // Auth
-  authLogin: (email: string, password: string) => Promise<{ success: boolean; user?: unknown; error?: string }>;
-  authRegister: (email: string, password: string) => Promise<{ success: boolean; user?: unknown; error?: string }>;
-  authLogout: () => Promise<{ success: boolean }>;
-  authGetUser: () => Promise<{ uid: string; email: string | null; displayName: string | null } | null>;
-  onAuthStateChanged: (callback: (user: unknown) => void) => () => void;
-
   // Sync
   syncPush: (uid: string) => Promise<{ success: boolean; error?: string }>;
   syncPull: (uid: string) => Promise<{ success: boolean; hasData?: boolean; error?: string }>;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Character from './Character';
 import TitleBar from '../shared/components/TitleBar';
+import { useAuthContext } from '../shared/AuthContext';
 
 interface Props {
   onComplete: () => void;
@@ -9,6 +10,7 @@ interface Props {
 
 export default function Onboarding({ onComplete }: Props) {
   const { t, i18n } = useTranslation();
+  const { login, register } = useAuthContext();
   const [step, setStep] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,8 +44,8 @@ export default function Onboarding({ onComplete }: Props) {
     setAuthLoading(true);
     try {
       const result = isLogin
-        ? await window.api.authLogin(email, password)
-        : await window.api.authRegister(email, password);
+        ? await login(email, password)
+        : await register(email, password);
       if (result.success) {
         finishOnboarding();
       } else {

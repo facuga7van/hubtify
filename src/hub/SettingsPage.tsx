@@ -1,17 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
+import { useAuthContext } from '../shared/AuthContext';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
+  const { user: authUser, logout } = useAuthContext();
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('hubtify_sound') !== 'false');
   const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
-  const [authUser, setAuthUser] = useState<{ uid: string; email: string | null } | null>(null);
   const [syncStatus, setSyncStatus] = useState('');
-
-  useEffect(() => {
-    window.api.authGetUser().then((u) => setAuthUser(u)).catch(console.error);
-  }, []);
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -145,7 +142,7 @@ export default function SettingsPage() {
                 <div style={labelStyle}>{authUser.email}</div>
                 <div style={descStyle}>{t('settings.loggedIn')}</div>
               </div>
-              <button className="rpg-button" onClick={() => window.api.authLogout().then(() => setAuthUser(null))}
+              <button className="rpg-button" onClick={() => logout()}
                 style={{ fontSize: '0.8rem' }}>
                 {t('auth.logout')}
               </button>

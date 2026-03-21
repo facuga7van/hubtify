@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuthContext } from '../shared/AuthContext';
 
 interface Props {
   onAuth: () => void;
@@ -7,6 +8,7 @@ interface Props {
 
 export default function AuthPage({ onAuth }: Props) {
   const { t } = useTranslation();
+  const { login, register } = useAuthContext();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,8 +23,8 @@ export default function AuthPage({ onAuth }: Props) {
 
     try {
       const result = isLogin
-        ? await window.api.authLogin(email, password)
-        : await window.api.authRegister(email, password);
+        ? await login(email, password)
+        : await register(email, password);
 
       if (result.success) {
         onAuth();
