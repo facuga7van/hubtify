@@ -49,6 +49,20 @@ const api = {
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
+
+  // Finance
+  financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
+  financeAddTransaction: (tx: Record<string, unknown>) => ipcRenderer.invoke('finance:addTransaction', tx),
+  financeDeleteTransaction: (id: string) => ipcRenderer.invoke('finance:deleteTransaction', id),
+  financeGetLoans: () => ipcRenderer.invoke('finance:getLoans'),
+  financeAddLoan: (loan: Record<string, unknown>) => ipcRenderer.invoke('finance:addLoan', loan),
+  financeSettleLoan: (id: string) => ipcRenderer.invoke('finance:settleLoan', id),
+  financeGetIncomeSources: () => ipcRenderer.invoke('finance:getIncomeSources'),
+  financeAddIncomeSource: (src: Record<string, unknown>) => ipcRenderer.invoke('finance:addIncomeSource', src),
+  financeToggleIncomeSource: (id: string) => ipcRenderer.invoke('finance:toggleIncomeSource', id),
+  financeGetCategories: () => ipcRenderer.invoke('finance:getCategories'),
+  financeGetMonthlyTotal: () => ipcRenderer.invoke('finance:getMonthlyTotal'),
+  financeGetActiveLoansCount: () => ipcRenderer.invoke('finance:getActiveLoansCount'),
 };
 
 export type Api = typeof api;

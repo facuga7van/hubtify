@@ -1,0 +1,131 @@
+import { ipcMain } from 'electron';
+import { getDb } from '../ipc/db';
+import crypto from 'crypto';
+
+function genId(): string {
+  return crypto.randomUUID();
+}
+
+export function registerFinanceIpcHandlers(): void {
+  // ── Transactions ────────────────────────────────────
+
+  ipcMain.handle('finance:getTransactions', (_e, month: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, type, amount, currency, category, description,
+             date, source, created_at AS createdAt, updated_at AS updatedAt
+      FROM finance_transactions
+      WHERE date LIKE ?
+      ORDER BY date DESC, created_at DESC
+    `).all(`${month}%`);
+  });
+
+  ipcMain.handle('finance:addTransaction', (_e, tx: {
+    type: 'expense' | 'income'; amount: number; currency?: string;
+    category?: string; description?: string; date: string; source?: string;
+  }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO finance_transactions (id, type, amount, currency, category, description, date, source, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, tx.type, tx.amount, tx.currency ?? 'ARS', tx.category ?? 'Otros',
+      tx.description ?? '', tx.date, tx.source ?? 'manual', now, now
+    );
+    return id;
+  });
+
+  ipcMain.handle('finance:deleteTransaction', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM finance_transactions WHERE id = ?').run(id);
+  });
+
+  // ── Loans ───────────────────────────────────────────
+
+  ipcMain.handle('finance:getLoans', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, person_name AS personName, type, amount, currency, date,
+             description, settled, settled_date AS settledDate, created_at AS createdAt
+      FROM finance_loans
+      ORDER BY settled ASC, date DESC
+    `).all();
+  });
+
+  ipcMain.handle('finance:addLoan', (_e, loan: {
+    personName: string; type: 'lent' | 'borrowed'; amount: number;
+    currency?: string; date: string; description?: string;
+  }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO finance_loans (id, person_name, type, amount, currency, date, description, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, loan.personName, loan.type, loan.amount, loan.currency ?? 'ARS', loan.date, loan.description ?? '', now);
+    return id;
+  });
+
+  ipcMain.handle('finance:settleLoan', (_e, id: string) => {
+    const db = getDb();
+    const now = new Date().toLocaleDateString('en-CA');
+    db.prepare('UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?').run(now, id);
+  });
+
+  // ── Income Sources ──────────────────────────────────
+
+  ipcMain.handle('finance:getIncomeSources', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, name, estimated_amount AS estimatedAmount, frequency,
+             is_variable AS isVariable, active, created_at AS createdAt
+      FROM finance_income_sources
+      ORDER BY created_at ASC
+    `).all();
+  });
+
+  ipcMain.handle('finance:addIncomeSource', (_e, src: {
+    name: string; estimatedAmount: number; frequency?: string; isVariable?: boolean;
+  }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO finance_income_sources (id, name, estimated_amount, frequency, is_variable, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, src.name, src.estimatedAmount, src.frequency ?? 'monthly', src.isVariable ? 1 : 0, now);
+    return id;
+  });
+
+  ipcMain.handle('finance:toggleIncomeSource', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('UPDATE finance_income_sources SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ?').run(id);
+  });
+
+  // ── Categories ──────────────────────────────────────
+
+  ipcMain.handle('finance:getCategories', () => {
+    const db = getDb();
+    return (db.prepare('SELECT name FROM finance_categories ORDER BY created_at ASC').all() as { name: string }[])
+      .map((r) => r.name);
+  });
+
+  // ── Stats helpers ───────────────────────────────────
+
+  ipcMain.handle('finance:getMonthlyTotal', () => {
+    const db = getDb();
+    const month = new Date().toLocaleDateString('en-CA').slice(0, 7); // YYYY-MM
+    const result = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ?"
+    ).get(`${month}%`) as { total: number };
+    return result.total;
+  });
+
+  ipcMain.handle('finance:getActiveLoansCount', () => {
+    const db = getDb();
+    const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };
+    return result.c;
+  });
+}

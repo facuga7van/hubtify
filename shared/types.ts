@@ -94,6 +94,20 @@ export interface HubtifyApi {
   nutritionGetStreak: () => Promise<number>;
   nutritionGetTodayCalories: () => Promise<number>;
   nutritionGetTodayTarget: () => Promise<number | null>;
+
+  // Finance
+  financeGetTransactions: (month: string) => Promise<unknown[]>;
+  financeAddTransaction: (tx: Record<string, unknown>) => Promise<string>;
+  financeDeleteTransaction: (id: string) => Promise<void>;
+  financeGetLoans: () => Promise<unknown[]>;
+  financeAddLoan: (loan: Record<string, unknown>) => Promise<string>;
+  financeSettleLoan: (id: string) => Promise<void>;
+  financeGetIncomeSources: () => Promise<unknown[]>;
+  financeAddIncomeSource: (src: Record<string, unknown>) => Promise<string>;
+  financeToggleIncomeSource: (id: string) => Promise<void>;
+  financeGetCategories: () => Promise<string[]>;
+  financeGetMonthlyTotal: () => Promise<number>;
+  financeGetActiveLoansCount: () => Promise<number>;
 }
 
 // ── RPG Constants ──────────────────────────────────────────

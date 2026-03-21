@@ -8,6 +8,8 @@ interface SidebarProps { stats: PlayerStats | null; }
 const navItems = [
   { path: '/', label: 'Home', icon: '\u{1F3E0}' },
   { path: '/quests', label: 'Quests', icon: '\u2694' },
+  { path: '/nutrition', label: 'Nutrition', icon: '\u{1F356}' },
+  { path: '/finance', label: 'Finance', icon: '\u{1F4B0}' },
 ];
 
 export default function Sidebar({ stats }: SidebarProps) {

@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import QuestsDashboardWidget from '../modules/quests/components/QuestsDashboardWidget';
+import NutritionDashboardWidget from '../modules/nutrition/components/NutritionDashboardWidget';
+import FinanceDashboardWidget from '../modules/finance/components/FinanceDashboardWidget';
 import './styles/components.css';
 
 export default function Dashboard() {
@@ -17,13 +19,21 @@ export default function Dashboard() {
           <div className="rpg-card-title">&#x2694; Quests</div>
           <QuestsDashboardWidget />
         </div>
-        <div className="rpg-card dashboard-widget">
+        <div
+          className="rpg-card dashboard-widget"
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate('/nutrition')}
+        >
           <div className="rpg-card-title">&#x1F356; Nutrition</div>
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>Module not installed</p>
+          <NutritionDashboardWidget />
         </div>
-        <div className="rpg-card dashboard-widget">
+        <div
+          className="rpg-card dashboard-widget"
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate('/finance')}
+        >
           <div className="rpg-card-title">&#x1F4B0; Finance</div>
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>Module not installed</p>
+          <FinanceDashboardWidget />
         </div>
         <div className="rpg-card dashboard-widget">
           <div className="rpg-card-title">&#x1F6E1; Character</div>
