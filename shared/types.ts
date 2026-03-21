@@ -54,6 +54,24 @@ export interface HubtifyApi {
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;
+
+  // Quests
+  questsGetTasks: () => Promise<unknown[]>;
+  questsUpsertTask: (task: Record<string, unknown>) => Promise<string>;
+  questsDeleteTasks: (ids: string[]) => Promise<void>;
+  questsSetTaskStatus: (taskId: string, status: boolean) => Promise<void>;
+  questsSyncTaskOrders: (orders: Array<{ id: string; order: number }>) => Promise<void>;
+  questsGetSubtasks: (taskId: string) => Promise<unknown[]>;
+  questsAddSubtask: (taskId: string, subtask: Record<string, unknown>) => Promise<string>;
+  questsUpdateSubtask: (subtaskId: string, changes: Record<string, unknown>) => Promise<void>;
+  questsDeleteSubtask: (subtaskId: string) => Promise<void>;
+  questsSetSubtaskStatus: (subtaskId: string, status: boolean, completedAt?: string) => Promise<void>;
+  questsSyncSubtaskOrders: (taskId: string, orderedIds: string[]) => Promise<void>;
+  questsGetCategories: () => Promise<string[]>;
+  questsEnsureCategory: (name: string) => Promise<void>;
+  questsCountCompletedToday: () => Promise<number>;
+  questsGetPendingCount: () => Promise<number>;
+  questsGetCompletedTodayCount: () => Promise<number>;
 }
 
 // ── RPG Constants ──────────────────────────────────────────

@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { registerAllIpcHandlers } from './ipc/registry';
-import { closeDb } from './ipc/db';
+import { closeDb, getDb, runModuleMigrations } from './ipc/db';
+import { questsMigrations } from '../src/modules/quests/quests.schema';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -49,6 +50,11 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   registerAllIpcHandlers();
+
+  // Run module migrations
+  getDb();
+  runModuleMigrations(questsMigrations);
+
   createWindow();
 });
 
