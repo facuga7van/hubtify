@@ -19,15 +19,28 @@ export default function PlayerCard({ stats }: PlayerCardProps) {
 
   return (
     <div style={{ padding: '12px 14px' }}>
-      {/* Avatar with golden frame */}
+      {/* Avatar */}
       <div style={{
-        width: 80, height: 80, margin: '0 auto 8px',
-        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: hpGlow,
+        width: 72, height: 72, margin: '0 auto 8px',
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, rgba(201,168,76,0.15) 0%, rgba(92,58,30,0.1) 100%)',
+        border: '2px solid var(--rpg-gold-dark)',
+        boxShadow: `${hpGlow}, inset 0 1px 3px rgba(0,0,0,0.2)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative',
       }}>
-        <img src={new URL('../assets/frame.png', import.meta.url).href}
-          alt="" style={{ position: 'absolute', inset: -8, width: 'calc(100% + 16px)', height: 'calc(100% + 16px)', objectFit: 'contain' }} />
-        <span style={{ fontSize: '1.8rem', zIndex: 1 }}>⚔</span>
+        {/* Outer ring */}
+        <div style={{
+          position: 'absolute', inset: -4,
+          borderRadius: '50%',
+          border: '1px solid rgba(201,168,76,0.3)',
+        }} />
+        <svg width="28" height="28" viewBox="0 0 16 16" fill="none"
+          stroke="var(--rpg-gold)" strokeWidth="1.2" strokeLinecap="round">
+          <path d="M8 2L5 8l3 2 3-2L8 2z"/>
+          <path d="M5 8l-2 4h10l-2-4"/>
+          <path d="M8 10v4"/>
+        </svg>
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
