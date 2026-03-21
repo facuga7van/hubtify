@@ -147,8 +147,8 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcMain.handle('quests:getCategories', () => {
     const db = getDb();
-    return db.prepare('SELECT name FROM task_categories ORDER BY created_at ASC').all()
-      .map((r: { name: string }) => r.name);
+    return (db.prepare('SELECT name FROM task_categories ORDER BY created_at ASC').all() as { name: string }[])
+      .map((r) => r.name);
   });
 
   ipcMain.handle('quests:ensureCategory', (_e, name: string) => {

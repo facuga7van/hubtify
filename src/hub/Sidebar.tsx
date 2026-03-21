@@ -5,7 +5,10 @@ import './styles/layout.css';
 
 interface SidebarProps { stats: PlayerStats | null; }
 
-const navItems = [{ path: '/', label: 'Home', icon: '\u{1F3E0}' }];
+const navItems = [
+  { path: '/', label: 'Home', icon: '\u{1F3E0}' },
+  { path: '/quests', label: 'Quests', icon: '\u2694' },
+];
 
 export default function Sidebar({ stats }: SidebarProps) {
   return (
