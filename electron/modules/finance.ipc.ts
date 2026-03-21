@@ -123,6 +123,37 @@ export function registerFinanceIpcHandlers(): void {
     return result.total;
   });
 
+  ipcMain.handle('finance:getMonthlyBalance', (_e, month?: string) => {
+    const db = getDb();
+    const m = month ?? new Date().toLocaleDateString('en-CA').slice(0, 7);
+    const expenses = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ?"
+    ).get(`${m}%`) as { total: number };
+    const income = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'income' AND date LIKE ?"
+    ).get(`${m}%`) as { total: number };
+    return { expenses: expenses.total, income: income.total, balance: income.total - expenses.total };
+  });
+
+  ipcMain.handle('finance:getCategoryBreakdown', (_e, month?: string) => {
+    const db = getDb();
+    const m = month ?? new Date().toLocaleDateString('en-CA').slice(0, 7);
+    return db.prepare(
+      "SELECT category, SUM(amount) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ? GROUP BY category ORDER BY total DESC"
+    ).all(`${m}%`);
+  });
+
+  ipcMain.handle('finance:updateTransaction', (_e, id: string, fields: { amount?: number; description?: string; category?: string }) => {
+    const db = getDb();
+    const sets: string[] = ['updated_at = ?'];
+    const vals: unknown[] = [new Date().toISOString()];
+    if (fields.amount !== undefined) { sets.push('amount = ?'); vals.push(fields.amount); }
+    if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
+    if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
+    vals.push(id);
+    db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+  });
+
   ipcMain.handle('finance:getActiveLoansCount', () => {
     const db = getDb();
     const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };

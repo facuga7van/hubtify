@@ -104,6 +104,9 @@ const api = {
   financeGetCategories: () => ipcRenderer.invoke('finance:getCategories'),
   financeGetMonthlyTotal: () => ipcRenderer.invoke('finance:getMonthlyTotal'),
   financeGetActiveLoansCount: () => ipcRenderer.invoke('finance:getActiveLoansCount'),
+  financeGetMonthlyBalance: (month?: string) => ipcRenderer.invoke('finance:getMonthlyBalance', month),
+  financeGetCategoryBreakdown: (month?: string) => ipcRenderer.invoke('finance:getCategoryBreakdown', month),
+  financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => ipcRenderer.invoke('finance:updateTransaction', id, fields),
 };
 
 export type Api = typeof api;

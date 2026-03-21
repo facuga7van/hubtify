@@ -12,6 +12,10 @@ export default function FinanceDashboard() {
   const [categories, setCategories] = useState<string[]>(CATEGORIES);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
 
+  // Balance & category breakdown
+  const [balance, setBalance] = useState<{ expenses: number; income: number; balance: number } | null>(null);
+  const [catBreakdown, setCatBreakdown] = useState<Array<{ category: string; total: number }>>([]);
+
   // Dollar rates
   const [dollarRates, setDollarRates] = useState<Array<{ nombre: string; compra: number; venta: number }>>([]);
   const [dollarCached, setDollarCached] = useState(false);
@@ -29,6 +33,12 @@ export default function FinanceDashboard() {
   const [loanType, setLoanType] = useState<'lent' | 'borrowed'>('lent');
   const [loanDesc, setLoanDesc] = useState('');
 
+  // Edit transaction
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+
   const loadData = useCallback(async (m: string) => {
     const [txList, loanList, cats, total] = await Promise.all([
       window.api.financeGetTransactions(m),
@@ -44,6 +54,9 @@ export default function FinanceDashboard() {
     })) as unknown as Loan[]);
     setCategories(cats as string[]);
     setMonthlyTotal(total as number);
+
+    window.api.financeGetMonthlyBalance(m).then(setBalance).catch(console.error);
+    window.api.financeGetCategoryBreakdown(m).then((c) => setCatBreakdown(c as typeof catBreakdown)).catch(console.error);
   }, []);
 
   useEffect(() => { loadData(month); }, [month, loadData]);
@@ -74,6 +87,30 @@ export default function FinanceDashboard() {
     loadData(month);
   };
 
+  const startEditTransaction = (tx: Transaction) => {
+    setEditingTxId(tx.id);
+    setEditAmount(String(tx.amount));
+    setEditDesc(tx.description || '');
+    setEditCategory(tx.category || 'Otros');
+  };
+
+  const saveEditTransaction = async () => {
+    if (!editingTxId) return;
+    const amount = parseFloat(editAmount);
+    if (!amount || amount <= 0) return;
+    await window.api.financeUpdateTransaction(editingTxId, {
+      amount,
+      description: editDesc,
+      category: editCategory,
+    });
+    setEditingTxId(null);
+    loadData(month);
+  };
+
+  const cancelEdit = () => {
+    setEditingTxId(null);
+  };
+
   const addLoan = async () => {
     const amount = parseFloat(loanAmount);
     if (!amount || !loanPerson.trim()) return;
@@ -90,6 +127,18 @@ export default function FinanceDashboard() {
   const settleLoan = async (id: string) => {
     await window.api.financeSettleLoan(id);
     loadData(month);
+  };
+
+  const prevMonth = () => {
+    const d = new Date(month + '-01');
+    d.setMonth(d.getMonth() - 1);
+    setMonth(d.toLocaleDateString('en-CA').slice(0, 7));
+  };
+
+  const nextMonth = () => {
+    const d = new Date(month + '-01');
+    d.setMonth(d.getMonth() + 1);
+    setMonth(d.toLocaleDateString('en-CA').slice(0, 7));
   };
 
   const activeLoans = loans.filter((l) => !l.settled);
@@ -121,20 +170,61 @@ export default function FinanceDashboard() {
         </div>
       )}
 
-      {/* Monthly total */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">{t('coinify.monthlyExpenses')} — {month}</div>
-        <p style={{ fontSize: '2rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
-          ${monthlyTotal.toLocaleString()} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>ARS</span>
-        </p>
-        <div style={{ marginTop: 8 }}>
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="rpg-input"
-          />
+      {/* Balance card */}
+      {balance && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+          <div className="rpg-card rpg-stat-card">
+            <div className="rpg-stat-number" style={{ color: 'var(--rpg-xp-green)', fontSize: '1.2rem' }}>
+              ${balance.income.toLocaleString()}
+            </div>
+            <div className="rpg-stat-label">{t('coinify.income')}</div>
+          </div>
+          <div className="rpg-card rpg-stat-card">
+            <div className="rpg-stat-number" style={{ color: 'var(--rpg-hp-red)', fontSize: '1.2rem' }}>
+              ${balance.expenses.toLocaleString()}
+            </div>
+            <div className="rpg-stat-label">{t('coinify.expense')}</div>
+          </div>
+          <div className="rpg-card rpg-stat-card">
+            <div className="rpg-stat-number" style={{ color: balance.balance >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)', fontSize: '1.2rem' }}>
+              ${balance.balance.toLocaleString()}
+            </div>
+            <div className="rpg-stat-label">{t('coinify.balance')}</div>
+          </div>
         </div>
+      )}
+
+      {/* Category breakdown */}
+      {catBreakdown.length > 0 && (
+        <div className="rpg-card" style={{ marginBottom: 16 }}>
+          <div className="rpg-card-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+              <circle cx="8" cy="8" r="6"/><path d="M8 2v6l4 2"/>
+            </svg>
+            {t('coinify.byCategory')}
+          </div>
+          {catBreakdown.map((c) => {
+            const pct = balance ? Math.round((c.total / balance.expenses) * 100) : 0;
+            return (
+              <div key={c.category} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--rpg-parchment-dark)' }}>
+                <span style={{ flex: 1, fontSize: '0.9rem' }}>{c.category}</span>
+                <span style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.85rem' }}>${c.total.toLocaleString()}</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.5, minWidth: 35, textAlign: 'right' }}>{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Month selector with arrows */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <button className="rpg-button" onClick={prevMonth} style={{ padding: '4px 8px' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
+        </button>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="rpg-input" />
+        <button className="rpg-button" onClick={nextMonth} style={{ padding: '4px 8px' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 1l4 4-4 4"/></svg>
+        </button>
       </div>
 
       {/* Quick-add transaction */}
@@ -192,23 +282,81 @@ export default function FinanceDashboard() {
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
               }}>
-                <div>
-                  <span style={{ color: tx.type === 'expense' ? 'var(--rpg-hp-red-light)' : 'var(--rpg-xp-green-light)', fontWeight: 600 }}>
-                    {tx.type === 'expense' ? '-' : '+'}${tx.amount.toLocaleString()}
-                  </span>
-                  <span style={{ opacity: 0.6, marginLeft: 8, fontSize: '0.85rem' }}>
-                    {tx.description || tx.category}
-                  </span>
-                  <span style={{ opacity: 0.4, marginLeft: 8, fontSize: '0.75rem' }}>
-                    {tx.date}
-                  </span>
-                </div>
-                <button
-                  onClick={() => deleteTransaction(tx.id)}
-                  style={{ background: 'none', border: 'none', color: 'var(--rpg-hp-red-light)', cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                  x
-                </button>
+                {editingTxId === tx.id ? (
+                  /* Inline edit mode */
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+                    <input
+                      type="number"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      className="rpg-input"
+                      style={{ width: 90 }}
+                      min="0"
+                      step="0.01"
+                    />
+                    <input
+                      type="text"
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      className="rpg-input"
+                      style={{ flex: 1, minWidth: 100 }}
+                    />
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="rpg-input"
+                      style={{ width: 120 }}
+                    >
+                      {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <button
+                      className="rpg-button"
+                      style={{ fontSize: '0.75rem', padding: '2px 8px' }}
+                      onClick={saveEditTransaction}
+                    >
+                      {t('coinify.saveTransaction')}
+                    </button>
+                    <button
+                      className="rpg-button"
+                      style={{ fontSize: '0.75rem', padding: '2px 8px' }}
+                      onClick={cancelEdit}
+                    >
+                      {t('coinify.cancelEdit')}
+                    </button>
+                  </div>
+                ) : (
+                  /* Display mode */
+                  <>
+                    <div>
+                      <span style={{ color: tx.type === 'expense' ? 'var(--rpg-hp-red-light)' : 'var(--rpg-xp-green-light)', fontWeight: 600 }}>
+                        {tx.type === 'expense' ? '-' : '+'}${tx.amount.toLocaleString()}
+                      </span>
+                      <span style={{ opacity: 0.6, marginLeft: 8, fontSize: '0.85rem' }}>
+                        {tx.description || tx.category}
+                      </span>
+                      <span style={{ opacity: 0.4, marginLeft: 8, fontSize: '0.75rem' }}>
+                        {tx.date}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => startEditTransaction(tx)}
+                        style={{ background: 'none', border: 'none', color: 'var(--rpg-gold-dark)', cursor: 'pointer', padding: '2px' }}
+                        title={t('coinify.editTransaction')}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10 1.5l2.5 2.5L4.5 12H2v-2.5L10 1.5z"/>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => deleteTransaction(tx.id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--rpg-hp-red-light)', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        x
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
