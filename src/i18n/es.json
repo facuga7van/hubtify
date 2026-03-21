@@ -10,7 +10,8 @@
     "questify": "Questify",
     "nutrify": "Nutrify",
     "coinify": "Coinify",
-    "character": "Personaje"
+    "character": "Personaje",
+    "settings": "Ajustes"
   },
   "questify": {
     "title": "Questify",
@@ -194,5 +195,27 @@
     "offlineWarning": "Tus datos se guardaran solo en este dispositivo",
     "passwordMin": "La contrasena debe tener al menos 6 caracteres",
     "connectionError": "Error de conexion"
+  },
+  "settings": {
+    "title": "Configuracion",
+    "subtitle": "Ajustes de la aplicacion",
+    "language": "Idioma",
+    "sound": "Sonido",
+    "soundEffects": "Efectos de sonido",
+    "soundDesc": "Sonidos al completar quests, subir de nivel, etc.",
+    "cloudSync": "Sincronizacion en la nube",
+    "loggedIn": "Conectado",
+    "notLoggedIn": "No has iniciado sesion. Inicia sesion para sincronizar tus datos entre dispositivos.",
+    "uploadData": "Subir datos",
+    "downloadData": "Descargar datos",
+    "dangerZone": "Zona de peligro",
+    "resetOnboarding": "Repetir onboarding",
+    "resetOnboardingDesc": "Vuelve a ver la introduccion de la app",
+    "resetAll": "Borrar todo",
+    "resetAllDesc": "Elimina todos los datos locales. No se puede deshacer.",
+    "resetOnboardingConfirm": "Queres reiniciar el onboarding? La app se va a recargar.",
+    "resetAllConfirm": "Estas seguro? Se van a borrar TODOS los datos locales.",
+    "resetAllConfirm2": "ULTIMA ADVERTENCIA: esta accion es irreversible. Confirmar?",
+    "reset": "Resetear"
   }
 }

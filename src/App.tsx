@@ -5,6 +5,7 @@ import Onboarding from './hub/Onboarding';
 import Dashboard from './hub/Dashboard';
 import CharacterPage from './hub/CharacterPage';
 import AuthPage from './hub/AuthPage';
+import SettingsPage from './hub/SettingsPage';
 import ErrorBoundary from './shared/components/ErrorBoundary';
 import { questsModule } from './modules/quests';
 import TaskList from './modules/quests/components/TaskList';
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/nutrition" element={<Today />} />
           <Route path="/nutrition/dashboard" element={<NutritionCharts />} />
           <Route path="/finance" element={<FinanceDashboard />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Route>
       </Routes>

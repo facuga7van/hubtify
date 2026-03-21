@@ -10,7 +10,8 @@
     "questify": "Questify",
     "nutrify": "Nutrify",
     "coinify": "Coinify",
-    "character": "Character"
+    "character": "Character",
+    "settings": "Settings"
   },
   "questify": {
     "title": "Questify",
@@ -194,5 +195,27 @@
     "offlineWarning": "Your data will only be saved on this device",
     "passwordMin": "Password must be at least 6 characters",
     "connectionError": "Connection error"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Application preferences",
+    "language": "Language",
+    "sound": "Sound",
+    "soundEffects": "Sound Effects",
+    "soundDesc": "Sounds when completing quests, leveling up, etc.",
+    "cloudSync": "Cloud Sync",
+    "loggedIn": "Connected",
+    "notLoggedIn": "You are not logged in. Log in to sync your data across devices.",
+    "uploadData": "Upload Data",
+    "downloadData": "Download Data",
+    "dangerZone": "Danger Zone",
+    "resetOnboarding": "Redo Onboarding",
+    "resetOnboardingDesc": "See the app introduction again",
+    "resetAll": "Delete Everything",
+    "resetAllDesc": "Deletes all local data. Cannot be undone.",
+    "resetOnboardingConfirm": "Reset onboarding? The app will reload.",
+    "resetAllConfirm": "Are you sure? ALL local data will be deleted.",
+    "resetAllConfirm2": "FINAL WARNING: this action is irreversible. Confirm?",
+    "reset": "Reset"
   }
 }

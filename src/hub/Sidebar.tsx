@@ -25,6 +25,12 @@ function NavIcon({ name }: { name: string }) {
     case 'shield': return (
       <svg {...s} viewBox="0 0 18 18"><path d="M9 2L3 5v4c0 4 3 6 6 7 3-1 6-3 6-7V5L9 2z"/><path d="M7 9l2 2 3-4"/></svg>
     );
+    case 'settings': return (
+      <svg {...s} viewBox="0 0 18 18">
+        <circle cx="9" cy="9" r="2.5"/>
+        <path d="M9 1v2M9 15v2M1 9h2M15 9h2M3.5 3.5l1.4 1.4M13.1 13.1l1.4 1.4M3.5 14.5l1.4-1.4M13.1 4.9l1.4-1.4"/>
+      </svg>
+    );
     default: return null;
   }
 }
@@ -35,6 +41,7 @@ const navKeys = [
   { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
   { path: '/finance', key: 'nav.coinify', icon: 'coins' },
   { path: '/character', key: 'nav.character', icon: 'shield' },
+  { path: '/settings', key: 'nav.settings', icon: 'settings' },
 ];
 
 export default function Sidebar({ stats }: SidebarProps) {
