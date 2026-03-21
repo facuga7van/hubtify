@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   onAuth: () => void;
 }
 
 export default function AuthPage({ onAuth }: Props) {
+  const { t } = useTranslation();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,15 +44,15 @@ export default function AuthPage({ onAuth }: Props) {
       backgroundSize: '600px', backgroundRepeat: 'repeat',
     }}>
       <div className="rpg-card" style={{ width: 360, padding: 32 }}>
-        <h2 style={{ textAlign: 'center', marginBottom: 4, fontSize: '1.6rem' }}>Hubtify</h2>
+        <h2 style={{ textAlign: 'center', marginBottom: 4, fontSize: '1.6rem' }}>{t('app.title')}</h2>
         <p style={{ textAlign: 'center', opacity: 0.6, marginBottom: 24, fontSize: '0.9rem' }}>
-          {isLogin ? 'Welcome back, adventurer' : 'Begin your adventure'}
+          {isLogin ? t('auth.welcomeBack') : t('auth.beginAdventure')}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t('auth.email')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="rpg-input"
@@ -59,7 +61,7 @@ export default function AuthPage({ onAuth }: Props) {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder={t('auth.password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="rpg-input"
@@ -72,7 +74,7 @@ export default function AuthPage({ onAuth }: Props) {
 
           <button className="rpg-button" type="submit" disabled={loading}
             style={{ width: '100%', padding: '10px', fontSize: '0.9rem', marginTop: 4 }}>
-            {loading ? 'Loading...' : isLogin ? 'Enter the Realm' : 'Create Account'}
+            {loading ? t('common.loading') : isLogin ? t('auth.enterRealm') : t('auth.createAccount')}
           </button>
         </form>
 
@@ -84,7 +86,7 @@ export default function AuthPage({ onAuth }: Props) {
               cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline',
             }}
           >
-            {isLogin ? "Don't have an account? Register" : 'Already have an account? Login'}
+            {isLogin ? t('auth.noAccount') : t('auth.hasAccount')}
           </button>
         </div>
 
@@ -96,7 +98,7 @@ export default function AuthPage({ onAuth }: Props) {
               cursor: 'pointer', fontSize: '0.8rem', opacity: 0.5,
             }}
           >
-            Continue offline
+            {t('auth.continueOffline')}
           </button>
         </div>
       </div>

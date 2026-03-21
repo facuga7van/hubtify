@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -6,6 +7,7 @@ interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tde
 interface WeightEntry { date: string; weightKg: number; }
 
 export default function NutritionCharts() {
+  const { t } = useTranslation();
   const [summaries, setSummaries] = useState<DailySummary[]>([]);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [streak, setStreak] = useState(0);
@@ -35,7 +37,7 @@ export default function NutritionCharts() {
 
   return (
     <div>
-      <PageHeader title="Nutrify Dashboard" subtitle="Last 30 days overview" />
+      <PageHeader title={t('nutrify.dashboard')} subtitle={t('nutrify.dashboardSub')} />
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
@@ -43,7 +45,7 @@ export default function NutritionCharts() {
           <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
             {streak}
           </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Day Streak</div>
+          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('nutrify.dayStreak')}</div>
         </div>
         <div className="rpg-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
@@ -51,20 +53,20 @@ export default function NutritionCharts() {
               ? Math.round(summaries.reduce((s, d) => s + d.totalCaloriesIn, 0) / summaries.length)
               : 0}
           </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Avg Daily kcal</div>
+          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('nutrify.avgDailyKcal')}</div>
         </div>
         <div className="rpg-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
             {summaries.length}
           </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Days Logged</div>
+          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('nutrify.daysLogged')}</div>
         </div>
       </div>
 
       {/* Calories chart */}
       {chartData.length > 0 && (
         <div className="rpg-card" style={{ marginBottom: 16 }}>
-          <div className="rpg-card-title">Calories (Last 30 Days)</div>
+          <div className="rpg-card-title">{t('nutrify.calories30')}</div>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--rpg-parchment-dark)" />
@@ -82,7 +84,7 @@ export default function NutritionCharts() {
       {/* Weight chart */}
       {weights.length > 1 && (
         <div className="rpg-card">
-          <div className="rpg-card-title">Weight Trend</div>
+          <div className="rpg-card-title">{t('nutrify.weightTrend')}</div>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={weights.map((w) => ({ date: w.date.slice(5), weight: w.weightKg }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--rpg-parchment-dark)" />
@@ -98,7 +100,7 @@ export default function NutritionCharts() {
       {chartData.length === 0 && (
         <div className="rpg-card">
           <p style={{ opacity: 0.5, fontStyle: 'italic', textAlign: 'center', padding: 24 }}>
-            Start logging food to see charts here
+            {t('nutrify.startLogging')}
           </p>
         </div>
       )}

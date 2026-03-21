@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
 import type { PlayerStats } from '../../shared/types';
@@ -7,6 +8,7 @@ import './styles/layout.css';
 import './styles/components.css';
 
 export default function Layout() {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const prevLevelRef = useRef<number>(0);
@@ -50,13 +52,13 @@ export default function Layout() {
           }}>
             <div style={{ fontSize: '3rem', marginBottom: 8 }}>⚔</div>
             <div style={{ fontFamily: 'Cinzel, serif', fontSize: '2rem', fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
-              LEVEL UP!
+              {t('rpg.levelUp')}
             </div>
             <div style={{ fontFamily: 'Fira Code, monospace', fontSize: '1.5rem', marginTop: 8 }}>
-              Level {levelUp}
+              {t('rpg.level')} {levelUp}
             </div>
             <div style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 12 }}>
-              Click to dismiss
+              {t('rpg.clickDismiss')}
             </div>
           </div>
         </div>

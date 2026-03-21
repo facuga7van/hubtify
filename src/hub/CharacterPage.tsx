@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
@@ -7,6 +8,7 @@ import { xpThreshold } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 
 export default function CharacterPage() {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
 
@@ -17,18 +19,18 @@ export default function CharacterPage() {
 
   if (!stats) return <div style={{ padding: 24, opacity: 0.5 }}>Loading...</div>;
 
-  const hpState = stats.hp <= 25 ? 'Injured' : stats.hp <= 50 ? 'Tired' : stats.hp <= 75 ? 'Healthy' : 'Radiant';
+  const hpState = stats.hp <= 25 ? t('character.injured') : stats.hp <= 50 ? t('character.tired') : stats.hp <= 75 ? t('character.healthy') : t('character.radiant');
   const hpColor = stats.hp <= 25 ? 'var(--rpg-hp-red)' : stats.hp <= 50 ? '#e67e22' : stats.hp <= 75 ? 'var(--rpg-xp-green)' : 'var(--rpg-gold)';
 
   return (
     <div>
-      <PageHeader title="Character" subtitle="Your RPG stats and customization" />
+      <PageHeader title={t('character.title')} subtitle={t('character.subtitle')} />
 
       {/* Main character card */}
       <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
         <Character size={128} canCustomize />
         <h3 style={{ fontSize: '1.3rem', color: 'var(--rpg-gold)', marginBottom: 4 }}>
-          Level {stats.level}
+          {t('rpg.level')} {stats.level}
         </h3>
         <p style={{ fontSize: '1rem', opacity: 0.8, marginBottom: 16 }}>{stats.title}</p>
 
@@ -38,7 +40,7 @@ export default function CharacterPage() {
         </div>
 
         <p style={{ fontSize: '0.85rem', color: hpColor, marginTop: 8 }}>
-          Status: {hpState}
+          {t('character.status')}: {hpState}
         </p>
       </div>
 
@@ -46,15 +48,15 @@ export default function CharacterPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.xp}</div>
-          <div className="rpg-stat-label">Total XP</div>
+          <div className="rpg-stat-label">{t('character.totalXp')}</div>
         </div>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.streak}</div>
-          <div className="rpg-stat-label">Day Streak 🔥</div>
+          <div className="rpg-stat-label">{t('character.dayStreak')}</div>
         </div>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.dailyCombo}</div>
-          <div className="rpg-stat-label">Today's Combo</div>
+          <div className="rpg-stat-label">{t('character.todayCombo')}</div>
         </div>
       </div>
 
@@ -62,34 +64,34 @@ export default function CharacterPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.totalTasks}</div>
-          <div className="rpg-stat-label">Questify Completed</div>
+          <div className="rpg-stat-label">{t('character.questifyCompleted')}</div>
         </div>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.totalMeals}</div>
-          <div className="rpg-stat-label">Nutrify Logged</div>
+          <div className="rpg-stat-label">{t('character.nutrifylLogged')}</div>
         </div>
         <div className="rpg-card rpg-stat-card">
           <div className="rpg-stat-number">{stats.totalExpenses}</div>
-          <div className="rpg-stat-label">Coinify Tracked</div>
+          <div className="rpg-stat-label">{t('character.coinifyTracked')}</div>
         </div>
       </div>
 
       {/* Level progress */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">Level Progress</div>
+        <div className="rpg-card-title">{t('character.levelProgress')}</div>
         <p style={{ fontSize: '0.9rem' }}>
-          {stats.xpToNextLevel} XP to level {stats.level + 1}
-          {' '}({xpThreshold(stats.level + 1)} XP total needed)
+          {t('character.xpToLevel', { level: stats.level + 1 })} — {stats.xpToNextLevel}
+          {' '}{t('character.xpNeeded', { xp: xpThreshold(stats.level + 1) })}
         </p>
         <p style={{ fontSize: '0.85rem', opacity: 0.6, marginTop: 4 }}>
-          Next title: {getNextTitle(stats.level)}
+          {t('character.nextTitle')}: {getNextTitle(stats.level)}
         </p>
       </div>
 
       {/* Recent activity */}
       <div className="rpg-card">
-        <div className="rpg-card-title">Recent Activity</div>
-        {history.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No activity yet</p>}
+        <div className="rpg-card-title">{t('character.recentActivity')}</div>
+        {history.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('character.noActivity')}</p>}
         {history.map((event) => (
           <div key={event.id} style={{
             display: 'flex', justifyContent: 'space-between', padding: '4px 0',

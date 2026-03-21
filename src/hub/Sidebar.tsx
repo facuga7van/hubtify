@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
 import './styles/layout.css';
@@ -28,15 +29,16 @@ function NavIcon({ name }: { name: string }) {
   }
 }
 
-const navItems = [
-  { path: '/', label: 'Home', icon: 'home' },
-  { path: '/quests', label: 'Questify', icon: 'sword' },
-  { path: '/nutrition', label: 'Nutrify', icon: 'goblet' },
-  { path: '/finance', label: 'Coinify', icon: 'coins' },
-  { path: '/character', label: 'Character', icon: 'shield' },
+const navKeys = [
+  { path: '/', key: 'nav.home', icon: 'home' },
+  { path: '/quests', key: 'nav.questify', icon: 'sword' },
+  { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
+  { path: '/finance', key: 'nav.coinify', icon: 'coins' },
+  { path: '/character', key: 'nav.character', icon: 'shield' },
 ];
 
 export default function Sidebar({ stats }: SidebarProps) {
+  const { t, i18n } = useTranslation();
   const [authUser, setAuthUser] = useState<{ uid: string; email: string | null } | null>(null);
 
   useEffect(() => {
@@ -55,14 +57,14 @@ export default function Sidebar({ stats }: SidebarProps) {
           alt="" style={{ width: '100%', height: 'auto' }} />
       </div>
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
+        {navKeys.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
           >
             <NavIcon name={item.icon} />
-            <span>{item.label}</span>
+            <span>{t(item.key)}</span>
           </NavLink>
         ))}
       </nav>
@@ -77,7 +79,7 @@ export default function Sidebar({ stats }: SidebarProps) {
               <svg width="14" height="14" viewBox="0 0 14 14" fill="#e67e22" style={{ verticalAlign: '-2px', marginRight: 4 }}>
                 <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
               </svg>
-              {stats.streak} day streak
+              {stats.streak} {t('rpg.streak')}
             </span>
           </div>
         )}
@@ -94,24 +96,33 @@ export default function Sidebar({ stats }: SidebarProps) {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <path d="M1 6a5 5 0 019-2M11 6a5 5 0 01-9 2"/><path d="M10 1v3h-3M2 11V8h3"/>
                 </svg>
-                {' '}Sync
+                {' '}{t('auth.sync')}
               </button>
               <button className="rpg-button" onClick={async () => {
                 await window.api.authLogout();
               }} style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
-                Logout
+                {t('auth.logout')}
               </button>
             </div>
           </div>
         ) : (
           <div style={{ marginBottom: 6 }}>
             <NavLink to="/login" style={{ fontSize: '0.8rem', color: 'var(--rpg-gold-dark)', textDecoration: 'underline' }}>
-              Login for cloud sync
+              {t('auth.loginForSync')}
             </NavLink>
           </div>
         )}
-        <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>
-          Hubtify v0.1.0
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>
+            {t('app.version')}
+          </div>
+          <button onClick={() => {
+            const newLang = i18n.language === 'es' ? 'en' : 'es';
+            i18n.changeLanguage(newLang);
+            localStorage.setItem('hubtify_lang', newLang);
+          }} style={{ background: 'none', border: 'none', color: 'var(--rpg-gold)', cursor: 'pointer', fontSize: '0.75rem' }}>
+            {i18n.language === 'es' ? 'EN' : 'ES'}
+          </button>
         </div>
       </div>
     </aside>

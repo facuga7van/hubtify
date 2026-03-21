@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -10,6 +11,7 @@ import { type Task, type TaskTier, type Subtask, XP_MAP } from '../types';
 import { TierBadge, calculateXpForAction } from '../utils';
 
 export default function TaskList() {
+  const { t } = useTranslation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasksMap, setSubtasksMap] = useState<Record<string, Subtask[]>>({});
   const [categories, setCategories] = useState<string[]>([]);
@@ -117,7 +119,7 @@ export default function TaskList() {
 
   return (
     <div>
-      <PageHeader title="Questify" subtitle="Manage your daily adventures" />
+      <PageHeader title={t('questify.title')} subtitle={t('questify.subtitle')} />
       <TaskForm editingTask={editingTask} categories={categories} onSaved={() => { setEditingTask(null); loadTasks(); }} />
 
       {/* Tabs */}
@@ -125,19 +127,19 @@ export default function TaskList() {
         <button className="rpg-button"
           onClick={() => setActiveTab('pending')}
           style={{ opacity: activeTab === 'pending' ? 1 : 0.6 }}>
-          Pending ({pending.length})
+          {t('questify.pending')} ({pending.length})
         </button>
         <button className="rpg-button"
           onClick={() => setActiveTab('completed')}
           style={{ opacity: activeTab === 'completed' ? 1 : 0.6 }}>
-          Completed ({completed.length})
+          {t('questify.completed')} ({completed.length})
         </button>
 
         {uniqueCategories.length > 0 && (
           <select value={filter} onChange={(e) => setFilter(e.target.value)}
             style={{ marginLeft: 'auto', padding: '4px 8px', border: '1px solid var(--rpg-wood)',
               borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)', fontSize: '0.85rem' }}>
-            <option value="">All categories</option>
+            <option value="">{t('questify.allCategories')}</option>
             {uniqueCategories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
@@ -148,7 +150,7 @@ export default function TaskList() {
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
               <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
             </svg>
-            Delete ({selectedIds.size})
+            {t('questify.delete')} ({selectedIds.size})
           </button>
         )}
       </div>
@@ -198,7 +200,7 @@ export default function TaskList() {
 
       {activeTab === 'pending' && pending.length === 0 && (
         <p style={{ textAlign: 'center', opacity: 0.5, padding: 24, fontStyle: 'italic' }}>
-          No quests yet. Add one above!
+          {t('questify.noQuests')}
         </p>
       )}
 

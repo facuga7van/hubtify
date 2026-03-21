@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
@@ -17,6 +18,7 @@ interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 export default function Today() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [date, setDate] = useState(() => getLocalDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
@@ -111,15 +113,15 @@ export default function Today() {
   return (
     <div>
       <PageHeader
-        title="Nutrify"
-        subtitle="Track your daily intake"
+        title={t('nutrify.title')}
+        subtitle={t('nutrify.subtitle')}
         actions={
           <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
             style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <rect x="1" y="7" width="3" height="6"/><rect x="5.5" y="4" width="3" height="9"/><rect x="10" y="1" width="3" height="12"/>
             </svg>
-            {' '}Charts
+            {' '}{t('nutrify.charts')}
           </button>
         }
       />
@@ -143,14 +145,14 @@ export default function Today() {
 
       {/* Food log */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">Food Log</div>
-        {foods.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No food logged yet</p>}
+        <div className="rpg-card-title">{t('nutrify.foodLog')}</div>
+        {foods.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('nutrify.noFood')}</p>}
         {foods.map((f) => <FoodLogItem key={f.id} entry={f} onDelete={handleDelete} />)}
       </div>
 
       {/* Manual entry */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">Log Food</div>
+        <div className="rpg-card-title">{t('nutrify.logFood')}</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input type="text" placeholder="Description" value={manualDesc}
             onChange={(e) => setManualDesc(e.target.value)} className="rpg-input" style={{ flex: 1 }} />
@@ -164,7 +166,7 @@ export default function Today() {
       {/* Frequent foods */}
       {frequentFoods.length > 0 && (
         <div className="rpg-card" style={{ marginBottom: 16 }}>
-          <div className="rpg-card-title">Frequent Foods</div>
+          <div className="rpg-card-title">{t('nutrify.frequentFoods')}</div>
           <input type="text" placeholder="Search..." value={frequentSearch}
             onChange={(e) => setFrequentSearch(e.target.value)} className="rpg-input" style={{ width: '100%', marginBottom: 8 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -180,10 +182,10 @@ export default function Today() {
 
       {/* Daily metrics */}
       <div className="rpg-card">
-        <div className="rpg-card-title">Daily Metrics</div>
+        <div className="rpg-card-title">{t('nutrify.dailyMetrics')}</div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            Steps:
+            {t('nutrify.steps')}:
             <input type="number" value={metrics.steps ?? ''} placeholder="0"
               onChange={(e) => handleMetrics('steps', e.target.value ? parseInt(e.target.value) : null)}
               className="rpg-input" style={{ width: 80 }} />
@@ -191,7 +193,7 @@ export default function Today() {
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input type="checkbox" checked={metrics.gym}
               onChange={(e) => handleMetrics('gym', e.target.checked)} />
-            Gym
+            {t('nutrify.gym')}
           </label>
         </div>
       </div>

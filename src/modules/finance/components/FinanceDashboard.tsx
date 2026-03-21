@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import type { Transaction, Loan } from '../types';
 import { CATEGORIES } from '../types';
 
 export default function FinanceDashboard() {
+  const { t } = useTranslation();
   const [month, setMonth] = useState(() => new Date().toLocaleDateString('en-CA').slice(0, 7));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -82,7 +84,7 @@ export default function FinanceDashboard() {
 
   return (
     <div>
-      <PageHeader title="Coinify" subtitle="Track expenses and manage loans" />
+      <PageHeader title={t('coinify.title')} subtitle={t('coinify.subtitle')} />
 
       {/* Monthly total */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
