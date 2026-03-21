@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
 
+// Note: Tailwind CSS is handled via PostCSS (postcss.config.mjs)
+// @tailwindcss/vite is ESM-only and incompatible with Electron Forge's require()-based config loading
 export default defineConfig({
-  plugins: [tailwindcss()],
   esbuild: {
     jsx: 'automatic',
     jsxImportSource: 'react',
