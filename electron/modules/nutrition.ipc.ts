@@ -1,7 +1,41 @@
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 import { getDb } from '../ipc/db';
+import { estimate } from './nutrition/estimator';
+import { searchFoodDatabase } from './nutrition/food-db';
+import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
+import { FOOD_SEED_DATA } from './nutrition/food-db-seed';
+
+/** Seed the food_database table if it's empty */
+export function seedFoodDatabaseIfEmpty(): void {
+  const db = getDb();
+  // Ensure table exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS food_database (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      keywords TEXT NOT NULL,
+      calories REAL NOT NULL,
+      serving_size TEXT NOT NULL,
+      category TEXT NOT NULL
+    )
+  `);
+  const count = (db.prepare('SELECT COUNT(*) AS cnt FROM food_database').get() as { cnt: number }).cnt;
+  if (count === 0) {
+    console.log('[Nutrition] Seeding food database with', FOOD_SEED_DATA.length, 'entries...');
+    const insert = db.prepare('INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)');
+    const insertMany = db.transaction(() => {
+      for (const entry of FOOD_SEED_DATA) {
+        insert.run(entry.name, entry.keywords, entry.calories, entry.serving_size, entry.category);
+      }
+    });
+    insertMany();
+    console.log('[Nutrition] Food database seeded successfully.');
+  }
+}
 
 export function registerNutritionIpcHandlers(): void {
+  // Seed food database on startup
+  seedFoodDatabaseIfEmpty();
   // ── Profile ────────────────────────────────────────
 
   ipcMain.handle('nutrition:getProfile', () => {
@@ -189,6 +223,35 @@ export function registerNutritionIpcHandlers(): void {
     const today = new Date().toLocaleDateString('en-CA');
     const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
     return row.total;
+  });
+
+  // ── AI Estimation ────────────────────────────────────
+
+  ipcMain.handle('nutrition:estimate', async (event, description: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return estimate(description, (stage: string) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('nutrition:estimate-progress', stage);
+      }
+    });
+  });
+
+  ipcMain.handle('nutrition:getAiStatus', () => {
+    return getOllamaStatus();
+  });
+
+  ipcMain.handle('nutrition:isOllamaAvailable', () => {
+    return isOllamaAvailable();
+  });
+
+  ipcMain.handle('nutrition:searchFoodDb', (_e, query: string) => {
+    return searchFoodDatabase(query);
+  });
+
+  ipcMain.handle('nutrition:learnFood', (_e, entry: { name: string; keywords: string; calories: number; serving_size: string; category: string }) => {
+    const db = getDb();
+    db.prepare('INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)')
+      .run(entry.name, entry.keywords, entry.calories, entry.serving_size, entry.category);
   });
 
   ipcMain.handle('nutrition:getTodayTarget', () => {

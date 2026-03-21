@@ -94,6 +94,12 @@ export interface HubtifyApi {
   nutritionGetStreak: () => Promise<number>;
   nutritionGetTodayCalories: () => Promise<number>;
   nutritionGetTodayTarget: () => Promise<number | null>;
+  nutritionEstimate: (description: string) => Promise<EstimationResult>;
+  nutritionGetAiStatus: () => Promise<OllamaStatus>;
+  nutritionIsOllamaAvailable: () => Promise<boolean>;
+  nutritionSearchFoodDb: (query: string) => Promise<{ matched: Array<{ name: string; calories: number; source: 'database' }>; unmatched: string[] }>;
+  nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
+  onEstimateProgress: (callback: (stage: string) => void) => () => void;
 
   // Finance
   financeGetTransactions: (month: string) => Promise<unknown[]>;
@@ -109,6 +115,35 @@ export interface HubtifyApi {
   financeGetMonthlyTotal: () => Promise<number>;
   financeGetActiveLoansCount: () => Promise<number>;
 }
+
+// ── Nutrition AI Types ──────────────────────────────────────
+
+export interface FoodDbEntry {
+  id: number;
+  name: string;
+  keywords: string;
+  calories: number;
+  serving_size: string;
+  category: string;
+}
+
+export interface EstimationMatch {
+  name: string;
+  calories: number;
+  source: 'database' | 'ai';
+}
+
+export interface EstimationResult {
+  totalCalories: number;
+  matches: EstimationMatch[];
+  breakdown: string;
+  hasAiFallback: boolean;
+  ollamaMissing: boolean;
+  unmatchedTokens: string[];
+  aiError?: string;
+}
+
+export type OllamaStatus = 'stopped' | 'starting' | 'running' | 'error';
 
 // ── RPG Constants ──────────────────────────────────────────
 

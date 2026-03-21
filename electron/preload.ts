@@ -49,6 +49,16 @@ const api = {
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
+  nutritionEstimate: (description: string) => ipcRenderer.invoke('nutrition:estimate', description),
+  nutritionGetAiStatus: () => ipcRenderer.invoke('nutrition:getAiStatus'),
+  nutritionIsOllamaAvailable: () => ipcRenderer.invoke('nutrition:isOllamaAvailable'),
+  nutritionSearchFoodDb: (query: string) => ipcRenderer.invoke('nutrition:searchFoodDb', query),
+  nutritionLearnFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:learnFood', entry),
+  onEstimateProgress: (callback: (stage: string) => void) => {
+    const handler = (_e: unknown, stage: string) => callback(stage);
+    ipcRenderer.on('nutrition:estimate-progress', handler);
+    return () => ipcRenderer.removeListener('nutrition:estimate-progress', handler);
+  },
 
   // Finance
   financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
