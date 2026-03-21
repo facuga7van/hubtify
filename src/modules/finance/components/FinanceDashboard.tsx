@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import PageHeader from '../../../shared/components/PageHeader';
 import type { Transaction, Loan } from '../types';
 import { CATEGORIES } from '../types';
 
@@ -81,7 +82,7 @@ export default function FinanceDashboard() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 16 }}>Finance</h2>
+      <PageHeader title="Finance" subtitle="Track expenses and manage loans" />
 
       {/* Monthly total */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>

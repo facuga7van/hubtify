@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import PageHeader from '../shared/components/PageHeader';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
 import Character from './Character';
@@ -21,7 +22,7 @@ export default function CharacterPage() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 16 }}>Character</h2>
+      <PageHeader title="Character" subtitle="Your RPG stats and customization" />
 
       {/* Main character card */}
       <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>

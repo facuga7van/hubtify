@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import PageHeader from '../../../shared/components/PageHeader';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; }
@@ -34,7 +35,7 @@ export default function NutritionCharts() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 16 }}>Nutrition Dashboard</h2>
+      <PageHeader title="Nutrition Dashboard" subtitle="Last 30 days overview" />
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>

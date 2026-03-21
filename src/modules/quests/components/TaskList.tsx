@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import PageHeader from '../../../shared/components/PageHeader';
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
@@ -116,6 +117,7 @@ export default function TaskList() {
 
   return (
     <div>
+      <PageHeader title="Quests" subtitle="Manage your daily adventures" />
       <TaskForm editingTask={editingTask} categories={categories} onSaved={() => { setEditingTask(null); loadTasks(); }} />
 
       {/* Tabs */}

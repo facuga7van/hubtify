@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
@@ -109,27 +110,32 @@ export default function Today() {
 
   return (
     <div>
-      {/* Header with charts link */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}>
-            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 1L1 6l5 5M1 6h14"/>
+      <PageHeader
+        title="Nutrition"
+        subtitle="Track your daily intake"
+        actions={
+          <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
+            style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <rect x="1" y="7" width="3" height="6"/><rect x="5.5" y="4" width="3" height="9"/><rect x="10" y="1" width="3" height="12"/>
             </svg>
+            {' '}Charts
           </button>
-          <h3 style={{ textAlign: 'center' }}>{date}</h3>
-          <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}>
-            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 1l5 5-5 5M15 6H1"/>
-            </svg>
-          </button>
-        </div>
-        <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
-          style={{ fontSize: '0.85rem' }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ verticalAlign: '-2px', marginRight: 4 }}>
-            <path d="M2 12V7M6 12V4M10 12V2M14 12V6"/>
+        }
+      />
+
+      {/* Date navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 1L1 6l5 5M1 6h14"/>
           </svg>
-          Charts
+        </button>
+        <h3 style={{ textAlign: 'center' }}>{date}</h3>
+        <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 1l5 5-5 5M15 6H1"/>
+          </svg>
         </button>
       </div>
 
