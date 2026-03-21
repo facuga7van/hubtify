@@ -107,7 +107,10 @@ export default function Sidebar({ stats }: SidebarProps) {
           </div>
         ) : (
           <div style={{ marginBottom: 6 }}>
-            <NavLink to="/login" style={{ fontSize: '0.8rem', color: 'var(--rpg-gold-dark)', textDecoration: 'underline' }}>
+            <NavLink to="/login" className="rpg-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.75rem', padding: '6px 10px', width: '100%', textDecoration: 'none' }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M7 1h4v10H7M1 6h7M6 3l3 3-3 3"/>
+              </svg>
               {t('auth.loginForSync')}
             </NavLink>
           </div>
