@@ -1,0 +1,97 @@
+/* ── XP Toast ─────────────────────────────────────── */
+.xp-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background: var(--rpg-wood);
+  color: var(--rpg-gold-light);
+  border: 2px solid var(--rpg-gold);
+  border-radius: var(--rpg-radius);
+  box-shadow: 0 4px 20px rgba(44, 24, 16, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1000;
+  animation: xp-toast-in 0.3s ease-out;
+  font-family: 'Cinzel', serif;
+}
+
+@keyframes xp-toast-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.xp-toast__xp { font-size: 1.2rem; font-weight: bold; }
+.xp-toast__combo { font-size: 0.85rem; opacity: 0.8; }
+.xp-toast__bonus { font-size: 0.9rem; color: var(--rpg-gold); }
+.xp-toast__streak { font-size: 0.85rem; color: var(--rpg-xp-green-light); }
+
+.xp-toast--good { border-color: #3498db; }
+.xp-toast--critical { border-color: #9b59b6; }
+.xp-toast--legendary { border-color: #e74c3c; background: #2c1810; }
+
+/* ── Subtask styles ───────────────────────────────── */
+.subtask-list { margin-top: 8px; }
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.subtask-item:hover { background: rgba(92, 58, 30, 0.05); }
+
+.subtask-item--completed { opacity: 0.5; }
+
+.subtask-toggle-completed {
+  background: none;
+  border: none;
+  color: var(--rpg-wood-light);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+.subtask-toggle-completed:hover { text-decoration: underline; }
+
+.subtask-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin-top: 6px;
+  border: 1px dashed var(--rpg-wood);
+  border-radius: var(--rpg-radius);
+  background: rgba(244, 228, 193, 0.5);
+}
+
+.subtask-input {
+  padding: 4px 8px;
+  border: 1px solid var(--rpg-wood);
+  border-radius: 3px;
+  background: var(--rpg-parchment);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.subtask-tier-buttons { display: flex; gap: 4px; }
+
+.subtask-tier-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--rpg-wood);
+  border-radius: 3px;
+  background: var(--rpg-parchment);
+  cursor: pointer;
+}
+
+.subtask-tier-btn.tierActive {
+  background: var(--rpg-gold);
+  font-weight: bold;
+}
+
+.subtask-form-actions { display: flex; gap: 6px; }

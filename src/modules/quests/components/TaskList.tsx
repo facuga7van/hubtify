@@ -1,0 +1,248 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import TaskForm from './TaskForm';
+import SubtaskList from './SubtaskList';
+import XpToast, { type XpToastData } from './XpToast';
+import { type Task, type TaskTier, type Subtask, XP_MAP, rollBonus } from '../types';
+
+const COMBO_MULTS = [1.0, 1.25, 1.5, 1.75, 2.0];
+
+function getComboMultiplier(count: number): number {
+  return COMBO_MULTS[Math.min(count, COMBO_MULTS.length - 1)];
+}
+
+export default function TaskList() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [subtasksMap, setSubtasksMap] = useState<Record<string, Subtask[]>>({});
+  const [categories, setCategories] = useState<string[]>([]);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const [filter, setFilter] = useState('');
+  const [toastData, setToastData] = useState<XpToastData | null>(null);
+  const [todayCount, setTodayCount] = useState(0);
+
+  const loadTasks = useCallback(async () => {
+    const [allTasks, cats, count] = await Promise.all([
+      window.api.questsGetTasks(),
+      window.api.questsGetCategories(),
+      window.api.questsCountCompletedToday(),
+    ]);
+    setTasks(allTasks as Task[]);
+    setCategories(cats);
+    setTodayCount(count);
+  }, []);
+
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  const loadSubtasks = useCallback(async (taskId: string) => {
+    const subs = await window.api.questsGetSubtasks(taskId);
+    setSubtasksMap((prev) => ({ ...prev, [taskId]: subs as Subtask[] }));
+  }, []);
+
+  const toggleExpand = (taskId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else { next.add(taskId); loadSubtasks(taskId); }
+      return next;
+    });
+  };
+
+  const pending = useMemo(() =>
+    tasks.filter((t) => !t.status).sort((a, b) => a.order - b.order)
+      .filter((t) => !filter || t.category === filter),
+    [tasks, filter]
+  );
+  const completed = useMemo(() => tasks.filter((t) => t.status), [tasks]);
+
+  const handleComplete = async (task: Task) => {
+    const newStatus = !task.status;
+    if (newStatus) {
+      const bonus = rollBonus();
+      const comboMult = getComboMultiplier(todayCount);
+      const xp = Math.round(XP_MAP[task.tier] * comboMult * bonus.multiplier);
+
+      await window.api.questsSetTaskStatus(task.id, true);
+      await window.api.processRpgEvent({
+        type: 'TASK_COMPLETED', moduleId: 'quests',
+        payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
+        timestamp: Date.now(),
+      });
+      setToastData({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult });
+    } else {
+      await window.api.questsSetTaskStatus(task.id, false);
+      await window.api.processRpgEvent({
+        type: 'TASK_UNCOMPLETED', moduleId: 'quests',
+        payload: { xp: -XP_MAP[task.tier], hp: 0, taskId: task.id },
+        timestamp: Date.now(),
+      });
+    }
+    await loadTasks();
+  };
+
+  const handleDelete = async () => {
+    if (selectedIds.size === 0) return;
+    await window.api.questsDeleteTasks(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    await loadTasks();
+  };
+
+  const onDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = pending.findIndex((t) => t.id === active.id);
+    const newIdx = pending.findIndex((t) => t.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const reordered = arrayMove(pending, oldIdx, newIdx);
+    const orders = reordered.map((t, i) => ({ id: t.id, order: i }));
+    setTasks((prev) => {
+      const updated = [...prev];
+      for (const { id, order } of orders) {
+        const idx = updated.findIndex((t) => t.id === id);
+        if (idx !== -1) updated[idx] = { ...updated[idx], order };
+      }
+      return updated;
+    });
+    await window.api.questsSyncTaskOrders(orders);
+  };
+
+  const tierEmoji = (t: number) => t === 1 ? '\u26A1' : t === 3 ? '\uD83D\uDC09' : '\u2694\uFE0F';
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set(tasks.map((t) => t.category).filter(Boolean));
+    return Array.from(cats);
+  }, [tasks]);
+
+  return (
+    <div>
+      <TaskForm editingTask={editingTask} categories={categories} onSaved={() => { setEditingTask(null); loadTasks(); }} />
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button className="rpg-button"
+          onClick={() => setActiveTab('pending')}
+          style={{ opacity: activeTab === 'pending' ? 1 : 0.6 }}>
+          Pending ({pending.length})
+        </button>
+        <button className="rpg-button"
+          onClick={() => setActiveTab('completed')}
+          style={{ opacity: activeTab === 'completed' ? 1 : 0.6 }}>
+          Completed ({completed.length})
+        </button>
+
+        {uniqueCategories.length > 0 && (
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}
+            style={{ marginLeft: 'auto', padding: '4px 8px', border: '1px solid var(--rpg-wood)',
+              borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)', fontSize: '0.85rem' }}>
+            <option value="">All categories</option>
+            {uniqueCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+
+        {selectedIds.size > 0 && (
+          <button className="rpg-button" onClick={handleDelete}
+            style={{ background: 'var(--rpg-hp-red)', marginLeft: 8 }}>
+            Delete ({selectedIds.size})
+          </button>
+        )}
+      </div>
+
+      {/* Task lists */}
+      {activeTab === 'pending' && (
+        <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={pending.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            {pending.map((task) => (
+              <SortableTaskItem
+                key={task.id}
+                task={task}
+                expanded={expandedIds.has(task.id)}
+                selected={selectedIds.has(task.id)}
+                subtasks={subtasksMap[task.id] ?? []}
+                todayCount={todayCount}
+                tierEmoji={tierEmoji}
+                onToggleExpand={() => toggleExpand(task.id)}
+                onComplete={() => handleComplete(task)}
+                onEdit={() => setEditingTask(task)}
+                onToggleSelect={() => setSelectedIds((prev) => {
+                  const next = new Set(prev);
+                  next.has(task.id) ? next.delete(task.id) : next.add(task.id);
+                  return next;
+                })}
+                onShowToast={setToastData}
+                onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); }}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {activeTab === 'completed' && completed.map((task) => (
+        <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked onChange={() => handleComplete(task)} />
+            <span style={{ textDecoration: 'line-through', flex: 1 }}>{task.name}</span>
+            <span>{tierEmoji(task.tier)}</span>
+          </div>
+        </div>
+      ))}
+
+      {activeTab === 'pending' && pending.length === 0 && (
+        <p style={{ textAlign: 'center', opacity: 0.5, padding: 24, fontStyle: 'italic' }}>
+          No quests yet. Add one above!
+        </p>
+      )}
+
+      <XpToast data={toastData} />
+    </div>
+  );
+}
+
+function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, tierEmoji,
+  onToggleExpand, onComplete, onEdit, onToggleSelect, onShowToast, onSubtaskChanged }: {
+  task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
+  todayCount: number; tierEmoji: (t: number) => string;
+  onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
+  onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
+  onSubtaskChanged: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={{ ...style, marginBottom: 8 }} {...attributes} className="rpg-card">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: expanded ? 8 : 0 }}>
+        <span {...listeners} style={{ cursor: 'grab', fontSize: '1rem' }}>&#x2630;</span>
+        <input type="checkbox" onChange={onComplete} />
+        <span onClick={onToggleExpand} style={{ flex: 1, cursor: 'pointer', fontWeight: 'bold' }}>
+          {task.name}
+        </span>
+        <span>{tierEmoji(task.tier)}</span>
+        <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>+{XP_MAP[task.tier]}</span>
+        {task.category && (
+          <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)',
+            padding: '1px 6px', borderRadius: 3 }}>{task.category}</span>
+        )}
+        <button onClick={onEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>&#x270F;&#xFE0F;</button>
+        <input type="checkbox" checked={selected} onChange={onToggleSelect} title="Select for deletion" />
+      </div>
+
+      {expanded && (
+        <div style={{ paddingLeft: 32 }}>
+          {task.description && <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 8 }}>{task.description}</p>}
+          {task.dueDate && <p style={{ fontSize: '0.8rem', opacity: 0.5 }}>Due: {new Date(task.dueDate).toLocaleString()}</p>}
+          <SubtaskList
+            taskId={task.id}
+            subtasks={subtasks}
+            countCompletedToday={todayCount}
+            onShowToast={onShowToast}
+            onSubtaskChanged={onSubtaskChanged}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
