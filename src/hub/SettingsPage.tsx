@@ -5,6 +5,7 @@ import PageHeader from '../shared/components/PageHeader';
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('hubtify_sound') !== 'false');
+  const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
   const [authUser, setAuthUser] = useState<{ uid: string; email: string | null } | null>(null);
   const [syncStatus, setSyncStatus] = useState('');
 
@@ -101,6 +102,30 @@ export default function SettingsPage() {
           <button className="rpg-button" onClick={toggleSound}
             style={{ minWidth: 60 }}>
             {soundEnabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="rpg-card" style={sectionStyle}>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <path d="M8 1a4 4 0 00-4 4v3l-1 2h10l-1-2V5a4 4 0 00-4-4zM6 12a2 2 0 004 0"/>
+          </svg>
+          {t('settings.notifications')}
+        </div>
+        <div style={rowStyle}>
+          <div>
+            <div style={labelStyle}>{t('settings.reminders')}</div>
+            <div style={descStyle}>{t('settings.remindersDesc')}</div>
+          </div>
+          <button className="rpg-button" onClick={() => {
+            const next = !remindersEnabled;
+            setRemindersEnabled(next);
+            localStorage.setItem('hubtify_reminders', next ? 'true' : 'false');
+            window.api.notificationsSetReminders(next);
+          }} style={{ minWidth: 60 }}>
+            {remindersEnabled ? 'ON' : 'OFF'}
           </button>
         </div>
       </div>

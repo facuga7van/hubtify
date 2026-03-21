@@ -53,4 +53,15 @@ export const financeMigrations: Migration[] = [
         ('Transporte'), ('Compras'), ('Supermercado'), ('Salud'), ('Educacion'), ('Otros');
     `,
   },
+  {
+    namespace: 'finance',
+    version: 2,
+    up: `
+      CREATE TABLE IF NOT EXISTS dollar_cache (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `,
+  },
 ];

@@ -12,6 +12,10 @@ export default function FinanceDashboard() {
   const [categories, setCategories] = useState<string[]>(CATEGORIES);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
 
+  // Dollar rates
+  const [dollarRates, setDollarRates] = useState<Array<{ nombre: string; compra: number; venta: number }>>([]);
+  const [dollarCached, setDollarCached] = useState(false);
+
   // Add transaction form
   const [txAmount, setTxAmount] = useState('');
   const [txDesc, setTxDesc] = useState('');
@@ -43,6 +47,15 @@ export default function FinanceDashboard() {
   }, []);
 
   useEffect(() => { loadData(month); }, [month, loadData]);
+
+  useEffect(() => {
+    window.api.dollarGetRates().then((result) => {
+      if (result.success && result.rates) {
+        setDollarRates(result.rates as typeof dollarRates);
+        setDollarCached(!!result.cached);
+      }
+    }).catch(console.error);
+  }, []);
 
   const addTransaction = async () => {
     const amount = parseFloat(txAmount);
@@ -85,6 +98,28 @@ export default function FinanceDashboard() {
   return (
     <div>
       <PageHeader title={t('coinify.title')} subtitle={t('coinify.subtitle')} />
+
+      {/* Dollar rates */}
+      {dollarRates.length > 0 && (
+        <div className="rpg-card" style={{ marginBottom: 16 }}>
+          <div className="rpg-card-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+              <circle cx="8" cy="8" r="6"/><path d="M8 4v8M6 5.5h3.5a1.5 1.5 0 010 3H5.5a1.5 1.5 0 000 3H11"/>
+            </svg>
+            {t('coinify.dollarRates')} {dollarCached && <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>(cache)</span>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+            {dollarRates.filter(r => ['Blue', 'Oficial', 'Tarjeta', 'Cripto'].includes(r.nombre)).map((rate) => (
+              <div key={rate.nombre} style={{ padding: 8, background: 'var(--rpg-parchment-dark)', borderRadius: 'var(--rpg-radius)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>{rate.nombre}</div>
+                <div style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.9rem' }}>
+                  ${rate.venta}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Monthly total */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>

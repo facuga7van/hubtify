@@ -75,7 +75,11 @@
     "light": "Light",
     "moderate": "Moderate",
     "active": "Active",
-    "startTracking": "Start Tracking"
+    "startTracking": "Start Tracking",
+    "aiEstimate": "AI Estimation",
+    "aiPlaceholder": "Describe what you ate...",
+    "estimate": "Estimate",
+    "confirmLog": "Confirm & Log"
   },
   "coinify": {
     "title": "Coinify",
@@ -98,7 +102,8 @@
     "hideSettled": "Hide settled",
     "noLoans": "No active loans",
     "activeLoans": "active loans",
-    "thisMonth": "this month"
+    "thisMonth": "this month",
+    "dollarRates": "Dollar Exchange Rates"
   },
   "character": {
     "title": "Character",
@@ -224,6 +229,9 @@
     "exportFailed": "Export failed",
     "importSuccess": "Backup imported. The app will reload.",
     "importFailed": "Import failed",
-    "importConfirm": "Import backup? This will replace all current data."
+    "importConfirm": "Import backup? This will replace all current data.",
+    "notifications": "Notifications",
+    "reminders": "Reminders",
+    "remindersDesc": "Get notifications every 3 hours to log food and quests"
   }
 }

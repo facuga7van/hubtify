@@ -40,6 +40,13 @@ export default function Layout() {
     return () => clearInterval(interval);
   }, []);
 
+  // Enable reminders if previously set
+  useEffect(() => {
+    if (localStorage.getItem('hubtify_reminders') === 'true') {
+      window.api.notificationsSetReminders(true).catch(console.error);
+    }
+  }, []);
+
   // Initial sync on mount — pull latest data if logged in
   useEffect(() => {
     (async () => {

@@ -6,6 +6,8 @@ import { registerCharacterIpcHandlers } from '../modules/character.ipc';
 import { registerAuthIpcHandlers } from '../modules/auth.ipc';
 import { registerSyncIpcHandlers } from '../modules/sync.ipc';
 import { registerBackupIpcHandlers } from '../modules/backup.ipc';
+import { registerNotificationIpcHandlers } from '../modules/notifications.ipc';
+import { registerDollarIpcHandlers } from '../modules/dollar.ipc';
 
 export function registerAllIpcHandlers(): void {
   registerRpgHandlers();
@@ -16,4 +18,6 @@ export function registerAllIpcHandlers(): void {
   registerAuthIpcHandlers();
   registerSyncIpcHandlers();
   registerBackupIpcHandlers();
+  registerNotificationIpcHandlers();
+  registerDollarIpcHandlers();
 }

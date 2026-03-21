@@ -83,6 +83,13 @@ const api = {
   backupExport: () => ipcRenderer.invoke('backup:export'),
   backupImport: () => ipcRenderer.invoke('backup:import'),
 
+  // Notifications
+  notificationsSetReminders: (enabled: boolean) => ipcRenderer.invoke('notifications:setReminders', enabled),
+  notificationsSend: (title: string, body: string) => ipcRenderer.invoke('notifications:send', title, body),
+
+  // Dollar
+  dollarGetRates: () => ipcRenderer.invoke('dollar:getRates'),
+
   // Finance
   financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
   financeAddTransaction: (tx: Record<string, unknown>) => ipcRenderer.invoke('finance:addTransaction', tx),

@@ -120,6 +120,13 @@ export interface HubtifyApi {
   characterSave: (data: Record<string, unknown>) => Promise<void>;
   characterLoad: () => Promise<unknown>;
 
+  // Notifications
+  notificationsSetReminders: (enabled: boolean) => Promise<{ success: boolean }>;
+  notificationsSend: (title: string, body: string) => Promise<boolean>;
+
+  // Dollar
+  dollarGetRates: () => Promise<{ success: boolean; rates?: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
+
   // Finance
   financeGetTransactions: (month: string) => Promise<unknown[]>;
   financeAddTransaction: (tx: Record<string, unknown>) => Promise<string>;

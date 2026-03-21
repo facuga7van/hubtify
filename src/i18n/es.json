@@ -75,7 +75,11 @@
     "light": "Ligero",
     "moderate": "Moderado",
     "active": "Activo",
-    "startTracking": "Comenzar Seguimiento"
+    "startTracking": "Comenzar Seguimiento",
+    "aiEstimate": "Estimacion IA",
+    "aiPlaceholder": "Describe lo que comiste...",
+    "estimate": "Estimar",
+    "confirmLog": "Confirmar y registrar"
   },
   "coinify": {
     "title": "Coinify",
@@ -98,7 +102,8 @@
     "hideSettled": "Ocultar saldados",
     "noLoans": "Sin prestamos activos",
     "activeLoans": "prestamos activos",
-    "thisMonth": "este mes"
+    "thisMonth": "este mes",
+    "dollarRates": "Cotizacion Dolar"
   },
   "character": {
     "title": "Personaje",
@@ -224,6 +229,9 @@
     "exportFailed": "Error al exportar",
     "importSuccess": "Respaldo importado. La app se va a recargar.",
     "importFailed": "Error al importar",
-    "importConfirm": "Importar respaldo? Esto reemplazara todos los datos actuales."
+    "importConfirm": "Importar respaldo? Esto reemplazara todos los datos actuales.",
+    "notifications": "Notificaciones",
+    "reminders": "Recordatorios",
+    "remindersDesc": "Recibir notificaciones cada 3 horas para registrar comidas y quests"
   }
 }

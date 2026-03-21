@@ -32,6 +32,11 @@ export default function Today() {
   const [manualCals, setManualCals] = useState('');
   const [frequentSearch, setFrequentSearch] = useState('');
 
+  // AI Estimation
+  const [estimateDesc, setEstimateDesc] = useState('');
+  const [estimating, setEstimating] = useState(false);
+  const [estimateResult, setEstimateResult] = useState<{ totalCalories: number; breakdown: string; matches: Array<{ name: string; calories: number }> } | null>(null);
+
   const loadData = useCallback(async (d: string) => {
     const [foodList, sum, met, freq, prof, tgt] = await Promise.all([
       window.api.nutritionGetFoodByDate(d),
@@ -83,6 +88,35 @@ export default function Today() {
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
+    loadData(date);
+  };
+
+  const handleEstimate = async () => {
+    if (!estimateDesc.trim() || estimating) return;
+    setEstimating(true);
+    setEstimateResult(null);
+    try {
+      const result = await window.api.nutritionEstimate(estimateDesc);
+      setEstimateResult(result as typeof estimateResult);
+    } catch (err) {
+      console.error('Estimation failed:', err);
+    } finally {
+      setEstimating(false);
+    }
+  };
+
+  const handleConfirmEstimate = async () => {
+    if (!estimateResult) return;
+    await window.api.nutritionLogFood({
+      date, description: estimateDesc, calories: estimateResult.totalCalories,
+      source: 'ai_estimate', aiBreakdown: estimateResult.breakdown,
+    });
+    await window.api.processRpgEvent({
+      type: 'MEAL_LOGGED', moduleId: 'nutrition',
+      payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+    });
+    setEstimateDesc('');
+    setEstimateResult(null);
     loadData(date);
   };
 
@@ -161,6 +195,52 @@ export default function Today() {
             onKeyDown={(e) => e.key === 'Enter' && handleManualLog()} />
           <button className="rpg-button" onClick={handleManualLog}>Log</button>
         </div>
+      </div>
+
+      {/* AI Estimation */}
+      <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>
+          </svg>
+          {t('nutrify.aiEstimate')}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="text"
+            placeholder={t('nutrify.aiPlaceholder')}
+            value={estimateDesc}
+            onChange={(e) => setEstimateDesc(e.target.value)}
+            className="rpg-input"
+            style={{ flex: 1 }}
+            onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
+          />
+          <button className="rpg-button" onClick={handleEstimate} disabled={estimating || !estimateDesc.trim()}>
+            {estimating ? t('common.loading') : t('nutrify.estimate')}
+          </button>
+        </div>
+
+        {estimateResult && (
+          <div style={{ marginTop: 12, padding: 12, border: '1px dashed var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)' }}>
+            <div style={{ fontFamily: 'Fira Code, monospace', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: 8 }}>
+              {estimateResult.totalCalories} kcal
+            </div>
+            {estimateResult.matches.map((m, i) => (
+              <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span>{m.name}</span>
+                <span style={{ fontFamily: 'Fira Code, monospace' }}>{m.calories} kcal</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="rpg-button" onClick={() => handleConfirmEstimate()} style={{ flex: 1 }}>
+                {t('nutrify.confirmLog')}
+              </button>
+              <button className="rpg-button" onClick={() => setEstimateResult(null)} style={{ opacity: 0.7 }}>
+                {t('questify.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Frequent foods */}
