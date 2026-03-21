@@ -25,6 +25,9 @@ const DEFAULT_CHAR: CharacterData = {
   frontHairIndex: 1,
 };
 
+// Simple cross-component sync channel
+const charChannel = new BroadcastChannel('hubtify-character');
+
 interface Props {
   size?: number;
   canCustomize?: boolean;
@@ -62,6 +65,19 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
         charDataRef.current = loaded;
       }
     }).catch(console.error).finally(() => setDbLoaded(true));
+  }, []);
+
+  // Listen for changes from other Character instances
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data && typeof e.data === 'object' && e.data.type === 'char-updated') {
+        const d = e.data.charData as CharacterData;
+        setCharData(d);
+        charDataRef.current = d;
+      }
+    };
+    charChannel.addEventListener('message', handler);
+    return () => charChannel.removeEventListener('message', handler);
   }, []);
 
   const loadAllHair = useCallback(async (bIdx: number, bClr: number, fIdx: number, fClr: number) => {
@@ -190,6 +206,8 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     setCharData((prev) => {
       const next = { ...prev, [field]: Math.max(1, prev[field] + delta) };
       window.api.characterSave(next).catch(console.error);
+      // Notify other Character instances (e.g. sidebar)
+      charChannel.postMessage({ type: 'char-updated', charData: next });
       return next;
     });
   };
