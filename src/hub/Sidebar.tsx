@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
 import './styles/layout.css';
@@ -36,6 +37,16 @@ const navItems = [
 ];
 
 export default function Sidebar({ stats }: SidebarProps) {
+  const [authUser, setAuthUser] = useState<{ uid: string; email: string | null } | null>(null);
+
+  useEffect(() => {
+    window.api.authGetUser().then(u => setAuthUser(u));
+    const unsub = window.api.onAuthStateChanged((u) => {
+      setAuthUser(u as { uid: string; email: string | null } | null);
+    });
+    return unsub;
+  }, []);
+
   return (
     <aside className="sidebar">
       <PlayerCard stats={stats} />
@@ -68,6 +79,35 @@ export default function Sidebar({ stats }: SidebarProps) {
               </svg>
               {stats.streak} day streak
             </span>
+          </div>
+        )}
+        {authUser ? (
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {authUser.email}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="rpg-button" onClick={async () => {
+                const result = await window.api.syncPush(authUser.uid);
+                alert(result.success ? 'Synced!' : `Sync failed: ${result.error}`);
+              }} style={{ fontSize: '0.7rem', padding: '3px 8px', flex: 1 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M1 6a5 5 0 019-2M11 6a5 5 0 01-9 2"/><path d="M10 1v3h-3M2 11V8h3"/>
+                </svg>
+                {' '}Sync
+              </button>
+              <button className="rpg-button" onClick={async () => {
+                await window.api.authLogout();
+              }} style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
+                Logout
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 6 }}>
+            <NavLink to="/login" style={{ fontSize: '0.8rem', color: 'var(--rpg-gold-dark)', textDecoration: 'underline' }}>
+              Login for cloud sync
+            </NavLink>
           </div>
         )}
         <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>

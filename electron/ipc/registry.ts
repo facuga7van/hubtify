@@ -3,6 +3,8 @@ import { registerQuestsIpcHandlers } from '../modules/quests.ipc';
 import { registerNutritionIpcHandlers } from '../modules/nutrition.ipc';
 import { registerFinanceIpcHandlers } from '../modules/finance.ipc';
 import { registerCharacterIpcHandlers } from '../modules/character.ipc';
+import { registerAuthIpcHandlers } from '../modules/auth.ipc';
+import { registerSyncIpcHandlers } from '../modules/sync.ipc';
 
 export function registerAllIpcHandlers(): void {
   registerRpgHandlers();
@@ -10,4 +12,6 @@ export function registerAllIpcHandlers(): void {
   registerNutritionIpcHandlers();
   registerFinanceIpcHandlers();
   registerCharacterIpcHandlers();
+  registerAuthIpcHandlers();
+  registerSyncIpcHandlers();
 }

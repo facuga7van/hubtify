@@ -64,6 +64,21 @@ const api = {
   characterSave: (data: Record<string, unknown>) => ipcRenderer.invoke('character:save', data),
   characterLoad: () => ipcRenderer.invoke('character:load'),
 
+  // Auth
+  authLogin: (email: string, password: string) => ipcRenderer.invoke('auth:login', email, password),
+  authRegister: (email: string, password: string) => ipcRenderer.invoke('auth:register', email, password),
+  authLogout: () => ipcRenderer.invoke('auth:logout'),
+  authGetUser: () => ipcRenderer.invoke('auth:getUser'),
+  onAuthStateChanged: (callback: (user: unknown) => void) => {
+    const handler = (_e: unknown, user: unknown) => callback(user);
+    ipcRenderer.on('auth:stateChanged', handler);
+    return () => ipcRenderer.removeListener('auth:stateChanged', handler);
+  },
+
+  // Sync
+  syncPush: (uid: string) => ipcRenderer.invoke('sync:push', uid),
+  syncPull: (uid: string) => ipcRenderer.invoke('sync:pull', uid),
+
   // Finance
   financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
   financeAddTransaction: (tx: Record<string, unknown>) => ipcRenderer.invoke('finance:addTransaction', tx),

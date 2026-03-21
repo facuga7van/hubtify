@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Layout from './hub/Layout';
 import Dashboard from './hub/Dashboard';
 import CharacterPage from './hub/CharacterPage';
+import AuthPage from './hub/AuthPage';
 import ErrorBoundary from './shared/components/ErrorBoundary';
 import { questsModule } from './modules/quests';
 import TaskList from './modules/quests/components/TaskList';
@@ -12,10 +13,16 @@ import NutritionCharts from './modules/nutrition/components/NutritionCharts';
 import { financeModule } from './modules/finance';
 import FinanceDashboard from './modules/finance/components/FinanceDashboard';
 
+function AuthPageWrapper() {
+  const navigate = useNavigate();
+  return <AuthPage onAuth={() => navigate('/')} />;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
+        <Route path="/login" element={<AuthPageWrapper />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/character" element={<CharacterPage />} />
