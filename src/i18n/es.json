@@ -38,7 +38,9 @@
     "normal": "Normal",
     "epic": "Epica",
     "doneToday": "hechas hoy",
-    "questsPending": "quests pendientes"
+    "questsPending": "quests pendientes",
+    "newCategory": "+ Nueva categoria",
+    "categoryName": "Nombre de categoria"
   },
   "nutrify": {
     "title": "Nutrify",

@@ -25,6 +25,7 @@ export default function TaskList() {
   const [toastData, setToastData] = useState<XpToastData | null>(null);
   const [todayCount, setTodayCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
   const loadTasks = useCallback(async () => {
@@ -104,11 +105,14 @@ export default function TaskList() {
 
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
-    const confirmed = window.confirm(`Delete ${selectedIds.size} quest(s)? This cannot be undone.`);
-    if (!confirmed) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
     playDelete();
     await window.api.questsDeleteTasks(Array.from(selectedIds));
     setSelectedIds(new Set());
+    setShowDeleteConfirm(false);
     await loadTasks();
   };
 
@@ -175,14 +179,34 @@ export default function TaskList() {
           </select>
         )}
 
-        {selectedIds.size > 0 && (
+        {selectedIds.size > 0 && !showDeleteConfirm && (
           <button className="rpg-button" onClick={handleDelete}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--rpg-hp-red)' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--rpg-hp-red)', marginLeft: 8 }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
               <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
             </svg>
             {t('questify.delete')} ({selectedIds.size})
           </button>
+        )}
+
+        {showDeleteConfirm && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8,
+            padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
+            border: '1px solid var(--rpg-hp-red)', borderRadius: 'var(--rpg-radius)',
+          }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--rpg-hp-red)' }}>
+              {t('questify.deleteConfirm', { count: selectedIds.size })}
+            </span>
+            <button className="rpg-button" onClick={confirmDelete}
+              style={{ background: 'var(--rpg-hp-red)', padding: '3px 10px', fontSize: '0.8rem' }}>
+              {t('questify.delete')}
+            </button>
+            <button className="rpg-button" onClick={() => setShowDeleteConfirm(false)}
+              style={{ padding: '3px 10px', fontSize: '0.8rem', opacity: 0.7 }}>
+              {t('questify.cancel')}
+            </button>
+          </div>
         )}
       </div>
 

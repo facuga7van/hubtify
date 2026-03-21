@@ -17,6 +17,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [useDate, setUseDate] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
 
   useEffect(() => {
     if (editingTask) {
@@ -35,12 +36,14 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const resolvedCategory = category === '__new__' ? newCategory.trim() : category;
+
     const task: Record<string, unknown> = {
       id: editingTask?.id,
       name: name.trim(),
       description: description.trim(),
       tier,
-      category,
+      category: resolvedCategory,
       dueDate: useDate && dueDate ? dueDate : null,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
@@ -48,11 +51,11 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
 
     await window.api.questsUpsertTask(task);
 
-    if (category && category.trim()) {
-      await window.api.questsEnsureCategory(category.trim());
+    if (resolvedCategory && resolvedCategory.trim()) {
+      await window.api.questsEnsureCategory(resolvedCategory.trim());
     }
 
-    setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(''); setUseDate(false);
+    setName(''); setDescription(''); setTier(2); setNewCategory(''); setCategory(''); setDueDate(''); setUseDate(false);
     onSaved();
   };
 
@@ -105,15 +108,29 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           style={{ flex: 1, minWidth: 150 }}
         />
 
-        {/* Category */}
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="rpg-select"
-        >
-          <option value="">{t('questify.noCategory')}</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        {/* Category — select existing or type new */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="rpg-select"
+          >
+            <option value="">{t('questify.noCategory')}</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            <option value="__new__">{t('questify.newCategory')}</option>
+          </select>
+          {category === '__new__' && (
+            <input
+              type="text"
+              placeholder={t('questify.categoryName')}
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              className="rpg-input"
+              style={{ width: 120 }}
+              autoFocus
+            />
+          )}
+        </div>
 
         {/* Due date toggle */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>

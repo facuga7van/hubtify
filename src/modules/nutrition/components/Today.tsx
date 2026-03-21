@@ -63,9 +63,12 @@ export default function Today() {
   useEffect(() => { loadData(date); }, [date, loadData]);
 
   const goDay = (offset: number) => {
-    const d = new Date(date);
-    d.setDate(d.getDate() + offset);
-    setDate(d.toLocaleDateString('en-CA'));
+    const [y, m, d] = date.split('-').map(Number);
+    const newDate = new Date(y, m - 1, d + offset);
+    const yyyy = newDate.getFullYear();
+    const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(newDate.getDate()).padStart(2, '0');
+    setDate(`${yyyy}-${mm}-${dd}`);
   };
 
   // ── Unified estimation flow ──────────────────────

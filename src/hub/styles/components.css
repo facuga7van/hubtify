@@ -239,20 +239,18 @@
 
 /* ── Page Header ──────────────────────────────────── */
 .page-header {
-  margin: -24px -28px 20px -28px;
+  margin-bottom: 20px;
   position: relative;
 }
 
-.page-header__banner {
-  width: 100%;
-  height: auto;
-  display: block;
-  opacity: 0.85;
+.page-header__ornament {
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, var(--rpg-gold-dark) 20%, var(--rpg-gold) 50%, var(--rpg-gold-dark) 80%, transparent 100%);
+  margin-bottom: 16px;
+  border-radius: 2px;
 }
 
 .page-header__content {
-  padding: 0 28px;
-  margin-top: -12px;
   position: relative;
 }
 
@@ -274,7 +272,7 @@
 
 .page-header__actions {
   position: absolute;
-  right: 28px;
+  right: 0;
   top: 0;
   display: flex;
   align-items: center;
@@ -286,15 +284,7 @@
     grid-template-columns: 1fr;
   }
 
-  .page-header {
-    margin: -12px -16px 16px -16px;
-  }
-
-  .page-header__content {
-    padding: 0 16px;
-  }
-
   .page-header__actions {
-    right: 16px;
+    right: 0;
   }
 }
