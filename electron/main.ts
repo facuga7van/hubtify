@@ -3,6 +3,7 @@ import path from 'path';
 import { registerAllIpcHandlers } from './ipc/registry';
 import { closeDb, getDb, runModuleMigrations } from './ipc/db';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
+import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -54,6 +55,7 @@ app.whenReady().then(() => {
   // Run module migrations
   getDb();
   runModuleMigrations(questsMigrations);
+  runModuleMigrations(nutritionMigrations);
 
   createWindow();
 });

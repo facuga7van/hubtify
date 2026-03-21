@@ -72,6 +72,28 @@ export interface HubtifyApi {
   questsCountCompletedToday: () => Promise<number>;
   questsGetPendingCount: () => Promise<number>;
   questsGetCompletedTodayCount: () => Promise<number>;
+
+  // Nutrition
+  nutritionGetProfile: () => Promise<unknown>;
+  nutritionSaveProfile: (profile: Record<string, unknown>) => Promise<void>;
+  nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
+  nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
+  nutritionDeleteFood: (id: number) => Promise<void>;
+  nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => Promise<void>;
+  nutritionGetFrequentFoods: () => Promise<unknown[]>;
+  nutritionCreateFrequentFood: (food: Record<string, unknown>) => Promise<void>;
+  nutritionDeleteFrequentFood: (id: number) => Promise<void>;
+  nutritionIncrementFrequentUsage: (id: number) => Promise<void>;
+  nutritionGetDailyMetrics: (date: string) => Promise<unknown>;
+  nutritionSaveDailyMetrics: (metrics: Record<string, unknown>) => Promise<void>;
+  nutritionGetWeeklyMetrics: (date: string) => Promise<unknown>;
+  nutritionSaveWeeklyMetrics: (metrics: Record<string, unknown>) => Promise<void>;
+  nutritionGetSummary: (date: string) => Promise<unknown>;
+  nutritionGetSummaryRange: (start: string, end: string) => Promise<unknown[]>;
+  nutritionGetWeights: () => Promise<unknown[]>;
+  nutritionGetStreak: () => Promise<number>;
+  nutritionGetTodayCalories: () => Promise<number>;
+  nutritionGetTodayTarget: () => Promise<number | null>;
 }
 
 // ── RPG Constants ──────────────────────────────────────────

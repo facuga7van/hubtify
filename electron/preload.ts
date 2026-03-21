@@ -27,6 +27,28 @@ const api = {
   questsCountCompletedToday: () => ipcRenderer.invoke('quests:countCompletedToday'),
   questsGetPendingCount: () => ipcRenderer.invoke('quests:getPendingCount'),
   questsGetCompletedTodayCount: () => ipcRenderer.invoke('quests:getCompletedTodayCount'),
+
+  // Nutrition
+  nutritionGetProfile: () => ipcRenderer.invoke('nutrition:getProfile'),
+  nutritionSaveProfile: (profile: Record<string, unknown>) => ipcRenderer.invoke('nutrition:saveProfile', profile),
+  nutritionLogFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:logFood', entry),
+  nutritionGetFoodByDate: (date: string) => ipcRenderer.invoke('nutrition:getFoodByDate', date),
+  nutritionDeleteFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFood', id),
+  nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => ipcRenderer.invoke('nutrition:updateFood', id, fields),
+  nutritionGetFrequentFoods: () => ipcRenderer.invoke('nutrition:getFrequentFoods'),
+  nutritionCreateFrequentFood: (food: Record<string, unknown>) => ipcRenderer.invoke('nutrition:createFrequentFood', food),
+  nutritionDeleteFrequentFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFrequentFood', id),
+  nutritionIncrementFrequentUsage: (id: number) => ipcRenderer.invoke('nutrition:incrementFrequentUsage', id),
+  nutritionGetDailyMetrics: (date: string) => ipcRenderer.invoke('nutrition:getDailyMetrics', date),
+  nutritionSaveDailyMetrics: (metrics: Record<string, unknown>) => ipcRenderer.invoke('nutrition:saveDailyMetrics', metrics),
+  nutritionGetWeeklyMetrics: (date: string) => ipcRenderer.invoke('nutrition:getWeeklyMetrics', date),
+  nutritionSaveWeeklyMetrics: (metrics: Record<string, unknown>) => ipcRenderer.invoke('nutrition:saveWeeklyMetrics', metrics),
+  nutritionGetSummary: (date: string) => ipcRenderer.invoke('nutrition:getSummary', date),
+  nutritionGetSummaryRange: (start: string, end: string) => ipcRenderer.invoke('nutrition:getSummaryRange', start, end),
+  nutritionGetWeights: () => ipcRenderer.invoke('nutrition:getWeights'),
+  nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
+  nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
+  nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
 };
 
 export type Api = typeof api;

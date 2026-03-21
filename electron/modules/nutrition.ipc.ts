@@ -1,0 +1,247 @@
+import { ipcMain } from 'electron';
+import { getDb } from '../ipc/db';
+
+export function registerNutritionIpcHandlers(): void {
+  // ── Profile ────────────────────────────────────────
+
+  ipcMain.handle('nutrition:getProfile', () => {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      age: row.age, sex: row.sex, heightCm: row.height_cm,
+      initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
+      deficitTargetKcal: row.deficit_target_kcal, gymCalories: row.gym_calories,
+      stepCaloriesFactor: row.step_calories_factor,
+    };
+  });
+
+  ipcMain.handle('nutrition:saveProfile', (_e, profile: {
+    age: number; sex: string; heightCm: number; initialWeightKg: number;
+    activityLevel: string; deficitTargetKcal?: number; gymCalories?: number; stepCaloriesFactor?: number;
+  }) => {
+    const db = getDb();
+    db.prepare(`
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(profile.age, profile.sex, profile.heightCm, profile.initialWeightKg,
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.gymCalories ?? 300,
+      profile.stepCaloriesFactor ?? 0.04);
+  });
+
+  // ── Food Log ───────────────────────────────────────
+
+  ipcMain.handle('nutrition:logFood', (_e, entry: {
+    date?: string; description: string; calories: number; source: string;
+    frequentFoodId?: number; aiBreakdown?: string;
+  }) => {
+    const db = getDb();
+    const date = entry.date ?? new Date().toLocaleDateString('en-CA');
+    const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    db.prepare(`
+      INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(date, time, entry.description, entry.calories, entry.source,
+      entry.frequentFoodId ?? null, entry.aiBreakdown ?? null);
+    recalcSummary(db, date);
+  });
+
+  ipcMain.handle('nutrition:getFoodByDate', (_e, date: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, date, time, description, calories, source,
+             frequent_food_id AS frequentFoodId, ai_breakdown AS aiBreakdown
+      FROM food_log WHERE date = ? ORDER BY time ASC
+    `).all(date);
+  });
+
+  ipcMain.handle('nutrition:deleteFood', (_e, id: number) => {
+    const db = getDb();
+    const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
+    db.prepare('DELETE FROM food_log WHERE id = ?').run(id);
+    if (entry) recalcSummary(db, entry.date);
+  });
+
+  ipcMain.handle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number }) => {
+    const db = getDb();
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
+    if (fields.calories !== undefined) { sets.push('calories = ?'); vals.push(fields.calories); }
+    if (sets.length === 0) return;
+    vals.push(id);
+    db.prepare(`UPDATE food_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
+    if (entry) recalcSummary(db, entry.date);
+  });
+
+  // ── Frequent Foods ─────────────────────────────────
+
+  ipcMain.handle('nutrition:getFrequentFoods', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, name, calories, ai_breakdown AS aiBreakdown,
+             times_used AS timesUsed, created_at AS createdAt
+      FROM frequent_foods ORDER BY times_used DESC
+    `).all();
+  });
+
+  ipcMain.handle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number; aiBreakdown?: string }) => {
+    const db = getDb();
+    db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, created_at) VALUES (?, ?, ?, ?)')
+      .run(food.name, food.calories, food.aiBreakdown ?? null, new Date().toISOString());
+  });
+
+  ipcMain.handle('nutrition:deleteFrequentFood', (_e, id: number) => {
+    const db = getDb();
+    db.prepare('DELETE FROM frequent_foods WHERE id = ?').run(id);
+  });
+
+  ipcMain.handle('nutrition:incrementFrequentUsage', (_e, id: number) => {
+    const db = getDb();
+    db.prepare('UPDATE frequent_foods SET times_used = times_used + 1 WHERE id = ?').run(id);
+  });
+
+  // ── Metrics ────────────────────────────────────────
+
+  ipcMain.handle('nutrition:getDailyMetrics', (_e, date: string) => {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+    return row ? { date: row.date, steps: row.steps, gym: !!row.gym } : { date, steps: null, gym: false };
+  });
+
+  ipcMain.handle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number; gym?: boolean }) => {
+    const db = getDb();
+    const date = metrics.date ?? new Date().toLocaleDateString('en-CA');
+    db.prepare(`
+      INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym)
+      VALUES (?, ?, ?)
+    `).run(date, metrics.steps ?? null, metrics.gym ? 1 : 0);
+    recalcSummary(db, date);
+  });
+
+  ipcMain.handle('nutrition:getWeeklyMetrics', (_e, date: string) => {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM nutrition_weekly_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+    return row ? { date: row.date, weightKg: row.weight_kg, waistCm: row.waist_cm } : null;
+  });
+
+  ipcMain.handle('nutrition:saveWeeklyMetrics', (_e, metrics: { date?: string; weightKg?: number; waistCm?: number }) => {
+    const db = getDb();
+    const date = metrics.date ?? getMondayOfWeek();
+    db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm) VALUES (?, ?, ?)')
+      .run(date, metrics.weightKg ?? null, metrics.waistCm ?? null);
+  });
+
+  // ── Summary ────────────────────────────────────────
+
+  ipcMain.handle('nutrition:getSummary', (_e, date: string) => {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM nutrition_daily_summary WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+    return row ? {
+      date: row.date, totalCaloriesIn: row.total_calories_in,
+      bmr: row.bmr, tdee: row.tdee, balance: row.balance,
+    } : null;
+  });
+
+  ipcMain.handle('nutrition:getSummaryRange', (_e, start: string, end: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT date, total_calories_in AS totalCaloriesIn, bmr, tdee, balance
+      FROM nutrition_daily_summary WHERE date BETWEEN ? AND ? ORDER BY date ASC
+    `).all(start, end);
+  });
+
+  // ── Dashboard ──────────────────────────────────────
+
+  ipcMain.handle('nutrition:getWeights', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT date, weight_kg AS weightKg FROM nutrition_weekly_metrics
+      WHERE weight_kg IS NOT NULL ORDER BY date ASC
+    `).all();
+  });
+
+  ipcMain.handle('nutrition:getStreak', () => {
+    const db = getDb();
+    const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
+    if (!profile) return 0;
+
+    let streak = 0;
+    let checkDate = new Date();
+    while (true) {
+      const dateStr = checkDate.toLocaleDateString('en-CA');
+      const summary = db.prepare('SELECT * FROM nutrition_daily_summary WHERE date = ?').get(dateStr) as Record<string, unknown> | undefined;
+      if (!summary || (summary.total_calories_in as number) === 0) break;
+      const target = (summary.tdee as number) - (profile.deficit_target_kcal as number);
+      if ((summary.total_calories_in as number) <= target * 1.1) {
+        streak++;
+      } else {
+        break;
+      }
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    return streak;
+  });
+
+  ipcMain.handle('nutrition:getTodayCalories', () => {
+    const db = getDb();
+    const today = new Date().toLocaleDateString('en-CA');
+    const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
+    return row.total;
+  });
+
+  ipcMain.handle('nutrition:getTodayTarget', () => {
+    const db = getDb();
+    const today = new Date().toLocaleDateString('en-CA');
+    const summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(today) as { tdee: number } | undefined;
+    const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1').get() as { deficit_target_kcal: number } | undefined;
+    if (!summary || !profile) return null;
+    return summary.tdee - profile.deficit_target_kcal;
+  });
+}
+
+// ── Helpers ────────────────────────────────────────
+
+function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
+  const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
+  if (!profile) return;
+
+  const totalCals = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(date) as { total: number };
+  const metrics = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+
+  const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
+  const weight = latestWeight?.weight_kg ?? (profile.initial_weight_kg as number);
+
+  const bmr = calculateBMR(weight, profile.height_cm as number, profile.age as number, profile.sex as string);
+  const steps = (metrics?.steps as number) ?? 0;
+  const gym = !!(metrics?.gym);
+  const tdee = calculateTDEE(bmr, profile.activity_level as string, steps, gym,
+    profile.step_calories_factor as number, profile.gym_calories as number);
+  const balance = tdee - totalCals.total;
+
+  db.prepare(`
+    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(date, totalCals.total, Math.round(bmr), tdee, balance);
+}
+
+function calculateBMR(weight: number, height: number, age: number, sex: string): number {
+  const base = 10 * weight + 6.25 * height - 5 * age;
+  return sex === 'M' ? base + 5 : base - 161;
+}
+
+function calculateTDEE(bmr: number, activityLevel: string, steps: number, gym: boolean,
+  stepFactor: number, gymCals: number): number {
+  const factors: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+  return Math.round(bmr * (factors[activityLevel] ?? 1.2) + steps * stepFactor + (gym ? gymCals : 0));
+}
+
+function getMondayOfWeek(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toLocaleDateString('en-CA');
+}
