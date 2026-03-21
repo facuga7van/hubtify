@@ -31,26 +31,7 @@ body {
   color: var(--rpg-ink);
   overflow: hidden;
   user-select: none;
-  /* Parchment texture background */
   background-color: var(--rpg-parchment);
-  background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(139, 109, 63, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(139, 109, 63, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(92, 58, 30, 0.05) 0%, transparent 40%),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(139, 109, 63, 0.015) 2px,
-      rgba(139, 109, 63, 0.015) 4px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 3px,
-      rgba(139, 109, 63, 0.01) 3px,
-      rgba(139, 109, 63, 0.01) 6px
-    );
 }
 
 h1, h2, h3, h4 {

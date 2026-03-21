@@ -1,6 +1,5 @@
 .app-layout {
   display: flex;
-  height: 100vh;
   width: 100vw;
 }
 
@@ -81,9 +80,9 @@
   flex: 1;
   overflow-y: auto;
   padding: 24px 28px;
-  /* Subtle parchment texture for content area */
-  background:
-    radial-gradient(ellipse at 30% 30%, rgba(139, 109, 63, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 70%, rgba(92, 58, 30, 0.03) 0%, transparent 50%),
-    var(--rpg-parchment);
+  background-image: url('../../assets/bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: var(--rpg-parchment);
 }

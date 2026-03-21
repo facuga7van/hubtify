@@ -14,9 +14,9 @@ export default function Layout() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
-      <div className="app-layout">
+      <div className="app-layout" style={{ flex: 1, height: 0 }}>
         <Sidebar stats={stats} />
         <main className="main-content">
           <Outlet />
