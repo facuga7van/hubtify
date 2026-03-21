@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Georgia, serif; background: #f4e4c1; color: #2c1810; }
