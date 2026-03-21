@@ -7,6 +7,7 @@ import type { PlayerStats } from '../../shared/types';
 import './styles/layout.css';
 import './styles/components.css';
 import { playLevelUp } from '../shared/audio';
+import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts';
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -14,6 +15,8 @@ export default function Layout() {
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const prevLevelRef = useRef<number>(0);
   const location = useLocation();
+
+  useKeyboardShortcuts();
 
   const refreshStats = useCallback(() => {
     window.api.getRpgStats().then(setStats).catch(console.error);

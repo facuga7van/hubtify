@@ -142,6 +142,36 @@ export function registerRpgHandlers(): void {
     ).all(limit) as RpgEventRecord[];
   });
 
+  ipcMain.handle('rpg:getDashboardStats', () => {
+    const db = getDb();
+    const today = new Date().toLocaleDateString('en-CA');
+
+    // XP gained today
+    const xpToday = db.prepare(
+      "SELECT COALESCE(SUM(xp_gained), 0) AS total FROM rpg_events WHERE DATE(created_at) = ?"
+    ).get(today) as { total: number };
+
+    // XP per day for last 7 days
+    const xpHistory = db.prepare(`
+      SELECT DATE(created_at) AS date, COALESCE(SUM(xp_gained), 0) AS xp
+      FROM rpg_events
+      WHERE DATE(created_at) >= DATE('now', '-6 days')
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `).all() as Array<{ date: string; xp: number }>;
+
+    // Events today count
+    const eventsToday = db.prepare(
+      "SELECT COUNT(*) AS count FROM rpg_events WHERE DATE(created_at) = ?"
+    ).get(today) as { count: number };
+
+    return {
+      xpToday: xpToday.total,
+      xpHistory,
+      eventsToday: eventsToday.count,
+    };
+  });
+
   ipcMain.handle('db:runMigrations', (_e, migrations) => {
     runModuleMigrations(migrations);
   });

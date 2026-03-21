@@ -206,6 +206,35 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Keyboard Shortcuts */}
+      <div className="rpg-card" style={sectionStyle}>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <rect x="1" y="4" width="14" height="9" rx="2"/><path d="M4 7h1M7 7h2M11 7h1M4 10h8"/>
+          </svg>
+          {t('settings.shortcuts')}
+        </div>
+        <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            ['Ctrl+1', t('nav.home')],
+            ['Ctrl+2', 'Questify'],
+            ['Ctrl+3', 'Nutrify'],
+            ['Ctrl+4', 'Coinify'],
+            ['Ctrl+5', t('nav.character')],
+            ['Ctrl+,', t('nav.settings')],
+          ].map(([key, label]) => (
+            <div key={key} style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>{label}</span>
+              <kbd style={{
+                fontFamily: 'Fira Code, monospace', fontSize: '0.75rem',
+                padding: '2px 6px', background: 'var(--rpg-parchment-dark)',
+                border: '1px solid var(--rpg-gold-dark)', borderRadius: 3,
+              }}>{key}</kbd>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="rpg-card" style={{ borderColor: 'var(--rpg-hp-red)' }}>
         <div className="rpg-card-title" style={{ color: 'var(--rpg-hp-red)' }}>

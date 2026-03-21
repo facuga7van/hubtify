@@ -232,6 +232,7 @@
     "importConfirm": "Importar respaldo? Esto reemplazara todos los datos actuales.",
     "notifications": "Notificaciones",
     "reminders": "Recordatorios",
-    "remindersDesc": "Recibir notificaciones cada 3 horas para registrar comidas y quests"
+    "remindersDesc": "Recibir notificaciones cada 3 horas para registrar comidas y quests",
+    "shortcuts": "Atajos de teclado"
   }
 }

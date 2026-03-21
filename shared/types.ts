@@ -50,6 +50,7 @@ export interface HubtifyApi {
   getRpgStats: () => Promise<PlayerStats>;
   processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number }>;
   getRpgHistory: (limit: number) => Promise<RpgEventRecord[]>;
+  rpgGetDashboardStats: () => Promise<{ xpToday: number; xpHistory: Array<{ date: string; xp: number }>; eventsToday: number }>;
   runMigrations: (migrations: Migration[]) => Promise<void>;
   windowMinimize: () => void;
   windowMaximize: () => void;

@@ -5,6 +5,7 @@ const api = {
   getRpgStats: () => ipcRenderer.invoke('rpg:getStats'),
   processRpgEvent: (event: RpgEvent) => ipcRenderer.invoke('rpg:processEvent', event),
   getRpgHistory: (limit: number) => ipcRenderer.invoke('rpg:getHistory', limit),
+  rpgGetDashboardStats: () => ipcRenderer.invoke('rpg:getDashboardStats'),
   runMigrations: (migrations: Migration[]) => ipcRenderer.invoke('db:runMigrations', migrations),
   windowMinimize: () => ipcRenderer.send('window:minimize'),
   windowMaximize: () => ipcRenderer.send('window:maximize'),
