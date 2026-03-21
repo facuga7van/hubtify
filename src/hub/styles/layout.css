@@ -1,0 +1,31 @@
+.app-layout { display: flex; height: 100vh; width: 100vw; }
+
+.sidebar {
+  width: 220px; min-width: 220px;
+  background: linear-gradient(180deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%);
+  display: flex; flex-direction: column;
+  border-right: 3px solid var(--rpg-wood);
+  color: var(--rpg-parchment);
+}
+
+.sidebar-nav { flex: 1; display: flex; flex-direction: column; padding: 8px; gap: 4px; }
+
+.sidebar-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--rpg-radius);
+  cursor: pointer; transition: background 0.2s;
+  font-size: 0.95rem; color: var(--rpg-parchment); text-decoration: none;
+}
+
+.sidebar-nav-item:hover { background: rgba(244, 228, 193, 0.15); }
+
+.sidebar-nav-item.active {
+  background: rgba(212, 160, 23, 0.25);
+  color: var(--rpg-gold-light); font-weight: bold;
+}
+
+.sidebar-divider { height: 1px; background: rgba(244, 228, 193, 0.2); margin: 8px 14px; }
+
+.sidebar-footer { padding: 12px 14px; border-top: 1px solid rgba(244, 228, 193, 0.2); font-size: 0.85rem; }
+
+.main-content { flex: 1; overflow-y: auto; padding: 24px; }

@@ -1,0 +1,66 @@
+.rpg-card {
+  background: var(--rpg-parchment);
+  border: var(--rpg-border); border-radius: var(--rpg-radius);
+  box-shadow: var(--rpg-shadow); padding: 16px;
+}
+
+.rpg-card-title {
+  font-family: 'Cinzel', serif; font-size: 1rem;
+  color: var(--rpg-wood); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.rpg-bar {
+  height: 14px; background: var(--rpg-parchment-dark);
+  border: 1px solid var(--rpg-wood); border-radius: 3px;
+  overflow: hidden; position: relative;
+}
+
+.rpg-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+.rpg-bar-fill--hp { background: linear-gradient(90deg, var(--rpg-hp-red) 0%, var(--rpg-hp-red-light) 100%); }
+.rpg-bar-fill--xp { background: linear-gradient(90deg, var(--rpg-xp-green) 0%, var(--rpg-xp-green-light) 100%); }
+
+.rpg-bar-label {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: bold; color: var(--rpg-ink);
+  font-family: 'Fira Code', monospace;
+}
+
+.rpg-button {
+  padding: 8px 16px;
+  background: linear-gradient(180deg, var(--rpg-wood-light) 0%, var(--rpg-wood) 100%);
+  color: var(--rpg-parchment); border: 1px solid var(--rpg-wood);
+  border-radius: var(--rpg-radius); cursor: pointer;
+  font-family: 'Cinzel', serif; font-size: 0.85rem; transition: all 0.2s;
+}
+
+.rpg-button:hover {
+  background: linear-gradient(180deg, var(--rpg-gold) 0%, var(--rpg-gold-light) 100%);
+  color: var(--rpg-ink);
+}
+
+.title-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 32px; background: var(--rpg-wood);
+  -webkit-app-region: drag; padding: 0 8px;
+}
+
+.title-bar-text { font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--rpg-gold); }
+
+.title-bar-controls { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+
+.title-bar-btn {
+  width: 28px; height: 24px; border: none; background: transparent;
+  color: var(--rpg-parchment); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; border-radius: 3px;
+}
+
+.title-bar-btn:hover { background: rgba(244, 228, 193, 0.2); }
+.title-bar-btn--close:hover { background: var(--rpg-hp-red); color: white; }
+
+.dashboard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+.dashboard-widget { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.dashboard-widget:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(44, 24, 16, 0.4); }

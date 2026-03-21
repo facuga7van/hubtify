@@ -1,4 +1,41 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:wght@400;700&family=Fira+Code:wght@400;700&display=swap');
+
+:root {
+  --rpg-parchment: #f4e4c1;
+  --rpg-parchment-dark: #e8d5a3;
+  --rpg-wood: #5c3a1e;
+  --rpg-wood-light: #8B4513;
+  --rpg-gold: #d4a017;
+  --rpg-gold-light: #f0c040;
+  --rpg-leather: #6b3a2a;
+  --rpg-ink: #2c1810;
+  --rpg-ink-light: #4a3728;
+  --rpg-hp-red: #c0392b;
+  --rpg-hp-red-light: #e74c3c;
+  --rpg-xp-green: #27ae60;
+  --rpg-xp-green-light: #2ecc71;
+  --rpg-border: 2px solid var(--rpg-wood);
+  --rpg-shadow: 0 2px 8px rgba(44, 24, 16, 0.3);
+  --rpg-radius: 6px;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: Georgia, serif; background: #f4e4c1; color: #2c1810; }
+
+body {
+  font-family: 'Crimson Text', 'Georgia', serif;
+  background-color: var(--rpg-parchment);
+  color: var(--rpg-ink);
+  overflow: hidden;
+  user-select: none;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Cinzel', 'Georgia', serif;
+  color: var(--rpg-wood);
+}
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--rpg-parchment-dark); border-left: 1px solid var(--rpg-wood); }
+::-webkit-scrollbar-thumb { background: var(--rpg-wood-light); border-radius: 4px; border: 1px solid var(--rpg-wood); }
+::-webkit-scrollbar-thumb:hover { background: var(--rpg-wood); }
