@@ -80,7 +80,9 @@
     "aiPlaceholder": "Describe lo que comiste...",
     "estimate": "Estimar",
     "confirmLog": "Confirmar y registrar",
-    "today": "Hoy"
+    "today": "Hoy",
+    "foodInputPlaceholder": "Que comiste? ej: milanesa con papas fritas",
+    "totalCalories": "Total"
   },
   "coinify": {
     "title": "Coinify",

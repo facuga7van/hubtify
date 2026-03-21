@@ -16,6 +16,14 @@ interface FrequentFood { id: number; name: string; calories: number; timesUsed: 
 interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; }
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
+interface EstimationMatch { name: string; calories: number; source: string; }
+interface EstimationResult {
+  totalCalories: number;
+  breakdown: string;
+  matches: EstimationMatch[];
+  hasAiFallback: boolean;
+}
+
 export default function Today() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -27,18 +35,13 @@ export default function Today() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [target, setTarget] = useState(0);
 
-  // Log confirmation toast
-  const [logMessage, setLogMessage] = useState('');
-
-  // Manual entry
-  const [manualDesc, setManualDesc] = useState('');
-  const [manualCals, setManualCals] = useState('');
-  const [frequentSearch, setFrequentSearch] = useState('');
-
-  // AI Estimation
-  const [estimateDesc, setEstimateDesc] = useState('');
+  // Unified food input
+  const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
-  const [estimateResult, setEstimateResult] = useState<{ totalCalories: number; breakdown: string; matches: Array<{ name: string; calories: number }> } | null>(null);
+  const [estimation, setEstimation] = useState<EstimationResult | null>(null);
+  const [editCalories, setEditCalories] = useState('');
+  const [frequentSearch, setFrequentSearch] = useState('');
+  const [logMessage, setLogMessage] = useState('');
 
   const loadData = useCallback(async (d: string) => {
     const [foodList, sum, met, freq, prof, tgt] = await Promise.all([
@@ -65,24 +68,59 @@ export default function Today() {
     setDate(d.toLocaleDateString('en-CA'));
   };
 
-  const handleManualLog = async () => {
-    if (!manualDesc.trim() || !manualCals) return;
+  // ── Unified estimation flow ──────────────────────
+  const handleEstimate = async () => {
+    if (!foodInput.trim() || estimating) return;
+    setEstimating(true);
+    setEstimation(null);
+    try {
+      const result = await window.api.nutritionEstimate(foodInput.trim());
+      const est = result as EstimationResult;
+      setEstimation(est);
+      setEditCalories(String(est.totalCalories));
+    } catch (err) {
+      console.error('Estimation failed:', err);
+    } finally {
+      setEstimating(false);
+    }
+  };
+
+  const handleConfirmEstimation = async () => {
+    if (!estimation) return;
+    const calories = parseInt(editCalories) || estimation.totalCalories;
+
+    // Log the food
     await window.api.nutritionLogFood({
-      date, description: manualDesc.trim(), calories: parseInt(manualCals), source: 'manual',
+      date,
+      description: foodInput.trim(),
+      calories,
+      source: estimation.hasAiFallback ? 'ai_estimate' : 'frequent',
+      aiBreakdown: estimation.breakdown,
     });
 
-    // Emit RPG event
+    // Learn food for next time (save per-unit calories to local DB)
+    try {
+      await window.api.nutritionLearnFood({
+        description: foodInput.trim(),
+        calories,
+        breakdown: estimation.breakdown,
+      });
+    } catch { /* best effort */ }
+
+    // RPG event
     await window.api.processRpgEvent({
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
 
-    setManualDesc(''); setManualCals('');
-    setLogMessage(`+${manualCals} kcal`);
-    setTimeout(() => setLogMessage(''), 2000);
+    showToast(`+${calories} kcal`);
+    setFoodInput('');
+    setEstimation(null);
+    setEditCalories('');
     loadData(date);
   };
 
+  // ── Quick log (frequent food) ────────────────────
   const handleLogFrequent = async (food: FrequentFood) => {
     await window.api.nutritionLogFood({
       date, description: food.name, calories: food.calories, source: 'frequent',
@@ -93,39 +131,7 @@ export default function Today() {
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
-    setLogMessage(`+${food.calories} kcal`);
-    setTimeout(() => setLogMessage(''), 2000);
-    loadData(date);
-  };
-
-  const handleEstimate = async () => {
-    if (!estimateDesc.trim() || estimating) return;
-    setEstimating(true);
-    setEstimateResult(null);
-    try {
-      const result = await window.api.nutritionEstimate(estimateDesc);
-      setEstimateResult(result as typeof estimateResult);
-    } catch (err) {
-      console.error('Estimation failed:', err);
-    } finally {
-      setEstimating(false);
-    }
-  };
-
-  const handleConfirmEstimate = async () => {
-    if (!estimateResult) return;
-    await window.api.nutritionLogFood({
-      date, description: estimateDesc, calories: estimateResult.totalCalories,
-      source: 'ai_estimate', aiBreakdown: estimateResult.breakdown,
-    });
-    await window.api.processRpgEvent({
-      type: 'MEAL_LOGGED', moduleId: 'nutrition',
-      payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
-    });
-    setLogMessage(`+${estimateResult.totalCalories} kcal`);
-    setTimeout(() => setLogMessage(''), 2000);
-    setEstimateDesc('');
-    setEstimateResult(null);
+    showToast(`+${food.calories} kcal`);
     loadData(date);
   };
 
@@ -140,18 +146,18 @@ export default function Today() {
     loadData(date);
   };
 
-  if (hasProfile === null) return <div style={{ padding: 24, opacity: 0.5 }}>Loading...</div>;
+  const showToast = (msg: string) => {
+    setLogMessage(msg);
+    setTimeout(() => setLogMessage(''), 2000);
+  };
 
-  // Show onboarding inline if no profile
-  if (!hasProfile) {
-    return <NutritionOnboarding onComplete={() => loadData(date)} />;
-  }
+  if (hasProfile === null) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
+  if (!hasProfile) return <NutritionOnboarding onComplete={() => loadData(date)} />;
 
   const consumed = summary?.totalCaloriesIn ?? foods.reduce((s, f) => s + f.calories, 0);
   const filteredFrequent = frequentFoods.filter((f) =>
     !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
   );
-
 
   return (
     <div>
@@ -176,8 +182,8 @@ export default function Today() {
             <path d="M6 1L1 6l5 5M1 6h14"/>
           </svg>
         </button>
-        <button className="rpg-button" onClick={() => setDate(new Date().toLocaleDateString('en-CA'))}
-          style={{ padding: '4px 8px', fontSize: '0.75rem', opacity: date === new Date().toLocaleDateString('en-CA') ? 0.5 : 1 }}>
+        <button className="rpg-button" onClick={() => setDate(getLocalDateString())}
+          style={{ padding: '4px 8px', fontSize: '0.75rem', opacity: date === getLocalDateString() ? 0.5 : 1 }}>
           {t('nutrify.today')}
         </button>
         <h3 style={{ flex: 1, textAlign: 'center' }}>{date}</h3>
@@ -190,6 +196,78 @@ export default function Today() {
 
       <CalorieProgressBar consumed={consumed} target={target} />
 
+      {/* ── Unified food input ──────────────────────── */}
+      <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-3-3-5-4-7z"/>
+          </svg>
+          {t('nutrify.logFood')}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="text"
+            placeholder={t('nutrify.foodInputPlaceholder')}
+            value={foodInput}
+            onChange={(e) => setFoodInput(e.target.value)}
+            className="rpg-input"
+            style={{ flex: 1 }}
+            onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
+          />
+          <button className="rpg-button" onClick={handleEstimate}
+            disabled={estimating || !foodInput.trim()}>
+            {estimating ? t('common.loading') : t('nutrify.estimate')}
+          </button>
+        </div>
+
+        {/* Estimation result */}
+        {estimation && (
+          <div style={{ marginTop: 12, padding: 12, border: '1px dashed var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)', background: 'rgba(201,168,76,0.05)' }}>
+            {/* Match breakdown */}
+            {estimation.matches.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {estimation.matches.map((m, i) => (
+                  <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--rpg-parchment-dark)' }}>
+                    <span>
+                      {m.name}
+                      {m.source === 'ai' && (
+                        <span style={{ fontSize: '0.7rem', opacity: 0.5, marginLeft: 4 }}>(IA)</span>
+                      )}
+                    </span>
+                    <span style={{ fontFamily: 'Fira Code, monospace' }}>{m.calories} kcal</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Editable total */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.9rem' }}>{t('nutrify.totalCalories')}:</span>
+              <input
+                type="number"
+                value={editCalories}
+                onChange={(e) => setEditCalories(e.target.value)}
+                className="rpg-input"
+                style={{ width: 80, fontFamily: 'Fira Code, monospace', fontWeight: 'bold', fontSize: '1rem', textAlign: 'center' }}
+              />
+              <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>kcal</span>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="rpg-button" onClick={handleConfirmEstimation} style={{ flex: 1 }}>
+                {t('nutrify.confirmLog')}
+              </button>
+              <button className="rpg-button" onClick={() => { setEstimation(null); setEditCalories(''); }}
+                style={{ opacity: 0.6 }}>
+                {t('questify.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Food log */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.foodLog')}</div>
@@ -200,70 +278,11 @@ export default function Today() {
         }} />)}
       </div>
 
-      {/* Manual entry */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">{t('nutrify.logFood')}</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input type="text" placeholder="Description" value={manualDesc}
-            onChange={(e) => setManualDesc(e.target.value)} className="rpg-input" style={{ flex: 1 }} />
-          <input type="number" placeholder="kcal" value={manualCals}
-            onChange={(e) => setManualCals(e.target.value)} className="rpg-input" style={{ width: 80 }}
-            onKeyDown={(e) => e.key === 'Enter' && handleManualLog()} />
-          <button className="rpg-button" onClick={handleManualLog}>Log</button>
-        </div>
-      </div>
-
-      {/* AI Estimation */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-            <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>
-          </svg>
-          {t('nutrify.aiEstimate')}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            type="text"
-            placeholder={t('nutrify.aiPlaceholder')}
-            value={estimateDesc}
-            onChange={(e) => setEstimateDesc(e.target.value)}
-            className="rpg-input"
-            style={{ flex: 1 }}
-            onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
-          />
-          <button className="rpg-button" onClick={handleEstimate} disabled={estimating || !estimateDesc.trim()}>
-            {estimating ? t('common.loading') : t('nutrify.estimate')}
-          </button>
-        </div>
-
-        {estimateResult && (
-          <div style={{ marginTop: 12, padding: 12, border: '1px dashed var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)' }}>
-            <div style={{ fontFamily: 'Fira Code, monospace', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: 8 }}>
-              {estimateResult.totalCalories} kcal
-            </div>
-            {estimateResult.matches.map((m, i) => (
-              <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                <span>{m.name}</span>
-                <span style={{ fontFamily: 'Fira Code, monospace' }}>{m.calories} kcal</span>
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button className="rpg-button" onClick={() => handleConfirmEstimate()} style={{ flex: 1 }}>
-                {t('nutrify.confirmLog')}
-              </button>
-              <button className="rpg-button" onClick={() => setEstimateResult(null)} style={{ opacity: 0.7 }}>
-                {t('questify.cancel')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Frequent foods */}
       {frequentFoods.length > 0 && (
         <div className="rpg-card" style={{ marginBottom: 16 }}>
           <div className="rpg-card-title">{t('nutrify.frequentFoods')}</div>
-          <input type="text" placeholder="Search..." value={frequentSearch}
+          <input type="text" placeholder={t('common.search')} value={frequentSearch}
             onChange={(e) => setFrequentSearch(e.target.value)} className="rpg-input" style={{ width: '100%', marginBottom: 8 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {filteredFrequent.slice(0, 12).map((f) => (
@@ -294,6 +313,7 @@ export default function Today() {
         </div>
       </div>
 
+      {/* Log confirmation toast */}
       {logMessage && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, padding: '8px 16px',

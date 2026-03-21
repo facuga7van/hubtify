@@ -80,7 +80,9 @@
     "aiPlaceholder": "Describe what you ate...",
     "estimate": "Estimate",
     "confirmLog": "Confirm & Log",
-    "today": "Today"
+    "today": "Today",
+    "foodInputPlaceholder": "What did you eat? e.g.: chicken with rice",
+    "totalCalories": "Total"
   },
   "coinify": {
     "title": "Coinify",
