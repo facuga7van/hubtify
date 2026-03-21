@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
 import type { XpToastData } from './XpToast';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
-import { tierEmoji, tierXp, calculateXpForAction } from '../utils';
+import { TierBadge, tierXp, calculateXpForAction } from '../utils';
 import { getLocalDateString } from '../../../../shared/rpg-engine';
 
 interface Props {
@@ -102,12 +102,12 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
 
       {showCompleted && completed.map((subtask) => (
         <div key={subtask.id} className="subtask-item subtask-item--completed">
-          <img
-            src={new URL('../../../assets/checked.png', import.meta.url).href}
-            alt="Completed"
-            onClick={() => handleComplete(subtask)}
-            style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7 }}
-          />
+          <svg onClick={() => handleComplete(subtask)} width="20" height="20" viewBox="0 0 20 20"
+            style={{ cursor: 'pointer', flexShrink: 0 }}
+            fill="none" stroke="var(--rpg-xp-green)" strokeWidth="1.5">
+            <rect x="3" y="3" width="14" height="14" rx="2"/>
+            <path d="M6 10l3 3 5-6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{subtask.name}</span>
         </div>
       ))}
@@ -136,24 +136,25 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="subtask-item">
-      <img
-        src={new URL('../../../assets/check.png', import.meta.url).href}
-        alt="Complete"
-        onClick={() => onComplete(subtask)}
-        style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7, transition: 'opacity 0.2s' }}
-        onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-        onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
-      />
+      <svg onClick={() => onComplete(subtask)} width="20" height="20" viewBox="0 0 20 20"
+        style={{ cursor: 'pointer', flexShrink: 0 }}
+        fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5">
+        <rect x="3" y="3" width="14" height="14" rx="2" />
+      </svg>
       <span className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
         {subtask.name}
       </span>
-      <span className="subtask-tier-badge">{tierEmoji(subtask.tier)}</span>
+      <TierBadge tier={subtask.tier} />
       <span className="subtask-xp-hint" style={{ fontSize: '0.75rem', opacity: 0.6 }}>
         +{tierXp(subtask.tier)}
       </span>
-      <button onClick={() => onDelete(subtask.id)} style={{
-        background: 'none', border: 'none', color: 'var(--rpg-hp-red)', cursor: 'pointer', fontSize: '0.9rem'
-      }}>&#x2715;</button>
+      <svg onClick={() => onDelete(subtask.id)} width="12" height="12" viewBox="0 0 12 12"
+        style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
+        onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
+        onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
+        stroke="var(--rpg-hp-red)" strokeWidth="1.8" strokeLinecap="round">
+        <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+      </svg>
     </div>
   );
 }

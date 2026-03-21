@@ -112,19 +112,24 @@ export default function Today() {
       {/* Header with charts link */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="rpg-button" onClick={() => goDay(-1)} style={{ display: 'flex', alignItems: 'center' }}>
-            <img src={new URL('../../../assets/arrow.png', import.meta.url).href}
-              alt="Previous" style={{ width: 20, height: 14 }} />
+          <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 1L1 6l5 5M1 6h14"/>
+            </svg>
           </button>
           <h3 style={{ textAlign: 'center' }}>{date}</h3>
-          <button className="rpg-button" onClick={() => goDay(1)} style={{ display: 'flex', alignItems: 'center' }}>
-            <img src={new URL('../../../assets/arrow.png', import.meta.url).href}
-              alt="Next" style={{ width: 20, height: 14, transform: 'scaleX(-1)' }} />
+          <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 1l5 5-5 5M15 6H1"/>
+            </svg>
           </button>
         </div>
         <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
           style={{ fontSize: '0.85rem' }}>
-          📊 Charts
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ verticalAlign: '-2px', marginRight: 4 }}>
+            <path d="M2 12V7M6 12V4M10 12V2M14 12V6"/>
+          </svg>
+          Charts
         </button>
       </div>
 

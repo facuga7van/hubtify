@@ -6,7 +6,7 @@ import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
 import { type Task, type TaskTier, type Subtask, XP_MAP } from '../types';
-import { tierEmoji, calculateXpForAction } from '../utils';
+import { TierBadge, calculateXpForAction } from '../utils';
 
 export default function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -142,9 +142,10 @@ export default function TaskList() {
 
         {selectedIds.size > 0 && (
           <button className="rpg-button" onClick={handleDelete}
-            style={{ background: 'var(--rpg-hp-red)', marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <img src={new URL('../../../assets/trash.png', import.meta.url).href}
-              alt="Delete" style={{ width: 16, height: 16 }} />
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--rpg-hp-red)' }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+              <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
+            </svg>
             Delete ({selectedIds.size})
           </button>
         )}
@@ -181,14 +182,14 @@ export default function TaskList() {
       {activeTab === 'completed' && completed.map((task) => (
         <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img
-              src={new URL('../../../assets/checked.png', import.meta.url).href}
-              alt="Completed"
-              onClick={() => handleComplete(task)}
-              style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7 }}
-            />
+            <svg onClick={() => handleComplete(task)} width="20" height="20" viewBox="0 0 20 20"
+              style={{ cursor: 'pointer', flexShrink: 0 }}
+              fill="none" stroke="var(--rpg-xp-green)" strokeWidth="1.5">
+              <rect x="3" y="3" width="14" height="14" rx="2"/>
+              <path d="M6 10l3 3 5-6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             <span style={{ textDecoration: 'line-through', flex: 1 }}>{task.name}</span>
-            <span>{tierEmoji(task.tier)}</span>
+            <TierBadge tier={task.tier} />
           </div>
         </div>
       ))}
@@ -218,33 +219,43 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
   return (
     <div ref={setNodeRef} style={{ ...style, marginBottom: 8 }} {...attributes} className="rpg-card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: expanded ? 8 : 0 }}>
-        <span {...listeners} style={{ cursor: 'grab', fontSize: '1rem' }}>&#x2630;</span>
-        <img
-          src={new URL('../../../assets/check.png', import.meta.url).href}
-          alt="Complete"
-          onClick={onComplete}
-          style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7, transition: 'opacity 0.2s' }}
-          onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
-        />
+        <svg {...listeners} width="14" height="14" viewBox="0 0 14 14"
+          style={{ cursor: 'grab', opacity: 0.4, flexShrink: 0 }}
+          fill="var(--rpg-gold-dark)">
+          <circle cx="4" cy="3" r="1.2"/><circle cx="10" cy="3" r="1.2"/>
+          <circle cx="4" cy="7" r="1.2"/><circle cx="10" cy="7" r="1.2"/>
+          <circle cx="4" cy="11" r="1.2"/><circle cx="10" cy="11" r="1.2"/>
+        </svg>
+        {/* Checkbox */}
+        <svg onClick={onComplete} width="20" height="20" viewBox="0 0 20 20"
+          style={{ cursor: 'pointer', flexShrink: 0 }}
+          fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5">
+          <rect x="3" y="3" width="14" height="14" rx="2" />
+        </svg>
         <span onClick={onToggleExpand} style={{ flex: 1, cursor: 'pointer', fontWeight: 'bold' }}>
           {task.name}
         </span>
-        <span>{tierEmoji(task.tier)}</span>
+        <TierBadge tier={task.tier} />
         <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>+{XP_MAP[task.tier]}</span>
         {task.category && (
           <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)',
             padding: '1px 6px', borderRadius: 3 }}>{task.category}</span>
         )}
-        <img
-          src={new URL('../../../assets/edit.png', import.meta.url).href}
-          alt="Edit"
-          onClick={onEdit}
-          style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0.6, transition: 'opacity 0.2s' }}
+        <svg onClick={onEdit} width="16" height="16" viewBox="0 0 16 16"
+          style={{ cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s' }}
           onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
-        />
-        <input type="checkbox" checked={selected} onChange={onToggleSelect} title="Select for deletion" />
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.5')}
+          fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+          <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
+        </svg>
+        <svg onClick={onToggleSelect} width="14" height="14" viewBox="0 0 14 14"
+          style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
+          fill="none" stroke={selected ? 'var(--rpg-hp-red)' : 'var(--rpg-gold-dark)'} strokeWidth="1.3">
+          <rect x="1" y="1" width="12" height="12" rx="2"/>
+          {selected && <path d="M3.5 7l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round"/>}
+        </svg>
       </div>
 
       {expanded && (
