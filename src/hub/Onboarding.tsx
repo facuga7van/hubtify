@@ -112,28 +112,26 @@ export default function Onboarding({ onComplete }: Props) {
         return (
           <div key="modules" className={animClass} style={{ textAlign: 'center' }}>
             <h2 style={{ marginBottom: 16 }}>{t('onboarding.yourModules')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-              <div className="rpg-card" style={{ padding: 12 }}>
-                <svg width="24" height="24" viewBox="0 0 18 18" fill="none" stroke="var(--rpg-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 6 }}>
-                  <path d="M14 2l-8 8M6 10l-2 2 2 2 2-2M10.5 5.5l2 2M14 2l2 2-3 3"/>
-                </svg>
-                <h4 style={{ fontSize: '0.9rem' }}>Questify</h4>
-                <p style={{ fontSize: '0.75rem', opacity: 0.6 }}>{t('onboarding.questifyDesc')}</p>
-              </div>
-              <div className="rpg-card" style={{ padding: 12 }}>
-                <svg width="24" height="24" viewBox="0 0 18 18" fill="none" stroke="var(--rpg-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 6 }}>
-                  <path d="M6 3h6v4c0 2-1.5 3-3 3s-3-1-3-3V3z"/><path d="M9 10v3M6 13h6"/>
-                </svg>
-                <h4 style={{ fontSize: '0.9rem' }}>Nutrify</h4>
-                <p style={{ fontSize: '0.75rem', opacity: 0.6 }}>{t('onboarding.nutriftyDesc')}</p>
-              </div>
-              <div className="rpg-card" style={{ padding: 12 }}>
-                <svg width="24" height="24" viewBox="0 0 18 18" fill="none" stroke="var(--rpg-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 6 }}>
-                  <ellipse cx="7" cy="10" rx="5" ry="3"/><path d="M2 10v2c0 1.7 2.2 3 5 3s5-1.3 5-3v-2"/>
-                </svg>
-                <h4 style={{ fontSize: '0.9rem' }}>Coinify</h4>
-                <p style={{ fontSize: '0.75rem', opacity: 0.6 }}>{t('onboarding.coinifyDesc')}</p>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24, textAlign: 'left' }}>
+              {[
+                { name: 'Questify', desc: t('onboarding.questifyDesc'), icon: <path d="M14 2l-8 8M6 10l-2 2 2 2 2-2M10.5 5.5l2 2M14 2l2 2-3 3"/> },
+                { name: 'Nutrify', desc: t('onboarding.nutriftyDesc'), icon: <><path d="M6 3h6v4c0 2-1.5 3-3 3s-3-1-3-3V3z"/><path d="M9 10v3M6 13h6"/></> },
+                { name: 'Coinify', desc: t('onboarding.coinifyDesc'), icon: <><ellipse cx="7" cy="10" rx="5" ry="3"/><path d="M2 10v2c0 1.7 2.2 3 5 3s5-1.3 5-3v-2"/></> },
+              ].map((mod) => (
+                <div key={mod.name} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', borderRadius: 'var(--rpg-radius)',
+                  border: '1px solid var(--rpg-gold-dark)', background: 'rgba(201,168,76,0.06)',
+                }}>
+                  <svg width="22" height="22" viewBox="0 0 18 18" fill="none" stroke="var(--rpg-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    {mod.icon}
+                  </svg>
+                  <div>
+                    <div style={{ fontFamily: 'Cinzel, serif', fontSize: '0.9rem', fontWeight: 700, color: 'var(--rpg-wood)' }}>{mod.name}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{mod.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="rpg-button" onClick={() => goStep(1)}
