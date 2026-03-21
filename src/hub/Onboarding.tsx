@@ -9,6 +9,36 @@ interface Props {
 export default function Onboarding({ onComplete }: Props) {
   const { t, i18n } = useTranslation();
   const [step, setStep] = useState(0);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLogin, setIsLogin] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const finishOnboarding = () => {
+    localStorage.setItem('hubtify_onboarded', 'true');
+    onComplete();
+  };
+
+  const handleAuth = async () => {
+    if (!email.trim() || !password.trim()) return;
+    setAuthError('');
+    setAuthLoading(true);
+    try {
+      const result = isLogin
+        ? await window.api.authLogin(email, password)
+        : await window.api.authRegister(email, password);
+      if (result.success) {
+        finishOnboarding();
+      } else {
+        setAuthError(result.error ?? 'Error');
+      }
+    } catch {
+      setAuthError('Connection error');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const steps = [
     // Step 0: Welcome
@@ -80,12 +110,64 @@ export default function Onboarding({ onComplete }: Props) {
           <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>Finanzas personales</p>
         </div>
       </div>
-      <button className="rpg-button" onClick={() => {
-        localStorage.setItem('hubtify_onboarded', 'true');
-        onComplete();
-      }} style={{ padding: '10px 32px', fontSize: '1rem' }}>
-        Comenzar!
+      <button className="rpg-button" onClick={() => setStep(3)}
+        style={{ padding: '10px 32px', fontSize: '1rem' }}>
+        Continuar
       </button>
+    </div>,
+
+    // Step 3: Account
+    <div key="auth" style={{ textAlign: 'center' }}>
+      <h2 style={{ marginBottom: 8 }}>
+        {isLogin ? 'Iniciar Sesion' : 'Crear Cuenta'}
+      </h2>
+      <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 20 }}>
+        Sincroniza tu progreso entre dispositivos
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280, margin: '0 auto' }}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="rpg-input"
+          style={{ width: '100%' }}
+        />
+        <input
+          type="password"
+          placeholder="Contrasena"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="rpg-input"
+          style={{ width: '100%' }}
+          onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+        />
+
+        {authError && (
+          <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', margin: 0 }}>{authError}</p>
+        )}
+
+        <button className="rpg-button" onClick={handleAuth} disabled={authLoading}
+          style={{ width: '100%', padding: '10px', fontSize: '0.95rem' }}>
+          {authLoading ? 'Cargando...' : isLogin ? 'Entrar' : 'Crear Cuenta'}
+        </button>
+
+        <button onClick={() => { setIsLogin(!isLogin); setAuthError(''); }}
+          style={{ background: 'none', border: 'none', color: 'var(--rpg-gold-dark)', cursor: 'pointer', fontSize: '0.8rem' }}>
+          {isLogin ? 'No tenes cuenta? Registrate' : 'Ya tenes cuenta? Inicia sesion'}
+        </button>
+      </div>
+
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--rpg-parchment-dark)' }}>
+        <button onClick={finishOnboarding}
+          style={{ background: 'none', border: 'none', color: 'var(--rpg-ink-light)', cursor: 'pointer', fontSize: '0.85rem' }}>
+          Continuar sin cuenta →
+        </button>
+        <p style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: 6 }}>
+          Tus datos se guardaran solo en este dispositivo
+        </p>
+      </div>
     </div>,
   ];
 
