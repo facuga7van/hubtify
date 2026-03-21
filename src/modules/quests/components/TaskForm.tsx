@@ -85,9 +85,10 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
                 background: tier === t ? 'var(--rpg-gold)' : 'var(--rpg-parchment)',
                 color: tier === t ? 'var(--rpg-ink)' : 'var(--rpg-ink-light)',
                 fontWeight: tier === t ? 'bold' : 'normal',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
               }}
             >
-              <TierBadge tier={t} size={14} /> {TIER_LABEL[t]}
+              <TierBadge tier={t} size={14} active={tier === t} /> {TIER_LABEL[t]}
             </button>
           ))}
         </div>

@@ -28,18 +28,21 @@ export function tierXp(tier: number): number {
   return XP_MAP[tier as TaskTier] ?? 15;
 }
 
-export function TierBadge({ tier, size = 16 }: { tier: number; size?: number }) {
-  const color = tier === 1 ? '#3498db' : tier === 3 ? '#c0392b' : 'var(--rpg-gold)';
+export function TierBadge({ tier, size = 16, active = false }: { tier: number; size?: number; active?: boolean }) {
+  const colors = {
+    1: active ? 'var(--rpg-ink)' : '#3498db',
+    2: active ? 'var(--rpg-ink)' : 'var(--rpg-gold-dark)',
+    3: active ? 'var(--rpg-ink)' : '#c0392b',
+  };
+  const color = colors[tier as TaskTier] ?? colors[2];
+
   if (tier === 1) {
-    // Lightning bolt for Quick
-    return <svg width={size} height={size} viewBox="0 0 16 16" fill={color}><path d="M9 1L4 9h4l-1 6 5-8H8l1-6z"/></svg>;
+    return <svg width={size} height={size} viewBox="0 0 16 16" fill={color} style={{ display: 'block', flexShrink: 0 }}><path d="M9 1L4 9h4l-1 6 5-8H8l1-6z"/></svg>;
   }
   if (tier === 3) {
-    // Dragon/flame for Epic
-    return <svg width={size} height={size} viewBox="0 0 16 16" fill={color}><path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-1-.5-2-1.5-3 .5 1 .5 2-.5 3-1-1-1-3-2-4-.5 1.5-1 2.5-1 3.5a1.5 1.5 0 003 0c0-.5-.3-1.5-1-2.5z"/></svg>;
+    return <svg width={size} height={size} viewBox="0 0 16 16" fill={color} style={{ display: 'block', flexShrink: 0 }}><path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-1-.5-2-1.5-3 .5 1 .5 2-.5 3-1-1-1-3-2-4-.5 1.5-1 2.5-1 3.5a1.5 1.5 0 003 0c0-.5-.3-1.5-1-2.5z"/></svg>;
   }
-  // Crossed swords for Normal
-  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"><path d="M2 14l5-5M7 9l3.5-3.5M12 2l2 2-1.5 1.5M2 2l12 12"/></svg>;
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" style={{ display: 'block', flexShrink: 0 }}><path d="M2 14l5-5M7 9l3.5-3.5M12 2l2 2-1.5 1.5M2 2l12 12"/></svg>;
 }
 
 export function rollBonus(): { tier: 'normal' | 'good' | 'critical' | 'legendary'; multiplier: number } {
