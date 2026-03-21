@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -24,6 +24,8 @@ export default function TaskList() {
   const [filter, setFilter] = useState('');
   const [toastData, setToastData] = useState<XpToastData | null>(null);
   const [todayCount, setTodayCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const formRef = useRef<HTMLDivElement>(null);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -42,6 +44,13 @@ export default function TaskList() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
+  // When editing starts, scroll to form
+  useEffect(() => {
+    if (editingTask && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [editingTask]);
+
   const loadSubtasks = useCallback(async (taskId: string) => {
     const subs = await window.api.questsGetSubtasks(taskId);
     setSubtasksMap((prev) => ({ ...prev, [taskId]: subs as Subtask[] }));
@@ -57,11 +66,17 @@ export default function TaskList() {
   };
 
   const pending = useMemo(() =>
-    tasks.filter((t) => !t.status).sort((a, b) => a.order - b.order)
-      .filter((t) => !filter || t.category === filter),
-    [tasks, filter]
+    tasks.filter((t) => !t.status)
+      .sort((a, b) => a.order - b.order)
+      .filter((t) => !filter || t.category === filter)
+      .filter((t) => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [tasks, filter, searchQuery]
   );
-  const completed = useMemo(() => tasks.filter((t) => t.status), [tasks]);
+  const completed = useMemo(() =>
+    tasks.filter((t) => t.status)
+      .filter((t) => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [tasks, searchQuery]
+  );
 
   const handleComplete = async (task: Task) => {
     const newStatus = !task.status;
@@ -124,7 +139,19 @@ export default function TaskList() {
   return (
     <div>
       <PageHeader title={t('questify.title')} subtitle={t('questify.subtitle')} />
-      <TaskForm editingTask={editingTask} categories={categories} onSaved={() => { setEditingTask(null); loadTasks(); }} />
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder={t('common.search')}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="rpg-input"
+          style={{ width: '100%' }}
+        />
+      </div>
+      <div ref={formRef}>
+        <TaskForm editingTask={editingTask} categories={categories} onSaved={() => { setEditingTask(null); loadTasks(); }} />
+      </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -231,14 +258,32 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
         </svg>
         {/* Checkbox */}
         <Checkbox onChange={onComplete} />
+        <svg onClick={onToggleExpand} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+          style={{ transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.4, flexShrink: 0, cursor: 'pointer' }}>
+          <path d="M3 1l4 4-4 4"/>
+        </svg>
         <span onClick={onToggleExpand} style={{ flex: 1, cursor: 'pointer', fontWeight: 'bold' }}>
           {task.name}
         </span>
+        {subtasks.length > 0 && (
+          <span style={{ fontSize: '0.7rem', opacity: 0.5, fontFamily: 'Fira Code, monospace' }}>
+            ({subtasks.filter(s => s.status).length}/{subtasks.length})
+          </span>
+        )}
         <TierBadge tier={task.tier} />
         <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>+{XP_MAP[task.tier]}</span>
         {task.category && (
           <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)',
             padding: '1px 6px', borderRadius: 3 }}>{task.category}</span>
+        )}
+        {task.dueDate && (
+          <span style={{
+            fontSize: '0.7rem', padding: '1px 6px', borderRadius: 3,
+            background: new Date(task.dueDate) < new Date() ? 'var(--rpg-hp-red)' : 'var(--rpg-parchment-dark)',
+            color: new Date(task.dueDate) < new Date() ? 'var(--rpg-parchment)' : 'var(--rpg-ink-light)',
+          }}>
+            {new Date(task.dueDate).toLocaleDateString()}
+          </span>
         )}
         <svg onClick={onEdit} width="16" height="16" viewBox="0 0 16 16"
           style={{ cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s' }}

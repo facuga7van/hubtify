@@ -115,7 +115,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
           onCancel={() => { setShowForm(false); setEditingSubtask(null); }}
         />
       ) : (
-        <button className="rpg-button" disabled={atLimit} onClick={() => setShowForm(true)}
+        <button className="rpg-button" disabled={atLimit} title={atLimit ? 'Max 30 subtasks reached' : undefined} onClick={() => setShowForm(true)}
           style={{ fontSize: '0.8rem', padding: '4px 10px', marginTop: 6 }}>
           + Add Subtask
         </button>
