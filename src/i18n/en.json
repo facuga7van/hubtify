@@ -173,5 +173,26 @@
     "critical": "Critical hit!",
     "legendary": "LEGENDARY!",
     "streakBonus": "Streak bonus +{{xp}} XP!"
+  },
+  "onboarding": {
+    "tagline": "Your gamified hub for productivity, nutrition, and finance",
+    "startAdventure": "Start Adventure",
+    "createCharacter": "Create your Character",
+    "continue": "Continue",
+    "yourModules": "Your Modules",
+    "questifyDesc": "Tasks and productivity",
+    "nutriftyDesc": "Nutrition and calories",
+    "coinifyDesc": "Personal finance",
+    "loginTitle": "Login",
+    "registerTitle": "Create Account",
+    "syncDesc": "Sync your progress across devices",
+    "login": "Login",
+    "register": "Create Account",
+    "noAccount": "Don't have an account? Register",
+    "hasAccount": "Already have an account? Login",
+    "continueOffline": "Continue without account",
+    "offlineWarning": "Your data will only be saved on this device",
+    "passwordMin": "Password must be at least 6 characters",
+    "connectionError": "Connection error"
   }
 }
