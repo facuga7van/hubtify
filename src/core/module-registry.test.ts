@@ -53,4 +53,22 @@ describe('ModuleRegistry', () => {
     registry.register(mod);
     expect(registry.getAllMigrations()).toHaveLength(1);
   });
+
+  it('getEventHandler returns handler for registered event', () => {
+    const mod = createMockModule('quests');
+    mod.rpgEventHandlers = {
+      TASK_COMPLETED: () => ({ xp: 15, hp: 0 }),
+    };
+    registry.register(mod);
+
+    const result = registry.getEventHandler('TASK_COMPLETED');
+    expect(result).toBeDefined();
+    expect(result!.moduleId).toBe('quests');
+    expect(result!.handler({})).toEqual({ xp: 15, hp: 0 });
+  });
+
+  it('getEventHandler returns undefined for unknown event', () => {
+    registry.register(createMockModule('quests'));
+    expect(registry.getEventHandler('UNKNOWN')).toBeUndefined();
+  });
 });

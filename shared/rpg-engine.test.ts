@@ -83,3 +83,63 @@ describe('getStreakMilestoneBonus', () => {
     expect(getStreakMilestoneBonus(100)).toBe(1000);
   });
 });
+
+describe('clampHp', () => {
+  it('clamps to 0 when negative', () => {
+    expect(clampHp(-10)).toBe(0);
+  });
+  it('clamps to 100 when over max', () => {
+    expect(clampHp(150)).toBe(100);
+  });
+  it('rounds to nearest integer', () => {
+    expect(clampHp(50.7)).toBe(51);
+  });
+  it('keeps valid values', () => {
+    expect(clampHp(50)).toBe(50);
+  });
+});
+
+describe('xpToNextLevel', () => {
+  it('at level 1 with 0 xp needs 246', () => {
+    expect(xpToNextLevel(0)).toBe(246);
+  });
+  it('at level 2 with 246 xp', () => {
+    // level 2 threshold is 246, level 3 threshold is ~369
+    const result = xpToNextLevel(246);
+    expect(result).toBeGreaterThan(0);
+  });
+});
+
+describe('isStreakActive', () => {
+  it('returns false for null lastDate', () => {
+    expect(isStreakActive(null, '2026-03-21')).toBe(false);
+  });
+  it('returns true if lastDate is yesterday', () => {
+    expect(isStreakActive('2026-03-20', '2026-03-21')).toBe(true);
+  });
+  it('returns true if lastDate is today', () => {
+    expect(isStreakActive('2026-03-21', '2026-03-21')).toBe(true);
+  });
+  it('returns false if lastDate is 2+ days ago', () => {
+    expect(isStreakActive('2026-03-19', '2026-03-21')).toBe(false);
+  });
+});
+
+describe('daysDiff', () => {
+  it('same day is 0', () => {
+    expect(daysDiff('2026-03-21', '2026-03-21')).toBe(0);
+  });
+  it('one day apart is 1', () => {
+    expect(daysDiff('2026-03-20', '2026-03-21')).toBe(1);
+  });
+  it('negative diff', () => {
+    expect(daysDiff('2026-03-21', '2026-03-20')).toBe(-1);
+  });
+});
+
+describe('getLocalDateString', () => {
+  it('returns YYYY-MM-DD format', () => {
+    const result = getLocalDateString();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
