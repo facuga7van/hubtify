@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TaskTier, Task } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
 
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function TaskForm({ editingTask, categories, onSaved }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tier, setTier] = useState<TaskTier>(2);
@@ -59,7 +61,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <input
           type="text"
-          placeholder="Quest name..."
+          placeholder={t('questify.questName')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="rpg-input"
@@ -67,7 +69,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           autoFocus
         />
         <button type="submit" className="rpg-button">
-          {editingTask ? 'Update' : 'Add Quest'}
+          {editingTask ? t('questify.update') : t('questify.addQuest')}
         </button>
       </div>
 
@@ -96,7 +98,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
         {/* Description */}
         <input
           type="text"
-          placeholder="Description (optional)"
+          placeholder={t('questify.description')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="rpg-input"
@@ -109,14 +111,14 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           onChange={(e) => setCategory(e.target.value)}
           className="rpg-select"
         >
-          <option value="">No category</option>
+          <option value="">{t('questify.noCategory')}</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
         {/* Due date toggle */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
           <input type="checkbox" checked={useDate} onChange={(e) => setUseDate(e.target.checked)} />
-          Due date
+          {t('questify.dueDate')}
         </label>
         {useDate && (
           <input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)}

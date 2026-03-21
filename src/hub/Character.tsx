@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Application, Assets, Sprite, type Renderer } from 'pixi.js';
 
 import faceImg from '../assets/pixi/face.png';
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export default function Character({ size = 100, canCustomize = false }: Props) {
+  const { t } = useTranslation();
   const pixiContainerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application<Renderer> | null>(null);
   const rearHairBackRef = useRef<Sprite | null>(null);
@@ -235,7 +237,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
         <div style={{ textAlign: 'center', marginTop: 12 }}>
           <button className="rpg-button" onClick={() => setShowCustomizer(!showCustomizer)}
             style={{ fontSize: '0.8rem', padding: '6px 16px' }}>
-            {showCustomizer ? 'Done' : 'Customize'}
+            {showCustomizer ? t('character.done') : t('character.customize')}
           </button>
         </div>
       )}
@@ -247,19 +249,19 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
               <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
             </svg>
-            Customize Character
+            {t('character.customizeTitle')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <ControlRow label="Hair Style" value={charData.frontHairIndex}
+            <ControlRow label={t('character.hairStyle')} value={charData.frontHairIndex}
               onPrev={() => updateField('frontHairIndex', -1)}
               onNext={() => updateField('frontHairIndex', 1)} />
-            <ControlRow label="Hair Color" value={charData.frontColorIndex}
+            <ControlRow label={t('character.hairColor')} value={charData.frontColorIndex}
               onPrev={() => updateField('frontColorIndex', -1)}
               onNext={() => updateField('frontColorIndex', 1)} />
-            <ControlRow label="Back Style" value={charData.backHairIndex}
+            <ControlRow label={t('character.backStyle')} value={charData.backHairIndex}
               onPrev={() => updateField('backHairIndex', -1)}
               onNext={() => updateField('backHairIndex', 1)} />
-            <ControlRow label="Back Color" value={charData.backColorIndex}
+            <ControlRow label={t('character.backColor')} value={charData.backColorIndex}
               onPrev={() => updateField('backColorIndex', -1)}
               onNext={() => updateField('backColorIndex', 1)} />
           </div>

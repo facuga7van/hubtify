@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
-import type { XpToastData } from '../types';
+import { useTranslation } from 'react-i18next';
+import type { XpToastData, BonusTier } from '../types';
 
 export type { XpToastData };
-
-const BONUS_LABELS: Record<string, string> = {
-  normal: '',
-  good: 'Buen golpe!',
-  critical: 'Golpe critico!',
-  legendary: 'LEGENDARIO!',
-};
 
 interface Props {
   data: XpToastData | null;
 }
 
 export default function XpToast({ data }: Props) {
+  const { t } = useTranslation();
+  const BONUS_LABELS: Record<BonusTier, string> = {
+    normal: '',
+    good: t('toast.good'),
+    critical: t('toast.critical'),
+    legendary: t('toast.legendary'),
+  };
   const [visible, setVisible] = useState(false);
   const [current, setCurrent] = useState<XpToastData | null>(null);
 

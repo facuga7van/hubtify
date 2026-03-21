@@ -90,8 +90,12 @@ export default function Sidebar({ stats }: SidebarProps) {
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <button className="rpg-button" onClick={async () => {
-                const result = await window.api.syncPush(authUser.uid);
-                alert(result.success ? 'Synced!' : `Sync failed: ${result.error}`);
+                try {
+                  const result = await window.api.syncPush(authUser.uid);
+                  alert(result.success ? t('auth.synced') : `${t('auth.syncFailed')}: ${result.error}`);
+                } catch (err) {
+                  alert(t('auth.syncFailed'));
+                }
               }} style={{ fontSize: '0.7rem', padding: '3px 8px', flex: 1 }}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <path d="M1 6a5 5 0 019-2M11 6a5 5 0 01-9 2"/><path d="M10 1v3h-3M2 11V8h3"/>

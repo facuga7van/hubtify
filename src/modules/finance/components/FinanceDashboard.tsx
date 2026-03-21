@@ -88,7 +88,7 @@ export default function FinanceDashboard() {
 
       {/* Monthly total */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">Monthly Expenses — {month}</div>
+        <div className="rpg-card-title">{t('coinify.monthlyExpenses')} — {month}</div>
         <p style={{ fontSize: '2rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
           ${monthlyTotal.toLocaleString()} <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>ARS</span>
         </p>
@@ -104,7 +104,7 @@ export default function FinanceDashboard() {
 
       {/* Quick-add transaction */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">Quick Add</div>
+        <div className="rpg-card-title">{t('coinify.quickAdd')}</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <select
             value={txType}
@@ -112,12 +112,12 @@ export default function FinanceDashboard() {
             className="rpg-input"
             style={{ width: 100 }}
           >
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
+            <option value="expense">{t('coinify.expense')}</option>
+            <option value="income">{t('coinify.income')}</option>
           </select>
           <input
             type="number"
-            placeholder="Amount"
+            placeholder={t('coinify.amount')}
             value={txAmount}
             onChange={(e) => setTxAmount(e.target.value)}
             className="rpg-input"
@@ -127,7 +127,7 @@ export default function FinanceDashboard() {
           />
           <input
             type="text"
-            placeholder="Description"
+            placeholder={t('coinify.description')}
             value={txDesc}
             onChange={(e) => setTxDesc(e.target.value)}
             className="rpg-input"
@@ -141,15 +141,15 @@ export default function FinanceDashboard() {
           >
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <button className="rpg-btn" onClick={addTransaction}>+ Add</button>
+          <button className="rpg-button" onClick={addTransaction}>+ {t('coinify.add')}</button>
         </div>
       </div>
 
       {/* Transaction list */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">Transactions ({transactions.length})</div>
+        <div className="rpg-card-title">{t('coinify.transactions')} ({transactions.length})</div>
         {transactions.length === 0 ? (
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No transactions this month</p>
+          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('coinify.noTransactions')}</p>
         ) : (
           <div style={{ maxHeight: 300, overflowY: 'auto' }}>
             {transactions.map((tx) => (
@@ -158,7 +158,7 @@ export default function FinanceDashboard() {
                 padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
               }}>
                 <div>
-                  <span style={{ color: tx.type === 'expense' ? '#e57373' : '#81c784', fontWeight: 600 }}>
+                  <span style={{ color: tx.type === 'expense' ? 'var(--rpg-hp-red-light)' : 'var(--rpg-xp-green-light)', fontWeight: 600 }}>
                     {tx.type === 'expense' ? '-' : '+'}${tx.amount.toLocaleString()}
                   </span>
                   <span style={{ opacity: 0.6, marginLeft: 8, fontSize: '0.85rem' }}>
@@ -170,7 +170,7 @@ export default function FinanceDashboard() {
                 </div>
                 <button
                   onClick={() => deleteTransaction(tx.id)}
-                  style={{ background: 'none', border: 'none', color: '#e57373', cursor: 'pointer', fontSize: '0.85rem' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--rpg-hp-red-light)', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   x
                 </button>
@@ -183,9 +183,9 @@ export default function FinanceDashboard() {
       {/* Loans */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Loans ({activeLoans.length} active)</span>
-          <button className="rpg-btn" style={{ fontSize: '0.75rem', padding: '2px 8px' }} onClick={() => setShowLoanForm(!showLoanForm)}>
-            {showLoanForm ? 'Cancel' : '+ Loan'}
+          <span>{t('coinify.loans')} ({activeLoans.length} {t('coinify.active')})</span>
+          <button className="rpg-button" style={{ fontSize: '0.75rem', padding: '2px 8px' }} onClick={() => setShowLoanForm(!showLoanForm)}>
+            {showLoanForm ? t('coinify.cancel') : `+ ${t('coinify.loan')}`}
           </button>
         </div>
 
@@ -197,12 +197,12 @@ export default function FinanceDashboard() {
               className="rpg-input"
               style={{ width: 110 }}
             >
-              <option value="lent">I lent</option>
-              <option value="borrowed">I borrowed</option>
+              <option value="lent">{t('coinify.iLent')}</option>
+              <option value="borrowed">{t('coinify.iBorrowed')}</option>
             </select>
             <input
               type="text"
-              placeholder="Person"
+              placeholder={t('coinify.person')}
               value={loanPerson}
               onChange={(e) => setLoanPerson(e.target.value)}
               className="rpg-input"
@@ -210,7 +210,7 @@ export default function FinanceDashboard() {
             />
             <input
               type="number"
-              placeholder="Amount"
+              placeholder={t('coinify.amount')}
               value={loanAmount}
               onChange={(e) => setLoanAmount(e.target.value)}
               className="rpg-input"
@@ -219,18 +219,18 @@ export default function FinanceDashboard() {
             />
             <input
               type="text"
-              placeholder="Note"
+              placeholder={t('coinify.note')}
               value={loanDesc}
               onChange={(e) => setLoanDesc(e.target.value)}
               className="rpg-input"
               style={{ flex: 1, minWidth: 100 }}
             />
-            <button className="rpg-btn" onClick={addLoan}>Add</button>
+            <button className="rpg-button" onClick={addLoan}>{t('coinify.add')}</button>
           </div>
         )}
 
         {activeLoans.length === 0 && !showLoanForm ? (
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No active loans</p>
+          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('coinify.noLoans')}</p>
         ) : (
           activeLoans.map((loan) => (
             <div key={loan.id} style={{
@@ -238,18 +238,18 @@ export default function FinanceDashboard() {
               padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
             }}>
               <div>
-                <span style={{ fontWeight: 600, color: loan.type === 'lent' ? '#81c784' : '#e57373' }}>
-                  {loan.type === 'lent' ? 'Lent to' : 'Borrowed from'} {loan.personName}
+                <span style={{ fontWeight: 600, color: loan.type === 'lent' ? 'var(--rpg-xp-green-light)' : 'var(--rpg-hp-red-light)' }}>
+                  {loan.type === 'lent' ? t('coinify.lentTo') : t('coinify.borrowedFrom')} {loan.personName}
                 </span>
                 <span style={{ marginLeft: 8 }}>${loan.amount.toLocaleString()}</span>
                 {loan.description && <span style={{ opacity: 0.5, marginLeft: 8, fontSize: '0.85rem' }}>({loan.description})</span>}
               </div>
               <button
-                className="rpg-btn"
+                className="rpg-button"
                 style={{ fontSize: '0.75rem', padding: '2px 8px' }}
                 onClick={() => settleLoan(loan.id)}
               >
-                Settle
+                {t('coinify.settle')}
               </button>
             </div>
           ))
@@ -258,12 +258,12 @@ export default function FinanceDashboard() {
         {settledLoans.length > 0 && (
           <details style={{ marginTop: 8 }}>
             <summary style={{ cursor: 'pointer', opacity: 0.6, fontSize: '0.85rem' }}>
-              {settledLoans.length} settled loan{settledLoans.length !== 1 ? 's' : ''}
+              {settledLoans.length} {t('coinify.settledLoans')}
             </summary>
             {settledLoans.map((loan) => (
               <div key={loan.id} style={{ padding: '4px 0', opacity: 0.5, fontSize: '0.85rem' }}>
-                {loan.type === 'lent' ? 'Lent to' : 'Borrowed from'} {loan.personName} — ${loan.amount.toLocaleString()}
-                {loan.settledDate && <span> (settled {loan.settledDate})</span>}
+                {loan.type === 'lent' ? t('coinify.lentTo') : t('coinify.borrowedFrom')} {loan.personName} — ${loan.amount.toLocaleString()}
+                {loan.settledDate && <span> ({t('coinify.settled')} {loan.settledDate})</span>}
               </div>
             ))}
           </details>

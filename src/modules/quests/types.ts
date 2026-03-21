@@ -47,14 +47,6 @@ export interface XpToastData {
   streakMilestone?: number | null;
 }
 
-export function rollBonus(): BonusRoll {
-  const roll = Math.random();
-  if (roll < 0.70) return { tier: 'normal', multiplier: 1.0 };
-  if (roll < 0.90) return { tier: 'good', multiplier: 1.5 };
-  if (roll < 0.98) return { tier: 'critical', multiplier: 2.0 };
-  return { tier: 'legendary', multiplier: 3.0 };
-}
-
 export function migrateOldDifficulty(oldDiff: number): TaskTier {
   if (oldDiff <= 3) return TASK_TIER.QUICK;
   if (oldDiff <= 7) return TASK_TIER.NORMAL;

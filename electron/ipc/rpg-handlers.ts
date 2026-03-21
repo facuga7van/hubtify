@@ -106,16 +106,12 @@ export function registerRpgHandlers(): void {
       `).run(finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today, 'default');
 
       // After the main UPDATE, increment module counters
-      const counterMap: Record<string, string> = {
-        'TASK_COMPLETED': 'total_tasks',
-        'SUBTASK_COMPLETED': 'total_tasks',
-        'MEAL_LOGGED': 'total_meals',
-        'EXPENSE_TRACKED': 'total_expenses',
-        'LOAN_SETTLED': 'total_expenses',
-      };
-      const counterCol = counterMap[event.type];
-      if (counterCol) {
-        db.prepare(`UPDATE player_stats SET ${counterCol} = ${counterCol} + 1 WHERE user_id = ?`).run('default');
+      if (event.type === 'TASK_COMPLETED' || event.type === 'SUBTASK_COMPLETED') {
+        db.prepare('UPDATE player_stats SET total_tasks = total_tasks + 1 WHERE user_id = ?').run('default');
+      } else if (event.type === 'MEAL_LOGGED') {
+        db.prepare('UPDATE player_stats SET total_meals = total_meals + 1 WHERE user_id = ?').run('default');
+      } else if (event.type === 'EXPENSE_TRACKED' || event.type === 'LOAN_SETTLED') {
+        db.prepare('UPDATE player_stats SET total_expenses = total_expenses + 1 WHERE user_id = ?').run('default');
       }
 
       return {
