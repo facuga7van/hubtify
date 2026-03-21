@@ -101,6 +101,10 @@ export interface HubtifyApi {
   nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
   onEstimateProgress: (callback: (stage: string) => void) => () => void;
 
+  // Character
+  characterSave: (data: Record<string, unknown>) => Promise<void>;
+  characterLoad: () => Promise<unknown>;
+
   // Finance
   financeGetTransactions: (month: string) => Promise<unknown[]>;
   financeAddTransaction: (tx: Record<string, unknown>) => Promise<string>;

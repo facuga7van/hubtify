@@ -25,7 +25,7 @@ export default function CharacterPage() {
 
       {/* Main character card */}
       <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
-        <Character size={128} showControls />
+        <Character size={128} canCustomize />
         <h3 style={{ fontSize: '1.3rem', color: 'var(--rpg-gold)', marginBottom: 4 }}>
           Level {stats.level}
         </h3>

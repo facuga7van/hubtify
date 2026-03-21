@@ -5,6 +5,7 @@ import { closeDb, getDb, runModuleMigrations } from './ipc/db';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
 import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
+import { characterMigrations } from '../src/modules/character/character.schema';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -58,6 +59,7 @@ app.whenReady().then(() => {
   runModuleMigrations(questsMigrations);
   runModuleMigrations(nutritionMigrations);
   runModuleMigrations(financeMigrations);
+  runModuleMigrations(characterMigrations);
 
   createWindow();
 });

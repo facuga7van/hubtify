@@ -60,6 +60,10 @@ const api = {
     return () => ipcRenderer.removeListener('nutrition:estimate-progress', handler);
   },
 
+  // Character
+  characterSave: (data: Record<string, unknown>) => ipcRenderer.invoke('character:save', data),
+  characterLoad: () => ipcRenderer.invoke('character:load'),
+
   // Finance
   financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
   financeAddTransaction: (tx: Record<string, unknown>) => ipcRenderer.invoke('finance:addTransaction', tx),

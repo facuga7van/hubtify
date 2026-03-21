@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Application, Assets, Sprite, type Renderer } from 'pixi.js';
 
 import faceImg from '../assets/pixi/face.png';
@@ -25,39 +25,41 @@ const DEFAULT_CHAR: CharacterData = {
   frontHairIndex: 1,
 };
 
-function getCharData(): CharacterData {
-  try {
-    const cached = localStorage.getItem('hubtify_charData');
-    return cached ? JSON.parse(cached) : { ...DEFAULT_CHAR };
-  } catch {
-    return { ...DEFAULT_CHAR };
-  }
-}
-
-function saveCharData(data: CharacterData): void {
-  localStorage.setItem('hubtify_charData', JSON.stringify(data));
-}
-
 interface Props {
   size?: number;
-  showControls?: boolean;
+  canCustomize?: boolean;
 }
 
-export default function Character({ size = 100, showControls = false }: Props) {
+export default function Character({ size = 100, canCustomize = false }: Props) {
   const pixiContainerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application<Renderer> | null>(null);
-  const rearHairBackSpriteRef = useRef<Sprite | null>(null);
-  const rearHairFrontSpriteRef = useRef<Sprite | null>(null);
-  const frontHairSpriteRef = useRef<Sprite | null>(null);
+  const rearHairBackRef = useRef<Sprite | null>(null);
+  const rearHairFrontRef = useRef<Sprite | null>(null);
+  const frontHairRef = useRef<Sprite | null>(null);
   const isLoadingRef = useRef(false);
 
-  const [charData, setCharData] = useState<CharacterData>(getCharData);
+  const [charData, setCharData] = useState<CharacterData>(DEFAULT_CHAR);
   const [loadingHair, setLoadingHair] = useState(true);
+  const [showCustomizer, setShowCustomizer] = useState(false);
+
+  // Load from SQLite on mount
+  useEffect(() => {
+    window.api.characterLoad().then((data) => {
+      if (data && typeof data === 'object') {
+        const d = data as CharacterData;
+        setCharData({
+          backHairIndex: d.backHairIndex ?? 1,
+          frontColorIndex: d.frontColorIndex ?? 1,
+          backColorIndex: d.backColorIndex ?? 1,
+          frontHairIndex: d.frontHairIndex ?? 1,
+        });
+      }
+    }).catch(console.error);
+  }, []);
 
   // Init Pixi app
   useEffect(() => {
     if (appRef.current) return;
-
     const app = new Application();
     appRef.current = app;
 
@@ -67,45 +69,31 @@ export default function Character({ size = 100, showControls = false }: Props) {
       canvas.style.height = `${size}px`;
       canvas.style.borderRadius = '50%';
 
-      await app.init({
-        canvas,
-        background: '#c0a080',
-        width: 100,
-        height: 100,
-      });
-
+      await app.init({ canvas, background: '#c0a080', width: 100, height: 100 });
       pixiContainerRef.current?.appendChild(canvas);
 
       const cx = app.screen.width / 2;
       const cy = app.screen.height / 2;
 
-      const sprites = await Promise.all([
-        Assets.load(neckImg),
-        Assets.load(faceImg),
-        Assets.load(eyesImg),
-        Assets.load(eyeBrImg),
-        Assets.load(mouthImg),
-        Assets.load(noseImg),
+      const textures = await Promise.all([
+        Assets.load(neckImg), Assets.load(faceImg), Assets.load(eyesImg),
+        Assets.load(eyeBrImg), Assets.load(mouthImg), Assets.load(noseImg),
       ]);
 
-      sprites.forEach((tex) => {
+      textures.forEach((tex) => {
         const sp = new Sprite(tex);
         sp.anchor.set(0.5, 0.5);
-        sp.x = cx;
-        sp.y = cy;
+        sp.x = cx; sp.y = cy;
         app.stage.addChild(sp);
       });
 
       loadAllHair(charData.backHairIndex, charData.backColorIndex, charData.frontHairIndex, charData.frontColorIndex);
     })();
 
-    return () => {
-      app.destroy(true);
-      appRef.current = null;
-    };
+    return () => { app.destroy(true); appRef.current = null; };
   }, []);
 
-  const loadAllHair = async (bIndex: number, bColor: number, fIndex: number, fColor: number) => {
+  const loadAllHair = useCallback(async (bIdx: number, bClr: number, fIdx: number, fClr: number) => {
     if (!appRef.current || isLoadingRef.current) return;
     isLoadingRef.current = true;
     setLoadingHair(true);
@@ -115,16 +103,12 @@ export default function Character({ size = 100, showControls = false }: Props) {
       const cx = app.screen.width / 2;
       const cy = app.screen.height / 2;
 
-      // Cleanup existing hair
-      [rearHairBackSpriteRef, rearHairFrontSpriteRef, frontHairSpriteRef].forEach((ref) => {
-        if (ref.current) {
-          app.stage.removeChild(ref.current);
-          ref.current.destroy();
-          ref.current = null;
-        }
+      // Cleanup
+      [rearHairBackRef, rearHairFrontRef, frontHairRef].forEach((ref) => {
+        if (ref.current) { app.stage.removeChild(ref.current); ref.current.destroy(); ref.current = null; }
       });
 
-      // Load rear hair spritesheets
+      // Rear hair
       if (!Assets.cache.has('rearHairBack')) {
         const tex = await Assets.load(rearHairsBackPng);
         Assets.add({ alias: 'rearHairBack', src: new URL('../assets/pixi/rearHairBack.json', import.meta.url).href, data: { texture: tex } });
@@ -137,70 +121,66 @@ export default function Character({ size = 100, showControls = false }: Props) {
       }
       const rearFrontSheet = await Assets.load('rearHairFront');
 
-      // Create rear hair sprites
-      const backFrameName = `rearHairBack${bIndex}-${bColor}`;
-      const frontFrameName = `rearHairFront${bIndex}-${bColor}`;
-
-      if (backFrameName in rearBackSheet.textures) {
-        const sp = new Sprite(rearBackSheet.textures[backFrameName]);
-        sp.anchor.set(0.5, 0.5);
-        sp.x = cx; sp.y = cy;
+      const backName = `rearHairBack${bIdx}-${bClr}`;
+      if (backName in rearBackSheet.textures) {
+        const sp = new Sprite(rearBackSheet.textures[backName]);
+        sp.anchor.set(0.5, 0.5); sp.x = cx; sp.y = cy;
         app.stage.addChildAt(sp, 0);
-        rearHairBackSpriteRef.current = sp;
+        rearHairBackRef.current = sp;
       }
 
-      if (frontFrameName in rearFrontSheet.textures) {
-        const sp = new Sprite(rearFrontSheet.textures[frontFrameName]);
-        sp.anchor.set(0.5, 0.5);
-        sp.x = cx; sp.y = cy;
+      const rearFName = `rearHairFront${bIdx}-${bClr}`;
+      if (rearFName in rearFrontSheet.textures) {
+        const sp = new Sprite(rearFrontSheet.textures[rearFName]);
+        sp.anchor.set(0.5, 0.5); sp.x = cx; sp.y = cy;
         app.stage.addChildAt(sp, 0);
-        rearHairFrontSpriteRef.current = sp;
+        rearHairFrontRef.current = sp;
       }
 
-      // Load front hair spritesheet
+      // Front hair
       if (!Assets.cache.has('frontHair')) {
         const tex = await Assets.load(frontHairsPng);
         Assets.add({ alias: 'frontHair', src: new URL('../assets/pixi/frontHair.json', import.meta.url).href, data: { texture: tex } });
       }
       const frontSheet = await Assets.load('frontHair');
 
-      const fFrameName = `fronthair${fIndex}-${fColor}`;
-      if (fFrameName in frontSheet.textures) {
-        const sp = new Sprite(frontSheet.textures[fFrameName]);
-        sp.anchor.set(0.5, 0.5);
-        sp.x = cx; sp.y = cy;
+      const fName = `fronthair${fIdx}-${fClr}`;
+      if (fName in frontSheet.textures) {
+        const sp = new Sprite(frontSheet.textures[fName]);
+        sp.anchor.set(0.5, 0.5); sp.x = cx; sp.y = cy;
         app.stage.addChild(sp);
-        frontHairSpriteRef.current = sp;
+        frontHairRef.current = sp;
       }
 
-      // Fix z-order
-      if (rearHairBackSpriteRef.current) app.stage.setChildIndex(rearHairBackSpriteRef.current, 0);
-      if (rearHairFrontSpriteRef.current) app.stage.setChildIndex(rearHairFrontSpriteRef.current, app.stage.children.length - 2);
-      if (frontHairSpriteRef.current) app.stage.setChildIndex(frontHairSpriteRef.current, app.stage.children.length - 1);
+      // Z-order
+      if (rearHairBackRef.current) app.stage.setChildIndex(rearHairBackRef.current, 0);
+      if (rearHairFrontRef.current) app.stage.setChildIndex(rearHairFrontRef.current, app.stage.children.length - 2);
+      if (frontHairRef.current) app.stage.setChildIndex(frontHairRef.current, app.stage.children.length - 1);
 
     } catch (e) {
-      console.error('Error loading character hair:', e);
+      console.error('Error loading hair:', e);
     } finally {
       isLoadingRef.current = false;
       setLoadingHair(false);
     }
-  };
+  }, []);
 
-  // Reload hair when charData changes
   useEffect(() => {
     loadAllHair(charData.backHairIndex, charData.backColorIndex, charData.frontHairIndex, charData.frontColorIndex);
-  }, [charData]);
+  }, [charData, loadAllHair]);
 
-  const updateChar = (field: keyof CharacterData, delta: number) => {
+  const updateField = (field: keyof CharacterData, delta: number) => {
     setCharData((prev) => {
       const next = { ...prev, [field]: Math.max(1, prev[field] + delta) };
-      saveCharData(next);
+      // Save to SQLite
+      window.api.characterSave(next).catch(console.error);
       return next;
     });
   };
 
   return (
     <div>
+      {/* Character canvas */}
       <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
         {loadingHair && (
           <div style={{
@@ -209,24 +189,46 @@ export default function Character({ size = 100, showControls = false }: Props) {
           }}>
             <div style={{
               width: 20, height: 20, border: '2px solid var(--rpg-gold-dark)',
-              borderTopColor: 'transparent', borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
+              borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite',
             }} />
           </div>
         )}
         <div ref={pixiContainerRef} style={{ visibility: loadingHair ? 'hidden' : 'visible' }} />
       </div>
 
-      {showControls && (
-        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <ControlRow label="Hair Style" value={charData.frontHairIndex}
-            onPrev={() => updateChar('frontHairIndex', -1)} onNext={() => updateChar('frontHairIndex', 1)} />
-          <ControlRow label="Hair Color" value={charData.frontColorIndex}
-            onPrev={() => updateChar('frontColorIndex', -1)} onNext={() => updateChar('frontColorIndex', 1)} />
-          <ControlRow label="Back Style" value={charData.backHairIndex}
-            onPrev={() => updateChar('backHairIndex', -1)} onNext={() => updateChar('backHairIndex', 1)} />
-          <ControlRow label="Back Color" value={charData.backColorIndex}
-            onPrev={() => updateChar('backColorIndex', -1)} onNext={() => updateChar('backColorIndex', 1)} />
+      {/* Customize button */}
+      {canCustomize && (
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <button className="rpg-button" onClick={() => setShowCustomizer(!showCustomizer)}
+            style={{ fontSize: '0.8rem', padding: '6px 16px' }}>
+            {showCustomizer ? 'Done' : 'Customize'}
+          </button>
+        </div>
+      )}
+
+      {/* Customization panel */}
+      {canCustomize && showCustomizer && (
+        <div className="rpg-card" style={{ marginTop: 12, animation: 'contentFadeIn 0.2s ease' }}>
+          <div className="rpg-card-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+              <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
+            </svg>
+            Customize Character
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <ControlRow label="Hair Style" value={charData.frontHairIndex}
+              onPrev={() => updateField('frontHairIndex', -1)}
+              onNext={() => updateField('frontHairIndex', 1)} />
+            <ControlRow label="Hair Color" value={charData.frontColorIndex}
+              onPrev={() => updateField('frontColorIndex', -1)}
+              onNext={() => updateField('frontColorIndex', 1)} />
+            <ControlRow label="Back Style" value={charData.backHairIndex}
+              onPrev={() => updateField('backHairIndex', -1)}
+              onNext={() => updateField('backHairIndex', 1)} />
+            <ControlRow label="Back Color" value={charData.backColorIndex}
+              onPrev={() => updateField('backColorIndex', -1)}
+              onNext={() => updateField('backColorIndex', 1)} />
+          </div>
         </div>
       )}
     </div>
@@ -237,15 +239,15 @@ function ControlRow({ label, value, onPrev, onNext }: {
   label: string; value: number; onPrev: () => void; onNext: () => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <span style={{ fontSize: '0.85rem', minWidth: 80 }}>{label}</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button className="rpg-button" onClick={onPrev} style={{ padding: '2px 8px', fontSize: '0.8rem' }}>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span style={{ fontSize: '0.85rem', color: 'var(--rpg-ink-light)' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button className="rpg-button" onClick={onPrev} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+          <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 1L2 5l4 4"/></svg>
         </button>
-        <span style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.85rem', minWidth: 20, textAlign: 'center' }}>{value}</span>
-        <button className="rpg-button" onClick={onNext} style={{ padding: '2px 8px', fontSize: '0.8rem' }}>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 1l4 4-4 4"/></svg>
+        <span style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.85rem', minWidth: 24, textAlign: 'center' }}>{value}</span>
+        <button className="rpg-button" onClick={onNext} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+          <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 1l4 4-4 4"/></svg>
         </button>
       </div>
     </div>
