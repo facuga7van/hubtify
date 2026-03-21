@@ -19,12 +19,16 @@ export default function PlayerCard({ stats }: PlayerCardProps) {
 
   return (
     <div style={{ padding: '12px 14px' }}>
+      {/* Avatar with golden frame */}
       <div style={{
-        width: 64, height: 64, borderRadius: '50%',
-        background: 'rgba(244,228,193,0.2)', border: '2px solid rgba(212,160,23,0.5)',
-        margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.5rem', boxShadow: hpGlow,
-      }}>&#x2694;</div>
+        width: 80, height: 80, margin: '0 auto 8px',
+        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: hpGlow,
+      }}>
+        <img src={new URL('../../assets/frame.png', import.meta.url).href}
+          alt="" style={{ position: 'absolute', inset: -8, width: 'calc(100% + 16px)', height: 'calc(100% + 16px)', objectFit: 'contain' }} />
+        <span style={{ fontSize: '1.8rem', zIndex: 1 }}>⚔</span>
+      </div>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
         <div style={{ fontFamily: 'Cinzel, serif', fontSize: '0.9rem', color: 'var(--rpg-gold-light)' }}>

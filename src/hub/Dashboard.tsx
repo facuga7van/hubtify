@@ -9,6 +9,8 @@ export default function Dashboard() {
 
   return (
     <div>
+      <img src={new URL('../../assets/header.png', import.meta.url).href}
+        alt="" style={{ width: '100%', height: 'auto', marginBottom: -8, marginTop: -24, opacity: 0.8 }} />
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: '1.4rem', marginBottom: 4 }}>Welcome, Adventurer</h2>
         <p style={{ fontSize: '0.9rem', opacity: 0.6 }}>Your quest log awaits</p>

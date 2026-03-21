@@ -142,7 +142,9 @@ export default function TaskList() {
 
         {selectedIds.size > 0 && (
           <button className="rpg-button" onClick={handleDelete}
-            style={{ background: 'var(--rpg-hp-red)', marginLeft: 8 }}>
+            style={{ background: 'var(--rpg-hp-red)', marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <img src={new URL('../../../assets/trash.png', import.meta.url).href}
+              alt="Delete" style={{ width: 16, height: 16 }} />
             Delete ({selectedIds.size})
           </button>
         )}
@@ -179,7 +181,12 @@ export default function TaskList() {
       {activeTab === 'completed' && completed.map((task) => (
         <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked onChange={() => handleComplete(task)} />
+            <img
+              src={new URL('../../../assets/checked.png', import.meta.url).href}
+              alt="Completed"
+              onClick={() => handleComplete(task)}
+              style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7 }}
+            />
             <span style={{ textDecoration: 'line-through', flex: 1 }}>{task.name}</span>
             <span>{tierEmoji(task.tier)}</span>
           </div>
@@ -212,7 +219,14 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
     <div ref={setNodeRef} style={{ ...style, marginBottom: 8 }} {...attributes} className="rpg-card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: expanded ? 8 : 0 }}>
         <span {...listeners} style={{ cursor: 'grab', fontSize: '1rem' }}>&#x2630;</span>
-        <input type="checkbox" onChange={onComplete} />
+        <img
+          src={new URL('../../../assets/check.png', import.meta.url).href}
+          alt="Complete"
+          onClick={onComplete}
+          style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7, transition: 'opacity 0.2s' }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
+        />
         <span onClick={onToggleExpand} style={{ flex: 1, cursor: 'pointer', fontWeight: 'bold' }}>
           {task.name}
         </span>
@@ -222,7 +236,14 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
           <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)',
             padding: '1px 6px', borderRadius: 3 }}>{task.category}</span>
         )}
-        <button onClick={onEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>&#x270F;&#xFE0F;</button>
+        <img
+          src={new URL('../../../assets/edit.png', import.meta.url).href}
+          alt="Edit"
+          onClick={onEdit}
+          style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0.6, transition: 'opacity 0.2s' }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
+        />
         <input type="checkbox" checked={selected} onChange={onToggleSelect} title="Select for deletion" />
       </div>
 

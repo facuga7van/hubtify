@@ -17,7 +17,10 @@ export default function Sidebar({ stats }: SidebarProps) {
   return (
     <aside className="sidebar">
       <PlayerCard stats={stats} />
-      <div className="sidebar-divider" />
+      <div style={{ padding: '4px 14px', opacity: 0.3 }}>
+        <img src={new URL('../../assets/footer.png', import.meta.url).href}
+          alt="" style={{ width: '100%', height: 'auto' }} />
+      </div>
       <nav className="sidebar-nav">
         {navItems.map((item) => (
           <NavLink
@@ -30,7 +33,10 @@ export default function Sidebar({ stats }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-divider" />
+      <div style={{ padding: '4px 14px', opacity: 0.3 }}>
+        <img src={new URL('../../assets/footer.png', import.meta.url).href}
+          alt="" style={{ width: '100%', height: 'auto' }} />
+      </div>
       <div className="sidebar-footer">
         {stats && stats.streak > 0 && (
           <div style={{ marginBottom: 6 }}>

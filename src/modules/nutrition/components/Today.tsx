@@ -112,9 +112,15 @@ export default function Today() {
       {/* Header with charts link */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="rpg-button" onClick={() => goDay(-1)}>&larr;</button>
+          <button className="rpg-button" onClick={() => goDay(-1)} style={{ display: 'flex', alignItems: 'center' }}>
+            <img src={new URL('../../../assets/arrow.png', import.meta.url).href}
+              alt="Previous" style={{ width: 20, height: 14 }} />
+          </button>
           <h3 style={{ textAlign: 'center' }}>{date}</h3>
-          <button className="rpg-button" onClick={() => goDay(1)}>&rarr;</button>
+          <button className="rpg-button" onClick={() => goDay(1)} style={{ display: 'flex', alignItems: 'center' }}>
+            <img src={new URL('../../../assets/arrow.png', import.meta.url).href}
+              alt="Next" style={{ width: 20, height: 14, transform: 'scaleX(-1)' }} />
+          </button>
         </div>
         <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
           style={{ fontSize: '0.85rem' }}>

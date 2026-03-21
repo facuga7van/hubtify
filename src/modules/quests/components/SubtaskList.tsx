@@ -102,7 +102,12 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
 
       {showCompleted && completed.map((subtask) => (
         <div key={subtask.id} className="subtask-item subtask-item--completed">
-          <input type="checkbox" checked onChange={() => handleComplete(subtask)} />
+          <img
+            src={new URL('../../../assets/checked.png', import.meta.url).href}
+            alt="Completed"
+            onClick={() => handleComplete(subtask)}
+            style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7 }}
+          />
           <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{subtask.name}</span>
         </div>
       ))}
@@ -131,7 +136,14 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="subtask-item">
-      <input type="checkbox" onChange={() => onComplete(subtask)} />
+      <img
+        src={new URL('../../../assets/check.png', import.meta.url).href}
+        alt="Complete"
+        onClick={() => onComplete(subtask)}
+        style={{ width: 22, height: 22, cursor: 'pointer', opacity: 0.7, transition: 'opacity 0.2s' }}
+        onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+        onMouseOut={(e) => (e.currentTarget.style.opacity = '0.7')}
+      />
       <span className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
         {subtask.name}
       </span>
