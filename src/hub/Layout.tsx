@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import type { PlayerStats } from '../../shared/types';
 import './styles/layout.css';
 import './styles/components.css';
+import { playLevelUp } from '../shared/audio';
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export default function Layout() {
   useEffect(() => {
     if (stats && prevLevelRef.current > 0 && stats.level > prevLevelRef.current) {
       setLevelUp(stats.level);
+      playLevelUp();
       setTimeout(() => setLevelUp(null), 3000);
     }
     if (stats) prevLevelRef.current = stats.level;

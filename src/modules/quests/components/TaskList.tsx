@@ -9,6 +9,7 @@ import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
 import { type Task, type TaskTier, type Subtask, XP_MAP } from '../types';
 import { TierBadge, calculateXpForAction } from '../utils';
+import { playTaskComplete, playDelete } from '../../../shared/audio';
 
 export default function TaskList() {
   const { t } = useTranslation();
@@ -72,6 +73,7 @@ export default function TaskList() {
         payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
         timestamp: Date.now(),
       });
+      playTaskComplete();
       setToastData({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null });
     } else {
       await window.api.questsSetTaskStatus(task.id, false);
@@ -88,6 +90,7 @@ export default function TaskList() {
     if (selectedIds.size === 0) return;
     const confirmed = window.confirm(`Delete ${selectedIds.size} quest(s)? This cannot be undone.`);
     if (!confirmed) return;
+    playDelete();
     await window.api.questsDeleteTasks(Array.from(selectedIds));
     setSelectedIds(new Set());
     await loadTasks();

@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Layout from './hub/Layout';
+import Onboarding from './hub/Onboarding';
 import Dashboard from './hub/Dashboard';
 import CharacterPage from './hub/CharacterPage';
 import AuthPage from './hub/AuthPage';
@@ -19,6 +21,12 @@ function AuthPageWrapper() {
 }
 
 export default function App() {
+  const [onboarded, setOnboarded] = useState(() => localStorage.getItem('hubtify_onboarded') === 'true');
+
+  if (!onboarded) {
+    return <Onboarding onComplete={() => setOnboarded(true)} />;
+  }
+
   return (
     <ErrorBoundary>
       <Routes>
