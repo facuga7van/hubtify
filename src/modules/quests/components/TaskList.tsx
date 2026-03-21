@@ -5,13 +5,8 @@ import { CSS } from '@dnd-kit/utilities';
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
-import { type Task, type TaskTier, type Subtask, XP_MAP, rollBonus } from '../types';
-
-const COMBO_MULTS = [1.0, 1.25, 1.5, 1.75, 2.0];
-
-function getComboMultiplier(count: number): number {
-  return COMBO_MULTS[Math.min(count, COMBO_MULTS.length - 1)];
-}
+import { type Task, type TaskTier, type Subtask, XP_MAP } from '../types';
+import { tierEmoji, calculateXpForAction } from '../utils';
 
 export default function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -66,9 +61,7 @@ export default function TaskList() {
   const handleComplete = async (task: Task) => {
     const newStatus = !task.status;
     if (newStatus) {
-      const bonus = rollBonus();
-      const comboMult = getComboMultiplier(todayCount);
-      const xp = Math.round(XP_MAP[task.tier] * comboMult * bonus.multiplier);
+      const { xp, bonus, comboMult } = calculateXpForAction(task.tier, todayCount);
 
       await window.api.questsSetTaskStatus(task.id, true);
       const result = await window.api.processRpgEvent({
@@ -115,8 +108,6 @@ export default function TaskList() {
     });
     await window.api.questsSyncTaskOrders(orders);
   };
-
-  const tierEmoji = (t: number) => t === 1 ? '\u26A1' : t === 3 ? '\uD83D\uDC09' : '\u2694\uFE0F';
 
   const uniqueCategories = useMemo(() => {
     const cats = new Set(tasks.map((t) => t.category).filter(Boolean));
@@ -169,7 +160,6 @@ export default function TaskList() {
                 selected={selectedIds.has(task.id)}
                 subtasks={subtasksMap[task.id] ?? []}
                 todayCount={todayCount}
-                tierEmoji={tierEmoji}
                 onToggleExpand={() => toggleExpand(task.id)}
                 onComplete={() => handleComplete(task)}
                 onEdit={() => setEditingTask(task)}

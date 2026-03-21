@@ -27,9 +27,21 @@
 .xp-toast__bonus { font-size: 0.9rem; color: var(--rpg-gold); }
 .xp-toast__streak { font-size: 0.85rem; color: var(--rpg-xp-green-light); }
 
-.xp-toast--good { border-color: #3498db; }
-.xp-toast--critical { border-color: #9b59b6; }
-.xp-toast--legendary { border-color: #e74c3c; background: #2c1810; }
+.xp-toast--good {
+  border-color: #3498db;
+  box-shadow: 0 0 8px rgba(52, 152, 219, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+}
+
+.xp-toast--critical {
+  border-color: #9b59b6;
+  box-shadow: 0 0 12px rgba(155, 89, 182, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+}
+
+.xp-toast--legendary {
+  border-color: var(--rpg-gold);
+  background: linear-gradient(135deg, var(--rpg-leather) 0%, var(--rpg-wood) 100%);
+  box-shadow: 0 0 20px rgba(201, 168, 76, 0.5), 0 4px 20px rgba(44, 24, 16, 0.5);
+}
 
 /* ── Subtask styles ───────────────────────────────── */
 .subtask-list { margin-top: 8px; }
