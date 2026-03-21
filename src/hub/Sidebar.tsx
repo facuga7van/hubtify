@@ -10,6 +10,7 @@ const navItems = [
   { path: '/quests', label: 'Quests', icon: '\u2694' },
   { path: '/nutrition', label: 'Nutrition', icon: '\u{1F356}' },
   { path: '/finance', label: 'Finance', icon: '\u{1F4B0}' },
+  { path: '/character', label: 'Character', icon: '\u{1F6E1}' },
 ];
 
 export default function Sidebar({ stats }: SidebarProps) {

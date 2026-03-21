@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
@@ -13,6 +14,7 @@ interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tde
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 export default function Today() {
+  const navigate = useNavigate();
   const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
@@ -111,11 +113,17 @@ export default function Today() {
 
   return (
     <div>
-      {/* Date navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <button className="rpg-button" onClick={() => goDay(-1)}>&larr;</button>
-        <h3 style={{ flex: 1, textAlign: 'center' }}>{date}</h3>
-        <button className="rpg-button" onClick={() => goDay(1)}>&rarr;</button>
+      {/* Header with charts link */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="rpg-button" onClick={() => goDay(-1)}>&larr;</button>
+          <h3 style={{ textAlign: 'center' }}>{date}</h3>
+          <button className="rpg-button" onClick={() => goDay(1)}>&rarr;</button>
+        </div>
+        <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
+          style={{ fontSize: '0.85rem' }}>
+          📊 Charts
+        </button>
       </div>
 
       <CalorieProgressBar consumed={consumed} target={target} />

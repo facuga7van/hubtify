@@ -35,9 +35,13 @@ export default function Dashboard() {
           <div className="rpg-card-title">&#x1F4B0; Finance</div>
           <FinanceDashboardWidget />
         </div>
-        <div className="rpg-card dashboard-widget">
+        <div
+          className="rpg-card dashboard-widget"
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate('/character')}
+        >
           <div className="rpg-card-title">&#x1F6E1; Character</div>
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>Stats overview coming soon</p>
+          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>View your stats &amp; progress</p>
         </div>
       </div>
     </div>
