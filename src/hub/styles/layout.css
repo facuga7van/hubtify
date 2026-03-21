@@ -1,31 +1,89 @@
-.app-layout { display: flex; height: 100vh; width: 100vw; }
-
-.sidebar {
-  width: 220px; min-width: 220px;
-  background: linear-gradient(180deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%);
-  display: flex; flex-direction: column;
-  border-right: 3px solid var(--rpg-wood);
-  color: var(--rpg-parchment);
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
 }
 
-.sidebar-nav { flex: 1; display: flex; flex-direction: column; padding: 8px; gap: 4px; }
+/* ── Sidebar ──────────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: linear-gradient(180deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%);
+  display: flex;
+  flex-direction: column;
+  border-right: 3px solid var(--rpg-gold-dark);
+  color: var(--rpg-parchment);
+  box-shadow: 2px 0 12px rgba(44, 24, 16, 0.4);
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  gap: 2px;
+}
 
 .sidebar-nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; border-radius: var(--rpg-radius);
-  cursor: pointer; transition: background 0.2s;
-  font-size: 0.95rem; color: var(--rpg-parchment); text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-radius: var(--rpg-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Crimson Text', serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--rpg-parchment);
+  text-decoration: none;
+  letter-spacing: 0.02em;
 }
 
-.sidebar-nav-item:hover { background: rgba(244, 228, 193, 0.15); }
+.sidebar-nav-item span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(201, 168, 76, 0.15);
+  transform: translateX(2px);
+}
 
 .sidebar-nav-item.active {
-  background: rgba(212, 160, 23, 0.25);
-  color: var(--rpg-gold-light); font-weight: bold;
+  background: linear-gradient(90deg, rgba(201, 168, 76, 0.25) 0%, rgba(201, 168, 76, 0.1) 100%);
+  color: var(--rpg-gold-light);
+  font-weight: 700;
+  border-left: 3px solid var(--rpg-gold);
+  padding-left: 11px;
 }
 
-.sidebar-divider { height: 1px; background: rgba(244, 228, 193, 0.2); margin: 8px 14px; }
+.sidebar-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, rgba(201, 168, 76, 0.3) 50%, transparent 95%);
+  margin: 6px 14px;
+}
 
-.sidebar-footer { padding: 12px 14px; border-top: 1px solid rgba(244, 228, 193, 0.2); font-size: 0.85rem; }
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid rgba(201, 168, 76, 0.2);
+  font-size: 0.85rem;
+  font-family: 'Crimson Text', serif;
+  color: var(--rpg-gold);
+}
 
-.main-content { flex: 1; overflow-y: auto; padding: 24px; }
+/* ── Main Content ─────────────────────────────────── */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  /* Subtle parchment texture for content area */
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(139, 109, 63, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(92, 58, 30, 0.03) 0%, transparent 50%),
+    var(--rpg-parchment);
+}
