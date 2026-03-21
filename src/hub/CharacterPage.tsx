@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
+import Character from './Character';
 import { xpThreshold } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 
@@ -24,12 +25,7 @@ export default function CharacterPage() {
 
       {/* Main character card */}
       <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
-        <div style={{
-          width: 96, height: 96, borderRadius: '50%',
-          background: 'var(--rpg-parchment-dark)', border: '3px solid var(--rpg-gold)',
-          margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '2.5rem',
-        }}>⚔</div>
+        <Character size={128} showControls />
         <h3 style={{ fontSize: '1.3rem', color: 'var(--rpg-gold)', marginBottom: 4 }}>
           Level {stats.level}
         </h3>
