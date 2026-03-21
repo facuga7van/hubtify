@@ -37,60 +37,31 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
   const rearHairFrontRef = useRef<Sprite | null>(null);
   const frontHairRef = useRef<Sprite | null>(null);
   const isLoadingRef = useRef(false);
+  const charDataRef = useRef<CharacterData>(DEFAULT_CHAR);
 
   const [charData, setCharData] = useState<CharacterData>(DEFAULT_CHAR);
   const [loadingHair, setLoadingHair] = useState(true);
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [dbLoaded, setDbLoaded] = useState(false);
+
+  // Keep ref in sync with state
+  useEffect(() => { charDataRef.current = charData; }, [charData]);
 
   // Load from SQLite on mount
   useEffect(() => {
     window.api.characterLoad().then((data) => {
       if (data && typeof data === 'object') {
         const d = data as CharacterData;
-        setCharData({
+        const loaded = {
           backHairIndex: d.backHairIndex ?? 1,
           frontColorIndex: d.frontColorIndex ?? 1,
           backColorIndex: d.backColorIndex ?? 1,
           frontHairIndex: d.frontHairIndex ?? 1,
-        });
+        };
+        setCharData(loaded);
+        charDataRef.current = loaded;
       }
-    }).catch(console.error);
-  }, []);
-
-  // Init Pixi app
-  useEffect(() => {
-    if (appRef.current) return;
-    const app = new Application();
-    appRef.current = app;
-
-    (async () => {
-      const canvas = document.createElement('canvas');
-      canvas.style.width = `${size}px`;
-      canvas.style.height = `${size}px`;
-      canvas.style.borderRadius = '50%';
-
-      await app.init({ canvas, background: '#c0a080', width: 100, height: 100 });
-      pixiContainerRef.current?.appendChild(canvas);
-
-      const cx = app.screen.width / 2;
-      const cy = app.screen.height / 2;
-
-      const textures = await Promise.all([
-        Assets.load(neckImg), Assets.load(faceImg), Assets.load(eyesImg),
-        Assets.load(eyeBrImg), Assets.load(mouthImg), Assets.load(noseImg),
-      ]);
-
-      textures.forEach((tex) => {
-        const sp = new Sprite(tex);
-        sp.anchor.set(0.5, 0.5);
-        sp.x = cx; sp.y = cy;
-        app.stage.addChild(sp);
-      });
-
-      loadAllHair(charData.backHairIndex, charData.backColorIndex, charData.frontHairIndex, charData.frontColorIndex);
-    })();
-
-    return () => { app.destroy(true); appRef.current = null; };
+    }).catch(console.error).finally(() => setDbLoaded(true));
   }, []);
 
   const loadAllHair = useCallback(async (bIdx: number, bClr: number, fIdx: number, fClr: number) => {
@@ -165,14 +136,59 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     }
   }, []);
 
+  // Init Pixi AFTER db data is loaded
   useEffect(() => {
-    loadAllHair(charData.backHairIndex, charData.backColorIndex, charData.frontHairIndex, charData.frontColorIndex);
+    if (!dbLoaded || appRef.current) return;
+
+    const app = new Application();
+    appRef.current = app;
+
+    (async () => {
+      const canvas = document.createElement('canvas');
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+      canvas.style.borderRadius = '50%';
+
+      await app.init({ canvas, background: '#c0a080', width: 100, height: 100 });
+      pixiContainerRef.current?.appendChild(canvas);
+
+      const cx = app.screen.width / 2;
+      const cy = app.screen.height / 2;
+
+      const textures = await Promise.all([
+        Assets.load(neckImg), Assets.load(faceImg), Assets.load(eyesImg),
+        Assets.load(eyeBrImg), Assets.load(mouthImg), Assets.load(noseImg),
+      ]);
+
+      textures.forEach((tex) => {
+        const sp = new Sprite(tex);
+        sp.anchor.set(0.5, 0.5);
+        sp.x = cx; sp.y = cy;
+        app.stage.addChild(sp);
+      });
+
+      // Use ref to get the latest data (not stale closure)
+      const d = charDataRef.current;
+      loadAllHair(d.backHairIndex, d.backColorIndex, d.frontHairIndex, d.frontColorIndex);
+    })();
+
+    return () => { app.destroy(true); appRef.current = null; };
+  }, [dbLoaded, loadAllHair, size]);
+
+  // Reload hair when charData changes (after initial load)
+  const prevDataRef = useRef<string>('');
+  useEffect(() => {
+    const key = JSON.stringify(charData);
+    if (key === prevDataRef.current) return;
+    prevDataRef.current = key;
+    if (appRef.current) {
+      loadAllHair(charData.backHairIndex, charData.backColorIndex, charData.frontHairIndex, charData.frontColorIndex);
+    }
   }, [charData, loadAllHair]);
 
   const updateField = (field: keyof CharacterData, delta: number) => {
     setCharData((prev) => {
       const next = { ...prev, [field]: Math.max(1, prev[field] + delta) };
-      // Save to SQLite
       window.api.characterSave(next).catch(console.error);
       return next;
     });
