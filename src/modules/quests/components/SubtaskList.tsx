@@ -3,6 +3,7 @@ import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
+import Checkbox from '../../../shared/components/Checkbox';
 import type { XpToastData } from './XpToast';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
 import { TierBadge, tierXp, calculateXpForAction } from '../utils';
@@ -102,12 +103,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
 
       {showCompleted && completed.map((subtask) => (
         <div key={subtask.id} className="subtask-item subtask-item--completed">
-          <svg onClick={() => handleComplete(subtask)} width="20" height="20" viewBox="0 0 20 20"
-            style={{ cursor: 'pointer', flexShrink: 0 }}
-            fill="none" stroke="var(--rpg-xp-green)" strokeWidth="1.5">
-            <rect x="3" y="3" width="14" height="14" rx="2"/>
-            <path d="M6 10l3 3 5-6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <Checkbox checked onChange={() => handleComplete(subtask)} />
           <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{subtask.name}</span>
         </div>
       ))}
@@ -136,11 +132,7 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="subtask-item">
-      <svg onClick={() => onComplete(subtask)} width="20" height="20" viewBox="0 0 20 20"
-        style={{ cursor: 'pointer', flexShrink: 0 }}
-        fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5">
-        <rect x="3" y="3" width="14" height="14" rx="2" />
-      </svg>
+      <Checkbox onChange={() => onComplete(subtask)} />
       <span className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
         {subtask.name}
       </span>

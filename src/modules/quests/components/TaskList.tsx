@@ -4,6 +4,7 @@ import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import PageHeader from '../../../shared/components/PageHeader';
+import Checkbox from '../../../shared/components/Checkbox';
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
@@ -189,12 +190,7 @@ export default function TaskList() {
       {activeTab === 'completed' && completed.map((task) => (
         <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg onClick={() => handleComplete(task)} width="20" height="20" viewBox="0 0 20 20"
-              style={{ cursor: 'pointer', flexShrink: 0 }}
-              fill="none" stroke="var(--rpg-xp-green)" strokeWidth="1.5">
-              <rect x="3" y="3" width="14" height="14" rx="2"/>
-              <path d="M6 10l3 3 5-6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Checkbox checked onChange={() => handleComplete(task)} />
             <span style={{ textDecoration: 'line-through', flex: 1 }}>{task.name}</span>
             <TierBadge tier={task.tier} />
           </div>
@@ -228,17 +224,13 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: expanded ? 8 : 0 }}>
         <svg {...listeners} width="14" height="14" viewBox="0 0 14 14"
           style={{ cursor: 'grab', opacity: 0.4, flexShrink: 0 }}
-          fill="var(--rpg-gold-dark)">
+          fill="var(--rpg-gold-dark)" aria-label="Drag to reorder">
           <circle cx="4" cy="3" r="1.2"/><circle cx="10" cy="3" r="1.2"/>
           <circle cx="4" cy="7" r="1.2"/><circle cx="10" cy="7" r="1.2"/>
           <circle cx="4" cy="11" r="1.2"/><circle cx="10" cy="11" r="1.2"/>
         </svg>
         {/* Checkbox */}
-        <svg onClick={onComplete} width="20" height="20" viewBox="0 0 20 20"
-          style={{ cursor: 'pointer', flexShrink: 0 }}
-          fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5">
-          <rect x="3" y="3" width="14" height="14" rx="2" />
-        </svg>
+        <Checkbox onChange={onComplete} />
         <span onClick={onToggleExpand} style={{ flex: 1, cursor: 'pointer', fontWeight: 'bold' }}>
           {task.name}
         </span>
@@ -252,14 +244,16 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
           style={{ cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s' }}
           onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
           onMouseOut={(e) => (e.currentTarget.style.opacity = '0.5')}
-          fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+          fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round"
+          aria-label="Edit">
           <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
         </svg>
         <svg onClick={onToggleSelect} width="14" height="14" viewBox="0 0 14 14"
           style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
           onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
           onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
-          fill="none" stroke={selected ? 'var(--rpg-hp-red)' : 'var(--rpg-gold-dark)'} strokeWidth="1.3">
+          fill="none" stroke={selected ? 'var(--rpg-hp-red)' : 'var(--rpg-gold-dark)'} strokeWidth="1.3"
+          aria-label="Select for deletion">
           <rect x="1" y="1" width="12" height="12" rx="2"/>
           {selected && <path d="M3.5 7l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round"/>}
         </svg>

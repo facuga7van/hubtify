@@ -266,3 +266,21 @@
   align-items: center;
   gap: 8px;
 }
+
+@media (max-width: 700px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    margin: -12px -16px 16px -16px;
+  }
+
+  .page-header__content {
+    padding: 0 16px;
+  }
+
+  .page-header__actions {
+    right: 16px;
+  }
+}

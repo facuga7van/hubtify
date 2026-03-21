@@ -1,5 +1,6 @@
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
+import Loading from '../shared/components/Loading';
 import Character from './Character';
 import type { PlayerStats } from '../../shared/types';
 
@@ -7,7 +8,7 @@ interface PlayerCardProps { stats: PlayerStats | null; }
 
 export default function PlayerCard({ stats }: PlayerCardProps) {
   if (!stats) {
-    return <div style={{ padding: '16px', textAlign: 'center', opacity: 0.6 }}>Loading...</div>;
+    return <Loading />;
   }
 
   const hpGlow = stats.hp > 75

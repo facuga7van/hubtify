@@ -76,21 +76,21 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Tier buttons */}
         <div style={{ display: 'flex', gap: 4 }}>
-          {([1, 2, 3] as TaskTier[]).map((t) => (
+          {([1, 2, 3] as TaskTier[]).map((tierVal) => (
             <button
-              key={t}
+              key={tierVal}
               type="button"
-              onClick={() => setTier(t)}
+              onClick={() => setTier(tierVal)}
               style={{
                 padding: '4px 10px', border: '1px solid var(--rpg-wood)',
                 borderRadius: 'var(--rpg-radius)', cursor: 'pointer',
-                background: tier === t ? 'var(--rpg-gold)' : 'var(--rpg-parchment)',
-                color: tier === t ? 'var(--rpg-ink)' : 'var(--rpg-ink-light)',
-                fontWeight: tier === t ? 'bold' : 'normal',
+                background: tier === tierVal ? 'var(--rpg-gold)' : 'var(--rpg-parchment)',
+                color: tier === tierVal ? 'var(--rpg-ink)' : 'var(--rpg-ink-light)',
+                fontWeight: tier === tierVal ? 'bold' : 'normal',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
               }}
             >
-              <TierBadge tier={t} size={14} active={tier === t} /> {TIER_LABEL[t]}
+              <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {TIER_LABEL[tierVal]}
             </button>
           ))}
         </div>

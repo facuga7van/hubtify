@@ -159,6 +159,9 @@ export function registerQuestsIpcHandlers(): void {
 
   // ── Stats helpers ──────────────────────────────────
 
+  // NOTE: For tasks, we use updated_at as a proxy for completion date since there's no
+  // dedicated completed_at column. This is acceptable because we also filter by status = 1,
+  // but it may miscount if a completed task is edited (updating updated_at) on a different day.
   ipcMain.handle('quests:countCompletedToday', () => {
     const db = getDb();
     const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD

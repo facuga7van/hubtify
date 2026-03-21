@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
+import Loading from '../shared/components/Loading';
 import Character from './Character';
 import { xpThreshold } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
@@ -17,7 +18,7 @@ export default function CharacterPage() {
     window.api.getRpgHistory(20).then(setHistory).catch(console.error);
   }, []);
 
-  if (!stats) return <div style={{ padding: 24, opacity: 0.5 }}>Loading...</div>;
+  if (!stats) return <Loading />;
 
   const hpState = stats.hp <= 25 ? t('character.injured') : stats.hp <= 50 ? t('character.tired') : stats.hp <= 75 ? t('character.healthy') : t('character.radiant');
   const hpColor = stats.hp <= 25 ? 'var(--rpg-hp-red)' : stats.hp <= 50 ? '#e67e22' : stats.hp <= 75 ? 'var(--rpg-xp-green)' : 'var(--rpg-gold)';

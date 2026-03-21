@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Loading from '../../../shared/components/Loading';
 
 export default function NutritionDashboardWidget() {
   const [calories, setCalories] = useState(0);
@@ -16,7 +17,7 @@ export default function NutritionDashboardWidget() {
     }).catch(console.error);
   }, []);
 
-  if (loading) return <p style={{ opacity: 0.5 }}>Loading...</p>;
+  if (loading) return <Loading size="sm" />;
 
   const pct = target && target > 0 ? Math.round((calories / target) * 100) : 0;
 

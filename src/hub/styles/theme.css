@@ -22,6 +22,9 @@
   --rpg-shadow: 0 2px 8px rgba(44, 24, 16, 0.35);
   --rpg-shadow-inset: inset 0 1px 3px rgba(44, 24, 16, 0.15);
   --rpg-radius: 6px;
+  --rpg-transition-fast: 0.15s;
+  --rpg-transition: 0.2s;
+  --rpg-transition-slow: 0.3s;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
