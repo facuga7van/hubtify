@@ -197,10 +197,10 @@ export default function TaskList() {
   );
 }
 
-function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, tierEmoji,
+function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
   onToggleExpand, onComplete, onEdit, onToggleSelect, onShowToast, onSubtaskChanged }: {
   task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
-  todayCount: number; tierEmoji: (t: number) => string;
+  todayCount: number;
   onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
   onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
   onSubtaskChanged: () => void;

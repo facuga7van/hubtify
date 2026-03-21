@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
+import { getLocalDateString } from '../../../../shared/rpg-engine';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -15,7 +16,7 @@ interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 export default function Today() {
   const navigate = useNavigate();
-  const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [date, setDate] = useState(() => getLocalDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });

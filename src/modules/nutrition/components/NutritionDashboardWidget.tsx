@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function NutritionDashboardWidget() {
   const [calories, setCalories] = useState(0);
   const [target, setTarget] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -11,8 +12,11 @@ export default function NutritionDashboardWidget() {
     ]).then(([c, t]) => {
       setCalories(c);
       setTarget(t);
+      setLoading(false);
     }).catch(console.error);
   }, []);
+
+  if (loading) return <p style={{ opacity: 0.5 }}>Loading...</p>;
 
   const pct = target && target > 0 ? Math.round((calories / target) * 100) : 0;
 

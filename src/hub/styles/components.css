@@ -173,3 +173,52 @@
   transform: translateY(-3px);
   box-shadow: 0 6px 20px rgba(44, 24, 16, 0.35), 0 0 0 1px var(--rpg-gold);
 }
+
+/* ── Utility Styles ───────────────────────────────── */
+.rpg-stat-number {
+  font-size: 1.5rem;
+  font-family: 'Fira Code', monospace;
+  color: var(--rpg-wood);
+}
+
+.rpg-stat-label {
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.rpg-stat-card {
+  text-align: center;
+}
+
+.rpg-muted {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.rpg-input {
+  padding: 6px 10px;
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: var(--rpg-radius);
+  background: var(--rpg-parchment);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.9rem;
+  color: var(--rpg-ink);
+  box-shadow: var(--rpg-shadow-inset);
+}
+
+.rpg-input:focus {
+  outline: none;
+  border-color: var(--rpg-gold);
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.3), var(--rpg-shadow-inset);
+}
+
+.rpg-select {
+  padding: 6px 10px;
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: var(--rpg-radius);
+  background: var(--rpg-parchment);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.9rem;
+  color: var(--rpg-ink);
+  cursor: pointer;
+}

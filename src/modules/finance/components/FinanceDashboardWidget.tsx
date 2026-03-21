@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function FinanceDashboardWidget() {
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [activeLoans, setActiveLoans] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -11,8 +12,11 @@ export default function FinanceDashboardWidget() {
     ]).then(([total, loans]) => {
       setMonthlyTotal(total);
       setActiveLoans(loans);
+      setLoading(false);
     }).catch(console.error);
   }, []);
+
+  if (loading) return <p style={{ opacity: 0.5 }}>Loading...</p>;
 
   return (
     <div>

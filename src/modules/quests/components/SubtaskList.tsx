@@ -4,13 +4,9 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
 import type { XpToastData } from './XpToast';
-import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS, rollBonus } from '../types';
-
-const COMBO_MULTS = [1.0, 1.25, 1.5, 1.75, 2.0];
-
-function getComboMultiplier(count: number): number {
-  return COMBO_MULTS[Math.min(count, COMBO_MULTS.length - 1)];
-}
+import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
+import { tierEmoji, tierXp, calculateXpForAction } from '../utils';
+import { getLocalDateString } from '../../../../shared/rpg-engine';
 
 interface Props {
   taskId: string;
@@ -42,10 +38,8 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
   const handleComplete = async (subtask: Subtask) => {
     const tier = subtask.tier as TaskTier;
     if (!subtask.status) {
-      const today = new Date().toLocaleDateString('en-CA');
-      const bonus = rollBonus();
-      const comboMult = getComboMultiplier(countCompletedToday);
-      const xp = Math.round(XP_MAP[tier] * comboMult * bonus.multiplier);
+      const today = getLocalDateString();
+      const { xp, bonus, comboMult } = calculateXpForAction(tier, countCompletedToday);
 
       await window.api.questsSetSubtaskStatus(subtask.id, true, today);
       const result = await window.api.processRpgEvent({
@@ -135,17 +129,15 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
-  const tierEmoji = subtask.tier === 1 ? '\u26A1' : subtask.tier === 3 ? '\uD83D\uDC09' : '\u2694\uFE0F';
-
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="subtask-item">
       <input type="checkbox" onChange={() => onComplete(subtask)} />
       <span className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
         {subtask.name}
       </span>
-      <span className="subtask-tier-badge">{tierEmoji}</span>
+      <span className="subtask-tier-badge">{tierEmoji(subtask.tier)}</span>
       <span className="subtask-xp-hint" style={{ fontSize: '0.75rem', opacity: 0.6 }}>
-        +{XP_MAP[subtask.tier]}
+        +{tierXp(subtask.tier)}
       </span>
       <button onClick={() => onDelete(subtask.id)} style={{
         background: 'none', border: 'none', color: 'var(--rpg-hp-red)', cursor: 'pointer', fontSize: '0.9rem'

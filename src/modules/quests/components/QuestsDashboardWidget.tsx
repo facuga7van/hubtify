@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function QuestsDashboardWidget() {
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -11,8 +12,11 @@ export default function QuestsDashboardWidget() {
     ]).then(([p, c]) => {
       setPendingCount(p);
       setCompletedToday(c);
+      setLoading(false);
     }).catch(console.error);
   }, []);
+
+  if (loading) return <p style={{ opacity: 0.5 }}>Loading...</p>;
 
   return (
     <div>
