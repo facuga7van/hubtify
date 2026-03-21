@@ -150,6 +150,37 @@ export default function SettingsPage() {
         )}
       </div>
 
+      {/* Backup */}
+      <div className="rpg-card" style={sectionStyle}>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <path d="M2 10v3h12v-3M8 2v8M5 7l3 3 3-3"/>
+          </svg>
+          {t('settings.backup')}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="rpg-button" onClick={async () => {
+            const result = await window.api.backupExport();
+            if (result.success) alert(t('settings.exportSuccess'));
+            else if (!result.canceled) alert(`${t('settings.exportFailed')}: ${result.error}`);
+          }} style={{ flex: 1 }}>
+            {t('settings.exportBackup')}
+          </button>
+          <button className="rpg-button" onClick={async () => {
+            if (!window.confirm(t('settings.importConfirm'))) return;
+            const result = await window.api.backupImport();
+            if (result.success) {
+              alert(t('settings.importSuccess'));
+              window.location.reload();
+            } else if (!result.canceled) {
+              alert(`${t('settings.importFailed')}: ${result.error}`);
+            }
+          }} style={{ flex: 1 }}>
+            {t('settings.importBackup')}
+          </button>
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="rpg-card" style={{ borderColor: 'var(--rpg-hp-red)' }}>
         <div className="rpg-card-title" style={{ color: 'var(--rpg-hp-red)' }}>

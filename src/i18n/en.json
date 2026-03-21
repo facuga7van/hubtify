@@ -216,6 +216,14 @@
     "resetOnboardingConfirm": "Reset onboarding? The app will reload.",
     "resetAllConfirm": "Are you sure? ALL local data will be deleted.",
     "resetAllConfirm2": "FINAL WARNING: this action is irreversible. Confirm?",
-    "reset": "Reset"
+    "reset": "Reset",
+    "backup": "Backup",
+    "exportBackup": "Export Backup",
+    "importBackup": "Import Backup",
+    "exportSuccess": "Backup exported successfully",
+    "exportFailed": "Export failed",
+    "importSuccess": "Backup imported. The app will reload.",
+    "importFailed": "Import failed",
+    "importConfirm": "Import backup? This will replace all current data."
   }
 }

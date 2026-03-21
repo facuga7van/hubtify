@@ -23,6 +23,39 @@ export default function Layout() {
     refreshStats();
   }, [location.pathname, refreshStats]);
 
+  // Auto-sync every 5 minutes if logged in
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const user = await window.api.authGetUser();
+        if (user) {
+          await window.api.syncPush(user.uid);
+          console.log('[AutoSync] Pushed data to cloud');
+        }
+      } catch {
+        // Silent fail — auto-sync is best-effort
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Initial sync on mount — pull latest data if logged in
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = await window.api.authGetUser();
+        if (user) {
+          await window.api.syncPull(user.uid);
+          refreshStats();
+          console.log('[AutoSync] Initial pull complete');
+        }
+      } catch {
+        // Silent fail
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (stats && prevLevelRef.current > 0 && stats.level > prevLevelRef.current) {
       setLevelUp(stats.level);

@@ -79,6 +79,10 @@ const api = {
   syncPush: (uid: string) => ipcRenderer.invoke('sync:push', uid),
   syncPull: (uid: string) => ipcRenderer.invoke('sync:pull', uid),
 
+  // Backup
+  backupExport: () => ipcRenderer.invoke('backup:export'),
+  backupImport: () => ipcRenderer.invoke('backup:import'),
+
   // Finance
   financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
   financeAddTransaction: (tx: Record<string, unknown>) => ipcRenderer.invoke('finance:addTransaction', tx),

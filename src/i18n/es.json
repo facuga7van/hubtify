@@ -216,6 +216,14 @@
     "resetOnboardingConfirm": "Queres reiniciar el onboarding? La app se va a recargar.",
     "resetAllConfirm": "Estas seguro? Se van a borrar TODOS los datos locales.",
     "resetAllConfirm2": "ULTIMA ADVERTENCIA: esta accion es irreversible. Confirmar?",
-    "reset": "Resetear"
+    "reset": "Resetear",
+    "backup": "Respaldo",
+    "exportBackup": "Exportar respaldo",
+    "importBackup": "Importar respaldo",
+    "exportSuccess": "Respaldo exportado correctamente",
+    "exportFailed": "Error al exportar",
+    "importSuccess": "Respaldo importado. La app se va a recargar.",
+    "importFailed": "Error al importar",
+    "importConfirm": "Importar respaldo? Esto reemplazara todos los datos actuales."
   }
 }

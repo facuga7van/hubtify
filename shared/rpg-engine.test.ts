@@ -8,6 +8,11 @@ import {
   calculateXpGain,
   calculateHpPenalty,
   getStreakMilestoneBonus,
+  clampHp,
+  xpToNextLevel,
+  isStreakActive,
+  daysDiff,
+  getLocalDateString,
 } from './rpg-engine';
 
 describe('xpThreshold', () => {
