@@ -50,6 +50,10 @@ export function registerNutritionIpcHandlers(): void {
     `).run(profile.age, profile.sex, profile.heightCm, profile.initialWeightKg,
       profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.gymCalories ?? 300,
       profile.stepCaloriesFactor ?? 0.04);
+
+    // Recalc today's summary with new profile
+    const today = new Date().toLocaleDateString('en-CA');
+    recalcSummary(db, today);
   });
 
   // ── Food Log ───────────────────────────────────────
@@ -409,7 +413,11 @@ function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const bmr = calculateBMR(weight, profile.height_cm as number, profile.age as number, profile.sex as string);
   const steps = (metrics?.steps as number) ?? 0;
   const gym = !!(metrics?.gym);
-  const tdee = calculateTDEE(bmr, profile.activity_level as string, steps, gym,
+
+  // Use dynamic activity factor based on recent history
+  const dynamicFactor = getDynamicActivityFactor(db, profile.activity_level as string);
+
+  const tdee = calculateTDEEWithFactor(bmr, dynamicFactor, steps, gym,
     profile.step_calories_factor as number, profile.gym_calories as number);
   const balance = tdee - totalCals.total;
 
@@ -417,6 +425,48 @@ function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
     INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance)
     VALUES (?, ?, ?, ?, ?)
   `).run(date, totalCals.total, Math.round(bmr), tdee, balance);
+}
+
+/**
+ * Calculate a dynamic activity factor based on last 14 days of real data.
+ * Blends the user's chosen base level with actual gym/steps history.
+ * More gym days + more steps → higher factor, fewer → lower factor.
+ */
+function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: string): number {
+  const baseFactor: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+  const base = baseFactor[baseLevel] ?? 1.2;
+
+  // Get last 14 days of metrics
+  const recentMetrics = db.prepare(`
+    SELECT steps, gym FROM nutrition_daily_metrics
+    WHERE date >= DATE('now', '-13 days')
+    ORDER BY date DESC
+  `).all() as Array<{ steps: number | null; gym: number }>;
+
+  if (recentMetrics.length < 3) {
+    // Not enough history, use base level as-is
+    return base;
+  }
+
+  // Calculate activity score from real data
+  const totalDays = recentMetrics.length;
+  const gymDays = recentMetrics.filter((m) => m.gym).length;
+  const avgSteps = recentMetrics.reduce((s, m) => s + (m.steps ?? 0), 0) / totalDays;
+
+  // Gym ratio: 0-1 (0 = never, 1 = every day)
+  const gymRatio = gymDays / totalDays;
+
+  // Steps score: 0-1 (0 = 0 steps, 1 = 10000+ steps average)
+  const stepsScore = Math.min(avgSteps / 10000, 1);
+
+  // Combined activity score 0-1
+  const activityScore = gymRatio * 0.5 + stepsScore * 0.5;
+
+  // Map score to factor range: sedentary (1.2) to active (1.725)
+  const dynamicFactor = 1.2 + activityScore * (1.725 - 1.2);
+
+  // Blend 50/50 with user's chosen base to not override their preference completely
+  return Math.round((base * 0.4 + dynamicFactor * 0.6) * 1000) / 1000;
 }
 
 function calculateBMR(weight: number, height: number, age: number, sex: string): number {
@@ -428,6 +478,11 @@ function calculateTDEE(bmr: number, activityLevel: string, steps: number, gym: b
   stepFactor: number, gymCals: number): number {
   const factors: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
   return Math.round(bmr * (factors[activityLevel] ?? 1.2) + steps * stepFactor + (gym ? gymCals : 0));
+}
+
+function calculateTDEEWithFactor(bmr: number, factor: number, steps: number, gym: boolean,
+  stepFactor: number, gymCals: number): number {
+  return Math.round(bmr * factor + steps * stepFactor + (gym ? gymCals : 0));
 }
 
 function getMondayOfWeek(dateStr?: string): string {
