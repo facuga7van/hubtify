@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
+import { syncPush } from '../shared/sync';
 import './styles/layout.css';
 
 interface SidebarProps { stats: PlayerStats | null; }
@@ -90,7 +91,7 @@ export default function Sidebar({ stats }: SidebarProps) {
             <div style={{ display: 'flex', gap: 6 }}>
               <button className="rpg-button" onClick={async () => {
                 try {
-                  const result = await window.api.syncPush(authUser.uid);
+                  const result = await syncPush(authUser.uid);
                   alert(result.success ? t('auth.synced') : `${t('auth.syncFailed')}: ${result.error}`);
                 } catch (err) {
                   alert(t('auth.syncFailed'));

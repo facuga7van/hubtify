@@ -68,8 +68,7 @@ const api = {
   characterLoad: () => ipcRenderer.invoke('character:load'),
 
   // Sync
-  syncPush: (uid: string) => ipcRenderer.invoke('sync:push', uid),
-  syncPull: (uid: string) => ipcRenderer.invoke('sync:pull', uid),
+  syncRestoreStats: (stats: Record<string, unknown>) => ipcRenderer.invoke('sync:restoreStats', stats),
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),

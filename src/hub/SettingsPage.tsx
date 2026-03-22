@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import { useAuthContext } from '../shared/AuthContext';
+import { syncPush, syncPull } from '../shared/sync';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -26,8 +27,8 @@ export default function SettingsPage() {
     setSyncStatus(t('common.loading'));
     try {
       const result = direction === 'push'
-        ? await window.api.syncPush(authUser.uid)
-        : await window.api.syncPull(authUser.uid);
+        ? await syncPush(authUser.uid)
+        : await syncPull(authUser.uid);
       setSyncStatus(result.success ? t('auth.synced') : `${t('auth.syncFailed')}: ${result.error}`);
     } catch {
       setSyncStatus(t('auth.syncFailed'));

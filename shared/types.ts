@@ -105,8 +105,7 @@ export interface HubtifyApi {
   onEstimateProgress: (callback: (stage: string) => void) => () => void;
 
   // Sync
-  syncPush: (uid: string) => Promise<{ success: boolean; error?: string }>;
-  syncPull: (uid: string) => Promise<{ success: boolean; hasData?: boolean; error?: string }>;
+  syncRestoreStats: (stats: Record<string, unknown>) => Promise<{ success: boolean }>;
 
   // Backup
   backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;

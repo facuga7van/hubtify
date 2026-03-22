@@ -172,6 +172,30 @@ export function registerRpgHandlers(): void {
     };
   });
 
+  ipcMain.handle('sync:restoreStats', (_e, stats: Record<string, unknown>) => {
+    try {
+      const db = getDb();
+      db.prepare(`
+        UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?,
+          streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?,
+          total_tasks = ?, total_meals = ?, total_expenses = ?
+        WHERE user_id = 'default'
+      `).run(
+        stats.level ?? 1, stats.xp ?? 0, stats.hp ?? 100, stats.title ?? 'Campesino',
+        stats.streak ?? 0, stats.dailyCombo ?? stats.daily_combo ?? 0,
+        stats.comboDate ?? stats.combo_date ?? null,
+        stats.streakLastDate ?? stats.streak_last_date ?? null,
+        stats.totalTasks ?? stats.total_tasks ?? 0,
+        stats.totalMeals ?? stats.total_meals ?? 0,
+        stats.totalExpenses ?? stats.total_expenses ?? 0
+      );
+      return { success: true };
+    } catch (err) {
+      console.error('[Sync] Restore stats failed:', err);
+      return { success: false };
+    }
+  });
+
   ipcMain.handle('db:runMigrations', (_e, migrations) => {
     runModuleMigrations(migrations);
   });

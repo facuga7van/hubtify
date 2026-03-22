@@ -5,6 +5,7 @@ import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
+import { syncPush, syncPull } from '../shared/sync';
 import './styles/layout.css';
 import './styles/components.css';
 import { playLevelUp } from '../shared/audio';
@@ -34,7 +35,7 @@ export default function Layout() {
     if (!authUser) return;
     const interval = setInterval(async () => {
       try {
-        await window.api.syncPush(authUser.uid);
+        await syncPush(authUser.uid);
         console.log('[AutoSync] Pushed data to cloud');
       } catch {
         // Silent fail — auto-sync is best-effort
@@ -56,7 +57,7 @@ export default function Layout() {
     if (!authUser) return;
     (async () => {
       try {
-        await window.api.syncPull(authUser.uid);
+        await syncPull(authUser.uid);
         refreshStats();
         console.log('[AutoSync] Initial pull complete');
       } catch {
