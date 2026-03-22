@@ -69,4 +69,21 @@ export const nutritionMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_food_database_keywords ON food_database(keywords);
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 2,
+    up: `
+      CREATE TABLE IF NOT EXISTS nutrition_daily_closed (
+        date TEXT PRIMARY KEY,
+        xp_precision INTEGER NOT NULL DEFAULT 0,
+        xp_steps INTEGER NOT NULL DEFAULT 0,
+        xp_gym INTEGER NOT NULL DEFAULT 0,
+        xp_weight INTEGER NOT NULL DEFAULT 0,
+        xp_total INTEGER NOT NULL DEFAULT 0,
+        hp_change INTEGER NOT NULL DEFAULT 0,
+        consumed INTEGER NOT NULL DEFAULT 0,
+        target INTEGER NOT NULL DEFAULT 0
+      );
+    `,
+  },
 ];

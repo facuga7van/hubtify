@@ -251,6 +251,99 @@ export function registerNutritionIpcHandlers(): void {
     if (!summary || !profile) return null;
     return summary.tdee - profile.deficit_target_kcal;
   });
+
+  // ── Close Day ──────────────────────────────────────
+
+  ipcMain.handle('nutrition:closeDay', (_e, date: string) => {
+    const db = getDb();
+
+    // Check if day already closed
+    const existing = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
+    if (existing) return { success: false, alreadyClosed: true };
+
+    // Get summary
+    const summary = db.prepare('SELECT * FROM nutrition_daily_summary WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+    if (!summary) return { success: false, error: 'No data for this day' };
+
+    // Get profile
+    const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
+    if (!profile) return { success: false, error: 'No profile' };
+
+    // Get metrics
+    const metrics = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+
+    // Check if weight logged this week
+    const monday = getMondayOfWeek(date);
+    const weightLogged = db.prepare('SELECT 1 FROM nutrition_weekly_metrics WHERE date = ? AND weight_kg IS NOT NULL').get(monday);
+
+    const consumed = summary.total_calories_in as number;
+    const tdee = summary.tdee as number;
+    const target = tdee - (profile.deficit_target_kcal as number);
+    const steps = (metrics?.steps as number) ?? 0;
+    const gym = !!(metrics?.gym);
+
+    // Calculate XP
+    let xpPrecision = 0;
+    if (consumed === 0) {
+      xpPrecision = 0;
+    } else if (target <= 0) {
+      xpPrecision = 10;
+    } else {
+      const pct = Math.abs(consumed - target) / target;
+      if (pct <= 0.05) xpPrecision = 100;
+      else if (pct <= 0.10) xpPrecision = 75;
+      else if (pct <= 0.20) xpPrecision = 40;
+      else xpPrecision = 10;
+    }
+
+    const xpSteps = steps > 0 ? 20 : 0;
+    const xpGym = gym ? 20 : 0;
+    const xpWeight = weightLogged ? 10 : 0;
+    const xpTotal = xpPrecision + xpSteps + xpGym + xpWeight;
+
+    // Calculate HP change
+    let hpChange = 0;
+    if (target > 0) {
+      const excess = consumed - target;
+      if (excess > 0) {
+        const excessPct = excess / target;
+        if (excessPct <= 0.10) hpChange = -10;
+        else if (excessPct <= 0.20) hpChange = -25;
+        else hpChange = -50;
+      } else {
+        const pct = Math.abs(consumed - target) / target;
+        if (pct <= 0.10) hpChange = 25;
+        else hpChange = 0;
+      }
+    }
+
+    // Save close record
+    db.prepare(`
+      INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_total, hp_change, consumed, target)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpTotal, hpChange, consumed, Math.round(target));
+
+    return {
+      success: true,
+      breakdown: {
+        xpPrecision, xpSteps, xpGym, xpWeight, xpTotal, hpChange,
+        consumed, target: Math.round(target),
+        precisionPct: target > 0 ? Math.round(Math.abs(consumed - target) / target * 100) : 0,
+      },
+    };
+  });
+
+  ipcMain.handle('nutrition:isDayClosed', (_e, date: string) => {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      xpPrecision: row.xp_precision, xpSteps: row.xp_steps,
+      xpGym: row.xp_gym, xpWeight: row.xp_weight,
+      xpTotal: row.xp_total, hpChange: row.hp_change,
+      consumed: row.consumed, target: row.target,
+    };
+  });
 }
 
 // ── Helpers ────────────────────────────────────────
@@ -289,11 +382,11 @@ function calculateTDEE(bmr: number, activityLevel: string, steps: number, gym: b
   return Math.round(bmr * (factors[activityLevel] ?? 1.2) + steps * stepFactor + (gym ? gymCals : 0));
 }
 
-function getMondayOfWeek(): string {
-  const now = new Date();
-  const day = now.getDay();
+function getMondayOfWeek(dateStr?: string): string {
+  const d = dateStr ? new Date(dateStr.split('-').map(Number).join('/')) : new Date();
+  const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diff);
-  return monday.toLocaleDateString('en-CA');
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diff);
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
 }

@@ -55,6 +55,8 @@ const api = {
   nutritionIsOllamaAvailable: () => ipcRenderer.invoke('nutrition:isOllamaAvailable'),
   nutritionSearchFoodDb: (query: string) => ipcRenderer.invoke('nutrition:searchFoodDb', query),
   nutritionLearnFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:learnFood', entry),
+  nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
+  nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
   onEstimateProgress: (callback: (stage: string) => void) => {
     const handler = (_e: unknown, stage: string) => callback(stage);
     ipcRenderer.on('nutrition:estimate-progress', handler);

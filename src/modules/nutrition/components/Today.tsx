@@ -35,6 +35,13 @@ export default function Today() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [target, setTarget] = useState(0);
 
+  // Close Day
+  const [dayClosed, setDayClosed] = useState<{
+    xpPrecision: number; xpSteps: number; xpGym: number; xpWeight: number;
+    xpTotal: number; hpChange: number; consumed: number; target: number;
+  } | null>(null);
+  const [closeResult, setCloseResult] = useState<typeof dayClosed | null>(null);
+
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
@@ -58,6 +65,8 @@ export default function Today() {
     setFrequentFoods(freq as FrequentFood[]);
     setHasProfile(!!prof);
     setTarget(tgt as number ?? 0);
+    setCloseResult(null);
+    window.api.nutritionIsDayClosed(d).then((r) => setDayClosed(r as typeof dayClosed)).catch(console.error);
   }, []);
 
   useEffect(() => { loadData(date); }, [date, loadData]);
@@ -152,6 +161,23 @@ export default function Today() {
   const showToast = (msg: string) => {
     setLogMessage(msg);
     setTimeout(() => setLogMessage(''), 2000);
+  };
+
+  const handleCloseDay = async () => {
+    const result = await window.api.nutritionCloseDay(date);
+    if (result.success && result.breakdown) {
+      const b = result.breakdown as typeof dayClosed;
+      setCloseResult(b);
+      await window.api.processRpgEvent({
+        type: 'DAY_SUMMARY', moduleId: 'nutrition',
+        payload: { xp: b!.xpTotal, hp: b!.hpChange },
+        timestamp: Date.now(),
+      });
+      showToast(`+${b!.xpTotal} XP`);
+    } else if (result.alreadyClosed) {
+      const closed = await window.api.nutritionIsDayClosed(date);
+      setDayClosed(closed as typeof dayClosed);
+    }
   };
 
   if (hasProfile === null) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
@@ -298,6 +324,41 @@ export default function Today() {
         </div>
       )}
 
+      {/* Close Day */}
+      <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
+          </svg>
+          {t('nutrify.closeDay')}
+        </div>
+
+        {dayClosed ? (
+          <div>
+            <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 10 }}>{t('nutrify.dayClosed')}</p>
+            <DayBreakdown data={dayClosed} t={t} />
+          </div>
+        ) : closeResult ? (
+          <div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--rpg-xp-green)', marginBottom: 10, fontWeight: 'bold' }}>
+              {t('nutrify.dayClosedSuccess')}
+            </p>
+            <DayBreakdown data={closeResult} t={t} />
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 10 }}>
+              {t('nutrify.closeDayDesc')}
+            </p>
+            <button className="rpg-button" onClick={handleCloseDay}
+              disabled={consumed === 0}
+              style={{ padding: '8px 24px' }}>
+              {t('nutrify.closeDayButton')}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Daily metrics */}
       <div className="rpg-card">
         <div className="rpg-card-title">{t('nutrify.dailyMetrics')}</div>
@@ -329,6 +390,42 @@ export default function Today() {
           {logMessage}
         </div>
       )}
+    </div>
+  );
+}
+
+function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: number; xpGym: number; xpWeight: number; xpTotal: number; hpChange: number; consumed: number; target: number }; t: (key: string) => string }) {
+  const rows = [
+    { label: t('nutrify.xpPrecision'), value: data.xpPrecision, desc: `${data.consumed} / ${data.target} kcal` },
+    { label: t('nutrify.xpSteps'), value: data.xpSteps },
+    { label: t('nutrify.xpGym'), value: data.xpGym },
+    { label: t('nutrify.xpWeight'), value: data.xpWeight },
+  ];
+
+  return (
+    <div>
+      {rows.map((row) => (
+        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--rpg-parchment-dark)', fontSize: '0.85rem' }}>
+          <span>
+            {row.label}
+            {row.desc && <span style={{ opacity: 0.5, marginLeft: 6, fontSize: '0.8rem' }}>({row.desc})</span>}
+          </span>
+          <span style={{ fontFamily: 'Fira Code, monospace', color: row.value > 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-ink-light)' }}>
+            +{row.value} XP
+          </span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.9rem', fontWeight: 'bold', marginTop: 4 }}>
+        <span>Total</span>
+        <span style={{ fontFamily: 'Fira Code, monospace' }}>
+          <span style={{ color: 'var(--rpg-xp-green)' }}>+{data.xpTotal} XP</span>
+          {data.hpChange !== 0 && (
+            <span style={{ color: data.hpChange > 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)', marginLeft: 8 }}>
+              {data.hpChange > 0 ? '+' : ''}{data.hpChange} HP
+            </span>
+          )}
+        </span>
+      </div>
     </div>
   );
 }

@@ -84,7 +84,16 @@
     "confirmLog": "Confirmar y registrar",
     "today": "Hoy",
     "foodInputPlaceholder": "Que comiste? ej: milanesa con papas fritas",
-    "totalCalories": "Total"
+    "totalCalories": "Total",
+    "closeDay": "Cierre del Dia",
+    "closeDayDesc": "Cierra el dia para calcular tu XP y HP segun precision calorica, pasos, gym y peso",
+    "closeDayButton": "Cerrar el Dia",
+    "dayClosed": "Dia cerrado",
+    "dayClosedSuccess": "Dia cerrado exitosamente!",
+    "xpPrecision": "Precision calorica",
+    "xpSteps": "Pasos",
+    "xpGym": "Gimnasio",
+    "xpWeight": "Peso registrado"
   },
   "coinify": {
     "title": "Coinify",

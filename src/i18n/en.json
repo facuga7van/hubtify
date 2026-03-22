@@ -84,7 +84,16 @@
     "confirmLog": "Confirm & Log",
     "today": "Today",
     "foodInputPlaceholder": "What did you eat? e.g.: chicken with rice",
-    "totalCalories": "Total"
+    "totalCalories": "Total",
+    "closeDay": "Day Summary",
+    "closeDayDesc": "Close the day to calculate XP and HP based on caloric precision, steps, gym, and weight",
+    "closeDayButton": "Close Day",
+    "dayClosed": "Day closed",
+    "dayClosedSuccess": "Day closed successfully!",
+    "xpPrecision": "Caloric precision",
+    "xpSteps": "Steps",
+    "xpGym": "Gym",
+    "xpWeight": "Weight logged"
   },
   "coinify": {
     "title": "Coinify",

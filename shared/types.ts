@@ -100,6 +100,8 @@ export interface HubtifyApi {
   nutritionIsOllamaAvailable: () => Promise<boolean>;
   nutritionSearchFoodDb: (query: string) => Promise<{ matched: Array<{ name: string; calories: number; source: 'database' }>; unmatched: string[] }>;
   nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
+  nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
+  nutritionIsDayClosed: (date: string) => Promise<unknown>;
   onEstimateProgress: (callback: (stage: string) => void) => () => void;
 
   // Sync
