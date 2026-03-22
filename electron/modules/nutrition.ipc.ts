@@ -305,24 +305,44 @@ export function registerNutritionIpcHandlers(): void {
     const steps = (metrics?.steps as number) ?? 0;
     const gym = !!(metrics?.gym);
 
-    // Calculate XP
+    // Calculate XP based on deficit compliance
     let xpPrecision = 0;
+    let xpBonus = 0;
     if (consumed === 0) {
       xpPrecision = 0;
     } else if (target <= 0) {
       xpPrecision = 10;
+    } else if (consumed <= target) {
+      // Under or at target = success!
+      const deficitPct = (target - consumed) / target;
+      if (deficitPct <= 0.05) {
+        // Within 5% of target — perfect precision
+        xpPrecision = 100;
+      } else if (deficitPct <= 0.15) {
+        // Good deficit margin (5-15% under target)
+        xpPrecision = 100;
+        xpBonus = 30; // bonus for solid deficit
+      } else if (deficitPct <= 0.30) {
+        // Great deficit margin (15-30% under target)
+        xpPrecision = 100;
+        xpBonus = 60; // bigger bonus
+      } else {
+        // Way under — might be undereating, still reward but less bonus
+        xpPrecision = 75;
+        xpBonus = 20;
+      }
     } else {
-      const pct = Math.abs(consumed - target) / target;
-      if (pct <= 0.05) xpPrecision = 100;
-      else if (pct <= 0.10) xpPrecision = 75;
-      else if (pct <= 0.20) xpPrecision = 40;
-      else xpPrecision = 10;
+      // Over target
+      const overPct = (consumed - target) / target;
+      if (overPct <= 0.10) xpPrecision = 40; // slightly over, some XP
+      else if (overPct <= 0.20) xpPrecision = 20;
+      else xpPrecision = 5; // way over
     }
 
     const xpSteps = steps > 0 ? 20 : 0;
     const xpGym = gym ? 20 : 0;
     const xpWeight = weightLogged ? 10 : 0;
-    const xpTotal = xpPrecision + xpSteps + xpGym + xpWeight;
+    const xpTotal = xpPrecision + xpBonus + xpSteps + xpGym + xpWeight;
 
     // Calculate HP change
     let hpChange = 0;

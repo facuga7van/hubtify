@@ -1,24 +1,116 @@
-interface Props { consumed: number; target: number; }
+import { useTranslation } from 'react-i18next';
 
-export default function CalorieProgressBar({ consumed, target }: Props) {
-  if (target <= 0) return null;
-  const pct = Math.min((consumed / target) * 100, 150);
-  const over = consumed > target;
-  const color = over ? 'var(--rpg-hp-red)' : 'var(--rpg-xp-green)';
+interface Props {
+  consumed: number;
+  target: number;    // TDEE - deficit (what you should eat)
+  tdee: number;      // Total daily energy expenditure
+}
+
+export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
+  const { t } = useTranslation();
+  if (tdee <= 0) return null;
+
+  // Positions as % of TDEE (the full bar represents TDEE)
+  const consumedPct = Math.min((consumed / tdee) * 100, 110);
+  const targetPct = (target / tdee) * 100;
+  const remaining = target - consumed;
+
+  // Status
+  const isOverTarget = consumed > target;
+  const isOverTdee = consumed > tdee;
+  const isInDeficit = consumed <= target;
+  const deficitAmount = target - consumed;
+  const surplusAmount = consumed - target;
+
+  // Bar color based on status
+  const barColor = isOverTdee
+    ? 'var(--rpg-hp-red)'
+    : isOverTarget
+    ? '#e67e22'  // orange warning
+    : 'var(--rpg-xp-green)';
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: 4 }}>
-        <span>{consumed} kcal consumed</span>
-        <span>Target: {target} kcal</span>
+      {/* Header stats */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: 6 }}>
+        <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold' }}>
+          {consumed} <span style={{ opacity: 0.5, fontWeight: 'normal' }}>kcal</span>
+        </span>
+        {isInDeficit ? (
+          <span style={{ color: 'var(--rpg-xp-green)' }}>
+            {remaining} kcal {t('nutrify.remaining')}
+          </span>
+        ) : (
+          <span style={{ color: isOverTdee ? 'var(--rpg-hp-red)' : '#e67e22' }}>
+            +{surplusAmount} kcal {t('nutrify.overTarget')}
+          </span>
+        )}
       </div>
-      <div className="rpg-bar" style={{ height: 20 }}>
-        <div className="rpg-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
-        <span className="rpg-bar-label">{Math.round(pct)}%</span>
+
+      {/* Progress bar with markers */}
+      <div style={{ position: 'relative' }}>
+        <div className="rpg-bar" style={{ height: 22 }}>
+          {/* Consumed fill */}
+          <div style={{
+            height: '100%', borderRadius: 2,
+            width: `${Math.min(consumedPct, 100)}%`,
+            background: barColor,
+            transition: 'width 0.5s ease, background 0.3s ease',
+          }} />
+        </div>
+
+        {/* Target marker line */}
+        <div style={{
+          position: 'absolute', top: -2, bottom: -2,
+          left: `${Math.min(targetPct, 100)}%`,
+          width: 2, background: 'var(--rpg-gold)',
+          boxShadow: '0 0 4px var(--rpg-gold)',
+          borderRadius: 1,
+        }} />
+
+        {/* Target label */}
+        <div style={{
+          position: 'absolute', top: -16,
+          left: `${Math.min(targetPct, 100)}%`,
+          transform: 'translateX(-50%)',
+          fontSize: '0.65rem', fontFamily: 'Fira Code, monospace',
+          color: 'var(--rpg-gold)', whiteSpace: 'nowrap',
+        }}>
+          {t('nutrify.target')} {target}
+        </div>
+
+        {/* TDEE label at 100% */}
+        {target < tdee && (
+          <div style={{
+            position: 'absolute', top: -16, right: 0,
+            fontSize: '0.65rem', fontFamily: 'Fira Code, monospace',
+            color: 'var(--rpg-ink-light)', opacity: 0.5,
+          }}>
+            TDEE {tdee}
+          </div>
+        )}
       </div>
-      {over && <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.8rem', marginTop: 4 }}>
-        Over by {consumed - target} kcal
-      </p>}
+
+      {/* Status message */}
+      <div style={{ fontSize: '0.8rem', marginTop: 8, textAlign: 'center' }}>
+        {isOverTdee ? (
+          <span style={{ color: 'var(--rpg-hp-red)' }}>
+            ⚠ {t('nutrify.overTdee')}
+          </span>
+        ) : isOverTarget ? (
+          <span style={{ color: '#e67e22' }}>
+            {t('nutrify.overTargetWarning')}
+          </span>
+        ) : deficitAmount > target * 0.3 ? (
+          <span style={{ color: 'var(--rpg-xp-green)' }}>
+            ★ {t('nutrify.greatDeficit')}
+          </span>
+        ) : (
+          <span style={{ opacity: 0.5 }}>
+            {t('nutrify.onTrack')}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

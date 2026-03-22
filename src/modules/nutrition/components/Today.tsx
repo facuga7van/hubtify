@@ -231,7 +231,7 @@ export default function Today() {
         </button>
       </div>
 
-      <CalorieProgressBar consumed={consumed} target={target} />
+      <CalorieProgressBar consumed={consumed} target={target} tdee={summary?.tdee ?? 0} />
 
       {/* ── Unified food input ──────────────────────── */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
