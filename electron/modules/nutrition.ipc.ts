@@ -237,10 +237,33 @@ export function registerNutritionIpcHandlers(): void {
     return searchFoodDatabase(query);
   });
 
-  ipcMain.handle('nutrition:learnFood', (_e, entry: { name: string; keywords: string; calories: number; serving_size: string; category: string }) => {
-    const db = getDb();
-    db.prepare('INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)')
-      .run(entry.name, entry.keywords, entry.calories, entry.serving_size, entry.category);
+  ipcMain.handle('nutrition:learnFood', (_e, entry: { description: string; calories: number; breakdown?: string }) => {
+    try {
+      const db = getDb();
+      const name = entry.description.trim();
+      if (!name) return;
+
+      // Extract quantity to store per-unit calories
+      const qtyMatch = name.match(/^(\d+)\s*/);
+      const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+      const caloriesPerUnit = Math.round(entry.calories / qty);
+
+      // Normalize keywords for search
+      const keywords = name.toLowerCase().replace(/[^a-záéíóúñü0-9\s]/g, '').trim();
+
+      // Check if already exists
+      const existing = db.prepare('SELECT id FROM food_database WHERE keywords = ?').get(keywords);
+      if (existing) {
+        // Update calories (average with existing)
+        db.prepare('UPDATE food_database SET calories = ? WHERE keywords = ?')
+          .run(caloriesPerUnit, keywords);
+      } else {
+        db.prepare('INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)')
+          .run(name, keywords, caloriesPerUnit, 'porcion', 'aprendido');
+      }
+    } catch (err) {
+      console.error('Error learning food:', err);
+    }
   });
 
   ipcMain.handle('nutrition:getTodayTarget', () => {
@@ -334,15 +357,20 @@ export function registerNutritionIpcHandlers(): void {
   });
 
   ipcMain.handle('nutrition:isDayClosed', (_e, date: string) => {
-    const db = getDb();
-    const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ?').get(date) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return {
-      xpPrecision: row.xp_precision, xpSteps: row.xp_steps,
-      xpGym: row.xp_gym, xpWeight: row.xp_weight,
-      xpTotal: row.xp_total, hpChange: row.hp_change,
-      consumed: row.consumed, target: row.target,
-    };
+    try {
+      const db = getDb();
+      const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+      if (!row) return null;
+      return {
+        xpPrecision: row.xp_precision, xpSteps: row.xp_steps,
+        xpGym: row.xp_gym, xpWeight: row.xp_weight,
+        xpTotal: row.xp_total, hpChange: row.hp_change,
+        consumed: row.consumed, target: row.target,
+      };
+    } catch (err) {
+      console.error('Error checking day closed:', err);
+      return null;
+    }
   });
 }
 
