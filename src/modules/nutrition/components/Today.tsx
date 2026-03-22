@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
@@ -26,6 +26,7 @@ interface EstimationResult {
 
 export default function Today() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const [date, setDate] = useState(() => getLocalDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
@@ -69,7 +70,8 @@ export default function Today() {
     window.api.nutritionIsDayClosed(d).then((r) => setDayClosed(r as typeof dayClosed)).catch(console.error);
   }, []);
 
-  useEffect(() => { loadData(date); }, [date, loadData]);
+  // Reload data when date changes OR when navigating back to this page (e.g. after settings change)
+  useEffect(() => { loadData(date); }, [date, loadData, location.key]);
 
   const goDay = (offset: number) => {
     const [y, m, d] = date.split('-').map(Number);
