@@ -332,8 +332,49 @@ export default function Today() {
         </div>
       )}
 
-      {/* Close Day */}
+      {/* Daily metrics */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <div className="rpg-card-title">{t('nutrify.dailyMetrics')}</div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {t('nutrify.steps')}:
+            <input type="number" value={metrics.steps ?? ''} placeholder="0"
+              onChange={(e) => handleMetrics('steps', e.target.value ? parseInt(e.target.value) : null)}
+              className="rpg-input" style={{ width: 80 }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="checkbox" checked={metrics.gym}
+              onChange={(e) => handleMetrics('gym', e.target.checked)} />
+            {t('nutrify.gym')}
+          </label>
+        </div>
+      </div>
+
+      {/* TDEE breakdown */}
+      {summary && (
+        <div className="rpg-card" style={{ marginBottom: 16 }}>
+          <div className="rpg-card-title">{t('nutrify.tdeeBreakdown')}</div>
+          <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>BMR</span>
+              <span style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr} kcal</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>TDEE ({t(`nutrify.${(summary as Record<string, unknown>).activityLevel ?? 'moderate'}`)})</span>
+              <span style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee} kcal</span>
+            </div>
+            {target > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 4, fontWeight: 'bold' }}>
+                <span>{t('nutrify.target')}</span>
+                <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-gold)' }}>{target} kcal</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Close Day — at the bottom so user fills metrics first */}
+      <div className="rpg-card">
         <div className="rpg-card-title">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
             <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
@@ -365,24 +406,6 @@ export default function Today() {
             </button>
           </div>
         )}
-      </div>
-
-      {/* Daily metrics */}
-      <div className="rpg-card">
-        <div className="rpg-card-title">{t('nutrify.dailyMetrics')}</div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {t('nutrify.steps')}:
-            <input type="number" value={metrics.steps ?? ''} placeholder="0"
-              onChange={(e) => handleMetrics('steps', e.target.value ? parseInt(e.target.value) : null)}
-              className="rpg-input" style={{ width: 80 }} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={metrics.gym}
-              onChange={(e) => handleMetrics('gym', e.target.checked)} />
-            {t('nutrify.gym')}
-          </label>
-        </div>
       </div>
 
       {/* Log confirmation toast */}
