@@ -194,13 +194,21 @@ export default function Today() {
         title={t('nutrify.title')}
         subtitle={t('nutrify.subtitle')}
         actions={
-          <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
-            style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <rect x="1" y="7" width="3" height="6"/><rect x="5.5" y="4" width="3" height="9"/><rect x="10" y="1" width="3" height="12"/>
-            </svg>
-            {' '}{t('nutrify.charts')}
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="rpg-button" onClick={() => navigate('/nutrition/settings')}
+              style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+                <circle cx="7" cy="7" r="2"/><path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.8 2.8l1 1M10.2 10.2l1 1M2.8 11.2l1-1M10.2 3.8l1-1"/>
+              </svg>
+            </button>
+            <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
+              style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <rect x="1" y="7" width="3" height="6"/><rect x="5.5" y="4" width="3" height="9"/><rect x="10" y="1" width="3" height="12"/>
+              </svg>
+              {' '}{t('nutrify.charts')}
+            </button>
+          </div>
         }
       />
 

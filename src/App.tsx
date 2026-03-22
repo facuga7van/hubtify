@@ -13,6 +13,7 @@ import './modules/quests/styles/quests.css';
 import { nutritionModule } from './modules/nutrition';
 import Today from './modules/nutrition/components/Today';
 import NutritionCharts from './modules/nutrition/components/NutritionCharts';
+import NutritionSettings from './modules/nutrition/components/NutritionSettings';
 import { financeModule } from './modules/finance';
 import FinanceDashboard from './modules/finance/components/FinanceDashboard';
 
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/quests" element={<TaskList />} />
           <Route path="/nutrition" element={<Today />} />
           <Route path="/nutrition/dashboard" element={<NutritionCharts />} />
+          <Route path="/nutrition/settings" element={<NutritionSettings />} />
           <Route path="/finance" element={<FinanceDashboard />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
