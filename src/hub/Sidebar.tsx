@@ -50,15 +50,25 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
-      {/* Toggle button */}
-      <button onClick={onToggle} className="sidebar-toggle" title={collapsed ? 'Expand' : 'Collapse'}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-          style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-          <path d="M9 2L4 7l5 5"/>
-        </svg>
-      </button>
+      {/* Toggle button — above avatar when expanded, below when collapsed */}
+      {!collapsed && (
+        <button onClick={onToggle} className="sidebar-toggle" title="Collapse">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M9 2L4 7l5 5"/>
+          </svg>
+        </button>
+      )}
 
       <PlayerCard stats={stats} collapsed={collapsed} />
+
+      {collapsed && (
+        <button onClick={onToggle} className="sidebar-toggle sidebar-toggle--collapsed" title="Expand">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+            style={{ transform: 'rotate(180deg)' }}>
+            <path d="M9 2L4 7l5 5"/>
+          </svg>
+        </button>
+      )}
 
       {!collapsed && (
         <div style={{ padding: '4px 14px', opacity: 0.3 }}>
