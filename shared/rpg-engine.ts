@@ -7,7 +7,7 @@ import {
 
 export function xpThreshold(n: number): number {
   if (n <= 1) return 0;
-  return Math.round(100 * Math.pow(n, 1.3));
+  return Math.round(120 * Math.pow(n, 1.5));
 }
 
 export function getLevel(totalXp: number): number {
