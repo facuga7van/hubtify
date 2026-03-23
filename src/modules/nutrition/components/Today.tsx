@@ -197,14 +197,14 @@ export default function Today() {
     }
   };
 
-  if (hasProfile === null) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
-  if (!hasProfile) return <NutritionOnboarding onComplete={() => loadData(date)} />;
-
   const consumed = summary?.totalCaloriesIn ?? foods.reduce((s, f) => s + f.calories, 0);
   const filteredFrequent = useMemo(() =>
     frequentFoods.filter((f) =>
       !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
     ), [frequentFoods, frequentSearch]);
+
+  if (hasProfile === null) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
+  if (!hasProfile) return <NutritionOnboarding onComplete={() => loadData(date)} />;
 
   return (
     <div>
