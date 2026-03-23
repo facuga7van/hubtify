@@ -10,6 +10,7 @@ import './styles/layout.css';
 import './styles/components.css';
 import { playLevelUp } from '../shared/audio';
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts';
+import QuickAdd from '../shared/components/QuickAdd';
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -21,6 +22,20 @@ export default function Layout() {
   const { user: authUser } = useAuthContext();
 
   useKeyboardShortcuts();
+
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  // Ctrl+Q to open quick add
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
+        e.preventDefault();
+        setShowQuickAdd(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('hubtify_sidebar_collapsed') === 'true';
@@ -164,6 +179,8 @@ export default function Layout() {
           </div>
         </div>
       )}
+
+      {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
     </div>
   );
 }
