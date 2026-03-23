@@ -6,3 +6,4 @@ dist/
 *.db-journal
 nutrify-q8.gguf
 electron/modules/nutrition/model/nutrify.gguf
+.superpowers/
