@@ -98,4 +98,12 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_habit_checks_date ON habit_checks(date);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 5,
+    up: `
+      ALTER TABLE habits ADD COLUMN frequency TEXT NOT NULL DEFAULT 'daily';
+      ALTER TABLE habits ADD COLUMN times_per_week INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];

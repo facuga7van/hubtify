@@ -286,50 +286,107 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcMain.handle('quests:getHabits', () => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA');
+
     const habits = db.prepare(`
-      SELECT id, name, icon, created_at AS createdAt
+      SELECT id, name, frequency, times_per_week AS timesPerWeek, created_at AS createdAt
       FROM habits ORDER BY created_at ASC
-    `).all() as Array<{ id: string; name: string; icon: string; createdAt: string }>;
+    `).all() as Array<{ id: string; name: string; frequency: string; timesPerWeek: number; createdAt: string }>;
 
     return habits.map((h) => {
-      // Check if done today
-      const check = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, today);
-      // Calculate streak: count consecutive days backwards from today (or yesterday if not checked today)
+      const checkedToday = !!db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, todayStr);
+
+      // Checks this period
+      let checksThisPeriod = 0;
+      let targetThisPeriod = 1;
+
+      if (h.frequency === 'daily') {
+        checksThisPeriod = checkedToday ? 1 : 0;
+        targetThisPeriod = 1;
+      } else if (h.frequency === 'weekly') {
+        // Count checks this week (Monday-Sunday)
+        const dayOfWeek = today.getDay() || 7; // 1=Mon..7=Sun
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - dayOfWeek + 1);
+        const mondayStr = monday.toLocaleDateString('en-CA');
+        const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+          .get(h.id, mondayStr, todayStr) as { c: number };
+        checksThisPeriod = count.c;
+        targetThisPeriod = h.timesPerWeek;
+      } else if (h.frequency === 'monthly') {
+        const monthStart = todayStr.slice(0, 7) + '-01';
+        const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+          .get(h.id, monthStart, todayStr) as { c: number };
+        checksThisPeriod = count.c;
+        targetThisPeriod = 1;
+      }
+
+      // Streak: consecutive completed periods backwards
       let streak = 0;
-      const startDate = check ? today : (() => {
-        const d = new Date(); d.setDate(d.getDate() - 1);
-        return d.toLocaleDateString('en-CA');
-      })();
+      if (h.frequency === 'daily') {
+        // Count consecutive days backwards
+        const startDate = checkedToday ? todayStr : (() => {
+          const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA');
+        })();
+        if (!checkedToday) {
+          const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+          const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, yesterday.toLocaleDateString('en-CA'));
+          if (!found) return { ...h, streak: 0, checkedToday, checksThisPeriod, targetThisPeriod };
+        }
+        const d = new Date(startDate);
+        while (true) {
+          const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, d.toLocaleDateString('en-CA'));
+          if (!found) break;
+          streak++;
+          d.setDate(d.getDate() - 1);
+        }
+      } else if (h.frequency === 'weekly') {
+        // Count consecutive weeks where target was met, backwards from last week (or current if met)
+        const currentMet = checksThisPeriod >= h.timesPerWeek;
+        const dayOfWeek = today.getDay() || 7;
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - dayOfWeek + 1);
+        if (!currentMet) weekStart.setDate(weekStart.getDate() - 7); // start from last week
 
-      // If not checked today and not checked yesterday, streak is 0
-      if (!check) {
-        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toLocaleDateString('en-CA');
-        const yesterdayCheck = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, yesterdayStr);
-        if (!yesterdayCheck) return { ...h, streak: 0, checkedToday: false };
+        const d = new Date(weekStart);
+        while (true) {
+          const wStart = d.toLocaleDateString('en-CA');
+          const wEnd = new Date(d); wEnd.setDate(d.getDate() + 6);
+          const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+            .get(h.id, wStart, wEnd.toLocaleDateString('en-CA')) as { c: number };
+          if (count.c < h.timesPerWeek) break;
+          streak++;
+          d.setDate(d.getDate() - 7);
+        }
+      } else if (h.frequency === 'monthly') {
+        // Count consecutive months with at least 1 check
+        const currentMet = checksThisPeriod >= 1;
+        let year = today.getFullYear();
+        let month = today.getMonth(); // 0-indexed
+        if (!currentMet) { month--; if (month < 0) { month = 11; year--; } }
+
+        while (true) {
+          const mStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+          const mEnd = `${year}-${String(month + 1).padStart(2, '0')}-31`;
+          const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+            .get(h.id, mStart, mEnd) as { c: number };
+          if (count.c < 1) break;
+          streak++;
+          month--; if (month < 0) { month = 11; year--; }
+        }
       }
 
-      // Count backwards
-      const d = new Date(startDate);
-      while (true) {
-        const dateStr = d.toLocaleDateString('en-CA');
-        const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, dateStr);
-        if (!found) break;
-        streak++;
-        d.setDate(d.getDate() - 1);
-      }
-
-      return { ...h, streak, checkedToday: !!check };
+      return { ...h, streak, checkedToday, checksThisPeriod, targetThisPeriod };
     });
   });
 
-  ipcMain.handle('quests:addHabit', (_e, habit: { name: string; icon: string }) => {
+  ipcMain.handle('quests:addHabit', (_e, habit: { name: string; frequency: string; timesPerWeek: number }) => {
     const db = getDb();
     const id = genId();
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO habits (id, name, icon, created_at) VALUES (?, ?, ?, ?)')
-      .run(id, habit.name, habit.icon, now);
+    db.prepare('INSERT INTO habits (id, name, frequency, times_per_week, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(id, habit.name, habit.frequency, habit.timesPerWeek, now);
     return id;
   });
 

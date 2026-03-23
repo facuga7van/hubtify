@@ -52,7 +52,7 @@ export function registerRpgHandlers(): void {
 
   ipcMain.handle('rpg:processEvent', (_e, event: RpgEvent) => {
     const db = getDb();
-    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED';
+    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED';
 
     const processTransaction = db.transaction(() => {
       const stats = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;

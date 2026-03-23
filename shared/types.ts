@@ -71,7 +71,7 @@ export interface HubtifyApi {
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
   questsGetHabits: () => Promise<unknown[]>;
-  questsAddHabit: (habit: { name: string; icon: string }) => Promise<string>;
+  questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => Promise<string>;
   questsDeleteHabit: (id: string) => Promise<void>;
   questsCheckHabit: (habitId: string) => Promise<{ checked: boolean }>;
   questsGetDrawings: (taskId: string) => Promise<unknown[]>;

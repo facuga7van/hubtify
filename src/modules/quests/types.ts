@@ -17,16 +17,21 @@ export interface Project {
   createdAt: string;
 }
 
+export type HabitFrequency = 'daily' | 'weekly' | 'monthly';
+
 export interface Habit {
   id: string;
   name: string;
-  icon: string;
+  frequency: HabitFrequency;
+  timesPerWeek: number;
   createdAt: string;
 }
 
 export interface HabitWithStreak extends Habit {
   streak: number;
   checkedToday: boolean;
+  checksThisPeriod: number;
+  targetThisPeriod: number;
 }
 
 export const PROJECT_COLORS = [
