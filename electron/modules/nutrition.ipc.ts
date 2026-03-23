@@ -410,11 +410,7 @@ function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const steps = (metrics?.steps as number) ?? 0;
   const gym = !!(metrics?.gym);
 
-  // Use dynamic activity factor based on recent history
-  const dynamicFactor = getDynamicActivityFactor(db, profile.activity_level as string);
-
-  const tdee = calculateTDEEWithFactor(bmr, dynamicFactor, steps, gym,
-    profile.step_calories_factor as number, profile.gym_calories as number);
+  const tdee = calculateTDEE(bmr, profile.activity_level as string);
   const balance = tdee - totalCals.total;
 
   db.prepare(`
@@ -470,15 +466,13 @@ function calculateBMR(weight: number, height: number, age: number, sex: string):
   return sex === 'M' ? base + 5 : base - 161;
 }
 
-function calculateTDEE(bmr: number, activityLevel: string, steps: number, gym: boolean,
-  stepFactor: number, gymCals: number): number {
+function calculateTDEE(bmr: number, activityLevel: string): number {
   const factors: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
-  return Math.round(bmr * (factors[activityLevel] ?? 1.2) + steps * stepFactor + (gym ? gymCals : 0));
+  return Math.round(bmr * (factors[activityLevel] ?? 1.2));
 }
 
-function calculateTDEEWithFactor(bmr: number, factor: number, steps: number, gym: boolean,
-  stepFactor: number, gymCals: number): number {
-  return Math.round(bmr * factor + steps * stepFactor + (gym ? gymCals : 0));
+function calculateTDEEWithFactor(bmr: number, factor: number): number {
+  return Math.round(bmr * factor);
 }
 
 function getMondayOfWeek(dateStr?: string): string {
