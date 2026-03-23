@@ -70,7 +70,37 @@ export function registerRpgHandlers(): void {
       let milestoneXp = 0;
 
       if (isUndo) {
-        xpGained = baseXp;
+        // Find the original completion event and reverse its exact XP
+        const undoMap: Record<string, string> = {
+          'TASK_UNCOMPLETED': 'TASK_COMPLETED',
+          'SUBTASK_UNCOMPLETED': 'SUBTASK_COMPLETED',
+          'HABIT_UNCHECKED': 'HABIT_CHECKED',
+        };
+        const originalType = undoMap[event.type];
+        const itemId = (payload?.taskId ?? payload?.habitId ?? payload?.subtaskId) as string | undefined;
+
+        let originalEvent: { id: number; xp_gained: number; created_at: string } | undefined;
+        if (itemId && originalType) {
+          // Find the most recent matching event
+          originalEvent = db.prepare(`
+            SELECT id, xp_gained, created_at FROM rpg_events
+            WHERE event_type = ? AND payload LIKE ?
+            ORDER BY id DESC LIMIT 1
+          `).get(originalType, `%"${itemId}"%`) as typeof originalEvent;
+        }
+
+        if (originalEvent) {
+          xpGained = -originalEvent.xp_gained;
+          // Delete the original event from the log
+          db.prepare('DELETE FROM rpg_events WHERE id = ?').run(originalEvent.id);
+          // Decrement combo if it was from today
+          const eventDate = originalEvent.created_at.slice(0, 10);
+          if (eventDate === today && combo > 0) {
+            combo = combo - 1;
+          }
+        } else {
+          xpGained = baseXp; // fallback to base XP if original not found
+        }
       } else {
         if ((stats.combo_date as string | null) !== today) combo = 0;
         comboMultiplier = getComboMultiplier(combo);
@@ -103,9 +133,9 @@ export function registerRpgHandlers(): void {
 
       if (isUndo) {
         db.prepare(`
-          UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?
+          UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?, daily_combo = ?
           WHERE user_id = ?
-        `).run(finalLevel, finalXp, newHp, finalTitle, 'default');
+        `).run(finalLevel, finalXp, newHp, finalTitle, Math.max(0, combo), 'default');
       } else {
         db.prepare(`
           UPDATE player_stats SET
@@ -117,6 +147,8 @@ export function registerRpgHandlers(): void {
 
       if (event.type === 'TASK_COMPLETED' || event.type === 'SUBTASK_COMPLETED') {
         db.prepare('UPDATE player_stats SET total_tasks = total_tasks + 1 WHERE user_id = ?').run('default');
+      } else if (event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED') {
+        db.prepare('UPDATE player_stats SET total_tasks = MAX(0, total_tasks - 1) WHERE user_id = ?').run('default');
       } else if (event.type === 'MEAL_LOGGED') {
         db.prepare('UPDATE player_stats SET total_meals = total_meals + 1 WHERE user_id = ?').run('default');
       } else if (event.type === 'EXPENSE_TRACKED' || event.type === 'LOAN_SETTLED') {
