@@ -1,21 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TaskTier, Task } from '../types';
+import type { TaskTier, Task, Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 
 interface Props {
   editingTask: Task | null;
   categories: string[];
+  projects: Project[];
+  activeProjectId: string | null;
   onSaved: () => void;
 }
 
-export default function TaskForm({ editingTask, categories, onSaved }: Props) {
+export default function TaskForm({ editingTask, categories, projects, activeProjectId, onSaved }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tier, setTier] = useState<TaskTier>(2);
   const [category, setCategory] = useState('');
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
   const [useDate, setUseDate] = useState(false);
   const [newCategory, setNewCategory] = useState('');
@@ -26,12 +29,14 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
       setDescription(editingTask.description);
       setTier(editingTask.tier);
       setCategory(editingTask.category);
+      setProjectId(editingTask.projectId ?? null);
       setDueDate(editingTask.dueDate ?? '');
       setUseDate(!!editingTask.dueDate);
     } else {
       setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(''); setUseDate(false);
+      setProjectId(activeProjectId);
     }
-  }, [editingTask]);
+  }, [editingTask, activeProjectId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +50,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
       description: description.trim(),
       tier,
       category: resolvedCategory,
+      projectId,
       dueDate: useDate && dueDate ? dueDate : null,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
@@ -53,10 +59,11 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
     await window.api.questsUpsertTask(task);
 
     if (resolvedCategory && resolvedCategory.trim()) {
-      await window.api.questsEnsureCategory(resolvedCategory.trim());
+      await window.api.questsEnsureCategory(resolvedCategory.trim(), projectId);
     }
 
     setName(''); setDescription(''); setTier(2); setNewCategory(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setProjectId(activeProjectId);
     onSaved();
   };
 
@@ -109,7 +116,25 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           style={{ flex: 1, minWidth: 150 }}
         />
 
-        {/* Category — select existing or type new */}
+        {/* Project */}
+        {projects.length > 0 && (
+          <select
+            value={projectId ?? ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              setProjectId(val || null);
+              setCategory('');
+            }}
+            className="rpg-select"
+          >
+            <option value="">{t('questify.noProject')}</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Category */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <select
             value={category}

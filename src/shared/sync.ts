@@ -7,7 +7,7 @@ const firestore = getFirestore(app);
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
     // Gather all data from IPC (SQLite)
-    const [stats, tasks, categories, charData, nutritionProfile, financeTx, loans] = await Promise.all([
+    const [stats, tasks, categories, charData, nutritionProfile, financeTx, loans, projects] = await Promise.all([
       window.api.getRpgStats(),
       window.api.questsGetTasks(),
       window.api.questsGetCategories(),
@@ -15,6 +15,7 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       window.api.nutritionGetProfile(),
       window.api.financeGetTransactions(new Date().toISOString().slice(0, 7)),
       window.api.financeGetLoans(),
+      window.api.questsGetProjects(),
     ]);
 
     // Get all subtasks for all tasks (parallel)
@@ -26,7 +27,7 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
     await setDoc(userRef, {
       playerStats: stats,
       characterData: charData,
-      questify: { tasks, subtasks: allSubs, categories },
+      questify: { tasks, subtasks: allSubs, categories, projects },
       nutrify: { profile: nutritionProfile },
       coinify: { transactions: financeTx, loans },
       lastSyncAt: new Date().toISOString(),
