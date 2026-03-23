@@ -225,7 +225,6 @@
   border-color: var(--rpg-gold);
   box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.3), var(--rpg-shadow-inset);
 }
-
 .rpg-select {
   padding: 6px 10px;
   border: 1px solid var(--rpg-gold-dark);

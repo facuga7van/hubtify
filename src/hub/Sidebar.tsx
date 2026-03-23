@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
-import { syncPush } from '../shared/sync';
 import './styles/layout.css';
 
-interface SidebarProps { stats: PlayerStats | null; }
+interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle: () => void; }
 
 function NavIcon({ name }: { name: string }) {
   const s = { width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -27,9 +26,9 @@ function NavIcon({ name }: { name: string }) {
       <svg {...s} viewBox="0 0 18 18"><path d="M9 2L3 5v4c0 4 3 6 6 7 3-1 6-3 6-7V5L9 2z"/><path d="M7 9l2 2 3-4"/></svg>
     );
     case 'settings': return (
-      <svg {...s} viewBox="0 0 18 18">
-        <circle cx="9" cy="9" r="2.5"/>
-        <path d="M9 1v2M9 15v2M1 9h2M15 9h2M3.5 3.5l1.4 1.4M13.1 13.1l1.4 1.4M3.5 14.5l1.4-1.4M13.1 4.9l1.4-1.4"/>
+      <svg {...s} viewBox="0 0 24 24">
+        <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
       </svg>
     );
     default: return null;
@@ -45,84 +44,85 @@ const navKeys = [
   { path: '/settings', key: 'nav.settings', icon: 'settings' },
 ];
 
-export default function Sidebar({ stats }: SidebarProps) {
+export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
   const { t, i18n } = useTranslation();
   const { user: authUser, logout } = useAuthContext();
 
   return (
-    <aside className="sidebar">
-      <PlayerCard stats={stats} />
-      <div style={{ padding: '4px 14px', opacity: 0.3 }}>
-        <img src={new URL('../../assets/footer.png', import.meta.url).href}
-          alt="" style={{ width: '100%', height: 'auto' }} />
-      </div>
+    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+      {/* Toggle button */}
+      <button onClick={onToggle} className="sidebar-toggle" title={collapsed ? 'Expand' : 'Collapse'}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+          style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          <path d="M9 2L4 7l5 5"/>
+        </svg>
+      </button>
+
+      <PlayerCard stats={stats} collapsed={collapsed} />
+
+      {!collapsed && (
+        <div style={{ padding: '4px 14px', opacity: 0.3 }}>
+          <img src={new URL('../../assets/footer.png', import.meta.url).href}
+            alt="" style={{ width: '100%', height: 'auto' }} />
+        </div>
+      )}
+
       <nav className="sidebar-nav">
         {navKeys.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
+            title={collapsed ? t(item.key) : undefined}
           >
             <NavIcon name={item.icon} />
-            <span>{t(item.key)}</span>
+            {!collapsed && <span>{t(item.key)}</span>}
           </NavLink>
         ))}
       </nav>
-      <div style={{ padding: '4px 14px', opacity: 0.3 }}>
-        <img src={new URL('../../assets/footer.png', import.meta.url).href}
-          alt="" style={{ width: '100%', height: 'auto' }} />
-      </div>
+
+      {!collapsed && (
+        <div style={{ padding: '4px 14px', opacity: 0.3 }}>
+          <img src={new URL('../../assets/footer.png', import.meta.url).href}
+            alt="" style={{ width: '100%', height: 'auto' }} />
+        </div>
+      )}
+
       <div className="sidebar-footer">
-        {stats && stats.streak > 0 && (
-          <div style={{ marginBottom: 6 }}>
-            <span style={{ fontSize: '0.9rem' }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="#e67e22" style={{ verticalAlign: '-2px', marginRight: 4 }}>
-                <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
-              </svg>
-              {stats.streak} {t('rpg.streak')}
-            </span>
-          </div>
-        )}
         {authUser ? (
           <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {authUser.email}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="rpg-button" onClick={async () => {
-                try {
-                  const result = await syncPush(authUser.uid);
-                  alert(result.success ? t('auth.synced') : `${t('auth.syncFailed')}: ${result.error}`);
-                } catch (err) {
-                  alert(t('auth.syncFailed'));
-                }
-              }} style={{ fontSize: '0.7rem', padding: '3px 8px', flex: 1 }}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M1 6a5 5 0 019-2M11 6a5 5 0 01-9 2"/><path d="M10 1v3h-3M2 11V8h3"/>
-                </svg>
-                {' '}{t('auth.sync')}
-              </button>
-              <button className="rpg-button" onClick={async () => {
-                await logout();
-              }} style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
-                {t('auth.logout')}
-              </button>
-            </div>
+            {!collapsed && (
+              <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {authUser.email}
+              </div>
+            )}
+            <button className="rpg-button" onClick={async () => { await logout(); }}
+              title={collapsed ? t('auth.logout') : undefined}
+              style={{ fontSize: '0.7rem', padding: collapsed ? '4px' : '3px 8px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M5 1H2v10h3M8 3l3 3-3 3M4 6h7"/>
+              </svg>
+              {!collapsed && t('auth.logout')}
+            </button>
           </div>
         ) : (
           <div style={{ marginBottom: 6 }}>
-            <NavLink to="/login" className="rpg-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.75rem', padding: '6px 10px', width: '100%', textDecoration: 'none' }}>
+            <NavLink to="/login" className="rpg-button"
+              title={collapsed ? t('auth.loginForSync') : undefined}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.75rem', padding: collapsed ? '6px' : '6px 10px', width: '100%', textDecoration: 'none' }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M7 1h4v10H7M1 6h7M6 3l3 3-3 3"/>
               </svg>
-              {t('auth.loginForSync')}
+              {!collapsed && t('auth.loginForSync')}
             </NavLink>
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>
-            {t('app.version')}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
+          {!collapsed && (
+            <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>
+              {t('app.version')}
+            </div>
+          )}
           <button onClick={() => {
             const newLang = i18n.language === 'es' ? 'en' : 'es';
             i18n.changeLanguage(newLang);

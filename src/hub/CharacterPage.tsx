@@ -85,7 +85,7 @@ export default function CharacterPage() {
           {' '}{t('character.xpNeeded', { xp: xpThreshold(stats.level + 1) })}
         </p>
         <p style={{ fontSize: '0.85rem', opacity: 0.6, marginTop: 4 }}>
-          {t('character.nextTitle')}: {getNextTitle(stats.level)}
+          {t('character.nextTitle')}: {getNextTitle(stats.level, t)}
         </p>
       </div>
 
@@ -98,7 +98,7 @@ export default function CharacterPage() {
             display: 'flex', justifyContent: 'space-between', padding: '4px 0',
             borderBottom: '1px solid var(--rpg-parchment-dark)', fontSize: '0.85rem',
           }}>
-            <span>{formatEventType(event.eventType)}</span>
+            <span>{formatEventType(event.eventType, t)}</span>
             <span style={{ fontFamily: 'Fira Code, monospace' }}>
               {event.xpGained > 0 ? '+' : ''}{Math.round(event.xpGained)} XP
               {event.hpChange !== 0 && ` | ${event.hpChange > 0 ? '+' : ''}${Math.round(event.hpChange)} HP`}
@@ -110,22 +110,24 @@ export default function CharacterPage() {
   );
 }
 
-function getNextTitle(currentLevel: number): string {
+function getNextTitle(currentLevel: number, t: (key: string) => string): string {
   const thresholds: [number, string][] = [[50,'Leyenda'],[40,'Hero'],[30,'Champion'],[20,'Caballero'],[10,'Guerrero'],[5,'Escudero']];
   for (const [level, title] of thresholds) {
     if (currentLevel < level) return `${title} (Lv.${level})`;
   }
-  return 'Max level reached!';
+  return t('character.maxLevel');
 }
 
-function formatEventType(type: string): string {
-  const map: Record<string, string> = {
-    TASK_COMPLETED: '⚔ Quest completed',
-    TASK_UNCOMPLETED: '⚔ Quest uncompleted',
-    SUBTASK_COMPLETED: '⚔ Subtask completed',
-    MEAL_LOGGED: '🍖 Meal logged',
-    EXPENSE_TRACKED: '💰 Expense tracked',
-    LOAN_SETTLED: '💰 Loan settled',
+function formatEventType(type: string, t: (key: string) => string): string {
+  const iconMap: Record<string, string> = {
+    TASK_COMPLETED: '\u2694',
+    TASK_UNCOMPLETED: '\u2694',
+    SUBTASK_COMPLETED: '\u2694',
+    MEAL_LOGGED: '\uD83C\uDF56',
+    EXPENSE_TRACKED: '\uD83D\uDCB0',
+    LOAN_SETTLED: '\uD83D\uDCB0',
   };
-  return map[type] ?? type;
+  const icon = iconMap[type] ?? '';
+  const label = t(`events.${type}`);
+  return label !== `events.${type}` ? `${icon} ${label}` : type;
 }

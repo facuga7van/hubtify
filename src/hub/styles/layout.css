@@ -13,6 +13,38 @@
   border-right: 3px solid var(--rpg-gold-dark);
   color: var(--rpg-parchment);
   box-shadow: 2px 0 12px rgba(44, 24, 16, 0.4);
+  transition: width 0.25s ease, min-width 0.25s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar--collapsed {
+  width: 56px;
+  min-width: 56px;
+}
+
+/* ── Toggle button ───────────────────────────────── */
+.sidebar-toggle {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  z-index: 10;
+  background: none;
+  border: none;
+  color: var(--rpg-gold);
+  cursor: pointer;
+  opacity: 0.5;
+  padding: 4px;
+  border-radius: var(--rpg-radius);
+  transition: opacity 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-toggle:hover {
+  opacity: 1;
+  background: rgba(201, 168, 76, 0.15);
 }
 
 .sidebar-nav {
@@ -21,6 +53,10 @@
   flex-direction: column;
   padding: 8px 10px;
   gap: 2px;
+}
+
+.sidebar--collapsed .sidebar-nav {
+  padding: 8px 6px;
 }
 
 .sidebar-nav-item {
@@ -37,6 +73,13 @@
   color: var(--rpg-parchment);
   text-decoration: none;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.sidebar--collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding: 10px;
+  gap: 0;
 }
 
 .sidebar-nav-item span:first-child {
@@ -53,12 +96,22 @@
   transform: translateX(2px);
 }
 
+.sidebar--collapsed .sidebar-nav-item:hover {
+  transform: none;
+}
+
 .sidebar-nav-item.active {
   background: linear-gradient(90deg, rgba(201, 168, 76, 0.25) 0%, rgba(201, 168, 76, 0.1) 100%);
   color: var(--rpg-gold-light);
   font-weight: 700;
   border-left: 3px solid var(--rpg-gold);
   padding-left: 11px;
+}
+
+.sidebar--collapsed .sidebar-nav-item.active {
+  border-left: none;
+  padding-left: 10px;
+  background: rgba(201, 168, 76, 0.2);
 }
 
 .sidebar-divider {
@@ -73,6 +126,10 @@
   font-size: 0.85rem;
   font-family: 'Crimson Text', serif;
   color: var(--rpg-gold);
+}
+
+.sidebar--collapsed .sidebar-footer {
+  padding: 8px 6px;
 }
 
 /* ── Main Content ─────────────────────────────────── */
@@ -97,7 +154,7 @@
 
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 900px) {
-  .sidebar {
+  .sidebar:not(.sidebar--collapsed) {
     width: 180px;
     min-width: 180px;
   }
@@ -113,24 +170,6 @@
 }
 
 @media (max-width: 700px) {
-  .sidebar {
-    width: 56px;
-    min-width: 56px;
-  }
-
-  .sidebar-nav-item span:last-child {
-    display: none;
-  }
-
-  .sidebar-nav-item {
-    justify-content: center;
-    padding: 10px;
-  }
-
-  .sidebar-footer {
-    display: none;
-  }
-
   .main-content {
     padding: 12px 16px;
   }
