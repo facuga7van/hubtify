@@ -13,21 +13,21 @@ function getSound(name: string, src: string, volume = 0.5): Howl {
 export function playTaskComplete() {
   if (localStorage.getItem('hubtify_sound') === 'false') return;
   try {
-    getSound('taskComplete', new URL('../assets/fx/graciastio.mp3', import.meta.url).href, 0.4).play();
+    getSound('taskComplete', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.4).play();
   } catch { /* Sound not available */ }
 }
 
 export function playXpGain() {
   if (localStorage.getItem('hubtify_sound') === 'false') return;
   try {
-    getSound('xpGain', new URL('../assets/fx/graciastio.mp3', import.meta.url).href, 0.3).play();
+    getSound('xpGain', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3).play();
   } catch { /* Sound not available */ }
 }
 
 export function playLevelUp() {
   if (localStorage.getItem('hubtify_sound') === 'false') return;
   try {
-    getSound('levelUp', new URL('../assets/fx/graciastio.mp3', import.meta.url).href, 0.5).play();
+    getSound('levelUp', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.5).play();
   } catch { /* Sound not available */ }
 }
 
