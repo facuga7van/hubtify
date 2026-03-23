@@ -226,17 +226,39 @@ export default function TaskList() {
 
   return (
     <div>
-      <PageHeader title={t('questify.title')} subtitle={t('questify.subtitle')} />
-      <div style={{ marginBottom: 12 }}>
-        <input
-          type="text"
-          placeholder={t('common.search')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="rpg-input"
-          style={{ width: '100%' }}
-        />
-      </div>
+      <PageHeader title={t('questify.title')} subtitle={t('questify.subtitle')}
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <select
+              value={activeProjectId === undefined ? '__all__' : (activeProjectId ?? '__none__')}
+              onChange={(e) => {
+                const val = e.target.value;
+                setActiveProjectId(val === '__all__' ? undefined : val === '__none__' ? null : val);
+                setFilter('');
+              }}
+              style={{
+                padding: '4px 2px', background: 'transparent', border: 'none',
+                borderBottom: '1px solid var(--rpg-gold-dark)', borderRadius: 0,
+                fontSize: '0.9rem', color: 'var(--rpg-ink)', cursor: 'pointer',
+                fontFamily: 'Crimson Text, serif',
+              }}>
+              <option value="__all__">{t('questify.allProjects')}</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+              <option value="__none__">{t('questify.noProject')}</option>
+            </select>
+            <button className="rpg-button" onClick={() => setShowProjectManager(true)}
+              title={t('questify.manageProjects')}
+              style={{ padding: '4px 8px', fontSize: '0.8rem' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
+        }
+      />
       <div ref={formRef}>
         <TaskForm
           editingTask={editingTask}
@@ -260,37 +282,10 @@ export default function TaskList() {
           {t('questify.completed')} ({completed.length})
         </button>
 
-        {/* Project filter */}
-        <select
-          value={activeProjectId === undefined ? '__all__' : (activeProjectId ?? '__none__')}
-          onChange={(e) => {
-            const val = e.target.value;
-            setActiveProjectId(val === '__all__' ? undefined : val === '__none__' ? null : val);
-            setFilter('');
-          }}
-          style={{ marginLeft: 'auto', padding: '4px 8px', border: '1px solid var(--rpg-wood)',
-            borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)', fontSize: '0.85rem' }}>
-          <option value="__all__">{t('questify.allProjects')}</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-          <option value="__none__">{t('questify.noProject')}</option>
-        </select>
-
-        {/* Manage projects */}
-        <button className="rpg-button" onClick={() => setShowProjectManager(true)}
-          title={t('questify.manageProjects')}
-          style={{ padding: '4px 8px', opacity: 0.6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-          </svg>
-        </button>
-
         {/* Category filter */}
         {uniqueCategories.length > 0 && (
           <select value={filter} onChange={(e) => setFilter(e.target.value)}
-            style={{ padding: '4px 8px', border: '1px solid var(--rpg-wood)',
+            style={{ marginLeft: 'auto', padding: '4px 8px', border: '1px solid var(--rpg-wood)',
               borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)', fontSize: '0.85rem' }}>
             <option value="">{t('questify.allCategories')}</option>
             {uniqueCategories.map((c) => <option key={c} value={c}>{c}</option>)}
