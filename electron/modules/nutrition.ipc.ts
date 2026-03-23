@@ -410,7 +410,8 @@ function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const steps = (metrics?.steps as number) ?? 0;
   const gym = !!(metrics?.gym);
 
-  const tdee = calculateTDEE(bmr, profile.activity_level as string);
+  const dynamicFactor = getDynamicActivityFactor(db, profile.activity_level as string);
+  const tdee = calculateTDEEWithFactor(bmr, dynamicFactor);
   const balance = tdee - totalCals.total;
 
   db.prepare(`
