@@ -54,6 +54,125 @@
   padding: 2px 0;
 }
 
+/* ── PlayerCard ──────────────────────────────────── */
+.player-card {
+  padding: 12px 14px;
+  transition: padding 0.25s ease;
+}
+
+.player-card--collapsed {
+  padding: 8px 6px;
+}
+
+.player-card__avatar-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 8px;
+  transition: transform 0.25s ease;
+  transform-origin: top center;
+}
+
+.player-card--collapsed .player-card__avatar-wrap {
+  transform: scale(0.5);
+  margin-bottom: -20px;
+}
+
+.player-card__avatar-glow {
+  border-radius: 50%;
+  width: 72px;
+  height: 72px;
+}
+
+.player-card__streak {
+  position: absolute;
+  bottom: -2px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 0.6rem;
+  color: #e67e22;
+  font-family: 'Fira Code', monospace;
+  line-height: 1;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.player-card--collapsed .player-card__streak-text {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.player-card__info {
+  text-align: center;
+  margin-bottom: 12px;
+  transition: margin-bottom 0.25s ease;
+}
+
+.player-card--collapsed .player-card__info {
+  margin-bottom: 4px;
+}
+
+.player-card__level {
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  color: var(--rpg-gold-light);
+  transition: font-size 0.25s ease;
+}
+
+.player-card--collapsed .player-card__level {
+  font-size: 0.65rem;
+}
+
+.player-card__title {
+  font-size: 0.8rem;
+  color: var(--rpg-parchment);
+  opacity: 0.8;
+  max-height: 1.5em;
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.25s ease;
+}
+
+.player-card--collapsed .player-card__title {
+  max-height: 0;
+  opacity: 0;
+}
+
+.player-card__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+.player-card--collapsed .player-card__bars {
+  max-height: 0;
+  opacity: 0;
+}
+
+.player-card__combo {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--rpg-gold-light);
+  font-family: 'Fira Code', monospace;
+  max-height: 1.5em;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+.player-card--collapsed .player-card__combo {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
 .sidebar-nav {
   flex: 1;
   display: flex;
