@@ -240,7 +240,7 @@ export default function TaskList() {
                 padding: '4px 2px', background: 'transparent', border: 'none',
                 borderBottom: '1px solid var(--rpg-gold-dark)', borderRadius: 0,
                 fontSize: '0.9rem', color: 'var(--rpg-ink)', cursor: 'pointer',
-                fontFamily: 'Crimson Text, serif',
+                fontFamily: 'Crimson Text, serif', outline: 'none',
               }}>
               <option value="__all__">{t('questify.allProjects')}</option>
               {projects.map((p) => (
