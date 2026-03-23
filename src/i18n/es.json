@@ -32,6 +32,7 @@
     "cancel": "Cancelar",
     "subtaskName": "Nombre de subtarea",
     "deleteConfirm": "Eliminar {{count}} quest(s)? No se puede deshacer.",
+    "subtaskDeleteConfirm": "Eliminar esta subtarea?",
     "showCompleted": "Mostrar completadas",
     "hideCompleted": "Ocultar completadas",
     "quick": "Rapida",
@@ -119,7 +120,8 @@
     "profileSettingsSub": "Ajusta tus datos y objetivos",
     "saveProfile": "Guardar Cambios",
     "saved": "Guardado",
-    "tdeeBreakdown": "Desglose Energetico"
+    "tdeeBreakdown": "Desglose Energetico",
+    "deleteConfirm": "Eliminar esta entrada?"
   },
   "coinify": {
     "title": "Coinify",
@@ -148,7 +150,9 @@
     "byCategory": "Por Categoria",
     "editTransaction": "Editar",
     "saveTransaction": "Guardar",
-    "cancelEdit": "Cancelar"
+    "cancelEdit": "Cancelar",
+    "deleteConfirm": "Eliminar esta transaccion?",
+    "settleConfirm": "Saldar este prestamo?"
   },
   "character": {
     "title": "Personaje",
@@ -209,7 +213,18 @@
     "search": "Buscar...",
     "loading": "Cargando...",
     "moduleNotInstalled": "Modulo no instalado",
-    "comingSoon": "Proximamente"
+    "comingSoon": "Proximamente",
+    "ok": "OK",
+    "somethingWentWrong": "Algo salio mal",
+    "tryAgain": "Intentar de nuevo"
+  },
+  "datePicker": {
+    "selectDateTime": "Seleccionar fecha y hora",
+    "day": "Dia",
+    "month": "Mes",
+    "year": "Anio",
+    "hour": "Hora",
+    "min": "Min"
   },
   "events": {
     "TASK_COMPLETED": "Quest completada",

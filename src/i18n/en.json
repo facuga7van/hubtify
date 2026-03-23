@@ -32,6 +32,7 @@
     "cancel": "Cancel",
     "subtaskName": "Subtask name",
     "deleteConfirm": "Delete {{count}} quest(s)? This cannot be undone.",
+    "subtaskDeleteConfirm": "Delete this subtask?",
     "showCompleted": "Show completed",
     "hideCompleted": "Hide completed",
     "quick": "Quick",
@@ -119,7 +120,8 @@
     "profileSettingsSub": "Adjust your data and goals",
     "saveProfile": "Save Changes",
     "saved": "Saved",
-    "tdeeBreakdown": "Energy Breakdown"
+    "tdeeBreakdown": "Energy Breakdown",
+    "deleteConfirm": "Delete this entry?"
   },
   "coinify": {
     "title": "Coinify",
@@ -148,7 +150,9 @@
     "byCategory": "By Category",
     "editTransaction": "Edit",
     "saveTransaction": "Save",
-    "cancelEdit": "Cancel"
+    "cancelEdit": "Cancel",
+    "deleteConfirm": "Delete this transaction?",
+    "settleConfirm": "Settle this loan?"
   },
   "character": {
     "title": "Character",
@@ -209,7 +213,18 @@
     "search": "Search...",
     "loading": "Loading...",
     "moduleNotInstalled": "Module not installed",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "ok": "OK",
+    "somethingWentWrong": "Something went wrong",
+    "tryAgain": "Try Again"
+  },
+  "datePicker": {
+    "selectDateTime": "Select date & time",
+    "day": "Day",
+    "month": "Month",
+    "year": "Year",
+    "hour": "Hour",
+    "min": "Min"
   },
   "events": {
     "TASK_COMPLETED": "Quest completed",
