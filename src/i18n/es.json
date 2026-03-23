@@ -35,7 +35,7 @@
     "scrollNotes": "Notas",
     "noteOf": "Nota {{current}} de {{total}}",
     "newNote": "Nueva",
-    "clearCanvas": "Borrar todo",
+    "clearCanvas": "Limpiar",
     "deleteNote": "Eliminar nota",
     "deleteNoteConfirm": "Eliminar esta nota? No se puede deshacer.",
     "noNotes": "Sin notas. Crea una!",
