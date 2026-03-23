@@ -9,6 +9,7 @@ import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
 import ProjectManager from './ProjectManager';
+import ScrollNotes from './ScrollNotes';
 import { type Task, type TaskTier, type Subtask, type Project, XP_MAP } from '../types';
 import { TierBadge, calculateXpForAction } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
@@ -30,6 +31,8 @@ export default function TaskList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProjectManager, setShowProjectManager] = useState(false);
+  const [notesTaskId, setNotesTaskId] = useState<string | null>(null);
+  const [drawingCounts, setDrawingCounts] = useState<Record<string, number>>({});
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('questify_collapsed_projects');
@@ -51,6 +54,12 @@ export default function TaskList() {
       setCategories(cats);
       setTodayCount(count);
       setProjects(projs as Project[]);
+      // Load drawing counts for all tasks
+      const counts: Record<string, number> = {};
+      const taskList = allTasks as Task[];
+      const drawCounts = await Promise.all(taskList.map(t => window.api.questsGetDrawingCount(t.id)));
+      taskList.forEach((t, i) => { if (drawCounts[i] > 0) counts[t.id] = drawCounts[i]; });
+      setDrawingCounts(counts);
     } catch (err) {
       console.error(err);
     }
@@ -222,6 +231,8 @@ export default function TaskList() {
     }),
     onShowToast: setToastData,
     onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); },
+    drawingCount: drawingCounts[task.id] ?? 0,
+    onOpenNotes: () => setNotesTaskId(task.id),
   });
 
   return (
@@ -391,17 +402,27 @@ export default function TaskList() {
           onSaved={() => loadTasks()}
         />
       )}
+
+      {notesTaskId && (
+        <ScrollNotes
+          taskId={notesTaskId}
+          onClose={() => setNotesTaskId(null)}
+          onCountChanged={() => loadTasks()}
+        />
+      )}
     </div>
   );
 }
 
 function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, projects, showProjectBadge,
-  onToggleExpand, onComplete, onEdit, onToggleSelect, onShowToast, onSubtaskChanged }: {
+  onToggleExpand, onComplete, onEdit, onToggleSelect, onShowToast, onSubtaskChanged,
+  drawingCount, onOpenNotes }: {
   task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
   todayCount: number; projects: Project[]; showProjectBadge: boolean;
   onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
   onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
   onSubtaskChanged: () => void;
+  drawingCount: number; onOpenNotes: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -454,6 +475,30 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, proj
             {new Date(task.dueDate).toLocaleDateString()}
           </span>
         )}
+        {/* Note icon */}
+        <span onClick={onOpenNotes} style={{ position: 'relative', cursor: 'pointer', display: 'inline-flex' }}>
+          <svg width="16" height="16" viewBox="0 0 16 16"
+            style={{ opacity: drawingCount > 0 ? 0.7 : 0.4, transition: 'opacity 0.2s' }}
+            onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseOut={(e) => (e.currentTarget.style.opacity = drawingCount > 0 ? '0.7' : '0.4')}
+            fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 1h8l2 2v10a1 1 0 01-1 1H3a1 1 0 01-1-1V2a1 1 0 011-1z"/>
+            <path d="M10 1v3h3"/>
+            <path d="M5 8h6M5 11h4"/>
+          </svg>
+          {drawingCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -4, right: -6,
+              fontSize: '0.55rem', fontFamily: 'Fira Code, monospace',
+              background: 'var(--rpg-gold)', color: 'var(--rpg-ink)',
+              borderRadius: '50%', width: 12, height: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 'bold',
+            }}>
+              {drawingCount}
+            </span>
+          )}
+        </span>
         <svg onClick={onEdit} width="16" height="16" viewBox="0 0 16 16"
           style={{ cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s' }}
           onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}

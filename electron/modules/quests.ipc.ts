@@ -243,4 +243,42 @@ export function registerQuestsIpcHandlers(): void {
     });
     tx();
   });
+
+  // ── Drawings ─────────────────────────────────────
+
+  ipcMain.handle('quests:getDrawings', (_e, taskId: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, task_id AS taskId, data, draw_order AS "order", created_at AS createdAt
+      FROM task_drawings WHERE task_id = ? ORDER BY draw_order ASC
+    `).all(taskId);
+  });
+
+  ipcMain.handle('quests:getDrawingCount', (_e, taskId: string) => {
+    const db = getDb();
+    const result = db.prepare('SELECT COUNT(*) AS c FROM task_drawings WHERE task_id = ?').get(taskId) as { c: number };
+    return result.c;
+  });
+
+  ipcMain.handle('quests:saveDrawing', (_e, drawing: { id?: string; taskId: string; data: string }) => {
+    const db = getDb();
+    const now = new Date().toISOString();
+
+    if (drawing.id) {
+      db.prepare('UPDATE task_drawings SET data = ? WHERE id = ?').run(drawing.data, drawing.id);
+      return drawing.id;
+    } else {
+      const id = genId();
+      const maxOrder = db.prepare('SELECT COALESCE(MAX(draw_order), -1) + 1 AS next FROM task_drawings WHERE task_id = ?')
+        .get(drawing.taskId) as { next: number };
+      db.prepare('INSERT INTO task_drawings (id, task_id, data, draw_order, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(id, drawing.taskId, drawing.data, maxOrder.next, now);
+      return id;
+    }
+  });
+
+  ipcMain.handle('quests:deleteDrawing', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM task_drawings WHERE id = ?').run(id);
+  });
 }

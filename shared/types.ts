@@ -70,6 +70,10 @@ export interface HubtifyApi {
   questsSyncSubtaskOrders: (taskId: string, orderedIds: string[]) => Promise<void>;
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
+  questsGetDrawings: (taskId: string) => Promise<unknown[]>;
+  questsGetDrawingCount: (taskId: string) => Promise<number>;
+  questsSaveDrawing: (drawing: Record<string, unknown>) => Promise<string>;
+  questsDeleteDrawing: (id: string) => Promise<void>;
   questsGetProjects: () => Promise<unknown[]>;
   questsUpsertProject: (project: Record<string, unknown>) => Promise<string>;
   questsDeleteProject: (id: string) => Promise<void>;
