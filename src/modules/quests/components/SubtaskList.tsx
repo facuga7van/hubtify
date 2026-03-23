@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function SubtaskList({ taskId, subtasks, countCompletedToday, onShowToast, onSubtaskChanged }: Props) {
+  const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [editingSubtask, setEditingSubtask] = useState<Subtask | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -59,6 +61,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
       });
     }
     onSubtaskChanged();
+    window.dispatchEvent(new Event('rpg:statsChanged'));
   };
 
   const handleDelete = async (subtaskId: string) => {
@@ -97,7 +100,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
 
       {completed.length > 0 && (
         <button className="subtask-toggle-completed" onClick={() => setShowCompleted(!showCompleted)}>
-          {showCompleted ? 'Hide' : 'Show'} completed ({completed.length})
+          {showCompleted ? t('questify.hideCompleted') : t('questify.showCompleted')} ({completed.length})
         </button>
       )}
 
@@ -117,7 +120,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
       ) : (
         <button className="rpg-button" disabled={atLimit} title={atLimit ? 'Max 30 subtasks reached' : undefined} onClick={() => setShowForm(true)}
           style={{ fontSize: '0.8rem', padding: '4px 10px', marginTop: 6 }}>
-          + Add Subtask
+          {t('questify.addSubtask')}
         </button>
       )}
     </div>
@@ -128,6 +131,8 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   subtask: Subtask; onComplete: (s: Subtask) => void;
   onEdit: (s: Subtask) => void; onDelete: (id: string) => void;
 }) {
+  const { t } = useTranslation();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
@@ -140,13 +145,33 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
       <span className="subtask-xp-hint" style={{ fontSize: '0.75rem', opacity: 0.6 }}>
         +{tierXp(subtask.tier)}
       </span>
-      <svg onClick={() => onDelete(subtask.id)} width="12" height="12" viewBox="0 0 12 12"
-        style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
-        onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
-        onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
-        stroke="var(--rpg-hp-red)" strokeWidth="1.8" strokeLinecap="round">
-        <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
-      </svg>
+      {confirmDelete ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
+          border: '1px solid var(--rpg-hp-red)', borderRadius: 'var(--rpg-radius)',
+        }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)', whiteSpace: 'nowrap' }}>
+            {t('questify.subtaskDeleteConfirm')}
+          </span>
+          <button className="rpg-button" onClick={() => onDelete(subtask.id)}
+            style={{ background: 'var(--rpg-hp-red)', padding: '3px 10px', fontSize: '0.8rem' }}>
+            {t('questify.delete')}
+          </button>
+          <button className="rpg-button" onClick={() => setConfirmDelete(false)}
+            style={{ padding: '3px 10px', fontSize: '0.8rem', opacity: 0.7 }}>
+            {t('questify.cancel')}
+          </button>
+        </div>
+      ) : (
+        <svg onClick={() => setConfirmDelete(true)} width="12" height="12" viewBox="0 0 12 12"
+          style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
+          stroke="var(--rpg-hp-red)" strokeWidth="1.8" strokeLinecap="round">
+          <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+        </svg>
+      )}
     </div>
   );
 }

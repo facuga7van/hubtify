@@ -39,6 +39,10 @@ export default function FinanceDashboard() {
   const [editDesc, setEditDesc] = useState('');
   const [editCategory, setEditCategory] = useState('');
 
+  // Confirmation states
+  const [confirmDeleteTxId, setConfirmDeleteTxId] = useState<string | null>(null);
+  const [confirmSettleLoanId, setConfirmSettleLoanId] = useState<string | null>(null);
+
   const loadData = useCallback(async (m: string) => {
     const [txList, loanList, cats, total] = await Promise.all([
       window.api.financeGetTransactions(m),
@@ -84,6 +88,7 @@ export default function FinanceDashboard() {
 
   const deleteTransaction = async (id: string) => {
     await window.api.financeDeleteTransaction(id);
+    setConfirmDeleteTxId(null);
     loadData(month);
   };
 
@@ -126,6 +131,7 @@ export default function FinanceDashboard() {
 
   const settleLoan = async (id: string) => {
     await window.api.financeSettleLoan(id);
+    setConfirmSettleLoanId(null);
     loadData(month);
   };
 
@@ -338,23 +344,43 @@ export default function FinanceDashboard() {
                         {tx.date}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        onClick={() => startEditTransaction(tx)}
-                        style={{ background: 'none', border: 'none', color: 'var(--rpg-gold-dark)', cursor: 'pointer', padding: '2px' }}
-                        title={t('coinify.editTransaction')}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10 1.5l2.5 2.5L4.5 12H2v-2.5L10 1.5z"/>
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => deleteTransaction(tx.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--rpg-hp-red-light)', cursor: 'pointer', fontSize: '0.85rem' }}
-                      >
-                        x
-                      </button>
-                    </div>
+                    {confirmDeleteTxId === tx.id ? (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
+                        border: '1px solid var(--rpg-hp-red)', borderRadius: 'var(--rpg-radius)',
+                      }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)' }}>
+                          {t('coinify.deleteConfirm')}
+                        </span>
+                        <button className="rpg-button" onClick={() => deleteTransaction(tx.id)}
+                          style={{ background: 'var(--rpg-hp-red)', padding: '3px 10px', fontSize: '0.8rem' }}>
+                          {t('questify.delete')}
+                        </button>
+                        <button className="rpg-button" onClick={() => setConfirmDeleteTxId(null)}
+                          style={{ padding: '3px 10px', fontSize: '0.8rem', opacity: 0.7 }}>
+                          {t('questify.cancel')}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => startEditTransaction(tx)}
+                          style={{ background: 'none', border: 'none', color: 'var(--rpg-gold-dark)', cursor: 'pointer', padding: '2px' }}
+                          title={t('coinify.editTransaction')}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10 1.5l2.5 2.5L4.5 12H2v-2.5L10 1.5z"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteTxId(tx.id)}
+                          style={{ background: 'none', border: 'none', color: 'var(--rpg-hp-red-light)', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                          x
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -427,13 +453,33 @@ export default function FinanceDashboard() {
                 <span style={{ marginLeft: 8 }}>${loan.amount.toLocaleString()}</span>
                 {loan.description && <span style={{ opacity: 0.5, marginLeft: 8, fontSize: '0.85rem' }}>({loan.description})</span>}
               </div>
-              <button
-                className="rpg-button"
-                style={{ fontSize: '0.75rem', padding: '2px 8px' }}
-                onClick={() => settleLoan(loan.id)}
-              >
-                {t('coinify.settle')}
-              </button>
+              {confirmSettleLoanId === loan.id ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
+                  border: '1px solid var(--rpg-hp-red)', borderRadius: 'var(--rpg-radius)',
+                }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)' }}>
+                    {t('coinify.settleConfirm')}
+                  </span>
+                  <button className="rpg-button" onClick={() => settleLoan(loan.id)}
+                    style={{ background: 'var(--rpg-hp-red)', padding: '3px 10px', fontSize: '0.8rem' }}>
+                    {t('coinify.settle')}
+                  </button>
+                  <button className="rpg-button" onClick={() => setConfirmSettleLoanId(null)}
+                    style={{ padding: '3px 10px', fontSize: '0.8rem', opacity: 0.7 }}>
+                    {t('questify.cancel')}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="rpg-button"
+                  style={{ fontSize: '0.75rem', padding: '2px 8px' }}
+                  onClick={() => setConfirmSettleLoanId(loan.id)}
+                >
+                  {t('coinify.settle')}
+                </button>
+              )}
             </div>
           ))
         )}

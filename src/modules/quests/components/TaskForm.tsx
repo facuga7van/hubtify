@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TaskTier, Task } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
+import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 
 interface Props {
   editingTask: Task | null;
@@ -138,8 +139,7 @@ export default function TaskForm({ editingTask, categories, onSaved }: Props) {
           {t('questify.dueDate')}
         </label>
         {useDate && (
-          <input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
-            className="rpg-input" />
+          <RpgDateTimePicker value={dueDate} onChange={setDueDate} />
         )}
       </div>
     </form>

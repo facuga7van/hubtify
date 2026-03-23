@@ -101,6 +101,7 @@ export default function TaskList() {
       });
     }
     await loadTasks();
+    window.dispatchEvent(new Event('rpg:statsChanged'));
   };
 
   const handleDelete = async () => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TaskTier, Subtask } from '../types';
 import { TierBadge } from '../utils';
 
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tier, setTier] = useState<TaskTier>(2);
@@ -45,7 +47,7 @@ export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) 
       <input
         type="text"
         className="subtask-input subtask-input--name"
-        placeholder="Subtask name"
+        placeholder={t('questify.subtaskName')}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -54,7 +56,7 @@ export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) 
       <input
         type="text"
         className="subtask-input subtask-input--desc"
-        placeholder="Description (optional)"
+        placeholder={t('questify.description')}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -65,8 +67,8 @@ export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) 
         <button type="button" className={`subtask-tier-btn ${tier === 3 ? 'tierActive' : ''}`} onClick={() => setTier(3)}><TierBadge tier={3} size={14} /></button>
       </div>
       <div className="subtask-form-actions">
-        <button className="rpg-button" onClick={handleSubmit}>Save</button>
-        <button className="rpg-button" onClick={onCancel} style={{ opacity: 0.7 }}>Cancel</button>
+        <button className="rpg-button" onClick={handleSubmit}>{t('questify.save')}</button>
+        <button className="rpg-button" onClick={onCancel} style={{ opacity: 0.7 }}>{t('questify.cancel')}</button>
       </div>
     </div>
   );

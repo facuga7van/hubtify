@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface FoodEntry {
   id: number; time: string; description: string; calories: number;
@@ -12,7 +13,9 @@ interface Props {
 }
 
 export default function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [editCals, setEditCals] = useState(String(entry.calories));
   const [editDesc, setEditDesc] = useState(entry.description);
 
@@ -40,7 +43,7 @@ export default function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
         <input type="number" value={editCals} onChange={(e) => setEditCals(e.target.value)}
           className="rpg-input" style={{ width: 60, padding: '4px 6px', fontSize: '0.85rem' }}
           onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
-        <button className="rpg-button" onClick={handleSave} style={{ padding: '3px 8px', fontSize: '0.75rem' }}>OK</button>
+        <button className="rpg-button" onClick={handleSave} style={{ padding: '3px 8px', fontSize: '0.75rem' }}>{t('common.ok')}</button>
         <button className="rpg-button" onClick={() => setEditing(false)} style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.6 }}>
           <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg>
         </button>
@@ -65,13 +68,33 @@ export default function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
         onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}>
         <path d="M8.5 1.5l2 2M3 7l5.5-5.5 2 2L5 9H3V7z"/>
       </svg>
-      <svg onClick={() => onDelete(entry.id)} width="12" height="12" viewBox="0 0 12 12"
-        stroke="var(--rpg-hp-red)" strokeWidth="1.5" strokeLinecap="round"
-        style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
-        onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
-        onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}>
-        <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
-      </svg>
+      {confirmDelete ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
+          border: '1px solid var(--rpg-hp-red)', borderRadius: 'var(--rpg-radius)',
+        }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)', whiteSpace: 'nowrap' }}>
+            {t('nutrify.deleteConfirm')}
+          </span>
+          <button className="rpg-button" onClick={() => onDelete(entry.id)}
+            style={{ background: 'var(--rpg-hp-red)', padding: '3px 10px', fontSize: '0.8rem' }}>
+            {t('questify.delete')}
+          </button>
+          <button className="rpg-button" onClick={() => setConfirmDelete(false)}
+            style={{ padding: '3px 10px', fontSize: '0.8rem', opacity: 0.7 }}>
+            {t('questify.cancel')}
+          </button>
+        </div>
+      ) : (
+        <svg onClick={() => setConfirmDelete(true)} width="12" height="12" viewBox="0 0 12 12"
+          stroke="var(--rpg-hp-red)" strokeWidth="1.5" strokeLinecap="round"
+          style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}>
+          <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+        </svg>
+      )}
     </div>
   );
 }
