@@ -17,6 +17,18 @@ export interface Project {
   createdAt: string;
 }
 
+export interface Habit {
+  id: string;
+  name: string;
+  icon: string;
+  createdAt: string;
+}
+
+export interface HabitWithStreak extends Habit {
+  streak: number;
+  checkedToday: boolean;
+}
+
 export const PROJECT_COLORS = [
   '#8b7355', // tierra
   '#6b7c5e', // verde musgo

@@ -10,6 +10,7 @@ import SubtaskList from './SubtaskList';
 import XpToast, { type XpToastData } from './XpToast';
 import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
+import HabitTracker from './HabitTracker';
 import { type Task, type TaskTier, type Subtask, type Project, XP_MAP } from '../types';
 import { TierBadge, calculateXpForAction } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
@@ -266,6 +267,7 @@ export default function TaskList() {
           </select>
         }
       />
+      <HabitTracker onXpGained={() => loadTasks()} />
       <div ref={formRef}>
         <TaskForm
           editingTask={editingTask}

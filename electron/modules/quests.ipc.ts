@@ -281,4 +281,78 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     db.prepare('DELETE FROM task_drawings WHERE id = ?').run(id);
   });
+
+  // ── Habits ───────────────────────────────────────
+
+  ipcMain.handle('quests:getHabits', () => {
+    const db = getDb();
+    const today = new Date().toLocaleDateString('en-CA');
+    const habits = db.prepare(`
+      SELECT id, name, icon, created_at AS createdAt
+      FROM habits ORDER BY created_at ASC
+    `).all() as Array<{ id: string; name: string; icon: string; createdAt: string }>;
+
+    return habits.map((h) => {
+      // Check if done today
+      const check = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, today);
+      // Calculate streak: count consecutive days backwards from today (or yesterday if not checked today)
+      let streak = 0;
+      const startDate = check ? today : (() => {
+        const d = new Date(); d.setDate(d.getDate() - 1);
+        return d.toLocaleDateString('en-CA');
+      })();
+
+      // If not checked today and not checked yesterday, streak is 0
+      if (!check) {
+        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+        const yesterdayCheck = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, yesterdayStr);
+        if (!yesterdayCheck) return { ...h, streak: 0, checkedToday: false };
+      }
+
+      // Count backwards
+      const d = new Date(startDate);
+      while (true) {
+        const dateStr = d.toLocaleDateString('en-CA');
+        const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, dateStr);
+        if (!found) break;
+        streak++;
+        d.setDate(d.getDate() - 1);
+      }
+
+      return { ...h, streak, checkedToday: !!check };
+    });
+  });
+
+  ipcMain.handle('quests:addHabit', (_e, habit: { name: string; icon: string }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO habits (id, name, icon, created_at) VALUES (?, ?, ?, ?)')
+      .run(id, habit.name, habit.icon, now);
+    return id;
+  });
+
+  ipcMain.handle('quests:deleteHabit', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM habits WHERE id = ?').run(id);
+  });
+
+  ipcMain.handle('quests:checkHabit', (_e, habitId: string) => {
+    const db = getDb();
+    const today = new Date().toLocaleDateString('en-CA');
+    const existing = db.prepare('SELECT id FROM habit_checks WHERE habit_id = ? AND date = ?').get(habitId, today);
+    if (existing) {
+      // Uncheck
+      db.prepare('DELETE FROM habit_checks WHERE habit_id = ? AND date = ?').run(habitId, today);
+      return { checked: false };
+    } else {
+      // Check
+      const id = genId();
+      const now = new Date().toISOString();
+      db.prepare('INSERT INTO habit_checks (id, habit_id, date, created_at) VALUES (?, ?, ?, ?)')
+        .run(id, habitId, today, now);
+      return { checked: true };
+    }
+  });
 }

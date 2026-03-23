@@ -75,4 +75,27 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_drawings_task ON task_drawings(task_id);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 4,
+    up: `
+      CREATE TABLE IF NOT EXISTS habits (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '⚡',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS habit_checks (
+        id TEXT PRIMARY KEY,
+        habit_id TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(habit_id, date)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_habit_checks_habit ON habit_checks(habit_id);
+      CREATE INDEX IF NOT EXISTS idx_habit_checks_date ON habit_checks(date);
+    `,
+  },
 ];
