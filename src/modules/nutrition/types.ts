@@ -51,10 +51,8 @@ export interface DailySummary {
 
 export interface EstimationResult {
   totalCalories: number;
-  matches: Array<{ name: string; calories: number; source: 'database' | 'ai' }>;
+  matches: Array<{ name: string; calories: number; source: 'ai' }>;
   breakdown: string;
-  hasAiFallback: boolean;
   ollamaMissing: boolean;
-  unmatchedTokens: string[];
   aiError?: string;
 }

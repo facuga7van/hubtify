@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
@@ -13,7 +13,7 @@ interface FoodEntry {
 }
 
 interface FrequentFood { id: number; name: string; calories: number; timesUsed: number; }
-interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; }
+interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; }
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 interface EstimationMatch { name: string; calories: number; source: string; }
@@ -21,12 +21,13 @@ interface EstimationResult {
   totalCalories: number;
   breakdown: string;
   matches: EstimationMatch[];
-  hasAiFallback: boolean;
+  ollamaMissing: boolean;
+  aiError?: string;
 }
 
 export default function Today() {
   const navigate = useNavigate();
-  const location = useLocation();
+
   const { t } = useTranslation();
   const [date, setDate] = useState(() => getLocalDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
@@ -70,8 +71,14 @@ export default function Today() {
     window.api.nutritionIsDayClosed(d).then((r) => setDayClosed(r as typeof dayClosed)).catch(console.error);
   }, []);
 
-  // Reload data when date changes OR when navigating back to this page (e.g. after settings change)
-  useEffect(() => { loadData(date); }, [date, loadData, location.key]);
+  useEffect(() => { loadData(date); }, [date, loadData]);
+
+  // Reload when settings change (e.g. profile/TDEE update)
+  useEffect(() => {
+    const handler = () => loadData(date);
+    window.addEventListener('nutrition:settingsChanged', handler);
+    return () => window.removeEventListener('nutrition:settingsChanged', handler);
+  }, [date, loadData]);
 
   const goDay = (offset: number) => {
     const [y, m, d] = date.split('-').map(Number);
@@ -108,7 +115,7 @@ export default function Today() {
       date,
       description: foodInput.trim(),
       calories,
-      source: estimation.hasAiFallback ? 'ai_estimate' : 'frequent',
+      source: 'ai_estimate',
       aiBreakdown: estimation.breakdown,
     });
 
@@ -132,6 +139,7 @@ export default function Today() {
     setEstimation(null);
     setEditCalories('');
     loadData(date);
+    window.dispatchEvent(new Event('rpg:statsChanged'));
   };
 
   // ── Quick log (frequent food) ────────────────────
@@ -147,6 +155,7 @@ export default function Today() {
     });
     showToast(`+${food.calories} kcal`);
     loadData(date);
+    window.dispatchEvent(new Event('rpg:statsChanged'));
   };
 
   const handleDelete = async (id: number) => {
@@ -160,10 +169,15 @@ export default function Today() {
     loadData(date);
   };
 
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (msg: string) => {
     setLogMessage(msg);
-    setTimeout(() => setLogMessage(''), 2000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setLogMessage(''), 2000);
   };
+  useEffect(() => {
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, []);
 
   const handleCloseDay = async () => {
     const result = await window.api.nutritionCloseDay(date);
@@ -176,6 +190,7 @@ export default function Today() {
         timestamp: Date.now(),
       });
       showToast(`+${b!.xpTotal} XP`);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
       setDayClosed(closed as typeof dayClosed);
@@ -199,8 +214,8 @@ export default function Today() {
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="rpg-button" onClick={() => navigate('/nutrition/settings')}
               style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                <circle cx="7" cy="7" r="2"/><path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.8 2.8l1 1M10.2 10.2l1 1M2.8 11.2l1-1M10.2 3.8l1-1"/>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
             </button>
             <button className="rpg-button" onClick={() => navigate('/nutrition/dashboard')}
@@ -270,9 +285,6 @@ export default function Today() {
                   <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--rpg-parchment-dark)' }}>
                     <span>
                       {m.name}
-                      {m.source === 'ai' && (
-                        <span style={{ fontSize: '0.7rem', opacity: 0.5, marginLeft: 4 }}>(IA)</span>
-                      )}
                     </span>
                     <span style={{ fontFamily: 'Fira Code, monospace' }}>{m.calories} kcal</span>
                   </div>
@@ -362,7 +374,7 @@ export default function Today() {
               <span style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr} kcal</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>TDEE ({t(`nutrify.${(summary as Record<string, unknown>).activityLevel ?? 'moderate'}`)})</span>
+              <span>TDEE ({t(`nutrify.${summary.activityLevel ?? 'moderate'}`)})</span>
               <span style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee} kcal</span>
             </div>
             {target > 0 && (

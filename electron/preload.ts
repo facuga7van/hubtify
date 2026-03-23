@@ -53,7 +53,6 @@ const api = {
   nutritionEstimate: (description: string) => ipcRenderer.invoke('nutrition:estimate', description),
   nutritionGetAiStatus: () => ipcRenderer.invoke('nutrition:getAiStatus'),
   nutritionIsOllamaAvailable: () => ipcRenderer.invoke('nutrition:isOllamaAvailable'),
-  nutritionSearchFoodDb: (query: string) => ipcRenderer.invoke('nutrition:searchFoodDb', query),
   nutritionLearnFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:learnFood', entry),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),

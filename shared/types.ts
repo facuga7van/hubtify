@@ -98,7 +98,7 @@ export interface HubtifyApi {
   nutritionEstimate: (description: string) => Promise<EstimationResult>;
   nutritionGetAiStatus: () => Promise<OllamaStatus>;
   nutritionIsOllamaAvailable: () => Promise<boolean>;
-  nutritionSearchFoodDb: (query: string) => Promise<{ matched: Array<{ name: string; calories: number; source: 'database' }>; unmatched: string[] }>;
+
   nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
@@ -154,16 +154,14 @@ export interface FoodDbEntry {
 export interface EstimationMatch {
   name: string;
   calories: number;
-  source: 'database' | 'ai';
+  source: 'ai';
 }
 
 export interface EstimationResult {
   totalCalories: number;
   matches: EstimationMatch[];
   breakdown: string;
-  hasAiFallback: boolean;
   ollamaMissing: boolean;
-  unmatchedTokens: string[];
   aiError?: string;
 }
 

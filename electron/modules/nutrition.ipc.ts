@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { getDb } from '../ipc/db';
 import { estimate } from './nutrition/estimator';
-import { searchFoodDatabase } from './nutrition/food-db';
+
 import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
 import { seedFoodDatabase } from './nutrition/food-db-seed';
 
@@ -235,10 +235,6 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcMain.handle('nutrition:isOllamaAvailable', () => {
     return isOllamaAvailable();
-  });
-
-  ipcMain.handle('nutrition:searchFoodDb', (_e, query: string) => {
-    return searchFoodDatabase(query);
   });
 
   ipcMain.handle('nutrition:learnFood', (_e, entry: { description: string; calories: number; breakdown?: string }) => {

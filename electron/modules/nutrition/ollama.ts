@@ -4,7 +4,7 @@ import fs from 'fs';
 import { app } from 'electron';
 import type { OllamaStatus } from '../../../shared/types';
 
-const MODEL = 'llama3.2:1b';
+const MODEL = 'nutrify';
 const DEFAULT_PORT = 11434;
 let port = DEFAULT_PORT;
 const INACTIVITY_TIMEOUT_MS = 15 * 1000; // 15s after last use
@@ -127,7 +127,6 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
     });
     if (res.ok) {
       modelReady = true;
-      console.log('[Ollama] Model already available:', MODEL);
       return;
     }
   } catch { /* not available */ }
@@ -136,8 +135,8 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
   pauseTimer();
 
   // Pull the model with streaming to track progress
-  console.log('[Ollama] Pulling model:', MODEL);
-  onProgress?.('Descargando modelo de IA (~670 MB)... 0%');
+
+  onProgress?.('Descargando modelo de IA (~1.3 GB)... 0%');
 
   const res = await fetch(`http://localhost:${port}/api/pull`, {
     method: 'POST',
@@ -155,60 +154,39 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const data = JSON.parse(line) as { status?: string; total?: number; completed?: number };
-        if (data.total && data.completed) {
-          const pct = Math.round((data.completed / data.total) * 100);
-          onProgress?.(`Descargando modelo de IA... ${pct}%`);
-          console.log(`[Ollama] Pull progress: ${pct}%`);
-        } else if (data.status) {
-          onProgress?.(`${data.status}...`);
-          console.log(`[Ollama] Pull status: ${data.status}`);
-        }
-      } catch { /* skip malformed line */ }
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line) as { status?: string; total?: number; completed?: number };
+          if (data.total && data.completed) {
+            const pct = Math.round((data.completed / data.total) * 100);
+            onProgress?.(`Descargando modelo de IA... ${pct}%`);
+          } else if (data.status) {
+            onProgress?.(`${data.status}...`);
+          }
+        } catch { /* skip malformed line */ }
+      }
     }
+  } finally {
+    reader.cancel().catch(() => {});
   }
 
   modelReady = true;
   resetTimer();
-  console.log('[Ollama] Model pulled successfully:', MODEL);
 }
 
 // --- AI Estimation ---
 
-const SYSTEM_PROMPT = `Sos un nutricionista argentino. Estimás calorías de comidas.
-Respondé SOLO con JSON válido. Sin texto adicional, sin explicaciones, sin markdown.
-
-REGLAS:
-- Estimá ÚNICAMENTE lo descrito. PROHIBIDO inventar ingredientes.
-- Para marcas/cadenas, usá calorías reales.
-- Respetá tamaños y cantidades indicadas. "pedacitos" = porciones pequeñas.
-- Ante la duda, estimá hacia arriba.
-
-EJEMPLOS:
-Usuario: dos milanesas con ensalada
-{"calories": 750, "breakdown": "2 milanesas ~700kcal + ensalada ~50kcal"}
-
-Usuario: 3 pedacitos de carne
-{"calories": 180, "breakdown": "3 trozos pequeños de carne ~180kcal"}
-
-Usuario: un vaso de jugo de naranja
-{"calories": 120, "breakdown": "jugo de naranja 350ml ~120kcal"}
-
-Usuario: big mac con papas medianas
-{"calories": 900, "breakdown": "Big Mac ~550kcal + papas medianas ~350kcal"}
-
-Respondé SOLO el JSON.`;
+const SYSTEM_PROMPT = 'Estimá las calorías de esta comida';
 
 export let lastAiDebug = '';
 
@@ -220,19 +198,19 @@ export async function estimateWithAi(description: string): Promise<{ calories: n
     const response = await fetch(`http://localhost:${port}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, prompt: `Usuario: ${description}`, system: SYSTEM_PROMPT, stream: false, temperature: 0.3 }),
+      body: JSON.stringify({ model: MODEL, prompt: description, system: SYSTEM_PROMPT, stream: false, temperature: 0.1 }),
       signal: controller.signal,
     });
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
       lastAiDebug = `HTTP ${response.status}: ${errorText.slice(0, 200)}`;
-      console.log('[AI] Error response:', lastAiDebug);
+
       return null;
     }
 
     const data = await response.json() as { response: string };
     lastAiDebug = data.response?.slice(0, 300) ?? '(empty)';
-    console.log('[AI] Raw response:', data.response);
+
     return parseAiResponse(data.response);
   } finally {
     clearTimeout(timeout);
