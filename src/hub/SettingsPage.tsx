@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull } from '../shared/sync';
+import { useConfirm } from '../shared/components/ConfirmDialog';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
+  const confirm = useConfirm();
   const { user: authUser, logout } = useAuthContext();
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('hubtify_sound') !== 'false');
   const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
@@ -41,16 +43,19 @@ export default function SettingsPage() {
     syncTimerRef.current = setTimeout(() => setSyncStatus(''), 3000);
   };
 
-  const resetOnboarding = () => {
-    if (window.confirm(t('settings.resetOnboardingConfirm'))) {
+  const resetOnboarding = async () => {
+    const ok = await confirm({ message: t('settings.resetOnboardingConfirm') });
+    if (ok) {
       localStorage.removeItem('hubtify_onboarded');
       window.location.reload();
     }
   };
 
-  const resetAllData = () => {
-    if (window.confirm(t('settings.resetAllConfirm'))) {
-      if (window.confirm(t('settings.resetAllConfirm2'))) {
+  const resetAllData = async () => {
+    const ok1 = await confirm({ message: t('settings.resetAllConfirm'), danger: true });
+    if (ok1) {
+      const ok2 = await confirm({ message: t('settings.resetAllConfirm2'), danger: true });
+      if (ok2) {
         localStorage.clear();
         window.location.reload();
       }
@@ -195,7 +200,8 @@ export default function SettingsPage() {
             {t('settings.exportBackup')}
           </button>
           <button className="rpg-button" onClick={async () => {
-            if (!window.confirm(t('settings.importConfirm'))) return;
+            const ok = await confirm({ message: t('settings.importConfirm') });
+            if (!ok) return;
             const result = await window.api.backupImport();
             if (result.success) {
               alert(t('settings.importSuccess'));

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { Project } from '../types';
 import { PROJECT_COLORS } from '../types';
 
@@ -11,6 +12,7 @@ interface Props {
 
 export default function ProjectManager({ projects, onClose, onSaved }: Props) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
@@ -37,7 +39,8 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('questify.deleteProjectConfirm'))) return;
+    const ok = await confirm({ message: t('questify.deleteProjectConfirm'), danger: true, confirmText: t('questify.delete') });
+    if (!ok) return;
     await window.api.questsDeleteProject(id);
     onSaved();
   };

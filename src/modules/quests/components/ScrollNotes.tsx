@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import parchmentBg from '../../../assets/bg.jpg';
 
 interface Drawing {
@@ -26,6 +27,7 @@ type Tool = 'pen' | 'eraser';
 
 export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const isDrawingRef = useRef(false);
@@ -188,7 +190,8 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   };
 
   const handleDelete = async () => {
-    if (!confirm(t('questify.deleteNoteConfirm'))) return;
+    const ok = await confirm({ message: t('questify.deleteNoteConfirm'), danger: true, confirmText: t('questify.deleteNote') });
+    if (!ok) return;
     const drawing = drawings[currentIdx];
     if (drawing) {
       await window.api.questsDeleteDrawing(drawing.id);
