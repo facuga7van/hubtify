@@ -61,6 +61,7 @@ function initCoreTables(db: Database.Database): void {
       payload TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE INDEX IF NOT EXISTS idx_rpg_events_created_at ON rpg_events(created_at);
 
     CREATE TABLE IF NOT EXISTS sync_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

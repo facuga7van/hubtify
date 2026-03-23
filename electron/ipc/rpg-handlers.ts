@@ -52,60 +52,69 @@ export function registerRpgHandlers(): void {
 
   ipcMain.handle('rpg:processEvent', (_e, event: RpgEvent) => {
     const db = getDb();
-    const stats = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
-    const today = getLocalDateString();
+    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED';
 
-    let xpGained = 0;
-    let hpChange = 0;
-    let comboMultiplier = 1.0;
-    let bonusMultiplier = 1.0;
-
-    try {
-      let combo = (stats.daily_combo as number) || 0;
-      if ((stats.combo_date as string | null) !== today) combo = 0;
-
-      comboMultiplier = getComboMultiplier(combo);
-      bonusMultiplier = rollRandomBonus();
+    const processTransaction = db.transaction(() => {
+      const stats = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
+      const today = getLocalDateString();
 
       const payload = event.payload as Record<string, unknown> | null;
       const baseXp = (payload && typeof payload.xp === 'number') ? payload.xp : 0;
-      hpChange = (payload && typeof payload.hp === 'number') ? payload.hp : 0;
+      const hpChange = (payload && typeof payload.hp === 'number') ? payload.hp : 0;
 
-      xpGained = Math.round(calculateXpGain(baseXp, comboMultiplier, bonusMultiplier, stats.hp as number) * 100) / 100;
-
-      const newHp = clampHp((stats.hp as number) + hpChange);
-      const oldLevel = stats.level as number;
-
+      let xpGained: number;
+      let comboMultiplier = 1.0;
+      let bonusMultiplier = 1.0;
       let streak = stats.streak as number;
-      const lastDate = stats.streak_last_date as string | null;
-      if (lastDate !== today) {
-        if (lastDate) {
-          const diff = daysDiff(lastDate, today);
-          streak = diff === 1 ? streak + 1 : 1;
-        } else {
-          streak = 1;
+      let combo = (stats.daily_combo as number) || 0;
+      let milestoneXp = 0;
+
+      if (isUndo) {
+        xpGained = baseXp;
+      } else {
+        if ((stats.combo_date as string | null) !== today) combo = 0;
+        comboMultiplier = getComboMultiplier(combo);
+        bonusMultiplier = rollRandomBonus();
+        xpGained = Math.round(calculateXpGain(baseXp, comboMultiplier, bonusMultiplier, stats.hp as number) * 100) / 100;
+
+        const lastDate = stats.streak_last_date as string | null;
+        if (lastDate !== today) {
+          if (lastDate) {
+            const diff = daysDiff(lastDate, today);
+            streak = diff === 1 ? streak + 1 : 1;
+          } else {
+            streak = 1;
+          }
         }
+        milestoneXp = getStreakMilestoneBonus(streak);
       }
 
-      const milestoneXp = getStreakMilestoneBonus(streak);
       const totalXpGained = xpGained + milestoneXp;
       const finalXp = Math.max(0, (stats.xp as number) + totalXpGained);
       const finalLevel = getLevel(finalXp);
       const finalTitle = getTitle(finalLevel);
+      const newHp = clampHp((stats.hp as number) + hpChange);
+      const oldLevel = stats.level as number;
 
       db.prepare(`
         INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(event.moduleId, event.type, totalXpGained, hpChange, comboMultiplier, bonusMultiplier, JSON.stringify(event.payload));
 
-      db.prepare(`
-        UPDATE player_stats SET
-          level = ?, xp = ?, hp = ?, title = ?,
-          streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?
-        WHERE user_id = ?
-      `).run(finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today, 'default');
+      if (isUndo) {
+        db.prepare(`
+          UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?
+          WHERE user_id = ?
+        `).run(finalLevel, finalXp, newHp, finalTitle, 'default');
+      } else {
+        db.prepare(`
+          UPDATE player_stats SET
+            level = ?, xp = ?, hp = ?, title = ?,
+            streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?
+          WHERE user_id = ?
+        `).run(finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today, 'default');
+      }
 
-      // After the main UPDATE, increment module counters
       if (event.type === 'TASK_COMPLETED' || event.type === 'SUBTASK_COMPLETED') {
         db.prepare('UPDATE player_stats SET total_tasks = total_tasks + 1 WHERE user_id = ?').run('default');
       } else if (event.type === 'MEAL_LOGGED') {
@@ -121,12 +130,18 @@ export function registerRpgHandlers(): void {
         newTitle: finalTitle !== (stats.title as string) ? finalTitle : null,
         milestoneXp,
       };
+    });
+
+    try {
+      return processTransaction();
     } catch (err) {
       console.error(`[RPG] Error processing event "${event.type}":`, err);
-      db.prepare(`
-        INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload)
-        VALUES (?, ?, 0, 0, 1.0, 1.0, ?)
-      `).run(event.moduleId, event.type, JSON.stringify(event.payload));
+      try {
+        db.prepare(`
+          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload)
+          VALUES (?, ?, 0, 0, 1.0, 1.0, ?)
+        `).run(event.moduleId, event.type, JSON.stringify(event.payload));
+      } catch { /* best effort logging */ }
       return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0 };
     }
   });
