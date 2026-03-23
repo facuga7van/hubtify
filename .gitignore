@@ -4,3 +4,5 @@ out/
 dist/
 *.db
 *.db-journal
+nutrify-q8.gguf
+electron/modules/nutrition/model/nutrify.gguf

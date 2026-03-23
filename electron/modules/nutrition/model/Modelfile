@@ -1,0 +1,6 @@
+FROM ./nutrify.gguf
+TEMPLATE "### Instruction:\n{{ .System }}\n\n### Input:\n{{ .Prompt }}\n\n### Response:\n"
+PARAMETER temperature 0.1
+PARAMETER stop "### Instruction:"
+PARAMETER stop "### Input:"
+SYSTEM "Estimá las calorías de esta comida"
