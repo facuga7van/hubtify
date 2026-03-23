@@ -35,12 +35,13 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [tool, setTool] = useState<Tool>('pen');
+  const [bgReady, setBgReady] = useState(false);
 
   // Preload bg image
   useEffect(() => {
     const img = new Image();
     img.src = parchmentBg;
-    img.onload = () => { bgImageRef.current = img; };
+    img.onload = () => { bgImageRef.current = img; setBgReady(true); };
   }, []);
 
   const clearCanvas = useCallback(() => {
@@ -64,9 +65,9 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
   useEffect(() => { loadDrawings(); }, [loadDrawings]);
 
-  // Paint current drawing onto canvas
+  // Paint current drawing onto canvas — wait for both data and bg texture
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !bgReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -81,7 +82,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
       img.src = drawing.data;
     }
     setDirty(false);
-  }, [currentIdx, drawings, loaded, clearCanvas]);
+  }, [currentIdx, drawings, loaded, bgReady, clearCanvas]);
 
   const saveCurrent = useCallback(async () => {
     if (!dirty) return;
