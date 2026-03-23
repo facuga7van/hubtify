@@ -11,6 +11,9 @@ export function getDb(): Database.Database {
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('cache_size = 10000');
+    db.pragma('temp_store = MEMORY');
     initCoreTables(db);
   }
   return db;

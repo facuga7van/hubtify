@@ -4,12 +4,13 @@ import PageHeader from '../shared/components/PageHeader';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull } from '../shared/sync';
 import { useConfirm } from '../shared/components/ConfirmDialog';
+import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/audio';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
   const { user: authUser, logout } = useAuthContext();
-  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('hubtify_sound') !== 'false');
+  const [soundEnabled, setSoundEnabled] = useState(() => isSoundEnabled());
   const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
   const [syncStatus, setSyncStatus] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -20,7 +21,7 @@ export default function SettingsPage() {
   const toggleSound = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
-    localStorage.setItem('hubtify_sound', next ? 'true' : 'false');
+    setGlobalSound(next);
   };
 
   const changeLanguage = (lang: string) => {

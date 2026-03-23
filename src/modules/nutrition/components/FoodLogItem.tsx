@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface FoodEntry {
@@ -12,7 +12,7 @@ interface Props {
   onUpdate: (id: number, fields: { description?: string; calories?: number }) => void;
 }
 
-export default function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
+export default memo(function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -97,4 +97,4 @@ export default function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
       )}
     </div>
   );
-}
+});

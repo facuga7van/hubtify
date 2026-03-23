@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
@@ -201,9 +201,10 @@ export default function Today() {
   if (!hasProfile) return <NutritionOnboarding onComplete={() => loadData(date)} />;
 
   const consumed = summary?.totalCaloriesIn ?? foods.reduce((s, f) => s + f.calories, 0);
-  const filteredFrequent = frequentFoods.filter((f) =>
-    !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
-  );
+  const filteredFrequent = useMemo(() =>
+    frequentFoods.filter((f) =>
+      !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
+    ), [frequentFoods, frequentSearch]);
 
   return (
     <div>
