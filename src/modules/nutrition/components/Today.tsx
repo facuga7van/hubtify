@@ -73,6 +73,34 @@ export default function Today() {
 
   useEffect(() => { loadData(date); }, [date, loadData]);
 
+  // Auto-close past days that have food but weren't closed
+  useEffect(() => {
+    (async () => {
+      const today = getLocalDateString();
+      for (let i = 1; i <= 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const pastDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (pastDate >= today) continue;
+        const closed = await window.api.nutritionIsDayClosed(pastDate);
+        if (closed) continue;
+        const foods = await window.api.nutritionGetFoodByDate(pastDate);
+        if ((foods as unknown[]).length === 0) continue;
+        // Auto-close this day
+        const result = await window.api.nutritionCloseDay(pastDate);
+        if (result.success && result.breakdown) {
+          const b = result.breakdown as { xpTotal: number; hpChange: number };
+          await window.api.processRpgEvent({
+            type: 'DAY_SUMMARY', moduleId: 'nutrition',
+            payload: { xp: b.xpTotal, hp: b.hpChange },
+            timestamp: Date.now(),
+          });
+          window.dispatchEvent(new Event('rpg:statsChanged'));
+        }
+      }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Reload when settings change (e.g. profile/TDEE update)
   useEffect(() => {
     const handler = () => loadData(date);
