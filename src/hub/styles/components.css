@@ -272,7 +272,7 @@
 .page-header__actions {
   position: absolute;
   right: 0;
-  top: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   gap: 8px;
