@@ -22,6 +22,17 @@ export default function Layout() {
 
   useKeyboardShortcuts();
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('hubtify_sidebar_collapsed') === 'true';
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('hubtify_sidebar_collapsed', String(next));
+      return next;
+    });
+  }, []);
+
   const refreshStats = useCallback(() => {
     window.api.getRpgStats().then(setStats).catch(console.error);
   }, []);
@@ -30,20 +41,61 @@ export default function Layout() {
     refreshStats();
   }, [location.pathname, refreshStats]);
 
-  // Auto-sync every 5 minutes if logged in
+  // Listen for stats refresh requests from child components
   useEffect(() => {
+    const handler = () => refreshStats();
+    window.addEventListener('rpg:statsChanged', handler);
+    return () => window.removeEventListener('rpg:statsChanged', handler);
+  }, [refreshStats]);
+
+  // Debounced push sync — triggers 30s after last data change
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedPush = useCallback(() => {
     if (!authUser) return;
-    const interval = setInterval(async () => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(async () => {
       try {
         await syncPush(authUser.uid);
-        console.log('[AutoSync] Pushed data to cloud');
-      } catch {
-        // Silent fail — auto-sync is best-effort
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(interval);
+      } catch { /* Silent fail */ }
+    }, 30_000);
   }, [authUser]);
+
+  // Cleanup sync timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, []);
+
+  // Push on data changes
+  useEffect(() => {
+    const handler = () => debouncedPush();
+    window.addEventListener('rpg:statsChanged', handler);
+    return () => window.removeEventListener('rpg:statsChanged', handler);
+  }, [debouncedPush]);
+
+  // Push on blur (leaving app), pull on focus (coming back)
+  useEffect(() => {
+    if (!authUser) return;
+    const onBlur = async () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      try {
+        await syncPush(authUser.uid);
+      } catch { /* Silent fail */ }
+    };
+    const onFocus = async () => {
+      try {
+        await syncPull(authUser.uid);
+        refreshStats();
+      } catch { /* Silent fail */ }
+    };
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [authUser, refreshStats]);
 
   // Enable reminders if previously set
   useEffect(() => {
@@ -59,27 +111,31 @@ export default function Layout() {
       try {
         await syncPull(authUser.uid);
         refreshStats();
-        console.log('[AutoSync] Initial pull complete');
       } catch {
         // Silent fail
       }
     })();
   }, [authUser, refreshStats]);
 
+  const levelUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (stats && prevLevelRef.current > 0 && stats.level > prevLevelRef.current) {
       setLevelUp(stats.level);
       playLevelUp();
-      setTimeout(() => setLevelUp(null), 3000);
+      if (levelUpTimerRef.current) clearTimeout(levelUpTimerRef.current);
+      levelUpTimerRef.current = setTimeout(() => setLevelUp(null), 3000);
     }
     if (stats) prevLevelRef.current = stats.level;
+    return () => {
+      if (levelUpTimerRef.current) clearTimeout(levelUpTimerRef.current);
+    };
   }, [stats]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
-        <Sidebar stats={stats} />
+        <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
         <main className="main-content">
           <Outlet />
         </main>

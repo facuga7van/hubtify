@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/PageHeader';
@@ -10,6 +10,10 @@ export default function NutritionSettings() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); };
+  }, []);
 
   const [age, setAge] = useState(25);
   const [sex, setSex] = useState<'M' | 'F'>('M');
@@ -51,7 +55,9 @@ export default function NutritionSettings() {
       activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
     });
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
+    window.dispatchEvent(new Event('nutrition:settingsChanged'));
   };
 
   if (loading) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;

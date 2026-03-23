@@ -17,13 +17,10 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       window.api.financeGetLoans(),
     ]);
 
-    // Get all subtasks for all tasks
+    // Get all subtasks for all tasks (parallel)
     const allTasks = tasks as Array<{ id: string }>;
-    const allSubs: unknown[] = [];
-    for (const t of allTasks) {
-      const subs = await window.api.questsGetSubtasks(t.id);
-      allSubs.push(...(subs as unknown[]));
-    }
+    const subsPerTask = await Promise.all(allTasks.map(t => window.api.questsGetSubtasks(t.id)));
+    const allSubs = subsPerTask.flat();
 
     const userRef = doc(firestore, 'hubtify_users', uid);
     await setDoc(userRef, {

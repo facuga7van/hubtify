@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import { useAuthContext } from '../shared/AuthContext';
@@ -10,6 +10,10 @@ export default function SettingsPage() {
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('hubtify_sound') !== 'false');
   const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
   const [syncStatus, setSyncStatus] = useState('');
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  }, []);
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -33,7 +37,8 @@ export default function SettingsPage() {
     } catch {
       setSyncStatus(t('auth.syncFailed'));
     }
-    setTimeout(() => setSyncStatus(''), 3000);
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => setSyncStatus(''), 3000);
   };
 
   const resetOnboarding = () => {

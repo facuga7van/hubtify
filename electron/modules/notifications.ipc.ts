@@ -2,6 +2,13 @@ import { ipcMain, Notification, app } from 'electron';
 
 let reminderInterval: NodeJS.Timeout | null = null;
 
+export function clearReminderInterval(): void {
+  if (reminderInterval) {
+    clearInterval(reminderInterval);
+    reminderInterval = null;
+  }
+}
+
 export function registerNotificationIpcHandlers(): void {
   ipcMain.handle('notifications:setReminders', (_e, enabled: boolean) => {
     if (reminderInterval) {
