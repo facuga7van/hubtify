@@ -9,20 +9,28 @@ function genId(): string {
 export function registerQuestsIpcHandlers(): void {
   // ── Tasks ──────────────────────────────────────────
 
-  ipcMain.handle('quests:getTasks', () => {
+  ipcMain.handle('quests:getTasks', (_e, projectId?: string | null) => {
     const db = getDb();
-    const tasks = db.prepare(`
-      SELECT id, name, description, status, tier, category,
-             due_date AS dueDate, task_order AS "order",
-             created_at AS createdAt, updated_at AS updatedAt
-      FROM tasks ORDER BY task_order ASC
-    `).all();
-    return tasks;
+    if (projectId === undefined) {
+      return db.prepare(`
+        SELECT id, name, description, status, tier, category,
+               project_id AS projectId, due_date AS dueDate, task_order AS "order",
+               created_at AS createdAt, updated_at AS updatedAt
+        FROM tasks ORDER BY task_order ASC
+      `).all();
+    } else {
+      return db.prepare(`
+        SELECT id, name, description, status, tier, category,
+               project_id AS projectId, due_date AS dueDate, task_order AS "order",
+               created_at AS createdAt, updated_at AS updatedAt
+        FROM tasks WHERE project_id IS ? ORDER BY task_order ASC
+      `).all(projectId);
+    }
   });
 
   ipcMain.handle('quests:upsertTask', (_e, task: {
     id?: string; name: string; description?: string; tier?: number;
-    category?: string; dueDate?: string | null; order?: number; status?: boolean;
+    category?: string; projectId?: string | null; dueDate?: string | null; order?: number; status?: boolean;
   }) => {
     const db = getDb();
     const id = task.id || genId();
@@ -30,23 +38,21 @@ export function registerQuestsIpcHandlers(): void {
     const validTier = [1, 2, 3].includes(task.tier ?? 2) ? (task.tier ?? 2) : 2;
 
     if (task.id) {
-      // Update
       db.prepare(`
         UPDATE tasks SET name = ?, description = ?, tier = ?, category = ?,
-               due_date = ?, task_order = ?, status = ?, updated_at = ?
+               project_id = ?, due_date = ?, task_order = ?, status = ?, updated_at = ?
         WHERE id = ?
       `).run(
         task.name, task.description ?? '', validTier, task.category ?? '',
-        task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now, id
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now, id
       );
     } else {
-      // Get max order
       const maxOrder = db.prepare('SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks').get() as { next: number };
       db.prepare(`
-        INSERT INTO tasks (id, name, description, tier, category, due_date, task_order, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
       `).run(id, task.name, task.description ?? '', validTier, task.category ?? '',
-        task.dueDate ?? null, task.order ?? maxOrder.next, now, now);
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, now, now);
     }
     return id;
   });
@@ -146,15 +152,20 @@ export function registerQuestsIpcHandlers(): void {
 
   // ── Categories ─────────────────────────────────────
 
-  ipcMain.handle('quests:getCategories', () => {
+  ipcMain.handle('quests:getCategories', (_e, projectId?: string | null) => {
     const db = getDb();
-    return (db.prepare('SELECT name FROM task_categories ORDER BY created_at ASC').all() as { name: string }[])
-      .map((r) => r.name);
+    if (projectId === undefined) {
+      return (db.prepare('SELECT name FROM task_categories ORDER BY created_at ASC').all() as { name: string }[])
+        .map((r) => r.name);
+    } else {
+      return (db.prepare('SELECT name FROM task_categories WHERE project_id IS ? ORDER BY created_at ASC').all(projectId) as { name: string }[])
+        .map((r) => r.name);
+    }
   });
 
-  ipcMain.handle('quests:ensureCategory', (_e, name: string) => {
+  ipcMain.handle('quests:ensureCategory', (_e, name: string, projectId?: string | null) => {
     const db = getDb();
-    db.prepare('INSERT OR IGNORE INTO task_categories (name) VALUES (?)').run(name);
+    db.prepare('INSERT OR IGNORE INTO task_categories (name, project_id) VALUES (?, ?)').run(name, projectId ?? null);
   });
 
   // ── Stats helpers ──────────────────────────────────
@@ -187,5 +198,49 @@ export function registerQuestsIpcHandlers(): void {
       "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND DATE(updated_at) = ?"
     ).get(today) as { c: number };
     return result.c;
+  });
+
+  // ── Projects ─────────────────────────────────────
+
+  ipcMain.handle('quests:getProjects', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, name, color, project_order AS "order", created_at AS createdAt
+      FROM projects ORDER BY project_order ASC
+    `).all();
+  });
+
+  ipcMain.handle('quests:upsertProject', (_e, project: {
+    id?: string; name: string; color: string;
+  }) => {
+    const db = getDb();
+    const id = project.id || genId();
+    const now = new Date().toISOString();
+
+    if (project.id) {
+      db.prepare('UPDATE projects SET name = ?, color = ? WHERE id = ?')
+        .run(project.name, project.color, id);
+    } else {
+      const maxOrder = db.prepare('SELECT COALESCE(MAX(project_order), -1) + 1 AS next FROM projects').get() as { next: number };
+      db.prepare('INSERT INTO projects (id, name, color, project_order, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(id, project.name, project.color, maxOrder.next, now);
+    }
+    return id;
+  });
+
+  ipcMain.handle('quests:deleteProject', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+  });
+
+  ipcMain.handle('quests:syncProjectOrders', (_e, orders: Array<{ id: string; order: number }>) => {
+    const db = getDb();
+    const stmt = db.prepare('UPDATE projects SET project_order = ? WHERE id = ?');
+    const tx = db.transaction(() => {
+      for (const { id, order } of orders) {
+        stmt.run(order, id);
+      }
+    });
+    tx();
   });
 }

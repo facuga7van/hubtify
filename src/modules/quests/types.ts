@@ -9,6 +9,25 @@ export const XP_MAP: Record<TaskTier, number> = {
 
 export const MAX_SUBTASKS = 30;
 
+export interface Project {
+  id: string;
+  name: string;
+  color: string;
+  order: number;
+  createdAt: string;
+}
+
+export const PROJECT_COLORS = [
+  '#8b7355', // tierra
+  '#6b7c5e', // verde musgo
+  '#7c6b6b', // borravino
+  '#5e6b7c', // azul pizarra
+  '#7c7254', // dorado oscuro
+  '#6b5e7c', // violeta
+  '#7c5e5e', // cobre
+  '#5e7c72', // verde agua
+] as const;
+
 export interface Task {
   id: string;
   name: string;
@@ -16,6 +35,7 @@ export interface Task {
   status: boolean;
   tier: TaskTier;
   category: string;
+  projectId: string | null;
   dueDate: string | null;
   order: number;
   createdAt: string;

@@ -57,7 +57,7 @@ export interface HubtifyApi {
   windowClose: () => void;
 
   // Quests
-  questsGetTasks: () => Promise<unknown[]>;
+  questsGetTasks: (projectId?: string | null) => Promise<unknown[]>;
   questsUpsertTask: (task: Record<string, unknown>) => Promise<string>;
   questsDeleteTasks: (ids: string[]) => Promise<void>;
   questsSetTaskStatus: (taskId: string, status: boolean) => Promise<void>;
@@ -68,8 +68,12 @@ export interface HubtifyApi {
   questsDeleteSubtask: (subtaskId: string) => Promise<void>;
   questsSetSubtaskStatus: (subtaskId: string, status: boolean, completedAt?: string) => Promise<void>;
   questsSyncSubtaskOrders: (taskId: string, orderedIds: string[]) => Promise<void>;
-  questsGetCategories: () => Promise<string[]>;
-  questsEnsureCategory: (name: string) => Promise<void>;
+  questsGetCategories: (projectId?: string | null) => Promise<string[]>;
+  questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
+  questsGetProjects: () => Promise<unknown[]>;
+  questsUpsertProject: (project: Record<string, unknown>) => Promise<string>;
+  questsDeleteProject: (id: string) => Promise<void>;
+  questsSyncProjectOrders: (orders: Array<{ id: string; order: number }>) => Promise<void>;
   questsCountCompletedToday: () => Promise<number>;
   questsGetPendingCount: () => Promise<number>;
   questsGetCompletedTodayCount: () => Promise<number>;

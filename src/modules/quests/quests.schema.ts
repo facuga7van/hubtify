@@ -41,4 +41,23 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_subtasks_task_id ON subtasks(task_id);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 2,
+    up: `
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#8b7355',
+        project_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      ALTER TABLE tasks ADD COLUMN project_id TEXT DEFAULT NULL REFERENCES projects(id) ON DELETE SET NULL;
+      ALTER TABLE task_categories ADD COLUMN project_id TEXT DEFAULT NULL REFERENCES projects(id) ON DELETE CASCADE;
+
+      CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_project ON task_categories(project_id);
+    `,
+  },
 ];

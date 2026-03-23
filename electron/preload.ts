@@ -12,7 +12,7 @@ const api = {
   windowClose: () => ipcRenderer.send('window:close'),
 
   // Quests
-  questsGetTasks: () => ipcRenderer.invoke('quests:getTasks'),
+  questsGetTasks: (projectId?: string | null) => ipcRenderer.invoke('quests:getTasks', projectId),
   questsUpsertTask: (task: Record<string, unknown>) => ipcRenderer.invoke('quests:upsertTask', task),
   questsDeleteTasks: (ids: string[]) => ipcRenderer.invoke('quests:deleteTasks', ids),
   questsSetTaskStatus: (taskId: string, status: boolean) => ipcRenderer.invoke('quests:setTaskStatus', taskId, status),
@@ -23,8 +23,12 @@ const api = {
   questsDeleteSubtask: (subtaskId: string) => ipcRenderer.invoke('quests:deleteSubtask', subtaskId),
   questsSetSubtaskStatus: (subtaskId: string, status: boolean, completedAt?: string) => ipcRenderer.invoke('quests:setSubtaskStatus', subtaskId, status, completedAt),
   questsSyncSubtaskOrders: (taskId: string, orderedIds: string[]) => ipcRenderer.invoke('quests:syncSubtaskOrders', taskId, orderedIds),
-  questsGetCategories: () => ipcRenderer.invoke('quests:getCategories'),
-  questsEnsureCategory: (name: string) => ipcRenderer.invoke('quests:ensureCategory', name),
+  questsGetCategories: (projectId?: string | null) => ipcRenderer.invoke('quests:getCategories', projectId),
+  questsEnsureCategory: (name: string, projectId?: string | null) => ipcRenderer.invoke('quests:ensureCategory', name, projectId),
+  questsGetProjects: () => ipcRenderer.invoke('quests:getProjects'),
+  questsUpsertProject: (project: Record<string, unknown>) => ipcRenderer.invoke('quests:upsertProject', project),
+  questsDeleteProject: (id: string) => ipcRenderer.invoke('quests:deleteProject', id),
+  questsSyncProjectOrders: (orders: Array<{ id: string; order: number }>) => ipcRenderer.invoke('quests:syncProjectOrders', orders),
   questsCountCompletedToday: () => ipcRenderer.invoke('quests:countCompletedToday'),
   questsGetPendingCount: () => ipcRenderer.invoke('quests:getPendingCount'),
   questsGetCompletedTodayCount: () => ipcRenderer.invoke('quests:getCompletedTodayCount'),
