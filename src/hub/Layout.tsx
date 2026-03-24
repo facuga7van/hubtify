@@ -82,11 +82,15 @@ export default function Layout() {
     };
   }, []);
 
-  // Push on data changes
+  // Push on data changes (RPG stats or quest data)
   useEffect(() => {
     const handler = () => debouncedPush();
     window.addEventListener('rpg:statsChanged', handler);
-    return () => window.removeEventListener('rpg:statsChanged', handler);
+    window.addEventListener('quests:dataChanged', handler);
+    return () => {
+      window.removeEventListener('rpg:statsChanged', handler);
+      window.removeEventListener('quests:dataChanged', handler);
+    };
   }, [debouncedPush]);
 
   // Push on blur (leaving app), pull on focus (coming back)
@@ -100,8 +104,11 @@ export default function Layout() {
     };
     const onFocus = async () => {
       try {
-        await syncPull(authUser.uid);
+        const result = await syncPull(authUser.uid);
         refreshStats();
+        if (result.changed) {
+          window.dispatchEvent(new Event('sync:questsUpdated'));
+        }
       } catch { /* Silent fail */ }
     };
     window.addEventListener('blur', onBlur);
@@ -124,8 +131,11 @@ export default function Layout() {
     if (!authUser) return;
     (async () => {
       try {
-        await syncPull(authUser.uid);
+        const result = await syncPull(authUser.uid);
         refreshStats();
+        if (result.changed) {
+          window.dispatchEvent(new Event('sync:questsUpdated'));
+        }
       } catch {
         // Silent fail
       }

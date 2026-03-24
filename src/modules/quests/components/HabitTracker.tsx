@@ -33,6 +33,13 @@ export default function HabitTracker({ onXpGained }: Props) {
 
   useEffect(() => { loadHabits(); }, [loadHabits]);
 
+  // Refresh when remote sync brings new data
+  useEffect(() => {
+    const handler = () => loadHabits();
+    window.addEventListener('sync:questsUpdated', handler);
+    return () => window.removeEventListener('sync:questsUpdated', handler);
+  }, [loadHabits]);
+
   const toggleCollapsed = () => {
     setCollapsed(prev => {
       const next = !prev;
@@ -64,6 +71,7 @@ export default function HabitTracker({ onXpGained }: Props) {
       window.dispatchEvent(new Event('rpg:statsChanged'));
     }
     await loadHabits();
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const handleAdd = async () => {
@@ -78,6 +86,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     setNewTimes(1);
     setAdding(false);
     await loadHabits();
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const handleDelete = async (id: string) => {
@@ -85,6 +94,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     if (!ok) return;
     await window.api.questsDeleteHabit(id);
     await loadHabits();
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const getFreqLabel = (h: HabitWithStreak) => {

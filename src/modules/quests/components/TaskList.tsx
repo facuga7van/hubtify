@@ -68,6 +68,13 @@ export default function TaskList() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
+  // Refresh when remote sync brings new data
+  useEffect(() => {
+    const handler = () => loadTasks();
+    window.addEventListener('sync:questsUpdated', handler);
+    return () => window.removeEventListener('sync:questsUpdated', handler);
+  }, [loadTasks]);
+
   useEffect(() => {
     if (editingTask && formRef.current) {
       formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -149,6 +156,7 @@ export default function TaskList() {
     }
     await loadTasks();
     window.dispatchEvent(new Event('rpg:statsChanged'));
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const handleDelete = async () => {
@@ -162,6 +170,7 @@ export default function TaskList() {
     setSelectedIds(new Set());
     setShowDeleteConfirm(false);
     await loadTasks();
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const onDragEnd = async (event: DragEndEvent) => {
@@ -181,6 +190,7 @@ export default function TaskList() {
       return updated;
     });
     await window.api.questsSyncTaskOrders(orders);
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const onDragEndInSection = async (event: DragEndEvent, sectionTasks: Task[]) => {
@@ -200,6 +210,7 @@ export default function TaskList() {
       return updated;
     });
     await window.api.questsSyncTaskOrders(orders);
+    window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const toggleProjectCollapse = (key: string) => {
@@ -231,7 +242,7 @@ export default function TaskList() {
       const next = new Set(prev); next.has(task.id) ? next.delete(task.id) : next.add(task.id); return next;
     }),
     onShowToast: setToastData,
-    onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); },
+    onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); },
     drawingCount: drawingCounts[task.id] ?? 0,
     onOpenNotes: () => setNotesTaskId(task.id),
   });
@@ -274,7 +285,7 @@ export default function TaskList() {
           categories={categories}
           projects={projects}
           activeProjectId={activeProjectId === undefined ? null : activeProjectId}
-          onSaved={() => { setEditingTask(null); loadTasks(); }}
+          onSaved={() => { setEditingTask(null); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
         />
       </div>
 
@@ -401,7 +412,7 @@ export default function TaskList() {
         <ProjectManager
           projects={projects}
           onClose={() => setShowProjectManager(false)}
-          onSaved={() => loadTasks()}
+          onSaved={() => { loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
         />
       )}
 

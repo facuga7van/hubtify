@@ -16,14 +16,14 @@ export function registerQuestsIpcHandlers(): void {
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
                created_at AS createdAt, updated_at AS updatedAt
-        FROM tasks ORDER BY task_order ASC
+        FROM tasks WHERE deleted_at IS NULL ORDER BY task_order ASC
       `).all();
     } else {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
                created_at AS createdAt, updated_at AS updatedAt
-        FROM tasks WHERE project_id IS ? ORDER BY task_order ASC
+        FROM tasks WHERE deleted_at IS NULL AND project_id IS ? ORDER BY task_order ASC
       `).all(projectId);
     }
   });
@@ -59,9 +59,10 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcMain.handle('quests:deleteTasks', (_e, ids: string[]) => {
     const db = getDb();
+    const now = new Date().toISOString();
     const placeholders = ids.map(() => '?').join(',');
-    db.prepare(`DELETE FROM subtasks WHERE task_id IN (${placeholders})`).run(...ids);
-    db.prepare(`DELETE FROM tasks WHERE id IN (${placeholders})`).run(...ids);
+    db.prepare(`UPDATE subtasks SET deleted_at = ?, updated_at = ? WHERE task_id IN (${placeholders}) AND deleted_at IS NULL`).run(now, now, ...ids);
+    db.prepare(`UPDATE tasks SET deleted_at = ?, updated_at = ? WHERE id IN (${placeholders})`).run(now, now, ...ids);
   });
 
   ipcMain.handle('quests:setTaskStatus', (_e, taskId: string, status: boolean) => {
@@ -89,7 +90,7 @@ export function registerQuestsIpcHandlers(): void {
     return db.prepare(`
       SELECT id, task_id AS taskId, name, description, tier, status,
              subtask_order AS "order", completed_at AS completedAt
-      FROM subtasks WHERE task_id = ? ORDER BY subtask_order ASC
+      FROM subtasks WHERE task_id = ? AND deleted_at IS NULL ORDER BY subtask_order ASC
     `).all(taskId);
   });
 
@@ -128,7 +129,8 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcMain.handle('quests:deleteSubtask', (_e, subtaskId: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM subtasks WHERE id = ?').run(subtaskId);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE subtasks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, subtaskId);
   });
 
   ipcMain.handle('quests:setSubtaskStatus', (_e, subtaskId: string, status: boolean, completedAt?: string) => {
@@ -155,10 +157,10 @@ export function registerQuestsIpcHandlers(): void {
   ipcMain.handle('quests:getCategories', (_e, projectId?: string | null) => {
     const db = getDb();
     if (projectId === undefined) {
-      return (db.prepare('SELECT name FROM task_categories ORDER BY created_at ASC').all() as { name: string }[])
+      return (db.prepare('SELECT name FROM task_categories WHERE deleted_at IS NULL ORDER BY created_at ASC').all() as { name: string }[])
         .map((r) => r.name);
     } else {
-      return (db.prepare('SELECT name FROM task_categories WHERE project_id IS ? ORDER BY created_at ASC').all(projectId) as { name: string }[])
+      return (db.prepare('SELECT name FROM task_categories WHERE deleted_at IS NULL AND project_id IS ? ORDER BY created_at ASC').all(projectId) as { name: string }[])
         .map((r) => r.name);
     }
   });
@@ -177,17 +179,17 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
     const taskCount = db.prepare(
-      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND DATE(updated_at) = ?"
+      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(updated_at) = ?"
     ).get(today) as { c: number };
     const subtaskCount = db.prepare(
-      "SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND completed_at = ?"
+      "SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND deleted_at IS NULL AND completed_at = ?"
     ).get(today) as { c: number };
     return taskCount.c + subtaskCount.c;
   });
 
   ipcMain.handle('quests:getPendingCount', () => {
     const db = getDb();
-    const result = db.prepare('SELECT COUNT(*) AS c FROM tasks WHERE status = 0').get() as { c: number };
+    const result = db.prepare('SELECT COUNT(*) AS c FROM tasks WHERE status = 0 AND deleted_at IS NULL').get() as { c: number };
     return result.c;
   });
 
@@ -195,7 +197,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const today = new Date().toLocaleDateString('en-CA');
     const result = db.prepare(
-      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND DATE(updated_at) = ?"
+      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(updated_at) = ?"
     ).get(today) as { c: number };
     return result.c;
   });
@@ -206,7 +208,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, name, color, project_order AS "order", created_at AS createdAt
-      FROM projects ORDER BY project_order ASC
+      FROM projects WHERE deleted_at IS NULL ORDER BY project_order ASC
     `).all();
   });
 
@@ -230,7 +232,8 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcMain.handle('quests:deleteProject', (_e, id: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE projects SET deleted_at = ? WHERE id = ?').run(now, id);
   });
 
   ipcMain.handle('quests:syncProjectOrders', (_e, orders: Array<{ id: string; order: number }>) => {
@@ -291,11 +294,11 @@ export function registerQuestsIpcHandlers(): void {
 
     const habits = db.prepare(`
       SELECT id, name, frequency, times_per_week AS timesPerWeek, created_at AS createdAt
-      FROM habits ORDER BY created_at ASC
+      FROM habits WHERE deleted_at IS NULL ORDER BY created_at ASC
     `).all() as Array<{ id: string; name: string; frequency: string; timesPerWeek: number; createdAt: string }>;
 
     return habits.map((h) => {
-      const checkedToday = !!db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, todayStr);
+      const checkedToday = !!db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ? AND deleted_at IS NULL AND deleted_at IS NULL').get(h.id, todayStr);
 
       // Checks this period
       let checksThisPeriod = 0;
@@ -310,13 +313,13 @@ export function registerQuestsIpcHandlers(): void {
         const monday = new Date(today);
         monday.setDate(today.getDate() - dayOfWeek + 1);
         const mondayStr = monday.toLocaleDateString('en-CA');
-        const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+        const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL')
           .get(h.id, mondayStr, todayStr) as { c: number };
         checksThisPeriod = count.c;
         targetThisPeriod = h.timesPerWeek;
       } else if (h.frequency === 'monthly') {
         const monthStart = todayStr.slice(0, 7) + '-01';
-        const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+        const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL')
           .get(h.id, monthStart, todayStr) as { c: number };
         checksThisPeriod = count.c;
         targetThisPeriod = 1;
@@ -331,12 +334,12 @@ export function registerQuestsIpcHandlers(): void {
         })();
         if (!checkedToday) {
           const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-          const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, yesterday.toLocaleDateString('en-CA'));
+          const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ? AND deleted_at IS NULL').get(h.id, yesterday.toLocaleDateString('en-CA'));
           if (!found) return { ...h, streak: 0, checkedToday, checksThisPeriod, targetThisPeriod };
         }
         const d = new Date(startDate);
         while (true) {
-          const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ?').get(h.id, d.toLocaleDateString('en-CA'));
+          const found = db.prepare('SELECT 1 FROM habit_checks WHERE habit_id = ? AND date = ? AND deleted_at IS NULL').get(h.id, d.toLocaleDateString('en-CA'));
           if (!found) break;
           streak++;
           d.setDate(d.getDate() - 1);
@@ -353,7 +356,7 @@ export function registerQuestsIpcHandlers(): void {
         while (true) {
           const wStart = d.toLocaleDateString('en-CA');
           const wEnd = new Date(d); wEnd.setDate(d.getDate() + 6);
-          const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+          const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL')
             .get(h.id, wStart, wEnd.toLocaleDateString('en-CA')) as { c: number };
           if (count.c < h.timesPerWeek) break;
           streak++;
@@ -369,7 +372,7 @@ export function registerQuestsIpcHandlers(): void {
         while (true) {
           const mStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
           const mEnd = `${year}-${String(month + 1).padStart(2, '0')}-31`;
-          const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ?')
+          const count = db.prepare('SELECT COUNT(*) AS c FROM habit_checks WHERE habit_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL')
             .get(h.id, mStart, mEnd) as { c: number };
           if (count.c < 1) break;
           streak++;
@@ -392,23 +395,28 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcMain.handle('quests:deleteHabit', (_e, id: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM habits WHERE id = ?').run(id);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE habits SET deleted_at = ? WHERE id = ?').run(now, id);
   });
 
   ipcMain.handle('quests:checkHabit', (_e, habitId: string) => {
     const db = getDb();
     const today = new Date().toLocaleDateString('en-CA');
-    const existing = db.prepare('SELECT id FROM habit_checks WHERE habit_id = ? AND date = ?').get(habitId, today);
-    if (existing) {
-      // Uncheck
-      db.prepare('DELETE FROM habit_checks WHERE habit_id = ? AND date = ?').run(habitId, today);
+    const now = new Date().toISOString();
+    const existing = db.prepare('SELECT id, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?').get(habitId, today) as { id: string; deleted_at: string | null } | undefined;
+    if (existing && !existing.deleted_at) {
+      // Uncheck — soft-delete
+      db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, existing.id);
       return { checked: false };
+    } else if (existing && existing.deleted_at) {
+      // Was unchecked (soft-deleted) — restore
+      db.prepare('UPDATE habit_checks SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now, existing.id);
+      return { checked: true };
     } else {
-      // Check
+      // Check — new record
       const id = genId();
-      const now = new Date().toISOString();
-      db.prepare('INSERT INTO habit_checks (id, habit_id, date, created_at) VALUES (?, ?, ?, ?)')
-        .run(id, habitId, today, now);
+      db.prepare('INSERT INTO habit_checks (id, habit_id, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+        .run(id, habitId, today, now, now);
       return { checked: true };
     }
   });

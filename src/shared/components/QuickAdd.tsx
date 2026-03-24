@@ -50,6 +50,7 @@ export default function QuickAdd({ onClose }: Props) {
     });
 
     window.dispatchEvent(new Event('rpg:statsChanged'));
+    window.dispatchEvent(new Event('quests:dataChanged'));
     onClose();
   };
 

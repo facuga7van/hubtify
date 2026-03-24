@@ -106,4 +106,23 @@ export const questsMigrations: Migration[] = [
       ALTER TABLE habits ADD COLUMN times_per_week INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    namespace: 'quests',
+    version: 6,
+    up: `
+      ALTER TABLE tasks ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE subtasks ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE projects ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE habits ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE task_categories ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'));
+      ALTER TABLE task_categories ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE habit_checks ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'));
+      ALTER TABLE habit_checks ADD COLUMN deleted_at TEXT DEFAULT NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_tasks_deleted ON tasks(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_subtasks_deleted ON subtasks(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_projects_deleted ON projects(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_habits_deleted ON habits(deleted_at);
+    `,
+  },
 ];

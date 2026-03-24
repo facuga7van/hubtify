@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Loading from '../../../shared/components/Loading';
 
 export default function QuestsDashboardWidget() {
@@ -6,7 +6,7 @@ export default function QuestsDashboardWidget() {
   const [completedToday, setCompletedToday] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadCounts = useCallback(() => {
     Promise.all([
       window.api.questsGetPendingCount(),
       window.api.questsGetCompletedTodayCount(),
@@ -16,6 +16,14 @@ export default function QuestsDashboardWidget() {
       setLoading(false);
     }).catch(console.error);
   }, []);
+
+  useEffect(() => { loadCounts(); }, [loadCounts]);
+
+  useEffect(() => {
+    const handler = () => loadCounts();
+    window.addEventListener('sync:questsUpdated', handler);
+    return () => window.removeEventListener('sync:questsUpdated', handler);
+  }, [loadCounts]);
 
   if (loading) return <Loading size="sm" />;
 

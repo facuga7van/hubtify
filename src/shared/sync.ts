@@ -6,28 +6,20 @@ const firestore = getFirestore(app);
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Gather all data from IPC (SQLite)
-    const [stats, tasks, categories, charData, nutritionProfile, financeTx, loans, projects] = await Promise.all([
+    const [stats, questData, charData, nutritionProfile, financeTx, loans] = await Promise.all([
       window.api.getRpgStats(),
-      window.api.questsGetTasks(),
-      window.api.questsGetCategories(),
+      window.api.syncGetAllQuestData(),
       window.api.characterLoad(),
       window.api.nutritionGetProfile(),
       window.api.financeGetTransactions(new Date().toISOString().slice(0, 7)),
       window.api.financeGetLoans(),
-      window.api.questsGetProjects(),
     ]);
-
-    // Get all subtasks for all tasks (parallel)
-    const allTasks = tasks as Array<{ id: string }>;
-    const subsPerTask = await Promise.all(allTasks.map(t => window.api.questsGetSubtasks(t.id)));
-    const allSubs = subsPerTask.flat();
 
     const userRef = doc(firestore, 'hubtify_users', uid);
     await setDoc(userRef, {
       playerStats: stats,
       characterData: charData,
-      questify: { tasks, subtasks: allSubs, categories, projects },
+      questify: questData,
       nutrify: { profile: nutritionProfile },
       coinify: { transactions: financeTx, loans },
       lastSyncAt: new Date().toISOString(),
@@ -41,7 +33,7 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
   }
 }
 
-export async function syncPull(uid: string): Promise<{ success: boolean; hasData?: boolean; error?: string }> {
+export async function syncPull(uid: string): Promise<{ success: boolean; hasData?: boolean; changed?: boolean; error?: string }> {
   try {
     const userRef = doc(firestore, 'hubtify_users', uid);
     const snap = await getDoc(userRef);
@@ -57,7 +49,14 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
       await window.api.characterSave(data.characterData);
     }
 
-    return { success: true, hasData: true };
+    // Merge quest data (tasks, subtasks, projects, categories, habits, habitChecks)
+    let changed = false;
+    if (data.questify) {
+      const result = await window.api.syncMergeQuestData(data.questify);
+      changed = result.changed;
+    }
+
+    return { success: true, hasData: true, changed };
   } catch (err: unknown) {
     const error = err as { message?: string };
     console.error('[Sync] Pull failed:', err);

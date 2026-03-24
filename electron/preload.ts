@@ -80,6 +80,8 @@ const api = {
 
   // Sync
   syncRestoreStats: (stats: Record<string, unknown>) => ipcRenderer.invoke('sync:restoreStats', stats),
+  syncGetAllQuestData: () => ipcRenderer.invoke('sync:getAllQuestData'),
+  syncMergeQuestData: (data: Record<string, unknown>) => ipcRenderer.invoke('sync:mergeQuestData', data),
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),
