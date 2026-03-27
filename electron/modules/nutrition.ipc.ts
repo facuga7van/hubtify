@@ -180,6 +180,7 @@ export function registerNutritionIpcHandlers(): void {
     const date = metrics.date ?? getMondayOfWeek();
     db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm) VALUES (?, ?, ?)')
       .run(date, metrics.weightKg ?? null, metrics.waistCm ?? null);
+    recalcSummary(db, todayDateString());
   });
 
   // ── Summary ────────────────────────────────────────
