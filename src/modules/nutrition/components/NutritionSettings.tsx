@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/PageHeader';
+import { getAgeFromDob } from '../../../../shared/date-utils';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -15,7 +16,8 @@ export default function NutritionSettings() {
     return () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); };
   }, []);
 
-  const [age, setAge] = useState(25);
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [weightCheckDay, setWeightCheckDay] = useState(1);
   const [sex, setSex] = useState<'M' | 'F'>('M');
   const [height, setHeight] = useState(170);
   const [weight, setWeight] = useState(70);
@@ -29,7 +31,8 @@ export default function NutritionSettings() {
     window.api.nutritionGetProfile().then((prof) => {
       if (prof) {
         const p = prof as Record<string, unknown>;
-        setAge(p.age as number);
+        setDateOfBirth((p.dateOfBirth as string) || '');
+        setWeightCheckDay((p.weightCheckDay as number) || 1);
         setSex(p.sex as 'M' | 'F');
         setHeight(p.heightCm as number);
         setWeight(p.initialWeightKg as number);
@@ -51,7 +54,7 @@ export default function NutritionSettings() {
       : 0;
 
     await window.api.nutritionSaveProfile({
-      age, sex, heightCm: height, initialWeightKg: weight,
+      dateOfBirth, weightCheckDay, sex, heightCm: height, initialWeightKg: weight,
       activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
     });
     setSaved(true);
@@ -82,8 +85,14 @@ export default function NutritionSettings() {
         <div className="rpg-card-title">{t('nutrify.bodyInfo')}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <label style={labelStyle}>
-            {t('nutrify.age')}
-            <input type="number" value={age} onChange={(e) => setAge(+e.target.value)} className="rpg-input" min={10} max={120} />
+            {t('nutrify.dateOfBirth')}
+            <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)}
+              max={new Date().toISOString().split('T')[0]} min="1900-01-01" className="rpg-input" />
+            {dateOfBirth && (
+              <span style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: 2 }}>
+                {t('nutrify.calculatedAge', { age: getAgeFromDob(dateOfBirth) })}
+              </span>
+            )}
           </label>
           <label style={labelStyle}>
             {t('nutrify.sex')}
@@ -153,6 +162,18 @@ export default function NutritionSettings() {
             <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('nutrify.stepFactorHint')}</span>
           </label>
         </div>
+      </div>
+
+      {/* Weight check-in day */}
+      <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>
+          {t('nutrify.weightCheckDay')}
+          <select value={weightCheckDay} onChange={(e) => setWeightCheckDay(+e.target.value)} className="rpg-input">
+            {[1, 2, 3, 4, 5, 6, 7].map(d => (
+              <option key={d} value={d}>{t(`nutrify.weekdays.${d}`)}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* Save */}
