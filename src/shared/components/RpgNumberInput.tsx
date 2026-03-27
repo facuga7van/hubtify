@@ -47,9 +47,9 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
 
   const arrowBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 28, height: '50%', border: 'none', cursor: 'pointer',
-    background: 'var(--rpg-wood, #2c1810)', color: 'var(--rpg-gold-light)',
-    userSelect: 'none', padding: 0,
+    width: 20, height: '50%', border: 'none', cursor: 'pointer',
+    background: 'transparent', color: 'var(--rpg-wood, #2c1810)',
+    userSelect: 'none', padding: 0, opacity: 0.6,
   };
 
   return (
@@ -89,10 +89,8 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
       <div style={{
         position: 'absolute', right: 2, top: 2, bottom: 2,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        borderLeft: '1px solid var(--rpg-gold-dark)',
-        borderRadius: '0 var(--rpg-radius) var(--rpg-radius) 0',
       }}>
-        <button type="button" style={{ ...arrowBtn, borderBottom: '1px solid var(--rpg-gold-dark)' }}
+        <button type="button" style={arrowBtn}
           onMouseDown={() => startHold(1)} onMouseUp={stopHold} onMouseLeave={stopHold}>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
             <path d="M2 7L5 3l3 4"/>
