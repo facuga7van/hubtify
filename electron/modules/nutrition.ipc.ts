@@ -5,6 +5,7 @@ import { estimate } from './nutrition/estimator';
 
 import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
 import { seedFoodDatabase } from './nutrition/food-db-seed';
+import { todayDateString, formatDateString, getMondayOfWeek } from '../../shared/date-utils';
 
 /** Seed the food_database table if it's empty or missing entries */
 export function seedFoodDatabaseIfEmpty(): void {
@@ -57,7 +58,7 @@ export function registerNutritionIpcHandlers(): void {
       profile.stepCaloriesFactor ?? 0.04);
 
     // Recalc today's summary with new profile
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     recalcSummary(db, today);
   });
 
@@ -69,7 +70,7 @@ export function registerNutritionIpcHandlers(): void {
   }) => {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
-    const date = entry.date ?? new Date().toLocaleDateString('en-CA');
+    const date = entry.date ?? todayDateString();
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     db.transaction(() => {
       db.prepare(`
@@ -153,7 +154,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number; gym?: boolean }) => {
     if (metrics.steps !== undefined && (!Number.isFinite(metrics.steps) || metrics.steps < 0)) throw new Error('Invalid steps: must be >= 0');
     const db = getDb();
-    const date = metrics.date ?? new Date().toLocaleDateString('en-CA');
+    const date = metrics.date ?? todayDateString();
     db.prepare(`
       INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym)
       VALUES (?, ?, ?)
@@ -209,26 +210,35 @@ export function registerNutritionIpcHandlers(): void {
     const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
     if (!profile) return 0;
 
+    const today = todayDateString();
+    const summaries = db.prepare(
+      'SELECT date, total_calories_in, tdee FROM nutrition_daily_summary WHERE date <= ? AND total_calories_in > 0 ORDER BY date DESC LIMIT 365'
+    ).all(today) as Array<{ date: string; total_calories_in: number; tdee: number }>;
+
+    if (summaries.length === 0) return 0;
+
     let streak = 0;
-    let checkDate = new Date();
-    while (true) {
-      const dateStr = checkDate.toLocaleDateString('en-CA');
-      const summary = db.prepare('SELECT * FROM nutrition_daily_summary WHERE date = ?').get(dateStr) as Record<string, unknown> | undefined;
-      if (!summary || (summary.total_calories_in as number) === 0) break;
-      const target = (summary.tdee as number) - (profile.deficit_target_kcal as number);
-      if ((summary.total_calories_in as number) <= target * 1.1) {
+    let expectedDate = new Date();
+    const deficitTarget = profile.deficit_target_kcal as number;
+
+    for (const row of summaries) {
+      const expectedStr = formatDateString(expectedDate);
+      if (row.date !== expectedStr) break; // non-consecutive day → stop
+
+      const target = row.tdee - deficitTarget;
+      if (row.total_calories_in <= target * 1.1) {
         streak++;
       } else {
         break;
       }
-      checkDate.setDate(checkDate.getDate() - 1);
+      expectedDate.setDate(expectedDate.getDate() - 1);
     }
     return streak;
   });
 
   ipcHandle('nutrition:getTodayCalories', () => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
     return row.total;
   });
@@ -285,7 +295,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:getTodayTarget', () => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     const summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(today) as { tdee: number } | undefined;
     const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1').get() as { deficit_target_kcal: number } | undefined;
     if (!summary || !profile) return null;
@@ -490,11 +500,3 @@ function calculateTDEEWithFactor(bmr: number, factor: number): number {
   return Math.round(bmr * factor);
 }
 
-function getMondayOfWeek(dateStr?: string): string {
-  const d = dateStr ? new Date(dateStr.split('-').map(Number).join('/')) : new Date();
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diff);
-  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
-}
