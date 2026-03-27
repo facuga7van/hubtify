@@ -1,5 +1,5 @@
 import { ensureOllamaRunning, ensureModelPulled, estimateWithAi, isOllamaAvailable, lastAiDebug, stopOllama, downloadAndInstallOllama } from './ollama';
-import type { EstimationMatch, EstimationResult } from '../../../shared/types';
+import type { EstimationResult } from '../../../shared/types';
 
 export type ProgressCallback = (stage: string) => void;
 
@@ -22,27 +22,22 @@ export async function estimate(description: string, onProgress?: ProgressCallbac
     if (!aiResult) {
       return {
         totalCalories: 0,
-        matches: [],
-        breakdown: '',
+        items: [],
         ollamaMissing: false,
         aiError: `La IA no pudo estimar. Respuesta: ${lastAiDebug}`,
       };
     }
 
-    const matches: EstimationMatch[] = [{ name: aiResult.breakdown, calories: aiResult.calories, source: 'ai' }];
-
     return {
       totalCalories: aiResult.calories,
-      matches,
-      breakdown: aiResult.breakdown,
+      items: aiResult.items,
       ollamaMissing: false,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
       totalCalories: 0,
-      matches: [],
-      breakdown: '',
+      items: [],
       ollamaMissing: false,
       aiError: msg,
     };
