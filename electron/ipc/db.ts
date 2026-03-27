@@ -87,7 +87,20 @@ export function runModuleMigrations(migrations: Migration[]): void {
       'SELECT 1 FROM migrations_applied WHERE namespace = ? AND version = ?'
     ).get(migration.namespace, migration.version);
     if (!applied) {
-      database.exec(migration.up);
+      const statements = migration.up
+        .split(';')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const stmt of statements) {
+        try {
+          database.exec(stmt);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '';
+          if (!msg.includes('duplicate column name')) {
+            throw err;
+          }
+        }
+      }
       database.prepare(
         'INSERT INTO migrations_applied (namespace, version) VALUES (?, ?)'
       ).run(migration.namespace, migration.version);

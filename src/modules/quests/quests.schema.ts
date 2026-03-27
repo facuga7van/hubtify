@@ -114,15 +114,31 @@ export const questsMigrations: Migration[] = [
       ALTER TABLE subtasks ADD COLUMN deleted_at TEXT DEFAULT NULL;
       ALTER TABLE projects ADD COLUMN deleted_at TEXT DEFAULT NULL;
       ALTER TABLE habits ADD COLUMN deleted_at TEXT DEFAULT NULL;
-      ALTER TABLE task_categories ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'));
+      ALTER TABLE task_categories ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
       ALTER TABLE task_categories ADD COLUMN deleted_at TEXT DEFAULT NULL;
-      ALTER TABLE habit_checks ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'));
+      ALTER TABLE habit_checks ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
       ALTER TABLE habit_checks ADD COLUMN deleted_at TEXT DEFAULT NULL;
+
+      UPDATE task_categories SET updated_at = datetime('now') WHERE updated_at = '';
+      UPDATE habit_checks SET updated_at = datetime('now') WHERE updated_at = '';
 
       CREATE INDEX IF NOT EXISTS idx_tasks_deleted ON tasks(deleted_at);
       CREATE INDEX IF NOT EXISTS idx_subtasks_deleted ON subtasks(deleted_at);
       CREATE INDEX IF NOT EXISTS idx_projects_deleted ON projects(deleted_at);
       CREATE INDEX IF NOT EXISTS idx_habits_deleted ON habits(deleted_at);
+    `,
+  },
+  {
+    namespace: 'quests',
+    version: 7,
+    up: `
+      ALTER TABLE projects ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      UPDATE projects SET updated_at = created_at WHERE updated_at = '';
+
+      CREATE INDEX IF NOT EXISTS idx_tasks_project_deleted ON tasks(project_id, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_subtasks_task_deleted ON subtasks(task_id, deleted_at, subtask_order);
+      CREATE INDEX IF NOT EXISTS idx_categories_name_project ON task_categories(name, project_id);
+      CREATE INDEX IF NOT EXISTS idx_drawings_task ON task_drawings(task_id, draw_order);
     `,
   },
 ];
