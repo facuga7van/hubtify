@@ -71,7 +71,7 @@ export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
       </div>
 
       {/* Status message + TDEE */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.8rem', marginTop: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', fontSize: '0.8rem', marginTop: 4, position: 'relative' }}>
         {isOverTdee ? (
           <span style={{ color: 'var(--rpg-hp-red)' }}>
             ⚠ {t('nutrify.overTdee')}
@@ -89,7 +89,7 @@ export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
             {t('nutrify.onTrack')}
           </span>
         )}
-        <span style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.5 }}>
+        <span style={{ position: 'absolute', right: 0, fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.5 }}>
           TDEE <b>{tdee}</b>
         </span>
       </div>
