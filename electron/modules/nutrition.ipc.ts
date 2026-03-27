@@ -34,7 +34,8 @@ export function registerNutritionIpcHandlers(): void {
     const row = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
     if (!row) return null;
     return {
-      age: row.age, sex: row.sex, heightCm: row.height_cm,
+      dateOfBirth: row.date_of_birth, weightCheckDay: row.weight_check_day,
+      sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal, gymCalories: row.gym_calories,
       stepCaloriesFactor: row.step_calories_factor,
