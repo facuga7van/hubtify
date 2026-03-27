@@ -55,11 +55,11 @@ export default function TaskList() {
       setCategories(cats);
       setTodayCount(count);
       setProjects(projs as Project[]);
-      // Load drawing counts for all tasks
-      const counts: Record<string, number> = {};
-      const taskList = allTasks as Task[];
-      const drawCounts = await Promise.all(taskList.map(t => window.api.questsGetDrawingCount(t.id)));
-      taskList.forEach((t, i) => { if (drawCounts[i] > 0) counts[t.id] = drawCounts[i]; });
+      // Load drawing counts in one batch query
+      const drawCountsRaw = await window.api.questsGetAllDrawingCounts();
+      const counts: Record<string, number> = Object.fromEntries(
+        drawCountsRaw.filter(dc => dc.count > 0).map(dc => [dc.task_id, dc.count])
+      );
       setDrawingCounts(counts);
     } catch (err) {
       console.error(err);

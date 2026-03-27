@@ -27,6 +27,7 @@ const api = {
   questsEnsureCategory: (name: string, projectId?: string | null) => ipcRenderer.invoke('quests:ensureCategory', name, projectId),
   questsGetDrawings: (taskId: string) => ipcRenderer.invoke('quests:getDrawings', taskId),
   questsGetDrawingCount: (taskId: string) => ipcRenderer.invoke('quests:getDrawingCount', taskId),
+  questsGetAllDrawingCounts: () => ipcRenderer.invoke('quests:getAllDrawingCounts'),
   questsSaveDrawing: (drawing: Record<string, unknown>) => ipcRenderer.invoke('quests:saveDrawing', drawing),
   questsDeleteDrawing: (id: string) => ipcRenderer.invoke('quests:deleteDrawing', id),
   questsGetHabits: () => ipcRenderer.invoke('quests:getHabits'),

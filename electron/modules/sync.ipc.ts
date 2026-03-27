@@ -36,6 +36,7 @@ interface SyncProject {
   color: string;
   order: number;
   createdAt: string;
+  updatedAt: string;
   deletedAt: string | null;
 }
 
@@ -65,6 +66,14 @@ interface SyncHabitCheck {
   deletedAt: string | null;
 }
 
+interface SyncDrawing {
+  id: string;
+  taskId: string;
+  data: string;
+  order: number;
+  createdAt: string;
+}
+
 interface SyncQuestData {
   tasks: SyncTask[];
   subtasks: SyncSubtask[];
@@ -72,6 +81,7 @@ interface SyncQuestData {
   categories: SyncCategory[];
   habits: SyncHabit[];
   habitChecks: SyncHabitCheck[];
+  drawings: SyncDrawing[];
 }
 
 export function registerSyncIpcHandlers(): void {
@@ -95,7 +105,7 @@ export function registerSyncIpcHandlers(): void {
 
     const projects = db.prepare(`
       SELECT id, name, color, project_order AS "order",
-             created_at AS createdAt, deleted_at AS deletedAt
+             created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM projects
     `).all();
 
@@ -117,7 +127,12 @@ export function registerSyncIpcHandlers(): void {
       FROM habit_checks
     `).all();
 
-    return { tasks, subtasks, projects, categories, habits, habitChecks };
+    const drawings = db.prepare(`
+      SELECT id, task_id AS taskId, data, draw_order AS "order", created_at AS createdAt
+      FROM task_drawings
+    `).all();
+
+    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings };
   });
 
   // Merges remote quest data with local using last-write-wins
@@ -128,30 +143,24 @@ export function registerSyncIpcHandlers(): void {
     const tx = db.transaction(() => {
       // ── Merge projects first (tasks reference them) ──
       if (remote.projects?.length) {
-        const getProject = db.prepare('SELECT id, created_at, deleted_at FROM projects WHERE id = ?');
+        const getProject = db.prepare('SELECT id, updated_at FROM projects WHERE id = ?');
         const insertProject = db.prepare(`
-          INSERT INTO projects (id, name, color, project_order, created_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO projects (id, name, color, project_order, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
         const updateProject = db.prepare(`
-          UPDATE projects SET name = ?, color = ?, project_order = ?, deleted_at = ?
+          UPDATE projects SET name = ?, color = ?, project_order = ?, updated_at = ?, deleted_at = ?
           WHERE id = ?
         `);
 
         for (const rp of remote.projects) {
-          const local = getProject.get(rp.id) as { id: string; created_at: string; deleted_at: string | null } | undefined;
+          const local = getProject.get(rp.id) as { id: string; updated_at: string } | undefined;
           if (!local) {
-            insertProject.run(rp.id, rp.name, rp.color, rp.order, rp.createdAt, rp.deletedAt);
+            insertProject.run(rp.id, rp.name, rp.color, rp.order, rp.createdAt, rp.updatedAt, rp.deletedAt);
             changed = true;
-          } else {
-            // Compare: remote createdAt vs local for updates — use createdAt as proxy since projects lack updatedAt
-            // For projects, always take remote if it has a deletedAt we don't, or vice versa
-            const remoteDeleted = rp.deletedAt != null;
-            const localDeleted = local.deleted_at != null;
-            if (remoteDeleted !== localDeleted || rp.name || rp.color) {
-              updateProject.run(rp.name, rp.color, rp.order, rp.deletedAt, rp.id);
-              changed = true;
-            }
+          } else if (rp.updatedAt > local.updated_at) {
+            updateProject.run(rp.name, rp.color, rp.order, rp.updatedAt, rp.deletedAt, rp.id);
+            changed = true;
           }
         }
       }
@@ -212,23 +221,34 @@ export function registerSyncIpcHandlers(): void {
 
       // ── Merge categories (keyed by name + projectId) ──
       if (remote.categories?.length) {
-        const getCategory = db.prepare('SELECT name, updated_at FROM task_categories WHERE name = ? AND project_id IS ?');
+        const getCategoryWithProject = db.prepare('SELECT name, updated_at FROM task_categories WHERE name = ? AND project_id = ?');
+        const getCategoryNoProject = db.prepare('SELECT name, updated_at FROM task_categories WHERE name = ? AND project_id IS NULL');
         const insertCategory = db.prepare(`
           INSERT INTO task_categories (name, project_id, created_at, updated_at, deleted_at)
           VALUES (?, ?, ?, ?, ?)
         `);
-        const updateCategory = db.prepare(`
+        const updateCategoryWithProject = db.prepare(`
           UPDATE task_categories SET updated_at = ?, deleted_at = ?
-          WHERE name = ? AND project_id IS ?
+          WHERE name = ? AND project_id = ?
+        `);
+        const updateCategoryNoProject = db.prepare(`
+          UPDATE task_categories SET updated_at = ?, deleted_at = ?
+          WHERE name = ? AND project_id IS NULL
         `);
 
         for (const rc of remote.categories) {
-          const local = getCategory.get(rc.name, rc.projectId) as { name: string; updated_at: string } | undefined;
+          const local = rc.projectId != null
+            ? getCategoryWithProject.get(rc.name, rc.projectId) as { name: string; updated_at: string } | undefined
+            : getCategoryNoProject.get(rc.name) as { name: string; updated_at: string } | undefined;
           if (!local) {
             insertCategory.run(rc.name, rc.projectId, rc.createdAt, rc.updatedAt, rc.deletedAt);
             changed = true;
           } else if (rc.updatedAt > local.updated_at) {
-            updateCategory.run(rc.updatedAt, rc.deletedAt, rc.name, rc.projectId);
+            if (rc.projectId != null) {
+              updateCategoryWithProject.run(rc.updatedAt, rc.deletedAt, rc.name, rc.projectId);
+            } else {
+              updateCategoryNoProject.run(rc.updatedAt, rc.deletedAt, rc.name);
+            }
             changed = true;
           }
         }
@@ -259,6 +279,20 @@ export function registerSyncIpcHandlers(): void {
               updateHabit.run(rh.name, rh.frequency, rh.timesPerWeek, rh.deletedAt, rh.id);
               changed = true;
             }
+          }
+        }
+      }
+
+      // ── Merge drawings (immutable — insert if not exists) ──
+      if (remote.drawings?.length) {
+        const getDrawing = db.prepare('SELECT id FROM task_drawings WHERE id = ?');
+        const insertDrawing = db.prepare('INSERT INTO task_drawings (id, task_id, data, draw_order, created_at) VALUES (?, ?, ?, ?, ?)');
+
+        for (const rd of remote.drawings) {
+          const exists = getDrawing.get(rd.id);
+          if (!exists) {
+            insertDrawing.run(rd.id, rd.taskId, rd.data, rd.order, rd.createdAt);
+            changed = true;
           }
         }
       }

@@ -76,6 +76,7 @@ export interface HubtifyApi {
   questsCheckHabit: (habitId: string) => Promise<{ checked: boolean }>;
   questsGetDrawings: (taskId: string) => Promise<unknown[]>;
   questsGetDrawingCount: (taskId: string) => Promise<number>;
+  questsGetAllDrawingCounts: () => Promise<Array<{ task_id: string; count: number }>>;
   questsSaveDrawing: (drawing: Record<string, unknown>) => Promise<string>;
   questsDeleteDrawing: (id: string) => Promise<void>;
   questsGetProjects: () => Promise<unknown[]>;
