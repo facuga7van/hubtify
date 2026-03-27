@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TaskTier, Task, Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
+import Checkbox from '../../../shared/components/Checkbox';
 
 interface Props {
   editingTask: Task | null;
@@ -159,10 +160,11 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
         </div>
 
         {/* Due date toggle */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
-          <input type="checkbox" checked={useDate} onChange={(e) => setUseDate(e.target.checked)} />
-          {t('questify.dueDate')}
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}
+          onClick={() => setUseDate(!useDate)}>
+          <Checkbox checked={useDate} onChange={() => setUseDate(!useDate)} size={16} />
+          <span>{t('questify.dueDate')}</span>
+        </div>
         {useDate && (
           <RpgDateTimePicker value={dueDate} onChange={setDueDate} />
         )}

@@ -7,6 +7,7 @@ import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
+import Checkbox from '../../../shared/components/Checkbox';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -405,18 +406,18 @@ export default function Today() {
       {/* Daily metrics */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.dailyMetrics')}</div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {t('nutrify.steps')}:
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+            <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
             <input type="number" value={metrics.steps ?? ''} placeholder="0"
               onChange={(e) => handleMetrics('steps', e.target.value ? parseInt(e.target.value) : null)}
-              className="rpg-input" style={{ width: 80 }} />
+              className="rpg-input" style={{ width: 90, textAlign: 'center' }} />
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={metrics.gym}
-              onChange={(e) => handleMetrics('gym', e.target.checked)} />
-            {t('nutrify.gym')}
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', cursor: 'pointer' }}
+            onClick={() => handleMetrics('gym', !metrics.gym)}>
+            <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} />
+            <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
+          </div>
         </div>
       </div>
 
