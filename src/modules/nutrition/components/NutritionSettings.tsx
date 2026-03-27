@@ -76,8 +76,8 @@ export default function NutritionSettings() {
         subtitle={t('nutrify.profileSettingsSub')}
         actions={
           <button className="rpg-button" onClick={() => navigate('/nutrition')}
-            style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
-            {t('onboarding.continue')} →
+            style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
+            ← {t('common.back')}
           </button>
         }
       />
