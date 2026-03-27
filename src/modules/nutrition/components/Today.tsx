@@ -417,18 +417,6 @@ export default function Today() {
         </div>
       )}
 
-      {/* TDEE summary line */}
-      {summary && (
-        <div style={{ fontSize: '0.8rem', display: 'flex', gap: 16, opacity: 0.7, marginBottom: 16, paddingLeft: 4 }}>
-          <span>BMR <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr}</b></span>
-          <span>TDEE <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee}</b></span>
-          {target > 0 && (
-            <span style={{ color: 'var(--rpg-gold)', fontWeight: 'bold' }}>
-              {t('nutrify.target')} <span style={{ fontFamily: 'Fira Code, monospace' }}>{target}</span>
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Close Day — at the bottom so user fills metrics first */}
       <div className="rpg-card">

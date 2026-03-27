@@ -32,19 +32,24 @@ export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
   return (
     <div style={{ marginBottom: 16 }}>
       {/* Header stats */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.85rem', marginBottom: 6 }}>
         <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold' }}>
           {consumed} <span style={{ opacity: 0.5, fontWeight: 'normal' }}>kcal</span>
         </span>
-        {isInDeficit ? (
-          <span style={{ color: 'var(--rpg-xp-green)' }}>
-            {remaining} kcal {t('nutrify.remaining')}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+          {isInDeficit ? (
+            <span style={{ color: 'var(--rpg-xp-green)' }}>
+              {remaining} kcal {t('nutrify.remaining')}
+            </span>
+          ) : (
+            <span style={{ color: isOverTdee ? 'var(--rpg-hp-red)' : '#e67e22' }}>
+              +{surplusAmount} kcal {t('nutrify.overTarget')}
+            </span>
+          )}
+          <span style={{ fontSize: '0.75rem', fontFamily: 'Fira Code, monospace', opacity: 0.5 }}>
+            TDEE <b>{tdee}</b> · {t('nutrify.target')} <b style={{ color: 'var(--rpg-gold)' }}>{target}</b>
           </span>
-        ) : (
-          <span style={{ color: isOverTdee ? 'var(--rpg-hp-red)' : '#e67e22' }}>
-            +{surplusAmount} kcal {t('nutrify.overTarget')}
-          </span>
-        )}
+        </div>
       </div>
 
       {/* Progress bar with markers */}
@@ -68,27 +73,6 @@ export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
           borderRadius: 1,
         }} />
 
-        {/* Target label */}
-        <div style={{
-          position: 'absolute', top: -16,
-          left: `${Math.min(targetPct, 100)}%`,
-          transform: 'translateX(-50%)',
-          fontSize: '0.65rem', fontFamily: 'Fira Code, monospace',
-          color: 'var(--rpg-gold)', whiteSpace: 'nowrap',
-        }}>
-          {t('nutrify.target')} {target}
-        </div>
-
-        {/* TDEE label at 100% */}
-        {target < tdee && (
-          <div style={{
-            position: 'absolute', top: -16, right: 0,
-            fontSize: '0.65rem', fontFamily: 'Fira Code, monospace',
-            color: 'var(--rpg-ink-light)', opacity: 0.5,
-          }}>
-            TDEE {tdee}
-          </div>
-        )}
       </div>
 
       {/* Status message */}
