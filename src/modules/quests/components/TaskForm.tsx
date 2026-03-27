@@ -102,7 +102,7 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
                 display: 'inline-flex', alignItems: 'center', gap: 5,
               }}
             >
-              <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {TIER_LABEL[tierVal]}
+              <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
             </button>
           ))}
         </div>

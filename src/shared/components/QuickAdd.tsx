@@ -102,7 +102,7 @@ export default function QuickAdd({ onClose }: Props) {
                     fontWeight: tier === tierVal ? 'bold' : 'normal',
                     display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8rem',
                   }}>
-                  <TierBadge tier={tierVal} size={12} active={tier === tierVal} /> {TIER_LABEL[tierVal]}
+                  <TierBadge tier={tierVal} size={12} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
                 </button>
               ))}
             </div>
