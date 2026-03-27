@@ -428,7 +428,10 @@ export function registerNutritionIpcHandlers(): void {
       'SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1'
     ).get() as { weight_kg: number } | undefined;
 
-    return { shouldAsk: true, lastWeight: lastWeight?.weight_kg };
+    const fallbackWeight = lastWeight?.weight_kg
+      ?? (db.prepare('SELECT initial_weight_kg FROM nutrition_profile WHERE id = 1').get() as { initial_weight_kg: number } | undefined)?.initial_weight_kg;
+
+    return { shouldAsk: true, lastWeight: fallbackWeight };
   });
 
   ipcHandle('nutrition:isDayClosed', (_e, date: string) => {

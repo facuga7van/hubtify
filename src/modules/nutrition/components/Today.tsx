@@ -6,6 +6,7 @@ import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
+import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -512,24 +513,21 @@ export default function Today() {
                 {t('nutrify.weightCheckin.lastWeight', { weight: weightPopup.lastWeight })}
               </p>
             )}
-            <input
-              type="number" step="0.1" min={30} max={300}
+            <RpgNumberInput
               value={weightInput}
-              onChange={(e) => setWeightInput(e.target.value)}
-              placeholder={t('nutrify.weightCheckin.placeholder')}
-              className="rpg-input"
-              style={{ width: '100%', marginBottom: 16, textAlign: 'center', fontSize: '1.2rem' }}
+              onChange={setWeightInput}
+              step={0.1} min={30} max={300}
+              suffix="kg"
               autoFocus
+              style={{ marginBottom: 16 }}
             />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleWeightDismiss} className="rpg-button"
-                style={{ flex: 1, background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
-                {t('nutrify.weightCheckin.later')}
-              </button>
-              <button className="rpg-button" onClick={handleWeightSave} style={{ flex: 2 }}>
-                {t('nutrify.weightCheckin.save')}
-              </button>
-            </div>
+            <button className="rpg-button" onClick={handleWeightSave} style={{ width: '100%', marginBottom: 8 }}>
+              {t('nutrify.weightCheckin.save')}
+            </button>
+            <button onClick={handleWeightDismiss} className="rpg-button"
+              style={{ width: '100%', padding: '4px 8px', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
+              {t('nutrify.weightCheckin.later')}
+            </button>
           </div>
         </div>
       )}
