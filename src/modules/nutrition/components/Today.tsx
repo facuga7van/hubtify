@@ -8,6 +8,8 @@ import NutritionOnboarding from './NutritionOnboarding';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
+import { upsertFoodItems } from '../food-telemetry';
+import { useAuthContext } from '../../../shared/AuthContext';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -18,17 +20,16 @@ interface FrequentFood { id: number; name: string; calories: number; timesUsed: 
 interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; }
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
-interface EstimationMatch { name: string; calories: number; source: string; }
 interface EstimationResult {
   totalCalories: number;
-  breakdown: string;
-  matches: EstimationMatch[];
+  items: Array<{ name: string; calories: number }>;
   ollamaMissing: boolean;
   aiError?: string;
 }
 
 export default function Today() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuthContext();
 
   const { t } = useTranslation();
   const [date, setDate] = useState(() => todayDateString());
@@ -149,25 +150,32 @@ export default function Today() {
     if (!estimation) return;
     const calories = parseInt(editCalories) || estimation.totalCalories;
 
-    // Log the food
     await window.api.nutritionLogFood({
       date,
       description: foodInput.trim(),
       calories,
       source: 'ai_estimate',
-      aiBreakdown: estimation.breakdown,
+      aiBreakdown: JSON.stringify(estimation.items),
     });
 
-    // Learn food for next time (save per-unit calories to local DB)
     try {
       await window.api.nutritionLearnFood({
         description: foodInput.trim(),
         calories,
-        breakdown: estimation.breakdown,
+        breakdown: estimation.items.map(it => `${it.name} ~${it.calories}kcal`).join(' + '),
       });
     } catch { /* best effort */ }
 
-    // RPG event
+    // Telemetry: upsert items to Firestore (fire-and-forget, only if logged in)
+    if (authUser) {
+      const ratio = estimation.totalCalories > 0 ? calories / estimation.totalCalories : 1;
+      const scaledItems = estimation.items.map(it => ({
+        name: it.name,
+        calories: Math.round(it.calories * ratio),
+      }));
+      upsertFoodItems(scaledItems).catch(() => {});
+    }
+
     await window.api.processRpgEvent({
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
@@ -358,12 +366,12 @@ export default function Today() {
         {/* Estimation result */}
         {estimation && (
           <div style={{ marginTop: 12, padding: 12, border: '1px dashed var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)', background: 'rgba(201,168,76,0.05)' }}>
-            {estimation.matches.length > 0 && (
+            {estimation.items.length > 0 && (
               <div style={{ marginBottom: 10 }}>
-                {estimation.matches.map((m, i) => (
+                {estimation.items.map((item, i) => (
                   <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--rpg-parchment-dark)' }}>
-                    <span>{m.name}</span>
-                    <span style={{ fontFamily: 'Fira Code, monospace' }}>{m.calories} kcal</span>
+                    <span>{item.name}</span>
+                    <span style={{ fontFamily: 'Fira Code, monospace' }}>{item.calories} kcal</span>
                   </div>
                 ))}
               </div>
