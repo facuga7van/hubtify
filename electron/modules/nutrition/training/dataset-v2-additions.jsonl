@@ -1,0 +1,915 @@
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con puré", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con papas fritas", "output": "{\"calories\": 700, \"breakdown\": \"Milanesa ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Milanesa ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con arroz", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa ~350kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con ensalada y papas fritas", "output": "{\"calories\": 780, \"breakdown\": \"Milanesa ~350kcal + Ensalada mixta ~80kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa napolitana con papas fritas", "output": "{\"calories\": 870, \"breakdown\": \"Milanesa napolitana ~520kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa napolitana con puré", "output": "{\"calories\": 720, \"breakdown\": \"Milanesa napolitana ~520kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa napolitana con ensalada", "output": "{\"calories\": 600, \"breakdown\": \"Milanesa napolitana ~520kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo con puré", "output": "{\"calories\": 500, \"breakdown\": \"Milanesa de pollo ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo con papas fritas", "output": "{\"calories\": 650, \"breakdown\": \"Milanesa de pollo ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Milanesa de pollo ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo con arroz", "output": "{\"calories\": 500, \"breakdown\": \"Milanesa de pollo ~300kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con puré y ensalada", "output": "{\"calories\": 630, \"breakdown\": \"Milanesa ~350kcal + Puré de papas ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con arroz y ensalada", "output": "{\"calories\": 630, \"breakdown\": \"Milanesa ~350kcal + Arroz blanco ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa napolitana con arroz", "output": "{\"calories\": 720, \"breakdown\": \"Milanesa napolitana ~520kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa a la napolitana con fritas", "output": "{\"calories\": 870, \"breakdown\": \"Milanesa napolitana ~520kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa a caballo", "output": "{\"calories\": 500, \"breakdown\": \"Milanesa ~350kcal + Huevo frito ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa a caballo con papas fritas", "output": "{\"calories\": 850, \"breakdown\": \"Milanesa ~350kcal + Huevo frito ~150kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo napolitana con fritas", "output": "{\"calories\": 820, \"breakdown\": \"Milanesa de pollo napolitana ~470kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo napolitana", "output": "{\"calories\": 470, \"breakdown\": \"Milanesa de pollo napolitana ~470kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo napolitana con puré", "output": "{\"calories\": 670, \"breakdown\": \"Milanesa de pollo napolitana ~470kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con papas al horno", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa ~350kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo con papas al horno", "output": "{\"calories\": 500, \"breakdown\": \"Milanesa de pollo ~300kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con puré", "output": "{\"calories\": 400, \"breakdown\": \"Pollo a la plancha ~200kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con papas fritas", "output": "{\"calories\": 550, \"breakdown\": \"Pollo a la plancha ~200kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Pollo a la plancha ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con arroz", "output": "{\"calories\": 400, \"breakdown\": \"Pollo a la plancha ~200kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo al horno con puré", "output": "{\"calories\": 480, \"breakdown\": \"Pollo al horno ~280kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo al horno con papas", "output": "{\"calories\": 480, \"breakdown\": \"Pollo al horno ~280kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo al horno con ensalada", "output": "{\"calories\": 360, \"breakdown\": \"Pollo al horno ~280kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo grillado con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Pollo grillado ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo grillado con arroz", "output": "{\"calories\": 400, \"breakdown\": \"Pollo grillado ~200kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo grillado con verduras", "output": "{\"calories\": 320, \"breakdown\": \"Pollo grillado ~200kcal + Verduras grilladas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con verduras", "output": "{\"calories\": 320, \"breakdown\": \"Pollo ~200kcal + Verduras grilladas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pechuga de pollo con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Pechuga de pollo ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pechuga de pollo con arroz", "output": "{\"calories\": 400, \"breakdown\": \"Pechuga de pollo ~200kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pechuga grillada con puré", "output": "{\"calories\": 400, \"breakdown\": \"Pechuga grillada ~200kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "suprema con puré", "output": "{\"calories\": 500, \"breakdown\": \"Suprema de pollo ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "suprema con papas fritas", "output": "{\"calories\": 650, \"breakdown\": \"Suprema de pollo ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "suprema con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Suprema de pollo ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "suprema napolitana con fritas", "output": "{\"calories\": 820, \"breakdown\": \"Suprema napolitana ~470kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "suprema napolitana con puré", "output": "{\"calories\": 670, \"breakdown\": \"Suprema napolitana ~470kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo al horno con papas y ensalada", "output": "{\"calories\": 560, \"breakdown\": \"Pollo al horno ~280kcal + Papas al horno ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado con ensalada", "output": "{\"calories\": 530, \"breakdown\": \"Asado ~450kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado con papas", "output": "{\"calories\": 650, \"breakdown\": \"Asado ~450kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado con puré", "output": "{\"calories\": 650, \"breakdown\": \"Asado ~450kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado con chimichurri", "output": "{\"calories\": 480, \"breakdown\": \"Asado ~450kcal + Chimichurri ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado con ensalada y pan", "output": "{\"calories\": 680, \"breakdown\": \"Asado ~450kcal + Ensalada mixta ~80kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado completo", "output": "{\"calories\": 900, \"breakdown\": \"Asado ~450kcal + Chorizo ~250kcal + Ensalada mixta ~80kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "choripán", "output": "{\"calories\": 400, \"breakdown\": \"Chorizo ~250kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "choripán con chimichurri", "output": "{\"calories\": 430, \"breakdown\": \"Chorizo ~250kcal + Pan ~150kcal + Chimichurri ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vacío con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Vacío ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vacío con papas fritas", "output": "{\"calories\": 700, \"breakdown\": \"Vacío ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife de chorizo con ensalada", "output": "{\"calories\": 480, \"breakdown\": \"Bife de chorizo ~400kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife de chorizo con papas fritas", "output": "{\"calories\": 750, \"breakdown\": \"Bife de chorizo ~400kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife de chorizo con puré", "output": "{\"calories\": 600, \"breakdown\": \"Bife de chorizo ~400kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife de lomo con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Bife de lomo ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife de lomo con puré", "output": "{\"calories\": 500, \"breakdown\": \"Bife de lomo ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife de lomo con papas fritas", "output": "{\"calories\": 650, \"breakdown\": \"Bife de lomo ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "matambre con ensalada rusa", "output": "{\"calories\": 580, \"breakdown\": \"Matambre ~380kcal + Ensalada rusa ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "entraña con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Entraña ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "entraña con papas fritas", "output": "{\"calories\": 700, \"breakdown\": \"Entraña ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tira de asado con ensalada", "output": "{\"calories\": 530, \"breakdown\": \"Tira de asado ~450kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bondiola con puré", "output": "{\"calories\": 550, \"breakdown\": \"Bondiola ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bondiola con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Bondiola ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "costilla con puré", "output": "{\"calories\": 650, \"breakdown\": \"Costilla ~450kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con tuco", "output": "{\"calories\": 450, \"breakdown\": \"Fideos con tuco ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con pesto", "output": "{\"calories\": 420, \"breakdown\": \"Fideos con pesto ~420kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con manteca", "output": "{\"calories\": 380, \"breakdown\": \"Fideos con manteca ~380kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con salsa blanca", "output": "{\"calories\": 480, \"breakdown\": \"Fideos con salsa blanca ~480kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con salsa rosa", "output": "{\"calories\": 460, \"breakdown\": \"Fideos con salsa rosa ~460kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con bolognesa", "output": "{\"calories\": 500, \"breakdown\": \"Fideos con bolognesa ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ravioles de verdura con tuco", "output": "{\"calories\": 480, \"breakdown\": \"Ravioles de verdura con tuco ~480kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ravioles de ricota con tuco", "output": "{\"calories\": 500, \"breakdown\": \"Ravioles de ricota con tuco ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ravioles con salsa blanca", "output": "{\"calories\": 530, \"breakdown\": \"Ravioles con salsa blanca ~530kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ñoquis con tuco", "output": "{\"calories\": 450, \"breakdown\": \"Ñoquis con tuco ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ñoquis con salsa bolognesa", "output": "{\"calories\": 500, \"breakdown\": \"Ñoquis con salsa bolognesa ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ñoquis con pesto", "output": "{\"calories\": 430, \"breakdown\": \"Ñoquis con pesto ~430kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ñoquis con crema", "output": "{\"calories\": 520, \"breakdown\": \"Ñoquis con crema ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tallarines con tuco", "output": "{\"calories\": 450, \"breakdown\": \"Tallarines con tuco ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tallarines con bolognesa", "output": "{\"calories\": 500, \"breakdown\": \"Tallarines con bolognesa ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "canelones de verdura", "output": "{\"calories\": 400, \"breakdown\": \"Canelones de verdura ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "canelones de carne", "output": "{\"calories\": 450, \"breakdown\": \"Canelones de carne ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lasaña", "output": "{\"calories\": 550, \"breakdown\": \"Lasaña ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lasaña de carne", "output": "{\"calories\": 580, \"breakdown\": \"Lasaña de carne ~580kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lasaña de verdura", "output": "{\"calories\": 450, \"breakdown\": \"Lasaña de verdura ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sorrentinos con salsa rosa", "output": "{\"calories\": 520, \"breakdown\": \"Sorrentinos con salsa rosa ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sorrentinos con tuco", "output": "{\"calories\": 480, \"breakdown\": \"Sorrentinos con tuco ~480kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con queso", "output": "{\"calories\": 430, \"breakdown\": \"Fideos con queso ~430kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con aceite y ajo", "output": "{\"calories\": 380, \"breakdown\": \"Fideos con aceite y ajo ~380kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "spaghetti con tuco", "output": "{\"calories\": 450, \"breakdown\": \"Spaghetti con tuco ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "spaghetti con bolognesa", "output": "{\"calories\": 500, \"breakdown\": \"Spaghetti con bolognesa ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con estofado", "output": "{\"calories\": 550, \"breakdown\": \"Fideos con estofado ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pasta con pollo", "output": "{\"calories\": 480, \"breakdown\": \"Pasta ~280kcal + Pollo ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con tuco y pan", "output": "{\"calories\": 600, \"breakdown\": \"Fideos con tuco ~450kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ravioles con pan", "output": "{\"calories\": 630, \"breakdown\": \"Ravioles con tuco ~480kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanadas con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Empanada de carne ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de carne con coca", "output": "{\"calories\": 440, \"breakdown\": \"Empanada de carne ~300kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de pollo con coca", "output": "{\"calories\": 420, \"breakdown\": \"Empanada de pollo ~280kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanadas y cerveza", "output": "{\"calories\": 500, \"breakdown\": \"Empanada de carne ~300kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostado de jamon y queso", "output": "{\"calories\": 300, \"breakdown\": \"Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostado con cafe", "output": "{\"calories\": 380, \"breakdown\": \"Tostado de jamón y queso ~300kcal + Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de milanesa", "output": "{\"calories\": 550, \"breakdown\": \"Pan ~150kcal + Milanesa ~350kcal + Lechuga y tomate ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de milanesa completo", "output": "{\"calories\": 650, \"breakdown\": \"Pan ~150kcal + Milanesa ~350kcal + Huevo frito ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de milanesa", "output": "{\"calories\": 550, \"breakdown\": \"Pan ~150kcal + Milanesa ~350kcal + Lechuga y tomate ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de milanesa con papas fritas", "output": "{\"calories\": 900, \"breakdown\": \"Sándwich de milanesa ~550kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de pollo", "output": "{\"calories\": 350, \"breakdown\": \"Pan ~150kcal + Pollo grillado ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de bondiola", "output": "{\"calories\": 500, \"breakdown\": \"Pan ~150kcal + Bondiola ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de lomo", "output": "{\"calories\": 500, \"breakdown\": \"Pan ~150kcal + Lomo ~250kcal + Lechuga y tomate ~50kcal + Huevo ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lomito", "output": "{\"calories\": 500, \"breakdown\": \"Pan ~150kcal + Lomo ~250kcal + Lechuga y tomate ~50kcal + Huevo ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lomito completo", "output": "{\"calories\": 600, \"breakdown\": \"Pan ~150kcal + Lomo ~250kcal + Jamón y queso ~100kcal + Huevo ~50kcal + Lechuga y tomate ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lomito con papas fritas", "output": "{\"calories\": 850, \"breakdown\": \"Lomito ~500kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de jamon y queso", "output": "{\"calories\": 280, \"breakdown\": \"Pan ~150kcal + Jamón y queso ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de jamon crudo y queso", "output": "{\"calories\": 320, \"breakdown\": \"Pan ~150kcal + Jamón crudo y queso ~170kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pan con manteca y dulce de leche", "output": "{\"calories\": 270, \"breakdown\": \"Pan ~150kcal + Manteca ~60kcal + Dulce de leche ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pan con queso crema", "output": "{\"calories\": 200, \"breakdown\": \"Pan ~150kcal + Queso crema ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con manteca", "output": "{\"calories\": 240, \"breakdown\": \"2 Tostadas ~120kcal + Manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con queso crema", "output": "{\"calories\": 220, \"breakdown\": \"2 Tostadas ~120kcal + Queso crema ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con dulce de leche", "output": "{\"calories\": 240, \"breakdown\": \"2 Tostadas ~120kcal + Dulce de leche ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con mermelada", "output": "{\"calories\": 200, \"breakdown\": \"2 Tostadas ~120kcal + Mermelada ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de atun", "output": "{\"calories\": 300, \"breakdown\": \"Pan ~150kcal + Atún con mayonesa ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de bondiola", "output": "{\"calories\": 500, \"breakdown\": \"Pan ~150kcal + Bondiola ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de lomo", "output": "{\"calories\": 500, \"breakdown\": \"Pan ~150kcal + Lomo ~250kcal + Lechuga y tomate ~50kcal + Huevo ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "super pancho", "output": "{\"calories\": 350, \"breakdown\": \"Pan de pancho ~120kcal + Salchicha ~180kcal + Aderezos ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pancho", "output": "{\"calories\": 300, \"breakdown\": \"Pan de pancho ~120kcal + Salchicha ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y medialunas", "output": "{\"calories\": 480, \"breakdown\": \"Café con leche ~80kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y 2 medialunas", "output": "{\"calories\": 480, \"breakdown\": \"Café con leche ~80kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y 3 medialunas", "output": "{\"calories\": 680, \"breakdown\": \"Café con leche ~80kcal + 3 Medialunas ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y tostadas", "output": "{\"calories\": 200, \"breakdown\": \"Café con leche ~80kcal + 2 Tostadas con manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cortado y medialuna", "output": "{\"calories\": 240, \"breakdown\": \"Cortado ~40kcal + Medialuna ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cortado con medialuna", "output": "{\"calories\": 240, \"breakdown\": \"Cortado ~40kcal + Medialuna ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cortado y 2 medialunas", "output": "{\"calories\": 440, \"breakdown\": \"Cortado ~40kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "café y tostado", "output": "{\"calories\": 305, \"breakdown\": \"Café ~5kcal + Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe y tostado", "output": "{\"calories\": 305, \"breakdown\": \"Café ~5kcal + Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "te con tostadas", "output": "{\"calories\": 125, \"breakdown\": \"Té ~5kcal + 2 Tostadas con manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate cocido con tostadas", "output": "{\"calories\": 125, \"breakdown\": \"Mate cocido ~5kcal + 2 Tostadas con manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "yogurt con granola", "output": "{\"calories\": 250, \"breakdown\": \"Yogurt ~120kcal + Granola ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "yogurt con frutas", "output": "{\"calories\": 200, \"breakdown\": \"Yogurt ~120kcal + Frutas ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "yogurt con banana", "output": "{\"calories\": 220, \"breakdown\": \"Yogurt ~120kcal + Banana ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y factura", "output": "{\"calories\": 330, \"breakdown\": \"Café con leche ~80kcal + Factura ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y 2 facturas", "output": "{\"calories\": 580, \"breakdown\": \"Café con leche ~80kcal + 2 Facturas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y 3 facturas", "output": "{\"calories\": 830, \"breakdown\": \"Café con leche ~80kcal + 3 Facturas ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo de naranja y tostadas", "output": "{\"calories\": 230, \"breakdown\": \"Jugo de naranja ~110kcal + 2 Tostadas con manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo y medialunas", "output": "{\"calories\": 510, \"breakdown\": \"Jugo de naranja ~110kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "submarino y facturas", "output": "{\"calories\": 530, \"breakdown\": \"Submarino ~280kcal + Factura ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostado y cortado", "output": "{\"calories\": 340, \"breakdown\": \"Tostado de jamón y queso ~300kcal + Cortado ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y pan con manteca", "output": "{\"calories\": 230, \"breakdown\": \"Café con leche ~80kcal + Pan con manteca ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "te con medialunas", "output": "{\"calories\": 405, \"breakdown\": \"Té ~5kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y huevos revueltos", "output": "{\"calories\": 200, \"breakdown\": \"Café con leche ~80kcal + Huevos revueltos ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuno completo", "output": "{\"calories\": 680, \"breakdown\": \"Café con leche ~80kcal + 2 Medialunas ~400kcal + Jugo de naranja ~110kcal + Tostada con manteca ~90kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "merienda", "output": "{\"calories\": 480, \"breakdown\": \"Café con leche ~80kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche y tostado", "output": "{\"calories\": 380, \"breakdown\": \"Café con leche ~80kcal + Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "te y tostado", "output": "{\"calories\": 305, \"breakdown\": \"Té ~5kcal + Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa con papas fritas", "output": "{\"calories\": 700, \"breakdown\": \"Hamburguesa simple ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa con papas y coca", "output": "{\"calories\": 840, \"breakdown\": \"Hamburguesa simple ~350kcal + Papas fritas ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa completa con papas fritas", "output": "{\"calories\": 900, \"breakdown\": \"Hamburguesa completa ~550kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa completa con papas y coca", "output": "{\"calories\": 1040, \"breakdown\": \"Hamburguesa completa ~550kcal + Papas fritas ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "doble hamburguesa con papas", "output": "{\"calories\": 1050, \"breakdown\": \"Doble hamburguesa ~700kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "combo hamburguesa", "output": "{\"calories\": 840, \"breakdown\": \"Hamburguesa simple ~350kcal + Papas fritas ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza y cerveza", "output": "{\"calories\": 500, \"breakdown\": \"Porción de pizza ~300kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza y coca", "output": "{\"calories\": 440, \"breakdown\": \"Porción de pizza ~300kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "panchos y coca", "output": "{\"calories\": 440, \"breakdown\": \"Pancho ~300kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "nuggets con papas fritas", "output": "{\"calories\": 700, \"breakdown\": \"Nuggets ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas fritas con cheddar y bacon", "output": "{\"calories\": 550, \"breakdown\": \"Papas fritas ~350kcal + Cheddar y bacon ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa con papas fritas y cerveza", "output": "{\"calories\": 900, \"breakdown\": \"Hamburguesa simple ~350kcal + Papas fritas ~350kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "doble cuarto de libra con papas", "output": "{\"calories\": 1100, \"breakdown\": \"Doble cuarto de libra ~750kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "combo big mac", "output": "{\"calories\": 1050, \"breakdown\": \"Big Mac ~550kcal + Papas fritas ~350kcal + Coca Cola ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "wrap de pollo con papas", "output": "{\"calories\": 650, \"breakdown\": \"Wrap de pollo ~350kcal + Papas fritas ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas", "output": "{\"calories\": 700, \"breakdown\": \"2 Milanesas ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas con puré", "output": "{\"calories\": 900, \"breakdown\": \"2 Milanesas ~700kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas con papas fritas", "output": "{\"calories\": 1050, \"breakdown\": \"2 Milanesas ~700kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas con ensalada", "output": "{\"calories\": 780, \"breakdown\": \"2 Milanesas ~700kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas de pollo", "output": "{\"calories\": 600, \"breakdown\": \"2 Milanesas de pollo ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas de pollo con puré", "output": "{\"calories\": 800, \"breakdown\": \"2 Milanesas de pollo ~600kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas", "output": "{\"calories\": 900, \"breakdown\": \"3 Empanadas de carne ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas de carne", "output": "{\"calories\": 900, \"breakdown\": \"3 Empanadas de carne ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas de pollo", "output": "{\"calories\": 840, \"breakdown\": \"3 Empanadas de pollo ~840kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas de jamon y queso", "output": "{\"calories\": 810, \"breakdown\": \"3 Empanadas de jamón y queso ~810kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas", "output": "{\"calories\": 600, \"breakdown\": \"2 Empanadas de carne ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas de carne", "output": "{\"calories\": 600, \"breakdown\": \"2 Empanadas de carne ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas de pollo", "output": "{\"calories\": 560, \"breakdown\": \"2 Empanadas de pollo ~560kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas de jamon y queso", "output": "{\"calories\": 540, \"breakdown\": \"2 Empanadas de jamón y queso ~540kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 empanadas", "output": "{\"calories\": 1200, \"breakdown\": \"4 Empanadas de carne ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 empanadas de carne", "output": "{\"calories\": 1200, \"breakdown\": \"4 Empanadas de carne ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 empanadas de pollo", "output": "{\"calories\": 1120, \"breakdown\": \"4 Empanadas de pollo ~1120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "5 empanadas", "output": "{\"calories\": 1500, \"breakdown\": \"5 Empanadas de carne ~1500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "5 empanadas de carne", "output": "{\"calories\": 1500, \"breakdown\": \"5 Empanadas de carne ~1500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "6 empanadas", "output": "{\"calories\": 1800, \"breakdown\": \"6 Empanadas de carne ~1800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de empanadas", "output": "{\"calories\": 1800, \"breakdown\": \"6 Empanadas de carne ~1800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de empanadas de carne", "output": "{\"calories\": 1800, \"breakdown\": \"6 Empanadas de carne ~1800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de empanadas de pollo", "output": "{\"calories\": 1680, \"breakdown\": \"6 Empanadas de pollo ~1680kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una docena de empanadas", "output": "{\"calories\": 3600, \"breakdown\": \"12 Empanadas de carne ~3600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "docena de empanadas", "output": "{\"calories\": 3600, \"breakdown\": \"12 Empanadas de carne ~3600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "docena de empanadas de carne", "output": "{\"calories\": 3600, \"breakdown\": \"12 Empanadas de carne ~3600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "docena de empanadas de pollo", "output": "{\"calories\": 3360, \"breakdown\": \"12 Empanadas de pollo ~3360kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de pizza", "output": "{\"calories\": 600, \"breakdown\": \"2 Porciones de pizza ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 porciones de pizza", "output": "{\"calories\": 900, \"breakdown\": \"3 Porciones de pizza ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 porciones de pizza", "output": "{\"calories\": 1200, \"breakdown\": \"4 Porciones de pizza ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de pizza de muzza", "output": "{\"calories\": 600, \"breakdown\": \"2 Porciones de pizza muzzarella ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "1 pizza entera", "output": "{\"calories\": 2400, \"breakdown\": \"Pizza entera (8 porciones) ~2400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza entera de muzza", "output": "{\"calories\": 2400, \"breakdown\": \"Pizza entera de muzzarella (8 porciones) ~2400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media pizza", "output": "{\"calories\": 1200, \"breakdown\": \"Media pizza (4 porciones) ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 medialunas", "output": "{\"calories\": 400, \"breakdown\": \"2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 medialunas", "output": "{\"calories\": 600, \"breakdown\": \"3 Medialunas ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 medialunas", "output": "{\"calories\": 800, \"breakdown\": \"4 Medialunas ~800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "5 medialunas", "output": "{\"calories\": 1000, \"breakdown\": \"5 Medialunas ~1000kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "6 medialunas", "output": "{\"calories\": 1200, \"breakdown\": \"6 Medialunas ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una docena de medialunas", "output": "{\"calories\": 2400, \"breakdown\": \"12 Medialunas ~2400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de medialunas", "output": "{\"calories\": 1200, \"breakdown\": \"6 Medialunas ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 facturas", "output": "{\"calories\": 500, \"breakdown\": \"2 Facturas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 facturas", "output": "{\"calories\": 750, \"breakdown\": \"3 Facturas ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 facturas", "output": "{\"calories\": 1000, \"breakdown\": \"4 Facturas ~1000kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de facturas", "output": "{\"calories\": 1500, \"breakdown\": \"6 Facturas ~1500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una docena de facturas", "output": "{\"calories\": 3000, \"breakdown\": \"12 Facturas ~3000kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 cafes con leche", "output": "{\"calories\": 160, \"breakdown\": \"2 Cafés con leche ~160kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tostados", "output": "{\"calories\": 600, \"breakdown\": \"2 Tostados de jamón y queso ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 huevos fritos", "output": "{\"calories\": 300, \"breakdown\": \"2 Huevos fritos ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 huevos revueltos", "output": "{\"calories\": 240, \"breakdown\": \"2 Huevos revueltos ~240kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 huevos revueltos", "output": "{\"calories\": 360, \"breakdown\": \"3 Huevos revueltos ~360kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 panchos", "output": "{\"calories\": 600, \"breakdown\": \"2 Panchos ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 choripanes", "output": "{\"calories\": 800, \"breakdown\": \"2 Choripanes ~800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 choripanes", "output": "{\"calories\": 1200, \"breakdown\": \"3 Choripanes ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 hamburguesas", "output": "{\"calories\": 700, \"breakdown\": \"2 Hamburguesas simples ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 hamburguesas con papas", "output": "{\"calories\": 1050, \"breakdown\": \"2 Hamburguesas simples ~700kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de asado", "output": "{\"calories\": 900, \"breakdown\": \"2 Porciones de asado ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 bananas", "output": "{\"calories\": 200, \"breakdown\": \"2 Bananas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 bananas", "output": "{\"calories\": 300, \"breakdown\": \"3 Bananas ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 manzanas", "output": "{\"calories\": 160, \"breakdown\": \"2 Manzanas ~160kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 naranjas", "output": "{\"calories\": 140, \"breakdown\": \"2 Naranjas ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 bochas de helado", "output": "{\"calories\": 260, \"breakdown\": \"2 Bochas de helado ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 bochas de helado", "output": "{\"calories\": 390, \"breakdown\": \"3 Bochas de helado ~390kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de 2 bochas", "output": "{\"calories\": 260, \"breakdown\": \"2 Bochas de helado ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de 3 bochas", "output": "{\"calories\": 390, \"breakdown\": \"3 Bochas de helado ~390kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado 1/4 kg", "output": "{\"calories\": 520, \"breakdown\": \"Helado 1/4 kg (~4 bochas) ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado medio kilo", "output": "{\"calories\": 1040, \"breakdown\": \"Helado 1/2 kg (~8 bochas) ~1040kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado 1 kg", "output": "{\"calories\": 2080, \"breakdown\": \"Helado 1 kg (~16 bochas) ~2080kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 cafés", "output": "{\"calories\": 10, \"breakdown\": \"2 Cafés ~10kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 cortados", "output": "{\"calories\": 80, \"breakdown\": \"2 Cortados ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 jugos de naranja", "output": "{\"calories\": 220, \"breakdown\": \"2 Jugos de naranja ~220kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 cervezas", "output": "{\"calories\": 400, \"breakdown\": \"2 Cervezas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 cervezas", "output": "{\"calories\": 600, \"breakdown\": \"3 Cervezas ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 fernets con coca", "output": "{\"calories\": 500, \"breakdown\": \"2 Fernets con Coca ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 fernets con coca", "output": "{\"calories\": 750, \"breakdown\": \"3 Fernets con Coca ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 coca colas", "output": "{\"calories\": 280, \"breakdown\": \"2 Coca Colas ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 vasos de coca", "output": "{\"calories\": 280, \"breakdown\": \"2 Vasos de Coca Cola ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 latas de cerveza", "output": "{\"calories\": 300, \"breakdown\": \"2 Latas de cerveza ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 latas de cerveza", "output": "{\"calories\": 450, \"breakdown\": \"3 Latas de cerveza ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "6 latas de cerveza", "output": "{\"calories\": 900, \"breakdown\": \"6 Latas de cerveza ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 pintas de cerveza", "output": "{\"calories\": 400, \"breakdown\": \"2 Pintas de cerveza ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 pintas de cerveza", "output": "{\"calories\": 600, \"breakdown\": \"3 Pintas de cerveza ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de torta", "output": "{\"calories\": 700, \"breakdown\": \"2 Porciones de torta ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 alfajores", "output": "{\"calories\": 400, \"breakdown\": \"2 Alfajores ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 alfajores", "output": "{\"calories\": 600, \"breakdown\": \"3 Alfajores ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 galletitas", "output": "{\"calories\": 80, \"breakdown\": \"2 Galletitas ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un paquete de galletitas", "output": "{\"calories\": 500, \"breakdown\": \"Paquete de galletitas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tostadas", "output": "{\"calories\": 120, \"breakdown\": \"2 Tostadas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 tostadas", "output": "{\"calories\": 180, \"breakdown\": \"3 Tostadas ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 tostadas", "output": "{\"calories\": 240, \"breakdown\": \"4 Tostadas ~240kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas y una coca", "output": "{\"calories\": 740, \"breakdown\": \"2 Empanadas de carne ~600kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas y una coca", "output": "{\"calories\": 1040, \"breakdown\": \"3 Empanadas de carne ~900kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas y una cerveza", "output": "{\"calories\": 1100, \"breakdown\": \"3 Empanadas de carne ~900kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de empanadas y coca", "output": "{\"calories\": 1940, \"breakdown\": \"6 Empanadas de carne ~1800kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas con ensalada", "output": "{\"calories\": 680, \"breakdown\": \"2 Empanadas de carne ~600kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 empanadas con ensalada", "output": "{\"calories\": 1280, \"breakdown\": \"4 Empanadas de carne ~1200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas napolitanas", "output": "{\"calories\": 1040, \"breakdown\": \"2 Milanesas napolitanas ~1040kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas napolitanas con fritas", "output": "{\"calories\": 1390, \"breakdown\": \"2 Milanesas napolitanas ~1040kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 huevos fritos con pan", "output": "{\"calories\": 450, \"breakdown\": \"2 Huevos fritos ~300kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 huevos fritos con pan", "output": "{\"calories\": 600, \"breakdown\": \"3 Huevos fritos ~450kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 panes", "output": "{\"calories\": 300, \"breakdown\": \"2 Panes ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 yogures", "output": "{\"calories\": 240, \"breakdown\": \"2 Yogures ~240kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 sanguchitos de miga", "output": "{\"calories\": 260, \"breakdown\": \"2 Sándwiches de miga ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 sanguchitos de miga", "output": "{\"calories\": 390, \"breakdown\": \"3 Sándwiches de miga ~390kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "6 sanguchitos de miga", "output": "{\"calories\": 780, \"breakdown\": \"6 Sándwiches de miga ~780kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una docena de sanguchitos de miga", "output": "{\"calories\": 1560, \"breakdown\": \"12 Sándwiches de miga ~1560kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de flan", "output": "{\"calories\": 400, \"breakdown\": \"2 Porciones de flan ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de flan con dulce de leche", "output": "{\"calories\": 520, \"breakdown\": \"2 Porciones de flan con dulce de leche ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 vasos de vino", "output": "{\"calories\": 240, \"breakdown\": \"2 Vasos de vino ~240kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 vasos de vino", "output": "{\"calories\": 360, \"breakdown\": \"3 Vasos de vino ~360kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una botella de vino", "output": "{\"calories\": 600, \"breakdown\": \"Botella de vino ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media botella de vino", "output": "{\"calories\": 300, \"breakdown\": \"Media botella de vino ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de tarta", "output": "{\"calories\": 500, \"breakdown\": \"2 Porciones de tarta ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 porciones de pizza y una cerveza", "output": "{\"calories\": 1100, \"breakdown\": \"3 Porciones de pizza ~900kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de pizza y una coca", "output": "{\"calories\": 740, \"breakdown\": \"2 Porciones de pizza ~600kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 porciones de pizza y 2 cervezas", "output": "{\"calories\": 1600, \"breakdown\": \"4 Porciones de pizza ~1200kcal + 2 Cervezas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milanesas a caballo", "output": "{\"calories\": 1000, \"breakdown\": \"2 Milanesas ~700kcal + 2 Huevos fritos ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 lomitos", "output": "{\"calories\": 1000, \"breakdown\": \"2 Lomitos ~1000kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 choripanes con chimichurri", "output": "{\"calories\": 860, \"breakdown\": \"2 Choripanes ~800kcal + Chimichurri ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de arroz", "output": "{\"calories\": 400, \"breakdown\": \"2 Porciones de arroz ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un litro de coca cola", "output": "{\"calories\": 420, \"breakdown\": \"1 Litro de Coca Cola ~420kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "medio litro de coca cola", "output": "{\"calories\": 210, \"breakdown\": \"Medio litro de Coca Cola ~210kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "1.5 litros de coca cola", "output": "{\"calories\": 630, \"breakdown\": \"1.5 Litros de Coca Cola ~630kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un litro de cerveza", "output": "{\"calories\": 400, \"breakdown\": \"1 Litro de cerveza ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un litro de jugo de naranja", "output": "{\"calories\": 440, \"breakdown\": \"1 Litro de jugo de naranja ~440kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila", "output": "{\"calories\": 350, \"breakdown\": \"Milanesa ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila con pure", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila con fritas", "output": "{\"calories\": 700, \"breakdown\": \"Milanesa ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Milanesa ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila napo", "output": "{\"calories\": 520, \"breakdown\": \"Milanesa napolitana ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila napo con fritas", "output": "{\"calories\": 870, \"breakdown\": \"Milanesa napolitana ~520kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila napo con pure", "output": "{\"calories\": 720, \"breakdown\": \"Milanesa napolitana ~520kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanga", "output": "{\"calories\": 350, \"breakdown\": \"Milanesa ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanga con pure", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanga con fritas", "output": "{\"calories\": 700, \"breakdown\": \"Milanesa ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanga de pollo", "output": "{\"calories\": 300, \"breakdown\": \"Milanesa de pollo ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanga de pollo con pure", "output": "{\"calories\": 500, \"breakdown\": \"Milanesa de pollo ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanga de pollo con fritas", "output": "{\"calories\": 650, \"breakdown\": \"Milanesa de pollo ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila de pollo", "output": "{\"calories\": 300, \"breakdown\": \"Milanesa de pollo ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila de pollo con pure", "output": "{\"calories\": 500, \"breakdown\": \"Milanesa de pollo ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mila de pollo con fritas", "output": "{\"calories\": 650, \"breakdown\": \"Milanesa de pollo ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milas", "output": "{\"calories\": 700, \"breakdown\": \"2 Milanesas ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milas con pure", "output": "{\"calories\": 900, \"breakdown\": \"2 Milanesas ~700kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 milas con fritas", "output": "{\"calories\": 1050, \"breakdown\": \"2 Milanesas ~700kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empa", "output": "{\"calories\": 300, \"breakdown\": \"Empanada de carne ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empas", "output": "{\"calories\": 600, \"breakdown\": \"2 Empanadas de carne ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empas", "output": "{\"calories\": 900, \"breakdown\": \"3 Empanadas de carne ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 empas", "output": "{\"calories\": 1200, \"breakdown\": \"4 Empanadas de carne ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empas de carne", "output": "{\"calories\": 300, \"breakdown\": \"Empanada de carne ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empas de pollo", "output": "{\"calories\": 280, \"breakdown\": \"Empanada de pollo ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de empas", "output": "{\"calories\": 1800, \"breakdown\": \"6 Empanadas de carne ~1800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "birra", "output": "{\"calories\": 200, \"breakdown\": \"Cerveza (pinta) ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una birra", "output": "{\"calories\": 200, \"breakdown\": \"Cerveza (pinta) ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 birras", "output": "{\"calories\": 400, \"breakdown\": \"2 Cervezas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 birras", "output": "{\"calories\": 600, \"breakdown\": \"3 Cervezas ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fernet con coca", "output": "{\"calories\": 250, \"breakdown\": \"Fernet con Coca ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un fernet", "output": "{\"calories\": 250, \"breakdown\": \"Fernet con Coca ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 fernets", "output": "{\"calories\": 500, \"breakdown\": \"2 Fernets con Coca ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fernet", "output": "{\"calories\": 250, \"breakdown\": \"Fernet con Coca ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguchito", "output": "{\"calories\": 130, \"breakdown\": \"Sándwich de miga ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 sanguchitos", "output": "{\"calories\": 260, \"breakdown\": \"2 Sándwiches de miga ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 sanguchitos", "output": "{\"calories\": 390, \"breakdown\": \"3 Sándwiches de miga ~390kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de mila", "output": "{\"calories\": 550, \"breakdown\": \"Pan ~150kcal + Milanesa ~350kcal + Lechuga y tomate ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche", "output": "{\"calories\": 280, \"breakdown\": \"Sándwich de jamón y queso ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguchito de jyq", "output": "{\"calories\": 130, \"breakdown\": \"Sándwich de miga de jamón y queso ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "chori", "output": "{\"calories\": 400, \"breakdown\": \"Choripán ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un chori", "output": "{\"calories\": 400, \"breakdown\": \"Choripán ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 choris", "output": "{\"calories\": 800, \"breakdown\": \"2 Choripanes ~800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "chori con chimichurri", "output": "{\"calories\": 430, \"breakdown\": \"Choripán con chimichurri ~430kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bondi", "output": "{\"calories\": 350, \"breakdown\": \"Bondiola ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de bondi", "output": "{\"calories\": 500, \"breakdown\": \"Pan ~150kcal + Bondiola ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostado", "output": "{\"calories\": 300, \"breakdown\": \"Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un tostado", "output": "{\"calories\": 300, \"breakdown\": \"Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tostados jyq", "output": "{\"calories\": 600, \"breakdown\": \"2 Tostados de jamón y queso ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostado jyq", "output": "{\"calories\": 300, \"breakdown\": \"Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos", "output": "{\"calories\": 350, \"breakdown\": \"Fideos ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con tuco y queso", "output": "{\"calories\": 500, \"breakdown\": \"Fideos con tuco ~450kcal + Queso rallado ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "guiso", "output": "{\"calories\": 500, \"breakdown\": \"Guiso ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "guiso de lentejas", "output": "{\"calories\": 450, \"breakdown\": \"Guiso de lentejas ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "guiso de arroz", "output": "{\"calories\": 500, \"breakdown\": \"Guiso de arroz ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "guisito", "output": "{\"calories\": 500, \"breakdown\": \"Guiso ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe con leche", "output": "{\"calories\": 80, \"breakdown\": \"Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafecito", "output": "{\"calories\": 5, \"breakdown\": \"Café ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un cafecito", "output": "{\"calories\": 5, \"breakdown\": \"Café ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un mate cocido", "output": "{\"calories\": 5, \"breakdown\": \"Mate cocido ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pure", "output": "{\"calories\": 200, \"breakdown\": \"Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fritas", "output": "{\"calories\": 350, \"breakdown\": \"Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas", "output": "{\"calories\": 350, \"breakdown\": \"Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una coca", "output": "{\"calories\": 140, \"breakdown\": \"Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "coca", "output": "{\"calories\": 140, \"breakdown\": \"Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "coca cola", "output": "{\"calories\": 140, \"breakdown\": \"Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "coca zero", "output": "{\"calories\": 0, \"breakdown\": \"Coca Cola Zero ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "coca light", "output": "{\"calories\": 0, \"breakdown\": \"Coca Cola Light ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sprite", "output": "{\"calories\": 140, \"breakdown\": \"Sprite ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fanta", "output": "{\"calories\": 140, \"breakdown\": \"Fanta ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un agua", "output": "{\"calories\": 0, \"breakdown\": \"Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "agua mineral", "output": "{\"calories\": 0, \"breakdown\": \"Agua mineral ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un helado", "output": "{\"calories\": 260, \"breakdown\": \"Helado (2 bochas) ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "heladito", "output": "{\"calories\": 130, \"breakdown\": \"Helado (1 bocha) ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un heladito", "output": "{\"calories\": 130, \"breakdown\": \"Helado (1 bocha) ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "facturas", "output": "{\"calories\": 500, \"breakdown\": \"2 Facturas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "unas facturas", "output": "{\"calories\": 500, \"breakdown\": \"2 Facturas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "medias lunas", "output": "{\"calories\": 400, \"breakdown\": \"2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bizcochitos", "output": "{\"calories\": 200, \"breakdown\": \"Bizcochitos ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tortita negra", "output": "{\"calories\": 250, \"breakdown\": \"Tortita negra ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vigilante", "output": "{\"calories\": 230, \"breakdown\": \"Queso y dulce de batata ~230kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "postre vigilante", "output": "{\"calories\": 230, \"breakdown\": \"Queso y dulce de batata ~230kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor", "output": "{\"calories\": 200, \"breakdown\": \"Alfajor ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un alfajorcito", "output": "{\"calories\": 200, \"breakdown\": \"Alfajor ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor de maicena", "output": "{\"calories\": 180, \"breakdown\": \"Alfajor de maicena ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor triple", "output": "{\"calories\": 300, \"breakdown\": \"Alfajor triple ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "morcipan", "output": "{\"calories\": 400, \"breakdown\": \"Pan ~150kcal + Morcilla ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "morci", "output": "{\"calories\": 250, \"breakdown\": \"Morcilla ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un cortadito", "output": "{\"calories\": 40, \"breakdown\": \"Cortado ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cortadito", "output": "{\"calories\": 40, \"breakdown\": \"Cortado ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un tecito", "output": "{\"calories\": 5, \"breakdown\": \"Té ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "provoleta", "output": "{\"calories\": 300, \"breakdown\": \"Provoleta ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una provo", "output": "{\"calories\": 300, \"breakdown\": \"Provoleta ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "matambre arrollado", "output": "{\"calories\": 380, \"breakdown\": \"Matambre arrollado ~380kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada rusa", "output": "{\"calories\": 200, \"breakdown\": \"Ensalada rusa ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un sanguchito de miga", "output": "{\"calories\": 130, \"breakdown\": \"Sándwich de miga ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé una mila con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Milanesa ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé milanesa con puré", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí 2 empanadas y una coca", "output": "{\"calories\": 740, \"breakdown\": \"2 Empanadas de carne ~600kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí 3 empanadas", "output": "{\"calories\": 900, \"breakdown\": \"3 Empanadas de carne ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un tostado", "output": "{\"calories\": 300, \"breakdown\": \"Tostado de jamón y queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí una mila napo con fritas", "output": "{\"calories\": 870, \"breakdown\": \"Milanesa napolitana ~520kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me pedí una hamburguesa con papas", "output": "{\"calories\": 700, \"breakdown\": \"Hamburguesa simple ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un café con 3 medialunas", "output": "{\"calories\": 680, \"breakdown\": \"Café con leche ~80kcal + 3 Medialunas ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuné café con leche y tostadas", "output": "{\"calories\": 200, \"breakdown\": \"Café con leche ~80kcal + 2 Tostadas con manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuné café con medialunas", "output": "{\"calories\": 480, \"breakdown\": \"Café con leche ~80kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené fideos con tuco", "output": "{\"calories\": 450, \"breakdown\": \"Fideos con tuco ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené pollo con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Pollo a la plancha ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me clavé 4 empanadas", "output": "{\"calories\": 1200, \"breakdown\": \"4 Empanadas de carne ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me clavé una pizza entera", "output": "{\"calories\": 2400, \"breakdown\": \"Pizza entera (8 porciones) ~2400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me mandé un lomito con fritas", "output": "{\"calories\": 850, \"breakdown\": \"Lomito ~500kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé asado con ensalada", "output": "{\"calories\": 530, \"breakdown\": \"Asado ~450kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí pizza y cerveza", "output": "{\"calories\": 500, \"breakdown\": \"Porción de pizza ~300kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "merendé café con facturas", "output": "{\"calories\": 330, \"breakdown\": \"Café con leche ~80kcal + Factura ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "merendé café y medialunas", "output": "{\"calories\": 480, \"breakdown\": \"Café con leche ~80kcal + 2 Medialunas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí 2 hamburguesas", "output": "{\"calories\": 700, \"breakdown\": \"2 Hamburguesas simples ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me tomé un fernet", "output": "{\"calories\": 250, \"breakdown\": \"Fernet con Coca ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me tomé 2 birras", "output": "{\"calories\": 400, \"breakdown\": \"2 Cervezas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me tomé un café con leche", "output": "{\"calories\": 80, \"breakdown\": \"Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené ensalada con pollo", "output": "{\"calories\": 280, \"breakdown\": \"Ensalada mixta ~80kcal + Pollo a la plancha ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé un plato de fideos con pesto", "output": "{\"calories\": 420, \"breakdown\": \"Fideos con pesto ~420kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un plato de ravioles", "output": "{\"calories\": 480, \"breakdown\": \"Ravioles con tuco ~480kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pedí delivery de empanadas", "output": "{\"calories\": 900, \"breakdown\": \"3 Empanadas de carne ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me hice unos huevos revueltos con tostadas", "output": "{\"calories\": 240, \"breakdown\": \"Huevos revueltos ~120kcal + 2 Tostadas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un sándwich de jamón y queso", "output": "{\"calories\": 280, \"breakdown\": \"Sándwich de jamón y queso ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuné yogurt con granola", "output": "{\"calories\": 250, \"breakdown\": \"Yogurt ~120kcal + Granola ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me pedí un lomito", "output": "{\"calories\": 500, \"breakdown\": \"Lomito ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me clavé media docena de empanadas", "output": "{\"calories\": 1800, \"breakdown\": \"6 Empanadas de carne ~1800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené una milanesa de pollo con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Milanesa de pollo ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí asado completo", "output": "{\"calories\": 900, \"breakdown\": \"Asado ~450kcal + Chorizo ~250kcal + Ensalada mixta ~80kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí un choripán", "output": "{\"calories\": 400, \"breakdown\": \"Chorizo ~250kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me bajé una pizza", "output": "{\"calories\": 2400, \"breakdown\": \"Pizza entera (8 porciones) ~2400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me mandé 3 porciones de pizza", "output": "{\"calories\": 900, \"breakdown\": \"3 Porciones de pizza ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé guiso de lentejas", "output": "{\"calories\": 450, \"breakdown\": \"Guiso de lentejas ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí sushi", "output": "{\"calories\": 500, \"breakdown\": \"Sushi (10 piezas) ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un plato de ñoquis con tuco", "output": "{\"calories\": 450, \"breakdown\": \"Ñoquis con tuco ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé bife con ensalada", "output": "{\"calories\": 480, \"breakdown\": \"Bife de chorizo ~400kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí una hamburguesa completa con papas y coca", "output": "{\"calories\": 1040, \"breakdown\": \"Hamburguesa completa ~550kcal + Papas fritas ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me mandé 2 choris", "output": "{\"calories\": 800, \"breakdown\": \"2 Choripanes ~800kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí 3 facturas", "output": "{\"calories\": 750, \"breakdown\": \"3 Facturas ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un helado de 2 bochas", "output": "{\"calories\": 260, \"breakdown\": \"2 Bochas de helado ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un helado de 3 bochas", "output": "{\"calories\": 390, \"breakdown\": \"3 Bochas de helado ~390kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé una ensalada cesar con pollo", "output": "{\"calories\": 350, \"breakdown\": \"Ensalada César con pollo ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené 2 porciones de pizza con cerveza", "output": "{\"calories\": 800, \"breakdown\": \"2 Porciones de pizza ~600kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé suprema con puré", "output": "{\"calories\": 500, \"breakdown\": \"Suprema de pollo ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené una tarta de jamon y queso", "output": "{\"calories\": 350, \"breakdown\": \"Tarta de jamón y queso ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuné tostado y cortado", "output": "{\"calories\": 340, \"breakdown\": \"Tostado de jamón y queso ~300kcal + Cortado ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé un sanguche de mila", "output": "{\"calories\": 550, \"breakdown\": \"Pan ~150kcal + Milanesa ~350kcal + Lechuga y tomate ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí una empanada sola", "output": "{\"calories\": 300, \"breakdown\": \"Empanada de carne ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pedí 2 milas napolitanas con fritas", "output": "{\"calories\": 1390, \"breakdown\": \"2 Milanesas napolitanas ~1040kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me tomé un cortado con una medialuna", "output": "{\"calories\": 240, \"breakdown\": \"Cortado ~40kcal + Medialuna ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí fideos con bolognesa y pan", "output": "{\"calories\": 650, \"breakdown\": \"Fideos con bolognesa ~500kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé bondiola con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Bondiola ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené una porción de tarta con ensalada", "output": "{\"calories\": 330, \"breakdown\": \"Tarta ~250kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me mandé 2 porciones de torta", "output": "{\"calories\": 700, \"breakdown\": \"2 Porciones de torta ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí un alfajor triple", "output": "{\"calories\": 300, \"breakdown\": \"Alfajor triple ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tomé 3 fernets", "output": "{\"calories\": 750, \"breakdown\": \"3 Fernets con Coca ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una porcion grande de papas fritas", "output": "{\"calories\": 500, \"breakdown\": \"Porción grande de papas fritas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una porcion chica de papas fritas", "output": "{\"calories\": 250, \"breakdown\": \"Porción chica de papas fritas ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un plato grande de fideos", "output": "{\"calories\": 550, \"breakdown\": \"Plato grande de fideos con tuco ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un plato chico de arroz", "output": "{\"calories\": 130, \"breakdown\": \"Plato chico de arroz ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un plato grande de arroz", "output": "{\"calories\": 300, \"breakdown\": \"Plato grande de arroz ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "medio bife de chorizo", "output": "{\"calories\": 200, \"breakdown\": \"Medio bife de chorizo ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una milanesa grande", "output": "{\"calories\": 450, \"breakdown\": \"Milanesa grande ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una milanesa chica", "output": "{\"calories\": 250, \"breakdown\": \"Milanesa chica ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un vaso de coca", "output": "{\"calories\": 140, \"breakdown\": \"Vaso de Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un vaso grande de coca", "output": "{\"calories\": 200, \"breakdown\": \"Vaso grande de Coca Cola ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una lata de cerveza", "output": "{\"calories\": 150, \"breakdown\": \"Lata de cerveza ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un litro de agua", "output": "{\"calories\": 0, \"breakdown\": \"1 Litro de agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "medio litro de agua", "output": "{\"calories\": 0, \"breakdown\": \"Medio litro de agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una porcion grande de asado", "output": "{\"calories\": 600, \"breakdown\": \"Porción grande de asado ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una porcion chica de asado", "output": "{\"calories\": 300, \"breakdown\": \"Porción chica de asado ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada grande", "output": "{\"calories\": 120, \"breakdown\": \"Ensalada grande ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada chica", "output": "{\"calories\": 50, \"breakdown\": \"Ensalada chica ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa grande con fritas", "output": "{\"calories\": 800, \"breakdown\": \"Milanesa grande ~450kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "plato grande de guiso", "output": "{\"calories\": 650, \"breakdown\": \"Plato grande de guiso ~650kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "plato chico de guiso", "output": "{\"calories\": 350, \"breakdown\": \"Plato chico de guiso ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una porcion generosa de puré", "output": "{\"calories\": 300, \"breakdown\": \"Porción generosa de puré ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa doble", "output": "{\"calories\": 550, \"breakdown\": \"Hamburguesa doble ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa triple", "output": "{\"calories\": 750, \"breakdown\": \"Hamburguesa triple ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza grande", "output": "{\"calories\": 2400, \"breakdown\": \"Pizza grande entera (8 porciones) ~2400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza chica", "output": "{\"calories\": 1200, \"breakdown\": \"Pizza chica entera (4 porciones) ~1200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una cucharada de dulce de leche", "output": "{\"calories\": 60, \"breakdown\": \"Cucharada de dulce de leche ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 cucharadas de dulce de leche", "output": "{\"calories\": 120, \"breakdown\": \"2 Cucharadas de dulce de leche ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una cucharada de queso crema", "output": "{\"calories\": 50, \"breakdown\": \"Cucharada de queso crema ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un pedazo grande de torta", "output": "{\"calories\": 450, \"breakdown\": \"Pedazo grande de torta ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un pedazo chico de torta", "output": "{\"calories\": 250, \"breakdown\": \"Pedazo chico de torta ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "un plato hondo de sopa", "output": "{\"calories\": 200, \"breakdown\": \"Plato hondo de sopa ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "taza grande de café con leche", "output": "{\"calories\": 120, \"breakdown\": \"Taza grande de café con leche ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "taza chica de café con leche", "output": "{\"calories\": 60, \"breakdown\": \"Taza chica de café con leche ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vaso grande de jugo", "output": "{\"calories\": 160, \"breakdown\": \"Vaso grande de jugo de naranja ~160kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vaso chico de jugo", "output": "{\"calories\": 70, \"breakdown\": \"Vaso chico de jugo de naranja ~70kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "merluza con puré", "output": "{\"calories\": 400, \"breakdown\": \"Merluza ~200kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "merluza con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Merluza ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "merluza al horno con papas", "output": "{\"calories\": 400, \"breakdown\": \"Merluza al horno ~200kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de merluza con puré", "output": "{\"calories\": 450, \"breakdown\": \"Milanesa de merluza ~250kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de merluza con papas fritas", "output": "{\"calories\": 600, \"breakdown\": \"Milanesa de merluza ~250kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "salmón con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Salmón ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "salmón con puré", "output": "{\"calories\": 500, \"breakdown\": \"Salmón ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "salmón con arroz", "output": "{\"calories\": 500, \"breakdown\": \"Salmón ~300kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "atún con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Atún ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de jamon y queso", "output": "{\"calories\": 350, \"breakdown\": \"Tarta de jamón y queso ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de verdura", "output": "{\"calories\": 280, \"breakdown\": \"Tarta de verdura ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de atún", "output": "{\"calories\": 320, \"breakdown\": \"Tarta de atún ~320kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de zapallitos", "output": "{\"calories\": 280, \"breakdown\": \"Tarta de zapallitos ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de choclo", "output": "{\"calories\": 320, \"breakdown\": \"Tarta de choclo ~320kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de calabaza", "output": "{\"calories\": 300, \"breakdown\": \"Tarta de calabaza ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta con ensalada", "output": "{\"calories\": 360, \"breakdown\": \"Tarta ~280kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta de jamon y queso con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Tarta de jamón y queso ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de verdura", "output": "{\"calories\": 250, \"breakdown\": \"Empanada de verdura ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de humita", "output": "{\"calories\": 260, \"breakdown\": \"Empanada de humita ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de atun", "output": "{\"calories\": 280, \"breakdown\": \"Empanada de atún ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de carne picante", "output": "{\"calories\": 300, \"breakdown\": \"Empanada de carne picante ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada caprese", "output": "{\"calories\": 260, \"breakdown\": \"Empanada caprese ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de roquefort y jamon", "output": "{\"calories\": 290, \"breakdown\": \"Empanada de roquefort y jamón ~290kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza de muzza", "output": "{\"calories\": 300, \"breakdown\": \"Porción de pizza muzzarella ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza de jamon y morrones", "output": "{\"calories\": 320, \"breakdown\": \"Porción de pizza de jamón y morrones ~320kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza napolitana", "output": "{\"calories\": 280, \"breakdown\": \"Porción de pizza napolitana ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza con anchoas", "output": "{\"calories\": 310, \"breakdown\": \"Porción de pizza con anchoas ~310kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza fugazza", "output": "{\"calories\": 300, \"breakdown\": \"Porción de pizza fugazza ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza fugazzeta", "output": "{\"calories\": 340, \"breakdown\": \"Porción de pizza fugazzeta ~340kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fainá", "output": "{\"calories\": 200, \"breakdown\": \"Porción de fainá ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza con fainá", "output": "{\"calories\": 500, \"breakdown\": \"Porción de pizza ~300kcal + Porción de fainá ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de fugazzeta", "output": "{\"calories\": 680, \"breakdown\": \"2 Porciones de fugazzeta ~680kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza de rucula y jamon crudo", "output": "{\"calories\": 350, \"breakdown\": \"Porción de pizza de rúcula y jamón crudo ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza 4 quesos", "output": "{\"calories\": 380, \"breakdown\": \"Porción de pizza 4 quesos ~380kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "calzone", "output": "{\"calories\": 450, \"breakdown\": \"Calzone ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada cesar", "output": "{\"calories\": 300, \"breakdown\": \"Ensalada César ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada cesar con pollo", "output": "{\"calories\": 350, \"breakdown\": \"Ensalada César con pollo ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada mixta", "output": "{\"calories\": 80, \"breakdown\": \"Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada completa", "output": "{\"calories\": 200, \"breakdown\": \"Ensalada completa (lechuga, tomate, zanahoria, huevo) ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de tomate y cebolla", "output": "{\"calories\": 50, \"breakdown\": \"Ensalada de tomate y cebolla ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada waldorf", "output": "{\"calories\": 300, \"breakdown\": \"Ensalada Waldorf ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada con atún", "output": "{\"calories\": 250, \"breakdown\": \"Ensalada mixta ~80kcal + Atún ~170kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de quinoa", "output": "{\"calories\": 250, \"breakdown\": \"Ensalada de quinoa ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de lentejas", "output": "{\"calories\": 220, \"breakdown\": \"Ensalada de lentejas ~220kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "guiso de lentejas con chorizo", "output": "{\"calories\": 550, \"breakdown\": \"Guiso de lentejas ~450kcal + Chorizo ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "guiso de arroz con pollo", "output": "{\"calories\": 500, \"breakdown\": \"Guiso de arroz con pollo ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "locro", "output": "{\"calories\": 600, \"breakdown\": \"Locro ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "carbonada", "output": "{\"calories\": 450, \"breakdown\": \"Carbonada ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "estofado", "output": "{\"calories\": 500, \"breakdown\": \"Estofado ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "estofado de carne con puré", "output": "{\"calories\": 700, \"breakdown\": \"Estofado de carne ~500kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "puchero", "output": "{\"calories\": 500, \"breakdown\": \"Puchero ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con pollo", "output": "{\"calories\": 450, \"breakdown\": \"Arroz con pollo ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "revuelto de zapallitos", "output": "{\"calories\": 200, \"breakdown\": \"Revuelto de zapallitos ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tortilla de papas", "output": "{\"calories\": 350, \"breakdown\": \"Tortilla de papas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tortilla de papas con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Tortilla de papas ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "matambre a la pizza", "output": "{\"calories\": 500, \"breakdown\": \"Matambre a la pizza ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "peceto al horno con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Peceto al horno ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cerdo con puré", "output": "{\"calories\": 550, \"breakdown\": \"Cerdo ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cerdo al horno con ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Cerdo al horno ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo al disco", "output": "{\"calories\": 400, \"breakdown\": \"Pollo al disco ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mondongo", "output": "{\"calories\": 400, \"breakdown\": \"Mondongo ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa al horno con ensalada", "output": "{\"calories\": 350, \"breakdown\": \"Milanesa al horno ~270kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo al verdeo con arroz", "output": "{\"calories\": 450, \"breakdown\": \"Pollo al verdeo ~250kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "carne al horno con papas", "output": "{\"calories\": 550, \"breakdown\": \"Carne al horno ~350kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "albondigas con puré", "output": "{\"calories\": 500, \"breakdown\": \"Albóndigas ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "albondigas con arroz", "output": "{\"calories\": 500, \"breakdown\": \"Albóndigas ~300kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "wok de verduras con pollo", "output": "{\"calories\": 350, \"breakdown\": \"Wok de verduras ~150kcal + Pollo ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "wok de verduras con arroz", "output": "{\"calories\": 350, \"breakdown\": \"Wok de verduras ~150kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "omelette de queso", "output": "{\"calories\": 300, \"breakdown\": \"Omelette de queso ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "omelette de jamon y queso", "output": "{\"calories\": 350, \"breakdown\": \"Omelette de jamón y queso ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "omelette de verduras", "output": "{\"calories\": 250, \"breakdown\": \"Omelette de verduras ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "huevos fritos con papas fritas", "output": "{\"calories\": 500, \"breakdown\": \"2 Huevos fritos ~300kcal + Papas fritas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa rellena con fritas", "output": "{\"calories\": 900, \"breakdown\": \"Milanesa rellena ~550kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa rellena con puré", "output": "{\"calories\": 750, \"breakdown\": \"Milanesa rellena ~550kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flan", "output": "{\"calories\": 200, \"breakdown\": \"Flan ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flan con dulce de leche", "output": "{\"calories\": 260, \"breakdown\": \"Flan ~200kcal + Dulce de leche ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flan con crema", "output": "{\"calories\": 280, \"breakdown\": \"Flan ~200kcal + Crema ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flan mixto", "output": "{\"calories\": 340, \"breakdown\": \"Flan ~200kcal + Dulce de leche ~60kcal + Crema ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "panqueques con dulce de leche", "output": "{\"calories\": 350, \"breakdown\": \"2 Panqueques ~230kcal + Dulce de leche ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "panqueques con nutella", "output": "{\"calories\": 380, \"breakdown\": \"2 Panqueques ~230kcal + Nutella ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "torta de chocolate", "output": "{\"calories\": 350, \"breakdown\": \"Porción de torta de chocolate ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "torta de ricota", "output": "{\"calories\": 280, \"breakdown\": \"Porción de torta de ricota ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tiramisú", "output": "{\"calories\": 350, \"breakdown\": \"Porción de tiramisú ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cheesecake", "output": "{\"calories\": 350, \"breakdown\": \"Porción de cheesecake ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "brownie", "output": "{\"calories\": 300, \"breakdown\": \"Brownie ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "brownie con helado", "output": "{\"calories\": 430, \"breakdown\": \"Brownie ~300kcal + Bocha de helado ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mousse de chocolate", "output": "{\"calories\": 280, \"breakdown\": \"Mousse de chocolate ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de frutas", "output": "{\"calories\": 150, \"breakdown\": \"Ensalada de frutas ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de frutas con crema", "output": "{\"calories\": 230, \"breakdown\": \"Ensalada de frutas ~150kcal + Crema ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con leche", "output": "{\"calories\": 250, \"breakdown\": \"Arroz con leche ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "churros con chocolate", "output": "{\"calories\": 350, \"breakdown\": \"Churros ~250kcal + Chocolate ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "torta frita", "output": "{\"calories\": 200, \"breakdown\": \"Torta frita ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tortas fritas", "output": "{\"calories\": 400, \"breakdown\": \"2 Tortas fritas ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "budin de pan", "output": "{\"calories\": 280, \"breakdown\": \"Budín de pan ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "rogel", "output": "{\"calories\": 350, \"breakdown\": \"Porción de rogel ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "chocotorta", "output": "{\"calories\": 400, \"breakdown\": \"Porción de chocotorta ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pastafrola", "output": "{\"calories\": 280, \"breakdown\": \"Porción de pastafrola ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lemon pie", "output": "{\"calories\": 320, \"breakdown\": \"Porción de lemon pie ~320kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vino tinto", "output": "{\"calories\": 120, \"breakdown\": \"Vaso de vino tinto ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vino blanco", "output": "{\"calories\": 110, \"breakdown\": \"Vaso de vino blanco ~110kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "gaseosa", "output": "{\"calories\": 140, \"breakdown\": \"Gaseosa ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "gaseosa light", "output": "{\"calories\": 0, \"breakdown\": \"Gaseosa light ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "gaseosa zero", "output": "{\"calories\": 0, \"breakdown\": \"Gaseosa zero ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo de manzana", "output": "{\"calories\": 120, \"breakdown\": \"Jugo de manzana ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "licuado de banana", "output": "{\"calories\": 200, \"breakdown\": \"Licuado de banana ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "licuado de frutilla", "output": "{\"calories\": 150, \"breakdown\": \"Licuado de frutilla ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "smoothie de frutas", "output": "{\"calories\": 200, \"breakdown\": \"Smoothie de frutas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "chocolate caliente", "output": "{\"calories\": 250, \"breakdown\": \"Chocolate caliente ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "submarino", "output": "{\"calories\": 280, \"breakdown\": \"Submarino ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "capuchino", "output": "{\"calories\": 100, \"breakdown\": \"Capuchino ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "espresso", "output": "{\"calories\": 5, \"breakdown\": \"Espresso ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "latte", "output": "{\"calories\": 120, \"breakdown\": \"Latte ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "te con leche", "output": "{\"calories\": 40, \"breakdown\": \"Té con leche ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cerveza artesanal", "output": "{\"calories\": 220, \"breakdown\": \"Cerveza artesanal (pinta) ~220kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "gin tonic", "output": "{\"calories\": 200, \"breakdown\": \"Gin tonic ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "campari con naranja", "output": "{\"calories\": 180, \"breakdown\": \"Campari con naranja ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "aperol spritz", "output": "{\"calories\": 180, \"breakdown\": \"Aperol spritz ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cynar", "output": "{\"calories\": 150, \"breakdown\": \"Cynar con soda ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "gancia con limón", "output": "{\"calories\": 150, \"breakdown\": \"Gancia con limón ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "galletitas de agua", "output": "{\"calories\": 80, \"breakdown\": \"Galletitas de agua (4 unidades) ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "galletitas dulces", "output": "{\"calories\": 120, \"breakdown\": \"Galletitas dulces (4 unidades) ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "barra de cereal", "output": "{\"calories\": 120, \"breakdown\": \"Barra de cereal ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mani", "output": "{\"calories\": 160, \"breakdown\": \"Puñado de maní ~160kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas fritas de paquete", "output": "{\"calories\": 300, \"breakdown\": \"Papas fritas de paquete (porción) ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pochoclo", "output": "{\"calories\": 200, \"breakdown\": \"Pochoclo ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "turrón", "output": "{\"calories\": 180, \"breakdown\": \"Turrón ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pepas", "output": "{\"calories\": 120, \"breakdown\": \"3 Pepas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "palitos salados", "output": "{\"calories\": 130, \"breakdown\": \"Palitos salados (porción) ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "conitos", "output": "{\"calories\": 120, \"breakdown\": \"Conitos (porción) ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "chizitos", "output": "{\"calories\": 130, \"breakdown\": \"Chizitos (porción) ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tutucas", "output": "{\"calories\": 120, \"breakdown\": \"Tutucas (porción) ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "banana", "output": "{\"calories\": 100, \"breakdown\": \"Banana ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "manzana", "output": "{\"calories\": 80, \"breakdown\": \"Manzana ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "naranja", "output": "{\"calories\": 70, \"breakdown\": \"Naranja ~70kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mandarina", "output": "{\"calories\": 40, \"breakdown\": \"Mandarina ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 mandarinas", "output": "{\"calories\": 80, \"breakdown\": \"2 Mandarinas ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 mandarinas", "output": "{\"calories\": 120, \"breakdown\": \"3 Mandarinas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "durazno", "output": "{\"calories\": 60, \"breakdown\": \"Durazno ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pera", "output": "{\"calories\": 80, \"breakdown\": \"Pera ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "uvas", "output": "{\"calories\": 100, \"breakdown\": \"Porción de uvas ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandía", "output": "{\"calories\": 80, \"breakdown\": \"Porción de sandía ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "melón", "output": "{\"calories\": 70, \"breakdown\": \"Porción de melón ~70kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ananá", "output": "{\"calories\": 80, \"breakdown\": \"Porción de ananá ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "frutilla", "output": "{\"calories\": 30, \"breakdown\": \"Porción de frutillas ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "kiwi", "output": "{\"calories\": 50, \"breakdown\": \"Kiwi ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 kiwis", "output": "{\"calories\": 100, \"breakdown\": \"2 Kiwis ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pomelo", "output": "{\"calories\": 60, \"breakdown\": \"Pomelo ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de carne", "output": "{\"calories\": 300, \"breakdown\": \"Empanada de carne ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de pollo", "output": "{\"calories\": 280, \"breakdown\": \"Empanada de pollo ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de jamon y queso", "output": "{\"calories\": 270, \"breakdown\": \"Empanada de jamón y queso ~270kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "huevo frito", "output": "{\"calories\": 150, \"breakdown\": \"Huevo frito ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "huevo revuelto", "output": "{\"calories\": 120, \"breakdown\": \"Huevo revuelto ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "huevo duro", "output": "{\"calories\": 80, \"breakdown\": \"Huevo duro ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 huevos duros", "output": "{\"calories\": 160, \"breakdown\": \"2 Huevos duros ~160kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pan", "output": "{\"calories\": 150, \"breakdown\": \"Pan (1 unidad) ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "medialuna", "output": "{\"calories\": 200, \"breakdown\": \"Medialuna ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "factura", "output": "{\"calories\": 250, \"breakdown\": \"Factura ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe", "output": "{\"calories\": 5, \"breakdown\": \"Café ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cortado", "output": "{\"calories\": 40, \"breakdown\": \"Cortado ~40kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "te", "output": "{\"calories\": 5, \"breakdown\": \"Té ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate", "output": "{\"calories\": 5, \"breakdown\": \"Mate ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate cocido", "output": "{\"calories\": 5, \"breakdown\": \"Mate cocido ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cerveza", "output": "{\"calories\": 200, \"breakdown\": \"Cerveza (pinta) ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo de naranja", "output": "{\"calories\": 110, \"breakdown\": \"Jugo de naranja ~110kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "agua", "output": "{\"calories\": 0, \"breakdown\": \"Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz blanco", "output": "{\"calories\": 200, \"breakdown\": \"Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas fritas", "output": "{\"calories\": 350, \"breakdown\": \"Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "puré de papas", "output": "{\"calories\": 200, \"breakdown\": \"Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "yogurt", "output": "{\"calories\": 120, \"breakdown\": \"Yogurt ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostada con manteca", "output": "{\"calories\": 120, \"breakdown\": \"Tostada con manteca ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "dulce de leche", "output": "{\"calories\": 60, \"breakdown\": \"Cucharada de dulce de leche ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "queso crema", "output": "{\"calories\": 50, \"breakdown\": \"Cucharada de queso crema ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado 1 bocha", "output": "{\"calories\": 130, \"breakdown\": \"Helado (1 bocha) ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado 2 bochas", "output": "{\"calories\": 260, \"breakdown\": \"Helado (2 bochas) ~260kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado 3 bochas", "output": "{\"calories\": 390, \"breakdown\": \"Helado (3 bochas) ~390kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con huevo frito", "output": "{\"calories\": 350, \"breakdown\": \"Arroz blanco ~200kcal + Huevo frito ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con pollo al horno", "output": "{\"calories\": 480, \"breakdown\": \"Arroz blanco ~200kcal + Pollo al horno ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada con huevo duro", "output": "{\"calories\": 160, \"breakdown\": \"Ensalada mixta ~80kcal + Huevo duro ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sopa con pan", "output": "{\"calories\": 350, \"breakdown\": \"Sopa ~200kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sopa de verduras", "output": "{\"calories\": 200, \"breakdown\": \"Sopa de verduras ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sopa crema de calabaza", "output": "{\"calories\": 250, \"breakdown\": \"Sopa crema de calabaza ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de carne con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Empanada de carne ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostado y cafe con leche", "output": "{\"calories\": 380, \"breakdown\": \"Tostado de jamón y queso ~300kcal + Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa y ensalada", "output": "{\"calories\": 430, \"breakdown\": \"Hamburguesa simple ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de soja", "output": "{\"calories\": 200, \"breakdown\": \"Milanesa de soja ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de soja con ensalada", "output": "{\"calories\": 280, \"breakdown\": \"Milanesa de soja ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de soja con puré", "output": "{\"calories\": 400, \"breakdown\": \"Milanesa de soja ~200kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de berenjena", "output": "{\"calories\": 180, \"breakdown\": \"Milanesa de berenjena ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de berenjena con ensalada", "output": "{\"calories\": 260, \"breakdown\": \"Milanesa de berenjena ~180kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "wok de pollo con fideos", "output": "{\"calories\": 450, \"breakdown\": \"Pollo ~200kcal + Fideos ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con crema y jamon", "output": "{\"calories\": 520, \"breakdown\": \"Fideos con crema y jamón ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ravioles de carne con salsa blanca", "output": "{\"calories\": 550, \"breakdown\": \"Ravioles de carne con salsa blanca ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "canelones de verdura con salsa blanca", "output": "{\"calories\": 450, \"breakdown\": \"Canelones de verdura con salsa blanca ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "carne con papas al horno", "output": "{\"calories\": 550, \"breakdown\": \"Carne ~350kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa doble con papas y coca", "output": "{\"calories\": 1040, \"breakdown\": \"Hamburguesa doble ~550kcal + Papas fritas ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "nuggets con puré", "output": "{\"calories\": 550, \"breakdown\": \"Nuggets ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas fritas con huevo frito", "output": "{\"calories\": 500, \"breakdown\": \"Papas fritas ~350kcal + Huevo frito ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pancho con papas fritas", "output": "{\"calories\": 650, \"breakdown\": \"Pancho ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada de carne y coca", "output": "{\"calories\": 440, \"breakdown\": \"Empanada de carne ~300kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "picada", "output": "{\"calories\": 600, \"breakdown\": \"Picada (fiambres, quesos, aceitunas) ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "picada completa", "output": "{\"calories\": 900, \"breakdown\": \"Picada completa (fiambres, quesos, aceitunas, pan) ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tabla de fiambres y quesos", "output": "{\"calories\": 600, \"breakdown\": \"Tabla de fiambres y quesos ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "provoleta con pan", "output": "{\"calories\": 450, \"breakdown\": \"Provoleta ~300kcal + Pan ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "matambre con puré", "output": "{\"calories\": 580, \"breakdown\": \"Matambre ~380kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "matambre con papas fritas", "output": "{\"calories\": 730, \"breakdown\": \"Matambre ~380kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con papas al horno", "output": "{\"calories\": 400, \"breakdown\": \"Pollo a la plancha ~200kcal + Papas al horno ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "atun con arroz", "output": "{\"calories\": 400, \"breakdown\": \"Atún ~200kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "lentejas", "output": "{\"calories\": 350, \"breakdown\": \"Lentejas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "garbanzos con arroz", "output": "{\"calories\": 450, \"breakdown\": \"Garbanzos ~250kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con verduras", "output": "{\"calories\": 300, \"breakdown\": \"Arroz blanco ~200kcal + Verduras salteadas ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanadas salteñas", "output": "{\"calories\": 300, \"breakdown\": \"Empanada salteña ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanadas tucumanas", "output": "{\"calories\": 320, \"breakdown\": \"Empanada tucumana ~320kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "humita en chala", "output": "{\"calories\": 250, \"breakdown\": \"Humita en chala ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tamal", "output": "{\"calories\": 280, \"breakdown\": \"Tamal ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tamales", "output": "{\"calories\": 560, \"breakdown\": \"2 Tamales ~560kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 humitas", "output": "{\"calories\": 500, \"breakdown\": \"2 Humitas ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pastel de papa", "output": "{\"calories\": 400, \"breakdown\": \"Pastel de papa ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pastel de papa con ensalada", "output": "{\"calories\": 480, \"breakdown\": \"Pastel de papa ~400kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sushi roll", "output": "{\"calories\": 350, \"breakdown\": \"Sushi roll (8 piezas) ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "combo de sushi", "output": "{\"calories\": 700, \"breakdown\": \"Combo de sushi (20 piezas) ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ramen", "output": "{\"calories\": 500, \"breakdown\": \"Ramen ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pad thai", "output": "{\"calories\": 500, \"breakdown\": \"Pad thai ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tacos", "output": "{\"calories\": 250, \"breakdown\": \"Taco ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tacos", "output": "{\"calories\": 500, \"breakdown\": \"2 Tacos ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 tacos", "output": "{\"calories\": 750, \"breakdown\": \"3 Tacos ~750kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "burrito", "output": "{\"calories\": 500, \"breakdown\": \"Burrito ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "quesadilla", "output": "{\"calories\": 350, \"breakdown\": \"Quesadilla ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "nachos con queso", "output": "{\"calories\": 400, \"breakdown\": \"Nachos con queso ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "shawarma", "output": "{\"calories\": 450, \"breakdown\": \"Shawarma ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "falafel con humus", "output": "{\"calories\": 350, \"breakdown\": \"Falafel ~200kcal + Hummus ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "café con leche y galletitas", "output": "{\"calories\": 200, \"breakdown\": \"Café con leche ~80kcal + Galletitas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate con galletitas", "output": "{\"calories\": 125, \"breakdown\": \"Mate ~5kcal + Galletitas dulces ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate con bizcochitos", "output": "{\"calories\": 205, \"breakdown\": \"Mate ~5kcal + Bizcochitos ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate con torta frita", "output": "{\"calories\": 205, \"breakdown\": \"Mate ~5kcal + Torta frita ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate con facturas", "output": "{\"calories\": 255, \"breakdown\": \"Mate ~5kcal + Factura ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "café con tostadas con dulce de leche", "output": "{\"calories\": 245, \"breakdown\": \"Café ~5kcal + 2 Tostadas ~120kcal + Dulce de leche ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuno americano", "output": "{\"calories\": 650, \"breakdown\": \"Huevos revueltos ~120kcal + Panceta ~200kcal + Tostadas ~120kcal + Jugo ~110kcal + Café ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "yogurt con frutas y granola", "output": "{\"calories\": 330, \"breakdown\": \"Yogurt ~120kcal + Frutas ~80kcal + Granola ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con palta", "output": "{\"calories\": 250, \"breakdown\": \"2 Tostadas ~120kcal + Palta ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con palta y huevo", "output": "{\"calories\": 400, \"breakdown\": \"2 Tostadas ~120kcal + Palta ~130kcal + Huevo ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bowl de açaí", "output": "{\"calories\": 400, \"breakdown\": \"Bowl de açaí ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "avena con leche", "output": "{\"calories\": 250, \"breakdown\": \"Avena con leche ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "avena con banana", "output": "{\"calories\": 300, \"breakdown\": \"Avena ~200kcal + Banana ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "granola con yogurt", "output": "{\"calories\": 250, \"breakdown\": \"Granola ~130kcal + Yogurt ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza y fernet", "output": "{\"calories\": 550, \"breakdown\": \"Porción de pizza ~300kcal + Fernet con Coca ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado y vino", "output": "{\"calories\": 570, \"breakdown\": \"Asado ~450kcal + Vaso de vino ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanadas con fernet", "output": "{\"calories\": 550, \"breakdown\": \"Empanada de carne ~300kcal + Fernet con Coca ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa con cerveza", "output": "{\"calories\": 550, \"breakdown\": \"Hamburguesa simple ~350kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "picada con cerveza", "output": "{\"calories\": 800, \"breakdown\": \"Picada ~600kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "picada con vino", "output": "{\"calories\": 720, \"breakdown\": \"Picada ~600kcal + Vaso de vino ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza con fainá y cerveza", "output": "{\"calories\": 700, \"breakdown\": \"Pizza ~300kcal + Fainá ~200kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas de pollo y 1 de carne", "output": "{\"calories\": 860, \"breakdown\": \"2 Empanadas de pollo ~560kcal + 1 Empanada de carne ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 empanadas de carne y 3 de pollo", "output": "{\"calories\": 1740, \"breakdown\": \"3 Empanadas de carne ~900kcal + 3 Empanadas de pollo ~840kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas de carne y 1 de jamon y queso", "output": "{\"calories\": 870, \"breakdown\": \"2 Empanadas de carne ~600kcal + 1 Empanada de jamón y queso ~270kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "1 de carne y 2 de pollo", "output": "{\"calories\": 860, \"breakdown\": \"1 Empanada de carne ~300kcal + 2 Empanadas de pollo ~560kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de muzza y 1 de fugazzeta", "output": "{\"calories\": 940, \"breakdown\": \"2 Porciones de muzzarella ~600kcal + 1 Porción de fugazzeta ~340kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con puré y coca", "output": "{\"calories\": 690, \"breakdown\": \"Milanesa ~350kcal + Puré de papas ~200kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con ensalada y agua", "output": "{\"calories\": 430, \"breakdown\": \"Milanesa ~350kcal + Ensalada mixta ~80kcal + Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo con arroz y ensalada", "output": "{\"calories\": 480, \"breakdown\": \"Pollo ~200kcal + Arroz blanco ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bife con papas fritas y ensalada", "output": "{\"calories\": 830, \"breakdown\": \"Bife de chorizo ~400kcal + Papas fritas ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "asado con puré y ensalada", "output": "{\"calories\": 730, \"breakdown\": \"Asado ~450kcal + Puré de papas ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "hamburguesa con ensalada y coca", "output": "{\"calories\": 570, \"breakdown\": \"Hamburguesa simple ~350kcal + Ensalada mixta ~80kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con tuco y coca cola", "output": "{\"calories\": 590, \"breakdown\": \"Fideos con tuco ~450kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ravioles con pan y agua", "output": "{\"calories\": 630, \"breakdown\": \"Ravioles con tuco ~480kcal + Pan ~150kcal + Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "matambre relleno", "output": "{\"calories\": 450, \"breakdown\": \"Matambre relleno ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "vitel toné", "output": "{\"calories\": 350, \"breakdown\": \"Vitel toné ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "niños envueltos", "output": "{\"calories\": 350, \"breakdown\": \"Niños envueltos ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arrollado primavera", "output": "{\"calories\": 200, \"breakdown\": \"Arrollado primavera ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pionono", "output": "{\"calories\": 250, \"breakdown\": \"Porción de pionono ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pizza casera", "output": "{\"calories\": 300, \"breakdown\": \"Porción de pizza casera ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanadas fritas de carne", "output": "{\"calories\": 350, \"breakdown\": \"Empanada frita de carne ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas fritas", "output": "{\"calories\": 700, \"breakdown\": \"2 Empanadas fritas ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "revuelto gramajo", "output": "{\"calories\": 400, \"breakdown\": \"Revuelto Gramajo ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "salpicón", "output": "{\"calories\": 250, \"breakdown\": \"Salpicón ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa al pan", "output": "{\"calories\": 550, \"breakdown\": \"Milanesa al pan ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "suprema maryland", "output": "{\"calories\": 700, \"breakdown\": \"Suprema Maryland (con banana, crema, papas) ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "peceto con verduras", "output": "{\"calories\": 380, \"breakdown\": \"Peceto ~300kcal + Verduras ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "osobuco", "output": "{\"calories\": 400, \"breakdown\": \"Osobuco ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "osobuco con puré", "output": "{\"calories\": 600, \"breakdown\": \"Osobuco ~400kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una mila napo", "output": "{\"calories\": 520, \"breakdown\": \"Milanesa napolitana ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanguita", "output": "{\"calories\": 250, \"breakdown\": \"Milanesa chica ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguchito de miga de jyq", "output": "{\"calories\": 130, \"breakdown\": \"Sándwich de miga de jamón y queso ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguchito de miga de pollo", "output": "{\"calories\": 130, \"breakdown\": \"Sándwich de miga de pollo ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de miga", "output": "{\"calories\": 130, \"breakdown\": \"Sándwich de miga ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sanguche de mila completo", "output": "{\"calories\": 700, \"breakdown\": \"Pan ~150kcal + Milanesa ~350kcal + Jamón ~50kcal + Queso ~80kcal + Huevo ~70kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bondi con chimichurri", "output": "{\"calories\": 380, \"breakdown\": \"Bondiola con chimichurri ~380kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bondi con criolla", "output": "{\"calories\": 380, \"breakdown\": \"Bondiola con ensalada criolla ~380kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "una porción de pizza muzza", "output": "{\"calories\": 300, \"breakdown\": \"Porción de pizza muzzarella ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mcdonalds big mac", "output": "{\"calories\": 550, \"breakdown\": \"Big Mac ~550kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mcdonalds cuarto de libra", "output": "{\"calories\": 520, \"breakdown\": \"Cuarto de libra ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mcdonalds mcnuggets", "output": "{\"calories\": 350, \"breakdown\": \"McNuggets (10 unidades) ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "whopper", "output": "{\"calories\": 650, \"breakdown\": \"Whopper ~650kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mostaza hamburguesa", "output": "{\"calories\": 450, \"breakdown\": \"Hamburguesa Mostaza ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "café doble", "output": "{\"calories\": 10, \"breakdown\": \"Café doble ~10kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "café americano", "output": "{\"calories\": 5, \"breakdown\": \"Café americano ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flat white", "output": "{\"calories\": 100, \"breakdown\": \"Flat white ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mocachino", "output": "{\"calories\": 200, \"breakdown\": \"Mocachino ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "frappuccino", "output": "{\"calories\": 350, \"breakdown\": \"Frappuccino ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "chai latte", "output": "{\"calories\": 200, \"breakdown\": \"Chai latte ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "5 empanadas con coca", "output": "{\"calories\": 1640, \"breakdown\": \"5 Empanadas de carne ~1500kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "media docena de empanadas de jamon y queso", "output": "{\"calories\": 1620, \"breakdown\": \"6 Empanadas de jamón y queso ~1620kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 porciones de muzza", "output": "{\"calories\": 900, \"breakdown\": \"3 Porciones de pizza muzzarella ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "4 medialunas con cafe con leche", "output": "{\"calories\": 880, \"breakdown\": \"4 Medialunas ~800kcal + Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "5 facturas con cafe con leche", "output": "{\"calories\": 1330, \"breakdown\": \"5 Facturas ~1250kcal + Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 tostados con cafe", "output": "{\"calories\": 680, \"breakdown\": \"2 Tostados de jamón y queso ~600kcal + Café con leche ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 pedazos de pizza", "output": "{\"calories\": 600, \"breakdown\": \"2 Porciones de pizza ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 pedazos de pizza", "output": "{\"calories\": 900, \"breakdown\": \"3 Porciones de pizza ~900kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "1 porcion de pizza", "output": "{\"calories\": 300, \"breakdown\": \"Porción de pizza ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de fainá", "output": "{\"calories\": 400, \"breakdown\": \"2 Porciones de fainá ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 canelones", "output": "{\"calories\": 450, \"breakdown\": \"2 Canelones ~450kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "3 canelones", "output": "{\"calories\": 675, \"breakdown\": \"3 Canelones ~675kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de lasaña", "output": "{\"calories\": 1100, \"breakdown\": \"2 Porciones de lasaña ~1100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de tarta de jamon y queso", "output": "{\"calories\": 700, \"breakdown\": \"2 Porciones de tarta de jamón y queso ~700kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me pedí una birra y unas empas", "output": "{\"calories\": 800, \"breakdown\": \"Cerveza ~200kcal + 2 Empanadas de carne ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí sándwich y tomé café", "output": "{\"calories\": 285, \"breakdown\": \"Sándwich de jamón y queso ~280kcal + Café ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé fideos con bolognesa", "output": "{\"calories\": 500, \"breakdown\": \"Fideos con bolognesa ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "desayuné un yogurt con frutas", "output": "{\"calories\": 200, \"breakdown\": \"Yogurt ~120kcal + Frutas ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me clavé unas facturas con mate", "output": "{\"calories\": 505, \"breakdown\": \"2 Facturas ~500kcal + Mate ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me tomé un submarino", "output": "{\"calories\": 280, \"breakdown\": \"Submarino ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me bajé 3 birras", "output": "{\"calories\": 600, \"breakdown\": \"3 Cervezas ~600kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí una picada con cerveza", "output": "{\"calories\": 800, \"breakdown\": \"Picada ~600kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé carne al horno con puré", "output": "{\"calories\": 550, \"breakdown\": \"Carne al horno ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené pollo al horno con arroz", "output": "{\"calories\": 480, \"breakdown\": \"Pollo al horno ~280kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me mandé un guiso", "output": "{\"calories\": 500, \"breakdown\": \"Guiso ~500kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí una ensalada grande con pollo", "output": "{\"calories\": 320, \"breakdown\": \"Ensalada grande ~120kcal + Pollo a la plancha ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cafe negro", "output": "{\"calories\": 5, \"breakdown\": \"Café negro ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "te verde", "output": "{\"calories\": 5, \"breakdown\": \"Té verde ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "agua con gas", "output": "{\"calories\": 0, \"breakdown\": \"Agua con gas ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "soda", "output": "{\"calories\": 0, \"breakdown\": \"Soda ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "agua saborizada", "output": "{\"calories\": 50, \"breakdown\": \"Agua saborizada ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo cepita", "output": "{\"calories\": 110, \"breakdown\": \"Jugo Cepita ~110kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "gatorade", "output": "{\"calories\": 120, \"breakdown\": \"Gatorade ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "powerade", "output": "{\"calories\": 120, \"breakdown\": \"Powerade ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor havanna", "output": "{\"calories\": 230, \"breakdown\": \"Alfajor Havanna ~230kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor jorgito", "output": "{\"calories\": 200, \"breakdown\": \"Alfajor Jorgito ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor cachafaz", "output": "{\"calories\": 220, \"breakdown\": \"Alfajor Cachafaz ~220kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor terrabusi", "output": "{\"calories\": 180, \"breakdown\": \"Alfajor Terrabusi ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor capitán del espacio", "output": "{\"calories\": 200, \"breakdown\": \"Alfajor Capitán del Espacio ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor guaymallen", "output": "{\"calories\": 120, \"breakdown\": \"Alfajor Guaymallén ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "alfajor block", "output": "{\"calories\": 180, \"breakdown\": \"Alfajor Block ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pepitos", "output": "{\"calories\": 130, \"breakdown\": \"Pepitos (3 unidades) ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "oreo", "output": "{\"calories\": 150, \"breakdown\": \"Oreo (3 unidades) ~150kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bon o bon", "output": "{\"calories\": 80, \"breakdown\": \"Bon o Bon ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 bon o bon", "output": "{\"calories\": 160, \"breakdown\": \"2 Bon o Bon ~160kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "rhodesia", "output": "{\"calories\": 70, \"breakdown\": \"Rhodesia ~70kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "fideos con carne", "output": "{\"calories\": 550, \"breakdown\": \"Fideos ~300kcal + Carne ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con carne", "output": "{\"calories\": 500, \"breakdown\": \"Arroz blanco ~200kcal + Carne ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con pollo y ensalada", "output": "{\"calories\": 480, \"breakdown\": \"Arroz blanco ~200kcal + Pollo ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con milanesa", "output": "{\"calories\": 550, \"breakdown\": \"Arroz blanco ~200kcal + Milanesa ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "arroz con huevos revueltos", "output": "{\"calories\": 320, \"breakdown\": \"Arroz blanco ~200kcal + Huevos revueltos ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas fritas con mayonesa", "output": "{\"calories\": 400, \"breakdown\": \"Papas fritas ~350kcal + Mayonesa ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas fritas con ketchup", "output": "{\"calories\": 380, \"breakdown\": \"Papas fritas ~350kcal + Ketchup ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de papa", "output": "{\"calories\": 200, \"breakdown\": \"Ensalada de papa ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de zanahoria rallada", "output": "{\"calories\": 50, \"breakdown\": \"Ensalada de zanahoria rallada ~50kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "verduras salteadas", "output": "{\"calories\": 100, \"breakdown\": \"Verduras salteadas ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "verduras grilladas", "output": "{\"calories\": 120, \"breakdown\": \"Verduras grilladas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pure de calabaza", "output": "{\"calories\": 180, \"breakdown\": \"Puré de calabaza ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pure de zapallo", "output": "{\"calories\": 180, \"breakdown\": \"Puré de zapallo ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "choclo hervido", "output": "{\"calories\": 120, \"breakdown\": \"Choclo hervido ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "zapallitos rellenos", "output": "{\"calories\": 250, \"breakdown\": \"Zapallitos rellenos ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "berenjena rellena", "output": "{\"calories\": 200, \"breakdown\": \"Berenjena rellena ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tomate relleno", "output": "{\"calories\": 180, \"breakdown\": \"Tomate relleno ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "morrones rellenos", "output": "{\"calories\": 220, \"breakdown\": \"Morrones rellenos ~220kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "churrasco con ensalada", "output": "{\"calories\": 380, \"breakdown\": \"Churrasco ~300kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "churrasco con fritas", "output": "{\"calories\": 650, \"breakdown\": \"Churrasco ~300kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "churrasco con puré", "output": "{\"calories\": 500, \"breakdown\": \"Churrasco ~300kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "costeleta con puré", "output": "{\"calories\": 550, \"breakdown\": \"Costeleta ~350kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "costeleta con fritas", "output": "{\"calories\": 700, \"breakdown\": \"Costeleta ~350kcal + Papas fritas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo a la mostaza con arroz", "output": "{\"calories\": 450, \"breakdown\": \"Pollo a la mostaza ~250kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa con papas fritas y coca", "output": "{\"calories\": 840, \"breakdown\": \"Milanesa ~350kcal + Papas fritas ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "milanesa de pollo con papas fritas y ensalada", "output": "{\"calories\": 730, \"breakdown\": \"Milanesa de pollo ~300kcal + Papas fritas ~350kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de dulce de leche 2 bochas", "output": "{\"calories\": 280, \"breakdown\": \"Helado de dulce de leche (2 bochas) ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de chocolate 2 bochas", "output": "{\"calories\": 270, \"breakdown\": \"Helado de chocolate (2 bochas) ~270kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de frutilla 2 bochas", "output": "{\"calories\": 240, \"breakdown\": \"Helado de frutilla (2 bochas) ~240kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de crema americana 2 bochas", "output": "{\"calories\": 280, \"breakdown\": \"Helado de crema americana (2 bochas) ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "helado de sambayón 2 bochas", "output": "{\"calories\": 280, \"breakdown\": \"Helado de sambayón (2 bochas) ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "postre balcarce", "output": "{\"calories\": 400, \"breakdown\": \"Postre Balcarce ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "don pedro", "output": "{\"calories\": 400, \"breakdown\": \"Don Pedro (helado con whisky) ~400kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de frutas con helado", "output": "{\"calories\": 280, \"breakdown\": \"Ensalada de frutas ~150kcal + Bocha de helado ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flan casero", "output": "{\"calories\": 200, \"breakdown\": \"Flan casero ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "flan casero con dulce de leche", "output": "{\"calories\": 260, \"breakdown\": \"Flan casero ~200kcal + Dulce de leche ~60kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "crème brûlée", "output": "{\"calories\": 300, \"breakdown\": \"Crème brûlée ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "panna cotta", "output": "{\"calories\": 280, \"breakdown\": \"Panna cotta ~280kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tarta y gaseosa", "output": "{\"calories\": 420, \"breakdown\": \"Tarta ~280kcal + Gaseosa ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "empanada y agua", "output": "{\"calories\": 300, \"breakdown\": \"Empanada de carne ~300kcal + Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 empanadas y agua", "output": "{\"calories\": 600, \"breakdown\": \"2 Empanadas de carne ~600kcal + Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "sandwich de pollo y coca", "output": "{\"calories\": 490, \"breakdown\": \"Sándwich de pollo ~350kcal + Coca Cola ~140kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "porcion de pizza y agua", "output": "{\"calories\": 300, \"breakdown\": \"Porción de pizza ~300kcal + Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "2 porciones de pizza y agua", "output": "{\"calories\": 600, \"breakdown\": \"2 Porciones de pizza ~600kcal + Agua ~0kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada de pollo grillado", "output": "{\"calories\": 280, \"breakdown\": \"Pollo grillado ~200kcal + Ensalada mixta ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pollo grillado con verduras grilladas", "output": "{\"calories\": 320, \"breakdown\": \"Pollo grillado ~200kcal + Verduras grilladas ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada con atún y huevo", "output": "{\"calories\": 330, \"breakdown\": \"Ensalada mixta ~80kcal + Atún ~170kcal + Huevo duro ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "omelette con ensalada", "output": "{\"calories\": 330, \"breakdown\": \"Omelette de queso ~300kcal + Ensalada mixta ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "huevos revueltos con jamón", "output": "{\"calories\": 200, \"breakdown\": \"Huevos revueltos ~120kcal + Jamón ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pechuga grillada con ensalada y arroz", "output": "{\"calories\": 480, \"breakdown\": \"Pechuga grillada ~200kcal + Ensalada mixta ~80kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "limonada", "output": "{\"calories\": 80, \"breakdown\": \"Limonada ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "limonada con jengibre", "output": "{\"calories\": 90, \"breakdown\": \"Limonada con jengibre ~90kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo de pomelo", "output": "{\"calories\": 100, \"breakdown\": \"Jugo de pomelo ~100kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "jugo de durazno", "output": "{\"calories\": 120, \"breakdown\": \"Jugo de durazno ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "café con crema", "output": "{\"calories\": 120, \"breakdown\": \"Café con crema ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "té con miel", "output": "{\"calories\": 30, \"breakdown\": \"Té con miel ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate amargo", "output": "{\"calories\": 5, \"breakdown\": \"Mate amargo ~5kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "mate dulce", "output": "{\"calories\": 30, \"breakdown\": \"Mate dulce ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "papas gratinadas", "output": "{\"calories\": 350, \"breakdown\": \"Papas gratinadas ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "soufflé de verduras", "output": "{\"calories\": 250, \"breakdown\": \"Soufflé de verduras ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "soufflé de choclo", "output": "{\"calories\": 300, \"breakdown\": \"Soufflé de choclo ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "berenjenas a la parmesana", "output": "{\"calories\": 300, \"breakdown\": \"Berenjenas a la parmesana ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "croquetas de papa", "output": "{\"calories\": 250, \"breakdown\": \"Croquetas de papa (4 unidades) ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "buñuelos de espinaca", "output": "{\"calories\": 200, \"breakdown\": \"Buñuelos de espinaca (3 unidades) ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "tostadas con palta y tomate", "output": "{\"calories\": 280, \"breakdown\": \"2 Tostadas ~120kcal + Palta ~130kcal + Tomate ~30kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "panini de jamón y queso", "output": "{\"calories\": 350, \"breakdown\": \"Panini de jamón y queso ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "wrap de verduras", "output": "{\"calories\": 300, \"breakdown\": \"Wrap de verduras ~300kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "wrap de pollo", "output": "{\"calories\": 350, \"breakdown\": \"Wrap de pollo ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "ensalada caprese", "output": "{\"calories\": 250, \"breakdown\": \"Ensalada caprese ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "bruschetta", "output": "{\"calories\": 180, \"breakdown\": \"Bruschetta (2 unidades) ~180kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "focaccia", "output": "{\"calories\": 250, \"breakdown\": \"Porción de focaccia ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "pan de campo", "output": "{\"calories\": 200, \"breakdown\": \"Pan de campo ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "criollo", "output": "{\"calories\": 250, \"breakdown\": \"Criollo ~250kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me almorcé una mila napo con pure", "output": "{\"calories\": 720, \"breakdown\": \"Milanesa napolitana ~520kcal + Puré de papas ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené bife con ensalada y un vasito de vino", "output": "{\"calories\": 600, \"breakdown\": \"Bife de chorizo ~400kcal + Ensalada mixta ~80kcal + Vaso de vino ~120kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí 2 empanadas de carne y 2 de pollo", "output": "{\"calories\": 1160, \"breakdown\": \"2 Empanadas de carne ~600kcal + 2 Empanadas de pollo ~560kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me pedí 3 porciones de muzza y una birra", "output": "{\"calories\": 1100, \"breakdown\": \"3 Porciones de pizza muzzarella ~900kcal + Cerveza ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "almorcé lentejas con arroz", "output": "{\"calories\": 550, \"breakdown\": \"Lentejas ~350kcal + Arroz blanco ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené omelette con ensalada y pan", "output": "{\"calories\": 460, \"breakdown\": \"Omelette de queso ~300kcal + Ensalada mixta ~80kcal + Pan ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí un brownie con helado", "output": "{\"calories\": 430, \"breakdown\": \"Brownie ~300kcal + Bocha de helado ~130kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me mandé un flan mixto", "output": "{\"calories\": 340, \"breakdown\": \"Flan ~200kcal + Dulce de leche ~60kcal + Crema ~80kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí un plato de sorrentinos con salsa rosa", "output": "{\"calories\": 520, \"breakdown\": \"Sorrentinos con salsa rosa ~520kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "comí ensalada rusa con milanesa", "output": "{\"calories\": 550, \"breakdown\": \"Ensalada rusa ~200kcal + Milanesa ~350kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "me comí un matambre con ensalada rusa", "output": "{\"calories\": 580, \"breakdown\": \"Matambre ~380kcal + Ensalada rusa ~200kcal\"}"}
+{"instruction": "Estimá las calorías de esta comida", "input": "cené peceto al horno con puré", "output": "{\"calories\": 500, \"breakdown\": \"Peceto al horno ~300kcal + Puré de papas ~200kcal\"}"}
