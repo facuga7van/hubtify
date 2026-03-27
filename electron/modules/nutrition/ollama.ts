@@ -240,14 +240,14 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
 const SYSTEM_PROMPT = `Sos un estimador preciso de calorías. Respondé SOLO con JSON válido.
 
 Formato EXACTO:
-{"calories": <total 10-5000>, "items": [{"name": "<ingrediente>", "calories": <número>}, ...]}
+{"calories": <total 10-5000>, "breakdown": "ingrediente1 ~Xkcal + ingrediente2 ~Ykcal"}
 
 Reglas:
 - Estimá porciones típicas argentinas
 - Redondeá hacia arriba si hay duda
-- Cada ingrediente en un item separado con sus calorías individuales
-- Si hay cantidad (ej: "2 milanesas"), multiplicá las calorías por la cantidad. "2 milanesas" = ~700kcal, no ~350kcal
-- La suma de items debe ser igual al total
+- Si hay cantidad (ej: "2 milanesas"), multiplicá las calorías. "2 milanesas" = ~700kcal, no ~350kcal
+- breakdown debe tener cada ingrediente separado por " + " con sus calorías YA multiplicadas por cantidad
+- La suma del breakdown debe ser igual al total
 - SOLO JSON, sin texto adicional, sin explicaciones
 - Si no reconocés la comida, estimá lo más cercano`;
 
@@ -312,6 +312,7 @@ export async function estimateWithAi(description: string): Promise<AiResult | nu
     }
 
     const data = await response.json() as { response: string };
+    console.log('[nutrify:ai-response]', data.response);
     lastAiDebug = data.response?.slice(0, 300) ?? '(empty)';
 
     const result = parseAiResponse(data.response, sanitized);
@@ -322,23 +323,50 @@ export async function estimateWithAi(description: string): Promise<AiResult | nu
   }
 }
 
+function parseItemFromPart(part: string): { name: string; calories: number } | null {
+  const trimmed = part.trim();
+  if (!trimmed) return null;
+
+  // Pattern: "ingrediente ~280kcal" or "ingrediente ~280 kcal"
+  const tilde = trimmed.match(/^(.+?)~\s*(\d+)\s*kcal/i);
+  if (tilde) return { name: tilde[1].trim(), calories: parseInt(tilde[2]) };
+
+  // Pattern: "ingrediente (100kcal c/u) = 300kcal" or "ingrediente = 300kcal"
+  const eq = trimmed.match(/^(.+?)=\s*(\d+)\s*kcal/i);
+  if (eq) return { name: eq[1].replace(/\(.*?\)/g, '').trim(), calories: parseInt(eq[2]) };
+
+  // Pattern: "2x ingrediente 500kcal" or "3 x ingrediente 500kcal"
+  const qtyPrefix = trimmed.match(/^(\d+)\s*x\s+(.+?)\s+(\d+)\s*kcal/i);
+  if (qtyPrefix) return { name: qtyPrefix[2].trim(), calories: parseInt(qtyPrefix[3]) };
+
+  // Pattern: "ingrediente 280kcal" or "ingrediente 280 kcal"
+  const simple = trimmed.match(/^(.+?)\s+(\d+)\s*kcal/i);
+  if (simple) return { name: simple[1].trim(), calories: parseInt(simple[2]) };
+
+  // Pattern: "ingrediente (280 kcal)"
+  const paren = trimmed.match(/^(.+?)\s*\(\s*(\d+)\s*kcal\s*\)/i);
+  if (paren) return { name: paren[1].trim(), calories: parseInt(paren[2]) };
+
+  return null;
+}
+
 function parseItems(items: unknown, totalCals: number, description: string): Array<{ name: string; calories: number }> {
-  // New format: items array
+  // Format: items array [{name, calories}]
   if (Array.isArray(items)) {
     const valid = items.filter((it: any) => typeof it.name === 'string' && typeof it.calories === 'number' && it.calories > 0);
     if (valid.length > 0) return valid.map((it: any) => ({ name: it.name.trim(), calories: Math.round(it.calories) }));
   }
-  // Old format: breakdown string "milanesa ~280kcal + puré ~120kcal"
+  // Format: breakdown string — split by "+" or newlines, parse each part
   if (typeof items === 'string') {
+    const parts = items.split(/\s*\+\s*|\n/).filter(Boolean);
     const parsed: Array<{ name: string; calories: number }> = [];
-    const regex = /([^~+]+?)~(\d+)\s*kcal/gi;
-    let m;
-    while ((m = regex.exec(items)) !== null) {
-      parsed.push({ name: m[1].trim(), calories: parseInt(m[2]) });
+    for (const part of parts) {
+      const item = parseItemFromPart(part);
+      if (item && item.calories > 0) parsed.push(item);
     }
     if (parsed.length > 0) return parsed;
   }
-  // Old format: object {"carne magra": 80}
+  // Format: object {"carne magra": 80}
   if (typeof items === 'object' && items !== null && !Array.isArray(items)) {
     const entries = Object.entries(items as Record<string, number>);
     if (entries.length > 0) return entries.map(([name, cals]) => ({ name, calories: Math.round(cals) }));
