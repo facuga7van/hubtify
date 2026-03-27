@@ -92,16 +92,17 @@ export default function NutritionCharts() {
       )}
 
       {/* Weight chart */}
-      {weights.length > 1 && (
+      {weights.length >= 1 && (
         <div className="rpg-card">
           <div className="rpg-card-title">{t('nutrify.weightTrend')}</div>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={weights.map((w) => ({ date: w.date.slice(5), weight: w.weightKg }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--rpg-parchment-dark)" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+              <YAxis domain={['dataMin - 2', 'dataMax + 2']} tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="weight" stroke="var(--rpg-gold)" name="Weight (kg)" />
+              <Line type="monotone" dataKey="weight" stroke="var(--rpg-gold)" name={t('nutrify.weight') + ' (kg)'}
+                dot={{ r: 4, fill: 'var(--rpg-gold)' }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
