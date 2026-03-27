@@ -81,9 +81,11 @@ export async function downloadAndInstallOllama(onProgress?: (stage: string) => v
 
   onProgress?.('Instalando motor de estimación...');
 
-  // Silent install
-  const { execFileSync } = require('child_process');
-  execFileSync(installerPath, ['/VERYSILENT', '/NORESTART'], { timeout: 120000 });
+  // Silent install — suppress UI and prevent auto-launch
+  execSync(`"${installerPath}" /VERYSILENT /NORESTART /SUPPRESSMSGBOXES`, { timeout: 120000, stdio: 'ignore' });
+
+  // Kill Ollama if the installer auto-launched it — we manage the process ourselves
+  try { execSync('taskkill /F /IM ollama.exe /T', { stdio: 'ignore' }); } catch { /* not running */ }
 
   // Clean up installer
   try { fs.unlinkSync(installerPath); } catch { /* ok */ }
