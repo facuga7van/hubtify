@@ -9,10 +9,11 @@ interface Props {
   placeholder?: string;
   suffix?: string;
   autoFocus?: boolean;
+  fontSize?: string;
   style?: React.CSSProperties;
 }
 
-export default function RpgNumberInput({ value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, style }: Props) {
+export default function RpgNumberInput({ value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, fontSize, style }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -73,8 +74,9 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
         placeholder={placeholder}
         className="rpg-input rpg-number-input"
         style={{
-          width: '100%', textAlign: 'center', fontSize: '1.2rem',
+          width: '100%', textAlign: 'center',
           paddingRight: 10,
+          ...(fontSize ? { fontSize } : {}),
         }}
         autoFocus={autoFocus}
       />

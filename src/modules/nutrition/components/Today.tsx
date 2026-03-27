@@ -307,50 +307,28 @@ export default function Today() {
 
       <CalorieProgressBar consumed={consumed} target={target} tdee={summary?.tdee ?? 0} />
 
-      {/* ── Food input + Daily metrics ──────────────── */}
+      {/* ── Food input ──────────────────────────────── */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          {/* Food input */}
-          <div style={{ flex: 1 }}>
-            <div className="rpg-card-title" style={{ marginBottom: 6 }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-                <path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-3-3-5-4-7z"/>
-              </svg>
-              {t('nutrify.logFood')}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="text"
-                placeholder={t('nutrify.foodInputPlaceholder')}
-                value={foodInput}
-                onChange={(e) => setFoodInput(e.target.value)}
-                className="rpg-input"
-                style={{ flex: 1 }}
-                onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
-              />
-              <button className="rpg-button" onClick={handleEstimate}
-                disabled={estimating || !foodInput.trim()}>
-                {estimating ? t('common.loading') : t('nutrify.estimate')}
-              </button>
-            </div>
-          </div>
-          {/* Metrics */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-              <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
-              <RpgNumberInput
-                value={String(metrics.steps ?? '')}
-                onChange={(v) => handleMetrics('steps', v ? parseInt(v) : null)}
-                step={100} min={0} max={99999}
-                style={{ width: 100 }}
-              />
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', cursor: 'pointer' }}
-              onClick={() => handleMetrics('gym', !metrics.gym)}>
-              <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} size={18} />
-              <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
-            </div>
-          </div>
+        <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-3-3-5-4-7z"/>
+          </svg>
+          {t('nutrify.logFood')}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="text"
+            placeholder={t('nutrify.foodInputPlaceholder')}
+            value={foodInput}
+            onChange={(e) => setFoodInput(e.target.value)}
+            className="rpg-input"
+            style={{ flex: 1 }}
+            onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
+          />
+          <button className="rpg-button" onClick={handleEstimate}
+            disabled={estimating || !foodInput.trim()}>
+            {estimating ? t('common.loading') : t('nutrify.estimate')}
+          </button>
         </div>
 
         {/* Estimation result */}
@@ -418,13 +396,31 @@ export default function Today() {
       )}
 
 
-      {/* Close Day — at the bottom so user fills metrics first */}
+      {/* Close Day */}
       <div className="rpg-card">
-        <div className="rpg-card-title">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-            <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
-          </svg>
-          {t('nutrify.closeDay')}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="rpg-card-title" style={{ marginBottom: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+              <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
+            </svg>
+            {t('nutrify.closeDay')}
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
+              <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
+              <RpgNumberInput
+                value={String(metrics.steps ?? '')}
+                onChange={(v) => handleMetrics('steps', v ? parseInt(v) : null)}
+                step={100} min={0} max={99999}
+                style={{ width: 100 }}
+              />
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', cursor: 'pointer' }}
+              onClick={() => handleMetrics('gym', !metrics.gym)}>
+              <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} size={18} />
+              <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
+            </div>
+          </div>
         </div>
 
         {dayClosed ? (
@@ -493,6 +489,7 @@ export default function Today() {
               onChange={setWeightInput}
               step={0.1} min={30} max={300}
               suffix="kg"
+              fontSize="1.2rem"
               autoFocus
               style={{ marginBottom: 16 }}
             />
