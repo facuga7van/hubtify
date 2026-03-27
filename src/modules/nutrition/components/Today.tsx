@@ -307,49 +307,65 @@ export default function Today() {
 
       <CalorieProgressBar consumed={consumed} target={target} tdee={summary?.tdee ?? 0} />
 
-      {/* ── Unified food input ──────────────────────── */}
+      {/* ── Food input + Daily metrics ──────────────── */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-            <path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-3-3-5-4-7z"/>
-          </svg>
-          {t('nutrify.logFood')}
-        </div>
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            type="text"
-            placeholder={t('nutrify.foodInputPlaceholder')}
-            value={foodInput}
-            onChange={(e) => setFoodInput(e.target.value)}
-            className="rpg-input"
-            style={{ flex: 1 }}
-            onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
-          />
-          <button className="rpg-button" onClick={handleEstimate}
-            disabled={estimating || !foodInput.trim()}>
-            {estimating ? t('common.loading') : t('nutrify.estimate')}
-          </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+          {/* Food input */}
+          <div style={{ flex: 1 }}>
+            <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+                <path d="M8 1c-1 2-4 4-4 7a4 4 0 008 0c0-3-3-5-4-7z"/>
+              </svg>
+              {t('nutrify.logFood')}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                placeholder={t('nutrify.foodInputPlaceholder')}
+                value={foodInput}
+                onChange={(e) => setFoodInput(e.target.value)}
+                className="rpg-input"
+                style={{ flex: 1 }}
+                onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
+              />
+              <button className="rpg-button" onClick={handleEstimate}
+                disabled={estimating || !foodInput.trim()}>
+                {estimating ? t('common.loading') : t('nutrify.estimate')}
+              </button>
+            </div>
+          </div>
+          {/* Metrics */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
+              <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
+              <RpgNumberInput
+                value={String(metrics.steps ?? '')}
+                onChange={(v) => handleMetrics('steps', v ? parseInt(v) : null)}
+                step={100} min={0} max={99999}
+                style={{ width: 100 }}
+              />
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', cursor: 'pointer' }}
+              onClick={() => handleMetrics('gym', !metrics.gym)}>
+              <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} size={18} />
+              <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
+            </div>
+          </div>
         </div>
 
         {/* Estimation result */}
         {estimation && (
           <div style={{ marginTop: 12, padding: 12, border: '1px dashed var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)', background: 'rgba(201,168,76,0.05)' }}>
-            {/* Match breakdown */}
             {estimation.matches.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 {estimation.matches.map((m, i) => (
                   <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--rpg-parchment-dark)' }}>
-                    <span>
-                      {m.name}
-                    </span>
+                    <span>{m.name}</span>
                     <span style={{ fontFamily: 'Fira Code, monospace' }}>{m.calories} kcal</span>
                   </div>
                 ))}
               </div>
             )}
-
-            {/* Editable total */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: '0.9rem' }}>{t('nutrify.totalCalories')}:</span>
               <input
@@ -361,8 +377,6 @@ export default function Today() {
               />
               <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>kcal</span>
             </div>
-
-            {/* Actions */}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button className="rpg-button" onClick={handleConfirmEstimation} style={{ flex: 1 }}>
                 {t('nutrify.confirmLog')}
@@ -403,36 +417,18 @@ export default function Today() {
         </div>
       )}
 
-      {/* Daily metrics + TDEE breakdown */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: summary ? 10 : 0 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-            <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
-            <RpgNumberInput
-              value={String(metrics.steps ?? '')}
-              onChange={(v) => handleMetrics('steps', v ? parseInt(v) : null)}
-              step={100} min={0} max={99999}
-              style={{ width: 110 }}
-            />
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', cursor: 'pointer' }}
-            onClick={() => handleMetrics('gym', !metrics.gym)}>
-            <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} />
-            <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
-          </div>
+      {/* TDEE summary line */}
+      {summary && (
+        <div style={{ fontSize: '0.8rem', display: 'flex', gap: 16, opacity: 0.7, marginBottom: 16, paddingLeft: 4 }}>
+          <span>BMR <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr}</b></span>
+          <span>TDEE <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee}</b></span>
+          {target > 0 && (
+            <span style={{ color: 'var(--rpg-gold)', fontWeight: 'bold' }}>
+              {t('nutrify.target')} <span style={{ fontFamily: 'Fira Code, monospace' }}>{target}</span>
+            </span>
+          )}
         </div>
-        {summary && (
-          <div style={{ fontSize: '0.8rem', display: 'flex', gap: 16, opacity: 0.7, borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 8 }}>
-            <span>BMR <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr}</b></span>
-            <span>TDEE <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee}</b></span>
-            {target > 0 && (
-              <span style={{ color: 'var(--rpg-gold)', fontWeight: 'bold' }}>
-                {t('nutrify.target')} <span style={{ fontFamily: 'Fira Code, monospace' }}>{target}</span>
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Close Day — at the bottom so user fills metrics first */}
       <div className="rpg-card">
