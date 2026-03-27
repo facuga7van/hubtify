@@ -44,6 +44,10 @@ export default function Today() {
   } | null>(null);
   const [closeResult, setCloseResult] = useState<typeof dayClosed | null>(null);
 
+  // Weight check-in popup
+  const [weightPopup, setWeightPopup] = useState<{ show: boolean; lastWeight?: number }>({ show: false });
+  const [weightInput, setWeightInput] = useState('');
+
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
@@ -203,6 +207,31 @@ export default function Today() {
   useEffect(() => {
     return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
   }, []);
+
+  // Weight check-in: only when viewing today
+  useEffect(() => {
+    if (date !== todayDateString()) return;
+    const dismissed = localStorage.getItem('hubtify_weight_dismiss_date');
+    if (dismissed === todayDateString()) return;
+    window.api.nutritionShouldAskWeight().then(result => {
+      if (result.shouldAsk) {
+        setWeightPopup({ show: true, lastWeight: result.lastWeight });
+        if (result.lastWeight) setWeightInput(String(result.lastWeight));
+      }
+    }).catch(console.error);
+  }, [date]);
+
+  const handleWeightSave = async () => {
+    const kg = parseFloat(weightInput);
+    if (!isFinite(kg) || kg < 30 || kg > 300) return;
+    await window.api.nutritionSaveWeeklyMetrics({ weightKg: kg });
+    setWeightPopup({ show: false });
+  };
+
+  const handleWeightDismiss = () => {
+    localStorage.setItem('hubtify_weight_dismiss_date', todayDateString());
+    setWeightPopup({ show: false });
+  };
 
   const handleCloseDay = async () => {
     const result = await window.api.nutritionCloseDay(date);
@@ -459,6 +488,45 @@ export default function Today() {
           boxShadow: 'var(--rpg-shadow)',
         }}>
           {logMessage}
+        </div>
+      )}
+
+      {/* Weight check-in popup */}
+      {weightPopup.show && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'var(--rpg-panel-bg)', border: '2px solid var(--rpg-gold-dark)',
+            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 340,
+            textAlign: 'center', color: 'var(--rpg-parchment)',
+          }}>
+            <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 12, color: 'var(--rpg-gold-light)' }}>
+              {t('nutrify.weightCheckin.title')}
+            </h3>
+            {weightPopup.lastWeight && (
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: 12 }}>
+                {t('nutrify.weightCheckin.lastWeight', { weight: weightPopup.lastWeight })}
+              </p>
+            )}
+            <input
+              type="number" step="0.1" min={30} max={300}
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              placeholder={t('nutrify.weightCheckin.placeholder')}
+              className="rpg-input"
+              style={{ width: '100%', marginBottom: 16, textAlign: 'center', fontSize: '1.2rem' }}
+              autoFocus
+            />
+            <button className="rpg-button" onClick={handleWeightSave} style={{ width: '100%', marginBottom: 8 }}>
+              {t('nutrify.weightCheckin.save')}
+            </button>
+            <button onClick={handleWeightDismiss}
+              style={{ background: 'none', border: 'none', color: 'var(--rpg-gold)', opacity: 0.6, cursor: 'pointer', fontSize: '0.8rem' }}>
+              {t('nutrify.weightCheckin.later')}
+            </button>
+          </div>
         </div>
       )}
     </div>
