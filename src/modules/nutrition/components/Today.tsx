@@ -56,6 +56,7 @@ export default function Today() {
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
+  const [estimateProgress, setEstimateProgress] = useState('');
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
   const [frequentSearch, setFrequentSearch] = useState('');
@@ -128,6 +129,8 @@ export default function Today() {
     if (!foodInput.trim() || estimating) return;
     setEstimating(true);
     setEstimation(null);
+    setEstimateProgress('');
+    const cleanup = window.api.onEstimateProgress((stage) => setEstimateProgress(stage));
     try {
       const result = await window.api.nutritionEstimate(foodInput.trim());
       const est = result as EstimationResult;
@@ -136,7 +139,9 @@ export default function Today() {
     } catch (err) {
       console.error('Estimation failed:', err);
     } finally {
+      cleanup();
       setEstimating(false);
+      setEstimateProgress('');
     }
   };
 
@@ -342,6 +347,13 @@ export default function Today() {
             {estimating ? t('common.loading') : t('nutrify.estimate')}
           </button>
         </div>
+
+        {/* Progress message */}
+        {estimating && estimateProgress && (
+          <div style={{ marginTop: 8, fontSize: '0.8rem', fontFamily: 'Fira Code, monospace', opacity: 0.7 }}>
+            {estimateProgress}
+          </div>
+        )}
 
         {/* Estimation result */}
         {estimation && (
