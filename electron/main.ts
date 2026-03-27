@@ -19,6 +19,15 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let minimizeToTray = true;
+let alwaysOnTop = false;
+
+function getIconPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'icon.ico');
+  }
+  return path.join(__dirname, '../../assets/icon.ico');
+}
 
 // Prevent multiple instances — second instance focuses the existing window
 const gotLock = app.requestSingleInstanceLock();
@@ -34,24 +43,36 @@ if (!gotLock) {
   });
 }
 
-function createTray(): void {
-  const iconPath = path.join(__dirname, '../../assets/icon.png');
-  let icon = nativeImage.createFromPath(iconPath);
-  if (icon.isEmpty()) {
-    // Fallback: create a tiny 16x16 placeholder if icon.png doesn't exist
-    icon = nativeImage.createEmpty();
-  }
-
-  tray = new Tray(icon.isEmpty() ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAADklEQVQ4y2NgGAWDEwAAAhAAATp23FAAAAAASUVORK5CYII=') : icon);
-  tray.setToolTip('Hubtify');
-
+function rebuildTrayMenu(): void {
+  if (!tray) return;
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Abrir Hubtify', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
     { type: 'separator' },
+    {
+      label: 'Siempre visible', type: 'checkbox', checked: alwaysOnTop,
+      click: () => { alwaysOnTop = !alwaysOnTop; mainWindow?.setAlwaysOnTop(alwaysOnTop); rebuildTrayMenu(); },
+    },
+    {
+      label: 'Minimizar a bandeja', type: 'checkbox', checked: minimizeToTray,
+      click: () => { minimizeToTray = !minimizeToTray; rebuildTrayMenu(); },
+    },
+    { type: 'separator' },
     { label: 'Salir', click: () => { isQuitting = true; app.quit(); } },
   ]);
-
   tray.setContextMenu(contextMenu);
+}
+
+function createTray(): void {
+  let icon = nativeImage.createFromPath(getIconPath());
+  if (icon.isEmpty()) {
+    icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAADklEQVQ4y2NgGAWDEwAAAhAAATp23FAAAAAASUVORK5CYII=');
+  }
+  // Resize for tray (16x16 looks best on Windows)
+  icon = icon.resize({ width: 16, height: 16 });
+
+  tray = new Tray(icon);
+  tray.setToolTip('Hubtify');
+  rebuildTrayMenu();
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
 }
 
@@ -64,7 +85,7 @@ function createWindow(): void {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
-    icon: path.join(__dirname, '../../assets/icon.png'),
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -78,9 +99,9 @@ function createWindow(): void {
     mainWindow?.focus();
   });
 
-  // Minimize to tray instead of closing
+  // Minimize to tray or close based on user preference
   mainWindow.on('close', (e) => {
-    if (!isQuitting) {
+    if (!isQuitting && minimizeToTray) {
       e.preventDefault();
       mainWindow?.hide();
     }

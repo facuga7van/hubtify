@@ -57,6 +57,7 @@ const config: ForgeConfig = {
       unpack: '**/node_modules/{better-sqlite3,bindings,file-uri-to-path}/**',
     },
     icon: './assets/icon',
+    extraResource: ['./assets/icon.ico'],
     appVersion: '0.1.0',
     appCopyright: 'Hubtify',
     win32metadata: {
