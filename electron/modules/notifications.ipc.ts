@@ -1,4 +1,5 @@
-import { ipcMain, Notification, app } from 'electron';
+import { Notification, app } from 'electron';
+import { ipcHandle } from '../ipc/ipc-handle';
 
 let reminderInterval: NodeJS.Timeout | null = null;
 
@@ -10,7 +11,7 @@ export function clearReminderInterval(): void {
 }
 
 export function registerNotificationIpcHandlers(): void {
-  ipcMain.handle('notifications:setReminders', (_e, enabled: boolean) => {
+  ipcHandle('notifications:setReminders', (_e, enabled: boolean) => {
     if (reminderInterval) {
       clearInterval(reminderInterval);
       reminderInterval = null;
@@ -32,7 +33,7 @@ export function registerNotificationIpcHandlers(): void {
     return { success: true };
   });
 
-  ipcMain.handle('notifications:send', (_e, title: string, body: string) => {
+  ipcHandle('notifications:send', (_e, title: string, body: string) => {
     if (Notification.isSupported()) {
       new Notification({ title, body }).show();
       return true;

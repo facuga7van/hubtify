@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 
 interface SyncTask {
@@ -86,7 +86,7 @@ interface SyncQuestData {
 
 export function registerSyncIpcHandlers(): void {
   // Returns ALL quest data including soft-deleted, for push to Firebase
-  ipcMain.handle('sync:getAllQuestData', () => {
+  ipcHandle('sync:getAllQuestData', () => {
     const db = getDb();
 
     const tasks = db.prepare(`
@@ -136,7 +136,7 @@ export function registerSyncIpcHandlers(): void {
   });
 
   // Merges remote quest data with local using last-write-wins
-  ipcMain.handle('sync:mergeQuestData', (_e, remote: SyncQuestData) => {
+  ipcHandle('sync:mergeQuestData', (_e, remote: SyncQuestData) => {
     const db = getDb();
     let changed = false;
 

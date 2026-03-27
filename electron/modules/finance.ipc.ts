@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
 
@@ -9,7 +9,7 @@ function genId(): string {
 export function registerFinanceIpcHandlers(): void {
   // ── Transactions ────────────────────────────────────
 
-  ipcMain.handle('finance:getTransactions', (_e, month: string) => {
+  ipcHandle('finance:getTransactions', (_e, month: string) => {
     const db = getDb();
     return db.prepare(`
       SELECT id, type, amount, currency, category, description,
@@ -20,7 +20,7 @@ export function registerFinanceIpcHandlers(): void {
     `).all(`${month}%`);
   });
 
-  ipcMain.handle('finance:addTransaction', (_e, tx: {
+  ipcHandle('finance:addTransaction', (_e, tx: {
     type: 'expense' | 'income'; amount: number; currency?: string;
     category?: string; description?: string; date: string; source?: string;
   }) => {
@@ -37,14 +37,14 @@ export function registerFinanceIpcHandlers(): void {
     return id;
   });
 
-  ipcMain.handle('finance:deleteTransaction', (_e, id: string) => {
+  ipcHandle('finance:deleteTransaction', (_e, id: string) => {
     const db = getDb();
     db.prepare('DELETE FROM finance_transactions WHERE id = ?').run(id);
   });
 
   // ── Loans ───────────────────────────────────────────
 
-  ipcMain.handle('finance:getLoans', () => {
+  ipcHandle('finance:getLoans', () => {
     const db = getDb();
     return db.prepare(`
       SELECT id, person_name AS personName, type, amount, currency, date,
@@ -54,7 +54,7 @@ export function registerFinanceIpcHandlers(): void {
     `).all();
   });
 
-  ipcMain.handle('finance:addLoan', (_e, loan: {
+  ipcHandle('finance:addLoan', (_e, loan: {
     personName: string; type: 'lent' | 'borrowed'; amount: number;
     currency?: string; date: string; description?: string;
   }) => {
@@ -68,7 +68,7 @@ export function registerFinanceIpcHandlers(): void {
     return id;
   });
 
-  ipcMain.handle('finance:settleLoan', (_e, id: string) => {
+  ipcHandle('finance:settleLoan', (_e, id: string) => {
     const db = getDb();
     const now = new Date().toLocaleDateString('en-CA');
     db.prepare('UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?').run(now, id);
@@ -76,7 +76,7 @@ export function registerFinanceIpcHandlers(): void {
 
   // ── Income Sources ──────────────────────────────────
 
-  ipcMain.handle('finance:getIncomeSources', () => {
+  ipcHandle('finance:getIncomeSources', () => {
     const db = getDb();
     return db.prepare(`
       SELECT id, name, estimated_amount AS estimatedAmount, frequency,
@@ -86,7 +86,7 @@ export function registerFinanceIpcHandlers(): void {
     `).all();
   });
 
-  ipcMain.handle('finance:addIncomeSource', (_e, src: {
+  ipcHandle('finance:addIncomeSource', (_e, src: {
     name: string; estimatedAmount: number; frequency?: string; isVariable?: boolean;
   }) => {
     const db = getDb();
@@ -99,14 +99,14 @@ export function registerFinanceIpcHandlers(): void {
     return id;
   });
 
-  ipcMain.handle('finance:toggleIncomeSource', (_e, id: string) => {
+  ipcHandle('finance:toggleIncomeSource', (_e, id: string) => {
     const db = getDb();
     db.prepare('UPDATE finance_income_sources SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ?').run(id);
   });
 
   // ── Categories ──────────────────────────────────────
 
-  ipcMain.handle('finance:getCategories', () => {
+  ipcHandle('finance:getCategories', () => {
     const db = getDb();
     return (db.prepare('SELECT name FROM finance_categories ORDER BY created_at ASC').all() as { name: string }[])
       .map((r) => r.name);
@@ -114,7 +114,7 @@ export function registerFinanceIpcHandlers(): void {
 
   // ── Stats helpers ───────────────────────────────────
 
-  ipcMain.handle('finance:getMonthlyTotal', () => {
+  ipcHandle('finance:getMonthlyTotal', () => {
     const db = getDb();
     const month = new Date().toLocaleDateString('en-CA').slice(0, 7); // YYYY-MM
     const result = db.prepare(
@@ -123,7 +123,7 @@ export function registerFinanceIpcHandlers(): void {
     return result.total;
   });
 
-  ipcMain.handle('finance:getMonthlyBalance', (_e, month?: string) => {
+  ipcHandle('finance:getMonthlyBalance', (_e, month?: string) => {
     const db = getDb();
     const m = month ?? new Date().toLocaleDateString('en-CA').slice(0, 7);
     const expenses = db.prepare(
@@ -135,7 +135,7 @@ export function registerFinanceIpcHandlers(): void {
     return { expenses: expenses.total, income: income.total, balance: income.total - expenses.total };
   });
 
-  ipcMain.handle('finance:getCategoryBreakdown', (_e, month?: string) => {
+  ipcHandle('finance:getCategoryBreakdown', (_e, month?: string) => {
     const db = getDb();
     const m = month ?? new Date().toLocaleDateString('en-CA').slice(0, 7);
     return db.prepare(
@@ -143,7 +143,7 @@ export function registerFinanceIpcHandlers(): void {
     ).all(`${m}%`);
   });
 
-  ipcMain.handle('finance:updateTransaction', (_e, id: string, fields: { amount?: number; description?: string; category?: string }) => {
+  ipcHandle('finance:updateTransaction', (_e, id: string, fields: { amount?: number; description?: string; category?: string }) => {
     const db = getDb();
     const sets: string[] = ['updated_at = ?'];
     const vals: unknown[] = [new Date().toISOString()];
@@ -154,7 +154,7 @@ export function registerFinanceIpcHandlers(): void {
     db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   });
 
-  ipcMain.handle('finance:getActiveLoansCount', () => {
+  ipcHandle('finance:getActiveLoansCount', () => {
     const db = getDb();
     const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };
     return result.c;
