@@ -16,6 +16,7 @@
   transition: width 0.25s ease, min-width 0.25s ease;
   overflow: hidden;
   position: relative;
+  z-index: 2;
 }
 
 .sidebar--collapsed {
@@ -23,35 +24,43 @@
   min-width: 56px;
 }
 
+/* ── Sidebar wrapper (holds sidebar + toggle) ────── */
+.sidebar-wrapper {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
 /* ── Toggle button ───────────────────────────────── */
 .sidebar-toggle {
   position: absolute;
-  top: 8px;
-  right: 6px;
-  z-index: 10;
-  background: none;
-  border: none;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%) translateX(50%);
+  z-index: 1;
+  background: var(--rpg-wood, #2c1810);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-left: none;
   color: var(--rpg-gold);
   cursor: pointer;
-  opacity: 0.5;
-  padding: 4px;
-  border-radius: var(--rpg-radius);
-  transition: opacity 0.2s, background 0.2s;
+  opacity: 0.6;
+  width: 24px;
+  height: 40px;
+  padding: 0;
+  border-radius: 0 6px 6px 0;
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .sidebar-toggle:hover {
+  transform: translateY(-50%) translateX(100%);
   opacity: 1;
-  background: rgba(201, 168, 76, 0.15);
+  background: var(--rpg-leather, #3a2218);
 }
 
 .sidebar-toggle--collapsed {
-  position: static;
-  width: 100%;
-  opacity: 0.4;
-  padding: 2px 0;
 }
 
 /* ── PlayerCard ──────────────────────────────────── */
@@ -74,8 +83,19 @@
 }
 
 .player-card--collapsed .player-card__avatar-wrap {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 0;
+}
+
+.player-card--collapsed .player-card__avatar-glow {
+  width: 36px;
+  height: 36px;
+}
+
+.player-card--collapsed .player-card__avatar-glow > * {
   transform: scale(0.5);
-  margin-bottom: -20px;
+  transform-origin: top left;
 }
 
 .player-card__avatar-glow {

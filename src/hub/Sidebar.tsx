@@ -5,7 +5,7 @@ import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import './styles/layout.css';
 
-interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle: () => void; }
+interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; }
 
 function NavIcon({ name }: { name: string }) {
   const s = { width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -50,15 +50,6 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
-      {/* Toggle button */}
-      <button onClick={onToggle} className={`sidebar-toggle ${collapsed ? 'sidebar-toggle--collapsed' : ''}`}
-        title={collapsed ? 'Expand' : 'Collapse'}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-          style={{ transition: 'transform 0.25s ease', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-          <path d="M9 2L4 7l5 5"/>
-        </svg>
-      </button>
-
       <PlayerCard stats={stats} collapsed={collapsed} />
 
       {!collapsed && (

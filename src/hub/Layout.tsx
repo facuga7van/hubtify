@@ -160,7 +160,16 @@ export default function Layout() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
-        <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <div className="sidebar-wrapper">
+          <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+          <button onClick={toggleSidebar} className={`sidebar-toggle ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
+            title={sidebarCollapsed ? 'Expand' : 'Collapse'}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              style={{ transition: 'transform 0.25s ease', transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <path d="M9 2L4 7l5 5"/>
+            </svg>
+          </button>
+        </div>
         <main className="main-content">
           <Outlet />
         </main>
