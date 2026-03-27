@@ -5,7 +5,7 @@ import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
-import { getLocalDateString } from '../../../../shared/rpg-engine';
+import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -29,7 +29,7 @@ export default function Today() {
   const navigate = useNavigate();
 
   const { t } = useTranslation();
-  const [date, setDate] = useState(() => getLocalDateString());
+  const [date, setDate] = useState(() => todayDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });
@@ -76,11 +76,11 @@ export default function Today() {
   // Auto-close past days that have food but weren't closed
   useEffect(() => {
     (async () => {
-      const today = getLocalDateString();
+      const today = todayDateString();
       for (let i = 1; i <= 7; i++) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const pastDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const pastDate = formatDateString(d);
         if (pastDate >= today) continue;
         const closed = await window.api.nutritionIsDayClosed(pastDate);
         if (closed) continue;
@@ -111,10 +111,7 @@ export default function Today() {
   const goDay = (offset: number) => {
     const [y, m, d] = date.split('-').map(Number);
     const newDate = new Date(y, m - 1, d + offset);
-    const yyyy = newDate.getFullYear();
-    const mm = String(newDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(newDate.getDate()).padStart(2, '0');
-    setDate(`${yyyy}-${mm}-${dd}`);
+    setDate(formatDateString(newDate));
   };
 
   // ── Unified estimation flow ──────────────────────
@@ -265,8 +262,8 @@ export default function Today() {
             <path d="M6 1L1 6l5 5M1 6h14"/>
           </svg>
         </button>
-        <button className="rpg-button" onClick={() => setDate(getLocalDateString())}
-          style={{ padding: '4px 8px', fontSize: '0.75rem', opacity: date === getLocalDateString() ? 0.5 : 1 }}>
+        <button className="rpg-button" onClick={() => setDate(todayDateString())}
+          style={{ padding: '4px 8px', fontSize: '0.75rem', opacity: date === todayDateString() ? 0.5 : 1 }}>
           {t('nutrify.today')}
         </button>
         <h3 style={{ flex: 1, textAlign: 'center' }}>{date}</h3>

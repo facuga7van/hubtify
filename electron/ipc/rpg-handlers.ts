@@ -13,6 +13,7 @@ import {
   daysDiff,
 } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEvent, RpgEventRecord } from '../../shared/types';
+import { todayDateString } from '../../shared/date-utils';
 
 function defaultStats(): PlayerStats {
   return {
@@ -191,7 +192,7 @@ export function registerRpgHandlers(): void {
 
   ipcMain.handle('rpg:getDashboardStats', () => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
 
     // XP gained today
     const xpToday = db.prepare(

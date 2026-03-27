@@ -8,7 +8,7 @@ import Checkbox from '../../../shared/components/Checkbox';
 import type { XpToastData } from './XpToast';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
 import { TierBadge, tierXp, calculateXpForAction } from '../utils';
-import { getLocalDateString } from '../../../../shared/rpg-engine';
+import { todayDateString } from '../../../../shared/date-utils';
 
 interface Props {
   taskId: string;
@@ -41,7 +41,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
   const handleComplete = async (subtask: Subtask) => {
     const tier = subtask.tier as TaskTier;
     if (!subtask.status) {
-      const today = getLocalDateString();
+      const today = todayDateString();
       const { xp, bonus, comboMult } = calculateXpForAction(tier, countCompletedToday);
 
       await window.api.questsSetSubtaskStatus(subtask.id, true, today);

@@ -75,10 +75,7 @@ export function isStreakActive(lastDate: string | null, today: string): boolean 
   return diffDays <= 1;
 }
 
-export function getLocalDateString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
+export { todayDateString as getLocalDateString } from './date-utils';
 
 export function daysDiff(a: string, b: string): number {
   return Math.floor((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));

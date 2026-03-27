@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 
 interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; }
 interface WeightEntry { date: string; weightKg: number; }
@@ -13,10 +14,10 @@ export default function NutritionCharts() {
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
-    const end = new Date().toLocaleDateString('en-CA');
+    const end = todayDateString();
     const start = new Date();
     start.setDate(start.getDate() - 30);
-    const startStr = start.toLocaleDateString('en-CA');
+    const startStr = formatDateString(start);
 
     Promise.all([
       window.api.nutritionGetSummaryRange(startStr, end),

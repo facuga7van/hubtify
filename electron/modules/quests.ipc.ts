@@ -1,6 +1,7 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
+import { todayDateString, formatDateString } from '../../shared/date-utils';
 
 function genId(): string {
   return crypto.randomUUID();
@@ -180,7 +181,7 @@ export function registerQuestsIpcHandlers(): void {
   // but it may miscount if a completed task is edited (updating updated_at) on a different day.
   ipcHandle('quests:countCompletedToday', () => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const today = todayDateString(); // YYYY-MM-DD
     const taskCount = db.prepare(
       "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(updated_at) = ?"
     ).get(today) as { c: number };
@@ -198,7 +199,7 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcHandle('quests:getCompletedTodayCount', () => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     const result = db.prepare(
       "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(updated_at) = ?"
     ).get(today) as { c: number };
@@ -299,7 +300,7 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:getHabits', () => {
     const db = getDb();
     const today = new Date();
-    const todayStr = today.toLocaleDateString('en-CA');
+    const todayStr = formatDateString(today);
 
     const habits = db.prepare(`
       SELECT id, name, frequency, times_per_week AS timesPerWeek, created_at AS createdAt
@@ -334,7 +335,7 @@ export function registerQuestsIpcHandlers(): void {
         const dayOfWeek = today.getDay() || 7; // 1=Mon..7=Sun
         const monday = new Date(today);
         monday.setDate(today.getDate() - dayOfWeek + 1);
-        const mondayStr = monday.toLocaleDateString('en-CA');
+        const mondayStr = formatDateString(monday);
         checksThisPeriod = 0;
         for (const d of dates) {
           if (d >= mondayStr && d <= todayStr) checksThisPeriod++;
@@ -354,17 +355,17 @@ export function registerQuestsIpcHandlers(): void {
       if (h.frequency === 'daily') {
         // Count consecutive days backwards
         const startDate = checkedToday ? todayStr : (() => {
-          const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA');
+          const d = new Date(); d.setDate(d.getDate() - 1); return formatDateString(d);
         })();
         if (!checkedToday) {
           const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-          if (!dates.has(yesterday.toLocaleDateString('en-CA'))) {
+          if (!dates.has(formatDateString(yesterday))) {
             return { ...h, streak: 0, checkedToday, checksThisPeriod, targetThisPeriod };
           }
         }
         const d = new Date(startDate);
         while (true) {
-          if (!dates.has(d.toLocaleDateString('en-CA'))) break;
+          if (!dates.has(formatDateString(d))) break;
           streak++;
           d.setDate(d.getDate() - 1);
         }
@@ -378,9 +379,9 @@ export function registerQuestsIpcHandlers(): void {
 
         const d = new Date(weekStart);
         while (true) {
-          const wStart = d.toLocaleDateString('en-CA');
+          const wStart = formatDateString(d);
           const wEnd = new Date(d); wEnd.setDate(d.getDate() + 6);
-          const wEndStr = wEnd.toLocaleDateString('en-CA');
+          const wEndStr = formatDateString(wEnd);
           let count = 0;
           for (const dt of dates) {
             if (dt >= wStart && dt <= wEndStr) count++;
@@ -430,7 +431,7 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcHandle('quests:checkHabit', (_e, habitId: string) => {
     const db = getDb();
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     const now = new Date().toISOString();
     const checkTx = db.transaction(() => {
       const existing = db.prepare('SELECT id, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?').get(habitId, today) as { id: string; deleted_at: string | null } | undefined;

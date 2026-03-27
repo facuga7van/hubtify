@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import type { Transaction, Loan } from '../types';
 import { CATEGORIES } from '../types';
+import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 
 export default function FinanceDashboard() {
   const { t } = useTranslation();
-  const [month, setMonth] = useState(() => new Date().toLocaleDateString('en-CA').slice(0, 7));
+  const [month, setMonth] = useState(() => todayDateString().slice(0, 7));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [categories, setCategories] = useState<string[]>(CATEGORIES);
@@ -77,7 +78,7 @@ export default function FinanceDashboard() {
   const addTransaction = async () => {
     const amount = parseFloat(txAmount);
     if (!amount || amount <= 0) return;
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     await window.api.financeAddTransaction({
       type: txType, amount, category: txCategory,
       description: txDesc, date: today,
@@ -119,7 +120,7 @@ export default function FinanceDashboard() {
   const addLoan = async () => {
     const amount = parseFloat(loanAmount);
     if (!amount || !loanPerson.trim()) return;
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = todayDateString();
     await window.api.financeAddLoan({
       personName: loanPerson.trim(), type: loanType,
       amount, date: today, description: loanDesc,
@@ -138,13 +139,13 @@ export default function FinanceDashboard() {
   const prevMonth = () => {
     const d = new Date(month + '-01');
     d.setMonth(d.getMonth() - 1);
-    setMonth(d.toLocaleDateString('en-CA').slice(0, 7));
+    setMonth(formatDateString(d).slice(0, 7));
   };
 
   const nextMonth = () => {
     const d = new Date(month + '-01');
     d.setMonth(d.getMonth() + 1);
-    setMonth(d.toLocaleDateString('en-CA').slice(0, 7));
+    setMonth(formatDateString(d).slice(0, 7));
   };
 
   const activeLoans = loans.filter((l) => !l.settled);

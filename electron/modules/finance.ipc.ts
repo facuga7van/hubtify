@@ -1,6 +1,7 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
+import { todayDateString } from '../../shared/date-utils';
 
 function genId(): string {
   return crypto.randomUUID();
@@ -70,7 +71,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:settleLoan', (_e, id: string) => {
     const db = getDb();
-    const now = new Date().toLocaleDateString('en-CA');
+    const now = todayDateString();
     db.prepare('UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?').run(now, id);
   });
 
@@ -116,7 +117,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getMonthlyTotal', () => {
     const db = getDb();
-    const month = new Date().toLocaleDateString('en-CA').slice(0, 7); // YYYY-MM
+    const month = todayDateString().slice(0, 7); // YYYY-MM
     const result = db.prepare(
       "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ?"
     ).get(`${month}%`) as { total: number };
@@ -125,7 +126,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getMonthlyBalance', (_e, month?: string) => {
     const db = getDb();
-    const m = month ?? new Date().toLocaleDateString('en-CA').slice(0, 7);
+    const m = month ?? todayDateString().slice(0, 7);
     const expenses = db.prepare(
       "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ?"
     ).get(`${m}%`) as { total: number };
@@ -137,7 +138,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getCategoryBreakdown', (_e, month?: string) => {
     const db = getDb();
-    const m = month ?? new Date().toLocaleDateString('en-CA').slice(0, 7);
+    const m = month ?? todayDateString().slice(0, 7);
     return db.prepare(
       "SELECT category, SUM(amount) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ? GROUP BY category ORDER BY total DESC"
     ).all(`${m}%`);
