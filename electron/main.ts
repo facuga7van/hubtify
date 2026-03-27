@@ -99,11 +99,14 @@ function createWindow(): void {
     mainWindow?.focus();
   });
 
-  // Minimize to tray or close based on user preference
+  // Minimize to tray or quit based on user preference
   mainWindow.on('close', (e) => {
     if (!isQuitting && minimizeToTray) {
       e.preventDefault();
       mainWindow?.hide();
+    } else if (!isQuitting) {
+      isQuitting = true;
+      app.quit();
     }
   });
 
