@@ -167,7 +167,8 @@ export function stopOllama(): void {
 let modelReady = false;
 
 export async function ensureModelPulled(onProgress?: (stage: string) => void): Promise<void> {
-  // Always pull — Ollama only downloads if there's a newer version
+  if (modelReady) return;
+  // Pull once per session — Ollama only downloads if there's a newer version
   pauseTimer();
 
   onProgress?.('Descargando modelo de IA (~1.3 GB)... 0%');
