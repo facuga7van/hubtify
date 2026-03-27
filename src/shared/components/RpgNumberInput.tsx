@@ -74,7 +74,7 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
         className="rpg-input rpg-number-input"
         style={{
           width: '100%', textAlign: 'center', fontSize: '1.2rem',
-          paddingRight: suffix ? 60 : 32,
+          paddingRight: 10,
         }}
         autoFocus={autoFocus}
       />

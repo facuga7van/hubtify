@@ -146,25 +146,6 @@ export default function NutritionSettings() {
         )}
       </div>
 
-      {/* Exercise */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">{t('nutrify.exerciseConfig')}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <label style={labelStyle}>
-            {t('nutrify.gymCalories')} (kcal)
-            <input type="number" value={gymCalories} onChange={(e) => setGymCalories(+e.target.value)}
-              className="rpg-input" min={0} max={1000} step={50} />
-            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('nutrify.gymCaloriesHint')}</span>
-          </label>
-          <label style={labelStyle}>
-            {t('nutrify.stepFactor')}
-            <input type="number" value={stepFactor} onChange={(e) => setStepFactor(+e.target.value)}
-              className="rpg-input" min={0} max={0.2} step={0.01} />
-            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('nutrify.stepFactorHint')}</span>
-          </label>
-        </div>
-      </div>
-
       {/* Weight check-in day */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <label style={labelStyle}>
