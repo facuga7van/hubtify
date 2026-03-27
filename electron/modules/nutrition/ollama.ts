@@ -167,25 +167,8 @@ export function stopOllama(): void {
 let modelReady = false;
 
 export async function ensureModelPulled(onProgress?: (stage: string) => void): Promise<void> {
-  if (modelReady) return;
-
-  // Check if model exists
-  try {
-    const res = await fetch(`http://localhost:${port}/api/show`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: MODEL }),
-    });
-    if (res.ok) {
-      modelReady = true;
-      return;
-    }
-  } catch { /* not available */ }
-
-  // Pause inactivity timer during pull — it can take several minutes
+  // Always pull — Ollama only downloads if there's a newer version
   pauseTimer();
-
-  // Pull the model with streaming to track progress
 
   onProgress?.('Descargando modelo de IA (~1.3 GB)... 0%');
 
