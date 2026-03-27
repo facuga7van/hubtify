@@ -8,7 +8,9 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      unpack: '**/{better-sqlite3,bindings,file-uri-to-path}/**/*.node',
+    },
     icon: './assets/icon',
     appVersion: '0.1.0',
     appCopyright: 'Hubtify',
