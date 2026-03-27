@@ -403,46 +403,36 @@ export default function Today() {
         </div>
       )}
 
-      {/* Daily metrics */}
+      {/* Daily metrics + TDEE breakdown */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">{t('nutrify.dailyMetrics')}</div>
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: summary ? 10 : 0 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
             <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
-            <input type="number" value={metrics.steps ?? ''} placeholder="0"
-              onChange={(e) => handleMetrics('steps', e.target.value ? parseInt(e.target.value) : null)}
-              className="rpg-input" style={{ width: 90, textAlign: 'center' }} />
+            <RpgNumberInput
+              value={String(metrics.steps ?? '')}
+              onChange={(v) => handleMetrics('steps', v ? parseInt(v) : null)}
+              step={100} min={0} max={99999}
+              style={{ width: 110 }}
+            />
           </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', cursor: 'pointer' }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', cursor: 'pointer' }}
             onClick={() => handleMetrics('gym', !metrics.gym)}>
             <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} />
             <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
           </div>
         </div>
-      </div>
-
-      {/* TDEE breakdown */}
-      {summary && (
-        <div className="rpg-card" style={{ marginBottom: 16 }}>
-          <div className="rpg-card-title">{t('nutrify.tdeeBreakdown')}</div>
-          <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>BMR</span>
-              <span style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr} kcal</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>TDEE ({t(`nutrify.${summary.activityLevel ?? 'moderate'}`)})</span>
-              <span style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee} kcal</span>
-            </div>
+        {summary && (
+          <div style={{ fontSize: '0.8rem', display: 'flex', gap: 16, opacity: 0.7, borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 8 }}>
+            <span>BMR <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.bmr}</b></span>
+            <span>TDEE <b style={{ fontFamily: 'Fira Code, monospace' }}>{summary.tdee}</b></span>
             {target > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 4, fontWeight: 'bold' }}>
-                <span>{t('nutrify.target')}</span>
-                <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-gold)' }}>{target} kcal</span>
-              </div>
+              <span style={{ color: 'var(--rpg-gold)', fontWeight: 'bold' }}>
+                {t('nutrify.target')} <span style={{ fontFamily: 'Fira Code, monospace' }}>{target}</span>
+              </span>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Close Day — at the bottom so user fills metrics first */}
       <div className="rpg-card">
