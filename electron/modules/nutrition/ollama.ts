@@ -246,7 +246,8 @@ Reglas:
 - Estimá porciones típicas argentinas
 - Redondeá hacia arriba si hay duda
 - Cada ingrediente en un item separado con sus calorías individuales
-- La suma de items debe ser cercana al total
+- Si hay cantidad (ej: "2 milanesas"), multiplicá las calorías por la cantidad. "2 milanesas" = ~700kcal, no ~350kcal
+- La suma de items debe ser igual al total
 - SOLO JSON, sin texto adicional, sin explicaciones
 - Si no reconocés la comida, estimá lo más cercano`;
 
