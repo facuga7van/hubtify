@@ -7,7 +7,7 @@ import type { OllamaStatus } from '../../../shared/types';
 const MODEL = 'nutrify';
 const DEFAULT_PORT = 11434;
 let port = DEFAULT_PORT;
-const INACTIVITY_TIMEOUT_MS = 15 * 1000; // 15s after last use
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 min after last use
 
 export function getOllamaPort(): number { return port; }
 
@@ -186,11 +186,59 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
 
 // --- AI Estimation ---
 
-const SYSTEM_PROMPT = 'Estimá las calorías de esta comida';
+const SYSTEM_PROMPT = `Sos un estimador preciso de calorías. Respondé SOLO con JSON válido.
+
+Formato EXACTO:
+{"calories": <número 10-5000>, "breakdown": "<descripción de ingredientes y calorías aprox>"}
+
+Reglas:
+- Estimá porciones típicas argentinas
+- Redondeá hacia arriba si hay duda
+- breakdown debe ser: "ingrediente1 ~Xkcal + ingrediente2 ~Ykcal"
+- SOLO JSON, sin texto adicional, sin explicaciones
+- Si no reconocés la comida, estimá lo más cercano`;
 
 export let lastAiDebug = '';
 
+function sanitizeDescription(input: string): string | null {
+  if (!input || typeof input !== 'string') return null;
+  let s = input.trim().replace(/[\x00-\x1F\x7F]/g, '').replace(/\s+/g, ' ');
+  if (s.length > 500) s = s.slice(0, 500);
+  return s || null;
+}
+
+const estimationCache = new Map<string, { result: { calories: number; breakdown: string }; ts: number }>();
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+
+function getCached(desc: string): { calories: number; breakdown: string } | null {
+  const key = desc.toLowerCase().trim();
+  const entry = estimationCache.get(key);
+  if (!entry || Date.now() - entry.ts > CACHE_TTL) { estimationCache.delete(key); return null; }
+  return entry.result;
+}
+
+function setCache(desc: string, result: { calories: number; breakdown: string }): void {
+  const key = desc.toLowerCase().trim();
+  estimationCache.set(key, { result, ts: Date.now() });
+  if (estimationCache.size > 500) {
+    const oldest = [...estimationCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+    if (oldest) estimationCache.delete(oldest[0]);
+  }
+}
+
 export async function estimateWithAi(description: string): Promise<{ calories: number; breakdown: string } | null> {
+  const sanitized = sanitizeDescription(description);
+  if (!sanitized) {
+    lastAiDebug = 'Input validation failed';
+    return null;
+  }
+
+  const cached = getCached(sanitized);
+  if (cached) {
+    lastAiDebug = '(cached)';
+    return cached;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60000);
 
@@ -198,7 +246,7 @@ export async function estimateWithAi(description: string): Promise<{ calories: n
     const response = await fetch(`http://localhost:${port}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, prompt: description, system: SYSTEM_PROMPT, stream: false, temperature: 0.1 }),
+      body: JSON.stringify({ model: MODEL, prompt: sanitized, system: SYSTEM_PROMPT, stream: false, temperature: 0.1 }),
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -211,7 +259,9 @@ export async function estimateWithAi(description: string): Promise<{ calories: n
     const data = await response.json() as { response: string };
     lastAiDebug = data.response?.slice(0, 300) ?? '(empty)';
 
-    return parseAiResponse(data.response);
+    const result = parseAiResponse(data.response);
+    if (result) setCache(sanitized, result);
+    return result;
   } finally {
     clearTimeout(timeout);
   }
