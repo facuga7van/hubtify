@@ -405,6 +405,31 @@ export function registerNutritionIpcHandlers(): void {
     })();
   });
 
+  ipcHandle('nutrition:shouldAskWeight', () => {
+    const db = getDb();
+    const profile = db.prepare('SELECT weight_check_day FROM nutrition_profile WHERE id = 1').get() as { weight_check_day: number } | undefined;
+    if (!profile) return { shouldAsk: false };
+
+    const checkDay = profile.weight_check_day ?? 1;
+    const today = new Date();
+    const dow = today.getDay() || 7; // Monday=1, Sunday=7
+
+    if (dow < checkDay) return { shouldAsk: false };
+
+    const monday = getMondayOfWeek();
+    const thisWeekWeight = db.prepare(
+      'SELECT weight_kg FROM nutrition_weekly_metrics WHERE date = ? AND weight_kg IS NOT NULL'
+    ).get(monday) as { weight_kg: number } | undefined;
+
+    if (thisWeekWeight) return { shouldAsk: false };
+
+    const lastWeight = db.prepare(
+      'SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1'
+    ).get() as { weight_kg: number } | undefined;
+
+    return { shouldAsk: true, lastWeight: lastWeight?.weight_kg };
+  });
+
   ipcHandle('nutrition:isDayClosed', (_e, date: string) => {
     try {
       const db = getDb();

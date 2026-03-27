@@ -69,6 +69,7 @@ const api = {
   nutritionLearnFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:learnFood', entry),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
+  nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
   onEstimateProgress: (callback: (stage: string) => void) => {
     const handler = (_e: unknown, stage: string) => callback(stage);
     ipcRenderer.on('nutrition:estimate-progress', handler);

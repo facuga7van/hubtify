@@ -115,6 +115,7 @@ export interface HubtifyApi {
   nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
+  nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
   onEstimateProgress: (callback: (stage: string) => void) => () => void;
 
   // Sync
