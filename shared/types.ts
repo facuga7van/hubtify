@@ -175,16 +175,14 @@ export interface FoodDbEntry {
   category: string;
 }
 
-export interface EstimationMatch {
+export interface EstimationItem {
   name: string;
   calories: number;
-  source: 'ai';
 }
 
 export interface EstimationResult {
   totalCalories: number;
-  matches: EstimationMatch[];
-  breakdown: string;
+  items: EstimationItem[];
   ollamaMissing: boolean;
   aiError?: string;
 }
