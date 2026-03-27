@@ -498,9 +498,11 @@ export default function Today() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            background: 'var(--rpg-panel-bg)', border: '2px solid var(--rpg-gold-dark)',
+            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
+            border: '2px solid var(--rpg-gold-dark)',
             borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 340,
             textAlign: 'center', color: 'var(--rpg-parchment)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
           }}>
             <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 12, color: 'var(--rpg-gold-light)' }}>
               {t('nutrify.weightCheckin.title')}
@@ -519,13 +521,15 @@ export default function Today() {
               style={{ width: '100%', marginBottom: 16, textAlign: 'center', fontSize: '1.2rem' }}
               autoFocus
             />
-            <button className="rpg-button" onClick={handleWeightSave} style={{ width: '100%', marginBottom: 8 }}>
-              {t('nutrify.weightCheckin.save')}
-            </button>
-            <button onClick={handleWeightDismiss}
-              style={{ background: 'none', border: 'none', color: 'var(--rpg-gold)', opacity: 0.6, cursor: 'pointer', fontSize: '0.8rem' }}>
-              {t('nutrify.weightCheckin.later')}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleWeightDismiss} className="rpg-button"
+                style={{ flex: 1, background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
+                {t('nutrify.weightCheckin.later')}
+              </button>
+              <button className="rpg-button" onClick={handleWeightSave} style={{ flex: 2 }}>
+                {t('nutrify.weightCheckin.save')}
+              </button>
+            </div>
           </div>
         </div>
       )}
