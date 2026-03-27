@@ -1,23 +1,16 @@
-import { ensureOllamaRunning, ensureModelPulled, estimateWithAi, isOllamaAvailable, lastAiDebug, stopOllama } from './ollama';
+import { ensureOllamaRunning, ensureModelPulled, estimateWithAi, isOllamaAvailable, lastAiDebug, stopOllama, downloadAndInstallOllama } from './ollama';
 import type { EstimationMatch, EstimationResult } from '../../../shared/types';
 
 export type ProgressCallback = (stage: string) => void;
 
 export async function estimate(description: string, onProgress?: ProgressCallback): Promise<EstimationResult> {
-  const available = isOllamaAvailable();
-
-  if (!available) {
-    return {
-      totalCalories: 0,
-      matches: [],
-      breakdown: '',
-      ollamaMissing: true,
-      aiError: 'Ollama no está instalado',
-    };
-  }
-
   try {
-    onProgress?.('Iniciando Ollama...');
+    if (!isOllamaAvailable()) {
+      onProgress?.('Instalando motor de estimación por primera vez...');
+      await downloadAndInstallOllama(onProgress);
+    }
+
+    onProgress?.('Iniciando motor de estimación...');
     await ensureOllamaRunning();
 
     onProgress?.('Verificando modelo de IA...');

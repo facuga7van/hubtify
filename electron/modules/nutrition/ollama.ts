@@ -4,7 +4,7 @@ import fs from 'fs';
 import { app } from 'electron';
 import type { OllamaStatus } from '../../../shared/types';
 
-const MODEL = 'nutrify';
+const MODEL = 'facundotgalvan/nutrify';
 const DEFAULT_PORT = 11434;
 let port = DEFAULT_PORT;
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 min after last use
@@ -46,6 +46,55 @@ function resolveOllamaExe(): string | null {
 
 export function isOllamaAvailable(): boolean {
   return resolveOllamaExe() !== null;
+}
+
+const OLLAMA_INSTALLER_URL = 'https://ollama.com/download/OllamaSetup.exe';
+
+export async function downloadAndInstallOllama(onProgress?: (stage: string) => void): Promise<void> {
+  const installerPath = path.join(app.getPath('temp'), 'OllamaSetup.exe');
+
+  onProgress?.('Descargando motor de estimación...');
+
+  const res = await fetch(OLLAMA_INSTALLER_URL);
+  if (!res.ok) throw new Error('No se pudo descargar Ollama');
+
+  const total = Number(res.headers.get('content-length')) || 0;
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('Error en la descarga');
+
+  const chunks: Uint8Array[] = [];
+  let downloaded = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    downloaded += value.length;
+    if (total > 0) {
+      const pct = Math.round((downloaded / total) * 100);
+      onProgress?.(`Descargando motor de estimación... ${pct}%`);
+    }
+  }
+
+  const buffer = Buffer.concat(chunks);
+  fs.writeFileSync(installerPath, buffer);
+
+  onProgress?.('Instalando motor de estimación...');
+
+  // Silent install
+  const { execFileSync } = require('child_process');
+  execFileSync(installerPath, ['/VERYSILENT', '/NORESTART'], { timeout: 120000 });
+
+  // Clean up installer
+  try { fs.unlinkSync(installerPath); } catch { /* ok */ }
+
+  // Wait for Ollama to be findable
+  let retries = 10;
+  while (retries-- > 0 && !resolveOllamaExe()) {
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  if (!resolveOllamaExe()) throw new Error('Ollama se instaló pero no se encontró');
 }
 
 async function isRunning(): Promise<boolean> {
