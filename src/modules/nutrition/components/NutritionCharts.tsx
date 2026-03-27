@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -9,6 +10,7 @@ interface WeightEntry { date: string; weightKg: number; }
 
 export default function NutritionCharts() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [summaries, setSummaries] = useState<DailySummary[]>([]);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [streak, setStreak] = useState(0);
@@ -38,7 +40,14 @@ export default function NutritionCharts() {
 
   return (
     <div>
-      <PageHeader title={t('nutrify.dashboard')} subtitle={t('nutrify.dashboardSub')} />
+      <PageHeader title={t('nutrify.dashboard')} subtitle={t('nutrify.dashboardSub')}
+        actions={
+          <button className="rpg-button" onClick={() => navigate('/nutrition')}
+            style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
+            ← {t('common.back')}
+          </button>
+        }
+      />
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>

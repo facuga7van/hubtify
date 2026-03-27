@@ -257,7 +257,8 @@
     "comingSoon": "Proximamente",
     "ok": "OK",
     "somethingWentWrong": "Algo salio mal",
-    "tryAgain": "Intentar de nuevo"
+    "tryAgain": "Intentar de nuevo",
+    "back": "Volver"
   },
   "datePicker": {
     "selectDateTime": "Seleccionar fecha y hora",

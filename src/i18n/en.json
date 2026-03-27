@@ -257,7 +257,8 @@
     "comingSoon": "Coming soon",
     "ok": "OK",
     "somethingWentWrong": "Something went wrong",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "back": "Back"
   },
   "datePicker": {
     "selectDateTime": "Select date & time",
