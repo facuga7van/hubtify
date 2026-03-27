@@ -436,7 +436,9 @@ function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
   const weight = latestWeight?.weight_kg ?? (profile.initial_weight_kg as number);
 
-  const bmr = calculateBMR(weight, profile.height_cm as number, profile.age as number, profile.sex as string);
+  const dob = profile.date_of_birth as string | null;
+  const age = dob ? getAgeFromDob(dob) : (profile.age as number) ?? 30;
+  const bmr = calculateBMR(weight, profile.height_cm as number, age, profile.sex as string);
   const steps = (metrics?.steps as number) ?? 0;
   const gym = !!(metrics?.gym);
 
