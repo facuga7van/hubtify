@@ -8,6 +8,10 @@ import { financeMigrations } from '../src/modules/finance/finance.schema';
 import { characterMigrations } from '../src/modules/character/character.schema';
 import { stopOllama } from './modules/nutrition/ollama';
 import { clearReminderInterval } from './modules/notifications.ipc';
+import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
+
+// Handle Squirrel events (Windows installer lifecycle)
+if (require('electron-squirrel-startup')) app.quit();
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -100,6 +104,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   registerAllIpcHandlers();
+  registerUpdaterIpcHandlers();
 
   // Run module migrations
   getDb();
@@ -110,6 +115,8 @@ app.whenReady().then(() => {
 
   createTray();
   createWindow();
+
+  if (mainWindow) initAutoUpdater(mainWindow);
 });
 
 app.on('before-quit', () => {

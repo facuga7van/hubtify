@@ -154,6 +154,14 @@ export interface HubtifyApi {
   financeGetMonthlyBalance: (month?: string) => Promise<{ expenses: number; income: number; balance: number }>;
   financeGetCategoryBreakdown: (month?: string) => Promise<Array<{ category: string; total: number }>>;
   financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => Promise<void>;
+
+  // Updater
+  updaterCheck: () => Promise<{ available: boolean; version?: string }>;
+  updaterDownload: () => Promise<void>;
+  updaterInstall: () => void;
+  onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
+  onUpdateDownloaded: (callback: () => void) => () => void;
+  onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;
 }
 
 // ── Nutrition AI Types ──────────────────────────────────────

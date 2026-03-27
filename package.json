@@ -51,6 +51,7 @@
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.8.0",
     "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.8.3",
     "firebase": "^12.11.0",
     "howler": "^2.2.4",
     "i18next": "^25.10.2",

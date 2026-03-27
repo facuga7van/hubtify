@@ -112,6 +112,25 @@ const api = {
   financeGetMonthlyBalance: (month?: string) => ipcRenderer.invoke('finance:getMonthlyBalance', month),
   financeGetCategoryBreakdown: (month?: string) => ipcRenderer.invoke('finance:getCategoryBreakdown', month),
   financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => ipcRenderer.invoke('finance:updateTransaction', id, fields),
+
+  // Updater
+  updaterCheck: () => ipcRenderer.invoke('updater:check'),
+  updaterDownload: () => ipcRenderer.invoke('updater:download'),
+  updaterInstall: () => ipcRenderer.invoke('updater:install'),
+  onUpdateAvailable: (callback: (info: { version: string }) => void) => {
+    const handler = (_e: unknown, info: { version: string }) => callback(info);
+    ipcRenderer.on('updater:update-available', handler);
+    return () => ipcRenderer.removeListener('updater:update-available', handler);
+  },
+  onUpdateDownloaded: (callback: () => void) => {
+    ipcRenderer.on('updater:update-downloaded', callback);
+    return () => ipcRenderer.removeListener('updater:update-downloaded', callback);
+  },
+  onDownloadProgress: (callback: (info: { percent: number }) => void) => {
+    const handler = (_e: unknown, info: { percent: number }) => callback(info);
+    ipcRenderer.on('updater:download-progress', handler);
+    return () => ipcRenderer.removeListener('updater:download-progress', handler);
+  },
 };
 
 export type Api = typeof api;

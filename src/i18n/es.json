@@ -372,6 +372,10 @@
     "notifications": "Notificaciones",
     "reminders": "Recordatorios",
     "remindersDesc": "Recibir notificaciones cada 3 horas para registrar comidas y quests",
-    "shortcuts": "Atajos de teclado"
+    "shortcuts": "Atajos de teclado",
+    "updateAvailable": "Nueva versión disponible: v{{version}}",
+    "downloading": "Descargando... {{percent}}%",
+    "downloadUpdate": "Descargar",
+    "installAndRestart": "Instalar y reiniciar"
   }
 }

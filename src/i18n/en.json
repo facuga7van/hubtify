@@ -371,6 +371,10 @@
     "notifications": "Notifications",
     "reminders": "Reminders",
     "remindersDesc": "Get notifications every 3 hours to log food and quests",
-    "shortcuts": "Keyboard Shortcuts"
+    "shortcuts": "Keyboard Shortcuts",
+    "updateAvailable": "New version available: v{{version}}",
+    "downloading": "Downloading... {{percent}}%",
+    "downloadUpdate": "Download",
+    "installAndRestart": "Install and restart"
   }
 }
