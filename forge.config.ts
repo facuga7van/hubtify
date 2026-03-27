@@ -23,24 +23,24 @@ const EXTERNAL_MODULES = [
 function copyExternalModules(buildPath: string): void {
   const nodeModulesSrc = path.resolve(__dirname, 'node_modules');
   const nodeModulesDst = path.join(buildPath, 'node_modules');
+  const copied = new Set<string>();
 
   const copyModule = (modName: string) => {
+    if (copied.has(modName)) return;
+    copied.add(modName);
+
     const src = path.join(nodeModulesSrc, modName);
     const dst = path.join(nodeModulesDst, modName);
     if (!fs.existsSync(src)) return;
-    fs.cpSync(src, dst, { recursive: true });
+    if (!fs.existsSync(dst)) fs.cpSync(src, dst, { recursive: true });
 
-    // Also copy the module's dependencies
+    // Recursively copy all dependencies
     const modPkgPath = path.join(src, 'package.json');
     if (fs.existsSync(modPkgPath)) {
       const modPkg = JSON.parse(fs.readFileSync(modPkgPath, 'utf-8'));
       const deps = { ...modPkg.dependencies, ...modPkg.optionalDependencies };
       for (const dep of Object.keys(deps || {})) {
-        const depSrc = path.join(nodeModulesSrc, dep);
-        const depDst = path.join(nodeModulesDst, dep);
-        if (fs.existsSync(depSrc) && !fs.existsSync(depDst)) {
-          fs.cpSync(depSrc, depDst, { recursive: true });
-        }
+        copyModule(dep);
       }
     }
   };
