@@ -5,7 +5,7 @@ import { estimate } from './nutrition/estimator';
 
 import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
 import { seedFoodDatabase } from './nutrition/food-db-seed';
-import { todayDateString, formatDateString, getMondayOfWeek } from '../../shared/date-utils';
+import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob } from '../../shared/date-utils';
 
 /** Seed the food_database table if it's empty or missing entries */
 export function seedFoodDatabaseIfEmpty(): void {
@@ -43,20 +43,25 @@ export function registerNutritionIpcHandlers(): void {
   });
 
   ipcHandle('nutrition:saveProfile', (_e, profile: {
-    age: number; sex: string; heightCm: number; initialWeightKg: number;
+    dateOfBirth: string; sex: string; heightCm: number; initialWeightKg: number;
     activityLevel: string; deficitTargetKcal?: number; gymCalories?: number; stepCaloriesFactor?: number;
+    weightCheckDay?: number;
   }) => {
-    if (!Number.isFinite(profile.age) || profile.age < 1 || profile.age > 120) throw new Error('Invalid age: must be between 1 and 120');
+    if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
+    const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
+    if (isNaN(dobDate.getTime()) || dobDate > new Date() || dobDate.getFullYear() < 1900) throw new Error('Invalid date of birth');
     if (!Number.isFinite(profile.heightCm) || profile.heightCm < 50 || profile.heightCm > 250) throw new Error('Invalid height: must be between 50 and 250 cm');
     if (!Number.isFinite(profile.initialWeightKg) || profile.initialWeightKg < 10 || profile.initialWeightKg > 500) throw new Error('Invalid weight: must be between 10 and 500 kg');
     if (profile.deficitTargetKcal !== undefined && (!Number.isFinite(profile.deficitTargetKcal) || profile.deficitTargetKcal < 0 || profile.deficitTargetKcal > 2000)) throw new Error('Invalid deficit target: must be between 0 and 2000 kcal');
+    const age = getAgeFromDob(profile.dateOfBirth);
+    const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const db = getDb();
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(profile.age, profile.sex, profile.heightCm, profile.initialWeightKg,
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
       profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.gymCalories ?? 300,
-      profile.stepCaloriesFactor ?? 0.04);
+      profile.stepCaloriesFactor ?? 0.04, profile.dateOfBirth, weightCheckDay);
 
     // Recalc today's summary with new profile
     const today = todayDateString();
