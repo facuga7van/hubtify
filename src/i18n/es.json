@@ -261,6 +261,7 @@
   },
   "datePicker": {
     "selectDateTime": "Seleccionar fecha y hora",
+    "selectDate": "Seleccionar fecha",
     "day": "Dia",
     "month": "Mes",
     "year": "Anio",

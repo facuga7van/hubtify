@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 
 interface Props { onComplete: () => void; }
 
@@ -48,8 +49,8 @@ export default function NutritionOnboarding({ onComplete }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={labelStyle}>
             {t('nutrify.dateOfBirth')}
-            <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)}
-              max={new Date().toISOString().split('T')[0]} min="1900-01-01" className="rpg-input" />
+            <RpgDatePicker value={dateOfBirth} onChange={setDateOfBirth}
+              min="1900-01-01" max={new Date().toISOString().split('T')[0]} />
           </label>
           <label style={labelStyle}>
             {t('nutrify.sex')}

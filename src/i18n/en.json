@@ -261,6 +261,7 @@
   },
   "datePicker": {
     "selectDateTime": "Select date & time",
+    "selectDate": "Select date",
     "day": "Day",
     "month": "Month",
     "year": "Year",

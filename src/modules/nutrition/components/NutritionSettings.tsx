@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/PageHeader';
 import { getAgeFromDob } from '../../../../shared/date-utils';
+import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -86,8 +87,8 @@ export default function NutritionSettings() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <label style={labelStyle}>
             {t('nutrify.dateOfBirth')}
-            <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)}
-              max={new Date().toISOString().split('T')[0]} min="1900-01-01" className="rpg-input" />
+            <RpgDatePicker value={dateOfBirth} onChange={setDateOfBirth}
+              min="1900-01-01" max={new Date().toISOString().split('T')[0]} />
             {dateOfBirth && (
               <span style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: 2 }}>
                 {t('nutrify.calculatedAge', { age: getAgeFromDob(dateOfBirth) })}
