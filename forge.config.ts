@@ -5,11 +5,56 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import fs from 'fs';
+import path from 'path';
+
+// Native/external modules that Vite can't bundle and must be copied to the package
+const EXTERNAL_MODULES = [
+  'better-sqlite3',
+  'bindings',
+  'file-uri-to-path',
+  'prebuild-install',
+  'node-addon-api',
+  'electron-updater',
+  'electron-squirrel-startup',
+  'adm-zip',
+];
+
+function copyExternalModules(buildPath: string): void {
+  const nodeModulesSrc = path.resolve(__dirname, 'node_modules');
+  const nodeModulesDst = path.join(buildPath, 'node_modules');
+
+  const copyModule = (modName: string) => {
+    const src = path.join(nodeModulesSrc, modName);
+    const dst = path.join(nodeModulesDst, modName);
+    if (!fs.existsSync(src)) return;
+    fs.cpSync(src, dst, { recursive: true });
+
+    // Also copy the module's dependencies
+    const modPkgPath = path.join(src, 'package.json');
+    if (fs.existsSync(modPkgPath)) {
+      const modPkg = JSON.parse(fs.readFileSync(modPkgPath, 'utf-8'));
+      const deps = { ...modPkg.dependencies, ...modPkg.optionalDependencies };
+      for (const dep of Object.keys(deps || {})) {
+        const depSrc = path.join(nodeModulesSrc, dep);
+        const depDst = path.join(nodeModulesDst, dep);
+        if (fs.existsSync(depSrc) && !fs.existsSync(depDst)) {
+          fs.cpSync(depSrc, depDst, { recursive: true });
+        }
+      }
+    }
+  };
+
+  fs.mkdirSync(nodeModulesDst, { recursive: true });
+  for (const mod of EXTERNAL_MODULES) {
+    copyModule(mod);
+  }
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
-      unpack: '**/{better-sqlite3,bindings,file-uri-to-path}/**/*.node',
+      unpack: '**/node_modules/{better-sqlite3,bindings,file-uri-to-path}/**',
     },
     icon: './assets/icon',
     appVersion: '0.1.0',
@@ -19,6 +64,16 @@ const config: ForgeConfig = {
       FileDescription: 'Hubtify - Gamified Life Hub',
       ProductName: 'Hubtify',
     },
+    afterCopy: [
+      (buildPath: string, _electronVersion: string, _platform: string, _arch: string, callback: (err?: Error) => void) => {
+        try {
+          copyExternalModules(buildPath);
+          callback();
+        } catch (err) {
+          callback(err as Error);
+        }
+      },
+    ],
   },
   rebuildConfig: {},
   makers: [
