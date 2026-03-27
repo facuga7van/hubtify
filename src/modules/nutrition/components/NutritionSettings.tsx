@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/PageHeader';
 import { getAgeFromDob } from '../../../../shared/date-utils';
 import RpgDatePicker from '../../../shared/components/RpgDatePicker';
+import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -84,35 +85,35 @@ export default function NutritionSettings() {
       {/* Body */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.bodyInfo')}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <label style={labelStyle}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <label style={{ ...labelStyle, flex: '2 1 0' }}>
             {t('nutrify.dateOfBirth')}
             <RpgDatePicker value={dateOfBirth} onChange={setDateOfBirth}
               min="1900-01-01" max={new Date().toISOString().split('T')[0]} />
             {dateOfBirth && (
-              <span style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: 2 }}>
+              <span style={{ fontSize: '0.7rem', opacity: 0.6, marginTop: 2 }}>
                 {t('nutrify.calculatedAge', { age: getAgeFromDob(dateOfBirth) })}
               </span>
             )}
           </label>
-          <label style={labelStyle}>
+          <label style={{ ...labelStyle, flex: '1 1 0' }}>
             {t('nutrify.sex')}
-            <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} className="rpg-select">
+            <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} className="rpg-select" style={{ width: '100%' }}>
               <option value="M">{t('nutrify.male')}</option>
               <option value="F">{t('nutrify.female')}</option>
             </select>
           </label>
-          <label style={labelStyle}>
+          <label style={{ ...labelStyle, flex: '1 1 0' }}>
             {t('nutrify.height')}
-            <input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} className="rpg-input" min={100} max={250} />
+            <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={100} max={250} suffix="cm" />
           </label>
-          <label style={labelStyle}>
+          <label style={{ ...labelStyle, flex: '1 1 0' }}>
             {t('nutrify.weight')}
-            <input type="number" value={weight} onChange={(e) => setWeight(+e.target.value)} className="rpg-input" min={30} max={300} />
+            <RpgNumberInput value={String(weight)} onChange={(v) => setWeight(+v)} step={0.1} min={30} max={300} suffix="kg" />
           </label>
-          <label style={{ ...labelStyle, gridColumn: 'span 2' }}>
+          <label style={{ ...labelStyle, flex: '1.5 1 0' }}>
             {t('nutrify.activityLevel')}
-            <select value={activity} onChange={(e) => setActivity(e.target.value)} className="rpg-select">
+            <select value={activity} onChange={(e) => setActivity(e.target.value)} className="rpg-select" style={{ width: '100%' }}>
               <option value="sedentary">{t('nutrify.sedentary')}</option>
               <option value="light">{t('nutrify.light')}</option>
               <option value="moderate">{t('nutrify.moderate')}</option>

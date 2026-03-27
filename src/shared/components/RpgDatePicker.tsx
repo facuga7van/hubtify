@@ -94,7 +94,7 @@ export default function RpgDatePicker({ value, onChange, min, max }: Props) {
         onClick={() => setOpen(!open)}
         style={{
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: '0.85rem', whiteSpace: 'nowrap',
+          fontSize: '0.85rem', whiteSpace: 'nowrap', width: '100%',
         }}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
