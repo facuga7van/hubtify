@@ -36,20 +36,15 @@ export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
         <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold' }}>
           {consumed} <span style={{ opacity: 0.5, fontWeight: 'normal' }}>kcal</span>
         </span>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-          {isInDeficit ? (
-            <span style={{ color: 'var(--rpg-xp-green)' }}>
-              {remaining} kcal {t('nutrify.remaining')}
-            </span>
-          ) : (
-            <span style={{ color: isOverTdee ? 'var(--rpg-hp-red)' : '#e67e22' }}>
-              +{surplusAmount} kcal {t('nutrify.overTarget')}
-            </span>
-          )}
-          <span style={{ fontSize: '0.75rem', fontFamily: 'Fira Code, monospace', opacity: 0.5 }}>
-            TDEE <b>{tdee}</b> · {t('nutrify.target')} <b style={{ color: 'var(--rpg-gold)' }}>{target}</b>
+        {isInDeficit ? (
+          <span style={{ color: 'var(--rpg-xp-green)' }}>
+            {remaining} kcal {t('nutrify.remaining')}
           </span>
-        </div>
+        ) : (
+          <span style={{ color: isOverTdee ? 'var(--rpg-hp-red)' : '#e67e22' }}>
+            +{surplusAmount} kcal {t('nutrify.overTarget')}
+          </span>
+        )}
       </div>
 
       {/* Progress bar with markers */}
@@ -73,6 +68,12 @@ export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
           borderRadius: 1,
         }} />
 
+      </div>
+
+      {/* TDEE + Target below bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.5, marginTop: 3 }}>
+        <span>TDEE <b>{tdee}</b></span>
+        <span><b style={{ color: 'var(--rpg-gold)' }}>{target}</b> kcal</span>
       </div>
 
       {/* Status message */}
