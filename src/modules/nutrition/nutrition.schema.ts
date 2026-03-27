@@ -86,4 +86,16 @@ export const nutritionMigrations: Migration[] = [
       );
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 3,
+    up: `
+      ALTER TABLE nutrition_profile ADD COLUMN date_of_birth TEXT DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN weight_check_day INTEGER NOT NULL DEFAULT 1;
+
+      UPDATE nutrition_profile SET date_of_birth = (
+        CAST(strftime('%Y', 'now') AS INTEGER) - age
+      ) || '-01-01' WHERE date_of_birth IS NULL;
+    `,
+  },
 ];
