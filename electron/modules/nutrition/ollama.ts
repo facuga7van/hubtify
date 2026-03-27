@@ -237,19 +237,7 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
 
 // --- AI Estimation ---
 
-const SYSTEM_PROMPT = `Sos un estimador preciso de calorías. Respondé SOLO con JSON válido.
-
-Formato EXACTO:
-{"calories": <total 10-5000>, "breakdown": "ingrediente1 ~Xkcal + ingrediente2 ~Ykcal"}
-
-Reglas:
-- Estimá porciones típicas argentinas
-- Redondeá hacia arriba si hay duda
-- Si el usuario dice una cantidad explícita (ej: "2 milanesas", "3 empanadas"), las calorías deben reflejar TODAS las unidades, no una sola
-- breakdown debe tener cada ingrediente UNA sola vez separado por " + " con sus calorías totales
-- La suma del breakdown debe ser igual al total
-- SOLO JSON, sin texto adicional, sin explicaciones
-- Si no reconocés la comida, estimá lo más cercano`;
+const SYSTEM_PROMPT = 'Estimá las calorías de esta comida. Respondé SOLO JSON: {"calories": N, "breakdown": "ingrediente1 ~Xkcal + ingrediente2 ~Ykcal"}';
 
 export let lastAiDebug = '';
 
@@ -312,7 +300,6 @@ export async function estimateWithAi(description: string): Promise<AiResult | nu
     }
 
     const data = await response.json() as { response: string };
-    console.log('[nutrify:ai-response]', data.response);
     lastAiDebug = data.response?.slice(0, 300) ?? '(empty)';
 
     const result = parseAiResponse(data.response, sanitized);
