@@ -49,6 +49,9 @@ export default function Today() {
   // Weight check-in popup
   const [weightPopup, setWeightPopup] = useState<{ show: boolean; lastWeight?: number }>({ show: false });
   const [weightInput, setWeightInput] = useState('');
+  const [closeDayPopup, setCloseDayPopup] = useState(false);
+  const [popupSteps, setPopupSteps] = useState('');
+  const [popupGym, setPopupGym] = useState(false);
 
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
@@ -235,7 +238,16 @@ export default function Today() {
     setWeightPopup({ show: false });
   };
 
-  const handleCloseDay = async () => {
+  const handleCloseDayConfirm = async () => {
+    // Save metrics from popup before closing the day
+    const stepsVal = popupSteps ? parseInt(popupSteps) : null;
+    await window.api.nutritionSaveDailyMetrics({ ...metrics, steps: stepsVal, gym: popupGym, date });
+    setCloseDayPopup(false);
+    // Now close the day
+    await doCloseDay();
+  };
+
+  const doCloseDay = async () => {
     const result = await window.api.nutritionCloseDay(date);
     if (result.success && result.breakdown) {
       const b = result.breakdown as typeof dayClosed;
@@ -398,29 +410,11 @@ export default function Today() {
 
       {/* Close Day */}
       <div className="rpg-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div className="rpg-card-title" style={{ marginBottom: 0 }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-              <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
-            </svg>
-            {t('nutrify.closeDay')}
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-              <span style={{ opacity: 0.7 }}>{t('nutrify.steps')}</span>
-              <RpgNumberInput
-                value={String(metrics.steps ?? '')}
-                onChange={(v) => handleMetrics('steps', v ? parseInt(v) : null)}
-                step={100} min={0} max={99999}
-                style={{ width: 100 }}
-              />
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', cursor: 'pointer' }}
-              onClick={() => handleMetrics('gym', !metrics.gym)}>
-              <Checkbox checked={metrics.gym} onChange={() => handleMetrics('gym', !metrics.gym)} size={18} />
-              <span style={{ opacity: metrics.gym ? 1 : 0.7 }}>{t('nutrify.gym')}</span>
-            </div>
-          </div>
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
+          </svg>
+          {t('nutrify.closeDay')}
         </div>
 
         {dayClosed ? (
@@ -440,7 +434,7 @@ export default function Today() {
             <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 10 }}>
               {t('nutrify.closeDayDesc')}
             </p>
-            <button className="rpg-button" onClick={handleCloseDay}
+            <button className="rpg-button" onClick={() => setCloseDayPopup(true)}
               disabled={consumed === 0}
               style={{ padding: '8px 24px' }}>
               {t('nutrify.closeDayButton')}
@@ -499,6 +493,48 @@ export default function Today() {
             <button onClick={handleWeightDismiss} className="rpg-button"
               style={{ width: '100%', padding: '4px 8px', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
               {t('nutrify.weightCheckin.later')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Close day popup */}
+      {closeDayPopup && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
+            border: '2px solid var(--rpg-gold-dark)',
+            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 340,
+            textAlign: 'center', color: 'var(--rpg-parchment)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          }}>
+            <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 16, color: 'var(--rpg-gold-light)' }}>
+              {t('nutrify.closeDay')}
+            </h3>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 12, fontSize: '0.9rem' }}>
+              <span>{t('nutrify.steps')}</span>
+              <RpgNumberInput
+                value={popupSteps}
+                onChange={setPopupSteps}
+                step={100} min={0} max={99999}
+                style={{ width: 120 }}
+                autoFocus
+              />
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 20, fontSize: '0.9rem', cursor: 'pointer' }}
+              onClick={() => setPopupGym(!popupGym)}>
+              <Checkbox checked={popupGym} onChange={() => setPopupGym(!popupGym)} />
+              <span>{t('nutrify.gym')}</span>
+            </div>
+            <button className="rpg-button" onClick={handleCloseDayConfirm} style={{ width: '100%', marginBottom: 8 }}>
+              {t('nutrify.closeDayButton')}
+            </button>
+            <button onClick={() => setCloseDayPopup(false)} className="rpg-button"
+              style={{ width: '100%', padding: '4px 8px', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
+              {t('questify.cancel')}
             </button>
           </div>
         </div>
