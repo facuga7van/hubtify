@@ -143,7 +143,26 @@
     "saveProfile": "Save Changes",
     "saved": "Saved",
     "tdeeBreakdown": "Energy Breakdown",
-    "deleteConfirm": "Delete this entry?"
+    "deleteConfirm": "Delete this entry?",
+    "dateOfBirth": "Date of birth",
+    "calculatedAge": "{{age}} years old",
+    "weightCheckin": {
+      "title": "Weekly weight check-in",
+      "lastWeight": "Last recorded weight: {{weight}} kg",
+      "placeholder": "Your current weight (kg)",
+      "save": "Save",
+      "later": "Not now"
+    },
+    "weightCheckDay": "Weekly weigh-in day",
+    "weekdays": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    }
   },
   "coinify": {
     "title": "Coinify",

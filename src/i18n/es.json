@@ -143,7 +143,26 @@
     "saveProfile": "Guardar Cambios",
     "saved": "Guardado",
     "tdeeBreakdown": "Desglose Energetico",
-    "deleteConfirm": "Eliminar esta entrada?"
+    "deleteConfirm": "Eliminar esta entrada?",
+    "dateOfBirth": "Fecha de nacimiento",
+    "calculatedAge": "{{age}} años",
+    "weightCheckin": {
+      "title": "Registro semanal de peso",
+      "lastWeight": "Último peso registrado: {{weight}} kg",
+      "placeholder": "Tu peso actual (kg)",
+      "save": "Guardar",
+      "later": "Ahora no"
+    },
+    "weightCheckDay": "Día de pesaje semanal",
+    "weekdays": {
+      "1": "Lunes",
+      "2": "Martes",
+      "3": "Miércoles",
+      "4": "Jueves",
+      "5": "Viernes",
+      "6": "Sábado",
+      "7": "Domingo"
+    }
   },
   "coinify": {
     "title": "Coinify",
