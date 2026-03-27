@@ -10,7 +10,7 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   const [step, setStep] = useState(0);
 
   // Body
-  const [age, setAge] = useState(25);
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [sex, setSex] = useState<'M' | 'F'>('M');
   const [height, setHeight] = useState(170);
   const [weight, setWeight] = useState(70);
@@ -28,7 +28,7 @@ export default function NutritionOnboarding({ onComplete }: Props) {
       : 0;
 
     await window.api.nutritionSaveProfile({
-      age, sex, heightCm: height, initialWeightKg: weight,
+      dateOfBirth, sex, heightCm: height, initialWeightKg: weight,
       activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
     });
     onComplete();
@@ -47,9 +47,9 @@ export default function NutritionOnboarding({ onComplete }: Props) {
         /* Step 1: Body info */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={labelStyle}>
-            {t('nutrify.age')}
-            <input type="number" value={age} onChange={(e) => setAge(+e.target.value)}
-              min={10} max={120} className="rpg-input" />
+            {t('nutrify.dateOfBirth')}
+            <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)}
+              max={new Date().toISOString().split('T')[0]} min="1900-01-01" className="rpg-input" />
           </label>
           <label style={labelStyle}>
             {t('nutrify.sex')}
@@ -78,7 +78,7 @@ export default function NutritionOnboarding({ onComplete }: Props) {
             </select>
           </label>
           <button className="rpg-button" onClick={() => {
-            if (age < 10 || age > 120 || height < 100 || height > 250 || weight < 30 || weight > 300) return;
+            if (!dateOfBirth || height < 100 || height > 250 || weight < 30 || weight > 300) return;
             setStep(1);
           }} style={{ marginTop: 8 }}>
             {t('onboarding.continue')}
