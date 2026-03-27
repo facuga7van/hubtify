@@ -245,8 +245,8 @@ Formato EXACTO:
 Reglas:
 - Estimá porciones típicas argentinas
 - Redondeá hacia arriba si hay duda
-- Si hay cantidad (ej: "2 milanesas"), multiplicá las calorías. "2 milanesas" = ~700kcal, no ~350kcal
-- breakdown debe tener cada ingrediente separado por " + " con sus calorías YA multiplicadas por cantidad
+- Si el usuario dice una cantidad explícita (ej: "2 milanesas", "3 empanadas"), las calorías deben reflejar TODAS las unidades, no una sola
+- breakdown debe tener cada ingrediente UNA sola vez separado por " + " con sus calorías totales
 - La suma del breakdown debe ser igual al total
 - SOLO JSON, sin texto adicional, sin explicaciones
 - Si no reconocés la comida, estimá lo más cercano`;
