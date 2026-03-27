@@ -17,6 +17,19 @@
     "title": "Questify",
     "subtitle": "Manage your daily adventures",
     "addQuest": "Add Quest",
+    "tier": {
+      "quick": "Quick",
+      "normal": "Normal",
+      "epic": "Epic"
+    },
+    "frequency": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
+    },
+    "timesPerWeek": "x/wk",
+    "resetsOn": "Resets on {{date}}",
+    "dueLabel": "Due:",
     "update": "Update",
     "questName": "Quest name...",
     "description": "Description (optional)",
@@ -68,6 +81,7 @@
   "nutrify": {
     "title": "Nutrify",
     "subtitle": "Track your daily intake",
+    "calorieTarget": "{{pct}}% of {{target}} kcal",
     "dashboard": "Nutrify Dashboard",
     "dashboardSub": "Last 30 days overview",
     "foodLog": "Food Log",
@@ -258,7 +272,9 @@
     "ok": "OK",
     "somethingWentWrong": "Something went wrong",
     "tryAgain": "Try Again",
-    "back": "Back"
+    "back": "Back",
+    "levelPrefix": "Lv.",
+    "combo": "Combo x"
   },
   "datePicker": {
     "selectDateTime": "Select date & time",
@@ -267,7 +283,21 @@
     "month": "Month",
     "year": "Year",
     "hour": "Hour",
-    "min": "Min"
+    "min": "Min",
+    "months": {
+      "0": "Jan",
+      "1": "Feb",
+      "2": "Mar",
+      "3": "Apr",
+      "4": "May",
+      "5": "Jun",
+      "6": "Jul",
+      "7": "Aug",
+      "8": "Sep",
+      "9": "Oct",
+      "10": "Nov",
+      "11": "Dec"
+    }
   },
   "events": {
     "TASK_COMPLETED": "Quest completed",
@@ -281,7 +311,8 @@
     "good": "Nice hit!",
     "critical": "Critical hit!",
     "legendary": "LEGENDARY!",
-    "streakBonus": "Streak bonus +{{xp}} XP!"
+    "streakBonus": "Streak bonus +{{xp}} XP!",
+    "combo": "Combo"
   },
   "onboarding": {
     "tagline": "Your gamified hub for productivity, nutrition, and finance",
@@ -308,6 +339,10 @@
     "title": "Settings",
     "subtitle": "Application preferences",
     "language": "Language",
+    "languageEs": "Español",
+    "languageEn": "English",
+    "toggleOn": "ON",
+    "toggleOff": "OFF",
     "sound": "Sound",
     "soundEffects": "Sound Effects",
     "soundDesc": "Sounds when completing quests, leveling up, etc.",

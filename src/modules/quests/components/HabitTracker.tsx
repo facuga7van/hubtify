@@ -9,10 +9,10 @@ interface Props {
   onXpGained: () => void;
 }
 
-const FREQ_LABELS: Record<HabitFrequency, string> = {
-  daily: 'Diario',
-  weekly: 'Semanal',
-  monthly: 'Mensual',
+const FREQ_LABEL_KEYS: Record<HabitFrequency, string> = {
+  daily: 'questify.frequency.daily',
+  weekly: 'questify.frequency.weekly',
+  monthly: 'questify.frequency.monthly',
 };
 
 export default function HabitTracker({ onXpGained }: Props) {
@@ -99,10 +99,8 @@ export default function HabitTracker({ onXpGained }: Props) {
   };
 
   const getFreqLabel = (h: HabitWithStreak) => {
-    if (h.frequency === 'weekly' && h.timesPerWeek > 1) return `${h.timesPerWeek}x/sem`;
-    if (h.frequency === 'weekly') return 'Semanal';
-    if (h.frequency === 'monthly') return 'Mensual';
-    return 'Diario';
+    if (h.frequency === 'weekly' && h.timesPerWeek > 1) return `${h.timesPerWeek}${t('questify.timesPerWeek')}`;
+    return t(FREQ_LABEL_KEYS[h.frequency]);
   };
 
   const getResetDate = (h: HabitWithStreak): string | null => {
@@ -186,7 +184,7 @@ export default function HabitTracker({ onXpGained }: Props) {
           {/* Progress for weekly/monthly */}
           {getProgressLabel(h) && (
             <span style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.6, cursor: 'default' }}
-              title={getResetDate(h) ? `Se resetea el ${getResetDate(h)}` : undefined}>
+              title={getResetDate(h) ? t('questify.resetsOn', { date: getResetDate(h) }) : undefined}>
               {getProgressLabel(h)}
             </span>
           )}
@@ -246,8 +244,8 @@ export default function HabitTracker({ onXpGained }: Props) {
           />
           <select value={newFreq} onChange={(e) => setNewFreq(e.target.value as HabitFrequency)}
             className="rpg-select" style={{ fontSize: '0.85rem' }}>
-            {Object.entries(FREQ_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
+            {Object.entries(FREQ_LABEL_KEYS).map(([k, v]) => (
+              <option key={k} value={k}>{t(v)}</option>
             ))}
           </select>
           {newFreq === 'weekly' && (
@@ -255,7 +253,7 @@ export default function HabitTracker({ onXpGained }: Props) {
               <input type="number" min={1} max={7} value={newTimes}
                 onChange={(e) => setNewTimes(Math.min(7, Math.max(1, parseInt(e.target.value) || 1)))}
                 className="rpg-input" style={{ width: 40, textAlign: 'center' }} />
-              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>x/sem</span>
+              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('questify.timesPerWeek')}</span>
             </div>
           )}
           <button className="rpg-button" onClick={handleAdd} disabled={!newName.trim()}

@@ -17,6 +17,19 @@
     "title": "Questify",
     "subtitle": "Gestiona tus aventuras diarias",
     "addQuest": "Agregar Quest",
+    "tier": {
+      "quick": "Rápida",
+      "normal": "Normal",
+      "epic": "Épica"
+    },
+    "frequency": {
+      "daily": "Diario",
+      "weekly": "Semanal",
+      "monthly": "Mensual"
+    },
+    "timesPerWeek": "x/sem",
+    "resetsOn": "Se resetea el {{date}}",
+    "dueLabel": "Vence:",
     "update": "Actualizar",
     "questName": "Nombre de la quest...",
     "description": "Descripcion (opcional)",
@@ -68,6 +81,8 @@
   "nutrify": {
     "title": "Nutrify",
     "subtitle": "Rastrea tu consumo diario",
+    "calorieTarget": "{{pct}}% de {{target}} kcal",
+    "setupRequired": "Configuración requerida",
     "dashboard": "Panel de Nutrify",
     "dashboardSub": "Resumen de los ultimos 30 dias",
     "foodLog": "Registro de Comidas",
@@ -87,7 +102,6 @@
     "greatDeficit": "Gran deficit! Bonus de XP al cerrar el dia",
     "onTrack": "Vas bien, segui asi",
     "overBy": "Excedido por",
-    "setupRequired": "Configuracion requerida",
     "dayStreak": "Racha de dias",
     "avgDailyKcal": "Promedio diario kcal",
     "daysLogged": "Dias registrados",
@@ -258,7 +272,9 @@
     "ok": "OK",
     "somethingWentWrong": "Algo salio mal",
     "tryAgain": "Intentar de nuevo",
-    "back": "Volver"
+    "back": "Volver",
+    "levelPrefix": "Nv.",
+    "combo": "Combo x"
   },
   "datePicker": {
     "selectDateTime": "Seleccionar fecha y hora",
@@ -267,7 +283,21 @@
     "month": "Mes",
     "year": "Anio",
     "hour": "Hora",
-    "min": "Min"
+    "min": "Min",
+    "months": {
+      "0": "Ene",
+      "1": "Feb",
+      "2": "Mar",
+      "3": "Abr",
+      "4": "May",
+      "5": "Jun",
+      "6": "Jul",
+      "7": "Ago",
+      "8": "Sep",
+      "9": "Oct",
+      "10": "Nov",
+      "11": "Dic"
+    }
   },
   "events": {
     "TASK_COMPLETED": "Quest completada",
@@ -281,7 +311,8 @@
     "good": "Buen golpe!",
     "critical": "Golpe critico!",
     "legendary": "LEGENDARIO!",
-    "streakBonus": "Racha bonus +{{xp}} XP!"
+    "streakBonus": "Racha bonus +{{xp}} XP!",
+    "combo": "Combo"
   },
   "onboarding": {
     "tagline": "Tu hub gamificado de productividad, nutricion y finanzas",
@@ -308,6 +339,11 @@
     "title": "Configuracion",
     "subtitle": "Ajustes de la aplicacion",
     "language": "Idioma",
+    "languageEs": "Español",
+    "languageEn": "English",
+    "toggleOn": "ON",
+    "toggleOff": "OFF",
+
     "sound": "Sonido",
     "soundEffects": "Efectos de sonido",
     "soundDesc": "Sonidos al completar quests, subir de nivel, etc.",

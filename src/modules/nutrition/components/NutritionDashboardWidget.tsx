@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Loading from '../../../shared/components/Loading';
 
 export default function NutritionDashboardWidget() {
+  const { t } = useTranslation();
   const [calories, setCalories] = useState(0);
   const [target, setTarget] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,10 +30,10 @@ export default function NutritionDashboardWidget() {
       </p>
       {target ? (
         <p style={{ fontSize: '0.85rem', opacity: 0.7, marginTop: 4 }}>
-          {pct}% of {target} kcal target
+          {t('nutrify.calorieTarget', { pct, target })}
         </p>
       ) : (
-        <p style={{ fontSize: '0.85rem', opacity: 0.5, fontStyle: 'italic' }}>Setup required</p>
+        <p style={{ fontSize: '0.85rem', opacity: 0.5, fontStyle: 'italic' }}>{t('nutrify.setupRequired')}</p>
       )}
     </div>
   );

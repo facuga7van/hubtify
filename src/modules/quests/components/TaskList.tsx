@@ -437,6 +437,7 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, proj
   onSubtaskChanged: () => void;
   drawingCount: number; onOpenNotes: () => void;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -534,7 +535,7 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, proj
       {expanded && (
         <div style={{ paddingLeft: 32 }}>
           {task.description && <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 8 }}>{task.description}</p>}
-          {task.dueDate && <p style={{ fontSize: '0.8rem', opacity: 0.5 }}>Due: {new Date(task.dueDate).toLocaleString()}</p>}
+          {task.dueDate && <p style={{ fontSize: '0.8rem', opacity: 0.5 }}>{t('questify.dueLabel')} {new Date(task.dueDate).toLocaleString()}</p>}
           <SubtaskList
             taskId={task.id}
             subtasks={subtasks}

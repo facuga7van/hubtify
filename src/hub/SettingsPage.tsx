@@ -86,11 +86,11 @@ export default function SettingsPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="rpg-button" onClick={() => changeLanguage('es')}
             style={{ opacity: i18n.language === 'es' ? 1 : 0.5, flex: 1 }}>
-            Español
+            {t('settings.languageEs')}
           </button>
           <button className="rpg-button" onClick={() => changeLanguage('en')}
             style={{ opacity: i18n.language === 'en' ? 1 : 0.5, flex: 1 }}>
-            English
+            {t('settings.languageEn')}
           </button>
         </div>
       </div>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
           </div>
           <button className="rpg-button" onClick={toggleSound}
             style={{ minWidth: 60 }}>
-            {soundEnabled ? 'ON' : 'OFF'}
+            {soundEnabled ? t('settings.toggleOn') : t('settings.toggleOff')}
           </button>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default function SettingsPage() {
             localStorage.setItem('hubtify_reminders', next ? 'true' : 'false');
             window.api.notificationsSetReminders(next);
           }} style={{ minWidth: 60 }}>
-            {remindersEnabled ? 'ON' : 'OFF'}
+            {remindersEnabled ? t('settings.toggleOn') : t('settings.toggleOff')}
           </button>
         </div>
       </div>

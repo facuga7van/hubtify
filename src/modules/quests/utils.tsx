@@ -11,9 +11,9 @@ export const TIER_EMOJI: Record<TaskTier, string> = {
 };
 
 export const TIER_LABEL: Record<TaskTier, string> = {
-  1: 'Quick',
-  2: 'Normal',
-  3: 'Epic',
+  1: 'questify.tier.quick',
+  2: 'questify.tier.normal',
+  3: 'questify.tier.epic',
 };
 
 export function tierEmoji(tier: number): string {
@@ -21,7 +21,7 @@ export function tierEmoji(tier: number): string {
 }
 
 export function tierLabel(tier: number): string {
-  return TIER_LABEL[tier as TaskTier] ?? 'Normal';
+  return TIER_LABEL[tier as TaskTier] ?? 'questify.tier.normal';
 }
 
 export function tierXp(tier: number): number {

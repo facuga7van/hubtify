@@ -128,7 +128,7 @@ export default function Dashboard() {
           {stats && (
             <div>
               <p className="rpg-stat-number" style={{ fontSize: '1.2rem' }}>
-                Lv.{stats.level} — {stats.title}
+                {t('common.levelPrefix')}{stats.level} — {stats.title}
               </p>
               <p className="rpg-stat-label" style={{ marginTop: 4 }}>
                 {dashStats?.eventsToday ?? 0} {t('questify.doneToday')}

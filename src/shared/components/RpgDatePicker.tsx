@@ -14,13 +14,9 @@ function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate();
 }
 
-const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 export default function RpgDatePicker({ value, onChange, min, max }: Props) {
   const { t } = useTranslation();
+  const MONTHS = Array.from({ length: 12 }, (_, i) => t('datePicker.months.' + i));
   const currentYear = new Date().getFullYear();
   const minYear = min ? parseInt(min.split('-')[0]) : 1900;
   const maxYear = max ? parseInt(max.split('-')[0]) : currentYear;

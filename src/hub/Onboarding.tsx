@@ -77,12 +77,12 @@ export default function Onboarding({ onComplete }: Props) {
               <button className="rpg-button"
                 onClick={() => setLanguage('es')}
                 style={{ opacity: i18n.language === 'es' ? 1 : 0.5 }}>
-                Español
+                {t('settings.languageEs')}
               </button>
               <button className="rpg-button"
                 onClick={() => setLanguage('en')}
                 style={{ opacity: i18n.language === 'en' ? 1 : 0.5 }}>
-                English
+                {t('settings.languageEn')}
               </button>
             </div>
             <button className="rpg-button" onClick={() => goStep(1)}

@@ -29,13 +29,9 @@ function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate();
 }
 
-const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 export default function RpgDateTimePicker({ value, onChange }: Props) {
   const { t } = useTranslation();
+  const MONTHS = Array.from({ length: 12 }, (_, i) => t('datePicker.months.' + i));
   const parsed = parseDT(value);
   const [year, setYear] = useState(parsed.year);
   const [month, setMonth] = useState(parsed.month);

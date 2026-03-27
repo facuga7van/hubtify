@@ -35,11 +35,11 @@ export default function XpToast({ data }: Props) {
     <div className={`xp-toast xp-toast--${current.bonusTier} ${visible ? 'xp-toast--visible' : ''}`}>
       <span className="xp-toast__xp">+{current.xp} XP</span>
       {current.comboMultiplier > 1 && (
-        <span className="xp-toast__combo">x{current.comboMultiplier} Combo</span>
+        <span className="xp-toast__combo">x{current.comboMultiplier} {t('toast.combo')}</span>
       )}
       {label && <span className="xp-toast__bonus">{label}</span>}
       {current.streakMilestone && (
-        <span className="xp-toast__streak">Racha bonus +{current.streakMilestone} XP!</span>
+        <span className="xp-toast__streak">{t('toast.streakBonus', { xp: current.streakMilestone })}</span>
       )}
     </div>
   );

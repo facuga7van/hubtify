@@ -113,7 +113,7 @@ export default function CharacterPage() {
 function getNextTitle(currentLevel: number, t: (key: string) => string): string {
   const thresholds: [number, string][] = [[50,'Leyenda'],[40,'Hero'],[30,'Champion'],[20,'Caballero'],[10,'Guerrero'],[5,'Escudero']];
   for (const [level, title] of thresholds) {
-    if (currentLevel < level) return `${title} (Lv.${level})`;
+    if (currentLevel < level) return `${title} (${t('common.levelPrefix')}${level})`;
   }
   return t('character.maxLevel');
 }

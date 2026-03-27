@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
 import Loading from '../shared/components/Loading';
@@ -7,6 +8,7 @@ import type { PlayerStats } from '../../shared/types';
 interface PlayerCardProps { stats: PlayerStats | null; collapsed?: boolean; }
 
 export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
+  const { t } = useTranslation();
   if (!stats) {
     return <Loading />;
   }
@@ -38,7 +40,7 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
 
       {/* Level & title */}
       <div className="player-card__info">
-        <div className="player-card__level">Lv.{stats.level}</div>
+        <div className="player-card__level">{t('common.levelPrefix')}{stats.level}</div>
         <div className="player-card__title">{stats.title}</div>
       </div>
 
@@ -50,7 +52,7 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
 
       {stats.dailyCombo > 0 && (
         <div className="player-card__combo">
-          Combo x{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(stats.dailyCombo, 4)]} ({stats.dailyCombo})
+          {t('common.combo')}{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(stats.dailyCombo, 4)]} ({stats.dailyCombo})
         </div>
       )}
     </div>
