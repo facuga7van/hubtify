@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { HabitWithStreak, HabitFrequency } from '../types';
 import { playTaskComplete } from '../../../shared/audio';
+import { formatDateString } from '../../../../shared/date-utils';
 
 interface Props {
   onXpGained: () => void;
@@ -104,6 +105,20 @@ export default function HabitTracker({ onXpGained }: Props) {
     return 'Diario';
   };
 
+  const getResetDate = (h: HabitWithStreak): string | null => {
+    if (h.frequency === 'daily') return null;
+    const now = new Date();
+    if (h.frequency === 'weekly') {
+      const dow = now.getDay() || 7;
+      const nextMonday = new Date(now);
+      nextMonday.setDate(now.getDate() + (8 - dow));
+      return formatDateString(nextMonday);
+    }
+    // monthly
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return formatDateString(nextMonth);
+  };
+
   const getProgressLabel = (h: HabitWithStreak) => {
     if (h.frequency === 'daily') return null;
     return `${h.checksThisPeriod}/${h.targetThisPeriod}`;
@@ -170,7 +185,8 @@ export default function HabitTracker({ onXpGained }: Props) {
 
           {/* Progress for weekly/monthly */}
           {getProgressLabel(h) && (
-            <span style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.6 }}>
+            <span style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.6, cursor: 'default' }}
+              title={getResetDate(h) ? `Se resetea el ${getResetDate(h)}` : undefined}>
               {getProgressLabel(h)}
             </span>
           )}
