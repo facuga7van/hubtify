@@ -17,3 +17,13 @@ export function getMondayOfWeek(dateStr?: string): string {
   monday.setDate(d.getDate() + diff);
   return formatDateString(monday);
 }
+
+/** Calculates age in years from a YYYY-MM-DD date of birth string */
+export function getAgeFromDob(dob: string): number {
+  const birth = new Date(dob + 'T00:00:00');
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
