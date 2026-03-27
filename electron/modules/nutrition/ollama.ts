@@ -240,12 +240,13 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
 const SYSTEM_PROMPT = `Sos un estimador preciso de calorías. Respondé SOLO con JSON válido.
 
 Formato EXACTO:
-{"calories": <número 10-5000>, "breakdown": "<descripción de ingredientes y calorías aprox>"}
+{"calories": <total 10-5000>, "items": [{"name": "<ingrediente>", "calories": <número>}, ...]}
 
 Reglas:
 - Estimá porciones típicas argentinas
 - Redondeá hacia arriba si hay duda
-- breakdown debe ser: "ingrediente1 ~Xkcal + ingrediente2 ~Ykcal"
+- Cada ingrediente en un item separado con sus calorías individuales
+- La suma de items debe ser cercana al total
 - SOLO JSON, sin texto adicional, sin explicaciones
 - Si no reconocés la comida, estimá lo más cercano`;
 
@@ -258,17 +259,19 @@ function sanitizeDescription(input: string): string | null {
   return s || null;
 }
 
-const estimationCache = new Map<string, { result: { calories: number; breakdown: string }; ts: number }>();
+type AiResult = { calories: number; items: Array<{ name: string; calories: number }> };
+
+const estimationCache = new Map<string, { result: AiResult; ts: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 
-function getCached(desc: string): { calories: number; breakdown: string } | null {
+function getCached(desc: string): AiResult | null {
   const key = desc.toLowerCase().trim();
   const entry = estimationCache.get(key);
   if (!entry || Date.now() - entry.ts > CACHE_TTL) { estimationCache.delete(key); return null; }
   return entry.result;
 }
 
-function setCache(desc: string, result: { calories: number; breakdown: string }): void {
+function setCache(desc: string, result: AiResult): void {
   const key = desc.toLowerCase().trim();
   estimationCache.set(key, { result, ts: Date.now() });
   if (estimationCache.size > 500) {
@@ -277,7 +280,7 @@ function setCache(desc: string, result: { calories: number; breakdown: string })
   }
 }
 
-export async function estimateWithAi(description: string): Promise<{ calories: number; breakdown: string } | null> {
+export async function estimateWithAi(description: string): Promise<AiResult | null> {
   const sanitized = sanitizeDescription(description);
   if (!sanitized) {
     lastAiDebug = 'Input validation failed';
@@ -310,7 +313,7 @@ export async function estimateWithAi(description: string): Promise<{ calories: n
     const data = await response.json() as { response: string };
     lastAiDebug = data.response?.slice(0, 300) ?? '(empty)';
 
-    const result = parseAiResponse(data.response);
+    const result = parseAiResponse(data.response, sanitized);
     if (result) setCache(sanitized, result);
     return result;
   } finally {
@@ -318,61 +321,72 @@ export async function estimateWithAi(description: string): Promise<{ calories: n
   }
 }
 
-function normalizeBreakdown(breakdown: unknown, totalCals: number): string | null {
-  if (typeof breakdown === 'string') return breakdown;
-  if (typeof breakdown === 'object' && breakdown !== null) {
-    // Model returned {"carne magra": 80, "otro": 40} — convert to readable string
-    const entries = Object.entries(breakdown as Record<string, number>);
-    if (entries.length > 0) {
-      return entries.map(([name, cals]) => `${name} ~${cals}kcal`).join(' + ');
-    }
+function parseItems(items: unknown, totalCals: number, description: string): Array<{ name: string; calories: number }> {
+  // New format: items array
+  if (Array.isArray(items)) {
+    const valid = items.filter((it: any) => typeof it.name === 'string' && typeof it.calories === 'number' && it.calories > 0);
+    if (valid.length > 0) return valid.map((it: any) => ({ name: it.name.trim(), calories: Math.round(it.calories) }));
   }
-  return `~${totalCals}kcal`;
+  // Old format: breakdown string "milanesa ~280kcal + puré ~120kcal"
+  if (typeof items === 'string') {
+    const parsed: Array<{ name: string; calories: number }> = [];
+    const regex = /([^~+]+?)~(\d+)\s*kcal/gi;
+    let m;
+    while ((m = regex.exec(items)) !== null) {
+      parsed.push({ name: m[1].trim(), calories: parseInt(m[2]) });
+    }
+    if (parsed.length > 0) return parsed;
+  }
+  // Old format: object {"carne magra": 80}
+  if (typeof items === 'object' && items !== null && !Array.isArray(items)) {
+    const entries = Object.entries(items as Record<string, number>);
+    if (entries.length > 0) return entries.map(([name, cals]) => ({ name, calories: Math.round(cals) }));
+  }
+  // Fallback: single item with total
+  return [{ name: description, calories: totalCals }];
 }
 
 function isValidCalories(cal: number): boolean {
   return cal > 0 && cal <= 5000;
 }
 
-export function parseAiResponse(raw: string): { calories: number; breakdown: string } | null {
-  // Strip markdown code fences that small models sometimes add
+export function parseAiResponse(raw: string, description: string): AiResult | null {
   const cleaned = raw.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
 
   // Try direct parse
   try {
     const obj = JSON.parse(cleaned);
     if (typeof obj.calories === 'number' && isValidCalories(obj.calories)) {
-      const breakdown = normalizeBreakdown(obj.breakdown, obj.calories);
-      if (breakdown) return { calories: obj.calories, breakdown };
+      const items = parseItems(obj.items ?? obj.breakdown, obj.calories, description);
+      return { calories: obj.calories, items };
     }
   } catch { /* fall through */ }
 
-  // Try to find JSON object in the response (model might add text around it)
+  // Try to find JSON object in the response
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
       const obj = JSON.parse(jsonMatch[0]);
       if (typeof obj.calories === 'number' && isValidCalories(obj.calories)) {
-        const breakdown = normalizeBreakdown(obj.breakdown, obj.calories);
-        if (breakdown) return { calories: obj.calories, breakdown };
+        const items = parseItems(obj.items ?? obj.breakdown, obj.calories, description);
+        return { calories: obj.calories, items };
       }
     } catch { /* fall through */ }
   }
 
-  // Try regex extraction (calories first)
+  // Regex extraction
   const match = raw.match(/"calories"\s*:\s*(\d+)/);
-  const matchBreakdown = raw.match(/"breakdown"\s*:\s*"([^"]*)"/);
-  if (match && matchBreakdown) {
+  if (match) {
     const cals = parseInt(match[1]);
-    if (isValidCalories(cals)) return { calories: cals, breakdown: matchBreakdown[1] };
+    if (isValidCalories(cals)) return { calories: cals, items: [{ name: description, calories: cals }] };
   }
 
-  // Last resort: find a number between 10-5000 that looks like calories
+  // Last resort
   const calMatch = raw.match(/\b(\d{2,4})\s*(?:kcal|cal|calorias|calorías)/i);
   if (calMatch) {
     const cals = parseInt(calMatch[1]);
     if (cals >= 10 && cals <= 5000) {
-      return { calories: cals, breakdown: raw.slice(0, 100).replace(/[{}"]/g, '').trim() };
+      return { calories: cals, items: [{ name: description, calories: cals }] };
     }
   }
 
