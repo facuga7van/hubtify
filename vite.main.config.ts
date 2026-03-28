@@ -10,7 +10,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['better-sqlite3', 'adm-zip', 'electron-updater'],
+      external: ['better-sqlite3', 'adm-zip'],
     },
   },
 });

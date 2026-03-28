@@ -29,15 +29,18 @@ export default function Layout() {
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null);
   const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
     const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
-    return () => { c1(); c2(); };
+    const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
+    return () => { c1(); c2(); c3(); };
   }, []);
 
   const handleUpdate = async () => {
     setUpdateState('downloading');
+    setUpdateError(null);
     try {
       await window.api.updaterDownload();
       // App will auto-quit and installer runs
@@ -243,6 +246,9 @@ export default function Layout() {
                 </div>
                 <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{downloadPercent}%</span>
               </div>
+            )}
+            {updateError && (
+              <p style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: 8 }}>{updateError}</p>
             )}
             {updateState === 'idle' && (
               <>

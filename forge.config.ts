@@ -15,7 +15,6 @@ const EXTERNAL_MODULES = [
   'file-uri-to-path',
   'prebuild-install',
   'node-addon-api',
-  'electron-updater',
   'electron-squirrel-startup',
   'adm-zip',
 ];

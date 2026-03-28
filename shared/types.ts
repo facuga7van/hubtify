@@ -160,10 +160,10 @@ export interface HubtifyApi {
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
   updaterDownload: () => Promise<string>;
-  updaterInstall: (path: string) => void;
   onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
   onUpdateDownloaded: (callback: () => void) => () => void;
   onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;
+  onUpdateError: (callback: (info: { message: string }) => void) => () => void;
 }
 
 // ── Nutrition AI Types ──────────────────────────────────────

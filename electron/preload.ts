@@ -118,7 +118,6 @@ const api = {
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),
   updaterDownload: () => ipcRenderer.invoke('updater:download') as Promise<string>,
-  updaterInstall: (path: string) => ipcRenderer.invoke('updater:install', path),
   onUpdateAvailable: (callback: (info: { version: string }) => void) => {
     const handler = (_e: unknown, info: { version: string }) => callback(info);
     ipcRenderer.on('updater:update-available', handler);
@@ -132,6 +131,11 @@ const api = {
     const handler = (_e: unknown, info: { percent: number }) => callback(info);
     ipcRenderer.on('updater:download-progress', handler);
     return () => ipcRenderer.removeListener('updater:download-progress', handler);
+  },
+  onUpdateError: (callback: (info: { message: string }) => void) => {
+    const handler = (_e: unknown, info: { message: string }) => callback(info);
+    ipcRenderer.on('updater:error', handler);
+    return () => ipcRenderer.removeListener('updater:error', handler);
   },
 };
 
