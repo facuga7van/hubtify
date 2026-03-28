@@ -74,17 +74,10 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
               key={item.path}
               className="sidebar-nav-item"
               style={{ opacity: 0.35, cursor: 'default' }}
-              title={collapsed ? `${t(item.key)} — ${t('common.comingSoon')}` : t('common.comingSoon')}
+              title={t('common.comingSoon')}
             >
               <NavIcon name={item.icon} />
-              {!collapsed && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
-                  {t(item.key)}
-                  <span style={{ fontSize: '0.55rem', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {t('common.comingSoon')}
-                  </span>
-                </span>
-              )}
+              {!collapsed && <span>{t(item.key)}</span>}
             </div>
           ) : (
             <NavLink
