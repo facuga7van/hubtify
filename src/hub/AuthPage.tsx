@@ -29,10 +29,10 @@ export default function AuthPage({ onAuth }: Props) {
       if (result.success) {
         onAuth();
       } else {
-        setError(result.error ?? 'Something went wrong');
+        setError(t(result.error ?? 'auth.errors.generic'));
       }
-    } catch (err) {
-      setError('Connection error');
+    } catch {
+      setError(t('auth.errors.networkError'));
     } finally {
       setLoading(false);
     }

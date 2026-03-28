@@ -9,6 +9,7 @@ import { todayDateString, formatDateString } from '../../../../shared/date-utils
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
 import { upsertFoodItems } from '../food-telemetry';
+import { estimateNutrition } from '../estimate-service';
 import { useAuthContext } from '../../../shared/AuthContext';
 
 interface FoodEntry {
@@ -23,7 +24,6 @@ interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 interface EstimationResult {
   totalCalories: number;
   items: Array<{ name: string; calories: number }>;
-  ollamaMissing: boolean;
   aiError?: string;
 }
 
@@ -57,7 +57,7 @@ export default function Today() {
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
-  const [estimateProgress, setEstimateProgress] = useState('');
+  const [estimateError, setEstimateError] = useState('');
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
   const [frequentSearch, setFrequentSearch] = useState('');
@@ -130,19 +130,17 @@ export default function Today() {
     if (!foodInput.trim() || estimating) return;
     setEstimating(true);
     setEstimation(null);
-    setEstimateProgress('');
-    const cleanup = window.api.onEstimateProgress((stage) => setEstimateProgress(stage));
+    setEstimateError('');
     try {
-      const result = await window.api.nutritionEstimate(foodInput.trim());
-      const est = result as EstimationResult;
-      setEstimation(est);
-      setEditCalories(String(est.totalCalories));
+      const result = await estimateNutrition(foodInput.trim());
+      setEstimation({ totalCalories: result.calories, items: result.items });
+      setEditCalories(String(result.calories));
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'AI estimation failed';
+      setEstimateError(msg);
       console.error('Estimation failed:', err);
     } finally {
-      cleanup();
       setEstimating(false);
-      setEstimateProgress('');
     }
   };
 
@@ -356,10 +354,10 @@ export default function Today() {
           </button>
         </div>
 
-        {/* Progress message */}
-        {estimating && estimateProgress && (
-          <div style={{ marginTop: 8, fontSize: '0.8rem', fontFamily: 'Fira Code, monospace', opacity: 0.7 }}>
-            {estimateProgress}
+        {/* Error message */}
+        {estimateError && (
+          <div style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--rpg-hp-red)' }}>
+            {estimateError}
           </div>
         )}
 

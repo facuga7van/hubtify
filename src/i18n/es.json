@@ -255,7 +255,19 @@
     "sync": "Sincronizar",
     "synced": "Sincronizado!",
     "syncFailed": "Sincronizacion fallida",
-    "loginRequired": "Login requerido para sincronizar"
+    "loginRequired": "Login requerido para sincronizar",
+    "errors": {
+      "invalidEmail": "Ingresá un correo electrónico válido",
+      "userNotFound": "No existe una cuenta con este correo",
+      "wrongPassword": "Contraseña incorrecta, intentá de nuevo",
+      "invalidCredential": "Correo o contraseña incorrectos",
+      "emailInUse": "Este correo ya está registrado",
+      "weakPassword": "La contraseña debe tener al menos 6 caracteres",
+      "tooManyRequests": "Demasiados intentos, probá de nuevo más tarde",
+      "userDisabled": "Esta cuenta fue deshabilitada",
+      "networkError": "Error de conexión, revisá tu internet",
+      "generic": "Algo salió mal, intentá de nuevo"
+    }
   },
   "rpg": {
     "level": "Nivel",

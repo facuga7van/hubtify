@@ -255,7 +255,19 @@
     "sync": "Sync",
     "synced": "Synced!",
     "syncFailed": "Sync failed",
-    "loginRequired": "Login required to sync"
+    "loginRequired": "Login required to sync",
+    "errors": {
+      "invalidEmail": "Please enter a valid email address",
+      "userNotFound": "No account found with this email",
+      "wrongPassword": "Incorrect password, try again",
+      "invalidCredential": "Incorrect email or password",
+      "emailInUse": "This email is already registered",
+      "weakPassword": "Password must be at least 6 characters",
+      "tooManyRequests": "Too many attempts, please try again later",
+      "userDisabled": "This account has been disabled",
+      "networkError": "Connection error, check your internet",
+      "generic": "Something went wrong, try again"
+    }
   },
   "rpg": {
     "level": "Level",

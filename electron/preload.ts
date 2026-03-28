@@ -63,19 +63,10 @@ const api = {
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
-  nutritionEstimate: (description: string) => ipcRenderer.invoke('nutrition:estimate', description),
-  nutritionGetAiStatus: () => ipcRenderer.invoke('nutrition:getAiStatus'),
-  nutritionIsOllamaAvailable: () => ipcRenderer.invoke('nutrition:isOllamaAvailable'),
   nutritionLearnFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:learnFood', entry),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
-  onEstimateProgress: (callback: (stage: string) => void) => {
-    const handler = (_e: unknown, stage: string) => callback(stage);
-    ipcRenderer.on('nutrition:estimate-progress', handler);
-    return () => ipcRenderer.removeListener('nutrition:estimate-progress', handler);
-  },
-
   // Character
   characterSave: (data: Record<string, unknown>) => ipcRenderer.invoke('character:save', data),
   characterLoad: () => ipcRenderer.invoke('character:load'),

@@ -1,7 +1,5 @@
-import { BrowserWindow } from 'electron';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
-import { estimate } from './nutrition/estimator';
 
 // import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
 import { seedFoodDatabase } from './nutrition/food-db-seed';
@@ -248,25 +246,6 @@ export function registerNutritionIpcHandlers(): void {
     const today = todayDateString();
     const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
     return row.total;
-  });
-
-  // ── AI Estimation ────────────────────────────────────
-
-  ipcHandle('nutrition:estimate', async (event, description: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    return await estimate(description, (stage: string) => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('nutrition:estimate-progress', stage);
-      }
-    });
-  });
-
-  ipcHandle('nutrition:getAiStatus', () => {
-    return 'running'; // Gemini API — always available
-  });
-
-  ipcHandle('nutrition:isOllamaAvailable', () => {
-    return true; // Gemini API — always available
   });
 
   ipcHandle('nutrition:learnFood', (_e, entry: { description: string; calories: number; breakdown?: string }) => {

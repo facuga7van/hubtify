@@ -5,6 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
   type User,
+  type AuthError,
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -12,6 +13,23 @@ export interface AuthUser {
   uid: string;
   email: string | null;
   displayName: string | null;
+}
+
+const firebaseErrorMap: Record<string, string> = {
+  'auth/invalid-email': 'auth.errors.invalidEmail',
+  'auth/user-not-found': 'auth.errors.userNotFound',
+  'auth/wrong-password': 'auth.errors.wrongPassword',
+  'auth/invalid-credential': 'auth.errors.invalidCredential',
+  'auth/email-already-in-use': 'auth.errors.emailInUse',
+  'auth/weak-password': 'auth.errors.weakPassword',
+  'auth/too-many-requests': 'auth.errors.tooManyRequests',
+  'auth/user-disabled': 'auth.errors.userDisabled',
+  'auth/network-request-failed': 'auth.errors.networkError',
+};
+
+function getErrorKey(err: unknown): string {
+  const code = (err as AuthError)?.code;
+  return firebaseErrorMap[code] ?? 'auth.errors.generic';
 }
 
 export function useAuth() {
@@ -35,8 +53,7 @@ export function useAuth() {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: { uid: cred.user.uid, email: cred.user.email, displayName: cred.user.displayName } };
     } catch (err: unknown) {
-      const error = err as { message?: string };
-      return { success: false, error: error.message ?? 'Login failed' };
+      return { success: false, error: getErrorKey(err) };
     }
   }, []);
 
@@ -45,8 +62,7 @@ export function useAuth() {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       return { success: true, user: { uid: cred.user.uid, email: cred.user.email, displayName: cred.user.displayName } };
     } catch (err: unknown) {
-      const error = err as { message?: string };
-      return { success: false, error: error.message ?? 'Registration failed' };
+      return { success: false, error: getErrorKey(err) };
     }
   }, []);
 

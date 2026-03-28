@@ -27,8 +27,11 @@ jobs:
 
       - name: Build installers
         run: npm run make
+
+      - name: Deploy Cloud Functions
+        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --token "$FIREBASE_TOKEN"
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Get version from tag
         id: version

@@ -8,3 +8,5 @@ dist/
 Modelfile
 .env
 .superpowers/
+functions/lib/
+functions/node_modules/
