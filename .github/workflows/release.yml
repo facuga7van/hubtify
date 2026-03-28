@@ -30,7 +30,7 @@ jobs:
 
       - name: Deploy Cloud Functions
         shell: bash
-        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --token "$FIREBASE_TOKEN"
+        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --force --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
