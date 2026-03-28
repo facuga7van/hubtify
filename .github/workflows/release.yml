@@ -27,6 +27,8 @@ jobs:
 
       - name: Build installers
         run: npm run make
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Get version from tag
         id: version

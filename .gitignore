@@ -6,4 +6,5 @@ dist/
 *.db-journal
 *.gguf
 Modelfile
+.env
 .superpowers/
