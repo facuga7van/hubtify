@@ -56,7 +56,7 @@ const config: ForgeConfig = {
     asar: {
       unpack: '**/node_modules/{better-sqlite3,bindings,file-uri-to-path}/**',
     },
-    icon: './assets/icon',
+    icon: path.resolve(__dirname, 'assets/icon'),
     extraResource: ['./assets/icon.ico'],
     appVersion: '0.3.0',
     appCopyright: 'Hubtify',
