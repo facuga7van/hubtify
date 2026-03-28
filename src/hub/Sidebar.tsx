@@ -25,6 +25,12 @@ function NavIcon({ name }: { name: string }) {
     case 'shield': return (
       <svg {...s} viewBox="0 0 18 18"><path d="M9 2L3 5v4c0 4 3 6 6 7 3-1 6-3 6-7V5L9 2z"/><path d="M7 9l2 2 3-4"/></svg>
     );
+    case 'trophy': return (
+      <svg {...s} viewBox="0 0 18 18"><path d="M5 3h8v4c0 2.5-1.8 4-4 4s-4-1.5-4-4V3z"/><path d="M9 11v3M6 14h6"/><path d="M13 5h1.5c.8 0 1.3.8 1 1.5-.5 1-1.3 1.8-2.5 2M5 5H3.5c-.8 0-1.3.8-1 1.5.5 1 1.3 1.8 2.5 2"/></svg>
+    );
+    case 'village': return (
+      <svg {...s} viewBox="0 0 18 18"><path d="M2 16h14"/><path d="M4 16V9l3-3 3 3v7"/><path d="M7 12h0"/><path d="M12 16v-5l2.5-2L17 11v5"/><path d="M7 6V3"/></svg>
+    );
     case 'settings': return (
       <svg {...s} viewBox="0 0 24 24">
         <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
@@ -35,11 +41,13 @@ function NavIcon({ name }: { name: string }) {
   }
 }
 
-const navKeys = [
+const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boolean }> = [
   { path: '/', key: 'nav.home', icon: 'home' },
   { path: '/quests', key: 'nav.questify', icon: 'sword' },
   { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
-  { path: '/finance', key: 'nav.coinify', icon: 'coins' },
+  { path: '/finance', key: 'nav.coinify', icon: 'coins', comingSoon: true },
+  { path: '/achievements', key: 'nav.achievements', icon: 'trophy', comingSoon: true },
+  { path: '/village', key: 'nav.village', icon: 'village', comingSoon: true },
   { path: '/character', key: 'nav.character', icon: 'shield' },
   { path: '/settings', key: 'nav.settings', icon: 'settings' },
 ];
@@ -61,15 +69,34 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
 
       <nav className="sidebar-nav">
         {navKeys.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
-            title={collapsed ? t(item.key) : undefined}
-          >
-            <NavIcon name={item.icon} />
-            {!collapsed && <span>{t(item.key)}</span>}
-          </NavLink>
+          item.comingSoon ? (
+            <div
+              key={item.path}
+              className="sidebar-nav-item"
+              style={{ opacity: 0.35, cursor: 'default' }}
+              title={collapsed ? `${t(item.key)} — ${t('common.comingSoon')}` : t('common.comingSoon')}
+            >
+              <NavIcon name={item.icon} />
+              {!collapsed && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {t(item.key)}
+                  <span style={{ fontSize: '0.55rem', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('common.comingSoon')}
+                  </span>
+                </span>
+              )}
+            </div>
+          ) : (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
+              title={collapsed ? t(item.key) : undefined}
+            >
+              <NavIcon name={item.icon} />
+              {!collapsed && <span>{t(item.key)}</span>}
+            </NavLink>
+          )
         ))}
       </nav>
 
