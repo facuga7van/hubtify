@@ -1,36 +1,28 @@
-import { ensureOllamaRunning, ensureModelPulled, estimateWithAi, isOllamaAvailable, lastAiDebug, stopOllama, downloadAndInstallOllama } from './ollama';
+import { estimateWithGemini } from './gemini';
 import type { EstimationResult } from '../../../shared/types';
+
+// Ollama imports kept for future reactivation:
+// import { ensureOllamaRunning, ensureModelPulled, estimateWithAi, isOllamaAvailable, lastAiDebug, stopOllama, downloadAndInstallOllama } from './ollama';
 
 export type ProgressCallback = (stage: string) => void;
 
 export async function estimate(description: string, onProgress?: ProgressCallback): Promise<EstimationResult> {
   try {
-    if (!isOllamaAvailable()) {
-      onProgress?.('Instalando motor de estimación por primera vez...');
-      await downloadAndInstallOllama(onProgress);
-    }
-
-    onProgress?.('Iniciando motor de estimación...');
-    await ensureOllamaRunning();
-
-    onProgress?.('Verificando modelo de IA...');
-    await ensureModelPulled(onProgress);
-
     onProgress?.('Estimando con IA...');
-    const aiResult = await estimateWithAi(description);
+    const result = await estimateWithGemini(description);
 
-    if (!aiResult) {
+    if (!result) {
       return {
         totalCalories: 0,
         items: [],
         ollamaMissing: false,
-        aiError: `La IA no pudo estimar. Respuesta: ${lastAiDebug}`,
+        aiError: 'La IA no pudo estimar. Intentá de nuevo.',
       };
     }
 
     return {
-      totalCalories: aiResult.calories,
-      items: aiResult.items,
+      totalCalories: result.calories,
+      items: result.items,
       ollamaMissing: false,
     };
   } catch (err) {
@@ -41,7 +33,5 @@ export async function estimate(description: string, onProgress?: ProgressCallbac
       ollamaMissing: false,
       aiError: msg,
     };
-  } finally {
-    stopOllama();
   }
 }

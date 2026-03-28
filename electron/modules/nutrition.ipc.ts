@@ -3,7 +3,7 @@ import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import { estimate } from './nutrition/estimator';
 
-import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
+// import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
 import { seedFoodDatabase } from './nutrition/food-db-seed';
 import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob } from '../../shared/date-utils';
 
@@ -262,11 +262,11 @@ export function registerNutritionIpcHandlers(): void {
   });
 
   ipcHandle('nutrition:getAiStatus', () => {
-    return getOllamaStatus();
+    return 'running'; // Gemini API — always available
   });
 
   ipcHandle('nutrition:isOllamaAvailable', () => {
-    return isOllamaAvailable();
+    return true; // Gemini API — always available
   });
 
   ipcHandle('nutrition:learnFood', (_e, entry: { description: string; calories: number; breakdown?: string }) => {
