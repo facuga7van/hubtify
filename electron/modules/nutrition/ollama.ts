@@ -383,6 +383,14 @@ function isValidCalories(cal: number): boolean {
   return cal > 0 && cal <= 5000;
 }
 
+function correctTotal(result: AiResult): AiResult {
+  const itemsSum = result.items.reduce((s, it) => s + it.calories, 0);
+  if (result.items.length > 1 && itemsSum > 0 && Math.abs(itemsSum - result.calories) > 10) {
+    return { calories: itemsSum, items: result.items };
+  }
+  return result;
+}
+
 export function parseAiResponse(raw: string, description: string): AiResult | null {
   const cleaned = raw.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
 
@@ -391,7 +399,7 @@ export function parseAiResponse(raw: string, description: string): AiResult | nu
     const obj = JSON.parse(cleaned);
     if (typeof obj.calories === 'number' && isValidCalories(obj.calories)) {
       const items = parseItems(obj.items ?? obj.breakdown, obj.calories, description);
-      return { calories: obj.calories, items };
+      return correctTotal({ calories: obj.calories, items });
     }
   } catch { /* fall through */ }
 
@@ -402,7 +410,7 @@ export function parseAiResponse(raw: string, description: string): AiResult | nu
       const obj = JSON.parse(jsonMatch[0]);
       if (typeof obj.calories === 'number' && isValidCalories(obj.calories)) {
         const items = parseItems(obj.items ?? obj.breakdown, obj.calories, description);
-        return { calories: obj.calories, items };
+        return correctTotal({ calories: obj.calories, items });
       }
     } catch { /* fall through */ }
   }
