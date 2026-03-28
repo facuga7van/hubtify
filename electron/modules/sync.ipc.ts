@@ -398,8 +398,8 @@ export function registerSyncIpcHandlers(): void {
       // Daily summary - merge by date
       if (Array.isArray(d.dailySummary)) {
         for (const s of d.dailySummary) {
-          db.prepare('INSERT OR REPLACE INTO nutrition_daily_summary (date, bmr, tdee, total_calories_in, balance, activity_level) VALUES (?, ?, ?, ?, ?, ?)').run(
-            s.date, s.bmr, s.tdee, s.total_calories_in, s.balance, s.activity_level
+          db.prepare('INSERT OR REPLACE INTO nutrition_daily_summary (date, bmr, tdee, total_calories_in, balance) VALUES (?, ?, ?, ?, ?)').run(
+            s.date, s.bmr, s.tdee, s.total_calories_in, s.balance
           );
         }
       }
