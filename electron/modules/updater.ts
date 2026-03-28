@@ -95,14 +95,12 @@ export function registerUpdaterIpcHandlers(): void {
     }
 
     fs.writeFileSync(installerPath, Buffer.concat(chunks));
-    mainWindow?.webContents.send('updater:update-downloaded');
+
+    // Auto-install: launch installer then quit
+    const child = execFile(installerPath, { detached: true, stdio: 'ignore' } as any);
+    child.unref();
+    setTimeout(() => app.quit(), 1000);
 
     return installerPath;
-  });
-
-  ipcHandle('updater:install', (_e, installerPath: string) => {
-    // Run the installer and quit
-    execFile(installerPath, { detached: true, stdio: 'ignore' } as any);
-    app.quit();
   });
 }

@@ -27,27 +27,21 @@ export default function Layout() {
 
   // Auto-updater
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null);
-  const [updateState, setUpdateState] = useState<'idle' | 'downloading' | 'ready'>('idle');
+  const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
-  const installerPathRef = useRef('');
 
   useEffect(() => {
     const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
     const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
-    const c3 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
-    return () => { c1(); c2(); c3(); };
+    return () => { c1(); c2(); };
   }, []);
 
   const handleUpdate = async () => {
     setUpdateState('downloading');
     try {
-      const p = await window.api.updaterDownload();
-      installerPathRef.current = p;
+      await window.api.updaterDownload();
+      // App will auto-quit and installer runs
     } catch { setUpdateState('idle'); }
-  };
-
-  const handleInstall = () => {
-    window.api.updaterInstall(installerPathRef.current);
   };
 
   // Ctrl+Q to open quick add
@@ -227,7 +221,7 @@ export default function Layout() {
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
 
       {/* Update popup */}
-      {updateAvailable && updateState !== 'ready' && (
+      {updateAvailable && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
@@ -265,31 +259,6 @@ export default function Layout() {
         </div>
       )}
 
-      {/* Update ready — auto install */}
-      {updateState === 'ready' && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
-            border: '2px solid var(--rpg-gold-dark)',
-            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 360,
-            textAlign: 'center', color: 'var(--rpg-parchment)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-          }}>
-            <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 12, color: 'var(--rpg-gold-light)' }}>
-              {t('settings.updateAvailable', { version: updateAvailable?.version })}
-            </h3>
-            <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 12 }}>
-              {t('settings.downloading', { percent: 100 })}
-            </p>
-            <button className="rpg-button" onClick={handleInstall} style={{ width: '100%' }}>
-              {t('settings.installAndRestart')}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
