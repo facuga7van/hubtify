@@ -81,6 +81,16 @@ const config: ForgeConfig = {
     new MakerSquirrel({ name: 'Hubtify', setupIcon: './assets/icon.ico' }),
     new MakerZIP({}),
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: { owner: 'facuga7van', name: 'hubtify' },
+        prerelease: false,
+        draft: false,
+      },
+    },
+  ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new VitePlugin({

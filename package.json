@@ -5,6 +5,11 @@
   "description": "Gamified life hub — quests, nutrition, and finance in one RPG app",
   "main": ".vite/build/main.js",
   "private": true,
+  "publish": {
+    "provider": "github",
+    "owner": "facuga7van",
+    "repo": "hubtify"
+  },
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -25,6 +30,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
+    "@electron-forge/publisher-github": "^7.11.1",
     "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^4.0.3",
     "@tailwindcss/postcss": "^4.2.1",
