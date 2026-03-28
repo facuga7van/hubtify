@@ -1,7 +1,4 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { defineSecret } from 'firebase-functions/params';
-
-const geminiApiKey = defineSecret('GEMINI_API_KEY');
+import * as functions from 'firebase-functions/v1';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
@@ -23,19 +20,19 @@ Input: "milanesa con puré" → {"items": [{"name": "milanesa", "calories": 350}
 Input: "3 empanadas de carne" → {"items": [{"name": "empanada de carne x3", "calories": 900}]}
 Input: "café con leche y 2 medialunas" → {"items": [{"name": "café con leche", "calories": 80}, {"name": "medialuna x2", "calories": 400}]}`;
 
-export const estimateNutrition = onCall(
-  { secrets: [geminiApiKey], timeoutSeconds: 60 },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Login required');
+export const estimateNutrition = functions
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 60, memory: '256MB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const description = request.data?.description;
+    const description = data?.description;
     if (!description || typeof description !== 'string' || description.trim().length === 0) {
-      throw new HttpsError('invalid-argument', 'Description is required');
+      throw new functions.https.HttpsError('invalid-argument', 'Description is required');
     }
 
-    const apiKey = geminiApiKey.value();
+    const apiKey = process.env.GEMINI_API_KEY ?? '';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
     const controller = new AbortController();
@@ -76,7 +73,7 @@ export const estimateNutrition = onCall(
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         console.error('[gemini] API error:', response.status, errText.slice(0, 200));
-        throw new HttpsError('internal', 'AI estimation failed');
+        throw new functions.https.HttpsError('internal', 'AI estimation failed');
       }
 
       const data = await response.json() as {
@@ -85,12 +82,12 @@ export const estimateNutrition = onCall(
 
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) {
-        throw new HttpsError('internal', 'No response from AI');
+        throw new functions.https.HttpsError('internal', 'No response from AI');
       }
 
       const parsed = JSON.parse(text) as { items?: Array<{ name: string; calories: number }> };
       if (!parsed.items || !Array.isArray(parsed.items) || parsed.items.length === 0) {
-        throw new HttpsError('internal', 'Could not parse AI response');
+        throw new functions.https.HttpsError('internal', 'Could not parse AI response');
       }
 
       const items = parsed.items
@@ -98,21 +95,20 @@ export const estimateNutrition = onCall(
         .map(it => ({ name: it.name.trim(), calories: Math.round(it.calories) }));
 
       if (items.length === 0) {
-        throw new HttpsError('internal', 'No valid items in AI response');
+        throw new functions.https.HttpsError('internal', 'No valid items in AI response');
       }
 
       const calories = items.reduce((sum, it) => sum + it.calories, 0);
 
       return { calories, items };
     } catch (err) {
-      if (err instanceof HttpsError) throw err;
+      if (err instanceof functions.https.HttpsError) throw err;
       if ((err as Error).name === 'AbortError') {
-        throw new HttpsError('deadline-exceeded', 'AI request timed out');
+        throw new functions.https.HttpsError('deadline-exceeded', 'AI request timed out');
       }
       console.error('[gemini] Error:', err);
-      throw new HttpsError('internal', 'AI estimation failed');
+      throw new functions.https.HttpsError('internal', 'AI estimation failed');
     } finally {
       clearTimeout(timeout);
     }
-  }
-);
+  });
