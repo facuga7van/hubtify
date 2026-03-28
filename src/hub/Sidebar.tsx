@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
+import Tooltip from '../shared/components/Tooltip';
 import './styles/layout.css';
 
 interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; }
@@ -70,15 +71,15 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
       <nav className="sidebar-nav">
         {navKeys.map((item) => (
           item.comingSoon ? (
-            <div
-              key={item.path}
-              className="sidebar-nav-item"
-              style={{ opacity: 0.35, cursor: 'default' }}
-              title={t('common.comingSoon')}
-            >
-              <NavIcon name={item.icon} />
-              {!collapsed && <span>{t(item.key)}</span>}
-            </div>
+            <Tooltip key={item.path} text={t('common.comingSoon')}>
+              <div
+                className="sidebar-nav-item"
+                style={{ opacity: 0.35, cursor: 'default' }}
+              >
+                <NavIcon name={item.icon} />
+                {!collapsed && <span>{t(item.key)}</span>}
+              </div>
+            </Tooltip>
           ) : (
             <NavLink
               key={item.path}
