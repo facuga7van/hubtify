@@ -14,20 +14,8 @@ export default function SettingsPage() {
   const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
   const [syncStatus, setSyncStatus] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [updateInfo, setUpdateInfo] = useState<{ version: string } | null>(null);
-  const [updateState, setUpdateState] = useState<'idle' | 'downloading' | 'ready'>('idle');
-  const [downloadPercent, setDownloadPercent] = useState(0);
-  const [installerPath, setInstallerPath] = useState('');
-
   useEffect(() => {
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
-  }, []);
-
-  useEffect(() => {
-    const cleanupAvailable = window.api.onUpdateAvailable((info) => setUpdateInfo(info));
-    const cleanupProgress = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
-    const cleanupDownloaded = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
-    return () => { cleanupAvailable(); cleanupProgress(); cleanupDownloaded(); };
   }, []);
 
   const toggleSound = () => {
@@ -287,36 +275,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Update banner */}
-      {updateInfo && (
-        <div className="rpg-card" style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>
-              {t('settings.updateAvailable', { version: updateInfo.version })}
-            </div>
-            {updateState === 'downloading' && (
-              <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('settings.downloading', { percent: downloadPercent })}</div>
-            )}
-          </div>
-          {updateState === 'idle' && (
-            <button className="rpg-button" onClick={async () => {
-              setUpdateState('downloading');
-              try {
-                const path = await window.api.updaterDownload();
-                setInstallerPath(path as string);
-              } catch { setUpdateState('idle'); }
-            }} style={{ fontSize: '0.8rem' }}>
-              {t('settings.downloadUpdate')}
-            </button>
-          )}
-          {updateState === 'ready' && (
-            <button className="rpg-button" onClick={() => window.api.updaterInstall(installerPath)}
-              style={{ fontSize: '0.8rem' }}>
-              {t('settings.installAndRestart')}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

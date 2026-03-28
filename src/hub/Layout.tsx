@@ -25,6 +25,31 @@ export default function Layout() {
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
+  // Auto-updater
+  const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null);
+  const [updateState, setUpdateState] = useState<'idle' | 'downloading' | 'ready'>('idle');
+  const [downloadPercent, setDownloadPercent] = useState(0);
+  const installerPathRef = useRef('');
+
+  useEffect(() => {
+    const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
+    const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
+    const c3 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
+    return () => { c1(); c2(); c3(); };
+  }, []);
+
+  const handleUpdate = async () => {
+    setUpdateState('downloading');
+    try {
+      const p = await window.api.updaterDownload();
+      installerPathRef.current = p;
+    } catch { setUpdateState('idle'); }
+  };
+
+  const handleInstall = () => {
+    window.api.updaterInstall(installerPathRef.current);
+  };
+
   // Ctrl+Q to open quick add
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -200,6 +225,71 @@ export default function Layout() {
       )}
 
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
+
+      {/* Update popup */}
+      {updateAvailable && updateState !== 'ready' && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
+            border: '2px solid var(--rpg-gold-dark)',
+            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 360,
+            textAlign: 'center', color: 'var(--rpg-parchment)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          }}>
+            <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 12, color: 'var(--rpg-gold-light)' }}>
+              {t('settings.updateAvailable', { version: updateAvailable.version })}
+            </h3>
+            {updateState === 'downloading' && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ height: '100%', background: 'var(--rpg-xp-green)', width: `${downloadPercent}%`, transition: 'width 0.3s ease' }} />
+                </div>
+                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{downloadPercent}%</span>
+              </div>
+            )}
+            {updateState === 'idle' && (
+              <>
+                <button className="rpg-button" onClick={handleUpdate} style={{ width: '100%', marginBottom: 8 }}>
+                  {t('settings.downloadUpdate')}
+                </button>
+                <button onClick={() => setUpdateAvailable(null)} className="rpg-button"
+                  style={{ width: '100%', padding: '4px 8px', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
+                  {t('nutrify.weightCheckin.later')}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Update ready — auto install */}
+      {updateState === 'ready' && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
+            border: '2px solid var(--rpg-gold-dark)',
+            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 360,
+            textAlign: 'center', color: 'var(--rpg-parchment)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          }}>
+            <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 12, color: 'var(--rpg-gold-light)' }}>
+              {t('settings.updateAvailable', { version: updateAvailable?.version })}
+            </h3>
+            <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 12 }}>
+              {t('settings.downloading', { percent: 100 })}
+            </p>
+            <button className="rpg-button" onClick={handleInstall} style={{ width: '100%' }}>
+              {t('settings.installAndRestart')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
