@@ -223,8 +223,37 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
 
 const INSTRUCTION = 'Estimá las calorías de esta comida';
 
+const FEW_SHOT = `### Instruction:
+${INSTRUCTION}
+
+### Input:
+milanesa con puré
+
+### Response:
+{"calories":550,"breakdown":"milanesa ~350kcal + puré de papas ~200kcal"}
+
+### Instruction:
+${INSTRUCTION}
+
+### Input:
+3 empanadas de carne
+
+### Response:
+{"calories":900,"breakdown":"3 empanadas de carne ~900kcal"}
+
+### Instruction:
+${INSTRUCTION}
+
+### Input:
+café con leche y 2 medialunas
+
+### Response:
+{"calories":480,"breakdown":"café con leche ~80kcal + 2 medialunas ~400kcal"}
+
+`;
+
 function buildAlpacaPrompt(input: string): string {
-  return `### Instruction:\n${INSTRUCTION}\n\n### Input:\n${input}\n\n### Response:\n`;
+  return `${FEW_SHOT}### Instruction:\n${INSTRUCTION}\n\n### Input:\n${input}\n\n### Response:\n`;
 }
 
 export let lastAiDebug = '';
