@@ -1,7 +1,7 @@
 {
   "name": "hubtify",
   "productName": "Hubtify",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Gamified life hub — quests, nutrition, and finance in one RPG app",
   "main": ".vite/build/main.js",
   "private": true,
