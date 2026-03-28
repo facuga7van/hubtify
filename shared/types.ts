@@ -122,6 +122,8 @@ export interface HubtifyApi {
   syncRestoreStats: (stats: Record<string, unknown>) => Promise<{ success: boolean }>;
   syncGetAllQuestData: () => Promise<Record<string, unknown[]>>;
   syncMergeQuestData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
+  syncGetAllNutritionData: () => Promise<Record<string, unknown>>;
+  syncMergeNutritionData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
 
   // Backup
   backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;

@@ -325,4 +325,99 @@ export function registerSyncIpcHandlers(): void {
     tx();
     return { changed };
   });
+
+  // ── Nutrition bulk export ──
+  ipcHandle('sync:getAllNutritionData', () => {
+    const db = getDb();
+
+    const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() || null;
+    const foodLog = db.prepare('SELECT * FROM food_log ORDER BY date DESC, time DESC').all();
+    const frequentFoods = db.prepare('SELECT * FROM frequent_foods ORDER BY times_used DESC').all();
+    const dailyMetrics = db.prepare('SELECT * FROM nutrition_daily_metrics ORDER BY date DESC').all();
+    const weeklyMetrics = db.prepare('SELECT * FROM nutrition_weekly_metrics ORDER BY date DESC').all();
+    const dailySummary = db.prepare('SELECT * FROM nutrition_daily_summary ORDER BY date DESC').all();
+    const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
+
+    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed };
+  });
+
+  // ── Nutrition bulk import (merge from Firestore) ──
+  ipcHandle('sync:mergeNutritionData', (_e, data: Record<string, unknown>) => {
+    const db = getDb();
+    const d = data as any;
+
+    const tx = db.transaction(() => {
+      // Profile
+      if (d.profile) {
+        const p = d.profile;
+        db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          p.age, p.sex, p.height_cm, p.initial_weight_kg, p.activity_level,
+          p.deficit_target_kcal ?? 500, p.gym_calories ?? 300, p.step_calories_factor ?? 0.04,
+          p.date_of_birth ?? null, p.weight_check_day ?? 1
+        );
+      }
+
+      // Food log - merge by date+time+description
+      if (Array.isArray(d.foodLog)) {
+        for (const f of d.foodLog) {
+          const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ?').get(f.date, f.time, f.description);
+          if (!exists) {
+            db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+              f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown
+            );
+          }
+        }
+      }
+
+      // Frequent foods - merge by name
+      if (Array.isArray(d.frequentFoods)) {
+        for (const f of d.frequentFoods) {
+          const exists = db.prepare('SELECT 1 FROM frequent_foods WHERE name = ?').get(f.name);
+          if (!exists) {
+            db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at) VALUES (?, ?, ?, ?, ?)').run(
+              f.name, f.calories, f.ai_breakdown, f.times_used, f.created_at
+            );
+          }
+        }
+      }
+
+      // Daily metrics - merge by date
+      if (Array.isArray(d.dailyMetrics)) {
+        for (const m of d.dailyMetrics) {
+          db.prepare('INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym) VALUES (?, ?, ?)').run(m.date, m.steps, m.gym);
+        }
+      }
+
+      // Weekly metrics - merge by date
+      if (Array.isArray(d.weeklyMetrics)) {
+        for (const m of d.weeklyMetrics) {
+          db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm) VALUES (?, ?, ?)').run(m.date, m.weight_kg, m.waist_cm);
+        }
+      }
+
+      // Daily summary - merge by date
+      if (Array.isArray(d.dailySummary)) {
+        for (const s of d.dailySummary) {
+          db.prepare('INSERT OR REPLACE INTO nutrition_daily_summary (date, bmr, tdee, total_calories_in, balance, activity_level) VALUES (?, ?, ?, ?, ?, ?)').run(
+            s.date, s.bmr, s.tdee, s.total_calories_in, s.balance, s.activity_level
+          );
+        }
+      }
+
+      // Daily closed - merge by date
+      if (Array.isArray(d.dailyClosed)) {
+        for (const c of d.dailyClosed) {
+          const exists = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(c.date);
+          if (!exists) {
+            db.prepare('INSERT INTO nutrition_daily_closed (date, closed_at, calories_in, tdee, balance, xp_earned, hp_change, steps, gym, weight_logged) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+              c.date, c.closed_at, c.calories_in, c.tdee, c.balance, c.xp_earned, c.hp_change, c.steps, c.gym, c.weight_logged
+            );
+          }
+        }
+      }
+    });
+
+    tx();
+    return { changed: true };
+  });
 }
