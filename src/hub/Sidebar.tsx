@@ -132,8 +132,8 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
           {!collapsed && (
-            <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>
-              {t('app.version')}
+            <div style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.35 }}>
+              v{APP_VERSION}
             </div>
           )}
           <button onClick={() => {
