@@ -221,7 +221,11 @@ export async function ensureModelPulled(onProgress?: (stage: string) => void): P
 
 // --- AI Estimation ---
 
-const SYSTEM_PROMPT = 'Estimá las calorías de esta comida. Respondé SOLO JSON: {"calories": N, "breakdown": "ingrediente1 ~Xkcal + ingrediente2 ~Ykcal"}';
+const INSTRUCTION = 'Estimá las calorías de esta comida';
+
+function buildAlpacaPrompt(input: string): string {
+  return `### Instruction:\n${INSTRUCTION}\n\n### Input:\n${input}\n\n### Response:\n`;
+}
 
 export let lastAiDebug = '';
 
@@ -273,7 +277,7 @@ export async function estimateWithAi(description: string): Promise<AiResult | nu
     const response = await fetch(`http://localhost:${port}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, prompt: sanitized, system: SYSTEM_PROMPT, stream: false, temperature: 0.1 }),
+      body: JSON.stringify({ model: MODEL, prompt: buildAlpacaPrompt(sanitized), stream: false, temperature: 0.1, raw: true }),
       signal: controller.signal,
     });
     if (!response.ok) {
