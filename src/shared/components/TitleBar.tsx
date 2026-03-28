@@ -2,9 +2,14 @@ export default function TitleBar() {
   return (
     <div className="title-bar">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <img src={new URL('../../assets/titleLeft.png', import.meta.url).href}
+        <img src={new URL('../../assets/titleLeft2.png', import.meta.url).href}
           alt="" style={{ height: 18, opacity: 0.5 }} />
         <span className="title-bar-text">Hubtify</span>
+    <img
+  src={new URL('../../assets/titleLeft2.png', import.meta.url).href}
+  alt=""
+  style={{ height: 18, opacity: 0.5, transform: 'scaleX(-1)' }}
+/>
       </div>
       <div className="title-bar-controls">
         <button className="title-bar-btn" onClick={() => window.api.windowMinimize()} aria-label="Minimize">
