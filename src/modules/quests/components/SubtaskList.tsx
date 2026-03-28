@@ -98,19 +98,6 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
         </SortableContext>
       </DndContext>
 
-      {completed.length > 0 && (
-        <button className="subtask-toggle-completed" onClick={() => setShowCompleted(!showCompleted)}>
-          {showCompleted ? t('questify.hideCompleted') : t('questify.showCompleted')} ({completed.length})
-        </button>
-      )}
-
-      {showCompleted && completed.map((subtask) => (
-        <div key={subtask.id} className="subtask-item subtask-item--completed">
-          <Checkbox checked onChange={() => handleComplete(subtask)} />
-          <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{subtask.name}</span>
-        </div>
-      ))}
-
       {showForm || editingSubtask ? (
         <SubtaskInlineForm
           editing={editingSubtask}
@@ -122,6 +109,20 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
           style={{ fontSize: '0.8rem', padding: '4px 10px', marginTop: 6 }}>
           {t('questify.addSubtask')}
         </button>
+      )}
+
+      {completed.length > 0 && (
+        <div style={{ marginTop: 6 }}>
+          <button className="subtask-toggle-completed" onClick={() => setShowCompleted(!showCompleted)}>
+            {showCompleted ? t('questify.hideCompleted') : t('questify.showCompleted')} ({completed.length})
+          </button>
+          {showCompleted && completed.map((subtask) => (
+            <div key={subtask.id} className="subtask-item subtask-item--completed">
+              <Checkbox checked onChange={() => handleComplete(subtask)} />
+              <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{subtask.name}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -136,8 +137,13 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="subtask-item">
-      <Checkbox onChange={() => onComplete(subtask)} />
+    <div ref={setNodeRef} style={style} {...attributes} className="subtask-item">
+      <div onPointerDown={(e) => e.stopPropagation()}>
+        <Checkbox onChange={() => onComplete(subtask)} />
+      </div>
+      <div {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '0 4px', opacity: 0.3 }}>
+        <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>
+      </div>
       <span className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
         {subtask.name}
       </span>
