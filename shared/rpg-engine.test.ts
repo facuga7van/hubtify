@@ -17,15 +17,15 @@ import {
 
 describe('xpThreshold', () => {
   it('level 1 is 0', () => { expect(xpThreshold(1)).toBe(0); });
-  it('level 2 is 246', () => { expect(xpThreshold(2)).toBe(246); });
-  it('level 10 is 1995', () => { expect(xpThreshold(10)).toBe(1995); });
+  it('level 2 is 339', () => { expect(xpThreshold(2)).toBe(339); });
+  it('level 10 is 3795', () => { expect(xpThreshold(10)).toBe(3795); });
 });
 
 describe('getLevel', () => {
   it('0 xp is level 1', () => { expect(getLevel(0)).toBe(1); });
-  it('245 xp is still level 1', () => { expect(getLevel(245)).toBe(1); });
-  it('246 xp is level 2', () => { expect(getLevel(246)).toBe(2); });
-  it('2000 xp is level 10', () => { expect(getLevel(2000)).toBe(10); });
+  it('338 xp is still level 1', () => { expect(getLevel(338)).toBe(1); });
+  it('339 xp is level 2', () => { expect(getLevel(339)).toBe(2); });
+  it('3795 xp is level 10', () => { expect(getLevel(3795)).toBe(10); });
 });
 
 describe('getTitle', () => {
@@ -100,13 +100,13 @@ describe('clampHp', () => {
 });
 
 describe('xpToNextLevel', () => {
-  it('at level 1 with 0 xp needs 246', () => {
-    expect(xpToNextLevel(0)).toBe(246);
+  it('at level 1 with 0 xp needs 339', () => {
+    expect(xpToNextLevel(0)).toBe(339);
   });
-  it('at level 2 with 246 xp', () => {
-    // level 2 threshold is 246, level 3 threshold is ~369
-    const result = xpToNextLevel(246);
-    expect(result).toBeGreaterThan(0);
+  it('at level 2 with 339 xp', () => {
+    // level 2 threshold is 339, level 3 threshold is round(120 * 3^1.5) = 624
+    const result = xpToNextLevel(339);
+    expect(result).toBe(624 - 339);
   });
 });
 
