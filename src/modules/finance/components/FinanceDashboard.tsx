@@ -10,7 +10,7 @@ export default function FinanceDashboard() {
   const [month, setMonth] = useState(() => todayDateString().slice(0, 7));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [categories, setCategories] = useState<string[]>(CATEGORIES);
+  const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
 
   // Balance & category breakdown
@@ -463,8 +463,8 @@ export default function FinanceDashboard() {
               padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
             }}>
               <div>
-                <span style={{ fontWeight: 600, color: loan.type === 'lent' ? 'var(--rpg-xp-green-light)' : 'var(--rpg-hp-red-light)' }}>
-                  {loan.type === 'lent' ? t('coinify.lentTo') : t('coinify.borrowedFrom')} {loan.personName}
+                <span style={{ fontWeight: 600, color: loan.direction === 'lent' ? 'var(--rpg-xp-green-light)' : 'var(--rpg-hp-red-light)' }}>
+                  {loan.direction === 'lent' ? t('coinify.lentTo') : t('coinify.borrowedFrom')} {loan.personName}
                 </span>
                 <span style={{ marginLeft: 8 }}>${loan.amount.toLocaleString()}</span>
                 {loan.description && <span style={{ opacity: 0.5, marginLeft: 8, fontSize: '0.85rem' }}>({loan.description})</span>}
@@ -507,7 +507,7 @@ export default function FinanceDashboard() {
             </summary>
             {settledLoans.map((loan) => (
               <div key={loan.id} style={{ padding: '4px 0', opacity: 0.5, fontSize: '0.85rem' }}>
-                {loan.type === 'lent' ? t('coinify.lentTo') : t('coinify.borrowedFrom')} {loan.personName} — ${loan.amount.toLocaleString()}
+                {loan.direction === 'lent' ? t('coinify.lentTo') : t('coinify.borrowedFrom')} {loan.personName} — ${loan.amount.toLocaleString()}
                 {loan.settledDate && <span> ({t('coinify.settled')} {loan.settledDate})</span>}
               </div>
             ))}
