@@ -10,3 +10,4 @@ Modelfile
 .superpowers/
 functions/lib/
 functions/node_modules/
+.worktrees/
