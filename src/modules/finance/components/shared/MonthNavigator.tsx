@@ -23,10 +23,10 @@ export function MonthNavigator({ month, onChange }: MonthNavigatorProps) {
   })();
 
   return (
-    <div className="flex items-center gap-4">
-      <button onClick={() => navigate(-1)} className="rpg-btn-sm">&lt;</button>
-      <span className="text-lg font-semibold capitalize">{label}</span>
-      <button onClick={() => navigate(1)} className="rpg-btn-sm">&gt;</button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <button onClick={() => navigate(-1)} className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>&lt;</button>
+      <span style={{ fontSize: '1.1rem', fontWeight: 600, textTransform: 'capitalize' }}>{label}</span>
+      <button onClick={() => navigate(1)} className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>&gt;</button>
     </div>
   );
 }

@@ -45,7 +45,6 @@ export default function Transactions() {
 
   useEffect(() => {
     loadTransactions();
-    // Auto-generate recurring for current month on page load
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     window.api.financeGenerateRecurringForMonth(currentMonth);
   }, [loadTransactions]);
@@ -55,7 +54,6 @@ export default function Transactions() {
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
   }) => {
     if (data.paymentMethod === 'credit_card' && data.installments > 1) {
-      // Create installment group + transactions
       await window.api.financeCreateInstallmentGroup({
         description: data.description || data.category,
         totalAmount: data.amount * data.installments,
@@ -113,11 +111,12 @@ export default function Transactions() {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       {/* Toggle form + Month nav */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
-        <button className="rpg-btn-sm" onClick={() => setShowForm(!showForm)}>
+        <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+          onClick={() => setShowForm(!showForm)}>
           {showForm ? '▲' : '+ ' + t('coinify.quickAdd')}
         </button>
       </div>
@@ -126,13 +125,15 @@ export default function Transactions() {
       {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rpg-select text-sm">
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
+          className="rpg-select" style={{ fontSize: '0.85rem' }}>
           <option value="">{t('coinify.expense')} / {t('coinify.income')}</option>
           <option value="expense">{t('coinify.expense')}</option>
           <option value="income">{t('coinify.income')}</option>
         </select>
-        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="rpg-select text-sm">
+        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)}
+          className="rpg-select" style={{ fontSize: '0.85rem' }}>
           <option value="">{t('coinify.paymentMethod')}</option>
           <option value="cash">{t('coinify.cash')}</option>
           <option value="debit">{t('coinify.debit')}</option>
@@ -142,45 +143,57 @@ export default function Transactions() {
       </div>
 
       {/* Transaction List */}
-      <div className="space-y-1">
+      <div>
         {transactions.length === 0 ? (
-          <p className="text-sm opacity-40 text-center py-8">{t('coinify.noTransactions')}</p>
+          <p style={{ opacity: 0.5, fontStyle: 'italic', textAlign: 'center', padding: 24 }}>
+            {t('coinify.noTransactions')}
+          </p>
         ) : (
           transactions.map((tx) => (
-            <div key={tx.id} className="rpg-card p-3 flex items-center gap-3">
+            <div key={tx.id} className="rpg-card" style={{ marginBottom: 8, padding: 12 }}>
               {editingId === tx.id ? (
                 /* Edit mode */
-                <div className="flex-1 flex gap-2 items-center">
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="number" value={editFields.amount}
                     onChange={(e) => setEditFields({ ...editFields, amount: e.target.value })}
-                    className="rpg-input w-24 text-sm" />
+                    className="rpg-input" style={{ width: 90, fontSize: '0.85rem' }} />
                   <input type="text" value={editFields.description}
                     onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
-                    className="rpg-input flex-1 text-sm" />
-                  <button className="rpg-btn-sm" onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
-                  <button className="rpg-btn-sm" onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
+                    className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
+                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+                    onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
+                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+                    onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
                 </div>
               ) : (
                 /* View mode */
-                <>
-                  <span className="text-xs opacity-40 w-20">{tx.date.slice(5)}</span>
-                  <span className="flex-1 text-sm truncate" title={tx.description}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', opacity: 0.5, width: 70, flexShrink: 0 }}>{tx.date.slice(5)}</span>
+                  <span style={{ flex: 1, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
                     {tx.description || tx.category}
                     {tx.forThirdParty && (
-                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#C9A84C]/20 text-[#C9A84C]">
+                      <span style={{ marginLeft: 8, fontSize: '0.75rem', padding: '1px 6px', borderRadius: 3, background: 'rgba(201, 168, 76, 0.2)', color: 'var(--rpg-gold)' }}>
                         → {tx.forThirdParty}
                       </span>
                     )}
                   </span>
-                  <span className="text-xs opacity-30">{tx.category}</span>
-                  <span className="text-xs opacity-30">{paymentMethodLabel(tx.paymentMethod)}</span>
-                  <span className={`font-mono text-sm ${tx.type === 'income' ? 'text-[#2D5A27]' : 'text-[#8B2020]'}`}>
+                  <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)', padding: '1px 6px', borderRadius: 3 }}>
+                    {tx.category}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{paymentMethodLabel(tx.paymentMethod)}</span>
+                  <span style={{
+                    fontFamily: 'Fira Code, monospace',
+                    fontSize: '0.85rem',
+                    color: tx.type === 'income' ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)',
+                  }}>
                     {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
                     {tx.currency === 'USD' && ' USD'}
                   </span>
-                  <button className="opacity-30 hover:opacity-60 text-sm" onClick={() => startEdit(tx)}>✎</button>
-                  <button className="opacity-30 hover:text-[#8B2020] text-sm" onClick={() => handleDelete(tx.id)}>✕</button>
-                </>
+                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '2px 6px', opacity: 0.5 }}
+                    onClick={() => startEdit(tx)}>✎</button>
+                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '2px 6px', opacity: 0.5 }}
+                    onClick={() => handleDelete(tx.id)}>✕</button>
+                </div>
               )}
             </div>
           ))
