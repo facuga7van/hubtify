@@ -425,8 +425,8 @@ export function registerSyncIpcHandlers(): void {
         for (const f of d.foodLog) {
           const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ?').get(f.date, f.time, f.description);
           if (!exists) {
-            db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-              f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown
+            db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id) VALUES (?, ?, ?, ?, ?, ?)').run(
+              f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id
             );
           }
         }
@@ -437,8 +437,8 @@ export function registerSyncIpcHandlers(): void {
         for (const f of d.frequentFoods) {
           const exists = db.prepare('SELECT 1 FROM frequent_foods WHERE name = ?').get(f.name);
           if (!exists) {
-            db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at) VALUES (?, ?, ?, ?, ?)').run(
-              f.name, f.calories, f.ai_breakdown, f.times_used, f.created_at
+            db.prepare('INSERT INTO frequent_foods (name, calories, times_used, created_at) VALUES (?, ?, ?, ?)').run(
+              f.name, f.calories, f.times_used, f.created_at
             );
           }
         }

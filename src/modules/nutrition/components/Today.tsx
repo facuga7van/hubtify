@@ -13,7 +13,7 @@ import type { NutritionProfile } from '../types';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
-  calories: number; source: string; frequentFoodId: number | null; aiBreakdown: string | null;
+  calories: number; source: string; frequentFoodId: number | null;
 }
 
 interface FrequentFood { id: number; name: string; calories: number; timesUsed: number; }
@@ -159,7 +159,6 @@ export default function Today() {
       description: foodInput.trim(),
       calories,
       source: 'ai_estimate',
-      aiBreakdown: JSON.stringify(estimation.items),
     });
 
     await window.api.processRpgEvent({

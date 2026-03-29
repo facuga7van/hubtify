@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 interface FoodEntry {
   id: number; time: string; description: string; calories: number;
-  source: string; aiBreakdown: string | null;
+  source: string;
 }
 
 interface Props {

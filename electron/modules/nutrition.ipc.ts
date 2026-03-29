@@ -47,7 +47,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:logFood', (_e, entry: {
     date?: string; description: string; calories: number; source: string;
-    frequentFoodId?: number; aiBreakdown?: string;
+    frequentFoodId?: number;
   }) => {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
@@ -55,10 +55,10 @@ export function registerNutritionIpcHandlers(): void {
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     db.transaction(() => {
       db.prepare(`
-        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id)
+        VALUES (?, ?, ?, ?, ?, ?)
       `).run(date, time, entry.description, entry.calories, entry.source,
-        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null);
+        entry.frequentFoodId ?? null);
       recalcSummary(db, date);
     })();
   });
@@ -67,7 +67,7 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, date, time, description, calories, source,
-             frequent_food_id AS frequentFoodId, ai_breakdown AS aiBreakdown
+             frequent_food_id AS frequentFoodId
       FROM food_log WHERE date = ? ORDER BY time ASC
     `).all(date);
   });
@@ -102,16 +102,16 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:getFrequentFoods', () => {
     const db = getDb();
     return db.prepare(`
-      SELECT id, name, calories, ai_breakdown AS aiBreakdown,
+      SELECT id, name, calories,
              times_used AS timesUsed, created_at AS createdAt
       FROM frequent_foods ORDER BY times_used DESC
     `).all();
   });
 
-  ipcHandle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number; aiBreakdown?: string }) => {
+  ipcHandle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number }) => {
     const db = getDb();
-    db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, created_at) VALUES (?, ?, ?, ?)')
-      .run(food.name, food.calories, food.aiBreakdown ?? null, new Date().toISOString());
+    db.prepare('INSERT INTO frequent_foods (name, calories, created_at) VALUES (?, ?, ?)')
+      .run(food.name, food.calories, new Date().toISOString());
   });
 
   ipcHandle('nutrition:deleteFrequentFood', (_e, id: number) => {

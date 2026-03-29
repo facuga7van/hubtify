@@ -17,14 +17,12 @@ export interface FoodLogEntry {
   calories: number;
   source: 'ai_estimate' | 'frequent' | 'manual';
   frequentFoodId: number | null;
-  aiBreakdown: string | null;
 }
 
 export interface FrequentFood {
   id: number;
   name: string;
   calories: number;
-  aiBreakdown: string | null;
   timesUsed: number;
   createdAt: string;
 }
