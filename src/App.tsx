@@ -15,7 +15,13 @@ import Today from './modules/nutrition/components/Today';
 import NutritionCharts from './modules/nutrition/components/NutritionCharts';
 import NutritionSettings from './modules/nutrition/components/NutritionSettings';
 import { financeModule } from './modules/finance';
-import FinanceDashboard from './modules/finance/components/FinanceDashboard';
+import FinanceLayout from './modules/finance/components/FinanceLayout';
+import Dashboard from './modules/finance/components/Dashboard';
+import Transactions from './modules/finance/components/Transactions';
+import Installments from './modules/finance/components/Installments';
+import Loans from './modules/finance/components/Loans';
+import Recurring from './modules/finance/components/Recurring';
+import Import from './modules/finance/components/Import';
 import { useAuthContext } from './shared/AuthContext';
 
 function AuthPageWrapper() {
@@ -64,7 +70,14 @@ export default function App() {
           <Route path="/nutrition" element={<Today />} />
           <Route path="/nutrition/dashboard" element={<NutritionCharts />} />
           <Route path="/nutrition/settings" element={<NutritionSettings />} />
-          <Route path="/finance" element={<FinanceDashboard />} />
+          <Route path="/finance" element={<FinanceLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="transactions" element={<Transactions />} />
+            <Route path="installments" element={<Installments />} />
+            <Route path="loans" element={<Loans />} />
+            <Route path="recurring" element={<Recurring />} />
+            <Route path="import" element={<Import />} />
+          </Route>
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Route>

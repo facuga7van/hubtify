@@ -1,16 +1,16 @@
 import type { ModuleDefinition } from '../../core/module-registry';
 import { financeMigrations } from './finance.schema';
-import FinanceDashboard from './components/FinanceDashboard';
-import FinanceDashboardWidget from './components/FinanceDashboardWidget';
+import FinanceLayout from './components/FinanceLayout';
+import DashboardWidget from './components/DashboardWidget';
 
 export const financeModule: ModuleDefinition = {
   id: 'finance',
   name: 'Coinify',
   icon: () => null,
   routes: [
-    { path: '/finance', component: FinanceDashboard },
+    { path: '/finance', component: FinanceLayout },
   ],
-  dashboardWidget: FinanceDashboardWidget,
+  dashboardWidget: DashboardWidget,
   migrations: financeMigrations,
   rpgEventHandlers: {
     EXPENSE_LOGGED: () => ({ xp: 5, hp: 0 }),
