@@ -29,5 +29,13 @@ export const questsModule: ModuleDefinition = {
       const p = payload as { xp?: number; hp?: number };
       return { xp: p.xp ?? -5, hp: p.hp ?? 0 };
     },
+    HABIT_CHECKED: (payload: unknown) => {
+      const p = payload as { xp?: number; hp?: number };
+      return { xp: p.xp ?? 5, hp: p.hp ?? 0 };
+    },
+    HABIT_UNCHECKED: (payload: unknown) => {
+      const p = payload as { xp?: number; hp?: number };
+      return { xp: p.xp ?? -5, hp: p.hp ?? 0 };
+    },
   },
 };

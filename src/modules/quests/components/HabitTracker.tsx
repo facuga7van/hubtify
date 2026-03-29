@@ -51,25 +51,36 @@ export default function HabitTracker({ onXpGained }: Props) {
 
   const handleCheck = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
     const result = await window.api.questsCheckHabit(habitId);
+
     if (result.checked) {
-      const streak = habit ? habit.streak + 1 : 1;
-      const xp = 5 + Math.min(streak, 10);
-      await window.api.processRpgEvent({
-        type: 'HABIT_CHECKED', moduleId: 'quests',
-        payload: { xp, hp: 0, habitId },
-        timestamp: Date.now(),
-      });
+      // XP only when this check completes the period target
+      const justCompletedPeriod = habit.checksThisPeriod + 1 >= habit.targetThisPeriod
+        && habit.checksThisPeriod < habit.targetThisPeriod;
+      if (justCompletedPeriod) {
+        const streak = habit.streak + 1;
+        const xp = 5 + Math.min(streak, 10);
+        await window.api.processRpgEvent({
+          type: 'HABIT_CHECKED', moduleId: 'quests',
+          payload: { xp, hp: 0, habitId },
+          timestamp: Date.now(),
+        });
+        onXpGained();
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+      }
       playTaskComplete();
-      onXpGained();
-      window.dispatchEvent(new Event('rpg:statsChanged'));
     } else {
-      await window.api.processRpgEvent({
-        type: 'HABIT_UNCHECKED', moduleId: 'quests',
-        payload: { xp: -5, hp: 0, habitId },
-        timestamp: Date.now(),
-      });
-      window.dispatchEvent(new Event('rpg:statsChanged'));
+      // Remove XP only if unchecking drops below the target
+      const droppedBelowTarget = habit.checksThisPeriod === habit.targetThisPeriod;
+      if (droppedBelowTarget) {
+        await window.api.processRpgEvent({
+          type: 'HABIT_UNCHECKED', moduleId: 'quests',
+          payload: { xp: -5, hp: 0, habitId },
+          timestamp: Date.now(),
+        });
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+      }
     }
     await loadHabits();
     window.dispatchEvent(new Event('quests:dataChanged'));
