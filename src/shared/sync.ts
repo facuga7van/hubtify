@@ -1,8 +1,5 @@
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { getFirestore } from 'firebase/firestore';
-import { app } from './firebase';
-
-const firestore = getFirestore(app);
+import { getActiveFirestore } from './firebase';
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -16,7 +13,7 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       window.api.financeGetIncomeSources(),
     ]);
 
-    const userRef = doc(firestore, 'hubtify_users', uid);
+    const userRef = doc(getActiveFirestore(), 'hubtify_users', uid);
     await setDoc(userRef, {
       playerStats: stats,
       characterData: charData,
@@ -43,7 +40,7 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
 
 export async function syncPull(uid: string): Promise<{ success: boolean; hasData?: boolean; changed?: boolean; error?: string }> {
   try {
-    const userRef = doc(firestore, 'hubtify_users', uid);
+    const userRef = doc(getActiveFirestore(), 'hubtify_users', uid);
     const snap = await getDoc(userRef);
     if (!snap.exists()) return { success: true, hasData: false };
 
