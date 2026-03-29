@@ -14,6 +14,33 @@ function getGoal(deficitTargetKcal: number): Goal {
   return 'maintain';
 }
 
+function statusMessage(t: (k: string) => string, goal: Goal, consumed: number, target: number, barMax: number) {
+  const pct = target > 0 ? consumed / target : 0;
+
+  // Over the absolute max — always bad
+  if (consumed > barMax) {
+    return <span style={{ color: 'var(--rpg-hp-red)' }}>{t(`nutrify.status.${goal}.over`)}</span>;
+  }
+
+  if (goal === 'deficit') {
+    if (consumed > target) return <span style={{ color: '#e67e22' }}>{t('nutrify.status.deficit.warning')}</span>;
+    if (pct >= 0.85) return <span style={{ opacity: 0.5 }}>{t('nutrify.status.deficit.close')}</span>;
+    if (pct >= 0.5) return <span style={{ color: 'var(--rpg-xp-green)' }}>{t('nutrify.status.deficit.good')}</span>;
+    return <span style={{ opacity: 0.4 }}>{t('nutrify.status.deficit.early')}</span>;
+  }
+
+  if (goal === 'surplus') {
+    if (pct >= 0.85) return <span style={{ color: 'var(--rpg-xp-green)' }}>{t('nutrify.status.surplus.close')}</span>;
+    if (pct >= 0.5) return <span style={{ opacity: 0.5 }}>{t('nutrify.status.surplus.good')}</span>;
+    return <span style={{ opacity: 0.4 }}>{t('nutrify.status.surplus.early')}</span>;
+  }
+
+  // maintain
+  if (pct >= 0.85 && pct <= 1.0) return <span style={{ color: 'var(--rpg-xp-green)' }}>{t('nutrify.status.maintain.good')}</span>;
+  if (pct >= 0.5) return <span style={{ opacity: 0.5 }}>{t('nutrify.status.maintain.onTrack')}</span>;
+  return <span style={{ opacity: 0.4 }}>{t('nutrify.status.maintain.early')}</span>;
+}
+
 export default function CalorieProgressBar({ consumed, tdee, deficitTargetKcal }: Props) {
   const { t } = useTranslation();
   if (tdee <= 0) return null;
@@ -94,23 +121,7 @@ export default function CalorieProgressBar({ consumed, tdee, deficitTargetKcal }
           TDEE: <b>{tdee}</b>
           {goal === 'surplus' && <> · {t('nutrify.target')}: <b>{target}</b></>}
         </span>
-        {consumed > barMax ? (
-          <span style={{ color: 'var(--rpg-hp-red)' }}>
-            {t('nutrify.overTdee')}
-          </span>
-        ) : goal === 'deficit' && consumed > target ? (
-          <span style={{ color: '#e67e22' }}>
-            {t('nutrify.overTargetWarning')}
-          </span>
-        ) : consumed <= target * 0.7 ? (
-          <span style={{ color: 'var(--rpg-xp-green)' }}>
-            {t('nutrify.onTrack')}
-          </span>
-        ) : (
-          <span style={{ opacity: 0.5 }}>
-            {t('nutrify.onTrack')}
-          </span>
-        )}
+        {statusMessage(t, goal, consumed, target, barMax)}
       </div>
     </div>
   );

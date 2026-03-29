@@ -102,6 +102,27 @@
     "overTargetWarning": "Over target but still under TDEE",
     "greatDeficit": "Great deficit! XP bonus when closing the day",
     "onTrack": "On track, keep it up",
+    "status": {
+      "deficit": {
+        "over": "Over TDEE — HP penalty at day close!",
+        "warning": "Over target but under TDEE — tighten up",
+        "close": "Almost at target — stay focused",
+        "good": "Good deficit — on track for XP bonus",
+        "early": "Keep logging your meals"
+      },
+      "surplus": {
+        "over": "Way over target — slow down!",
+        "close": "Almost at your surplus goal — nice!",
+        "good": "Halfway there — keep eating",
+        "early": "Still need to eat more today"
+      },
+      "maintain": {
+        "over": "Over your TDEE — watch out",
+        "good": "Right on target — perfect balance",
+        "onTrack": "On track, keep it up",
+        "early": "Keep logging your meals"
+      }
+    },
     "overBy": "Over by",
     "setupRequired": "Setup required",
     "dayStreak": "Day Streak",

@@ -103,6 +103,27 @@
     "overTargetWarning": "Pasaste tu objetivo pero todavía bajo TDEE",
     "greatDeficit": "¡Gran déficit! Bonus de XP al cerrar el día",
     "onTrack": "Vas bien, seguí así",
+    "status": {
+      "deficit": {
+        "over": "Superaste tu TDEE — penalización de HP al cerrar!",
+        "warning": "Pasaste el objetivo pero bajo TDEE — ajustá",
+        "close": "Casi en el objetivo — mantené el foco",
+        "good": "Buen déficit — vas por el bonus de XP",
+        "early": "Seguí registrando tus comidas"
+      },
+      "surplus": {
+        "over": "Muy por encima del objetivo — frená!",
+        "close": "Casi en tu meta de superávit — bien ahí!",
+        "good": "Vas por la mitad — seguí comiendo",
+        "early": "Todavía necesitás comer más hoy"
+      },
+      "maintain": {
+        "over": "Superaste tu TDEE — ojo",
+        "good": "Justo en el objetivo — balance perfecto",
+        "onTrack": "Vas bien, seguí así",
+        "early": "Seguí registrando tus comidas"
+      }
+    },
     "overBy": "Excedido por",
     "dayStreak": "Racha de días",
     "avgDailyKcal": "Promedio diario kcal",
