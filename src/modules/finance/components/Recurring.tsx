@@ -215,7 +215,7 @@ export default function Recurring() {
 
           <CategorySelect value={formCategory} onChange={setFormCategory} />
 
-          <button type="submit" className="rpg-btn w-full" disabled={formSubmitting}>
+          <button type="submit" className="rpg-button w-full" disabled={formSubmitting}>
             {formSubmitting ? t('coinify.saving') : t('coinify.save')}
           </button>
         </form>
@@ -224,7 +224,7 @@ export default function Recurring() {
       {/* Generate Button */}
       <div className="flex items-center gap-3">
         <button
-          className="rpg-btn"
+          className="rpg-button"
           onClick={handleGenerate}
           disabled={generating}
         >

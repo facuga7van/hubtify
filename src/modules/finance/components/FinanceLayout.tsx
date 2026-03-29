@@ -15,7 +15,7 @@ export default function FinanceLayout() {
 
   return (
     <div className="flex flex-col h-full">
-      <nav className="flex gap-1 p-2 border-b border-white/10 overflow-x-auto">
+      <nav className="flex gap-1 p-2 border-b overflow-x-auto" style={{ borderColor: 'var(--rpg-gold-dark)' }}>
         {tabs.map((tab) => (
           <NavLink
             key={tab.path}
@@ -24,10 +24,11 @@ export default function FinanceLayout() {
             className={({ isActive }) =>
               `px-3 py-1.5 rounded text-sm whitespace-nowrap transition-colors ${
                 isActive
-                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]'
-                  : 'text-white/60 hover:text-white/80'
+                  ? 'rpg-btn-active'
+                  : ''
               }`
             }
+            style={({ isActive }) => isActive ? {} : { color: 'var(--rpg-wood)', opacity: 0.7 }}
           >
             {t(tab.label)}
           </NavLink>

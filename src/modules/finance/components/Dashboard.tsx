@@ -175,10 +175,10 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <div className="flex gap-3">
-        <button className="rpg-btn flex-1" onClick={() => navigate('/finance/transactions?type=expense')}>
+        <button className="rpg-button flex-1" onClick={() => navigate('/finance/transactions?type=expense')}>
           + {t('coinify.expense')}
         </button>
-        <button className="rpg-btn flex-1" onClick={() => navigate('/finance/transactions?type=income')}>
+        <button className="rpg-button flex-1" onClick={() => navigate('/finance/transactions?type=income')}>
           + {t('coinify.income')}
         </button>
       </div>

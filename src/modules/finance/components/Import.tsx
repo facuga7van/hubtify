@@ -114,7 +114,7 @@ export default function Import() {
 
       {/* File picker */}
       <div className="rpg-card p-4 flex items-center gap-4">
-        <label className="rpg-btn cursor-pointer">
+        <label className="rpg-button cursor-pointer">
           {t('coinify.importSelectFile')}
           <input
             ref={fileInputRef}
@@ -207,7 +207,7 @@ export default function Import() {
               />
             </div>
             <button
-              className="rpg-btn"
+              className="rpg-button"
               onClick={handleConfirm}
               disabled={importing || includedCount === 0}
             >

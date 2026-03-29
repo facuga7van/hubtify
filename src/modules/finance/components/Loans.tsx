@@ -373,7 +373,7 @@ export default function Loans() {
             className="rpg-input"
           />
 
-          <button type="submit" className="rpg-btn w-full">
+          <button type="submit" className="rpg-button w-full">
             {t('coinify.add') || 'Agregar'}
           </button>
         </form>
@@ -404,7 +404,7 @@ export default function Loans() {
           </div>
           <div className="flex gap-2">
             <button
-              className="rpg-btn flex-1"
+              className="rpg-button flex-1"
               onClick={() => handleAddPayment(payingLoanId)}
             >
               {t('coinify.saveTransaction') || 'Guardar'}

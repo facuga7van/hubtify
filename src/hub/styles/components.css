@@ -103,6 +103,39 @@
   box-shadow: 0 1px 2px rgba(44, 24, 16, 0.3);
 }
 
+/* ── Button Small ─────────────────────────────────── */
+.rpg-btn-sm {
+  padding: 4px 12px;
+  background: linear-gradient(to bottom, var(--rpg-wood-light), var(--rpg-wood));
+  color: var(--rpg-gold-light);
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: 4px;
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.rpg-btn-sm:hover {
+  background: linear-gradient(to bottom, var(--rpg-gold-dark), var(--rpg-gold));
+  color: var(--rpg-wood);
+}
+
+/* ── Button Active State ─────────────────────────── */
+.rpg-btn-active {
+  background: linear-gradient(to bottom, var(--rpg-gold-dark), var(--rpg-gold)) !important;
+  color: var(--rpg-wood) !important;
+  border-color: var(--rpg-gold-light) !important;
+}
+
+/* ── Card Small ───────────────────────────────────── */
+.rpg-card-sm {
+  background: linear-gradient(to bottom, var(--rpg-parchment-dark), var(--rpg-parchment));
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: 4px;
+  color: var(--rpg-ink);
+}
+
 /* ── Title Bar ────────────────────────────────────── */
 .title-bar {
   display: flex;

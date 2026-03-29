@@ -108,7 +108,7 @@ export default function Installments() {
       {error && (
         <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
           <p style={{ color: 'var(--rpg-hp-red)', marginBottom: 8 }}>{t('common.somethingWentWrong')}</p>
-          <button className="rpg-btn" onClick={() => loadRows(month)}>{t('common.tryAgain')}</button>
+          <button className="rpg-button" onClick={() => loadRows(month)}>{t('common.tryAgain')}</button>
         </div>
       )}
 

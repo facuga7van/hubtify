@@ -96,7 +96,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
         </div>
       )}
 
-      <button type="submit" className="rpg-btn w-full">{t('coinify.add')}</button>
+      <button type="submit" className="rpg-button w-full">{t('coinify.add')}</button>
     </form>
   );
 }
