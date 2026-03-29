@@ -19,6 +19,11 @@ export interface CharacterData {
   frontHairIndex: number;
 }
 
+const FIELD_MAX: Record<keyof CharacterData, number> = {
+  frontHairIndex: 18, frontColorIndex: 25,
+  backHairIndex: 22, backColorIndex: 24,
+};
+
 const DEFAULT_CHAR: CharacterData = {
   backHairIndex: 1,
   frontColorIndex: 1,
@@ -206,9 +211,11 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
 
   const updateField = (field: keyof CharacterData, delta: number) => {
     setCharData((prev) => {
-      const next = { ...prev, [field]: Math.max(1, prev[field] + delta) };
+      const max = FIELD_MAX[field];
+      const raw = prev[field] + delta;
+      const wrapped = raw < 1 ? max : raw > max ? 1 : raw;
+      const next = { ...prev, [field]: wrapped };
       window.api.characterSave(next).catch(console.error);
-      // Notify other Character instances (e.g. sidebar)
       charChannel.postMessage({ type: 'char-updated', charData: next });
       return next;
     });
