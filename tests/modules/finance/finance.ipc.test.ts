@@ -1,0 +1,411 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import Database from 'better-sqlite3';
+import { financeMigrations } from '@modules/finance/finance.schema';
+
+function setupDb(): Database.Database {
+  const db = new Database(':memory:');
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  for (const m of financeMigrations) db.exec(m.up);
+  return db;
+}
+
+// ── helpers that mirror the handler SQL ────────────────────────────────────
+
+function addTransaction(
+  db: Database.Database,
+  id: string,
+  tx: {
+    type: 'expense' | 'income';
+    amount: number;
+    currency?: string;
+    category?: string;
+    description?: string;
+    date: string;
+    paymentMethod?: string;
+    source?: string;
+    installments?: number;
+    installmentGroupId?: string | null;
+    forThirdParty?: boolean;
+    recurringId?: string | null;
+    importBatchId?: string | null;
+  },
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO finance_transactions
+      (id, type, amount, currency, category, description, date, payment_method,
+       source, installments, installment_group_id, for_third_party, recurring_id,
+       import_batch_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    tx.type,
+    tx.amount,
+    tx.currency ?? 'ARS',
+    tx.category ?? 'Otros',
+    tx.description ?? '',
+    tx.date,
+    tx.paymentMethod ?? 'cash',
+    tx.source ?? 'manual',
+    tx.installments ?? 1,
+    tx.installmentGroupId ?? null,
+    tx.forThirdParty ? 1 : 0,
+    tx.recurringId ?? null,
+    tx.importBatchId ?? null,
+    now,
+    now,
+  );
+}
+
+function getTransactions(
+  db: Database.Database,
+  filters: {
+    month?: string;
+    category?: string;
+    type?: string;
+    paymentMethod?: string;
+    installmentGroupId?: string;
+  },
+) {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filters.month) {
+    conditions.push('date LIKE ?');
+    params.push(`${filters.month}%`);
+  }
+  if (filters.category) {
+    conditions.push('category = ?');
+    params.push(filters.category);
+  }
+  if (filters.type) {
+    conditions.push('type = ?');
+    params.push(filters.type);
+  }
+  if (filters.paymentMethod) {
+    conditions.push('payment_method = ?');
+    params.push(filters.paymentMethod);
+  }
+  if (filters.installmentGroupId !== undefined) {
+    conditions.push('installment_group_id = ?');
+    params.push(filters.installmentGroupId);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return db.prepare(`
+    SELECT id, type, amount, currency, category, description, date,
+           payment_method AS paymentMethod, source, installments,
+           installment_group_id AS installmentGroupId,
+           for_third_party AS forThirdParty,
+           recurring_id AS recurringId,
+           import_batch_id AS importBatchId,
+           created_at AS createdAt, updated_at AS updatedAt
+    FROM finance_transactions
+    ${where}
+    ORDER BY date DESC, created_at DESC
+  `).all(...params);
+}
+
+function getMonthlyBalance(
+  db: Database.Database,
+  month: string,
+): { ARS: { income: number; expenses: number; balance: number }; USD: { income: number; expenses: number; balance: number } } {
+  const rows = db.prepare(`
+    SELECT currency,
+           COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
+           COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
+    FROM finance_transactions
+    WHERE date LIKE ?
+    GROUP BY currency
+  `).all(`${month}%`) as Array<{ currency: string; income: number; expenses: number }>;
+
+  const result = {
+    ARS: { income: 0, expenses: 0, balance: 0 },
+    USD: { income: 0, expenses: 0, balance: 0 },
+  };
+  for (const row of rows) {
+    const key = row.currency as 'ARS' | 'USD';
+    if (key === 'ARS' || key === 'USD') {
+      result[key].income = row.income;
+      result[key].expenses = row.expenses;
+      result[key].balance = row.income - row.expenses;
+    }
+  }
+  return result;
+}
+
+function getCategoryBreakdown(
+  db: Database.Database,
+  month: string,
+): Array<{ category: string; ARS: number; USD: number }> {
+  const rows = db.prepare(`
+    SELECT category, currency,
+           COALESCE(SUM(amount), 0) AS total
+    FROM finance_transactions
+    WHERE type = 'expense' AND date LIKE ?
+    GROUP BY category, currency
+    ORDER BY category ASC
+  `).all(`${month}%`) as Array<{ category: string; currency: string; total: number }>;
+
+  const map = new Map<string, { ARS: number; USD: number }>();
+  for (const row of rows) {
+    if (!map.has(row.category)) map.set(row.category, { ARS: 0, USD: 0 });
+    const entry = map.get(row.category)!;
+    if (row.currency === 'ARS' || row.currency === 'USD') {
+      entry[row.currency] += row.total;
+    }
+  }
+  return Array.from(map.entries()).map(([category, amounts]) => ({ category, ...amounts }));
+}
+
+// ── tests ──────────────────────────────────────────────────────────────────
+
+describe('transaction handlers (SQL-level)', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = setupDb();
+  });
+
+  // ── addTransaction + getTransactions ──────────────────────────────────
+
+  it('adds a transaction and retrieves it by month', () => {
+    addTransaction(db, 'tx-1', { type: 'expense', amount: 1500, date: '2026-03-15', category: 'Delivery' });
+    addTransaction(db, 'tx-2', { type: 'income', amount: 100000, date: '2026-03-01' });
+    // Different month — should not appear
+    addTransaction(db, 'tx-3', { type: 'expense', amount: 999, date: '2026-02-28' });
+
+    const rows = getTransactions(db, { month: '2026-03' }) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.id)).toContain('tx-1');
+    expect(rows.map((r) => r.id)).toContain('tx-2');
+    expect(rows.map((r) => r.id)).not.toContain('tx-3');
+  });
+
+  it('returns camelCase aliases for snake_case columns', () => {
+    addTransaction(db, 'tx-alias', {
+      type: 'expense',
+      amount: 500,
+      date: '2026-03-10',
+      paymentMethod: 'credit',
+      installmentGroupId: 'grp-1',
+    });
+
+    const [row] = getTransactions(db, { month: '2026-03' }) as Array<Record<string, unknown>>;
+    expect(row.paymentMethod).toBe('credit');
+    expect(row.installmentGroupId).toBe('grp-1');
+    expect(row.forThirdParty).toBe(0);
+    // snake_case aliases must NOT appear
+    expect(row.payment_method).toBeUndefined();
+    expect(row.installment_group_id).toBeUndefined();
+  });
+
+  it('applies category filter', () => {
+    addTransaction(db, 'tx-a', { type: 'expense', amount: 200, date: '2026-03-01', category: 'Delivery' });
+    addTransaction(db, 'tx-b', { type: 'expense', amount: 300, date: '2026-03-02', category: 'Transporte' });
+
+    const rows = getTransactions(db, { category: 'Delivery' }) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe('tx-a');
+  });
+
+  it('applies type filter', () => {
+    addTransaction(db, 'tx-exp', { type: 'expense', amount: 100, date: '2026-03-01' });
+    addTransaction(db, 'tx-inc', { type: 'income', amount: 5000, date: '2026-03-01' });
+
+    const rows = getTransactions(db, { type: 'income' }) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe('tx-inc');
+  });
+
+  it('applies paymentMethod filter', () => {
+    addTransaction(db, 'tx-cash', { type: 'expense', amount: 100, date: '2026-03-01', paymentMethod: 'cash' });
+    addTransaction(db, 'tx-credit', { type: 'expense', amount: 200, date: '2026-03-01', paymentMethod: 'credit' });
+
+    const rows = getTransactions(db, { paymentMethod: 'credit' }) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe('tx-credit');
+  });
+
+  it('filters transactions by installment_group_id', () => {
+    addTransaction(db, 'tx-inst-1', { type: 'expense', amount: 1000, date: '2026-03-01', installmentGroupId: 'grp-abc', installments: 3 });
+    addTransaction(db, 'tx-inst-2', { type: 'expense', amount: 1000, date: '2026-04-01', installmentGroupId: 'grp-abc', installments: 3 });
+    addTransaction(db, 'tx-other', { type: 'expense', amount: 500, date: '2026-03-01', installmentGroupId: null });
+
+    const rows = getTransactions(db, { installmentGroupId: 'grp-abc' }) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.installmentGroupId === 'grp-abc')).toBe(true);
+  });
+
+  it('orders results by date DESC then created_at DESC', () => {
+    addTransaction(db, 'tx-older', { type: 'expense', amount: 100, date: '2026-03-01' });
+    addTransaction(db, 'tx-newer', { type: 'expense', amount: 200, date: '2026-03-15' });
+
+    const rows = getTransactions(db, { month: '2026-03' }) as Array<Record<string, unknown>>;
+    expect(rows[0].id).toBe('tx-newer');
+    expect(rows[1].id).toBe('tx-older');
+  });
+
+  // ── updateTransaction ─────────────────────────────────────────────────
+
+  it('updates transaction fields', () => {
+    addTransaction(db, 'tx-upd', { type: 'expense', amount: 500, date: '2026-03-01', description: 'original' });
+
+    const sets: string[] = ['updated_at = ?'];
+    const vals: unknown[] = [new Date().toISOString()];
+    const fields = { amount: 750, description: 'updated desc', category: 'Salud', paymentMethod: 'debit' };
+    if (fields.amount !== undefined) { sets.push('amount = ?'); vals.push(fields.amount); }
+    if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
+    if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
+    if (fields.paymentMethod !== undefined) { sets.push('payment_method = ?'); vals.push(fields.paymentMethod); }
+    vals.push('tx-upd');
+
+    db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+
+    const row = db.prepare('SELECT * FROM finance_transactions WHERE id = ?').get('tx-upd') as Record<string, unknown>;
+    expect(row.amount).toBe(750);
+    expect(row.description).toBe('updated desc');
+    expect(row.category).toBe('Salud');
+    expect(row.payment_method).toBe('debit');
+  });
+
+  it('partial update only touches provided fields', () => {
+    addTransaction(db, 'tx-partial', { type: 'expense', amount: 300, date: '2026-03-01', category: 'Delivery' });
+
+    const sets: string[] = ['updated_at = ?'];
+    const vals: unknown[] = [new Date().toISOString()];
+    // Only update amount — category must stay
+    sets.push('amount = ?');
+    vals.push(999);
+    vals.push('tx-partial');
+
+    db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+
+    const row = db.prepare('SELECT * FROM finance_transactions WHERE id = ?').get('tx-partial') as Record<string, unknown>;
+    expect(row.amount).toBe(999);
+    expect(row.category).toBe('Delivery');
+  });
+
+  // ── deleteTransaction ─────────────────────────────────────────────────
+
+  it('deletes a transaction', () => {
+    addTransaction(db, 'tx-del', { type: 'expense', amount: 100, date: '2026-03-01' });
+    expect(db.prepare('SELECT id FROM finance_transactions WHERE id = ?').get('tx-del')).toBeTruthy();
+
+    db.prepare('DELETE FROM finance_transactions WHERE id = ?').run('tx-del');
+
+    expect(db.prepare('SELECT id FROM finance_transactions WHERE id = ?').get('tx-del')).toBeUndefined();
+  });
+
+  it('deleting nonexistent id does not throw', () => {
+    expect(() => {
+      db.prepare('DELETE FROM finance_transactions WHERE id = ?').run('does-not-exist');
+    }).not.toThrow();
+  });
+
+  // ── getMonthlyBalance ─────────────────────────────────────────────────
+
+  it('returns monthly balance separated by currency', () => {
+    addTransaction(db, 'b-ars-inc', { type: 'income', amount: 100000, currency: 'ARS', date: '2026-03-01' });
+    addTransaction(db, 'b-ars-exp', { type: 'expense', amount: 30000, currency: 'ARS', date: '2026-03-10' });
+    addTransaction(db, 'b-usd-inc', { type: 'income', amount: 500, currency: 'USD', date: '2026-03-05' });
+    addTransaction(db, 'b-usd-exp', { type: 'expense', amount: 150, currency: 'USD', date: '2026-03-20' });
+
+    const result = getMonthlyBalance(db, '2026-03');
+    expect(result.ARS.income).toBe(100000);
+    expect(result.ARS.expenses).toBe(30000);
+    expect(result.ARS.balance).toBe(70000);
+    expect(result.USD.income).toBe(500);
+    expect(result.USD.expenses).toBe(150);
+    expect(result.USD.balance).toBe(350);
+  });
+
+  it('returns zeros for currencies with no transactions', () => {
+    addTransaction(db, 'only-ars', { type: 'income', amount: 5000, currency: 'ARS', date: '2026-03-01' });
+
+    const result = getMonthlyBalance(db, '2026-03');
+    expect(result.USD.income).toBe(0);
+    expect(result.USD.expenses).toBe(0);
+    expect(result.USD.balance).toBe(0);
+  });
+
+  it('ignores transactions outside the requested month', () => {
+    addTransaction(db, 'in-month', { type: 'expense', amount: 1000, currency: 'ARS', date: '2026-03-15' });
+    addTransaction(db, 'out-month', { type: 'expense', amount: 9999, currency: 'ARS', date: '2026-02-28' });
+
+    const result = getMonthlyBalance(db, '2026-03');
+    expect(result.ARS.expenses).toBe(1000);
+  });
+
+  // ── getCategoryBreakdown ──────────────────────────────────────────────
+
+  it('returns category breakdown by currency', () => {
+    addTransaction(db, 'cb-1', { type: 'expense', amount: 500, currency: 'ARS', category: 'Delivery', date: '2026-03-01' });
+    addTransaction(db, 'cb-2', { type: 'expense', amount: 200, currency: 'ARS', category: 'Delivery', date: '2026-03-10' });
+    addTransaction(db, 'cb-3', { type: 'expense', amount: 50, currency: 'USD', category: 'Delivery', date: '2026-03-05' });
+    addTransaction(db, 'cb-4', { type: 'expense', amount: 1000, currency: 'ARS', category: 'Transporte', date: '2026-03-08' });
+    // Income must not appear in category breakdown
+    addTransaction(db, 'cb-5', { type: 'income', amount: 9999, currency: 'ARS', category: 'Delivery', date: '2026-03-01' });
+
+    const breakdown = getCategoryBreakdown(db, '2026-03');
+    const delivery = breakdown.find((r) => r.category === 'Delivery');
+    expect(delivery).toBeDefined();
+    expect(delivery!.ARS).toBe(700);
+    expect(delivery!.USD).toBe(50);
+
+    const transport = breakdown.find((r) => r.category === 'Transporte');
+    expect(transport).toBeDefined();
+    expect(transport!.ARS).toBe(1000);
+    expect(transport!.USD).toBe(0);
+  });
+
+  it('excludes income from category breakdown', () => {
+    addTransaction(db, 'income-only', { type: 'income', amount: 10000, currency: 'ARS', category: 'Otros', date: '2026-03-01' });
+
+    const breakdown = getCategoryBreakdown(db, '2026-03');
+    expect(breakdown).toHaveLength(0);
+  });
+
+  // ── getMonthlyTotal (backward compat) ─────────────────────────────────
+
+  it('getMonthlyTotal sums only ARS expenses for the given month', () => {
+    addTransaction(db, 'mt-1', { type: 'expense', amount: 1000, currency: 'ARS', date: '2026-03-01' });
+    addTransaction(db, 'mt-2', { type: 'expense', amount: 500, currency: 'ARS', date: '2026-03-15' });
+    addTransaction(db, 'mt-3', { type: 'income', amount: 9999, currency: 'ARS', date: '2026-03-10' });
+    addTransaction(db, 'mt-4', { type: 'expense', amount: 200, currency: 'USD', date: '2026-03-10' });
+
+    const month = '2026-03';
+    const result = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND currency = 'ARS' AND date LIKE ?",
+    ).get(`${month}%`) as { total: number };
+
+    expect(result.total).toBe(1500);
+  });
+
+  // ── getActiveLoansCount (backward compat) ─────────────────────────────
+
+  it('getActiveLoansCount returns count of unsettled loans', () => {
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO finance_loans (id, person_name, direction, type, amount, currency, date, description, settled, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('ln-1', 'Juan', 'lent', 'single', 5000, 'ARS', '2026-03-01', '', 0, now);
+    db.prepare(`INSERT INTO finance_loans (id, person_name, direction, type, amount, currency, date, description, settled, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('ln-2', 'Ana', 'borrowed', 'single', 2000, 'ARS', '2026-03-05', '', 0, now);
+    db.prepare(`INSERT INTO finance_loans (id, person_name, direction, type, amount, currency, date, description, settled, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('ln-3', 'Pedro', 'lent', 'single', 1000, 'ARS', '2026-03-10', '', 1, now);
+
+    const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };
+    expect(result.c).toBe(2);
+  });
+
+  // ── getCategories (backward compat) ──────────────────────────────────
+
+  it('getCategories returns category name list', () => {
+    const rows = db.prepare('SELECT name FROM finance_categories ORDER BY created_at ASC').all() as Array<{ name: string }>;
+    const names = rows.map((r) => r.name);
+    expect(names).toContain('Delivery');
+    expect(names).toContain('Otros');
+    expect(names).toContain('Inversiones');
+    expect(names.length).toBeGreaterThanOrEqual(11);
+  });
+});

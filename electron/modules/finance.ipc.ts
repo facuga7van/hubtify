@@ -10,32 +10,113 @@ function genId(): string {
 export function registerFinanceIpcHandlers(): void {
   // ── Transactions ────────────────────────────────────
 
-  ipcHandle('finance:getTransactions', (_e, month: string) => {
+  ipcHandle('finance:getTransactions', (_e, filters: {
+    month?: string;
+    category?: string;
+    type?: string;
+    paymentMethod?: string;
+    installmentGroupId?: string;
+  } = {}) => {
     const db = getDb();
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filters.month) {
+      conditions.push('date LIKE ?');
+      params.push(`${filters.month}%`);
+    }
+    if (filters.category) {
+      conditions.push('category = ?');
+      params.push(filters.category);
+    }
+    if (filters.type) {
+      conditions.push('type = ?');
+      params.push(filters.type);
+    }
+    if (filters.paymentMethod) {
+      conditions.push('payment_method = ?');
+      params.push(filters.paymentMethod);
+    }
+    if (filters.installmentGroupId !== undefined) {
+      conditions.push('installment_group_id = ?');
+      params.push(filters.installmentGroupId);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     return db.prepare(`
-      SELECT id, type, amount, currency, category, description,
-             date, source, created_at AS createdAt, updated_at AS updatedAt
+      SELECT id, type, amount, currency, category, description, date,
+             payment_method AS paymentMethod, source, installments,
+             installment_group_id AS installmentGroupId,
+             for_third_party AS forThirdParty,
+             recurring_id AS recurringId,
+             import_batch_id AS importBatchId,
+             created_at AS createdAt, updated_at AS updatedAt
       FROM finance_transactions
-      WHERE date LIKE ?
+      ${where}
       ORDER BY date DESC, created_at DESC
-    `).all(`${month}%`);
+    `).all(...params);
   });
 
   ipcHandle('finance:addTransaction', (_e, tx: {
-    type: 'expense' | 'income'; amount: number; currency?: string;
-    category?: string; description?: string; date: string; source?: string;
+    type: 'expense' | 'income';
+    amount: number;
+    currency?: string;
+    category?: string;
+    description?: string;
+    date: string;
+    paymentMethod?: string;
+    source?: string;
+    installments?: number;
+    installmentGroupId?: string | null;
+    forThirdParty?: boolean;
+    recurringId?: string | null;
+    importBatchId?: string | null;
   }) => {
     const db = getDb();
     const id = genId();
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO finance_transactions (id, type, amount, currency, category, description, date, source, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO finance_transactions
+        (id, type, amount, currency, category, description, date, payment_method,
+         source, installments, installment_group_id, for_third_party, recurring_id,
+         import_batch_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, tx.type, tx.amount, tx.currency ?? 'ARS', tx.category ?? 'Otros',
-      tx.description ?? '', tx.date, tx.source ?? 'manual', now, now
+      id,
+      tx.type,
+      tx.amount,
+      tx.currency ?? 'ARS',
+      tx.category ?? 'Otros',
+      tx.description ?? '',
+      tx.date,
+      tx.paymentMethod ?? 'cash',
+      tx.source ?? 'manual',
+      tx.installments ?? 1,
+      tx.installmentGroupId ?? null,
+      tx.forThirdParty ? 1 : 0,
+      tx.recurringId ?? null,
+      tx.importBatchId ?? null,
+      now,
+      now,
     );
     return id;
+  });
+
+  ipcHandle('finance:updateTransaction', (_e, id: string, fields: {
+    amount?: number;
+    description?: string;
+    category?: string;
+    paymentMethod?: string;
+  }) => {
+    const db = getDb();
+    const sets: string[] = ['updated_at = ?'];
+    const vals: unknown[] = [new Date().toISOString()];
+    if (fields.amount !== undefined) { sets.push('amount = ?'); vals.push(fields.amount); }
+    if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
+    if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
+    if (fields.paymentMethod !== undefined) { sets.push('payment_method = ?'); vals.push(fields.paymentMethod); }
+    vals.push(id);
+    db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   });
 
   ipcHandle('finance:deleteTransaction', (_e, id: string) => {
@@ -43,66 +124,90 @@ export function registerFinanceIpcHandlers(): void {
     db.prepare('DELETE FROM finance_transactions WHERE id = ?').run(id);
   });
 
-  // ── Loans ───────────────────────────────────────────
+  // ── Dashboard / Stats ──────────────────────────────
 
-  ipcHandle('finance:getLoans', () => {
+  ipcHandle('finance:getMonthlyBalance', (_e, month?: string) => {
     const db = getDb();
-    return db.prepare(`
-      SELECT id, person_name AS personName, type, amount, currency, date,
-             description, settled, settled_date AS settledDate, created_at AS createdAt
-      FROM finance_loans
-      ORDER BY settled ASC, date DESC
-    `).all();
+    const m = month ?? todayDateString().slice(0, 7);
+
+    const rows = db.prepare(`
+      SELECT currency,
+             COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
+             COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
+      FROM finance_transactions
+      WHERE date LIKE ?
+      GROUP BY currency
+    `).all(`${m}%`) as Array<{ currency: string; income: number; expenses: number }>;
+
+    const result: Record<string, { income: number; expenses: number; balance: number }> = {
+      ARS: { income: 0, expenses: 0, balance: 0 },
+      USD: { income: 0, expenses: 0, balance: 0 },
+    };
+    for (const row of rows) {
+      if (result[row.currency]) {
+        result[row.currency].income = row.income;
+        result[row.currency].expenses = row.expenses;
+        result[row.currency].balance = row.income - row.expenses;
+      }
+    }
+    return result;
   });
 
-  ipcHandle('finance:addLoan', (_e, loan: {
-    personName: string; type: 'lent' | 'borrowed'; amount: number;
-    currency?: string; date: string; description?: string;
-  }) => {
+  ipcHandle('finance:getCategoryBreakdown', (_e, month?: string) => {
     const db = getDb();
-    const id = genId();
-    const now = new Date().toISOString();
-    db.prepare(`
-      INSERT INTO finance_loans (id, person_name, type, amount, currency, date, description, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, loan.personName, loan.type, loan.amount, loan.currency ?? 'ARS', loan.date, loan.description ?? '', now);
-    return id;
+    const m = month ?? todayDateString().slice(0, 7);
+
+    const rows = db.prepare(`
+      SELECT category, currency,
+             COALESCE(SUM(amount), 0) AS total
+      FROM finance_transactions
+      WHERE type = 'expense' AND date LIKE ?
+      GROUP BY category, currency
+      ORDER BY category ASC
+    `).all(`${m}%`) as Array<{ category: string; currency: string; total: number }>;
+
+    const map = new Map<string, { ARS: number; USD: number }>();
+    for (const row of rows) {
+      if (!map.has(row.category)) map.set(row.category, { ARS: 0, USD: 0 });
+      const entry = map.get(row.category)!;
+      if (row.currency === 'ARS' || row.currency === 'USD') {
+        entry[row.currency] += row.total;
+      }
+    }
+    return Array.from(map.entries()).map(([category, amounts]) => ({ category, ...amounts }));
   });
 
-  ipcHandle('finance:settleLoan', (_e, id: string) => {
+  ipcHandle('finance:getProjection', (_e, months: number) => {
     const db = getDb();
-    const now = todayDateString();
-    db.prepare('UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?').run(now, id);
-  });
+    const today = todayDateString(); // YYYY-MM-DD
+    const [year, month] = today.slice(0, 7).split('-').map(Number);
 
-  // ── Income Sources ──────────────────────────────────
+    const recurring = db.prepare(
+      "SELECT SUM(amount) AS total FROM finance_recurring WHERE active = 1 AND type = 'expense'"
+    ).get() as { total: number | null };
+    const recurringTotal = recurring.total ?? 0;
 
-  ipcHandle('finance:getIncomeSources', () => {
-    const db = getDb();
-    return db.prepare(`
-      SELECT id, name, estimated_amount AS estimatedAmount, frequency,
-             is_variable AS isVariable, active, created_at AS createdAt
-      FROM finance_income_sources
-      ORDER BY created_at ASC
-    `).all();
-  });
+    const projection: Array<{ month: string; installments: number; recurring: number; total: number }> = [];
 
-  ipcHandle('finance:addIncomeSource', (_e, src: {
-    name: string; estimatedAmount: number; frequency?: string; isVariable?: boolean;
-  }) => {
-    const db = getDb();
-    const id = genId();
-    const now = new Date().toISOString();
-    db.prepare(`
-      INSERT INTO finance_income_sources (id, name, estimated_amount, frequency, is_variable, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, src.name, src.estimatedAmount, src.frequency ?? 'monthly', src.isVariable ? 1 : 0, now);
-    return id;
-  });
+    for (let i = 1; i <= months; i++) {
+      const targetDate = new Date(year, month - 1 + i, 1);
+      const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
 
-  ipcHandle('finance:toggleIncomeSource', (_e, id: string) => {
-    const db = getDb();
-    db.prepare('UPDATE finance_income_sources SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END WHERE id = ?').run(id);
+      const installmentRow = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM finance_transactions
+        WHERE installment_group_id IS NOT NULL AND date LIKE ?
+      `).get(`${targetMonth}%`) as { total: number };
+
+      projection.push({
+        month: targetMonth,
+        installments: installmentRow.total,
+        recurring: recurringTotal,
+        total: installmentRow.total + recurringTotal,
+      });
+    }
+
+    return projection;
   });
 
   // ── Categories ──────────────────────────────────────
@@ -113,46 +218,15 @@ export function registerFinanceIpcHandlers(): void {
       .map((r) => r.name);
   });
 
-  // ── Stats helpers ───────────────────────────────────
+  // ── Backward compat (dashboard widget) ─────────────
 
   ipcHandle('finance:getMonthlyTotal', () => {
     const db = getDb();
-    const month = todayDateString().slice(0, 7); // YYYY-MM
+    const month = todayDateString().slice(0, 7);
     const result = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ?"
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND currency = 'ARS' AND date LIKE ?"
     ).get(`${month}%`) as { total: number };
     return result.total;
-  });
-
-  ipcHandle('finance:getMonthlyBalance', (_e, month?: string) => {
-    const db = getDb();
-    const m = month ?? todayDateString().slice(0, 7);
-    const expenses = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ?"
-    ).get(`${m}%`) as { total: number };
-    const income = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'income' AND date LIKE ?"
-    ).get(`${m}%`) as { total: number };
-    return { expenses: expenses.total, income: income.total, balance: income.total - expenses.total };
-  });
-
-  ipcHandle('finance:getCategoryBreakdown', (_e, month?: string) => {
-    const db = getDb();
-    const m = month ?? todayDateString().slice(0, 7);
-    return db.prepare(
-      "SELECT category, SUM(amount) AS total FROM finance_transactions WHERE type = 'expense' AND date LIKE ? GROUP BY category ORDER BY total DESC"
-    ).all(`${m}%`);
-  });
-
-  ipcHandle('finance:updateTransaction', (_e, id: string, fields: { amount?: number; description?: string; category?: string }) => {
-    const db = getDb();
-    const sets: string[] = ['updated_at = ?'];
-    const vals: unknown[] = [new Date().toISOString()];
-    if (fields.amount !== undefined) { sets.push('amount = ?'); vals.push(fields.amount); }
-    if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
-    if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
-    vals.push(id);
-    db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   });
 
   ipcHandle('finance:getActiveLoansCount', () => {
