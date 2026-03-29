@@ -42,6 +42,10 @@ export default function NutritionCharts() {
     tdee: s.tdee,
   }));
 
+  // Weekly balance: sum of (tdee - consumed) for last 7 logged days
+  const last7 = summaries.slice(-7);
+  const weeklyBalance = last7.reduce((s, d) => s + d.balance, 0);
+
   return (
     <div>
       <PageHeader title={t('nutrify.dashboard')} subtitle={t('nutrify.dashboardSub')}
@@ -54,12 +58,18 @@ export default function NutritionCharts() {
       />
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         <div className="rpg-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
             {streak}
           </div>
           <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('nutrify.dayStreak')}</div>
+        </div>
+        <div className="rpg-card" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: weeklyBalance >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)' }}>
+            {weeklyBalance >= 0 ? '+' : ''}{Math.round(weeklyBalance)}
+          </div>
+          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('nutrify.weeklyBalance')}</div>
         </div>
         <div className="rpg-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '1.5rem', fontFamily: 'Fira Code, monospace', color: 'var(--rpg-wood)' }}>
