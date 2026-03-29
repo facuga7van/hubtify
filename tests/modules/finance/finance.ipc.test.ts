@@ -918,3 +918,192 @@ describe('loan handlers', () => {
     expect(summary.borrowed).toBe(3000);
   });
 });
+
+// ── helpers for recurring transaction tests ─────────────────────────────────
+
+function addRecurring(
+  db: Database.Database,
+  id: string,
+  rec: {
+    name: string;
+    type: 'expense' | 'income';
+    amount: number;
+    currency?: string;
+    category?: string;
+    active?: number;
+  },
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO finance_recurring
+      (id, name, type, amount, currency, category, active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    rec.name,
+    rec.type,
+    rec.amount,
+    rec.currency ?? 'ARS',
+    rec.category ?? 'Otros',
+    rec.active ?? 1,
+    now,
+  );
+}
+
+function generateRecurringForMonth(db: Database.Database, month: string): number {
+  const actives = db.prepare(`
+    SELECT id, name, type, amount, currency, category
+    FROM finance_recurring
+    WHERE active = 1
+  `).all() as Array<{
+    id: string;
+    name: string;
+    type: 'expense' | 'income';
+    amount: number;
+    currency: string;
+    category: string;
+  }>;
+
+  const now = new Date().toISOString();
+  let generated = 0;
+
+  for (const rec of actives) {
+    const existing = db.prepare(`
+      SELECT COUNT(*) AS c
+      FROM finance_transactions
+      WHERE source = 'recurring' AND recurring_id = ? AND date LIKE ?
+    `).get(rec.id, `${month}%`) as { c: number };
+
+    if (existing.c > 0) continue;
+
+    const txId = `gen-${rec.id}-${month}`;
+    db.prepare(`
+      INSERT INTO finance_transactions
+        (id, type, amount, currency, category, description, date, payment_method,
+         source, installments, installment_group_id, for_third_party, recurring_id,
+         import_batch_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      txId, rec.type, rec.amount, rec.currency, rec.category, rec.name,
+      `${month}-01`, 'cash', 'recurring', 1, null, 0, rec.id, null, now, now,
+    );
+    generated++;
+  }
+
+  return generated;
+}
+
+// ── recurring transaction handler tests ─────────────────────────────────────
+
+describe('recurring transaction handlers', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = setupDb();
+  });
+
+  it('creates a recurring transaction and retrieves it', () => {
+    addRecurring(db, 'rec-1', { name: 'Alquiler', type: 'expense', amount: 50000, currency: 'ARS', category: 'Hogar' });
+
+    const rows = db.prepare(`
+      SELECT id, name, type, amount, currency, category, active,
+             created_at AS createdAt
+      FROM finance_recurring
+      ORDER BY created_at ASC
+    `).all() as Array<Record<string, unknown>>;
+
+    // Filter to only newly added (ignore seeded data from migrations)
+    const rec = rows.find((r) => r.id === 'rec-1') as Record<string, unknown>;
+    expect(rec).toBeDefined();
+    expect(rec.name).toBe('Alquiler');
+    expect(rec.type).toBe('expense');
+    expect(rec.amount).toBe(50000);
+    expect(rec.currency).toBe('ARS');
+    expect(rec.category).toBe('Hogar');
+    expect(rec.active).toBe(1);
+    // snake_case must NOT appear
+    expect((rec as Record<string, unknown>).created_at).toBeUndefined();
+  });
+
+  it('updates amount and logs history entry', () => {
+    addRecurring(db, 'rec-upd', { name: 'Netflix', type: 'expense', amount: 1200 });
+
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    const historyId = 'hist-1';
+    db.prepare(`
+      INSERT INTO finance_recurring_amount_history
+        (id, recurring_id, amount, currency, effective_date, created_at)
+      SELECT ?, id, ?, currency, ?, ?
+      FROM finance_recurring
+      WHERE id = ?
+    `).run(historyId, 1500, today, now, 'rec-upd');
+    db.prepare(`UPDATE finance_recurring SET amount = ? WHERE id = ?`).run(1500, 'rec-upd');
+
+    // Verify updated amount
+    const rec = db.prepare('SELECT amount FROM finance_recurring WHERE id = ?').get('rec-upd') as { amount: number };
+    expect(rec.amount).toBe(1500);
+
+    // Verify history entry was logged
+    const history = db.prepare(`
+      SELECT id, recurring_id AS recurringId, amount, currency, effective_date AS effectiveDate
+      FROM finance_recurring_amount_history
+      WHERE recurring_id = ?
+    `).all('rec-upd') as Array<Record<string, unknown>>;
+    expect(history).toHaveLength(1);
+    expect(history[0].recurringId).toBe('rec-upd');
+    expect(history[0].amount).toBe(1500);
+    expect(history[0].effectiveDate).toBe(today);
+  });
+
+  it('generates recurring transactions idempotently', () => {
+    addRecurring(db, 'rec-idem', { name: 'Spotify', type: 'expense', amount: 800 });
+
+    // Generate twice for same month
+    generateRecurringForMonth(db, '2026-03');
+    generateRecurringForMonth(db, '2026-03');
+
+    // Should still only have ONE transaction for this recurring in March
+    const txs = db.prepare(`
+      SELECT id FROM finance_transactions
+      WHERE source = 'recurring' AND recurring_id = ? AND date LIKE '2026-03%'
+    `).all('rec-idem') as Array<Record<string, unknown>>;
+    expect(txs).toHaveLength(1);
+  });
+
+  it('paused recurring (active=0) does not generate transactions', () => {
+    addRecurring(db, 'rec-paused', { name: 'Disney+', type: 'expense', amount: 600, active: 0 });
+
+    generateRecurringForMonth(db, '2026-03');
+
+    const txs = db.prepare(`
+      SELECT id FROM finance_transactions
+      WHERE source = 'recurring' AND recurring_id = ?
+    `).all('rec-paused') as Array<Record<string, unknown>>;
+    expect(txs).toHaveLength(0);
+  });
+
+  it('toggles active/paused state', () => {
+    addRecurring(db, 'rec-toggle', { name: 'Gym', type: 'expense', amount: 3000, active: 1 });
+
+    // Toggle to inactive
+    db.prepare(`
+      UPDATE finance_recurring
+      SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END
+      WHERE id = ?
+    `).run('rec-toggle');
+
+    const after = db.prepare('SELECT active FROM finance_recurring WHERE id = ?').get('rec-toggle') as { active: number };
+    expect(after.active).toBe(0);
+
+    // Toggle back to active
+    db.prepare(`
+      UPDATE finance_recurring
+      SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END
+      WHERE id = ?
+    `).run('rec-toggle');
+
+    const back = db.prepare('SELECT active FROM finance_recurring WHERE id = ?').get('rec-toggle') as { active: number };
+    expect(back.active).toBe(1);
+  });
+});

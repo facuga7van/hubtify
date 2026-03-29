@@ -570,4 +570,140 @@ export function registerFinanceIpcHandlers(): void {
     }
     return summary;
   });
+
+  // ── Recurring Transactions ────────────────────────────────────────────
+
+  ipcHandle('finance:getRecurring', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, name, type, amount, currency, category, active,
+             created_at AS createdAt
+      FROM finance_recurring
+      ORDER BY created_at ASC
+    `).all();
+  });
+
+  ipcHandle('finance:addRecurring', (_e, rec: {
+    name: string;
+    type: 'expense' | 'income';
+    amount: number;
+    currency?: string;
+    category?: string;
+  }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO finance_recurring
+        (id, name, type, amount, currency, category, active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    `).run(
+      id,
+      rec.name,
+      rec.type,
+      rec.amount,
+      rec.currency ?? 'ARS',
+      rec.category ?? 'Otros',
+      now,
+    );
+    return id;
+  });
+
+  ipcHandle('finance:updateRecurringAmount', (_e, id: string, newAmount: number) => {
+    const db = getDb();
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    const historyId = genId();
+    db.prepare(`
+      INSERT INTO finance_recurring_amount_history
+        (id, recurring_id, amount, currency, effective_date, created_at)
+      SELECT ?, id, ?, currency, ?, ?
+      FROM finance_recurring
+      WHERE id = ?
+    `).run(historyId, newAmount, today, now, id);
+    db.prepare(`UPDATE finance_recurring SET amount = ? WHERE id = ?`).run(newAmount, id);
+  });
+
+  ipcHandle('finance:toggleRecurring', (_e, id: string) => {
+    const db = getDb();
+    db.prepare(`
+      UPDATE finance_recurring
+      SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END
+      WHERE id = ?
+    `).run(id);
+  });
+
+  ipcHandle('finance:deleteRecurring', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM finance_recurring WHERE id = ?').run(id);
+  });
+
+  ipcHandle('finance:generateRecurringForMonth', (_e, month: string) => {
+    const db = getDb();
+    const actives = db.prepare(`
+      SELECT id, name, type, amount, currency, category
+      FROM finance_recurring
+      WHERE active = 1
+    `).all() as Array<{
+      id: string;
+      name: string;
+      type: 'expense' | 'income';
+      amount: number;
+      currency: string;
+      category: string;
+    }>;
+
+    const now = new Date().toISOString();
+    let generated = 0;
+
+    for (const rec of actives) {
+      const existing = db.prepare(`
+        SELECT COUNT(*) AS c
+        FROM finance_transactions
+        WHERE source = 'recurring' AND recurring_id = ? AND date LIKE ?
+      `).get(rec.id, `${month}%`) as { c: number };
+
+      if (existing.c > 0) continue;
+
+      const txId = genId();
+      db.prepare(`
+        INSERT INTO finance_transactions
+          (id, type, amount, currency, category, description, date, payment_method,
+           source, installments, installment_group_id, for_third_party, recurring_id,
+           import_batch_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        txId,
+        rec.type,
+        rec.amount,
+        rec.currency,
+        rec.category,
+        rec.name,
+        `${month}-01`,
+        'cash',
+        'recurring',
+        1,
+        null,
+        0,
+        rec.id,
+        null,
+        now,
+        now,
+      );
+      generated++;
+    }
+
+    return generated;
+  });
+
+  ipcHandle('finance:getRecurringAmountHistory', (_e, recurringId: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, recurring_id AS recurringId, amount, currency,
+             effective_date AS effectiveDate, created_at AS createdAt
+      FROM finance_recurring_amount_history
+      WHERE recurring_id = ?
+      ORDER BY created_at DESC
+    `).all(recurringId);
+  });
 }
