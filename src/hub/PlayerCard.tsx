@@ -1,14 +1,24 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
 import Loading from '../shared/components/Loading';
 import Character from './Character';
+import AccountDropdown from './AccountDropdown';
 import type { PlayerStats } from '../../shared/types';
+import type { AuthUser } from '../shared/hooks/useAuth';
+import { useAuthContext } from '../shared/AuthContext';
 
-interface PlayerCardProps { stats: PlayerStats | null; collapsed?: boolean; }
+interface PlayerCardProps {
+  stats: PlayerStats | null;
+  collapsed?: boolean;
+}
 
 export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
   const { t } = useTranslation();
+  const { user: authUser, logout, switching, switchAccount, getCachedAccounts } = useAuthContext();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   if (!stats) {
     return <Loading />;
   }
@@ -22,7 +32,7 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
     : '0 0 8px rgba(139, 32, 32, 0.4)';
 
   return (
-    <div className={`player-card ${collapsed ? 'player-card--collapsed' : ''}`}>
+    <div className={`player-card ${collapsed ? 'player-card--collapsed' : ''}`} style={{ position: 'relative' }}>
       {/* Avatar — fixed size canvas, scaled with CSS transform */}
       <div className="player-card__avatar-wrap">
         <div className="player-card__avatar-glow" style={{ boxShadow: hpGlow }}>
@@ -41,7 +51,23 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
       {/* Level & title */}
       <div className="player-card__info">
         <div className="player-card__level">{t('common.levelPrefix')}{stats.level}</div>
-        <div className="player-card__title">{stats.title}</div>
+        {!collapsed ? (
+          <button
+            className="player-card__title player-card__title--clickable"
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+          >
+            {stats.title}
+            <svg
+              width="10" height="10" viewBox="0 0 10 10" fill="none"
+              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              style={{ marginLeft: 4, transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >
+              <path d="M3 4l2 2 2-2"/>
+            </svg>
+          </button>
+        ) : (
+          <div className="player-card__title">{stats.title}</div>
+        )}
       </div>
 
       {/* Bars */}
@@ -54,6 +80,28 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
         <div className="player-card__combo">
           {t('common.combo')}{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(stats.dailyCombo, 4)]} ({stats.dailyCombo})
         </div>
+      )}
+
+      {/* Switching overlay */}
+      {switching && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 'inherit', zIndex: 99,
+        }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--rpg-gold)' }}>{t('common.loading')}</span>
+        </div>
+      )}
+
+      {/* Account dropdown */}
+      {dropdownOpen && authUser && !switching && (
+        <AccountDropdown
+          activeUser={authUser}
+          cachedAccounts={getCachedAccounts()}
+          onSwitch={switchAccount}
+          onLogout={logout}
+          onClose={() => setDropdownOpen(false)}
+        />
       )}
     </div>
   );

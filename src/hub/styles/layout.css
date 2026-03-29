@@ -410,3 +410,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Clickable title in PlayerCard */
+.player-card__title--clickable {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+
+.player-card__title--clickable:hover {
+  opacity: 0.8;
+}
