@@ -173,11 +173,8 @@ export interface EstimationItem {
 export interface EstimationResult {
   totalCalories: number;
   items: EstimationItem[];
-  ollamaMissing: boolean;
   aiError?: string;
 }
-
-export type OllamaStatus = 'stopped' | 'starting' | 'running' | 'error';
 
 // ── RPG Constants ──────────────────────────────────────────
 

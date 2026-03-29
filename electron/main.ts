@@ -6,7 +6,6 @@ import { questsMigrations } from '../src/modules/quests/quests.schema';
 import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
 import { characterMigrations } from '../src/modules/character/character.schema';
-// import { stopOllama } from './modules/nutrition/ollama';
 import { clearReminderInterval } from './modules/notifications.ipc';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 
@@ -145,7 +144,6 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
-  // stopOllama();
   clearReminderInterval();
   closeDb();
 });
