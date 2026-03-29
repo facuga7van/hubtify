@@ -32,6 +32,7 @@ const api = {
   questsDeleteDrawing: (id: string) => ipcRenderer.invoke('quests:deleteDrawing', id),
   questsGetHabits: () => ipcRenderer.invoke('quests:getHabits'),
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => ipcRenderer.invoke('quests:addHabit', habit),
+  questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => ipcRenderer.invoke('quests:updateHabit', id, updates),
   questsDeleteHabit: (id: string) => ipcRenderer.invoke('quests:deleteHabit', id),
   questsCheckHabit: (habitId: string) => ipcRenderer.invoke('quests:checkHabit', habitId),
   questsGetProjects: () => ipcRenderer.invoke('quests:getProjects'),

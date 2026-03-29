@@ -421,6 +421,17 @@ export function registerQuestsIpcHandlers(): void {
     return id;
   });
 
+  ipcHandle('quests:updateHabit', (_e, id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => {
+    const db = getDb();
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+    if (updates.frequency !== undefined) { fields.push('frequency = ?'); values.push(updates.frequency); }
+    if (updates.timesPerWeek !== undefined) { fields.push('times_per_week = ?'); values.push(updates.timesPerWeek); }
+    if (fields.length === 0) return;
+    db.prepare(`UPDATE habits SET ${fields.join(', ')} WHERE id = ?`).run(...values, id);
+  });
+
   ipcHandle('quests:deleteHabit', (_e, id: string) => {
     const db = getDb();
     const now = new Date().toISOString();
