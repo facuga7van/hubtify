@@ -409,3 +409,230 @@ describe('transaction handlers (SQL-level)', () => {
     expect(names.length).toBeGreaterThanOrEqual(11);
   });
 });
+
+// ── helpers for installment group tests ────────────────────────────────────
+
+function addInstallmentGroup(
+  db: Database.Database,
+  id: string,
+  group: {
+    description?: string;
+    totalAmount: number;
+    currency?: string;
+    totalInstallments: number;
+    category?: string;
+    date: string;
+  },
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO finance_installment_groups
+      (id, description, total_amount, currency, total_installments, category, date, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    group.description ?? '',
+    group.totalAmount,
+    group.currency ?? 'ARS',
+    group.totalInstallments,
+    group.category ?? 'Otros',
+    group.date,
+    now,
+  );
+}
+
+// Mirrors the createInstallmentGroup handler logic
+function createInstallmentGroupWithTransactions(
+  db: Database.Database,
+  groupId: string,
+  group: {
+    description: string;
+    totalAmount: number;
+    installmentCount: number;
+    installmentAmount: number;
+    currency?: string;
+    category?: string;
+    startDate: string;
+    forThirdParty?: boolean;
+  },
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO finance_installment_groups
+      (id, description, total_amount, currency, total_installments, category, date, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    groupId,
+    group.description,
+    group.totalAmount,
+    group.currency ?? 'ARS',
+    group.installmentCount,
+    group.category ?? 'Otros',
+    group.startDate,
+    now,
+  );
+
+  const [yearStr, monthStr, dayStr] = group.startDate.split('-');
+  const startYear = parseInt(yearStr, 10);
+  const startMonth = parseInt(monthStr, 10) - 1; // 0-based
+  const startDay = parseInt(dayStr, 10);
+
+  for (let i = 0; i < group.installmentCount; i++) {
+    const txDate = new Date(startYear, startMonth + i, startDay);
+    const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
+    const txId = `${groupId}-tx-${i}`;
+    db.prepare(`
+      INSERT INTO finance_transactions
+        (id, type, amount, currency, category, description, date, payment_method,
+         source, installments, installment_group_id, for_third_party, recurring_id,
+         import_batch_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      txId,
+      'expense',
+      group.installmentAmount,
+      group.currency ?? 'ARS',
+      group.category ?? 'Otros',
+      `${group.description} (Cuota ${i + 1}/${group.installmentCount})`,
+      txDateStr,
+      'credit_card',
+      'manual',
+      group.installmentCount,
+      groupId,
+      group.forThirdParty ? 1 : 0,
+      null,
+      null,
+      now,
+      now,
+    );
+  }
+}
+
+describe('installment group handlers', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = setupDb();
+  });
+
+  it('creates an installment group and generates monthly transactions', () => {
+    createInstallmentGroupWithTransactions(db, 'grp-create', {
+      description: 'Laptop',
+      totalAmount: 3000,
+      installmentCount: 3,
+      installmentAmount: 1000,
+      currency: 'ARS',
+      category: 'Compras',
+      startDate: '2026-03-15',
+    });
+
+    // Verify group was created
+    const group = db.prepare('SELECT * FROM finance_installment_groups WHERE id = ?').get('grp-create') as Record<string, unknown>;
+    expect(group).toBeDefined();
+    expect(group.description).toBe('Laptop');
+    expect(group.total_installments).toBe(3);
+
+    // Verify 3 transactions were generated
+    const txs = db.prepare('SELECT * FROM finance_transactions WHERE installment_group_id = ? ORDER BY date ASC').all('grp-create') as Array<Record<string, unknown>>;
+    expect(txs).toHaveLength(3);
+
+    // Check descriptions
+    expect(txs[0].description).toBe('Laptop (Cuota 1/3)');
+    expect(txs[1].description).toBe('Laptop (Cuota 2/3)');
+    expect(txs[2].description).toBe('Laptop (Cuota 3/3)');
+
+    // Check dates (same day, incremented monthly)
+    expect(txs[0].date).toBe('2026-03-15');
+    expect(txs[1].date).toBe('2026-04-15');
+    expect(txs[2].date).toBe('2026-05-15');
+
+    // Check all link back to group
+    expect(txs.every((tx) => tx.installment_group_id === 'grp-create')).toBe(true);
+
+    // Check type and payment method
+    expect(txs.every((tx) => tx.type === 'expense')).toBe(true);
+    expect(txs.every((tx) => tx.payment_method === 'credit_card')).toBe(true);
+    expect(txs.every((tx) => tx.source === 'manual')).toBe(true);
+  });
+
+  it('deleting a group removes all linked transactions', () => {
+    addInstallmentGroup(db, 'grp-del', { totalAmount: 6000, totalInstallments: 3, date: '2026-03-01' });
+    addTransaction(db, 'tx-del-1', { type: 'expense', amount: 2000, date: '2026-03-01', installmentGroupId: 'grp-del' });
+    addTransaction(db, 'tx-del-2', { type: 'expense', amount: 2000, date: '2026-04-01', installmentGroupId: 'grp-del' });
+    addTransaction(db, 'tx-del-3', { type: 'expense', amount: 2000, date: '2026-05-01', installmentGroupId: 'grp-del' });
+    // An unrelated transaction — should survive
+    addTransaction(db, 'tx-unrelated', { type: 'expense', amount: 500, date: '2026-03-10' });
+
+    // Delete transactions first, then group (application-level cascade)
+    db.prepare('DELETE FROM finance_transactions WHERE installment_group_id = ?').run('grp-del');
+    db.prepare('DELETE FROM finance_installment_groups WHERE id = ?').run('grp-del');
+
+    // Verify group is gone
+    expect(db.prepare('SELECT id FROM finance_installment_groups WHERE id = ?').get('grp-del')).toBeUndefined();
+
+    // Verify linked transactions are gone
+    const linked = db.prepare('SELECT id FROM finance_transactions WHERE installment_group_id = ?').all('grp-del');
+    expect(linked).toHaveLength(0);
+
+    // Verify unrelated transaction survived
+    expect(db.prepare('SELECT id FROM finance_transactions WHERE id = ?').get('tx-unrelated')).toBeTruthy();
+  });
+
+  it('gets installments for a specific month', () => {
+    addInstallmentGroup(db, 'grp-month', { totalAmount: 3000, totalInstallments: 3, date: '2026-03-01' });
+    addTransaction(db, 'tx-m1', { type: 'expense', amount: 1000, date: '2026-03-01', installmentGroupId: 'grp-month' });
+    addTransaction(db, 'tx-m2', { type: 'expense', amount: 1000, date: '2026-04-01', installmentGroupId: 'grp-month' });
+    addTransaction(db, 'tx-m3', { type: 'expense', amount: 1000, date: '2026-05-01', installmentGroupId: 'grp-month' });
+    // Non-installment transaction in same month — should NOT appear
+    addTransaction(db, 'tx-no-grp', { type: 'expense', amount: 500, date: '2026-03-15' });
+
+    const month = '2026-03';
+    const rows = db.prepare(`
+      SELECT t.id, t.amount, t.date, t.installment_group_id AS installmentGroupId,
+             g.description AS groupDescription, g.total_installments AS installmentCount
+      FROM finance_transactions t
+      JOIN finance_installment_groups g ON g.id = t.installment_group_id
+      WHERE t.installment_group_id IS NOT NULL AND t.date LIKE ?
+    `).all(`${month}%`) as Array<Record<string, unknown>>;
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe('tx-m1');
+    expect(rows[0].installmentGroupId).toBe('grp-month');
+    expect(rows[0].groupDescription).toBe('');
+    expect(rows[0].installmentCount).toBe(3);
+  });
+
+  it('projects installments for upcoming months', () => {
+    addInstallmentGroup(db, 'grp-proj', { totalAmount: 6000, totalInstallments: 6, date: '2026-03-01' });
+    // 6 monthly installments starting 2026-03
+    const months = ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'];
+    for (let i = 0; i < months.length; i++) {
+      addTransaction(db, `tx-proj-${i}`, {
+        type: 'expense',
+        amount: 1000,
+        date: `${months[i]}-01`,
+        installmentGroupId: 'grp-proj',
+      });
+    }
+
+    // Query projection for 6 months starting from 2026-03
+    const [yearStr, monthStr] = '2026-02'.split('-').map(Number); // simulate "current month" as Feb so next 6 = Mar-Aug
+    const projection: Array<{ month: string; total: number }> = [];
+
+    for (let i = 1; i <= 6; i++) {
+      const targetDate = new Date(yearStr, monthStr - 1 + i, 1);
+      const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+      const row = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM finance_transactions
+        WHERE installment_group_id IS NOT NULL AND date LIKE ?
+      `).get(`${targetMonth}%`) as { total: number };
+      projection.push({ month: targetMonth, total: row.total });
+    }
+
+    expect(projection).toHaveLength(6);
+    expect(projection.every((p) => p.total === 1000)).toBe(true);
+    expect(projection[0].month).toBe('2026-03');
+    expect(projection[5].month).toBe('2026-08');
+  });
+});

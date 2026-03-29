@@ -234,4 +234,138 @@ export function registerFinanceIpcHandlers(): void {
     const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };
     return result.c;
   });
+
+  // ── Installment Groups ───────────────────────────────
+
+  ipcHandle('finance:getInstallmentGroups', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT g.id, g.description, g.total_amount AS totalAmount, g.currency,
+             g.total_installments AS totalInstallments, g.category, g.date,
+             g.created_at AS createdAt,
+             COUNT(t.id) AS transactionCount
+      FROM finance_installment_groups g
+      LEFT JOIN finance_transactions t ON t.installment_group_id = g.id
+      GROUP BY g.id
+      ORDER BY g.date DESC, g.created_at DESC
+    `).all();
+  });
+
+  ipcHandle('finance:getInstallmentsForMonth', (_e, month: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT t.id, t.type, t.amount, t.currency, t.category, t.description, t.date,
+             t.payment_method AS paymentMethod, t.source, t.installments,
+             t.installment_group_id AS installmentGroupId,
+             t.for_third_party AS forThirdParty,
+             t.recurring_id AS recurringId,
+             t.import_batch_id AS importBatchId,
+             t.created_at AS createdAt, t.updated_at AS updatedAt,
+             g.description AS groupDescription,
+             g.total_installments AS installmentCount,
+             g.total_amount AS groupTotalAmount
+      FROM finance_transactions t
+      JOIN finance_installment_groups g ON g.id = t.installment_group_id
+      WHERE t.installment_group_id IS NOT NULL AND t.date LIKE ?
+      ORDER BY t.date DESC, t.created_at DESC
+    `).all(`${month}%`);
+  });
+
+  ipcHandle('finance:getInstallmentProjection', (_e, months: number) => {
+    const db = getDb();
+    const today = todayDateString(); // YYYY-MM-DD
+    const [year, month] = today.slice(0, 7).split('-').map(Number);
+
+    const projection: Array<{ month: string; total: number }> = [];
+
+    for (let i = 1; i <= months; i++) {
+      const targetDate = new Date(year, month - 1 + i, 1);
+      const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+
+      const row = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM finance_transactions
+        WHERE installment_group_id IS NOT NULL AND date LIKE ?
+      `).get(`${targetMonth}%`) as { total: number };
+
+      projection.push({ month: targetMonth, total: row.total });
+    }
+
+    return projection;
+  });
+
+  ipcHandle('finance:createInstallmentGroup', (_e, group: {
+    description: string;
+    totalAmount: number;
+    installmentCount: number;
+    installmentAmount: number;
+    currency?: string;
+    category?: string;
+    startDate: string;
+    forThirdParty?: boolean;
+  }) => {
+    const db = getDb();
+    const groupId = genId();
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO finance_installment_groups
+        (id, description, total_amount, currency, total_installments, category, date, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      groupId,
+      group.description,
+      group.totalAmount,
+      group.currency ?? 'ARS',
+      group.installmentCount,
+      group.category ?? 'Otros',
+      group.startDate,
+      now,
+    );
+
+    const [yearStr, monthStr, dayStr] = group.startDate.split('-');
+    const startYear = parseInt(yearStr, 10);
+    const startMonth = parseInt(monthStr, 10) - 1; // 0-based
+    const startDay = parseInt(dayStr, 10);
+
+    for (let i = 0; i < group.installmentCount; i++) {
+      const txDate = new Date(startYear, startMonth + i, startDay);
+      const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
+      const txId = genId();
+
+      db.prepare(`
+        INSERT INTO finance_transactions
+          (id, type, amount, currency, category, description, date, payment_method,
+           source, installments, installment_group_id, for_third_party, recurring_id,
+           import_batch_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        txId,
+        'expense',
+        group.installmentAmount,
+        group.currency ?? 'ARS',
+        group.category ?? 'Otros',
+        `${group.description} (Cuota ${i + 1}/${group.installmentCount})`,
+        txDateStr,
+        'credit_card',
+        'manual',
+        group.installmentCount,
+        groupId,
+        group.forThirdParty ? 1 : 0,
+        null,
+        null,
+        now,
+        now,
+      );
+    }
+
+    return groupId;
+  });
+
+  ipcHandle('finance:deleteInstallmentGroup', (_e, id: string) => {
+    const db = getDb();
+    // Application-level cascade: delete linked transactions first, then the group
+    db.prepare('DELETE FROM finance_transactions WHERE installment_group_id = ?').run(id);
+    db.prepare('DELETE FROM finance_installment_groups WHERE id = ?').run(id);
+  });
 }
