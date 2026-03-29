@@ -12,13 +12,13 @@ export default function DashboardWidget() {
   }, []);
 
   return (
-    <div className="space-y-1">
-      <p className="font-mono text-lg">
+    <div>
+      <div className="rpg-stat-number">
         {total !== null ? `$${total.toLocaleString('es-AR')}` : '...'}
-      </p>
-      <p className="text-xs opacity-40">
+      </div>
+      <div className="rpg-stat-label">
         {t('coinify.thisMonth')} · {loansCount} {t('coinify.activeLoans')}
-      </p>
+      </div>
     </div>
   );
 }

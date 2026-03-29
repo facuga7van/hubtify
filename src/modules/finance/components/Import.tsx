@@ -108,80 +108,93 @@ export default function Import() {
 
   const includedCount = rows.filter((r) => r.included).length;
 
+  const thStyle: React.CSSProperties = {
+    textAlign: 'left' as const,
+    padding: '6px 8px',
+    borderBottom: '2px solid var(--rpg-gold-dark)',
+    fontFamily: 'Cinzel, serif',
+    fontSize: '0.8rem',
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: '6px 8px',
+    borderBottom: '1px solid var(--rpg-parchment-dark)',
+  };
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-[var(--rpg-gold)]">{t('coinify.importTitle')}</h2>
+    <div>
+      <h2 style={{ color: 'var(--rpg-gold)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0, marginBottom: 16 }}>
+        {t('coinify.importTitle')}
+      </h2>
 
       {/* File picker */}
-      <div className="rpg-card p-4 flex items-center gap-4">
-        <label className="rpg-button cursor-pointer">
+      <div className="rpg-card" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+        <label className="rpg-button" style={{ position: 'relative', overflow: 'hidden' }}>
           {t('coinify.importSelectFile')}
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf"
-            className="hidden"
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }}
             onChange={handleFileChange}
           />
         </label>
-        <span className="text-sm opacity-60 truncate">
+        <span style={{ fontSize: '0.85rem', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {fileName || t('coinify.importNoFile')}
         </span>
         {parsing && (
-          <span className="text-sm text-[#C9A84C] animate-pulse">{t('coinify.importParsing')}</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--rpg-gold)' }}>{t('coinify.importParsing')}</span>
         )}
       </div>
 
       {/* Parse error */}
       {parseError && (
-        <p className="text-sm text-[#8B2020]">{parseError}</p>
+        <p style={{ fontSize: '0.85rem', color: 'var(--rpg-hp-red)', marginBottom: 12 }}>{parseError}</p>
       )}
 
       {/* Preview table */}
       {rows.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-sm opacity-60">
-            {t('coinify.importPreview')} — {includedCount} / {rows.length}
+        <div>
+          <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 12 }}>
+            {t('coinify.importPreview')} -- {includedCount} / {rows.length}
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+
+          <div className="rpg-card" style={{ padding: 12, marginBottom: 16, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
-                <tr className="opacity-40 text-left border-b border-[#A68A3E]/30">
-                  <th className="pb-2 pr-3">{t('coinify.importColInclude')}</th>
-                  <th className="pb-2 pr-3">{t('coinify.importColDate')}</th>
-                  <th className="pb-2 pr-3">{t('coinify.importColMerchant')}</th>
-                  <th className="pb-2 pr-3">{t('coinify.importColInstallment')}</th>
-                  <th className="pb-2 pr-3">{t('coinify.importColAmount')}</th>
-                  <th className="pb-2 pr-3">{t('coinify.importColCurrency')}</th>
-                  <th className="pb-2">{t('coinify.importColCategory')}</th>
+                <tr>
+                  <th style={thStyle}>{t('coinify.importColInclude')}</th>
+                  <th style={thStyle}>{t('coinify.importColDate')}</th>
+                  <th style={thStyle}>{t('coinify.importColMerchant')}</th>
+                  <th style={thStyle}>{t('coinify.importColInstallment')}</th>
+                  <th style={thStyle}>{t('coinify.importColAmount')}</th>
+                  <th style={thStyle}>{t('coinify.importColCurrency')}</th>
+                  <th style={thStyle}>{t('coinify.importColCategory')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className={`border-b border-[#A68A3E]/10 ${!row.included ? 'opacity-40' : ''}`}
-                  >
-                    <td className="py-1.5 pr-3">
+                  <tr key={idx} style={!row.included ? { opacity: 0.4 } : undefined}>
+                    <td style={tdStyle}>
                       <input
                         type="checkbox"
                         checked={row.included}
                         onChange={() => toggleRow(idx)}
-                        className="cursor-pointer"
                       />
                     </td>
-                    <td className="py-1.5 pr-3 whitespace-nowrap opacity-70">{row.date}</td>
-                    <td className="py-1.5 pr-3 max-w-[180px] truncate" title={row.merchant}>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', opacity: 0.7 }}>{row.date}</td>
+                    <td style={{ ...tdStyle, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.merchant}>
                       {row.merchant}
                     </td>
-                    <td className="py-1.5 pr-3 opacity-50">{formatInstallment(row)}</td>
-                    <td className="py-1.5 pr-3 font-mono">{formatAmount(row)}</td>
-                    <td className="py-1.5 pr-3 opacity-50">{formatCurrency(row)}</td>
-                    <td className="py-1.5">
+                    <td style={{ ...tdStyle, opacity: 0.5 }}>{formatInstallment(row)}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'Fira Code, monospace' }}>{formatAmount(row)}</td>
+                    <td style={{ ...tdStyle, opacity: 0.5 }}>{formatCurrency(row)}</td>
+                    <td style={tdStyle}>
                       <select
                         value={row.category}
                         onChange={(e) => setCategory(idx, e.target.value)}
-                        className="rpg-select text-xs"
+                        className="rpg-select"
+                        style={{ fontSize: '0.75rem' }}
                         disabled={!row.included}
                       >
                         {CATEGORIES.map((cat) => (
@@ -196,14 +209,15 @@ export default function Import() {
           </div>
 
           {/* Month selector + confirm */}
-          <div className="flex items-end gap-4 flex-wrap">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs opacity-50">{t('coinify.importStatementMonth')}</label>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('coinify.importStatementMonth')}</label>
               <input
                 type="month"
                 value={statementMonth}
                 onChange={(e) => setStatementMonth(e.target.value)}
-                className="rpg-input text-sm"
+                className="rpg-input"
+                style={{ fontSize: '0.85rem' }}
               />
             </div>
             <button
@@ -216,15 +230,15 @@ export default function Import() {
           </div>
 
           {importError && (
-            <p className="text-sm text-[#8B2020]">{importError}</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--rpg-hp-red)' }}>{importError}</p>
           )}
         </div>
       )}
 
       {/* Success message */}
       {successCount !== null && (
-        <div className="rpg-card p-4">
-          <p className="text-[#2D5A27] text-sm">
+        <div className="rpg-card" style={{ padding: 16 }}>
+          <p style={{ color: 'var(--rpg-xp-green)', fontSize: '0.85rem', margin: 0 }}>
             {t('coinify.importSuccess', { count: successCount })}
           </p>
         </div>
