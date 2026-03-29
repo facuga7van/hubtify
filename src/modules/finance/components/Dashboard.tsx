@@ -54,78 +54,87 @@ export default function Dashboard() {
     window.api.financeGetActiveLoanSummary().then(setLoans);
   }, []);
 
-  const COLORS = ['#d4a373', '#e6b422', '#c2956e', '#a67b5b', '#8b6f47', '#6d5c3f', '#b8860b', '#cd853f', '#daa520', '#bc8f8f', '#f4a460'];
+  const COLORS = ['#C9A84C', '#A68A3E', '#5C3A1E', '#3B2314', '#6B3A2A', '#4A2D1A', '#E0C068', '#8B6F47', '#cd853f', '#bc8f8f'];
 
   return (
-    <div className="space-y-4">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
         <DollarChip />
       </div>
 
       {/* Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {balance && (
-          <>
-            <div className="rpg-card p-4">
-              <h3 className="text-sm opacity-50 mb-2">ARS</h3>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="opacity-60">{t('coinify.income')}</span>
-                  <span className="text-[#2D5A27] font-mono">+${balance.ARS.income.toLocaleString('es-AR')}</span>
+      {balance && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: (balance.USD.income > 0 || balance.USD.expenses > 0) ? '1fr 1fr' : '1fr',
+          gap: 12,
+          marginBottom: 16,
+        }}>
+          <div className="rpg-card">
+            <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8M8 14h8"/></svg>
+              ARS
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ opacity: 0.6 }}>{t('coinify.income')}</span>
+                <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>+${balance.ARS.income.toLocaleString('es-AR')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ opacity: 0.6 }}>{t('coinify.expense')}</span>
+                <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>-${balance.ARS.expenses.toLocaleString('es-AR')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 4, fontSize: '0.9rem' }}>
+                <span style={{ fontWeight: 'bold' }}>{t('coinify.balance')}</span>
+                <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold', color: balance.ARS.balance >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)' }}>
+                  ${balance.ARS.balance.toLocaleString('es-AR')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {(balance.USD.income > 0 || balance.USD.expenses > 0) && (
+            <div className="rpg-card">
+              <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9h6M9 15h6"/></svg>
+                USD
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ opacity: 0.6 }}>{t('coinify.income')}</span>
+                  <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>+${balance.USD.income.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="opacity-60">{t('coinify.expense')}</span>
-                  <span className="text-[#8B2020] font-mono">-${balance.ARS.expenses.toLocaleString('es-AR')}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ opacity: 0.6 }}>{t('coinify.expense')}</span>
+                  <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>-${balance.USD.expenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between border-t border-[#A68A3E]/30 pt-1">
-                  <span className="font-semibold">{t('coinify.balance')}</span>
-                  <span className={`font-mono font-bold ${balance.ARS.balance >= 0 ? 'text-[#2D5A27]' : 'text-[#8B2020]'}`}>
-                    ${balance.ARS.balance.toLocaleString('es-AR')}
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 4, fontSize: '0.9rem' }}>
+                  <span style={{ fontWeight: 'bold' }}>{t('coinify.balance')}</span>
+                  <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold', color: balance.USD.balance >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)' }}>
+                    ${balance.USD.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
             </div>
-
-            {(balance.USD.income > 0 || balance.USD.expenses > 0) && (
-              <div className="rpg-card p-4">
-                <h3 className="text-sm opacity-50 mb-2">USD</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="opacity-60">{t('coinify.income')}</span>
-                    <span className="text-[#2D5A27] font-mono">+${balance.USD.income.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="opacity-60">{t('coinify.expense')}</span>
-                    <span className="text-[#8B2020] font-mono">-${balance.USD.expenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[#A68A3E]/30 pt-1">
-                    <span className="font-semibold">{t('coinify.balance')}</span>
-                    <span className={`font-mono font-bold ${balance.USD.balance >= 0 ? 'text-[#2D5A27]' : 'text-[#8B2020]'}`}>
-                      ${balance.USD.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Category Breakdown */}
       {categories.length > 0 && (
-        <div className="rpg-card p-4">
-          <h3 className="text-sm opacity-50 mb-3">{t('coinify.byCategory')}</h3>
+        <div className="rpg-card" style={{ marginBottom: 16 }}>
+          <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            {t('coinify.byCategory')}
+          </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={categories} layout="vertical">
               <XAxis type="number" hide />
-              <YAxis type="category" dataKey="category" width={100} tick={{ fill: 'var(--rpg-ink, #2C1810)', fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{ background: 'var(--rpg-parchment, #F4E4C1)', border: '1px solid var(--rpg-gold-dark, #A68A3E)', borderRadius: 8 }}
-                labelStyle={{ color: 'var(--rpg-ink, #2C1810)' }}
-              />
-              <Bar dataKey="ARS" fill="var(--rpg-gold, #d4a373)" radius={[0, 4, 4, 0]}>
+              <YAxis type="category" dataKey="category" width={100} tick={{ fill: 'var(--rpg-ink-light)', fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: 'var(--rpg-parchment-light)', border: '1px solid var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)' }} />
+              <Bar dataKey="ARS" fill="var(--rpg-gold)" radius={[0, 4, 4, 0]}>
                 {categories.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
@@ -136,49 +145,52 @@ export default function Dashboard() {
       )}
 
       {/* Projection + Loans */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Projection */}
-        <div className="rpg-card p-4">
-          <h3 className="text-sm opacity-50 mb-3">{t('coinify.projection')}</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div className="rpg-card">
+          <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            {t('coinify.projection')}
+          </div>
           {projection.length > 0 ? (
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {projection.map((p) => (
-                <div key={p.month} className="flex justify-between text-sm">
-                  <span className="opacity-60 capitalize">
+                <div key={p.month} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ opacity: 0.6 }}>
                     {new Date(p.month + '-01').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
                   </span>
-                  <span className="font-mono">${p.total.toLocaleString('es-AR')}</span>
+                  <span style={{ fontFamily: 'Fira Code, monospace' }}>${p.total.toLocaleString('es-AR')}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm opacity-40">{t('coinify.noData')}</p>
+            <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('coinify.noData')}</p>
           )}
         </div>
 
-        {/* Loans Summary */}
-        <div className="rpg-card p-4 cursor-pointer hover:border-[var(--rpg-gold)]/30 transition-colors"
-          onClick={() => navigate('/finance/loans')}>
-          <h3 className="text-sm opacity-50 mb-3">{t('coinify.loans')}</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="opacity-60">{t('coinify.owed')}</span>
-              <span className="text-[#2D5A27] font-mono">${loans.lent.toLocaleString('es-AR')}</span>
+        <div className="rpg-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/finance/loans')}>
+          <div className="rpg-card-title" style={{ marginBottom: 6 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {t('coinify.loans')}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.6 }}>{t('coinify.owed')}</span>
+              <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>${loans.lent.toLocaleString('es-AR')}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="opacity-60">{t('coinify.owing')}</span>
-              <span className="text-[#8B2020] font-mono">${loans.borrowed.toLocaleString('es-AR')}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.6 }}>{t('coinify.owing')}</span>
+              <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>${loans.borrowed.toLocaleString('es-AR')}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="flex gap-3">
-        <button className="rpg-button flex-1" onClick={() => navigate('/finance/transactions?type=expense')}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="rpg-button" style={{ flex: 1 }} onClick={() => navigate('/finance/transactions?type=expense')}>
           + {t('coinify.expense')}
         </button>
-        <button className="rpg-button flex-1" onClick={() => navigate('/finance/transactions?type=income')}>
+        <button className="rpg-button" style={{ flex: 1 }} onClick={() => navigate('/finance/transactions?type=income')}>
           + {t('coinify.income')}
         </button>
       </div>

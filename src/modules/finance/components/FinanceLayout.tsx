@@ -14,27 +14,41 @@ export default function FinanceLayout() {
   const { t } = useTranslation();
 
   return (
-    <div className="flex flex-col h-full">
-      <nav className="flex gap-1 p-2 border-b overflow-x-auto" style={{ borderColor: 'var(--rpg-gold-dark)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <nav style={{
+        display: 'flex',
+        gap: 4,
+        padding: 8,
+        borderBottom: '1px solid var(--rpg-parchment-dark)',
+        overflowX: 'auto',
+      }}>
         {tabs.map((tab) => (
           <NavLink
             key={tab.path}
             to={tab.path}
             end={'end' in tab ? tab.end : undefined}
-            className={({ isActive }) =>
-              `px-3 py-1.5 rounded text-sm whitespace-nowrap transition-colors ${
-                isActive
-                  ? 'rpg-btn-active'
-                  : ''
-              }`
-            }
-            style={({ isActive }) => isActive ? {} : { color: 'var(--rpg-wood)', opacity: 0.7 }}
+            style={({ isActive }) => ({
+              padding: '6px 14px',
+              borderRadius: 'var(--rpg-radius)',
+              fontSize: '0.85rem',
+              fontFamily: 'Cinzel, serif',
+              fontWeight: isActive ? 700 : 600,
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+              background: isActive
+                ? 'linear-gradient(to bottom, var(--rpg-gold-dark), var(--rpg-gold))'
+                : 'transparent',
+              color: isActive ? 'var(--rpg-wood)' : 'var(--rpg-ink-light)',
+              opacity: isActive ? 1 : 0.6,
+              border: isActive ? '1px solid var(--rpg-gold-light)' : '1px solid transparent',
+              transition: 'all 0.2s ease',
+            })}
           >
             {t(tab.label)}
           </NavLink>
         ))}
       </nav>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         <Outlet />
       </div>
     </div>
