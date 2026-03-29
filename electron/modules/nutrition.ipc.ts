@@ -14,14 +14,13 @@ export function registerNutritionIpcHandlers(): void {
       dateOfBirth: row.date_of_birth, weightCheckDay: row.weight_check_day,
       sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
-      deficitTargetKcal: row.deficit_target_kcal, gymCalories: row.gym_calories,
-      stepCaloriesFactor: row.step_calories_factor,
+      deficitTargetKcal: row.deficit_target_kcal,
     };
   });
 
   ipcHandle('nutrition:saveProfile', (_e, profile: {
     dateOfBirth: string; sex: string; heightCm: number; initialWeightKg: number;
-    activityLevel: string; deficitTargetKcal?: number; gymCalories?: number; stepCaloriesFactor?: number;
+    activityLevel: string; deficitTargetKcal?: number;
     weightCheckDay?: number;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
@@ -34,11 +33,10 @@ export function registerNutritionIpcHandlers(): void {
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const db = getDb();
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.gymCalories ?? 300,
-      profile.stepCaloriesFactor ?? 0.04, profile.dateOfBirth, weightCheckDay);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay);
 
     // Recalc today's summary with new profile
     const today = todayDateString();
@@ -459,11 +457,6 @@ function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: strin
 function calculateBMR(weight: number, height: number, age: number, sex: string): number {
   const base = 10 * weight + 6.25 * height - 5 * age;
   return Math.max(800, Math.min(3500, sex === 'M' ? base + 5 : base - 161));
-}
-
-function calculateTDEE(bmr: number, activityLevel: string): number {
-  const factors: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
-  return Math.round(bmr * (factors[activityLevel] ?? 1.2));
 }
 
 function calculateTDEEWithFactor(bmr: number, factor: number): number {

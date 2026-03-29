@@ -414,10 +414,9 @@ export function registerSyncIpcHandlers(): void {
       // Profile
       if (d.profile) {
         const p = d.profile;
-        db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           p.age, p.sex, p.height_cm, p.initial_weight_kg, p.activity_level,
-          p.deficit_target_kcal ?? 500, p.gym_calories ?? 300, p.step_calories_factor ?? 0.04,
-          p.date_of_birth ?? null, p.weight_check_day ?? 1
+          p.deficit_target_kcal ?? 500, p.date_of_birth ?? null, p.weight_check_day ?? 1
         );
       }
 

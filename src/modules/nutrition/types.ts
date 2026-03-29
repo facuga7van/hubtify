@@ -5,8 +5,6 @@ export interface NutritionProfile {
   initialWeightKg: number;
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active';
   deficitTargetKcal: number;
-  gymCalories: number;
-  stepCaloriesFactor: number;
   dateOfBirth: string;
   weightCheckDay: number;
 }
