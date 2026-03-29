@@ -8,9 +8,9 @@ import NutritionOnboarding from './NutritionOnboarding';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
-import { upsertFoodItems } from '../food-telemetry';
 import { estimateNutrition } from '../estimate-service';
 import { useAuthContext } from '../../../shared/AuthContext';
+import type { NutritionProfile } from '../types';
 
 interface FoodEntry {
   id: number; date: string; time: string; description: string;
@@ -39,6 +39,7 @@ export default function Today() {
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [target, setTarget] = useState(0);
+  const [deficitTargetKcal, setDeficitTargetKcal] = useState(0);
 
   // Close Day
   const [dayClosed, setDayClosed] = useState<{
@@ -78,6 +79,7 @@ export default function Today() {
     setFrequentFoods(freq as FrequentFood[]);
     setHasProfile(!!prof);
     setTarget(tgt as number ?? 0);
+    setDeficitTargetKcal((prof as NutritionProfile | null)?.deficitTargetKcal ?? 0);
     setCloseResult(null);
     window.api.nutritionIsDayClosed(d).then((r) => setDayClosed(r as typeof dayClosed)).catch(console.error);
   }, []);
@@ -110,7 +112,10 @@ export default function Today() {
         }
       }
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Intentionally runs once on mount: auto-closes unclosed past days (up to 7 days back).
+  // No reactive deps needed — uses only date arithmetic and IPC calls.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reload when settings change (e.g. profile/TDEE update)
   useEffect(() => {
@@ -138,7 +143,7 @@ export default function Today() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'AI estimation failed';
       setEstimateError(msg);
-      console.error('Estimation failed:', err);
+      console.error('[Nutrition]', err);
     } finally {
       setEstimating(false);
     }
@@ -156,14 +161,6 @@ export default function Today() {
       aiBreakdown: JSON.stringify(estimation.items),
     });
 
-    try {
-      await window.api.nutritionLearnFood({
-        description: foodInput.trim(),
-        calories,
-        breakdown: estimation.items.map(it => `${it.name} ~${it.calories}kcal`).join(' + '),
-      });
-    } catch { /* best effort */ }
-
     // Telemetry: upsert items to Firestore (fire-and-forget, only if logged in)
     if (authUser) {
       const ratio = estimation.totalCalories > 0 ? calories / estimation.totalCalories : 1;
@@ -171,7 +168,6 @@ export default function Today() {
         name: it.name,
         calories: Math.round(it.calories * ratio),
       }));
-      upsertFoodItems(scaledItems).catch(() => {});
     }
 
     await window.api.processRpgEvent({
@@ -263,12 +259,14 @@ export default function Today() {
     if (result.success && result.breakdown) {
       const b = result.breakdown as typeof dayClosed;
       setCloseResult(b);
+      const xp = b?.xpTotal ?? 0;
+      const hp = b?.hpChange ?? 0;
       await window.api.processRpgEvent({
         type: 'DAY_SUMMARY', moduleId: 'nutrition',
-        payload: { xp: b!.xpTotal, hp: b!.hpChange },
+        payload: { xp, hp },
         timestamp: Date.now(),
       });
-      showToast(`+${b!.xpTotal} XP`);
+      showToast(`+${xp} XP`);
       window.dispatchEvent(new Event('rpg:statsChanged'));
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
@@ -293,7 +291,8 @@ export default function Today() {
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="rpg-button" onClick={() => navigate('/nutrition/settings')}
-              style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+              style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+              aria-label={t('nutrify.profileSettings')}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
@@ -311,7 +310,8 @@ export default function Today() {
 
       {/* Date navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}>
+        <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}
+          aria-label="Previous day">
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 1L1 6l5 5M1 6h14"/>
           </svg>
@@ -321,14 +321,15 @@ export default function Today() {
           {t('nutrify.today')}
         </button>
         <h3 style={{ flex: 1, textAlign: 'center' }}>{date}</h3>
-        <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}>
+        <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}
+          aria-label="Next day">
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10 1l5 5-5 5M15 6H1"/>
           </svg>
         </button>
       </div>
 
-      <CalorieProgressBar consumed={consumed} target={target} tdee={summary?.tdee ?? 0} />
+      <CalorieProgressBar consumed={consumed} tdee={summary?.tdee ?? 0} deficitTargetKcal={deficitTargetKcal} />
 
       {/* ── Food input ──────────────────────────────── */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>

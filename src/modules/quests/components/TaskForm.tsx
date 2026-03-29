@@ -45,7 +45,7 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
 
     const resolvedCategory = category === '__new__' ? newCategory.trim() : category;
 
-    const task: Record<string, unknown> = {
+    const task = {
       id: editingTask?.id,
       name: name.trim(),
       description: description.trim(),
@@ -57,7 +57,7 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
       status: editingTask?.status ?? false,
     };
 
-    await window.api.questsUpsertTask(task);
+    await window.api.questsUpsertTask(task as Record<string, unknown>);
 
     if (resolvedCategory && resolvedCategory.trim()) {
       await window.api.questsEnsureCategory(resolvedCategory.trim(), projectId);

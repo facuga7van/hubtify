@@ -12,11 +12,24 @@ export default function CharacterPage() {
   const { t } = useTranslation();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    window.api.getRpgStats().then(setStats).catch(console.error);
-    window.api.getRpgHistory(20).then(setHistory).catch(console.error);
-  }, []);
+  const load = () => {
+    setLoadError(false);
+    Promise.all([
+      window.api.getRpgStats().then(setStats),
+      window.api.getRpgHistory(20).then(setHistory),
+    ]).catch(() => setLoadError(true));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  if (loadError) return (
+    <div style={{ padding: 24, textAlign: 'center' }}>
+      <p style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>
+      <button className="rpg-button" onClick={load}>{t('common.tryAgain')}</button>
+    </div>
+  );
 
   if (!stats) return <Loading />;
 

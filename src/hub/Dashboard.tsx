@@ -16,18 +16,30 @@ export default function Dashboard() {
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [dashStats, setDashStats] = useState<{ xpToday: number; xpHistory: Array<{ date: string; xp: number }>; eventsToday: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false);
+    setLoading(true);
     Promise.all([
       window.api.getRpgStats(),
       window.api.rpgGetDashboardStats(),
     ]).then(([s, d]) => {
       setStats(s);
       setDashStats(d);
-    }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
 
   if (loading) return <Loading />;
+
+  if (loadError) return (
+    <div style={{ padding: 24, textAlign: 'center' }}>
+      <p style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>
+      <button className="rpg-button" onClick={load}>{t('common.tryAgain')}</button>
+    </div>
+  );
 
   const chartData = dashStats?.xpHistory.map((d) => ({
     date: d.date.slice(5), // MM-DD

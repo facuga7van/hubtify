@@ -5,6 +5,7 @@ import PageHeader from '../../../shared/components/PageHeader';
 import { getAgeFromDob } from '../../../../shared/date-utils';
 import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
+import type { NutritionProfile } from '../types';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -12,6 +13,7 @@ export default function NutritionSettings() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saved, setSaved] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -32,22 +34,22 @@ export default function NutritionSettings() {
   useEffect(() => {
     window.api.nutritionGetProfile().then((prof) => {
       if (prof) {
-        const p = prof as Record<string, unknown>;
-        setDateOfBirth((p.dateOfBirth as string) || '');
-        setWeightCheckDay((p.weightCheckDay as number) || 1);
-        setSex(p.sex as 'M' | 'F');
-        setHeight(p.heightCm as number);
-        setWeight(p.initialWeightKg as number);
-        setActivity(p.activityLevel as string);
-        setGymCalories(p.gymCalories as number);
-        setStepFactor(p.stepCaloriesFactor as number);
+        const p = prof as NutritionProfile;
+        setDateOfBirth(p.dateOfBirth || '');
+        setWeightCheckDay(p.weightCheckDay || 1);
+        setSex(p.sex);
+        setHeight(p.heightCm);
+        setWeight(p.initialWeightKg);
+        setActivity(p.activityLevel);
+        setGymCalories(p.gymCalories);
+        setStepFactor(p.stepCaloriesFactor);
 
-        const deficit = p.deficitTargetKcal as number;
+        const deficit = p.deficitTargetKcal;
         if (deficit > 0) { setGoal('deficit'); setGoalAmount(deficit); }
         else if (deficit < 0) { setGoal('surplus'); setGoalAmount(Math.abs(deficit)); }
         else { setGoal('maintain'); setGoalAmount(0); }
       }
-    }).catch(console.error).finally(() => setLoading(false));
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
@@ -66,6 +68,13 @@ export default function NutritionSettings() {
   };
 
   if (loading) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
+
+  if (loadError) return (
+    <div style={{ padding: 24, textAlign: 'center' }}>
+      <p style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>
+      <button className="rpg-button" onClick={() => window.location.reload()}>{t('common.tryAgain')}</button>
+    </div>
+  );
 
   const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.9rem', marginBottom: 4 };
 

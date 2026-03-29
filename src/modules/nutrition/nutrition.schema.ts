@@ -58,15 +58,6 @@ export const nutritionMigrations: Migration[] = [
         balance INTEGER NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS food_database (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        keywords TEXT NOT NULL,
-        calories INTEGER NOT NULL,
-        serving_size TEXT NOT NULL DEFAULT 'porcion estandar',
-        category TEXT NOT NULL DEFAULT 'general'
-      );
-      CREATE INDEX IF NOT EXISTS idx_food_database_keywords ON food_database(keywords);
     `,
   },
   {

@@ -1,97 +1,116 @@
 import { useTranslation } from 'react-i18next';
 
+type Goal = 'deficit' | 'maintain' | 'surplus';
+
 interface Props {
   consumed: number;
-  target: number;    // TDEE - deficit (what you should eat)
-  tdee: number;      // Total daily energy expenditure
+  tdee: number;
+  deficitTargetKcal: number; // positive = deficit, negative = surplus, 0 = maintain
 }
 
-export default function CalorieProgressBar({ consumed, target, tdee }: Props) {
+function getGoal(deficitTargetKcal: number): Goal {
+  if (deficitTargetKcal > 0) return 'deficit';
+  if (deficitTargetKcal < 0) return 'surplus';
+  return 'maintain';
+}
+
+export default function CalorieProgressBar({ consumed, tdee, deficitTargetKcal }: Props) {
   const { t } = useTranslation();
   if (tdee <= 0) return null;
 
-  // Positions as % of TDEE (the full bar represents TDEE)
-  const consumedPct = Math.min((consumed / tdee) * 100, 110);
-  const targetPct = (target / tdee) * 100;
+  const goal = getGoal(deficitTargetKcal);
+  const surplusAmount = Math.abs(deficitTargetKcal);
+
+  // Bar max and target based on goal
+  const barMax = goal === 'surplus' ? tdee + surplusAmount : tdee;
+  const target = goal === 'deficit' ? tdee - deficitTargetKcal : barMax;
+
+  const consumedPct = Math.min((consumed / barMax) * 100, 100);
+  const targetPct = (target / barMax) * 100;
   const remaining = target - consumed;
 
-  // Status
-  const isOverTarget = consumed > target;
-  const isOverTdee = consumed > tdee;
-  const isInDeficit = consumed <= target;
-  const deficitAmount = target - consumed;
-  const surplusAmount = consumed - target;
-
-  // Bar color based on status
-  const barColor = isOverTdee
+  // Bar color
+  const barColor = consumed > barMax
     ? 'var(--rpg-hp-red)'
-    : isOverTarget
-    ? '#e67e22'  // orange warning
-    : 'var(--rpg-xp-green)';
+    : goal === 'deficit' && consumed > target
+      ? '#e67e22'
+      : 'var(--rpg-xp-green)';
 
   return (
     <div style={{ marginBottom: 16 }}>
-      {/* Header stats */}
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.85rem', marginBottom: 6 }}>
         <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold' }}>
           {consumed} <span style={{ opacity: 0.5, fontWeight: 'normal' }}>kcal</span>
         </span>
-        {isInDeficit ? (
-          <span style={{ color: 'var(--rpg-xp-green)' }}>
+        {consumed <= target ? (
+          <span style={{ color: 'var(--rpg-xp-green)', fontSize: '0.8rem' }}>
             {remaining} kcal {t('nutrify.remaining')}
           </span>
         ) : (
-          <span style={{ color: isOverTdee ? 'var(--rpg-hp-red)' : '#e67e22' }}>
-            +{surplusAmount} kcal {t('nutrify.overTarget')}
+          <span style={{ color: consumed > barMax ? 'var(--rpg-hp-red)' : '#e67e22', fontSize: '0.8rem' }}>
+            +{consumed - target} kcal {t('nutrify.overTarget')}
           </span>
         )}
       </div>
 
-      {/* Progress bar with markers */}
+      {/* Bar */}
       <div style={{ position: 'relative' }}>
         <div className="rpg-bar" style={{ height: 22 }}>
-          {/* Consumed fill */}
           <div style={{
             height: '100%', borderRadius: 2,
-            width: `${Math.min(consumedPct, 100)}%`,
+            width: `${consumedPct}%`,
             background: barColor,
             transition: 'width 0.5s ease, background 0.3s ease',
           }} />
         </div>
 
-        {/* Target marker line */}
-        <div style={{
-          position: 'absolute', top: -2, bottom: -2,
-          left: `${Math.min(targetPct, 100)}%`,
-          width: 2, background: 'var(--rpg-gold)',
-          boxShadow: '0 0 4px var(--rpg-gold)',
-          borderRadius: 1,
-        }} />
+        {/* Deficit marker */}
+        {goal === 'deficit' && (
+          <div style={{
+            position: 'absolute', top: -2, bottom: -2,
+            left: `${targetPct}%`,
+            width: 2, background: 'var(--rpg-gold)',
+            boxShadow: '0 0 4px var(--rpg-gold)',
+            borderRadius: 1,
+          }} />
+        )}
 
+        {/* Overflow indicator */}
+        {consumed > barMax && (
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 6, borderRadius: '0 2px 2px 0',
+            background: 'var(--rpg-hp-red)',
+            boxShadow: '0 0 6px var(--rpg-hp-red)',
+          }} />
+        )}
       </div>
 
-      {/* Status message + TDEE */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', fontSize: '0.8rem', marginTop: 4, position: 'relative' }}>
-        {isOverTdee ? (
+      {/* Footer */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.75rem', marginTop: 4 }}>
+        <span style={{ opacity: 0.5, fontFamily: 'Fira Code, monospace' }}>
+          {goal === 'deficit' && <>{t('nutrify.target')}: <b>{target}</b> · </>}
+          TDEE: <b>{tdee}</b>
+          {goal === 'surplus' && <> · {t('nutrify.target')}: <b>{target}</b></>}
+        </span>
+        {consumed > barMax ? (
           <span style={{ color: 'var(--rpg-hp-red)' }}>
-            ⚠ {t('nutrify.overTdee')}
+            {t('nutrify.overTdee')}
           </span>
-        ) : isOverTarget ? (
+        ) : goal === 'deficit' && consumed > target ? (
           <span style={{ color: '#e67e22' }}>
             {t('nutrify.overTargetWarning')}
           </span>
-        ) : deficitAmount > target * 0.3 ? (
+        ) : consumed <= target * 0.7 ? (
           <span style={{ color: 'var(--rpg-xp-green)' }}>
-            ★ {t('nutrify.greatDeficit')}
+            {t('nutrify.onTrack')}
           </span>
         ) : (
           <span style={{ opacity: 0.5 }}>
             {t('nutrify.onTrack')}
           </span>
         )}
-        <span style={{ position: 'absolute', right: 0, fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.5 }}>
-          TDEE <b>{tdee}</b>
-        </span>
       </div>
     </div>
   );

@@ -63,7 +63,6 @@ const api = {
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
-  nutritionLearnFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:learnFood', entry),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
@@ -77,6 +76,9 @@ const api = {
   syncMergeQuestData: (data: Record<string, unknown>) => ipcRenderer.invoke('sync:mergeQuestData', data),
   syncGetAllNutritionData: () => ipcRenderer.invoke('sync:getAllNutritionData'),
   syncMergeNutritionData: (data: Record<string, unknown>) => ipcRenderer.invoke('sync:mergeNutritionData', data),
+  syncClearUserData: () => ipcRenderer.invoke('sync:clearUserData'),
+  syncSetCurrentUser: (uid: string) => ipcRenderer.invoke('sync:setCurrentUser', uid),
+  syncGetCurrentUser: () => ipcRenderer.invoke('sync:getCurrentUser'),
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),

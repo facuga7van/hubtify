@@ -147,7 +147,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       if (frontHairRef.current) app.stage.setChildIndex(frontHairRef.current, app.stage.children.length - 1);
 
     } catch (e) {
-      console.error('Error loading hair:', e);
+      console.error('[Character]', e);
     } finally {
       isLoadingRef.current = false;
       setLoadingHair(false);
@@ -278,11 +278,13 @@ function ControlRow({ label, value, onPrev, onNext }: {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <span style={{ fontSize: '0.85rem', color: 'var(--rpg-ink-light)' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button className="rpg-button" onClick={onPrev} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+        <button className="rpg-button" onClick={onPrev} style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+          aria-label={`Previous ${label}`}>
           <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 1L2 5l4 4"/></svg>
         </button>
         <span style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.85rem', minWidth: 24, textAlign: 'center' }}>{value}</span>
-        <button className="rpg-button" onClick={onNext} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+        <button className="rpg-button" onClick={onNext} style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+          aria-label={`Next ${label}`}>
           <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 1l4 4-4 4"/></svg>
         </button>
       </div>

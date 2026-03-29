@@ -62,7 +62,7 @@ export default function TaskList() {
       );
       setDrawingCounts(counts);
     } catch (err) {
-      console.error(err);
+      console.error('[Quests]', err);
     }
   }, [activeProjectId]);
 

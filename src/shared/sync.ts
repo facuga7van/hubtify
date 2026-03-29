@@ -1,6 +1,14 @@
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getActiveFirestore } from './firebase';
 
+interface SyncSettings {
+  language?: string;
+  sound?: boolean;
+  reminders?: boolean;
+  sidebarCollapsed?: boolean;
+  onboarded?: boolean;
+}
+
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
     const [stats, questData, charData, nutritionData, financeTx, loans, incomeSources] = await Promise.all([
@@ -63,7 +71,7 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
 
     // Restore nutrition data
     if (data.nutrify) {
-      const nutritionResult = await window.api.syncMergeNutritionData(data.nutrify as Record<string, unknown>);
+      const nutritionResult = await window.api.syncMergeNutritionData(data.nutrify);
       if (nutritionResult.changed) changed = true;
     }
 
@@ -76,8 +84,8 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
 
     // Restore settings
     if (data.settings) {
-      const s = data.settings as Record<string, unknown>;
-      if (s.language) localStorage.setItem('hubtify_lang', String(s.language));
+      const s = data.settings as SyncSettings;
+      if (s.language) localStorage.setItem('hubtify_lang', s.language);
       if (s.sound !== undefined) localStorage.setItem('hubtify_sound', String(s.sound));
       if (s.reminders !== undefined) localStorage.setItem('hubtify_reminders', String(s.reminders));
       if (s.sidebarCollapsed !== undefined) localStorage.setItem('hubtify_sidebar_collapsed', String(s.sidebarCollapsed));

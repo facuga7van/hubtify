@@ -108,7 +108,6 @@ export interface HubtifyApi {
   nutritionGetStreak: () => Promise<number>;
   nutritionGetTodayCalories: () => Promise<number>;
   nutritionGetTodayTarget: () => Promise<number | null>;
-  nutritionLearnFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
@@ -119,6 +118,9 @@ export interface HubtifyApi {
   syncMergeQuestData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
   syncGetAllNutritionData: () => Promise<Record<string, unknown>>;
   syncMergeNutritionData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
+  syncClearUserData: () => Promise<{ success: boolean }>;
+  syncSetCurrentUser: (uid: string) => Promise<void>;
+  syncGetCurrentUser: () => Promise<string | null>;
 
   // Backup
   backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
@@ -162,15 +164,6 @@ export interface HubtifyApi {
 }
 
 // ── Nutrition AI Types ──────────────────────────────────────
-
-export interface FoodDbEntry {
-  id: number;
-  name: string;
-  keywords: string;
-  calories: number;
-  serving_size: string;
-  category: string;
-}
 
 export interface EstimationItem {
   name: string;

@@ -84,7 +84,69 @@ interface SyncQuestData {
   drawings: SyncDrawing[];
 }
 
+const USER_DATA_TABLES = [
+  'player_stats',
+  'rpg_events',
+  'user_profile',
+  'character_data',
+  'tasks',
+  'subtasks',
+  'task_categories',
+  'projects',
+  'task_drawings',
+  'habits',
+  'habit_checks',
+  'finance_transactions',
+  'finance_loans',
+  'finance_income_sources',
+  'finance_categories',
+  'nutrition_profile',
+  'food_log',
+  'frequent_foods',
+  'nutrition_daily_metrics',
+  'nutrition_weekly_metrics',
+  'nutrition_daily_summary',
+  'nutrition_daily_closed',
+  'dollar_cache',
+];
+
 export function registerSyncIpcHandlers(): void {
+  ipcHandle('sync:clearUserData', () => {
+    const db = getDb();
+    const tx = db.transaction(() => {
+      for (const table of USER_DATA_TABLES) {
+        db.prepare(`DELETE FROM ${table}`).run();
+      }
+      db.prepare(`INSERT OR IGNORE INTO player_stats (user_id) VALUES ('default')`).run();
+      db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
+    });
+    tx();
+    return { success: true };
+  });
+
+  ipcHandle('sync:setCurrentUser', (_e, uid: string) => {
+    const db = getDb();
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    `).run();
+    db.prepare(`INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_uid', ?)`).run(uid);
+  });
+
+  ipcHandle('sync:getCurrentUser', () => {
+    const db = getDb();
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    `).run();
+    const row = db.prepare(`SELECT value FROM app_state WHERE key = 'last_uid'`).get() as { value: string } | undefined;
+    return row?.value ?? null;
+  });
+
   // Returns ALL quest data including soft-deleted, for push to Firebase
   ipcHandle('sync:getAllQuestData', () => {
     const db = getDb();

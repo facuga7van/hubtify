@@ -16,6 +16,7 @@ export default function FinanceDashboard() {
   // Balance & category breakdown
   const [balance, setBalance] = useState<{ expenses: number; income: number; balance: number } | null>(null);
   const [catBreakdown, setCatBreakdown] = useState<Array<{ category: string; total: number }>>([]);
+  const [loadError, setLoadError] = useState(false);
 
   // Dollar rates
   const [dollarRates, setDollarRates] = useState<Array<{ nombre: string; compra: number; venta: number }>>([]);
@@ -45,23 +46,27 @@ export default function FinanceDashboard() {
   const [confirmSettleLoanId, setConfirmSettleLoanId] = useState<string | null>(null);
 
   const loadData = useCallback(async (m: string) => {
-    const [txList, loanList, cats, total] = await Promise.all([
-      window.api.financeGetTransactions(m),
-      window.api.financeGetLoans(),
-      window.api.financeGetCategories(),
-      window.api.financeGetMonthlyTotal(),
-    ]);
-    setTransactions(txList as Transaction[]);
-    setLoans((loanList as Array<Record<string, unknown>>).map((l) => ({
-      ...l,
-      settled: Boolean(l.settled),
-      isVariable: Boolean(l.isVariable),
-    })) as unknown as Loan[]);
-    setCategories(cats as string[]);
-    setMonthlyTotal(total as number);
+    try {
+      const [txList, loanList, cats, total] = await Promise.all([
+        window.api.financeGetTransactions(m),
+        window.api.financeGetLoans(),
+        window.api.financeGetCategories(),
+        window.api.financeGetMonthlyTotal(),
+      ]);
+      setTransactions(txList as Transaction[]);
+      setLoans((loanList as Loan[]).map((l) => ({
+        ...l,
+        settled: Boolean(l.settled),
+      })));
+      setCategories(cats as string[]);
+      setMonthlyTotal(total as number);
+      setLoadError(false);
 
-    window.api.financeGetMonthlyBalance(m).then(setBalance).catch(console.error);
-    window.api.financeGetCategoryBreakdown(m).then((c) => setCatBreakdown(c as typeof catBreakdown)).catch(console.error);
+      window.api.financeGetMonthlyBalance(m).then(setBalance).catch(console.error);
+      window.api.financeGetCategoryBreakdown(m).then((c) => setCatBreakdown(c as typeof catBreakdown)).catch(console.error);
+    } catch {
+      setLoadError(true);
+    }
   }, []);
 
   useEffect(() => { loadData(month); }, [month, loadData]);
@@ -155,6 +160,13 @@ export default function FinanceDashboard() {
     <div>
       <PageHeader title={t('coinify.title')} subtitle={t('coinify.subtitle')} />
 
+      {loadError && (
+        <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
+          <p style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>
+          <button className="rpg-button" onClick={() => loadData(month)}>{t('common.tryAgain')}</button>
+        </div>
+      )}
+
       {/* Dollar rates */}
       {dollarRates.length > 0 && (
         <div className="rpg-card" style={{ marginBottom: 16 }}>
@@ -225,11 +237,13 @@ export default function FinanceDashboard() {
 
       {/* Month selector with arrows */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <button className="rpg-button" onClick={prevMonth} style={{ padding: '4px 8px' }}>
+        <button className="rpg-button" onClick={prevMonth} style={{ padding: '4px 8px' }}
+          aria-label="Previous month">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
         </button>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="rpg-input" />
-        <button className="rpg-button" onClick={nextMonth} style={{ padding: '4px 8px' }}>
+        <button className="rpg-button" onClick={nextMonth} style={{ padding: '4px 8px' }}
+          aria-label="Next month">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 1l4 4-4 4"/></svg>
         </button>
       </div>
@@ -377,6 +391,7 @@ export default function FinanceDashboard() {
                         <button
                           onClick={() => setConfirmDeleteTxId(tx.id)}
                           style={{ background: 'none', border: 'none', color: 'var(--rpg-hp-red-light)', cursor: 'pointer', fontSize: '0.85rem' }}
+                          aria-label={t('coinify.deleteConfirm')}
                         >
                           x
                         </button>

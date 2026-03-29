@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Loading from '../../../shared/components/Loading';
 
 export default function FinanceDashboardWidget() {
+  const { t } = useTranslation();
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [activeLoans, setActiveLoans] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -14,10 +17,11 @@ export default function FinanceDashboardWidget() {
       setMonthlyTotal(total);
       setActiveLoans(loans);
       setLoading(false);
-    }).catch(console.error);
+    }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
   if (loading) return <Loading size="sm" />;
+  if (loadError) return <p style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>;
 
   return (
     <div>

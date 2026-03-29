@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react';
+import { useState, useRef, useCallback, type ReactNode } from 'react';
 
 interface Props {
   text: string;
@@ -6,22 +6,33 @@ interface Props {
 }
 
 export default function Tooltip({ text, children }: Props) {
-  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  const handleEnter = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const firstChild = el.firstElementChild as HTMLElement | null;
+    const rect = firstChild?.getBoundingClientRect() ?? el.getBoundingClientRect();
+    setPos({
+      left: rect.right + 8,
+      top: rect.top + rect.height / 2,
+    });
+  }, []);
 
   return (
     <div
       ref={ref}
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-      style={{ position: 'relative', display: 'contents' }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setPos(null)}
+      style={{ display: 'contents' }}
     >
       {children}
-      {show && (
+      {pos && (
         <div style={{
           position: 'fixed',
-          left: (ref.current?.getBoundingClientRect().right ?? 0) + 8,
-          top: (ref.current?.getBoundingClientRect().top ?? 0) + (ref.current?.getBoundingClientRect().height ?? 0) / 2,
+          left: pos.left,
+          top: pos.top,
           transform: 'translateY(-50%)',
           background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
           border: '1px solid var(--rpg-gold-dark)',

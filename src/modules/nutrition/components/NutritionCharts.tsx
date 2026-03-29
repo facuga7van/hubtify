@@ -14,8 +14,10 @@ export default function NutritionCharts() {
   const [summaries, setSummaries] = useState<DailySummary[]>([]);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [streak, setStreak] = useState(0);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
+    setLoadError(false);
     const end = todayDateString();
     const start = new Date();
     start.setDate(start.getDate() - 30);
@@ -29,8 +31,10 @@ export default function NutritionCharts() {
       setSummaries(sums as DailySummary[]);
       setWeights(wts as WeightEntry[]);
       setStreak(str);
-    });
-  }, []);
+    }).catch(() => setLoadError(true));
+  };
+
+  useEffect(() => { load(); }, []);
 
   const chartData = summaries.map((s) => ({
     date: s.date.slice(5), // MM-DD
@@ -108,7 +112,14 @@ export default function NutritionCharts() {
         </div>
       )}
 
-      {chartData.length === 0 && (
+      {loadError && (
+        <div className="rpg-card" style={{ textAlign: 'center', padding: 24 }}>
+          <p style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>
+          <button className="rpg-button" onClick={load}>{t('common.tryAgain')}</button>
+        </div>
+      )}
+
+      {!loadError && chartData.length === 0 && (
         <div className="rpg-card">
           <p style={{ opacity: 0.5, fontStyle: 'italic', textAlign: 'center', padding: 24 }}>
             {t('nutrify.startLogging')}

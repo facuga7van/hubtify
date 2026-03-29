@@ -7,6 +7,8 @@ export interface NutritionProfile {
   deficitTargetKcal: number;
   gymCalories: number;
   stepCaloriesFactor: number;
+  dateOfBirth: string;
+  weightCheckDay: number;
 }
 
 export interface FoodLogEntry {

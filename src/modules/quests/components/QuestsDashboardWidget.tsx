@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import Loading from '../../../shared/components/Loading';
 
 export default function QuestsDashboardWidget() {
+  const { t } = useTranslation();
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadCounts = useCallback(() => {
     Promise.all([
@@ -14,7 +17,7 @@ export default function QuestsDashboardWidget() {
       setPendingCount(p);
       setCompletedToday(c);
       setLoading(false);
-    }).catch(console.error);
+    }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
   useEffect(() => { loadCounts(); }, [loadCounts]);
@@ -26,6 +29,7 @@ export default function QuestsDashboardWidget() {
   }, [loadCounts]);
 
   if (loading) return <Loading size="sm" />;
+  if (loadError) return <p style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>;
 
   return (
     <div>

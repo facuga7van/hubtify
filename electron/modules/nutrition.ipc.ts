@@ -1,30 +1,9 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 
-// import { getOllamaStatus, isOllamaAvailable } from './nutrition/ollama';
-import { seedFoodDatabase } from './nutrition/food-db-seed';
 import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob } from '../../shared/date-utils';
 
-/** Seed the food_database table if it's empty or missing entries */
-export function seedFoodDatabaseIfEmpty(): void {
-  const db = getDb();
-  // Ensure table exists
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS food_database (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      keywords TEXT NOT NULL,
-      calories REAL NOT NULL,
-      serving_size TEXT NOT NULL,
-      category TEXT NOT NULL
-    )
-  `);
-  seedFoodDatabase(db);
-}
-
 export function registerNutritionIpcHandlers(): void {
-  // Seed food database on startup
-  seedFoodDatabaseIfEmpty();
   // ── Profile ────────────────────────────────────────
 
   ipcHandle('nutrition:getProfile', () => {
@@ -50,7 +29,7 @@ export function registerNutritionIpcHandlers(): void {
     if (isNaN(dobDate.getTime()) || dobDate > new Date() || dobDate.getFullYear() < 1900) throw new Error('Invalid date of birth');
     if (!Number.isFinite(profile.heightCm) || profile.heightCm < 50 || profile.heightCm > 250) throw new Error('Invalid height: must be between 50 and 250 cm');
     if (!Number.isFinite(profile.initialWeightKg) || profile.initialWeightKg < 10 || profile.initialWeightKg > 500) throw new Error('Invalid weight: must be between 10 and 500 kg');
-    if (profile.deficitTargetKcal !== undefined && (!Number.isFinite(profile.deficitTargetKcal) || profile.deficitTargetKcal < 0 || profile.deficitTargetKcal > 2000)) throw new Error('Invalid deficit target: must be between 0 and 2000 kcal');
+    if (profile.deficitTargetKcal !== undefined && (!Number.isFinite(profile.deficitTargetKcal) || Math.abs(profile.deficitTargetKcal) > 2000)) throw new Error('Invalid deficit/surplus target: must be between -2000 and 2000 kcal');
     const age = getAgeFromDob(profile.dateOfBirth);
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const db = getDb();
@@ -246,37 +225,6 @@ export function registerNutritionIpcHandlers(): void {
     const today = todayDateString();
     const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
     return row.total;
-  });
-
-  ipcHandle('nutrition:learnFood', (_e, entry: { description: string; calories: number; breakdown?: string }) => {
-    const db = getDb();
-    const name = entry.description.trim();
-    if (!name) return;
-
-    try {
-      // Extract quantity to store per-unit calories
-      const qtyMatch = name.match(/^(\d+)\s*/);
-      const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-      const caloriesPerUnit = Math.round(entry.calories / qty);
-
-      // Normalize keywords for search
-      const keywords = name.toLowerCase().replace(/[^a-záéíóúñü0-9\s]/g, '').trim();
-
-      // Check if already exists
-      const existing = db.prepare('SELECT id, calories FROM food_database WHERE keywords = ?').get(keywords) as { id: number; calories: number } | undefined;
-      if (existing) {
-        // Update calories (average with existing)
-        const avg = Math.round((existing.calories + caloriesPerUnit) / 2);
-        db.prepare('UPDATE food_database SET calories = ? WHERE keywords = ?')
-          .run(avg, keywords);
-      } else {
-        db.prepare('INSERT INTO food_database (name, keywords, calories, serving_size, category) VALUES (?, ?, ?, ?, ?)')
-          .run(name, keywords, caloriesPerUnit, 'porcion', 'aprendido');
-      }
-    } catch (err) {
-      // Silent catch — learning failures should not break the UI
-      console.error('[nutrition:learnFood]', err);
-    }
   });
 
   ipcHandle('nutrition:getTodayTarget', () => {
