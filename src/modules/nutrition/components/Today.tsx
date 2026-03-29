@@ -9,7 +9,6 @@ import { todayDateString, formatDateString } from '../../../../shared/date-utils
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
-import { useAuthContext } from '../../../shared/AuthContext';
 import type { NutritionProfile } from '../types';
 
 interface FoodEntry {
@@ -29,8 +28,6 @@ interface EstimationResult {
 
 export default function Today() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuthContext();
-
   const { t } = useTranslation();
   const [date, setDate] = useState(() => todayDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
@@ -161,15 +158,6 @@ export default function Today() {
       aiBreakdown: JSON.stringify(estimation.items),
     });
 
-    // Telemetry: upsert items to Firestore (fire-and-forget, only if logged in)
-    if (authUser) {
-      const ratio = estimation.totalCalories > 0 ? calories / estimation.totalCalories : 1;
-      const scaledItems = estimation.items.map(it => ({
-        name: it.name,
-        calories: Math.round(it.calories * ratio),
-      }));
-    }
-
     await window.api.processRpgEvent({
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
@@ -233,9 +221,14 @@ export default function Today() {
     }).catch(console.error);
   }, [date]);
 
+  const [weightError, setWeightError] = useState('');
   const handleWeightSave = async () => {
     const kg = parseFloat(weightInput);
-    if (!isFinite(kg) || kg < 30 || kg > 300) return;
+    if (!isFinite(kg) || kg < 30 || kg > 300) {
+      setWeightError(t('nutrify.weightCheckin.invalid'));
+      return;
+    }
+    setWeightError('');
     await window.api.nutritionSaveWeeklyMetrics({ weightKg: kg });
     setWeightPopup({ show: false });
   };
@@ -321,7 +314,9 @@ export default function Today() {
           {t('nutrify.today')}
         </button>
         <h3 style={{ flex: 1, textAlign: 'center' }}>{date}</h3>
-        <button className="rpg-button" onClick={() => goDay(1)} style={{ padding: '6px 10px' }}
+        <button className="rpg-button" onClick={() => goDay(1)}
+          disabled={date >= todayDateString()}
+          style={{ padding: '6px 10px', opacity: date >= todayDateString() ? 0.3 : 1 }}
           aria-label="Next day">
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10 1l5 5-5 5M15 6H1"/>
@@ -506,6 +501,9 @@ export default function Today() {
               autoFocus
               style={{ marginBottom: 16 }}
             />
+            {weightError && (
+              <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.8rem', marginBottom: 8 }}>{weightError}</p>
+            )}
             <button className="rpg-button" onClick={handleWeightSave} style={{ width: '100%', marginBottom: 8 }}>
               {t('nutrify.weightCheckin.save')}
             </button>

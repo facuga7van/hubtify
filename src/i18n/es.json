@@ -167,7 +167,8 @@
       "lastWeight": "Último peso registrado: {{weight}} kg",
       "placeholder": "Tu peso actual (kg)",
       "save": "Guardar",
-      "later": "Ahora no"
+      "later": "Ahora no",
+      "invalid": "Ingresá un peso válido (30-300 kg)"
     },
     "weightCheckDay": "Día de pesaje semanal",
     "weekdays": {

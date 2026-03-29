@@ -167,7 +167,8 @@
       "lastWeight": "Last recorded weight: {{weight}} kg",
       "placeholder": "Your current weight (kg)",
       "save": "Save",
-      "later": "Not now"
+      "later": "Not now",
+      "invalid": "Enter a valid weight (30-300 kg)"
     },
     "weightCheckDay": "Weekly weigh-in day",
     "weekdays": {

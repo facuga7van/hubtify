@@ -15,6 +15,8 @@ export default function NutritionSettings() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); };
@@ -53,18 +55,27 @@ export default function NutritionSettings() {
   }, []);
 
   const handleSave = async () => {
-    const deficitTargetKcal = goal === 'deficit' ? goalAmount
-      : goal === 'surplus' ? -goalAmount
-      : 0;
+    if (saving) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const deficitTargetKcal = goal === 'deficit' ? goalAmount
+        : goal === 'surplus' ? -goalAmount
+        : 0;
 
-    await window.api.nutritionSaveProfile({
-      dateOfBirth, weightCheckDay, sex, heightCm: height, initialWeightKg: weight,
-      activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
-    });
-    setSaved(true);
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
-    window.dispatchEvent(new Event('nutrition:settingsChanged'));
+      await window.api.nutritionSaveProfile({
+        dateOfBirth, weightCheckDay, sex, heightCm: height, initialWeightKg: weight,
+        activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
+      });
+      setSaved(true);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
+      window.dispatchEvent(new Event('nutrition:settingsChanged'));
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : t('common.somethingWentWrong'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
@@ -169,8 +180,12 @@ export default function NutritionSettings() {
       </div>
 
       {/* Save */}
-      <button className="rpg-button" onClick={handleSave} style={{ width: '100%', padding: '10px', fontSize: '1rem' }}>
-        {saved ? '✓ ' + t('nutrify.saved') : t('nutrify.saveProfile')}
+      {saveError && (
+        <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', marginBottom: 8 }}>{saveError}</p>
+      )}
+      <button className="rpg-button" onClick={handleSave} disabled={saving}
+        style={{ width: '100%', padding: '10px', fontSize: '1rem' }}>
+        {saving ? t('common.loading') : saved ? '✓ ' + t('nutrify.saved') : t('nutrify.saveProfile')}
       </button>
     </div>
   );

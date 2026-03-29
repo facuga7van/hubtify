@@ -22,17 +22,28 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   const [goalAmount, setGoalAmount] = useState(500);
   const [gymCalories, setGymCalories] = useState(300);
   const [stepFactor, setStepFactor] = useState(0.04);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    const deficitTargetKcal = goal === 'deficit' ? goalAmount
-      : goal === 'surplus' ? -goalAmount
-      : 0;
+    if (submitting) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const deficitTargetKcal = goal === 'deficit' ? goalAmount
+        : goal === 'surplus' ? -goalAmount
+        : 0;
 
-    await window.api.nutritionSaveProfile({
-      dateOfBirth, sex, heightCm: height, initialWeightKg: weight,
-      activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
-    });
-    onComplete();
+      await window.api.nutritionSaveProfile({
+        dateOfBirth, sex, heightCm: height, initialWeightKg: weight,
+        activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
+      });
+      onComplete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.somethingWentWrong'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.9rem' };
@@ -125,12 +136,15 @@ export default function NutritionOnboarding({ onComplete }: Props) {
             <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('nutrify.stepFactorHint')}</span>
           </label>
 
+          {error && (
+            <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', margin: 0 }}>{error}</p>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button className="rpg-button" onClick={() => setStep(0)} style={{ opacity: 0.7 }}>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
             </button>
-            <button className="rpg-button" onClick={handleSubmit} style={{ flex: 1 }}>
-              {t('nutrify.startTracking')}
+            <button className="rpg-button" onClick={handleSubmit} disabled={submitting} style={{ flex: 1 }}>
+              {submitting ? t('common.loading') : t('nutrify.startTracking')}
             </button>
           </div>
         </div>

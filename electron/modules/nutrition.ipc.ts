@@ -257,9 +257,15 @@ export function registerNutritionIpcHandlers(): void {
       // Get metrics
       const metrics = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
 
-      // Check if weight logged this week
-      const monday = getMondayOfWeek(date);
-      const weightLogged = db.prepare('SELECT 1 FROM nutrition_weekly_metrics WHERE date = ? AND weight_kg IS NOT NULL').get(monday);
+      // Check if weight logged this week (using configured check day)
+      const weightCheckDay = (profile.weight_check_day as number) ?? 1; // 1=Mon, 7=Sun
+      const d = new Date(date + 'T12:00:00');
+      const currentDow = d.getDay() || 7; // Convert Sun=0 to 7
+      const diff = currentDow >= weightCheckDay ? currentDow - weightCheckDay : 7 - (weightCheckDay - currentDow);
+      const checkDate = new Date(d);
+      checkDate.setDate(checkDate.getDate() - diff);
+      const checkDateStr = formatDateString(checkDate);
+      const weightLogged = db.prepare('SELECT 1 FROM nutrition_weekly_metrics WHERE date = ? AND weight_kg IS NOT NULL').get(checkDateStr);
 
       const consumed = summary.total_calories_in as number;
       const tdee = summary.tdee as number;
