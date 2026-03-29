@@ -136,6 +136,28 @@ app.whenReady().then(() => {
   runModuleMigrations(financeMigrations);
   runModuleMigrations(characterMigrations);
 
+  // Auto-generate recurring transactions for current month
+  try {
+    const db = getDb();
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const activeRecurrings = db.prepare('SELECT * FROM finance_recurring WHERE active = 1').all() as Array<Record<string, unknown>>;
+    for (const rec of activeRecurrings) {
+      const existing = db.prepare(
+        "SELECT COUNT(*) as count FROM finance_transactions WHERE source = 'recurring' AND recurring_id = ? AND date LIKE ?"
+      ).get(rec.id, `${currentMonth}%`) as { count: number };
+
+      if (existing.count === 0) {
+        const id = require('crypto').randomUUID();
+        db.prepare(`INSERT INTO finance_transactions
+          (id, type, amount, currency, category, description, date, payment_method, source, recurring_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', ?, datetime('now'), datetime('now'))`)
+          .run(id, rec.type, rec.amount, rec.currency ?? 'ARS', rec.category ?? 'Outros', rec.name, `${currentMonth}-01`, rec.id);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to generate recurring transactions:', e);
+  }
+
   createTray();
   createWindow();
 

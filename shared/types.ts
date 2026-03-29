@@ -44,6 +44,19 @@ export interface Migration {
   up: string;
 }
 
+// ── Finance Import Types ────────────────────────────────────
+
+export interface ParsedRow {
+  date: string;
+  merchant: string;
+  installmentCurrent?: number;
+  installmentTotal?: number;
+  amountARS?: number;
+  amountUSD?: number;
+  isExcluded: boolean;
+  suggestedCategory: string;
+}
+
 // ── API Types ──────────────────────────────────────────────
 
 export interface HubtifyApi {
@@ -142,9 +155,13 @@ export interface HubtifyApi {
   financeGetTransactions: (month: string) => Promise<unknown[]>;
   financeAddTransaction: (tx: Record<string, unknown>) => Promise<string>;
   financeDeleteTransaction: (id: string) => Promise<void>;
-  financeGetLoans: () => Promise<unknown[]>;
+  financeGetLoans: (filter?: Record<string, unknown>) => Promise<unknown[]>;
+  financeGetLoansByPerson: (name: string) => Promise<unknown[]>;
   financeAddLoan: (loan: Record<string, unknown>) => Promise<string>;
   financeSettleLoan: (id: string) => Promise<void>;
+  financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => Promise<string>;
+  financeGetLoanPayments: (loanId: string) => Promise<unknown[]>;
+  financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => Promise<string>;
   financeGetIncomeSources: () => Promise<unknown[]>;
   financeAddIncomeSource: (src: Record<string, unknown>) => Promise<string>;
   financeToggleIncomeSource: (id: string) => Promise<void>;
@@ -154,6 +171,10 @@ export interface HubtifyApi {
   financeGetMonthlyBalance: (month?: string) => Promise<{ expenses: number; income: number; balance: number }>;
   financeGetCategoryBreakdown: (month?: string) => Promise<Array<{ category: string; total: number }>>;
   financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => Promise<void>;
+  financeGetInstallmentsForMonth: (month: string) => Promise<unknown[]>;
+  financeGetInstallmentProjection: (months: number) => Promise<Array<{ month: string; total: number }>>;
+  financeImportParsePDF: (filePath: string) => Promise<ParsedRow[]>;
+  financeImportConfirm: (rows: ParsedRow[], statementMonth: string, fileName: string) => Promise<{ count: number }>;
 
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;

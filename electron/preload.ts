@@ -92,22 +92,53 @@ const api = {
   // Dollar
   dollarGetRates: () => ipcRenderer.invoke('dollar:getRates'),
 
-  // Finance
-  financeGetTransactions: (month: string) => ipcRenderer.invoke('finance:getTransactions', month),
+  // Finance - Transactions
+  financeGetTransactions: (filters: Record<string, unknown>) => ipcRenderer.invoke('finance:getTransactions', filters),
   financeAddTransaction: (tx: Record<string, unknown>) => ipcRenderer.invoke('finance:addTransaction', tx),
+  financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => ipcRenderer.invoke('finance:updateTransaction', id, fields),
   financeDeleteTransaction: (id: string) => ipcRenderer.invoke('finance:deleteTransaction', id),
-  financeGetLoans: () => ipcRenderer.invoke('finance:getLoans'),
+
+  // Finance - Installments
+  financeGetInstallmentGroups: () => ipcRenderer.invoke('finance:getInstallmentGroups'),
+  financeGetInstallmentsForMonth: (month: string) => ipcRenderer.invoke('finance:getInstallmentsForMonth', month),
+  financeGetInstallmentProjection: (months: number) => ipcRenderer.invoke('finance:getInstallmentProjection', months),
+  financeCreateInstallmentGroup: (group: Record<string, unknown>) => ipcRenderer.invoke('finance:createInstallmentGroup', group),
+  financeDeleteInstallmentGroup: (id: string) => ipcRenderer.invoke('finance:deleteInstallmentGroup', id),
+
+  // Finance - Loans
+  financeGetLoans: (filter?: Record<string, unknown>) => ipcRenderer.invoke('finance:getLoans', filter),
+  financeGetLoansByPerson: (name: string) => ipcRenderer.invoke('finance:getLoansByPerson', name),
   financeAddLoan: (loan: Record<string, unknown>) => ipcRenderer.invoke('finance:addLoan', loan),
   financeSettleLoan: (id: string) => ipcRenderer.invoke('finance:settleLoan', id),
-  financeGetIncomeSources: () => ipcRenderer.invoke('finance:getIncomeSources'),
-  financeAddIncomeSource: (src: Record<string, unknown>) => ipcRenderer.invoke('finance:addIncomeSource', src),
-  financeToggleIncomeSource: (id: string) => ipcRenderer.invoke('finance:toggleIncomeSource', id),
-  financeGetCategories: () => ipcRenderer.invoke('finance:getCategories'),
-  financeGetMonthlyTotal: () => ipcRenderer.invoke('finance:getMonthlyTotal'),
-  financeGetActiveLoansCount: () => ipcRenderer.invoke('finance:getActiveLoansCount'),
+  financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => ipcRenderer.invoke('finance:addLoanPayment', loanId, payment),
+  financeGetLoanPayments: (loanId: string) => ipcRenderer.invoke('finance:getLoanPayments', loanId),
+  financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => ipcRenderer.invoke('finance:createThirdPartyPurchase', data),
+  financeGetActiveLoanSummary: () => ipcRenderer.invoke('finance:getActiveLoanSummary'),
+
+  // Finance - Recurring
+  financeGetRecurring: () => ipcRenderer.invoke('finance:getRecurring'),
+  financeAddRecurring: (rec: Record<string, unknown>) => ipcRenderer.invoke('finance:addRecurring', rec),
+  financeUpdateRecurringAmount: (id: string, newAmount: number) => ipcRenderer.invoke('finance:updateRecurringAmount', id, newAmount),
+  financeToggleRecurring: (id: string) => ipcRenderer.invoke('finance:toggleRecurring', id),
+  financeDeleteRecurring: (id: string) => ipcRenderer.invoke('finance:deleteRecurring', id),
+  financeGenerateRecurringForMonth: (month: string) => ipcRenderer.invoke('finance:generateRecurringForMonth', month),
+  financeGetRecurringAmountHistory: (id: string) => ipcRenderer.invoke('finance:getRecurringAmountHistory', id),
+
+  // Finance - Import
+  financeImportParsePDF: (filePath: string) => ipcRenderer.invoke('finance:importParsePDF', filePath),
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName),
+  financeGetCategoryMappings: () => ipcRenderer.invoke('finance:getCategoryMappings'),
+  financeUpdateCategoryMapping: (pattern: string, category: string) => ipcRenderer.invoke('finance:updateCategoryMapping', pattern, category),
+
+  // Finance - Dashboard
   financeGetMonthlyBalance: (month?: string) => ipcRenderer.invoke('finance:getMonthlyBalance', month),
   financeGetCategoryBreakdown: (month?: string) => ipcRenderer.invoke('finance:getCategoryBreakdown', month),
-  financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => ipcRenderer.invoke('finance:updateTransaction', id, fields),
+  financeGetProjection: (months: number) => ipcRenderer.invoke('finance:getProjection', months),
+
+  // Finance - Backward compat
+  financeGetMonthlyTotal: () => ipcRenderer.invoke('finance:getMonthlyTotal'),
+  financeGetActiveLoansCount: () => ipcRenderer.invoke('finance:getActiveLoansCount'),
+  financeGetCategories: () => ipcRenderer.invoke('finance:getCategories'),
 
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),

@@ -45,7 +45,7 @@ const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boo
   { path: '/', key: 'nav.home', icon: 'home' },
   { path: '/quests', key: 'nav.questify', icon: 'sword' },
   { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
-  { path: '/finance', key: 'nav.coinify', icon: 'coins', comingSoon: true },
+  { path: '/finance', key: 'nav.coinify', icon: 'coins' },
   { path: '/achievements', key: 'nav.achievements', icon: 'trophy', comingSoon: true },
   { path: '/village', key: 'nav.village', icon: 'village', comingSoon: true },
   { path: '/character', key: 'nav.character', icon: 'shield' },
