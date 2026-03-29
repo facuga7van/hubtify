@@ -26,6 +26,8 @@ export default function Layout() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   // Auto-updater
+  const [syncError, setSyncError] = useState(false);
+
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null);
   const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
@@ -127,7 +129,10 @@ export default function Layout() {
     const onFocus = async () => {
       try {
         const result = await syncPull(authUser.uid);
-        refreshStats();
+        // Update stats without triggering level-up (sync restore, not user action)
+        const freshStats = await window.api.getRpgStats();
+        if (freshStats) prevLevelRef.current = freshStats.level;
+        setStats(freshStats);
         if (result.changed) {
           window.dispatchEvent(new Event('sync:questsUpdated'));
         }
@@ -139,7 +144,7 @@ export default function Layout() {
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('focus', onFocus);
     };
-  }, [authUser, refreshStats]);
+  }, [authUser]);
 
   // Enable reminders if previously set
   useEffect(() => {
@@ -148,21 +153,32 @@ export default function Layout() {
     }
   }, []);
 
-  // Initial sync on mount — pull latest data if logged in
-  useEffect(() => {
+  const retrySyncPull = useCallback(async () => {
     if (!authUser) return;
-    (async () => {
-      try {
-        const result = await syncPull(authUser.uid);
-        refreshStats();
-        if (result.changed) {
-          window.dispatchEvent(new Event('sync:questsUpdated'));
-        }
-      } catch {
-        // Silent fail
+    setSyncError(false);
+    try {
+      const lastUid = await window.api.syncGetCurrentUser();
+      if (lastUid && lastUid !== authUser.uid) {
+        await window.api.syncClearUserData();
       }
-    })();
-  }, [authUser, refreshStats]);
+      await window.api.syncSetCurrentUser(authUser.uid);
+      const result = await syncPull(authUser.uid);
+      // Refresh stats after sync but skip level-up detection
+      // (sync restores cloud data, not a real level-up action)
+      const freshStats = await window.api.getRpgStats();
+      if (freshStats) prevLevelRef.current = freshStats.level;
+      setStats(freshStats);
+      if (result.changed) {
+        window.dispatchEvent(new Event('sync:questsUpdated'));
+      }
+    } catch {
+      setSyncError(true);
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    retrySyncPull();
+  }, [retrySyncPull]);
 
   const levelUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -193,6 +209,20 @@ export default function Layout() {
           </button>
         </div>
         <main className="main-content">
+          {syncError && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+              padding: '10px 16px', background: 'rgba(248, 113, 113, 0.15)',
+              border: '1px solid rgba(248, 113, 113, 0.3)', borderRadius: 'var(--rpg-radius)',
+              margin: '8px 16px 0', color: '#f87171', fontSize: '0.85rem',
+            }}>
+              <span>{t('auth.syncPullFailed')}</span>
+              <button className="rpg-button" onClick={retrySyncPull}
+                style={{ padding: '4px 12px', fontSize: '0.8rem', flexShrink: 0 }}>
+                {t('auth.syncRetry')}
+              </button>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>
