@@ -16,15 +16,45 @@ import NutritionCharts from './modules/nutrition/components/NutritionCharts';
 import NutritionSettings from './modules/nutrition/components/NutritionSettings';
 import { financeModule } from './modules/finance';
 import FinanceDashboard from './modules/finance/components/FinanceDashboard';
+import { useAuthContext } from './shared/AuthContext';
 
 function AuthPageWrapper() {
   const navigate = useNavigate();
   return <AuthPage onAuth={() => navigate('/')} />;
 }
 
+function AddAccountPageWrapper() {
+  const navigate = useNavigate();
+  return <AuthPage mode="addAccount" onAuth={() => navigate('/')} onBack={() => navigate(-1)} />;
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuthContext();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('hubtify_onboarded') === 'true');
+  const { user, loading } = useAuthContext();
 
+  // Show loading while Firebase checks auth state
+  if (loading) return null;
+
+  // Auth gate: must be logged in first
+  if (!user) {
+    return (
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/login" element={<AuthPageWrapper />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </ErrorBoundary>
+    );
+  }
+
+  // Onboarding gate: must complete onboarding after first login
   if (!onboarded) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
@@ -32,7 +62,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/login" element={<AuthPageWrapper />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/login/add" element={<AddAccountPageWrapper />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/character" element={<CharacterPage />} />
