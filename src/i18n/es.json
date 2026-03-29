@@ -249,12 +249,15 @@
     "createAccount": "Crear Cuenta",
     "noAccount": "No tienes cuenta? Registrate",
     "hasAccount": "Ya tienes cuenta? Inicia sesion",
-    "continueOffline": "Continuar sin conexion",
-    "loginForSync": "Login para sincronizar",
+    "addAccount": "Agregar cuenta",
+    "addAccountDesc": "Iniciá sesión para agregar otra cuenta",
+    "sessionExpired": "Sesión expirada para {email}. Iniciá sesión de nuevo.",
     "logout": "Salir",
     "sync": "Sincronizar",
     "synced": "Sincronizado!",
     "syncFailed": "Sincronizacion fallida",
+    "syncRetry": "Reintentar",
+    "syncPullFailed": "No se pudieron cargar tus datos. Revisá tu conexión y reintentá.",
     "loginRequired": "Login requerido para sincronizar",
     "errors": {
       "invalidEmail": "Ingresá un correo electrónico válido",
@@ -344,8 +347,6 @@
     "register": "Crear Cuenta",
     "noAccount": "No tenes cuenta? Registrate",
     "hasAccount": "Ya tenes cuenta? Inicia sesion",
-    "continueOffline": "Continuar sin cuenta",
-    "offlineWarning": "Tus datos se guardaran solo en este dispositivo",
     "passwordMin": "La contrasena debe tener al menos 6 caracteres",
     "connectionError": "Error de conexion"
   },
@@ -391,5 +392,10 @@
     "downloading": "Descargando... {{percent}}%",
     "downloadUpdate": "Descargar",
     "installAndRestart": "Instalar y reiniciar"
+  },
+  "account": {
+    "addAccount": "Agregar cuenta",
+    "signOut": "Cerrar sesión",
+    "cached": "Cuentas guardadas"
   }
 }

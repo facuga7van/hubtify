@@ -249,12 +249,15 @@
     "createAccount": "Create Account",
     "noAccount": "Don't have an account? Register",
     "hasAccount": "Already have an account? Login",
-    "continueOffline": "Continue offline",
-    "loginForSync": "Login for cloud sync",
+    "addAccount": "Add Account",
+    "addAccountDesc": "Log in to add another account",
+    "sessionExpired": "Session expired for {email}. Please log in again.",
     "logout": "Logout",
     "sync": "Sync",
     "synced": "Synced!",
     "syncFailed": "Sync failed",
+    "syncRetry": "Retry",
+    "syncPullFailed": "Could not load your data. Check your connection and retry.",
     "loginRequired": "Login required to sync",
     "errors": {
       "invalidEmail": "Please enter a valid email address",
@@ -344,8 +347,6 @@
     "register": "Create Account",
     "noAccount": "Don't have an account? Register",
     "hasAccount": "Already have an account? Login",
-    "continueOffline": "Continue without account",
-    "offlineWarning": "Your data will only be saved on this device",
     "passwordMin": "Password must be at least 6 characters",
     "connectionError": "Connection error"
   },
@@ -390,5 +391,10 @@
     "downloading": "Downloading... {{percent}}%",
     "downloadUpdate": "Download",
     "installAndRestart": "Install and restart"
+  },
+  "account": {
+    "addAccount": "Add account",
+    "signOut": "Sign out",
+    "cached": "Saved accounts"
   }
 }
