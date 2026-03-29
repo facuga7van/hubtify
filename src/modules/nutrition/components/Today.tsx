@@ -211,9 +211,9 @@ export default function Today() {
     return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
   }, []);
 
-  // Weight check-in: only when viewing today
+  // Weight check-in: only when viewing today, re-check after sync restores profile
   useEffect(() => {
-    if (date !== todayDateString()) return;
+    if (!hasProfile || date !== todayDateString()) return;
     const dismissed = localStorage.getItem('hubtify_weight_dismiss_date');
     if (dismissed === todayDateString()) return;
     window.api.nutritionShouldAskWeight().then(result => {
@@ -222,7 +222,7 @@ export default function Today() {
         if (result.lastWeight) setWeightInput(String(result.lastWeight));
       }
     }).catch(console.error);
-  }, [date]);
+  }, [date, hasProfile]);
 
   const [weightError, setWeightError] = useState('');
   const handleWeightSave = async () => {
