@@ -16,7 +16,7 @@ import NutritionCharts from './modules/nutrition/components/NutritionCharts';
 import NutritionSettings from './modules/nutrition/components/NutritionSettings';
 import { financeModule } from './modules/finance';
 import FinanceLayout from './modules/finance/components/FinanceLayout';
-import Dashboard from './modules/finance/components/Dashboard';
+import FinanceDashboard from './modules/finance/components/Dashboard';
 import Transactions from './modules/finance/components/Transactions';
 import Installments from './modules/finance/components/Installments';
 import Loans from './modules/finance/components/Loans';
@@ -71,7 +71,7 @@ export default function App() {
           <Route path="/nutrition/dashboard" element={<NutritionCharts />} />
           <Route path="/nutrition/settings" element={<NutritionSettings />} />
           <Route path="/finance" element={<FinanceLayout />}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<FinanceDashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="installments" element={<Installments />} />
             <Route path="loans" element={<Loans />} />
