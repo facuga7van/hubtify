@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Character from './Character';
 import TitleBar from '../shared/components/TitleBar';
-import { useAuthContext } from '../shared/AuthContext';
 
 interface Props {
   onComplete: () => void;
@@ -10,13 +9,7 @@ interface Props {
 
 export default function Onboarding({ onComplete }: Props) {
   const { t, i18n } = useTranslation();
-  const { login, register } = useAuthContext();
   const [step, setStep] = useState(0);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLogin, setIsLogin] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
   const [animDir, setAnimDir] = useState<'forward' | 'back'>('forward');
 
   const finishOnboarding = () => {
@@ -32,30 +25,6 @@ export default function Onboarding({ onComplete }: Props) {
   const setLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
     localStorage.setItem('hubtify_lang', lang);
-  };
-
-  const handleAuth = async () => {
-    if (!email.trim() || !password.trim()) return;
-    if (password.length < 6) {
-      setAuthError(t('onboarding.passwordMin'));
-      return;
-    }
-    setAuthError('');
-    setAuthLoading(true);
-    try {
-      const result = isLogin
-        ? await login(email, password)
-        : await register(email, password);
-      if (result.success) {
-        finishOnboarding();
-      } else {
-        setAuthError(result.error ?? 'Error');
-      }
-    } catch {
-      setAuthError(t('onboarding.connectionError'));
-    } finally {
-      setAuthLoading(false);
-    }
   };
 
   const animClass = animDir === 'forward' ? 'onboarding-step-forward' : 'onboarding-step-back';
@@ -140,60 +109,10 @@ export default function Onboarding({ onComplete }: Props) {
                 style={{ padding: '8px 20px', opacity: 0.7 }}>
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
               </button>
-              <button className="rpg-button" onClick={() => goStep(3)}
+              <button className="rpg-button" onClick={finishOnboarding}
                 style={{ padding: '10px 32px', fontSize: '1rem' }}>
                 {t('onboarding.continue')}
               </button>
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div key="auth" className={animClass} style={{ textAlign: 'center' }}>
-            <h2 style={{ marginBottom: 8 }}>
-              {isLogin ? t('onboarding.loginTitle') : t('onboarding.registerTitle')}
-            </h2>
-            <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 20 }}>
-              {t('onboarding.syncDesc')}
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280, margin: '0 auto' }}>
-              <input type="email" placeholder={t('auth.email')} value={email}
-                onChange={(e) => setEmail(e.target.value)} className="rpg-input" style={{ width: '100%' }} />
-              <input type="password" placeholder={t('auth.password')} value={password}
-                onChange={(e) => setPassword(e.target.value)} className="rpg-input" style={{ width: '100%' }}
-                onKeyDown={(e) => e.key === 'Enter' && handleAuth()} />
-
-              {authError && (
-                <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', margin: 0 }}>{authError}</p>
-              )}
-
-              <button className="rpg-button" onClick={handleAuth} disabled={authLoading}
-                style={{ width: '100%', padding: '10px', fontSize: '0.95rem' }}>
-                {authLoading ? t('common.loading') : isLogin ? t('onboarding.login') : t('onboarding.register')}
-              </button>
-
-              <button onClick={() => { setIsLogin(!isLogin); setAuthError(''); }}
-                style={{ background: 'none', border: 'none', color: 'var(--rpg-gold-dark)', cursor: 'pointer', fontSize: '0.8rem' }}>
-                {isLogin ? t('onboarding.noAccount') : t('onboarding.hasAccount')}
-              </button>
-            </div>
-
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--rpg-parchment-dark)' }}>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
-                <button className="rpg-button" onClick={() => goStep(2)}
-                  style={{ padding: '8px 20px', opacity: 0.7 }}>
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
-                </button>
-                <button onClick={finishOnboarding}
-                  style={{ background: 'none', border: 'none', color: 'var(--rpg-ink-light)', cursor: 'pointer', fontSize: '0.85rem' }}>
-                  {t('onboarding.continueOffline')} →
-                </button>
-              </div>
-              <p style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: 6 }}>
-                {t('onboarding.offlineWarning')}
-              </p>
             </div>
           </div>
         );
@@ -217,7 +136,7 @@ export default function Onboarding({ onComplete }: Props) {
 
           {/* Step indicators */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2].map((i) => (
               <div key={i} style={{
                 width: 8, height: 8, borderRadius: '50%',
                 background: i === step ? 'var(--rpg-gold)' : i < step ? 'var(--rpg-gold-dark)' : 'var(--rpg-parchment-dark)',
