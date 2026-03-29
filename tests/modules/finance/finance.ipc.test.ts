@@ -636,3 +636,285 @@ describe('installment group handlers', () => {
     expect(projection[5].month).toBe('2026-08');
   });
 });
+
+// ── helpers for loan tests ──────────────────────────────────────────────────
+
+function addLoan(
+  db: Database.Database,
+  id: string,
+  loan: {
+    personName: string;
+    direction: 'lent' | 'borrowed';
+    type?: 'single' | 'installments';
+    amount: number;
+    currency?: string;
+    date: string;
+    description?: string;
+    settled?: number;
+    installmentGroupId?: string | null;
+  },
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO finance_loans
+      (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    loan.personName,
+    loan.direction,
+    loan.type ?? 'single',
+    loan.amount,
+    loan.currency ?? 'ARS',
+    loan.date,
+    loan.description ?? '',
+    loan.settled ?? 0,
+    loan.installmentGroupId ?? null,
+    now,
+  );
+}
+
+function addLoanPayment(
+  db: Database.Database,
+  id: string,
+  payment: {
+    loanId: string;
+    amount: number;
+    currency?: string;
+    date: string;
+    note?: string;
+  },
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, note, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    payment.loanId,
+    payment.amount,
+    payment.currency ?? 'ARS',
+    payment.date,
+    payment.note ?? '',
+    now,
+  );
+}
+
+function createThirdPartyPurchase(
+  db: Database.Database,
+  data: {
+    description: string;
+    installmentCount: number;
+    installmentAmount: number;
+    currency?: string;
+    category?: string;
+    startDate: string;
+    personName: string;
+  },
+  groupId: string,
+  loanId: string,
+): void {
+  const currency = data.currency ?? 'ARS';
+  const category = data.category ?? 'Otros';
+  const totalAmount = data.installmentCount * data.installmentAmount;
+  const now = new Date().toISOString();
+
+  const trx = db.transaction(() => {
+    // 1. Create installment group
+    db.prepare(`
+      INSERT INTO finance_installment_groups
+        (id, description, total_amount, currency, total_installments, category, date, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(groupId, data.description, totalAmount, currency, data.installmentCount, category, data.startDate, now);
+
+    // 2. Generate monthly transactions
+    const [yearStr, monthStr, dayStr] = data.startDate.split('-');
+    const startYear = parseInt(yearStr, 10);
+    const startMonth = parseInt(monthStr, 10) - 1;
+    const startDay = parseInt(dayStr, 10);
+
+    for (let i = 0; i < data.installmentCount; i++) {
+      const txDate = new Date(startYear, startMonth + i, startDay);
+      const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
+      const txId = `${groupId}-tx-${i}`;
+      db.prepare(`
+        INSERT INTO finance_transactions
+          (id, type, amount, currency, category, description, date, payment_method,
+           source, installments, installment_group_id, for_third_party, recurring_id,
+           import_batch_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        txId, 'expense', data.installmentAmount, currency, category,
+        `${data.description} (Cuota ${i + 1}/${data.installmentCount})`,
+        txDateStr, 'credit_card', 'manual', data.installmentCount,
+        groupId, 1, null, null, now, now,
+      );
+    }
+
+    // 3. Create loan linked to group
+    db.prepare(`
+      INSERT INTO finance_loans
+        (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
+      VALUES (?, ?, 'lent', 'installments', ?, ?, ?, ?, 0, ?, ?)
+    `).run(loanId, data.personName, totalAmount, currency, data.startDate, data.description, groupId, now);
+  });
+
+  trx();
+}
+
+// ── loan handler tests ──────────────────────────────────────────────────────
+
+describe('loan handlers', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = setupDb();
+  });
+
+  it('creates a single-payment loan and retrieves it', () => {
+    addLoan(db, 'ln-single', {
+      personName: 'Maria',
+      direction: 'lent',
+      type: 'single',
+      amount: 10000,
+      currency: 'ARS',
+      date: '2026-03-01',
+      description: 'Prestamo personal',
+    });
+
+    const rows = db.prepare(`
+      SELECT id, person_name AS personName, direction, type, amount, currency,
+             date, description, settled, installment_group_id AS installmentGroupId,
+             settled_date AS settledDate, created_at AS createdAt
+      FROM finance_loans
+      WHERE settled = 0
+      ORDER BY settled ASC, date DESC
+    `).all() as Array<Record<string, unknown>>;
+
+    expect(rows).toHaveLength(1);
+    const loan = rows[0];
+    expect(loan.id).toBe('ln-single');
+    expect(loan.personName).toBe('Maria');
+    expect(loan.direction).toBe('lent');
+    expect(loan.type).toBe('single');
+    expect(loan.amount).toBe(10000);
+    expect(loan.settled).toBe(0);
+    // camelCase aliases must be present
+    expect(loan.personName).toBeDefined();
+    expect(loan.person_name).toBeUndefined();
+  });
+
+  it('records loan payments and computes remaining amount', () => {
+    addLoan(db, 'ln-pay', { personName: 'Carlos', direction: 'borrowed', amount: 5000, date: '2026-03-01' });
+    addLoanPayment(db, 'pay-1', { loanId: 'ln-pay', amount: 1500, date: '2026-03-10' });
+    addLoanPayment(db, 'pay-2', { loanId: 'ln-pay', amount: 2000, date: '2026-03-20' });
+
+    const payments = db.prepare(`
+      SELECT id, loan_id AS loanId, amount, date, note, created_at AS createdAt
+      FROM finance_loan_payments
+      WHERE loan_id = ?
+      ORDER BY date ASC
+    `).all('ln-pay') as Array<Record<string, unknown>>;
+
+    expect(payments).toHaveLength(2);
+    expect(payments[0].id).toBe('pay-1');
+    expect(payments[1].id).toBe('pay-2');
+
+    const totalPaid = (payments as Array<{ amount: number }>).reduce((sum, p) => sum + p.amount, 0);
+    const loan = db.prepare('SELECT amount FROM finance_loans WHERE id = ?').get('ln-pay') as { amount: number };
+    expect(loan.amount - totalPaid).toBe(1500);
+  });
+
+  it('creates third-party purchase atomically (group + transactions + loan)', () => {
+    createThirdPartyPurchase(db, {
+      description: 'iPhone para Juan',
+      installmentCount: 3,
+      installmentAmount: 50000,
+      currency: 'ARS',
+      category: 'Compras',
+      startDate: '2026-03-01',
+      personName: 'Juan',
+    }, 'grp-3p', 'ln-3p');
+
+    // Verify installment group exists
+    const group = db.prepare('SELECT * FROM finance_installment_groups WHERE id = ?').get('grp-3p') as Record<string, unknown>;
+    expect(group).toBeDefined();
+    expect(group.description).toBe('iPhone para Juan');
+    expect(group.total_amount).toBe(150000);
+    expect(group.total_installments).toBe(3);
+
+    // Verify 3 transactions exist with for_third_party=1
+    const txs = db.prepare('SELECT * FROM finance_transactions WHERE installment_group_id = ? ORDER BY date ASC').all('grp-3p') as Array<Record<string, unknown>>;
+    expect(txs).toHaveLength(3);
+    expect(txs.every((tx) => tx.for_third_party === 1)).toBe(true);
+    expect(txs[0].date).toBe('2026-03-01');
+    expect(txs[1].date).toBe('2026-04-01');
+    expect(txs[2].date).toBe('2026-05-01');
+
+    // Verify loan exists linked to group
+    const loan = db.prepare('SELECT * FROM finance_loans WHERE id = ?').get('ln-3p') as Record<string, unknown>;
+    expect(loan).toBeDefined();
+    expect(loan.person_name).toBe('Juan');
+    expect(loan.direction).toBe('lent');
+    expect(loan.type).toBe('installments');
+    expect(loan.amount).toBe(150000);
+    expect(loan.installment_group_id).toBe('grp-3p');
+    expect(loan.settled).toBe(0);
+  });
+
+  it('groups loans by person (getLoansByPerson)', () => {
+    addLoan(db, 'ln-p1a', { personName: 'Ana', direction: 'lent', amount: 3000, date: '2026-02-01' });
+    addLoan(db, 'ln-p1b', { personName: 'Ana', direction: 'lent', amount: 7000, date: '2026-03-01' });
+    addLoan(db, 'ln-p2', { personName: 'Luis', direction: 'borrowed', amount: 1000, date: '2026-03-05' });
+    // Settled loan for Ana — should not appear
+    addLoan(db, 'ln-p1c', { personName: 'Ana', direction: 'lent', amount: 500, date: '2026-01-01', settled: 1 });
+
+    const rows = db.prepare(`
+      SELECT id, person_name AS personName, direction, type, amount, settled
+      FROM finance_loans
+      WHERE person_name = ? AND settled = 0
+      ORDER BY date DESC
+    `).all('Ana') as Array<Record<string, unknown>>;
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.personName === 'Ana')).toBe(true);
+    expect(rows.map((r) => r.id)).toContain('ln-p1a');
+    expect(rows.map((r) => r.id)).toContain('ln-p1b');
+    expect(rows.map((r) => r.id)).not.toContain('ln-p1c');
+  });
+
+  it('settles a loan by setting settled=1 and settled_date', () => {
+    addLoan(db, 'ln-settle', { personName: 'Pedro', direction: 'lent', amount: 2000, date: '2026-03-01' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?`).run(today, 'ln-settle');
+
+    const loan = db.prepare('SELECT * FROM finance_loans WHERE id = ?').get('ln-settle') as Record<string, unknown>;
+    expect(loan.settled).toBe(1);
+    expect(loan.settled_date).toBe(today);
+  });
+
+  it('returns loan summary: total lent vs borrowed', () => {
+    addLoan(db, 'ls-1', { personName: 'A', direction: 'lent', amount: 10000, date: '2026-03-01' });
+    addLoan(db, 'ls-2', { personName: 'B', direction: 'lent', amount: 5000, date: '2026-03-02' });
+    addLoan(db, 'ls-3', { personName: 'C', direction: 'borrowed', amount: 3000, date: '2026-03-03' });
+    // Settled — should not be included
+    addLoan(db, 'ls-4', { personName: 'D', direction: 'lent', amount: 99999, date: '2026-03-04', settled: 1 });
+
+    const rows = db.prepare(`
+      SELECT direction, COALESCE(SUM(amount), 0) AS total
+      FROM finance_loans
+      WHERE settled = 0
+      GROUP BY direction
+    `).all() as Array<{ direction: string; total: number }>;
+
+    const summary = { lent: 0, borrowed: 0 };
+    for (const row of rows) {
+      if (row.direction === 'lent') summary.lent = row.total;
+      if (row.direction === 'borrowed') summary.borrowed = row.total;
+    }
+
+    expect(summary.lent).toBe(15000);
+    expect(summary.borrowed).toBe(3000);
+  });
+});

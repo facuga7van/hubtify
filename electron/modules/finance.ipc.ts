@@ -368,4 +368,206 @@ export function registerFinanceIpcHandlers(): void {
     db.prepare('DELETE FROM finance_transactions WHERE installment_group_id = ?').run(id);
     db.prepare('DELETE FROM finance_installment_groups WHERE id = ?').run(id);
   });
+
+  // ── Loans ────────────────────────────────────────────
+
+  ipcHandle('finance:getLoans', (_e, filter: { direction?: 'lent' | 'borrowed'; settled?: boolean } = {}) => {
+    const db = getDb();
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filter.direction !== undefined) {
+      conditions.push('direction = ?');
+      params.push(filter.direction);
+    }
+    if (filter.settled !== undefined) {
+      conditions.push('settled = ?');
+      params.push(filter.settled ? 1 : 0);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    return db.prepare(`
+      SELECT id, person_name AS personName, direction, type, amount, currency,
+             date, description, settled, installment_group_id AS installmentGroupId,
+             settled_date AS settledDate, created_at AS createdAt
+      FROM finance_loans
+      ${where}
+      ORDER BY settled ASC, date DESC
+    `).all(...params);
+  });
+
+  ipcHandle('finance:getLoansByPerson', (_e, personName: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, person_name AS personName, direction, type, amount, currency,
+             date, description, settled, installment_group_id AS installmentGroupId,
+             settled_date AS settledDate, created_at AS createdAt
+      FROM finance_loans
+      WHERE person_name = ? AND settled = 0
+      ORDER BY date DESC
+    `).all(personName);
+  });
+
+  ipcHandle('finance:addLoan', (_e, loan: {
+    personName: string;
+    direction: 'lent' | 'borrowed';
+    type?: 'single' | 'installments';
+    amount: number;
+    currency?: string;
+    date: string;
+    description?: string;
+    installmentGroupId?: string | null;
+  }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO finance_loans
+        (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    `).run(
+      id,
+      loan.personName,
+      loan.direction,
+      loan.type ?? 'single',
+      loan.amount,
+      loan.currency ?? 'ARS',
+      loan.date,
+      loan.description ?? '',
+      loan.installmentGroupId ?? null,
+      now,
+    );
+    return id;
+  });
+
+  ipcHandle('finance:settleLoan', (_e, id: string) => {
+    const db = getDb();
+    const today = new Date().toISOString().slice(0, 10);
+    db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?`).run(today, id);
+  });
+
+  ipcHandle('finance:addLoanPayment', (_e, loanId: string, payment: {
+    amount: number;
+    currency?: string;
+    date: string;
+    note?: string;
+  }) => {
+    const db = getDb();
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, note, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      loanId,
+      payment.amount,
+      payment.currency ?? 'ARS',
+      payment.date,
+      payment.note ?? '',
+      now,
+    );
+    return id;
+  });
+
+  ipcHandle('finance:getLoanPayments', (_e, loanId: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, loan_id AS loanId, amount, currency, date, note, created_at AS createdAt
+      FROM finance_loan_payments
+      WHERE loan_id = ?
+      ORDER BY date ASC
+    `).all(loanId);
+  });
+
+  ipcHandle('finance:createThirdPartyPurchase', (_e, data: {
+    description: string;
+    installmentCount: number;
+    installmentAmount: number;
+    currency?: string;
+    category?: string;
+    startDate: string;
+    personName: string;
+  }) => {
+    const db = getDb();
+    const currency = data.currency ?? 'ARS';
+    const category = data.category ?? 'Otros';
+    const totalAmount = data.installmentCount * data.installmentAmount;
+    const groupId = genId();
+    const loanId = genId();
+    const now = new Date().toISOString();
+
+    const trx = db.transaction(() => {
+      // 1. Create installment group
+      db.prepare(`
+        INSERT INTO finance_installment_groups
+          (id, description, total_amount, currency, total_installments, category, date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(groupId, data.description, totalAmount, currency, data.installmentCount, category, data.startDate, now);
+
+      // 2. Generate monthly transactions
+      const [yearStr, monthStr, dayStr] = data.startDate.split('-');
+      const startYear = parseInt(yearStr, 10);
+      const startMonth = parseInt(monthStr, 10) - 1;
+      const startDay = parseInt(dayStr, 10);
+
+      for (let i = 0; i < data.installmentCount; i++) {
+        const txDate = new Date(startYear, startMonth + i, startDay);
+        const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
+        const txId = genId();
+
+        db.prepare(`
+          INSERT INTO finance_transactions
+            (id, type, amount, currency, category, description, date, payment_method,
+             source, installments, installment_group_id, for_third_party, recurring_id,
+             import_batch_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          txId,
+          'expense',
+          data.installmentAmount,
+          currency,
+          category,
+          `${data.description} (Cuota ${i + 1}/${data.installmentCount})`,
+          txDateStr,
+          'credit_card',
+          'manual',
+          data.installmentCount,
+          groupId,
+          1,
+          null,
+          null,
+          now,
+          now,
+        );
+      }
+
+      // 3. Create loan linked to group
+      db.prepare(`
+        INSERT INTO finance_loans
+          (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
+        VALUES (?, ?, 'lent', 'installments', ?, ?, ?, ?, 0, ?, ?)
+      `).run(loanId, data.personName, totalAmount, currency, data.startDate, data.description, groupId, now);
+    });
+
+    trx();
+    return { groupId, loanId };
+  });
+
+  ipcHandle('finance:getActiveLoanSummary', () => {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT direction, COALESCE(SUM(amount), 0) AS total
+      FROM finance_loans
+      WHERE settled = 0
+      GROUP BY direction
+    `).all() as Array<{ direction: string; total: number }>;
+
+    const summary = { lent: 0, borrowed: 0 };
+    for (const row of rows) {
+      if (row.direction === 'lent') summary.lent = row.total;
+      if (row.direction === 'borrowed') summary.borrowed = row.total;
+    }
+    return summary;
+  });
 }
