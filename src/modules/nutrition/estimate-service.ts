@@ -1,14 +1,13 @@
 import { httpsCallable } from 'firebase/functions';
-import { functions, auth } from '../../shared/firebase';
+import { getActiveFunctions, getActiveAuth } from '../../shared/firebase';
 
 type AiResult = { calories: number; items: Array<{ name: string; calories: number }> };
 
-const estimateNutritionFn = httpsCallable<{ description: string }, AiResult>(functions, 'estimateNutrition');
-
 export async function estimateNutrition(description: string): Promise<AiResult> {
-  if (!auth.currentUser) {
+  if (!getActiveAuth().currentUser) {
     throw new Error('Login required to estimate nutrition');
   }
-  const result = await estimateNutritionFn({ description });
+  const fn = httpsCallable<{ description: string }, AiResult>(getActiveFunctions(), 'estimateNutrition');
+  const result = await fn({ description });
   return result.data;
 }
