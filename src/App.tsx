@@ -28,13 +28,6 @@ function AddAccountPageWrapper() {
   return <AuthPage mode="addAccount" onAuth={() => navigate('/')} onBack={() => navigate(-1)} />;
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuthContext();
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
 export default function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('hubtify_onboarded') === 'true');
   const { user, loading } = useAuthContext();
