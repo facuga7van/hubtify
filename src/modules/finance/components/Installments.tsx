@@ -35,10 +35,6 @@ function todayMonth(): string {
 }
 
 function parseInstallmentNumber(row: InstallmentRow): { current: number; total: number } {
-  // date is 'YYYY-MM-DD', startDate is in installment group — derive current number from month diff
-  // The API returns the cuota number embedded in the description or we infer from date vs group start.
-  // Since the shape only gives us `date` (the cuota's payment date) and `installments` (total count),
-  // we fall back to showing just the total count unless a cuotaNumber field is present.
   const raw = row as InstallmentRow & { installmentNumber?: number };
   const current = raw.installmentNumber ?? 1;
   return { current, total: row.installments };
@@ -140,11 +136,10 @@ export default function Installments() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '8px 0',
-                    borderBottom: '1px solid rgba(166,138,62,0.2)',
+                    borderBottom: '1px solid var(--rpg-parchment-dark)',
                     gap: 8,
                   }}
                 >
-                  {/* Left: description + cuota label */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
                       {row.description}
@@ -161,17 +156,15 @@ export default function Installments() {
                     </span>
                   </div>
 
-                  {/* Right: third-party badge + amount */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     {row.forThirdParty && (
                       <span
                         style={{
-                          fontSize: '0.72rem',
-                          padding: '2px 7px',
-                          borderRadius: 999,
-                          background: 'rgba(var(--rpg-gold-rgb, 184,144,64), 0.15)',
-                          border: '1px solid var(--rpg-gold-dark)',
-                          color: 'var(--rpg-gold)',
+                          fontSize: '0.75rem',
+                          background: 'var(--rpg-gold)',
+                          color: 'var(--rpg-ink)',
+                          padding: '1px 6px',
+                          borderRadius: 3,
                           whiteSpace: 'nowrap',
                         }}
                       >
@@ -182,7 +175,7 @@ export default function Installments() {
                       style={{
                         fontFamily: 'Fira Code, monospace',
                         fontSize: '0.9rem',
-                        color: 'var(--rpg-hp-red-light)',
+                        color: 'var(--rpg-hp-red)',
                         minWidth: 70,
                         textAlign: 'right',
                       }}
@@ -208,7 +201,7 @@ export default function Installments() {
           }}
         >
           <div className="rpg-card rpg-stat-card">
-            <div className="rpg-stat-number" style={{ color: 'var(--rpg-hp-red-light)', fontSize: '1.1rem' }}>
+            <div className="rpg-stat-number" style={{ color: 'var(--rpg-hp-red)', fontSize: '1.1rem' }}>
               {fmt(totalOwn)}
             </div>
             <div className="rpg-stat-label">
@@ -252,15 +245,15 @@ export default function Installments() {
                 }))}
                 margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(166,138,62,0.15)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--rpg-parchment-dark)" />
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: 11, fill: 'var(--rpg-ink, #2C1810)' }}
+                  tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: 'var(--rpg-ink, #2C1810)' }}
+                  tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }}
                   axisLine={false}
                   tickLine={false}
                   width={60}
@@ -268,7 +261,7 @@ export default function Installments() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: 'var(--rpg-parchment, #F4E4C1)',
+                    background: 'var(--rpg-parchment)',
                     border: '1px solid var(--rpg-gold-dark)',
                     borderRadius: 6,
                     fontSize: '0.85rem',
@@ -278,7 +271,7 @@ export default function Installments() {
                 />
                 <Bar
                   dataKey="total"
-                  fill="var(--rpg-gold-dark, #b89040)"
+                  fill="var(--rpg-gold)"
                   radius={[3, 3, 0, 0]}
                 />
               </BarChart>

@@ -129,7 +129,6 @@ export default function Loans() {
     const parsed = parseFloat(paymentAmount);
     if (isNaN(parsed) || parsed <= 0) return;
     await window.api.financeAddLoanPayment(loanId, { amount: parsed, date: paymentDate });
-    // Refresh payments for this loan
     const rows = await window.api.financeGetLoanPayments(loanId);
     setPayments((prev) => ({ ...prev, [loanId]: rows as LoanPaymentRow[] }));
     setPayingLoanId(null);
@@ -148,12 +147,13 @@ export default function Loans() {
     const groups = groupByPerson(loans);
     if (Object.keys(groups).length === 0) {
       return (
-        <p className="text-sm opacity-40 text-center py-8">{t('coinify.noLoans')}</p>
+        <p style={{ fontSize: '0.85rem', opacity: 0.4, textAlign: 'center', padding: '32px 0' }}>
+          {t('coinify.noLoans')}
+        </p>
       );
     }
 
     return Object.entries(groups).map(([person, personLoans]) => {
-      // For installment groups, calculate progress
       const installmentGroups: Record<string, LoanRow[]> = {};
       const singleLoans: LoanRow[] = [];
 
@@ -169,32 +169,77 @@ export default function Loans() {
       }
 
       return (
-        <div key={person} className="rpg-card p-4 space-y-3">
-          <h3 className="font-semibold text-[var(--rpg-gold)]">{person}</h3>
+        <div key={person} className="rpg-card" style={{ marginBottom: 12, padding: 16 }}>
+          <div
+            style={{
+              fontWeight: 'bold',
+              color: 'var(--rpg-gold)',
+              borderBottom: '1px solid var(--rpg-parchment-dark)',
+              paddingBottom: 4,
+              marginBottom: 8,
+            }}
+          >
+            {person}
+          </div>
 
           {/* Single loans */}
           {singleLoans.map((loan) => (
-            <div key={loan.id} className="flex items-center gap-3 py-2 border-t border-[#A68A3E]/30">
-              <span className="text-xs px-2 py-0.5 rounded bg-[#C9A84C]/20 text-[#C9A84C]">
+            <div
+              key={loan.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 0',
+                borderBottom: '1px solid var(--rpg-parchment-dark)',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  background: 'var(--rpg-gold)',
+                  color: 'var(--rpg-ink)',
+                  padding: '1px 6px',
+                  borderRadius: 3,
+                }}
+              >
                 {t('coinify.singlePayment') || 'Pago único'}
               </span>
-              <span className="flex-1 text-sm truncate" title={loan.description}>
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: '0.85rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={loan.description}
+              >
                 {loan.description || loan.date}
               </span>
-              <span className="text-xs opacity-40">{loan.date.slice(0, 10)}</span>
-              <span className="font-mono text-sm text-[var(--rpg-gold)]">
+              <span style={{ fontSize: '0.75rem', opacity: 0.4 }}>{loan.date.slice(0, 10)}</span>
+              <span
+                style={{
+                  fontFamily: 'Fira Code, monospace',
+                  fontSize: '0.85rem',
+                  color: 'var(--rpg-gold)',
+                }}
+              >
                 {formatAmount(loan.amount, loan.currency)}
               </span>
               {!isSettled(loan) && (
                 <button
-                  className="rpg-btn-sm text-xs"
+                  className="rpg-button"
+                  style={{ fontSize: '0.75rem', padding: '2px 8px' }}
                   onClick={() => handleSettle(loan.id)}
                 >
                   {t('coinify.settle')}
                 </button>
               )}
               {isSettled(loan) && (
-                <span className="text-xs text-[#2D5A27]">✓ {t('coinify.settled')}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--rpg-xp-green)' }}>
+                  ✓ {t('coinify.settled')}
+                </span>
               )}
             </div>
           ))}
@@ -206,31 +251,85 @@ export default function Loans() {
             const firstLoan = groupLoans[0];
             const allSettled = paid === total;
             const totalAmount = groupLoans.reduce((sum, l) => sum + l.amount, 0);
+            const progressPct = total > 0 ? (paid / total) * 100 : 0;
 
             return (
-              <div key={groupId} className="flex items-center gap-3 py-2 border-t border-[#A68A3E]/30">
-                <span className="text-xs px-2 py-0.5 rounded bg-[#C9A84C]/20 text-[#C9A84C]">
+              <div
+                key={groupId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 0',
+                  borderBottom: '1px solid var(--rpg-parchment-dark)',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    background: 'var(--rpg-gold)',
+                    color: 'var(--rpg-ink)',
+                    padding: '1px 6px',
+                    borderRadius: 3,
+                  }}
+                >
                   {t('coinify.installmentsLabel') || 'Cuotas'}
                 </span>
-                <span className="flex-1 text-sm truncate">
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: '0.85rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {firstLoan.description || firstLoan.date}
                 </span>
-                <span className="text-xs opacity-40">
-                  {paid}/{total} cuotas
+                {/* Progress bar */}
+                <div
+                  style={{
+                    width: 60,
+                    height: 6,
+                    background: 'var(--rpg-parchment-dark)',
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${progressPct}%`,
+                      height: '100%',
+                      background: allSettled ? 'var(--rpg-xp-green)' : 'var(--rpg-gold)',
+                      borderRadius: 3,
+                    }}
+                  />
+                </div>
+                <span style={{ fontSize: '0.75rem', opacity: 0.5, fontFamily: 'Fira Code, monospace' }}>
+                  {paid}/{total}
                 </span>
-                <span className="font-mono text-sm text-[var(--rpg-gold)]">
+                <span
+                  style={{
+                    fontFamily: 'Fira Code, monospace',
+                    fontSize: '0.85rem',
+                    color: 'var(--rpg-gold)',
+                  }}
+                >
                   {formatAmount(totalAmount, firstLoan.currency)}
                 </span>
                 {!allSettled && (
                   <button
-                    className="rpg-btn-sm text-xs"
+                    className="rpg-button"
+                    style={{ fontSize: '0.75rem', padding: '2px 8px' }}
                     onClick={() => openPayment(firstLoan.id)}
                   >
                     {t('coinify.markPayment') || 'Pagar cuota'}
                   </button>
                 )}
                 {allSettled && (
-                  <span className="text-xs text-[#2D5A27]">✓ {t('coinify.settled')}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--rpg-xp-green)' }}>
+                    ✓ {t('coinify.settled')}
+                  </span>
                 )}
               </div>
             );
@@ -241,157 +340,184 @@ export default function Loans() {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
           <button
-            className={`rpg-btn-sm ${direction === 'lent' ? 'rpg-btn-active' : ''}`}
+            className="rpg-button"
+            style={{ opacity: direction === 'lent' ? 1 : 0.6, padding: '4px 12px', fontSize: '0.85rem' }}
             onClick={() => setDirection('lent')}
           >
             {t('coinify.lent') || 'Me deben'}
           </button>
           <button
-            className={`rpg-btn-sm ${direction === 'borrowed' ? 'rpg-btn-active' : ''}`}
+            className="rpg-button"
+            style={{ opacity: direction === 'borrowed' ? 1 : 0.6, padding: '4px 12px', fontSize: '0.85rem' }}
             onClick={() => setDirection('borrowed')}
           >
             {t('coinify.borrowed') || 'Debo'}
           </button>
         </div>
-        <button className="rpg-btn-sm" onClick={() => setShowForm(!showForm)}>
+        <button
+          className="rpg-button"
+          style={{ padding: '4px 12px', fontSize: '0.85rem' }}
+          onClick={() => setShowForm(!showForm)}
+        >
           {showForm ? '▲' : `+ ${t('coinify.addLoan')}`}
         </button>
       </div>
 
       {/* Add Loan Form */}
       {showForm && (
-        <form onSubmit={handleAddLoan} className="rpg-card p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-[var(--rpg-gold)]">{t('coinify.addLoan')}</h3>
+        <form onSubmit={handleAddLoan}>
+          <div className="rpg-card" style={{ marginBottom: 16, padding: 16 }}>
+            <div className="rpg-card-title">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+                <path d="M8 3v10M3 8h10" />
+              </svg>
+              {t('coinify.addLoan')}
+            </div>
 
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={formPerson}
-              onChange={(e) => setFormPerson(e.target.value)}
-              placeholder={t('coinify.personName')}
-              className="rpg-input flex-1"
-              required
-            />
-          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+              <input
+                type="text"
+                value={formPerson}
+                onChange={(e) => setFormPerson(e.target.value)}
+                placeholder={t('coinify.personName')}
+                className="rpg-input"
+                required
+              />
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setFormDirection('lent')}
-              className={`rpg-btn-sm flex-1 ${formDirection === 'lent' ? 'rpg-btn-active' : ''}`}
-            >
-              {t('coinify.lent') || 'Me deben'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormDirection('borrowed')}
-              className={`rpg-btn-sm flex-1 ${formDirection === 'borrowed' ? 'rpg-btn-active' : ''}`}
-            >
-              {t('coinify.borrowed') || 'Debo'}
-            </button>
-          </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setFormDirection('lent')}
+                  className="rpg-button"
+                  style={{ flex: 1, opacity: formDirection === 'lent' ? 1 : 0.6 }}
+                >
+                  {t('coinify.lent') || 'Me deben'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormDirection('borrowed')}
+                  className="rpg-button"
+                  style={{ flex: 1, opacity: formDirection === 'borrowed' ? 1 : 0.6 }}
+                >
+                  {t('coinify.borrowed') || 'Debo'}
+                </button>
+              </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setFormType('single')}
-              className={`rpg-btn-sm flex-1 ${formType === 'single' ? 'rpg-btn-active' : ''}`}
-            >
-              {t('coinify.singlePayment') || 'Pago único'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormType('installments')}
-              className={`rpg-btn-sm flex-1 ${formType === 'installments' ? 'rpg-btn-active' : ''}`}
-            >
-              {t('coinify.installmentsLabel') || 'Cuotas'}
-            </button>
-          </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setFormType('single')}
+                  className="rpg-button"
+                  style={{ flex: 1, opacity: formType === 'single' ? 1 : 0.6 }}
+                >
+                  {t('coinify.singlePayment') || 'Pago único'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormType('installments')}
+                  className="rpg-button"
+                  style={{ flex: 1, opacity: formType === 'installments' ? 1 : 0.6 }}
+                >
+                  {t('coinify.installmentsLabel') || 'Cuotas'}
+                </button>
+              </div>
 
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={formAmount}
-              onChange={(e) => setFormAmount(e.target.value)}
-              placeholder={t('coinify.amount')}
-              className="rpg-input flex-1"
-              min="0"
-              step="0.01"
-              required
-            />
-            <select
-              value={formCurrency}
-              onChange={(e) => setFormCurrency(e.target.value as Currency)}
-              className="rpg-select w-20"
-            >
-              <option value="ARS">ARS</option>
-              <option value="USD">USD</option>
-            </select>
-          </div>
-
-          {formType === 'installments' && (
-            <>
-              <div className="flex items-center gap-2">
-                <label className="text-sm opacity-60">{t('coinify.installments') || 'Cuotas'}</label>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   type="number"
-                  value={formInstallments}
-                  onChange={(e) => setFormInstallments(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="rpg-input w-20"
-                  min="1"
+                  value={formAmount}
+                  onChange={(e) => setFormAmount(e.target.value)}
+                  placeholder={t('coinify.amount')}
+                  className="rpg-input"
+                  style={{ flex: 1 }}
+                  min="0"
+                  step="0.01"
+                  required
                 />
+                <select
+                  value={formCurrency}
+                  onChange={(e) => setFormCurrency(e.target.value as Currency)}
+                  className="rpg-select"
+                  style={{ width: 80 }}
+                >
+                  <option value="ARS">ARS</option>
+                  <option value="USD">USD</option>
+                </select>
               </div>
-              <select
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-                className="rpg-select"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </>
-          )}
 
-          <input
-            type="text"
-            value={formDescription}
-            onChange={(e) => setFormDescription(e.target.value)}
-            placeholder={t('coinify.description') || 'Descripción'}
-            className="rpg-input"
-          />
+              {formType === 'installments' && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label style={{ fontSize: '0.85rem', opacity: 0.6 }}>
+                      {t('coinify.installments') || 'Cuotas'}
+                    </label>
+                    <input
+                      type="number"
+                      value={formInstallments}
+                      onChange={(e) => setFormInstallments(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="rpg-input"
+                      style={{ width: 80 }}
+                      min="1"
+                    />
+                  </div>
+                  <select
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value)}
+                    className="rpg-select"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </>
+              )}
 
-          <input
-            type="date"
-            value={formDate}
-            onChange={(e) => setFormDate(e.target.value)}
-            className="rpg-input"
-          />
+              <input
+                type="text"
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder={t('coinify.description') || 'Descripción'}
+                className="rpg-input"
+              />
 
-          <button type="submit" className="rpg-button w-full">
-            {t('coinify.add') || 'Agregar'}
-          </button>
+              <input
+                type="date"
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
+                className="rpg-input"
+              />
+
+              <button type="submit" className="rpg-button" style={{ width: '100%' }}>
+                {t('coinify.add') || 'Agregar'}
+              </button>
+            </div>
+          </div>
         </form>
       )}
 
       {/* Payment Modal */}
       {payingLoanId && (
-        <div className="rpg-card p-4 space-y-3 border border-[var(--rpg-gold)]/40">
-          <h3 className="text-sm font-semibold text-[var(--rpg-gold)]">
+        <div className="rpg-card" style={{ marginBottom: 16, padding: 16 }}>
+          <div className="rpg-card-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+              <circle cx="8" cy="8" r="5" />
+              <path d="M8 5v3l2 2" />
+            </svg>
             {t('coinify.markPayment') || 'Registrar pago'}
-          </h3>
-          <div className="flex gap-2">
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <input
               type="number"
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
               placeholder={t('coinify.amount')}
-              className="rpg-input flex-1"
+              className="rpg-input"
+              style={{ flex: 1 }}
               min="0"
               step="0.01"
             />
@@ -402,15 +528,17 @@ export default function Loans() {
               className="rpg-input"
             />
           </div>
-          <div className="flex gap-2">
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button
-              className="rpg-button flex-1"
+              className="rpg-button"
+              style={{ flex: 1 }}
               onClick={() => handleAddPayment(payingLoanId)}
             >
               {t('coinify.saveTransaction') || 'Guardar'}
             </button>
             <button
-              className="rpg-btn-sm"
+              className="rpg-button"
+              style={{ opacity: 0.6 }}
               onClick={() => setPayingLoanId(null)}
             >
               {t('coinify.cancelEdit') || 'Cancelar'}
@@ -420,21 +548,22 @@ export default function Loans() {
       )}
 
       {/* Active Loans */}
-      <div className="space-y-3">
+      <div style={{ marginBottom: 16 }}>
         {renderLoanGroups(activeLoans)}
       </div>
 
       {/* Settled Section */}
-      <div className="space-y-2">
+      <div>
         <button
-          className="text-sm opacity-50 hover:opacity-80 transition-colors"
+          className="rpg-button"
+          style={{ fontSize: '0.85rem', opacity: 0.5, padding: '4px 12px', marginBottom: 8 }}
           onClick={() => setShowSettled(!showSettled)}
         >
           {showSettled ? t('coinify.hideSettled') : t('coinify.showSettled')}
           {settledLoans.length > 0 && ` (${settledLoans.length})`}
         </button>
         {showSettled && (
-          <div className="space-y-3 opacity-60">
+          <div style={{ opacity: 0.6 }}>
             {renderLoanGroups(settledLoans)}
           </div>
         )}
