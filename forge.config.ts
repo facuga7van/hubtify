@@ -57,7 +57,7 @@ const config: ForgeConfig = {
     },
     icon: path.resolve(__dirname, 'assets/icon'),
     extraResource: ['./assets/icon.ico'],
-    appVersion: '0.5.1',
+    appVersion: '0.5.2',
     appCopyright: 'Hubtify',
     win32metadata: {
       CompanyName: 'Hubtify',
