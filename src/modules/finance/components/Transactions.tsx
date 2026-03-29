@@ -93,8 +93,10 @@ export default function Transactions() {
 
   const saveEdit = async () => {
     if (!editingId) return;
+    const amount = parseFloat(editFields.amount);
+    if (!isFinite(amount) || amount <= 0) return;
     await window.api.financeUpdateTransaction(editingId, {
-      amount: parseFloat(editFields.amount),
+      amount,
       description: editFields.description,
       category: editFields.category,
     });

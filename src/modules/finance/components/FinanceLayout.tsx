@@ -15,12 +15,13 @@ export default function FinanceLayout() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Book-tab navigation */}
       <nav style={{
         display: 'flex',
-        gap: 4,
-        padding: 8,
-        borderBottom: '1px solid var(--rpg-parchment-dark)',
-        overflowX: 'auto',
+        gap: 0,
+        paddingLeft: 8,
+        position: 'relative',
+        zIndex: 1,
       }}>
         {tabs.map((tab) => (
           <NavLink
@@ -28,27 +29,39 @@ export default function FinanceLayout() {
             to={tab.path}
             end={'end' in tab ? tab.end : undefined}
             style={({ isActive }) => ({
-              padding: '6px 14px',
-              borderRadius: 'var(--rpg-radius)',
-              fontSize: '0.85rem',
+              padding: '7px 16px 9px',
+              fontSize: '0.8rem',
               fontFamily: 'Cinzel, serif',
-              fontWeight: isActive ? 700 : 600,
+              fontWeight: isActive ? 700 : 500,
               textDecoration: 'none',
               whiteSpace: 'nowrap',
+              color: isActive ? 'var(--rpg-gold-light)' : 'var(--rpg-ink-light)',
+              opacity: isActive ? 1 : 0.85,
               background: isActive
-                ? 'linear-gradient(to bottom, var(--rpg-gold-dark), var(--rpg-gold))'
-                : 'transparent',
-              color: isActive ? 'var(--rpg-wood)' : 'var(--rpg-ink-light)',
-              opacity: isActive ? 1 : 0.6,
-              border: isActive ? '1px solid var(--rpg-gold-light)' : '1px solid transparent',
-              transition: 'all 0.2s ease',
+                ? 'linear-gradient(180deg, var(--rpg-leather) 0%, var(--rpg-wood) 100%)'
+                : 'linear-gradient(180deg, rgba(139,90,43,0.4) 0%, rgba(139,90,43,0.18) 100%)',
+              borderTop: isActive ? '2px solid var(--rpg-gold-dark)' : '2px solid rgba(201,168,76,0.5)',
+              borderLeft: isActive ? '1px solid var(--rpg-gold-dark)' : '1px solid rgba(201,168,76,0.45)',
+              borderRight: isActive ? '1px solid var(--rpg-gold-dark)' : '1px solid rgba(201,168,76,0.45)',
+              borderBottom: isActive ? '1px solid var(--rpg-wood)' : '1px solid rgba(201,168,76,0.3)',
+              borderRadius: '6px 6px 0 0',
+              marginBottom: isActive ? -1 : 0,
+              position: 'relative',
+              transition: 'all 0.15s ease',
             })}
           >
             {t(tab.label)}
           </NavLink>
         ))}
       </nav>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+
+      {/* Content area with top border connecting to active tab */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: 16,
+        borderTop: '1px solid var(--rpg-gold-dark)',
+      }}>
         <Outlet />
       </div>
     </div>

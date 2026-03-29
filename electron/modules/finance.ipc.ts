@@ -488,6 +488,7 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
     startDate: string;
     personName: string;
+    direction?: 'lent' | 'borrowed';
   }) => {
     const db = getDb();
     const currency = data.currency ?? 'ARS';
@@ -546,8 +547,8 @@ export function registerFinanceIpcHandlers(): void {
       db.prepare(`
         INSERT INTO finance_loans
           (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
-        VALUES (?, ?, 'lent', 'installments', ?, ?, ?, ?, 0, ?, ?)
-      `).run(loanId, data.personName, totalAmount, currency, data.startDate, data.description, groupId, now);
+        VALUES (?, ?, ?, 'installments', ?, ?, ?, ?, 0, ?, ?)
+      `).run(loanId, data.personName, data.direction ?? 'lent', totalAmount, currency, data.startDate, data.description, groupId, now);
     });
 
     trx();
