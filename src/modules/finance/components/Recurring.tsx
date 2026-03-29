@@ -164,7 +164,7 @@ export default function Recurring() {
       {/* Add Form */}
       {showForm && (
         <form onSubmit={handleAddSubmit} className="rpg-card p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-white/70">{t('coinify.addRecurring')}</h3>
+          <h3 className="text-sm font-semibold opacity-70">{t('coinify.addRecurring')}</h3>
 
           <input
             type="text"
@@ -237,7 +237,7 @@ export default function Recurring() {
 
       {/* List */}
       {items.length === 0 ? (
-        <div className="rpg-card p-6 text-center text-white/40 text-sm">
+        <div className="rpg-card p-6 text-center opacity-40 text-sm">
           {t('coinify.noRecurring')}
         </div>
       ) : (
@@ -252,8 +252,8 @@ export default function Recurring() {
                   title={isActive(item) ? t('coinify.pause') : t('coinify.activate')}
                   className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs transition-colors ${
                     isActive(item)
-                      ? 'border-green-500 text-green-500 hover:bg-green-500/10'
-                      : 'border-white/20 text-white/30 hover:bg-white/5'
+                      ? 'border-[#2D5A27] text-[#2D5A27] hover:bg-[#2D5A27]/10'
+                      : 'border-[#A68A3E]/30 opacity-30 hover:opacity-50'
                   }`}
                 >
                   {isActive(item) ? '▶' : '⏸'}
@@ -268,15 +268,15 @@ export default function Recurring() {
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                     item.type === 'income'
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-red-500/20 text-red-400'
+                      ? 'bg-[#2D5A27]/15 text-[#2D5A27]'
+                      : 'bg-[#8B2020]/15 text-[#8B2020]'
                   }`}
                 >
                   {item.type === 'income' ? t('coinify.income') : t('coinify.expense')}
                 </span>
 
                 {/* Category */}
-                <span className="text-xs text-white/50 hidden sm:inline">
+                <span className="text-xs opacity-50 hidden sm:inline">
                   {item.category}
                 </span>
 
@@ -298,11 +298,11 @@ export default function Recurring() {
                     />
                     <button
                       onClick={() => saveEdit(item.id)}
-                      className="rpg-btn-sm text-green-400"
+                      className="rpg-btn-sm text-[#2D5A27]"
                     >
                       ✓
                     </button>
-                    <button onClick={cancelEdit} className="rpg-btn-sm text-white/40">
+                    <button onClick={cancelEdit} className="rpg-btn-sm opacity-40">
                       ✕
                     </button>
                   </div>
@@ -313,14 +313,14 @@ export default function Recurring() {
                     title={t('coinify.editAmount')}
                   >
                     {formatAmount(item.amount, item.currency)}
-                    <span className="ml-1 text-xs text-white/30">{item.currency}</span>
+                    <span className="ml-1 text-xs opacity-30">{item.currency}</span>
                   </button>
                 )}
 
                 {/* History Toggle */}
                 <button
                   onClick={() => toggleHistory(item.id)}
-                  className="rpg-btn-sm text-xs text-white/50 hover:text-white/80"
+                  className="rpg-btn-sm text-xs opacity-50 hover:opacity-80"
                   title={t('coinify.amountHistory')}
                 >
                   ↺
@@ -329,16 +329,16 @@ export default function Recurring() {
                 {/* Delete */}
                 {deletingId === item.id ? (
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-red-400">{t('coinify.confirmDelete')}</span>
+                    <span className="text-xs text-[#8B2020]">{t('coinify.confirmDelete')}</span>
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="rpg-btn-sm text-red-400 text-xs"
+                      className="rpg-btn-sm text-[#8B2020] text-xs"
                     >
                       {t('coinify.yes')}
                     </button>
                     <button
                       onClick={() => setDeletingId(null)}
-                      className="rpg-btn-sm text-white/40 text-xs"
+                      className="rpg-btn-sm opacity-40 text-xs"
                     >
                       {t('coinify.no')}
                     </button>
@@ -346,7 +346,7 @@ export default function Recurring() {
                 ) : (
                   <button
                     onClick={() => setDeletingId(item.id)}
-                    className="rpg-btn-sm text-red-400/60 hover:text-red-400 text-xs"
+                    className="rpg-btn-sm text-[#8B2020]/60 hover:text-[#8B2020] text-xs"
                     title={t('coinify.delete')}
                   >
                     ✕
@@ -356,22 +356,22 @@ export default function Recurring() {
 
               {/* Amount History */}
               {expandedHistory === item.id && (
-                <div className="mt-2 pt-2 border-t border-white/10">
-                  <p className="text-xs text-white/50 mb-2">{t('coinify.amountHistory')}</p>
+                <div className="mt-2 pt-2 border-t border-[#A68A3E]/30">
+                  <p className="text-xs opacity-50 mb-2">{t('coinify.amountHistory')}</p>
                   {(history[item.id] ?? []).length === 0 ? (
-                    <p className="text-xs text-white/30">{t('coinify.noHistory')}</p>
+                    <p className="text-xs opacity-30">{t('coinify.noHistory')}</p>
                   ) : (
                     <div className="space-y-1">
                       {history[item.id].map((h) => (
-                        <div key={h.id} className="flex items-center gap-2 text-xs text-white/60">
-                          <span className="font-mono text-red-400/80">
+                        <div key={h.id} className="flex items-center gap-2 text-xs opacity-60">
+                          <span className="font-mono text-[#8B2020]">
                             {formatAmount(h.previousAmount, item.currency)}
                           </span>
-                          <span className="text-white/30">→</span>
-                          <span className="font-mono text-green-400/80">
+                          <span className="opacity-30">→</span>
+                          <span className="font-mono text-[#2D5A27]">
                             {formatAmount(h.newAmount, item.currency)}
                           </span>
-                          <span className="ml-auto text-white/30">
+                          <span className="ml-auto opacity-30">
                             {new Date(h.changedAt).toLocaleDateString()}
                           </span>
                         </div>

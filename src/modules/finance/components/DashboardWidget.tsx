@@ -16,7 +16,7 @@ export default function DashboardWidget() {
       <p className="font-mono text-lg">
         {total !== null ? `$${total.toLocaleString('es-AR')}` : '...'}
       </p>
-      <p className="text-xs text-white/40">
+      <p className="text-xs opacity-40">
         {t('coinify.thisMonth')} · {loansCount} {t('coinify.activeLoans')}
       </p>
     </div>

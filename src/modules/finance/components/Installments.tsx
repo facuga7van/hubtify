@@ -140,7 +140,7 @@ export default function Installments() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '8px 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    borderBottom: '1px solid rgba(166,138,62,0.2)',
                     gap: 8,
                   }}
                 >
@@ -252,15 +252,15 @@ export default function Installments() {
                 }))}
                 margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(166,138,62,0.15)" />
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.5)' }}
+                  tick={{ fontSize: 11, fill: 'var(--rpg-ink, #2C1810)' }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.5)' }}
+                  tick={{ fontSize: 11, fill: 'var(--rpg-ink, #2C1810)' }}
                   axisLine={false}
                   tickLine={false}
                   width={60}
@@ -268,7 +268,7 @@ export default function Installments() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: 'var(--rpg-parchment-dark, #1a1a2e)',
+                    background: 'var(--rpg-parchment, #F4E4C1)',
                     border: '1px solid var(--rpg-gold-dark)',
                     borderRadius: 6,
                     fontSize: '0.85rem',

@@ -69,19 +69,19 @@ export default function Dashboard() {
         {balance && (
           <>
             <div className="rpg-card p-4">
-              <h3 className="text-sm text-white/50 mb-2">ARS</h3>
+              <h3 className="text-sm opacity-50 mb-2">ARS</h3>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-white/60">{t('coinify.income')}</span>
-                  <span className="text-green-400 font-mono">+${balance.ARS.income.toLocaleString('es-AR')}</span>
+                  <span className="opacity-60">{t('coinify.income')}</span>
+                  <span className="text-[#2D5A27] font-mono">+${balance.ARS.income.toLocaleString('es-AR')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-white/60">{t('coinify.expense')}</span>
-                  <span className="text-red-400 font-mono">-${balance.ARS.expenses.toLocaleString('es-AR')}</span>
+                  <span className="opacity-60">{t('coinify.expense')}</span>
+                  <span className="text-[#8B2020] font-mono">-${balance.ARS.expenses.toLocaleString('es-AR')}</span>
                 </div>
-                <div className="flex justify-between border-t border-white/10 pt-1">
+                <div className="flex justify-between border-t border-[#A68A3E]/30 pt-1">
                   <span className="font-semibold">{t('coinify.balance')}</span>
-                  <span className={`font-mono font-bold ${balance.ARS.balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`font-mono font-bold ${balance.ARS.balance >= 0 ? 'text-[#2D5A27]' : 'text-[#8B2020]'}`}>
                     ${balance.ARS.balance.toLocaleString('es-AR')}
                   </span>
                 </div>
@@ -90,19 +90,19 @@ export default function Dashboard() {
 
             {(balance.USD.income > 0 || balance.USD.expenses > 0) && (
               <div className="rpg-card p-4">
-                <h3 className="text-sm text-white/50 mb-2">USD</h3>
+                <h3 className="text-sm opacity-50 mb-2">USD</h3>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-white/60">{t('coinify.income')}</span>
-                    <span className="text-green-400 font-mono">+${balance.USD.income.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="opacity-60">{t('coinify.income')}</span>
+                    <span className="text-[#2D5A27] font-mono">+${balance.USD.income.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-white/60">{t('coinify.expense')}</span>
-                    <span className="text-red-400 font-mono">-${balance.USD.expenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="opacity-60">{t('coinify.expense')}</span>
+                    <span className="text-[#8B2020] font-mono">-${balance.USD.expenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <div className="flex justify-between border-t border-white/10 pt-1">
+                  <div className="flex justify-between border-t border-[#A68A3E]/30 pt-1">
                     <span className="font-semibold">{t('coinify.balance')}</span>
-                    <span className={`font-mono font-bold ${balance.USD.balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`font-mono font-bold ${balance.USD.balance >= 0 ? 'text-[#2D5A27]' : 'text-[#8B2020]'}`}>
                       ${balance.USD.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -116,14 +116,14 @@ export default function Dashboard() {
       {/* Category Breakdown */}
       {categories.length > 0 && (
         <div className="rpg-card p-4">
-          <h3 className="text-sm text-white/50 mb-3">{t('coinify.byCategory')}</h3>
+          <h3 className="text-sm opacity-50 mb-3">{t('coinify.byCategory')}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={categories} layout="vertical">
               <XAxis type="number" hide />
-              <YAxis type="category" dataKey="category" width={100} tick={{ fill: '#999', fontSize: 12 }} />
+              <YAxis type="category" dataKey="category" width={100} tick={{ fill: 'var(--rpg-ink, #2C1810)', fontSize: 12 }} />
               <Tooltip
-                contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
-                labelStyle={{ color: '#fff' }}
+                contentStyle={{ background: 'var(--rpg-parchment, #F4E4C1)', border: '1px solid var(--rpg-gold-dark, #A68A3E)', borderRadius: 8 }}
+                labelStyle={{ color: 'var(--rpg-ink, #2C1810)' }}
               />
               <Bar dataKey="ARS" fill="var(--rpg-gold, #d4a373)" radius={[0, 4, 4, 0]}>
                 {categories.map((_, i) => (
@@ -139,12 +139,12 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Projection */}
         <div className="rpg-card p-4">
-          <h3 className="text-sm text-white/50 mb-3">{t('coinify.projection')}</h3>
+          <h3 className="text-sm opacity-50 mb-3">{t('coinify.projection')}</h3>
           {projection.length > 0 ? (
             <div className="space-y-2">
               {projection.map((p) => (
                 <div key={p.month} className="flex justify-between text-sm">
-                  <span className="text-white/60 capitalize">
+                  <span className="opacity-60 capitalize">
                     {new Date(p.month + '-01').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
                   </span>
                   <span className="font-mono">${p.total.toLocaleString('es-AR')}</span>
@@ -152,22 +152,22 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-white/40">{t('coinify.noData')}</p>
+            <p className="text-sm opacity-40">{t('coinify.noData')}</p>
           )}
         </div>
 
         {/* Loans Summary */}
         <div className="rpg-card p-4 cursor-pointer hover:border-[var(--rpg-gold)]/30 transition-colors"
           onClick={() => navigate('/finance/loans')}>
-          <h3 className="text-sm text-white/50 mb-3">{t('coinify.loans')}</h3>
+          <h3 className="text-sm opacity-50 mb-3">{t('coinify.loans')}</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-white/60">{t('coinify.owed')}</span>
-              <span className="text-green-400 font-mono">${loans.lent.toLocaleString('es-AR')}</span>
+              <span className="opacity-60">{t('coinify.owed')}</span>
+              <span className="text-[#2D5A27] font-mono">${loans.lent.toLocaleString('es-AR')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/60">{t('coinify.owing')}</span>
-              <span className="text-red-400 font-mono">${loans.borrowed.toLocaleString('es-AR')}</span>
+              <span className="opacity-60">{t('coinify.owing')}</span>
+              <span className="text-[#8B2020] font-mono">${loans.borrowed.toLocaleString('es-AR')}</span>
             </div>
           </div>
         </div>

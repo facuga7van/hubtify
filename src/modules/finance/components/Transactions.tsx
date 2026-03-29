@@ -144,7 +144,7 @@ export default function Transactions() {
       {/* Transaction List */}
       <div className="space-y-1">
         {transactions.length === 0 ? (
-          <p className="text-sm text-white/40 text-center py-8">{t('coinify.noTransactions')}</p>
+          <p className="text-sm opacity-40 text-center py-8">{t('coinify.noTransactions')}</p>
         ) : (
           transactions.map((tx) => (
             <div key={tx.id} className="rpg-card p-3 flex items-center gap-3">
@@ -163,23 +163,23 @@ export default function Transactions() {
               ) : (
                 /* View mode */
                 <>
-                  <span className="text-xs text-white/40 w-20">{tx.date.slice(5)}</span>
+                  <span className="text-xs opacity-40 w-20">{tx.date.slice(5)}</span>
                   <span className="flex-1 text-sm truncate" title={tx.description}>
                     {tx.description || tx.category}
                     {tx.forThirdParty && (
-                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#C9A84C]/20 text-[#C9A84C]">
                         → {tx.forThirdParty}
                       </span>
                     )}
                   </span>
-                  <span className="text-xs text-white/30">{tx.category}</span>
-                  <span className="text-xs text-white/30">{paymentMethodLabel(tx.paymentMethod)}</span>
-                  <span className={`font-mono text-sm ${tx.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className="text-xs opacity-30">{tx.category}</span>
+                  <span className="text-xs opacity-30">{paymentMethodLabel(tx.paymentMethod)}</span>
+                  <span className={`font-mono text-sm ${tx.type === 'income' ? 'text-[#2D5A27]' : 'text-[#8B2020]'}`}>
                     {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
                     {tx.currency === 'USD' && ' USD'}
                   </span>
-                  <button className="text-white/30 hover:text-white/60 text-sm" onClick={() => startEdit(tx)}>✎</button>
-                  <button className="text-white/30 hover:text-red-400 text-sm" onClick={() => handleDelete(tx.id)}>✕</button>
+                  <button className="opacity-30 hover:opacity-60 text-sm" onClick={() => startEdit(tx)}>✎</button>
+                  <button className="opacity-30 hover:text-[#8B2020] text-sm" onClick={() => handleDelete(tx.id)}>✕</button>
                 </>
               )}
             </div>

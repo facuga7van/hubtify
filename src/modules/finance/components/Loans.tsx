@@ -148,7 +148,7 @@ export default function Loans() {
     const groups = groupByPerson(loans);
     if (Object.keys(groups).length === 0) {
       return (
-        <p className="text-sm text-white/40 text-center py-8">{t('coinify.noLoans')}</p>
+        <p className="text-sm opacity-40 text-center py-8">{t('coinify.noLoans')}</p>
       );
     }
 
@@ -174,14 +174,14 @@ export default function Loans() {
 
           {/* Single loans */}
           {singleLoans.map((loan) => (
-            <div key={loan.id} className="flex items-center gap-3 py-2 border-t border-white/10">
-              <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+            <div key={loan.id} className="flex items-center gap-3 py-2 border-t border-[#A68A3E]/30">
+              <span className="text-xs px-2 py-0.5 rounded bg-[#C9A84C]/20 text-[#C9A84C]">
                 {t('coinify.singlePayment') || 'Pago único'}
               </span>
-              <span className="flex-1 text-sm truncate text-white/80" title={loan.description}>
+              <span className="flex-1 text-sm truncate" title={loan.description}>
                 {loan.description || loan.date}
               </span>
-              <span className="text-xs text-white/40">{loan.date.slice(0, 10)}</span>
+              <span className="text-xs opacity-40">{loan.date.slice(0, 10)}</span>
               <span className="font-mono text-sm text-[var(--rpg-gold)]">
                 {formatAmount(loan.amount, loan.currency)}
               </span>
@@ -194,7 +194,7 @@ export default function Loans() {
                 </button>
               )}
               {isSettled(loan) && (
-                <span className="text-xs text-green-400">✓ {t('coinify.settled')}</span>
+                <span className="text-xs text-[#2D5A27]">✓ {t('coinify.settled')}</span>
               )}
             </div>
           ))}
@@ -208,14 +208,14 @@ export default function Loans() {
             const totalAmount = groupLoans.reduce((sum, l) => sum + l.amount, 0);
 
             return (
-              <div key={groupId} className="flex items-center gap-3 py-2 border-t border-white/10">
-                <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">
+              <div key={groupId} className="flex items-center gap-3 py-2 border-t border-[#A68A3E]/30">
+                <span className="text-xs px-2 py-0.5 rounded bg-[#C9A84C]/20 text-[#C9A84C]">
                   {t('coinify.installmentsLabel') || 'Cuotas'}
                 </span>
-                <span className="flex-1 text-sm truncate text-white/80">
+                <span className="flex-1 text-sm truncate">
                   {firstLoan.description || firstLoan.date}
                 </span>
-                <span className="text-xs text-white/40">
+                <span className="text-xs opacity-40">
                   {paid}/{total} cuotas
                 </span>
                 <span className="font-mono text-sm text-[var(--rpg-gold)]">
@@ -230,7 +230,7 @@ export default function Loans() {
                   </button>
                 )}
                 {allSettled && (
-                  <span className="text-xs text-green-400">✓ {t('coinify.settled')}</span>
+                  <span className="text-xs text-[#2D5A27]">✓ {t('coinify.settled')}</span>
                 )}
               </div>
             );
@@ -337,7 +337,7 @@ export default function Loans() {
           {formType === 'installments' && (
             <>
               <div className="flex items-center gap-2">
-                <label className="text-sm text-white/60">{t('coinify.installments') || 'Cuotas'}</label>
+                <label className="text-sm opacity-60">{t('coinify.installments') || 'Cuotas'}</label>
                 <input
                   type="number"
                   value={formInstallments}
@@ -427,7 +427,7 @@ export default function Loans() {
       {/* Settled Section */}
       <div className="space-y-2">
         <button
-          className="text-sm text-white/50 hover:text-white/80 transition-colors"
+          className="text-sm opacity-50 hover:opacity-80 transition-colors"
           onClick={() => setShowSettled(!showSettled)}
         >
           {showSettled ? t('coinify.hideSettled') : t('coinify.showSettled')}

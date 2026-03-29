@@ -124,29 +124,29 @@ export default function Import() {
             onChange={handleFileChange}
           />
         </label>
-        <span className="text-sm text-white/60 truncate">
+        <span className="text-sm opacity-60 truncate">
           {fileName || t('coinify.importNoFile')}
         </span>
         {parsing && (
-          <span className="text-sm text-yellow-400 animate-pulse">{t('coinify.importParsing')}</span>
+          <span className="text-sm text-[#C9A84C] animate-pulse">{t('coinify.importParsing')}</span>
         )}
       </div>
 
       {/* Parse error */}
       {parseError && (
-        <p className="text-sm text-red-400">{parseError}</p>
+        <p className="text-sm text-[#8B2020]">{parseError}</p>
       )}
 
       {/* Preview table */}
       {rows.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm text-white/60">
+          <p className="text-sm opacity-60">
             {t('coinify.importPreview')} — {includedCount} / {rows.length}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="text-white/40 text-left border-b border-white/10">
+                <tr className="opacity-40 text-left border-b border-[#A68A3E]/30">
                   <th className="pb-2 pr-3">{t('coinify.importColInclude')}</th>
                   <th className="pb-2 pr-3">{t('coinify.importColDate')}</th>
                   <th className="pb-2 pr-3">{t('coinify.importColMerchant')}</th>
@@ -160,7 +160,7 @@ export default function Import() {
                 {rows.map((row, idx) => (
                   <tr
                     key={idx}
-                    className={`border-b border-white/5 ${!row.included ? 'opacity-40' : ''}`}
+                    className={`border-b border-[#A68A3E]/10 ${!row.included ? 'opacity-40' : ''}`}
                   >
                     <td className="py-1.5 pr-3">
                       <input
@@ -170,13 +170,13 @@ export default function Import() {
                         className="cursor-pointer"
                       />
                     </td>
-                    <td className="py-1.5 pr-3 whitespace-nowrap text-white/70">{row.date}</td>
+                    <td className="py-1.5 pr-3 whitespace-nowrap opacity-70">{row.date}</td>
                     <td className="py-1.5 pr-3 max-w-[180px] truncate" title={row.merchant}>
                       {row.merchant}
                     </td>
-                    <td className="py-1.5 pr-3 text-white/50">{formatInstallment(row)}</td>
+                    <td className="py-1.5 pr-3 opacity-50">{formatInstallment(row)}</td>
                     <td className="py-1.5 pr-3 font-mono">{formatAmount(row)}</td>
-                    <td className="py-1.5 pr-3 text-white/50">{formatCurrency(row)}</td>
+                    <td className="py-1.5 pr-3 opacity-50">{formatCurrency(row)}</td>
                     <td className="py-1.5">
                       <select
                         value={row.category}
@@ -198,7 +198,7 @@ export default function Import() {
           {/* Month selector + confirm */}
           <div className="flex items-end gap-4 flex-wrap">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-white/50">{t('coinify.importStatementMonth')}</label>
+              <label className="text-xs opacity-50">{t('coinify.importStatementMonth')}</label>
               <input
                 type="month"
                 value={statementMonth}
@@ -216,7 +216,7 @@ export default function Import() {
           </div>
 
           {importError && (
-            <p className="text-sm text-red-400">{importError}</p>
+            <p className="text-sm text-[#8B2020]">{importError}</p>
           )}
         </div>
       )}
@@ -224,7 +224,7 @@ export default function Import() {
       {/* Success message */}
       {successCount !== null && (
         <div className="rpg-card p-4">
-          <p className="text-green-400 text-sm">
+          <p className="text-[#2D5A27] text-sm">
             {t('coinify.importSuccess', { count: successCount })}
           </p>
         </div>
