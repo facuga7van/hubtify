@@ -44,6 +44,19 @@ export interface Migration {
   up: string;
 }
 
+// ── Finance Import Types ────────────────────────────────────
+
+export interface ParsedRow {
+  date: string;
+  merchant: string;
+  installmentCurrent?: number;
+  installmentTotal?: number;
+  amountARS?: number;
+  amountUSD?: number;
+  isExcluded: boolean;
+  suggestedCategory: string;
+}
+
 // ── API Types ──────────────────────────────────────────────
 
 export interface HubtifyApi {
