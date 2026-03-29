@@ -159,6 +159,8 @@ export interface HubtifyApi {
   financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => Promise<void>;
   financeGetInstallmentsForMonth: (month: string) => Promise<unknown[]>;
   financeGetInstallmentProjection: (months: number) => Promise<Array<{ month: string; total: number }>>;
+  financeImportParsePDF: (filePath: string) => Promise<ParsedRow[]>;
+  financeImportConfirm: (rows: ParsedRow[], statementMonth: string, fileName: string) => Promise<{ count: number }>;
 
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
