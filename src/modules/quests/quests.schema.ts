@@ -141,4 +141,13 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_drawings_task ON task_drawings(task_id, draw_order);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 8,
+    up: `
+      ALTER TABLE tasks ADD COLUMN completed_at TEXT DEFAULT NULL;
+      UPDATE tasks SET completed_at = updated_at WHERE status = 1 AND deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed_at);
+    `,
+  },
 ];

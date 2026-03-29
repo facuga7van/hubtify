@@ -72,7 +72,8 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:setTaskStatus', (_e, taskId: string, status: boolean) => {
     const db = getDb();
     const now = new Date().toISOString();
-    db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?').run(status ? 1 : 0, now, taskId);
+    db.prepare('UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+      .run(status ? 1 : 0, status ? now : null, now, taskId);
   });
 
   ipcHandle('quests:syncTaskOrders', (_e, orders: Array<{ id: string; order: number }>) => {
@@ -176,14 +177,11 @@ export function registerQuestsIpcHandlers(): void {
 
   // ── Stats helpers ──────────────────────────────────
 
-  // NOTE: For tasks, we use updated_at as a proxy for completion date since there's no
-  // dedicated completed_at column. This is acceptable because we also filter by status = 1,
-  // but it may miscount if a completed task is edited (updating updated_at) on a different day.
   ipcHandle('quests:countCompletedToday', () => {
     const db = getDb();
     const today = todayDateString(); // YYYY-MM-DD
     const taskCount = db.prepare(
-      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(updated_at) = ?"
+      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
     ).get(today) as { c: number };
     const subtaskCount = db.prepare(
       "SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND deleted_at IS NULL AND completed_at = ?"
@@ -201,7 +199,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const today = todayDateString();
     const result = db.prepare(
-      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(updated_at) = ?"
+      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
     ).get(today) as { c: number };
     return result.c;
   });
