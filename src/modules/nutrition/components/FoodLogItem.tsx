@@ -10,9 +10,10 @@ interface Props {
   entry: FoodEntry;
   onDelete: (id: number) => void;
   onUpdate: (id: number, fields: { description?: string; calories?: number }) => void;
+  readOnly?: boolean;
 }
 
-export default memo(function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
+export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly }: Props) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -61,6 +62,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
       <span style={{ flex: 1 }}>{entry.description}</span>
       <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold' }}>{entry.calories}</span>
       <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>kcal</span>
+      {!readOnly && <>
       <svg onClick={() => setEditing(true)} width="12" height="12" viewBox="0 0 12 12" fill="none"
         stroke="var(--rpg-gold-dark)" strokeWidth="1.2" strokeLinecap="round"
         style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
@@ -95,6 +97,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate }: Props) {
           <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
         </svg>
       )}
+      </>}
     </div>
   );
 });

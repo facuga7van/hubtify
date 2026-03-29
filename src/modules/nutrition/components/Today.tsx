@@ -327,6 +327,7 @@ export default function Today() {
       <CalorieProgressBar consumed={consumed} tdee={summary?.tdee ?? 0} deficitTargetKcal={deficitTargetKcal} />
 
       {/* ── Food input ──────────────────────────────── */}
+      {!dayClosed && (
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title" style={{ marginBottom: 6 }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
@@ -393,12 +394,13 @@ export default function Today() {
           </div>
         )}
       </div>
+      )}
 
       {/* Food log */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.foodLog')}</div>
         {foods.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('nutrify.noFood')}</p>}
-        {foods.map((f) => <FoodLogItem key={f.id} entry={f} onDelete={handleDelete} onUpdate={async (id, fields) => {
+        {foods.map((f) => <FoodLogItem key={f.id} entry={f} readOnly={!!dayClosed} onDelete={handleDelete} onUpdate={async (id, fields) => {
           await window.api.nutritionUpdateFood(id, fields);
           loadData(date);
         }} />)}
