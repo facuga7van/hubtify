@@ -114,11 +114,15 @@ export default function Today() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reload when settings change (e.g. profile/TDEE update)
+  // Reload when settings change or sync completes
   useEffect(() => {
     const handler = () => loadData(date);
     window.addEventListener('nutrition:settingsChanged', handler);
-    return () => window.removeEventListener('nutrition:settingsChanged', handler);
+    window.addEventListener('sync:questsUpdated', handler);
+    return () => {
+      window.removeEventListener('nutrition:settingsChanged', handler);
+      window.removeEventListener('sync:questsUpdated', handler);
+    };
   }, [date, loadData]);
 
   const goDay = (offset: number) => {

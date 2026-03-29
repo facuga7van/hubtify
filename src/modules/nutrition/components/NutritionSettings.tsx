@@ -30,8 +30,6 @@ export default function NutritionSettings() {
   const [activity, setActivity] = useState('moderate');
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
-  const [gymCalories, setGymCalories] = useState(300);
-  const [stepFactor, setStepFactor] = useState(0.04);
 
   useEffect(() => {
     window.api.nutritionGetProfile().then((prof) => {
@@ -43,8 +41,6 @@ export default function NutritionSettings() {
         setHeight(p.heightCm);
         setWeight(p.initialWeightKg);
         setActivity(p.activityLevel);
-        setGymCalories(p.gymCalories);
-        setStepFactor(p.stepCaloriesFactor);
 
         const deficit = p.deficitTargetKcal;
         if (deficit > 0) { setGoal('deficit'); setGoalAmount(deficit); }
@@ -65,7 +61,7 @@ export default function NutritionSettings() {
 
       await window.api.nutritionSaveProfile({
         dateOfBirth, weightCheckDay, sex, heightCm: height, initialWeightKg: weight,
-        activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
+        activityLevel: activity, deficitTargetKcal,
       });
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);

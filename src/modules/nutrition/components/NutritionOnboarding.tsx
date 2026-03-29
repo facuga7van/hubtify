@@ -20,8 +20,6 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   // Goal
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
-  const [gymCalories, setGymCalories] = useState(300);
-  const [stepFactor, setStepFactor] = useState(0.04);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,7 +34,7 @@ export default function NutritionOnboarding({ onComplete }: Props) {
 
       await window.api.nutritionSaveProfile({
         dateOfBirth, sex, heightCm: height, initialWeightKg: weight,
-        activityLevel: activity, deficitTargetKcal, gymCalories, stepCaloriesFactor: stepFactor,
+        activityLevel: activity, deficitTargetKcal,
       });
       onComplete();
     } catch (err) {
@@ -121,20 +119,6 @@ export default function NutritionOnboarding({ onComplete }: Props) {
               </span>
             </label>
           )}
-
-          <label style={labelStyle}>
-            {t('nutrify.gymCalories')} (kcal)
-            <input type="number" value={gymCalories} onChange={(e) => setGymCalories(+e.target.value)}
-              min={0} max={1000} step={50} className="rpg-input" />
-            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('nutrify.gymCaloriesHint')}</span>
-          </label>
-
-          <label style={labelStyle}>
-            {t('nutrify.stepFactor')}
-            <input type="number" value={stepFactor} onChange={(e) => setStepFactor(+e.target.value)}
-              min={0} max={0.2} step={0.01} className="rpg-input" />
-            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('nutrify.stepFactorHint')}</span>
-          </label>
 
           {error && (
             <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', margin: 0 }}>{error}</p>
