@@ -6,7 +6,7 @@ import PageHeader from '../shared/components/PageHeader';
 import Loading from '../shared/components/Loading';
 import QuestsDashboardWidget from '../modules/quests/components/QuestsDashboardWidget';
 import NutritionDashboardWidget from '../modules/nutrition/components/NutritionDashboardWidget';
-import FinanceDashboardWidget from '../modules/finance/components/FinanceDashboardWidget';
+import FinanceDashboardWidget from '../modules/finance/components/DashboardWidget';
 import type { PlayerStats } from '../../shared/types';
 import './styles/components.css';
 
