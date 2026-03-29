@@ -390,15 +390,40 @@ export default function TaskList() {
         </DndContext>
       ) : null}
 
-      {activeTab === 'completed' && completed.map((task) => (
-        <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Checkbox checked onChange={() => handleComplete(task)} />
-            <span style={{ textDecoration: 'line-through', flex: 1 }}>{task.name}</span>
-            <TierBadge tier={task.tier} />
+      {activeTab === 'completed' && completed.map((task) => {
+        const isExpanded = expandedIds.has(task.id);
+        const subs = subtasksMap[task.id] ?? [];
+        return (
+          <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isExpanded ? 8 : 0 }}>
+              <Checkbox checked onChange={() => handleComplete(task)} />
+              <svg onClick={() => toggleExpand(task.id)} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.4, flexShrink: 0, cursor: 'pointer' }}>
+                <path d="M3 1l4 4-4 4"/>
+              </svg>
+              <span onClick={() => toggleExpand(task.id)} style={{ textDecoration: 'line-through', flex: 1, cursor: 'pointer' }}>{task.name}</span>
+              {subs.length > 0 && (
+                <span style={{ fontSize: '0.7rem', opacity: 0.5, fontFamily: 'Fira Code, monospace' }}>
+                  ({subs.filter(s => s.status).length}/{subs.length})
+                </span>
+              )}
+              <TierBadge tier={task.tier} />
+            </div>
+            {isExpanded && (
+              <div style={{ paddingLeft: 24 }}>
+                {task.description && <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 8 }}>{task.description}</p>}
+                <SubtaskList
+                  taskId={task.id}
+                  subtasks={subs}
+                  countCompletedToday={todayCount}
+                  onShowToast={setToastData}
+                  onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
+                />
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {activeTab === 'pending' && pending.length === 0 && (
         <p style={{ textAlign: 'center', opacity: 0.5, padding: 24, fontStyle: 'italic' }}>
