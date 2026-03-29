@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
-import { useAuthContext } from '../shared/AuthContext';
 import Tooltip from '../shared/components/Tooltip';
 import './styles/layout.css';
 
@@ -55,7 +54,6 @@ const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boo
 
 export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
   const { t, i18n } = useTranslation();
-  const { user: authUser, logout } = useAuthContext();
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
@@ -102,34 +100,6 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
       )}
 
       <div className="sidebar-footer">
-        {authUser ? (
-          <div style={{ marginBottom: 6 }}>
-            {!collapsed && (
-              <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {authUser.email}
-              </div>
-            )}
-            <button className="rpg-button" onClick={async () => { await logout(); }}
-              title={collapsed ? t('auth.logout') : undefined}
-              style={{ fontSize: '0.7rem', padding: collapsed ? '4px' : '3px 8px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M5 1H2v10h3M8 3l3 3-3 3M4 6h7"/>
-              </svg>
-              {!collapsed && t('auth.logout')}
-            </button>
-          </div>
-        ) : (
-          <div style={{ marginBottom: 6 }}>
-            <NavLink to="/login" className="rpg-button"
-              title={collapsed ? t('auth.loginForSync') : undefined}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.75rem', padding: collapsed ? '6px' : '6px 10px', width: '100%', textDecoration: 'none' }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M7 1h4v10H7M1 6h7M6 3l3 3-3 3"/>
-              </svg>
-              {!collapsed && t('auth.loginForSync')}
-            </NavLink>
-          </div>
-        )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
           {!collapsed && (
             <div style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.35 }}>
