@@ -12,7 +12,7 @@ import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
 import HabitTracker from './HabitTracker';
 import { type Task, type TaskTier, type Subtask, type Project, XP_MAP } from '../types';
-import { TierBadge, calculateXpForAction } from '../utils';
+import { TierBadge, calculateXpForAction, getDueDateStatus } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
 
 export default function TaskList() {
@@ -34,6 +34,7 @@ export default function TaskList() {
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [notesTaskId, setNotesTaskId] = useState<string | null>(null);
   const [drawingCounts, setDrawingCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('questify_collapsed_projects');
@@ -61,6 +62,7 @@ export default function TaskList() {
         drawCountsRaw.filter(dc => dc.count > 0).map(dc => [dc.task_id, dc.count])
       );
       setDrawingCounts(counts);
+      setLoading(false);
     } catch (err) {
       console.error('[Quests]', err);
     }
@@ -233,8 +235,6 @@ export default function TaskList() {
     selected: selectedIds.has(task.id),
     subtasks: subtasksMap[task.id] ?? [],
     todayCount,
-    projects,
-    showProjectBadge: activeProjectId === undefined,
     onToggleExpand: () => toggleExpand(task.id),
     onComplete: () => handleComplete(task),
     onEdit: () => setEditingTask(task),
@@ -246,6 +246,14 @@ export default function TaskList() {
     drawingCount: drawingCounts[task.id] ?? 0,
     onOpenNotes: () => setNotesTaskId(task.id),
   });
+
+  const SkeletonCards = () => (
+    <>
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="quest-skeleton" style={{ animationDelay: `${i * 100}ms` }} />
+      ))}
+    </>
+  );
 
   return (
     <div>
@@ -344,92 +352,94 @@ export default function TaskList() {
       </div>
 
       {/* Task lists */}
-      {activeTab === 'pending' && pendingByProject ? (
-        /* Global view — sections by project */
-        pendingByProject.map(({ project, tasks: sectionTasks }) => {
-          const sectionKey = project?.id ?? '__none__';
-          const isCollapsed = collapsedProjects.has(sectionKey);
+      {loading ? <SkeletonCards /> : (<>
+        {activeTab === 'pending' && pendingByProject ? (
+          /* Global view — sections by project */
+          pendingByProject.map(({ project, tasks: sectionTasks }) => {
+            const sectionKey = project?.id ?? '__none__';
+            const isCollapsed = collapsedProjects.has(sectionKey);
+            return (
+              <div key={sectionKey} style={{ marginBottom: 12 }}>
+                <div onClick={() => toggleProjectCollapse(sectionKey)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+                    cursor: 'pointer', borderBottom: '1px solid var(--rpg-parchment-dark)',
+                    userSelect: 'none',
+                  }}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                    style={{ transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+                    <path d="M3 1l4 4-4 4"/>
+                  </svg>
+                  {project && <span style={{ width: 10, height: 10, borderRadius: '50%', background: project.color, flexShrink: 0 }} />}
+                  <span style={{ fontWeight: 'bold', flex: 1 }}>{project?.name ?? t('questify.noProject')}</span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+                    {t('questify.pendingCount', { count: sectionTasks.length })}
+                  </span>
+                </div>
+                {!isCollapsed && (
+                  <DndContext collisionDetection={closestCenter} onDragEnd={(event) => onDragEndInSection(event, sectionTasks)}>
+                    <SortableContext items={sectionTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                      {sectionTasks.map((task) => (
+                        <SortableTaskItem key={task.id} {...taskItemProps(task)} />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+            );
+          })
+        ) : activeTab === 'pending' ? (
+          /* Single project view — flat list */
+          <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={pending.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              {pending.map((task) => (
+                <SortableTaskItem key={task.id} {...taskItemProps(task)} />
+              ))}
+            </SortableContext>
+          </DndContext>
+        ) : null}
+
+        {activeTab === 'completed' && completed.map((task) => {
+          const isExpanded = expandedIds.has(task.id);
+          const subs = subtasksMap[task.id] ?? [];
           return (
-            <div key={sectionKey} style={{ marginBottom: 12 }}>
-              <div onClick={() => toggleProjectCollapse(sectionKey)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                  cursor: 'pointer', borderBottom: '1px solid var(--rpg-parchment-dark)',
-                  userSelect: 'none',
-                }}>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                  style={{ transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+            <div key={task.id} className="rpg-card quest-card-stagger" style={{ marginBottom: 8, opacity: 0.7 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isExpanded ? 8 : 0 }}>
+                <Checkbox checked onChange={() => handleComplete(task)} />
+                <svg onClick={() => toggleExpand(task.id)} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                  style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.4, flexShrink: 0, cursor: 'pointer' }}>
                   <path d="M3 1l4 4-4 4"/>
                 </svg>
-                {project && <span style={{ width: 10, height: 10, borderRadius: '50%', background: project.color, flexShrink: 0 }} />}
-                <span style={{ fontWeight: 'bold', flex: 1 }}>{project?.name ?? t('questify.noProject')}</span>
-                <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-                  {t('questify.pendingCount', { count: sectionTasks.length })}
-                </span>
+                <span onClick={() => toggleExpand(task.id)} style={{ textDecoration: 'line-through', flex: 1, cursor: 'pointer' }}>{task.name}</span>
+                {subs.length > 0 && (
+                  <span style={{ fontSize: '0.7rem', opacity: 0.5, fontFamily: 'Fira Code, monospace' }}>
+                    ({subs.filter(s => s.status).length}/{subs.length})
+                  </span>
+                )}
+                <TierBadge tier={task.tier} />
               </div>
-              {!isCollapsed && (
-                <DndContext collisionDetection={closestCenter} onDragEnd={(event) => onDragEndInSection(event, sectionTasks)}>
-                  <SortableContext items={sectionTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                    {sectionTasks.map((task) => (
-                      <SortableTaskItem key={task.id} {...taskItemProps(task)} />
-                    ))}
-                  </SortableContext>
-                </DndContext>
+              {isExpanded && (
+                <div style={{ paddingLeft: 24 }}>
+                  {task.description && <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 8 }}>{task.description}</p>}
+                  <SubtaskList
+                    taskId={task.id}
+                    subtasks={subs}
+                    countCompletedToday={todayCount}
+                    onShowToast={setToastData}
+                    onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
+                  />
+                </div>
               )}
             </div>
           );
-        })
-      ) : activeTab === 'pending' ? (
-        /* Single project view — flat list */
-        <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={pending.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {pending.map((task) => (
-              <SortableTaskItem key={task.id} {...taskItemProps(task)} />
-            ))}
-          </SortableContext>
-        </DndContext>
-      ) : null}
+        })}
 
-      {activeTab === 'completed' && completed.map((task) => {
-        const isExpanded = expandedIds.has(task.id);
-        const subs = subtasksMap[task.id] ?? [];
-        return (
-          <div key={task.id} className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isExpanded ? 8 : 0 }}>
-              <Checkbox checked onChange={() => handleComplete(task)} />
-              <svg onClick={() => toggleExpand(task.id)} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.4, flexShrink: 0, cursor: 'pointer' }}>
-                <path d="M3 1l4 4-4 4"/>
-              </svg>
-              <span onClick={() => toggleExpand(task.id)} style={{ textDecoration: 'line-through', flex: 1, cursor: 'pointer' }}>{task.name}</span>
-              {subs.length > 0 && (
-                <span style={{ fontSize: '0.7rem', opacity: 0.5, fontFamily: 'Fira Code, monospace' }}>
-                  ({subs.filter(s => s.status).length}/{subs.length})
-                </span>
-              )}
-              <TierBadge tier={task.tier} />
-            </div>
-            {isExpanded && (
-              <div style={{ paddingLeft: 24 }}>
-                {task.description && <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 8 }}>{task.description}</p>}
-                <SubtaskList
-                  taskId={task.id}
-                  subtasks={subs}
-                  countCompletedToday={todayCount}
-                  onShowToast={setToastData}
-                  onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {activeTab === 'pending' && pending.length === 0 && (
-        <p style={{ textAlign: 'center', opacity: 0.5, padding: 24, fontStyle: 'italic' }}>
-          {t('questify.noQuests')}
-        </p>
-      )}
+        {activeTab === 'pending' && pending.length === 0 && (
+          <p style={{ textAlign: 'center', opacity: 0.5, padding: 24, fontStyle: 'italic' }}>
+            {t('questify.noQuests')}
+          </p>
+        )}
+      </>)}
 
       <XpToast data={toastData} />
 
@@ -452,11 +462,11 @@ export default function TaskList() {
   );
 }
 
-function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, projects, showProjectBadge,
+function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
   onToggleExpand, onComplete, onEdit, onToggleSelect, onShowToast, onSubtaskChanged,
   drawingCount, onOpenNotes }: {
   task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
-  todayCount: number; projects: Project[]; showProjectBadge: boolean;
+  todayCount: number;
   onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
   onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
   onSubtaskChanged: () => void;
@@ -466,10 +476,9 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, proj
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
-  const project = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-
   return (
-    <div ref={setNodeRef} style={{ ...style, marginBottom: 8 }} {...attributes} className="rpg-card">
+    <div ref={setNodeRef} style={{ ...style, marginBottom: 8 }} {...attributes}
+      className={`rpg-card quest-card-stagger${task.dueDate && getDueDateStatus(task.dueDate) === 'overdue' ? ' quest-card--overdue' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: expanded ? 8 : 0 }}>
         <svg {...listeners} width="14" height="14" viewBox="0 0 14 14"
           style={{ cursor: 'grab', opacity: 0.4, flexShrink: 0 }}
@@ -493,27 +502,19 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount, proj
         )}
         <TierBadge tier={task.tier} />
         <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>+{XP_MAP[task.tier]}</span>
-        {showProjectBadge && project && (
-          <span style={{
-            fontSize: '0.7rem', padding: '1px 6px', borderRadius: 3,
-            background: project.color, color: '#f5f0e1', opacity: 0.9,
-          }}>
-            {project.name}
-          </span>
-        )}
         {task.category && (
           <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)',
             padding: '1px 6px', borderRadius: 3 }}>{task.category}</span>
         )}
-        {task.dueDate && (
-          <span style={{
-            fontSize: '0.7rem', padding: '1px 6px', borderRadius: 3,
-            background: new Date(task.dueDate) < new Date() ? 'var(--rpg-hp-red)' : 'var(--rpg-parchment-dark)',
-            color: new Date(task.dueDate) < new Date() ? 'var(--rpg-parchment)' : 'var(--rpg-ink-light)',
-          }}>
-            {new Date(task.dueDate).toLocaleDateString()}
-          </span>
-        )}
+        {task.dueDate && (() => {
+          const status = getDueDateStatus(task.dueDate);
+          return (
+            <span className={`quest-due--${status}`}
+              style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: 3 }}>
+              {status === 'today' ? t('questify.dueToday') : new Date(task.dueDate).toLocaleDateString()}
+            </span>
+          );
+        })()}
         {/* Note icon */}
         <span onClick={onOpenNotes} style={{ position: 'relative', cursor: 'pointer', display: 'inline-flex' }}>
           <svg width="16" height="16" viewBox="0 0 16 16"

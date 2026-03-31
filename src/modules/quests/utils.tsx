@@ -2,8 +2,6 @@ import type { TaskTier } from './types';
 import { XP_MAP } from './types';
 import { getComboMultiplier } from '../../../shared/rpg-engine';
 
-export { getComboMultiplier };
-
 export const TIER_EMOJI: Record<TaskTier, string> = {
   1: '⚡',
   2: '⚔️',
@@ -15,14 +13,6 @@ export const TIER_LABEL: Record<TaskTier, string> = {
   2: 'questify.tier.normal',
   3: 'questify.tier.epic',
 };
-
-export function tierEmoji(tier: number): string {
-  return TIER_EMOJI[tier as TaskTier] ?? '⚔️';
-}
-
-export function tierLabel(tier: number): string {
-  return TIER_LABEL[tier as TaskTier] ?? 'questify.tier.normal';
-}
 
 export function tierXp(tier: number): number {
   return XP_MAP[tier as TaskTier] ?? 15;
@@ -58,4 +48,19 @@ export function calculateXpForAction(tier: number, todayCount: number): { xp: nu
   const comboMult = getComboMultiplier(todayCount);
   const xp = Math.round(tierXp(tier) * comboMult * bonus.multiplier);
   return { xp, bonus, comboMult };
+}
+
+export function getDueDateStatus(dueDate: string): 'overdue' | 'today' | 'this-week' | 'later' {
+  const now = new Date();
+  const due = new Date(dueDate);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart);
+  todayEnd.setDate(todayEnd.getDate() + 1);
+  const weekEnd = new Date(todayStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  if (due < todayStart) return 'overdue';
+  if (due < todayEnd) return 'today';
+  if (due < weekEnd) return 'this-week';
+  return 'later';
 }

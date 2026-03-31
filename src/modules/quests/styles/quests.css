@@ -112,3 +112,92 @@
 .rpg-card + .rpg-card {
   margin-top: 8px;
 }
+
+/* ── Card Animations ──────────────────────────────── */
+.quest-card-enter {
+  animation: questCardEnter 0.3s ease-out forwards;
+}
+
+@keyframes questCardEnter {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.quest-card-exit {
+  animation: questCardExit 0.3s ease-in forwards;
+}
+
+@keyframes questCardExit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-20px); }
+}
+
+/* Staggered fade-in on page load */
+.quest-card-stagger { animation: contentFadeIn 0.3s ease-out both; }
+.quest-card-stagger:nth-child(1) { animation-delay: 0ms; }
+.quest-card-stagger:nth-child(2) { animation-delay: 50ms; }
+.quest-card-stagger:nth-child(3) { animation-delay: 50ms; }
+.quest-card-stagger:nth-child(4) { animation-delay: 100ms; }
+.quest-card-stagger:nth-child(5) { animation-delay: 100ms; }
+.quest-card-stagger:nth-child(6) { animation-delay: 150ms; }
+.quest-card-stagger:nth-child(7) { animation-delay: 150ms; }
+.quest-card-stagger:nth-child(8) { animation-delay: 200ms; }
+.quest-card-stagger:nth-child(9) { animation-delay: 200ms; }
+.quest-card-stagger:nth-child(10) { animation-delay: 250ms; }
+.quest-card-stagger:nth-child(n+11) { animation-delay: 250ms; }
+
+/* ── Overdue Glow ─────────────────────────────────── */
+.quest-card--overdue {
+  border-left: 3px solid var(--rpg-hp-red) !important;
+  box-shadow: inset 3px 0 6px rgba(139, 32, 32, 0.15);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ── Due Date Badges ──────────────────────────────── */
+.quest-due--overdue {
+  background: var(--rpg-hp-red);
+  color: var(--rpg-parchment);
+}
+
+.quest-due--today {
+  background: #c0792a;
+  color: var(--rpg-parchment);
+}
+
+.quest-due--this-week {
+  background: var(--rpg-gold);
+  color: var(--rpg-ink);
+  opacity: 0.8;
+}
+
+.quest-due--later {
+  background: var(--rpg-parchment-dark);
+  color: var(--rpg-ink-light);
+}
+
+/* ── Stats Strip ──────────────────────────────────── */
+.quest-stats-strip {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.quest-stats-strip .coin-stat {
+  flex: 1;
+  padding: 10px 8px;
+}
+
+/* ── Skeleton Loading ─────────────────────────────── */
+@keyframes questShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.quest-skeleton {
+  background: linear-gradient(90deg, var(--rpg-parchment-dark) 25%, var(--rpg-parchment-light) 50%, var(--rpg-parchment-dark) 75%);
+  background-size: 200% 100%;
+  animation: questShimmer 1.5s ease infinite;
+  border-radius: var(--rpg-radius);
+  height: 48px;
+  margin-bottom: 8px;
+}
