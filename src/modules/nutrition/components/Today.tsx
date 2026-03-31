@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useNutriToast } from './NutriToastProvider';
 import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
@@ -9,6 +10,7 @@ import { todayDateString, formatDateString } from '../../../../shared/date-utils
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
+import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import type { NutritionProfile } from '../types';
 
 interface FoodEntry {
@@ -37,6 +39,7 @@ export default function Today() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [target, setTarget] = useState(0);
   const [deficitTargetKcal, setDeficitTargetKcal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   // Close Day
   const [dayClosed, setDayClosed] = useState<{
@@ -59,7 +62,9 @@ export default function Today() {
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
   const [frequentSearch, setFrequentSearch] = useState('');
-  const [logMessage, setLogMessage] = useState('');
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [lastAddedId, setLastAddedId] = useState<number | null>(null);
+  const { showToast } = useNutriToast();
 
   const loadData = useCallback(async (d: string) => {
     const [foodList, sum, met, freq, prof, tgt] = await Promise.all([
@@ -78,6 +83,7 @@ export default function Today() {
     setTarget(tgt as number ?? 0);
     setDeficitTargetKcal((prof as NutritionProfile | null)?.deficitTargetKcal ?? 0);
     setCloseResult(null);
+    setLoading(false);
     window.api.nutritionIsDayClosed(d).then((r) => setDayClosed(r as typeof dayClosed)).catch(console.error);
   }, []);
 
@@ -166,10 +172,12 @@ export default function Today() {
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
 
-    showToast(`+${calories} kcal`);
+    showToast('success', `+${calories} kcal`);
     setFoodInput('');
     setEstimation(null);
     setEditCalories('');
+    const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+    if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
     loadData(date);
     window.dispatchEvent(new Event('rpg:statsChanged'));
   };
@@ -185,14 +193,20 @@ export default function Today() {
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
-    showToast(`+${food.calories} kcal`);
+    showToast('success', `+${food.calories} kcal`);
+    const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+    if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
     loadData(date);
     window.dispatchEvent(new Event('rpg:statsChanged'));
   };
 
-  const handleDelete = async (id: number) => {
-    await window.api.nutritionDeleteFood(id);
-    loadData(date);
+  const handleDelete = (id: number) => {
+    setRemovingId(id);
+    setTimeout(async () => {
+      await window.api.nutritionDeleteFood(id);
+      loadData(date);
+      setRemovingId(null);
+    }, 300);
   };
 
   const handleMetrics = async (field: string, value: unknown) => {
@@ -200,16 +214,6 @@ export default function Today() {
     await window.api.nutritionSaveDailyMetrics(updated);
     loadData(date);
   };
-
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = (msg: string) => {
-    setLogMessage(msg);
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setLogMessage(''), 2000);
-  };
-  useEffect(() => {
-    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
-  }, []);
 
   // Weight check-in: only when viewing today, re-check after sync restores profile
   useEffect(() => {
@@ -262,7 +266,7 @@ export default function Today() {
         payload: { xp, hp },
         timestamp: Date.now(),
       });
-      showToast(`+${xp} XP`);
+      showToast('info', `+${xp} XP`);
       window.dispatchEvent(new Event('rpg:statsChanged'));
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
@@ -276,7 +280,51 @@ export default function Today() {
       !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
     ), [frequentFoods, frequentSearch]);
 
-  if (hasProfile === null) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
+  if (loading) return (
+    <div>
+      <PageHeader
+        title={t('nutrify.title')}
+        subtitle={t('nutrify.subtitle')}
+        actions={
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }} disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+            </button>
+            <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 12px' }} disabled>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <rect x="1" y="7" width="3" height="6"/><rect x="5.5" y="4" width="3" height="9"/><rect x="10" y="1" width="3" height="12"/>
+              </svg>
+              {' '}{t('nutrify.charts')}
+            </button>
+          </div>
+        }
+      />
+      {/* Date nav placeholder */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: 120 }} />
+      </div>
+      {/* Progress bar skeleton */}
+      <div style={{ marginBottom: 16 }}>
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ marginBottom: 6 }} />
+        <div className="nutri-skeleton nutri-skeleton--bar" />
+      </div>
+      {/* Food input skeleton */}
+      <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '40%', marginBottom: 12 }} />
+        <div className="nutri-skeleton nutri-skeleton--bar" />
+      </div>
+      {/* Food log skeleton */}
+      <div className="rpg-card">
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '40%', marginBottom: 12 }} />
+        {[1,2,3].map(i => (
+          <div key={i} className="nutri-skeleton nutri-skeleton--text" style={{ marginBottom: 8 }} />
+        ))}
+      </div>
+    </div>
+  );
+  if (hasProfile === null) return null;
   if (!hasProfile) return <NutritionOnboarding onComplete={() => loadData(date)} />;
 
   return (
@@ -327,10 +375,13 @@ export default function Today() {
         </button>
       </div>
 
-      <CalorieProgressBar consumed={consumed} tdee={summary?.tdee ?? 0} deficitTargetKcal={deficitTargetKcal} />
+      <div className="nutri-section nutri-stagger-1">
+        <CalorieProgressBar consumed={consumed} tdee={summary?.tdee ?? 0} deficitTargetKcal={deficitTargetKcal} />
+      </div>
 
       {/* ── Food input ──────────────────────────────── */}
       {!dayClosed && (
+      <div className="nutri-section nutri-stagger-2">
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title" style={{ marginBottom: 6 }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
@@ -369,7 +420,7 @@ export default function Today() {
                 {estimation.items.map((item, i) => (
                   <div key={i} style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--rpg-parchment-dark)' }}>
                     <span>{item.name}</span>
-                    <span style={{ fontFamily: 'Fira Code, monospace' }}>{item.calories} kcal</span>
+                    <span style={{ fontFamily: 'Fira Code, monospace' }}><AnimatedNumber value={item.calories} prefix="" locale="es-AR" duration={400} /> kcal</span>
                   </div>
                 ))}
               </div>
@@ -397,20 +448,24 @@ export default function Today() {
           </div>
         )}
       </div>
+      </div>
       )}
 
       {/* Food log */}
+      <div className="nutri-section nutri-stagger-3">
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.foodLog')}</div>
         {foods.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('nutrify.noFood')}</p>}
-        {foods.map((f) => <FoodLogItem key={f.id} entry={f} readOnly={!!dayClosed} onDelete={handleDelete} onUpdate={async (id, fields) => {
+        {foods.map((f) => <FoodLogItem key={f.id} entry={f} className={removingId === f.id ? 'nutri-food-exit' : lastAddedId === f.id ? 'nutri-food-enter' : ''} readOnly={!!dayClosed} onDelete={handleDelete} onUpdate={async (id, fields) => {
           await window.api.nutritionUpdateFood(id, fields);
           loadData(date);
         }} />)}
       </div>
+      </div>
 
       {/* Frequent foods */}
       {frequentFoods.length > 0 && (
+        <div className="nutri-section nutri-stagger-4">
         <div className="rpg-card" style={{ marginBottom: 16 }}>
           <div className="rpg-card-title">{t('nutrify.frequentFoods')}</div>
           <input type="text" placeholder={t('common.search')} value={frequentSearch}
@@ -424,10 +479,12 @@ export default function Today() {
             ))}
           </div>
         </div>
+        </div>
       )}
 
 
       {/* Close Day */}
+      <div className="nutri-section nutri-stagger-5">
       <div className="rpg-card">
         <div className="rpg-card-title">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
@@ -461,20 +518,7 @@ export default function Today() {
           </div>
         )}
       </div>
-
-      {/* Log confirmation toast */}
-      {logMessage && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, padding: '8px 16px',
-          background: 'var(--rpg-wood)', color: 'var(--rpg-gold-light)',
-          border: '1px solid var(--rpg-gold)', borderRadius: 'var(--rpg-radius)',
-          fontFamily: 'Fira Code, monospace', fontSize: '0.9rem',
-          animation: 'contentFadeIn 0.2s ease', zIndex: 1000,
-          boxShadow: 'var(--rpg-shadow)',
-        }}>
-          {logMessage}
-        </div>
-      )}
+      </div>
 
       {/* Weight check-in popup */}
       {weightPopup.show && (

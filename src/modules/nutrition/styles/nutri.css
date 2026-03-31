@@ -1,0 +1,145 @@
+/* ── Nutrify Module Styles ── */
+
+/* Keyframes */
+@keyframes nutriStaggerIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nutriSlideIn {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nutriFadeOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-20px); }
+}
+
+@keyframes nutriPulseGold {
+  0%, 100% { outline-color: var(--rpg-gold); }
+  50% { outline-color: var(--rpg-gold-light); box-shadow: 0 0 6px rgba(201, 168, 76, 0.4); }
+}
+
+@keyframes nutriShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes nutriToastIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Skeleton Loading ── */
+.nutri-skeleton {
+  background: linear-gradient(90deg, var(--rpg-parchment-dark) 25%, var(--rpg-parchment-light) 50%, var(--rpg-parchment-dark) 75%);
+  background-size: 200% 100%;
+  animation: nutriShimmer 1.5s ease infinite;
+  border-radius: var(--rpg-radius);
+}
+
+.nutri-skeleton--bar {
+  height: 22px;
+  width: 100%;
+}
+
+.nutri-skeleton--text {
+  height: 14px;
+  width: 65%;
+}
+
+.nutri-skeleton--number {
+  height: 24px;
+  width: 80px;
+}
+
+.nutri-skeleton--chart {
+  height: 250px;
+  width: 100%;
+}
+
+.nutri-skeleton--card {
+  height: 80px;
+  width: 100%;
+}
+
+/* ── Staggered Section Entry ── */
+.nutri-section {
+  animation: nutriStaggerIn 0.35s ease both;
+}
+
+.nutri-stagger-1 { animation-delay: 0ms; }
+.nutri-stagger-2 { animation-delay: 50ms; }
+.nutri-stagger-3 { animation-delay: 100ms; }
+.nutri-stagger-4 { animation-delay: 150ms; }
+.nutri-stagger-5 { animation-delay: 200ms; }
+
+/* ── Food Item Animations ── */
+.nutri-food-enter {
+  animation: nutriSlideIn 0.3s ease both;
+}
+
+.nutri-food-exit {
+  animation: nutriFadeOut 0.3s ease both;
+}
+
+/* ── Inline Edit Pulse ── */
+.nutri-pulse-gold {
+  animation: nutriPulseGold 1.5s infinite;
+  outline: 1px solid var(--rpg-gold);
+  outline-offset: -1px;
+  border-radius: var(--rpg-radius);
+}
+
+/* ── Toast ── */
+.nutri-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background: var(--rpg-wood);
+  color: var(--rpg-gold-light);
+  border: 2px solid var(--rpg-gold);
+  border-radius: var(--rpg-radius);
+  box-shadow: 0 4px 20px rgba(44, 24, 16, 0.5);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+  z-index: 1000;
+  animation: nutriToastIn 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-toast--success {
+  border-color: var(--rpg-xp-green);
+  box-shadow: 0 0 8px rgba(45, 90, 39, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+}
+
+.nutri-toast--info {
+  border-color: var(--rpg-gold);
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+}
+
+.nutri-toast--warning {
+  border-color: #e67e22;
+  box-shadow: 0 0 8px rgba(230, 126, 34, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+}
+
+.nutri-toast__icon {
+  display: flex;
+  align-items: center;
+}
+
+.nutri-toast__message {
+  flex: 1;
+}
+
+/* ── Stats Grid (Charts Dashboard) ── */
+.nutri-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}

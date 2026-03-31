@@ -11,9 +11,10 @@ interface Props {
   onDelete: (id: number) => void;
   onUpdate: (id: number, fields: { description?: string; calories?: number }) => void;
   readOnly?: boolean;
+  className?: string;
 }
 
-export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly }: Props) {
+export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly, className }: Props) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -35,7 +36,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly }
 
   if (editing) {
     return (
-      <div style={{
+      <div className={`nutri-pulse-gold ${className || ''}`} style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0',
         borderBottom: '1px solid var(--rpg-parchment-dark)',
       }}>
@@ -53,7 +54,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly }
   }
 
   return (
-    <div style={{
+    <div className={className || ''} style={{
       display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
       borderBottom: '1px solid var(--rpg-parchment-dark)',
     }}>

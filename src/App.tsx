@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, Outlet } from 'react-router-dom';
 import Layout from './hub/Layout';
 import Onboarding from './hub/Onboarding';
 import Dashboard from './hub/Dashboard';
@@ -10,10 +10,13 @@ import ErrorBoundary from './shared/components/ErrorBoundary';
 import { questsModule } from './modules/quests';
 import TaskList from './modules/quests/components/TaskList';
 import './modules/quests/styles/quests.css';
+import './modules/finance/styles/coinify.css';
+import './modules/nutrition/styles/nutri.css';
 import { nutritionModule } from './modules/nutrition';
 import Today from './modules/nutrition/components/Today';
 import NutritionCharts from './modules/nutrition/components/NutritionCharts';
 import NutritionSettings from './modules/nutrition/components/NutritionSettings';
+import NutriToastProvider from './modules/nutrition/components/NutriToastProvider';
 import { financeModule } from './modules/finance';
 import FinanceLayout from './modules/finance/components/FinanceLayout';
 import FinanceDashboard from './modules/finance/components/Dashboard';
@@ -67,9 +70,11 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/character" element={<CharacterPage />} />
           <Route path="/quests" element={<TaskList />} />
-          <Route path="/nutrition" element={<Today />} />
-          <Route path="/nutrition/dashboard" element={<NutritionCharts />} />
-          <Route path="/nutrition/settings" element={<NutritionSettings />} />
+          <Route path="/nutrition" element={<NutriToastProvider><Outlet /></NutriToastProvider>}>
+            <Route index element={<Today />} />
+            <Route path="dashboard" element={<NutritionCharts />} />
+            <Route path="settings" element={<NutritionSettings />} />
+          </Route>
           <Route path="/finance" element={<FinanceLayout />}>
             <Route index element={<FinanceDashboard />} />
             <Route path="transactions" element={<Transactions />} />
