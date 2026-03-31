@@ -44,7 +44,3 @@ export function touchAccount(uid: string): void {
   }
 }
 
-export function getActiveAccountUid(): string | null {
-  const accounts = readAccounts();
-  return accounts.length > 0 ? accounts[0].uid : null;
-}

@@ -72,20 +72,9 @@ export interface Subtask {
 
 export type BonusTier = 'normal' | 'good' | 'critical' | 'legendary';
 
-export interface BonusRoll {
-  tier: BonusTier;
-  multiplier: number;
-}
-
 export interface XpToastData {
   xp: number;
   bonusTier: BonusTier;
   comboMultiplier: number;
   streakMilestone?: number | null;
-}
-
-export function migrateOldDifficulty(oldDiff: number): TaskTier {
-  if (oldDiff <= 3) return TASK_TIER.QUICK;
-  if (oldDiff <= 7) return TASK_TIER.NORMAL;
-  return TASK_TIER.EPIC;
 }

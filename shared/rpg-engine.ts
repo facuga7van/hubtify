@@ -66,15 +66,6 @@ export function getStreakMilestoneBonus(streak: number): number {
   return STREAK_MILESTONES[streak] ?? 0;
 }
 
-export function isStreakActive(lastDate: string | null, today: string): boolean {
-  if (!lastDate) return false;
-  const last = new Date(lastDate);
-  const now = new Date(today);
-  const diffMs = now.getTime() - last.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  return diffDays <= 1;
-}
-
 export { todayDateString as getLocalDateString } from './date-utils';
 
 export function daysDiff(a: string, b: string): number {

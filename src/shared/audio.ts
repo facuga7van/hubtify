@@ -29,13 +29,6 @@ export function playTaskComplete() {
   } catch { /* Sound not available */ }
 }
 
-export function playXpGain() {
-  if (!soundEnabled) return;
-  try {
-    getSound('xpGain', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3).play();
-  } catch { /* Sound not available */ }
-}
-
 export function playLevelUp() {
   if (!soundEnabled) return;
   try {

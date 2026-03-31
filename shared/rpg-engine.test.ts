@@ -10,7 +10,6 @@ import {
   getStreakMilestoneBonus,
   clampHp,
   xpToNextLevel,
-  isStreakActive,
   daysDiff,
   getLocalDateString,
 } from './rpg-engine';
@@ -107,21 +106,6 @@ describe('xpToNextLevel', () => {
     // level 2 threshold is 339, level 3 threshold is round(120 * 3^1.5) = 624
     const result = xpToNextLevel(339);
     expect(result).toBe(624 - 339);
-  });
-});
-
-describe('isStreakActive', () => {
-  it('returns false for null lastDate', () => {
-    expect(isStreakActive(null, '2026-03-21')).toBe(false);
-  });
-  it('returns true if lastDate is yesterday', () => {
-    expect(isStreakActive('2026-03-20', '2026-03-21')).toBe(true);
-  });
-  it('returns true if lastDate is today', () => {
-    expect(isStreakActive('2026-03-21', '2026-03-21')).toBe(true);
-  });
-  it('returns false if lastDate is 2+ days ago', () => {
-    expect(isStreakActive('2026-03-19', '2026-03-21')).toBe(false);
   });
 });
 

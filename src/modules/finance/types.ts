@@ -66,32 +66,12 @@ export interface LoanPayment {
   createdAt: string;
 }
 
-export interface RecurringTransaction {
-  id: string;
-  name: string;
-  type: TransactionType;
-  amount: number;
-  currency: Currency;
-  category: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface RecurringAmountHistory {
   id: string;
   recurringId: string;
   previousAmount: number;
   newAmount: number;
   changedAt: string;
-}
-
-export interface ImportBatch {
-  id: string;
-  fileName: string;
-  statementMonth: string;
-  transactionCount: number;
-  createdAt: string;
 }
 
 export interface CategoryMapping {

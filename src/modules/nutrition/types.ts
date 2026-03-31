@@ -9,16 +9,6 @@ export interface NutritionProfile {
   weightCheckDay: number;
 }
 
-export interface FoodLogEntry {
-  id: number;
-  date: string;
-  time: string;
-  description: string;
-  calories: number;
-  source: 'ai_estimate' | 'frequent' | 'manual';
-  frequentFoodId: number | null;
-}
-
 export interface FrequentFood {
   id: number;
   name: string;
