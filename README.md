@@ -71,6 +71,6 @@ GitHub Actions builds the installer and creates a release automatically.
 - Electron + React + TypeScript
 - SQLite (better-sqlite3) for local storage
 - Firebase Firestore for sync and food telemetry
-- Ollama + fine-tuned Llama 3.2 1B for calorie estimation
+- Gemini API for calorie estimation
 - Vite for bundling
 - Electron Forge for packaging
