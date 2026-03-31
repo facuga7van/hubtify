@@ -11,14 +11,14 @@ interface SyncSettings {
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const [stats, questData, charData, nutritionData, financeTx, loans, incomeSources] = await Promise.all([
+    const [stats, questData, charData, nutritionData, financeTx, loans, recurring] = await Promise.all([
       window.api.getRpgStats(),
       window.api.syncGetAllQuestData(),
       window.api.characterLoad(),
       window.api.syncGetAllNutritionData(),
-      window.api.financeGetTransactions(new Date().toISOString().slice(0, 7)),
+      window.api.financeGetTransactions({ month: new Date().toISOString().slice(0, 7) }),
       window.api.financeGetLoans(),
-      window.api.financeGetIncomeSources(),
+      window.api.financeGetRecurring(),
     ]);
 
     const userRef = doc(getActiveFirestore(), 'hubtify_users', uid);
@@ -27,7 +27,7 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       characterData: charData,
       questify: questData,
       nutrify: nutritionData,
-      coinify: { transactions: financeTx, loans, incomeSources },
+      coinify: { transactions: financeTx, loans, recurring },
       settings: {
         language: localStorage.getItem('hubtify_lang') || 'es',
         sound: localStorage.getItem('hubtify_sound') !== 'false',
@@ -75,10 +75,10 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
       if (nutritionResult.changed) changed = true;
     }
 
-    // Restore finance income sources
-    if (data.coinify?.incomeSources && Array.isArray(data.coinify.incomeSources)) {
-      for (const src of data.coinify.incomeSources) {
-        try { await window.api.financeAddIncomeSource(src); } catch { /* already exists */ }
+    // Restore finance recurring
+    if (data.coinify?.recurring && Array.isArray(data.coinify.recurring)) {
+      for (const rec of data.coinify.recurring) {
+        try { await window.api.financeAddRecurring(rec); } catch { /* already exists */ }
       }
     }
 

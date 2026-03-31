@@ -52,25 +52,30 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rpg-card" style={{ marginBottom: 16, padding: 16 }}>
-      <div className="rpg-card-title" style={{ marginBottom: 10 }}>💰 Carga rápida</div>
+    <form onSubmit={handleSubmit} className="rpg-card coin-quick-add-form coin-quick-add-form--open">
+      <div className="coin-quick-add-form__title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="10" /><path d="M12 6v12M8 10h8M8 14h8" />
+        </svg>
+        {t('coinify.quickAdd')}
+      </div>
 
       {/* Type toggle */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div className="coin-quick-add-form__type-row">
         <button type="button" onClick={() => setType('expense')}
-          className="rpg-button"
-          style={{ flex: 1, opacity: type === 'expense' ? 1 : 0.4 }}>
+          className={`rpg-button ${type === 'expense' ? 'rpg-btn-active' : ''}`}
+          style={{ flex: 1 }}>
           {t('coinify.expense')}
         </button>
         <button type="button" onClick={() => setType('income')}
-          className="rpg-button"
-          style={{ flex: 1, opacity: type === 'income' ? 1 : 0.4 }}>
+          className={`rpg-button ${type === 'income' ? 'rpg-btn-active' : ''}`}
+          style={{ flex: 1 }}>
           {t('coinify.income')}
         </button>
       </div>
 
       {/* Amount + currency */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div className="coin-quick-add-form__amount-row">
         <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
           placeholder={t('coinify.amount')} className="rpg-input" style={{ flex: 1 }} min="0" step="0.01" required />
         <select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}
@@ -81,21 +86,21 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       </div>
 
       {/* Category */}
-      <div style={{ marginBottom: 12 }}>
+      <div className="coin-quick-add-form__field">
         <CategorySelect value={category} onChange={setCategory} />
       </div>
 
       {/* Description */}
       <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-        placeholder={t('coinify.description')} className="rpg-input" style={{ width: '100%', marginBottom: 12 }} />
+        placeholder={t('coinify.description')} className="rpg-input coin-quick-add-form__field" />
 
       {/* Date */}
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-        className="rpg-input" style={{ width: '100%', marginBottom: 12 }} />
+        className="rpg-input coin-quick-add-form__field" />
 
       {/* Payment method */}
       <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-        className="rpg-select" style={{ width: '100%', marginBottom: 12 }}>
+        className="rpg-select coin-quick-add-form__field">
         <option value="cash">{t('coinify.cash')}</option>
         <option value="debit">{t('coinify.debit')}</option>
         <option value="transfer">{t('coinify.transfer')}</option>
@@ -104,7 +109,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
       {/* Installments (conditional) */}
       {paymentMethod === 'credit_card' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <div className="coin-quick-add-form__installment-row">
           <label style={{ fontSize: '0.85rem' }}>{t('coinify.installments')}</label>
           <input type="number" value={installments}
             onChange={(e) => setInstallments(Math.max(1, parseInt(e.target.value) || 1))}

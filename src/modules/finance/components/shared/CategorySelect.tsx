@@ -4,10 +4,10 @@ import { CATEGORIES } from '../../types';
 interface CategorySelectProps {
   value: string;
   onChange: (category: string) => void;
-  style?: React.CSSProperties;
+  className?: string;
 }
 
-export function CategorySelect({ value, onChange, style }: CategorySelectProps) {
+export function CategorySelect({ value, onChange, className }: CategorySelectProps) {
   const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
 
   useEffect(() => {
@@ -21,8 +21,7 @@ export function CategorySelect({ value, onChange, style }: CategorySelectProps) 
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rpg-select"
-      style={{ width: '100%', ...style }}
+      className={`rpg-select coin-category-select ${className ?? ''}`}
     >
       {categories.map((cat) => (
         <option key={cat} value={cat}>{cat}</option>

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 interface MonthNavigatorProps {
-  month: string; // 'YYYY-MM' format
+  month: string;
   onChange: (month: string) => void;
 }
 
@@ -23,10 +23,10 @@ export function MonthNavigator({ month, onChange }: MonthNavigatorProps) {
   })();
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-      <button onClick={() => navigate(-1)} className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>&lt;</button>
-      <span style={{ fontSize: '1.1rem', fontWeight: 600, textTransform: 'capitalize' }}>{label}</span>
-      <button onClick={() => navigate(1)} className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>&gt;</button>
+    <div className="coin-month-nav">
+      <button onClick={() => navigate(-1)} className="rpg-button coin-month-nav__btn">&lt;</button>
+      <span className="coin-month-nav__label">{label}</span>
+      <button onClick={() => navigate(1)} className="rpg-button coin-month-nav__btn">&gt;</button>
     </div>
   );
 }

@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { DollarChip } from './shared/DollarChip';
+import { AnimatedNumber } from './shared/AnimatedNumber';
+import { CoinStatCard } from './shared/CoinStatCard';
+import { BalanceBar } from './shared/BalanceBar';
+import { DonutChart } from './shared/DonutChart';
+
+// ── Types ──
 
 interface CurrencyBalance {
   income: number;
@@ -34,165 +39,308 @@ interface LoanSummary {
   borrowed: number;
 }
 
+// ── Helpers ──
+
+const COLORS = ['#C9A84C', '#A68A3E', '#5C3A1E', '#3B2314', '#6B3A2A', '#4A2D1A', '#E0C068', '#8B6F47', '#cd853f', '#bc8f8f'];
+
+function getPrevMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// ── Icons (inline SVG) ──
+
+const SwordIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m11 19-6-6" /><path d="m5 21-2-2" /><path d="m8 16-4 4" /><path d="M9.5 17.5 21 6V3h-3L6.5 14.5" />
+  </svg>
+);
+
+const ShieldIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
+
+const ChainIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+);
+
+const ScaleIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v18" /><path d="M5 6l7-3 7 3" />
+    <path d="M2 15l3-9 3 9a5 5 0 0 1-6 0z" /><path d="M16 15l3-9 3 9a5 5 0 0 1-6 0z" />
+  </svg>
+);
+
+const ChestIcon = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3" /><path d="M3 16v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" />
+    <path d="M3 8h18v8H3z" /><circle cx="12" cy="12" r="2" />
+  </svg>
+);
+
+// ── Component ──
+
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+
   const [balance, setBalance] = useState<MonthlyBalance | null>(null);
+  const [prevBalance, setPrevBalance] = useState<MonthlyBalance | null>(null);
   const [categories, setCategories] = useState<CategoryBreakdown[]>([]);
   const [projection, setProjection] = useState<ProjectionMonth[]>([]);
   const [loans, setLoans] = useState<LoanSummary>({ lent: 0, borrowed: 0 });
+  const [installmentCount, setInstallmentCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [fadeState, setFadeState] = useState<'in' | 'out'>('in');
+  const isFirstLoad = useRef(true);
 
+  // Fetch month-dependent data
   useEffect(() => {
-    window.api.financeGetMonthlyBalance(month).then(setBalance);
-    window.api.financeGetCategoryBreakdown(month).then(setCategories);
+    const fetchData = async () => {
+      if (!isFirstLoad.current) {
+        setFadeState('out');
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      setLoading(true);
+
+      const prevMonth = getPrevMonth(month);
+      const [bal, prev, cats] = await Promise.all([
+        window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
+        window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
+        window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
+      ]);
+
+      setBalance(bal);
+      setPrevBalance(prev);
+      setCategories(cats);
+      setLoading(false);
+      setFadeState('in');
+      isFirstLoad.current = false;
+    };
+
+    fetchData();
   }, [month]);
 
+  // Fetch static data (projection, loans, installment count)
   useEffect(() => {
-    window.api.financeGetProjection(3).then(setProjection);
-    window.api.financeGetActiveLoanSummary().then(setLoans);
+    window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[]));
+    window.api.financeGetActiveLoanSummary().then((data) => setLoans(data as LoanSummary));
+    window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length));
   }, []);
 
-  const COLORS = ['#C9A84C', '#A68A3E', '#5C3A1E', '#3B2314', '#6B3A2A', '#4A2D1A', '#E0C068', '#8B6F47', '#cd853f', '#bc8f8f'];
+  // Trend calculation
+  const trendPct = (() => {
+    if (!balance || !prevBalance) return null;
+    const currExpenses = balance.ARS.expenses;
+    const prevExpenses = prevBalance.ARS.expenses;
+    if (prevExpenses === 0) return null;
+    return Math.round(((currExpenses - prevExpenses) / prevExpenses) * 100);
+  })();
+
+  // Donut data
+  const donutData = categories
+    .filter((c) => c.ARS > 0)
+    .map((c, i) => ({
+      label: c.category,
+      value: c.ARS,
+      color: COLORS[i % COLORS.length],
+    }));
+
+  // Projection bar max
+  const projMax = Math.max(...projection.map((p) => p.total), 1);
+
+  const hasUsd = balance ? (balance.USD.income > 0 || balance.USD.expenses > 0) : false;
+  const netLoans = loans.lent - loans.borrowed;
+
+  // ── Skeleton ──
+
+  if (loading && isFirstLoad.current) {
+    return (
+      <div className="coin-dashboard coin-dashboard--loading">
+        <div className="coin-dashboard__header">
+          <MonthNavigator month={month} onChange={setMonth} />
+          <DollarChip />
+        </div>
+        <div className="coin-skeleton coin-skeleton--card" style={{ height: 120 }} />
+        <div className="coin-stats-grid">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="coin-skeleton coin-skeleton--card" />
+          ))}
+        </div>
+        <div className="coin-skeleton coin-skeleton--chart" />
+        <div className="coin-bottom-grid">
+          <div className="coin-skeleton coin-skeleton--card" style={{ height: 100 }} />
+          <div className="coin-skeleton coin-skeleton--card" style={{ height: 100 }} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render ──
 
   return (
-    <div>
+    <div className="coin-dashboard">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div className="coin-dashboard__header">
         <MonthNavigator month={month} onChange={setMonth} />
         <DollarChip />
       </div>
 
-      {/* Balance Cards */}
-      {balance && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: (balance.USD.income > 0 || balance.USD.expenses > 0) ? '1fr 1fr' : '1fr',
-          gap: 12,
-          marginBottom: 16,
-        }}>
-          <div className="rpg-card">
-            <div className="rpg-card-title" style={{ marginBottom: 6 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8M8 14h8"/></svg>
-              ARS
+      <div
+        className={`coin-dashboard__content ${
+          fadeState === 'out' ? 'coin-dashboard__content--fade-out' : 'coin-dashboard__content--fade-in'
+        }`}
+      >
+        {/* Hero: Cofre del Mes */}
+        {balance && (
+          <div className="coin-hero">
+            <div className="coin-hero__row">
+              <div className="coin-hero__icon">
+                <ChestIcon />
+              </div>
+              <div className="coin-hero__numbers">
+                <AnimatedNumber
+                  value={balance.ARS.balance}
+                  className={`coin-hero__balance ${
+                    balance.ARS.balance >= 0 ? 'coin-hero__balance--positive' : 'coin-hero__balance--negative'
+                  }`}
+                />
+                {hasUsd && (
+                  <AnimatedNumber
+                    value={balance.USD.balance}
+                    locale="en-US"
+                    className="coin-hero__balance-usd"
+                  />
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span style={{ opacity: 0.6 }}>{t('coinify.income')}</span>
-                <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>+${balance.ARS.income.toLocaleString('es-AR')}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span style={{ opacity: 0.6 }}>{t('coinify.expense')}</span>
-                <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>-${balance.ARS.expenses.toLocaleString('es-AR')}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 4, fontSize: '0.9rem' }}>
-                <span style={{ fontWeight: 'bold' }}>{t('coinify.balance')}</span>
-                <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold', color: balance.ARS.balance >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)' }}>
-                  ${balance.ARS.balance.toLocaleString('es-AR')}
+            <BalanceBar income={balance.ARS.income} expenses={balance.ARS.expenses} />
+            {trendPct !== null && (
+              <div className={`coin-hero__trend ${trendPct <= 0 ? 'coin-hero__trend--up' : 'coin-hero__trend--down'}`}>
+                <span className="coin-hero__trend-arrow">{trendPct <= 0 ? '\u25BC' : '\u25B2'}</span>
+                <span>
+                  {Math.abs(trendPct)}% {trendPct <= 0 ? t('coinify.lessThanLastMonth') : t('coinify.moreThanLastMonth')}
                 </span>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Stat Cards */}
+        {balance && (
+          <div className="coin-stats-grid">
+            <CoinStatCard
+              icon={<SwordIcon />}
+              label={t('coinify.expense')}
+              value={balance.ARS.expenses}
+              color="red"
+            />
+            <CoinStatCard
+              icon={<ShieldIcon />}
+              label={t('coinify.income')}
+              value={balance.ARS.income}
+              color="green"
+            />
+            <CoinStatCard
+              icon={<ChainIcon />}
+              label={t('coinify.activeInstallments')}
+              value={installmentCount}
+              color="gold"
+              prefix=""
+            />
+            <CoinStatCard
+              icon={<ScaleIcon />}
+              label={t('coinify.netDebts')}
+              value={netLoans}
+              color={netLoans >= 0 ? 'green' : 'red'}
+            />
+          </div>
+        )}
+
+        {/* Donut: Categories */}
+        <DonutChart data={donutData} title={t('coinify.byCategory')} />
+
+        {/* Bottom Grid: Projection + Loans */}
+        <div className="coin-bottom-grid">
+          {/* Projection */}
+          <div className="rpg-card coin-projection">
+            <div className="rpg-card-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+              {t('coinify.nextBattles')}
             </div>
+            {projection.length > 0 ? (
+              <div className="coin-projection__bar-wrap">
+                {projection.map((p) => {
+                  const pct = (p.total / projMax) * 100;
+                  const label = new Date(p.month + '-01').toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+                  return (
+                    <div key={p.month} className="coin-projection__row" title={`${t('coinify.installments')}: $${p.installments.toLocaleString('es-AR')} | ${t('coinify.recurringLabel')}: $${p.recurring.toLocaleString('es-AR')}`}>
+                      <span className="coin-projection__month-label">{label}</span>
+                      <div className="coin-projection__bar">
+                        <div className="coin-projection__bar-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="coin-projection__value">${p.total.toLocaleString('es-AR')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="coin-empty">{t('coinify.noData')}</p>
+            )}
           </div>
 
-          {(balance.USD.income > 0 || balance.USD.expenses > 0) && (
-            <div className="rpg-card">
-              <div className="rpg-card-title" style={{ marginBottom: 6 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9h6M9 15h6"/></svg>
-                USD
+          {/* Loans Summary */}
+          <div className="rpg-card coin-loans-summary" onClick={() => navigate('/finance/loans')}>
+            <div className="rpg-card-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              {t('coinify.alliancesAndDebts')}
+            </div>
+            {loans.lent === 0 && loans.borrowed === 0 ? (
+              <div className="coin-loans-summary__empty">
+                <ShieldIcon />
+                <span>{t('coinify.noActiveDebts')}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ opacity: 0.6 }}>{t('coinify.income')}</span>
-                  <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>+${balance.USD.income.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            ) : (
+              <div>
+                <div className="coin-loans-summary__row">
+                  <span className="coin-loans-summary__label">{t('coinify.owed')}</span>
+                  <span className="coin-loans-summary__value coin-loans-summary__value--green">
+                    ${loans.lent.toLocaleString('es-AR')}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ opacity: 0.6 }}>{t('coinify.expense')}</span>
-                  <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>-${balance.USD.expenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 4, fontSize: '0.9rem' }}>
-                  <span style={{ fontWeight: 'bold' }}>{t('coinify.balance')}</span>
-                  <span style={{ fontFamily: 'Fira Code, monospace', fontWeight: 'bold', color: balance.USD.balance >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)' }}>
-                    ${balance.USD.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <div className="coin-loans-summary__row">
+                  <span className="coin-loans-summary__label">{t('coinify.owing')}</span>
+                  <span className="coin-loans-summary__value coin-loans-summary__value--red">
+                    ${loans.borrowed.toLocaleString('es-AR')}
                   </span>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Category Breakdown */}
-      {categories.length > 0 && (
-        <div className="rpg-card" style={{ marginBottom: 16 }}>
-          <div className="rpg-card-title" style={{ marginBottom: 6 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-            {t('coinify.byCategory')}
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={categories} layout="vertical">
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="category" width={100} tick={{ fill: 'var(--rpg-ink-light)', fontSize: 12 }} />
-              <Tooltip contentStyle={{ background: 'var(--rpg-parchment-light)', border: '1px solid var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)' }} />
-              <Bar dataKey="ARS" fill="var(--rpg-gold)" radius={[0, 4, 4, 0]}>
-                {categories.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Projection + Loans */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div className="rpg-card">
-          <div className="rpg-card-title" style={{ marginBottom: 6 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            {t('coinify.projection')}
-          </div>
-          {projection.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {projection.map((p) => (
-                <div key={p.month} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ opacity: 0.6 }}>
-                    {new Date(p.month + '-01').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
-                  </span>
-                  <span style={{ fontFamily: 'Fira Code, monospace' }}>${p.total.toLocaleString('es-AR')}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('coinify.noData')}</p>
-          )}
-        </div>
-
-        <div className="rpg-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/finance/loans')}>
-          <div className="rpg-card-title" style={{ marginBottom: 6 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            {t('coinify.loans')}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.85rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.6 }}>{t('coinify.owed')}</span>
-              <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>${loans.lent.toLocaleString('es-AR')}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.6 }}>{t('coinify.owing')}</span>
-              <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>${loans.borrowed.toLocaleString('es-AR')}</span>
-            </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="rpg-button" style={{ flex: 1 }} onClick={() => navigate('/finance/transactions?type=expense')}>
-          + {t('coinify.expense')}
-        </button>
-        <button className="rpg-button" style={{ flex: 1 }} onClick={() => navigate('/finance/transactions?type=income')}>
-          + {t('coinify.income')}
-        </button>
+        {/* Quick Actions */}
+        <div className="coin-quick-actions">
+          <button className="rpg-button" onClick={() => navigate('/finance/transactions?type=expense')}>
+            <SwordIcon /> + {t('coinify.expense')}
+          </button>
+          <button className="rpg-button" onClick={() => navigate('/finance/transactions?type=income')}>
+            <ShieldIcon /> + {t('coinify.income')}
+          </button>
+        </div>
       </div>
     </div>
   );

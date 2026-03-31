@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { QuickAddForm } from './shared/QuickAddForm';
+import { useCoinToast } from './CoinToastProvider';
 import type { TransactionType, PaymentMethod, Currency } from '../types';
 
 interface TransactionRow {
@@ -20,8 +21,32 @@ interface TransactionRow {
   forThirdParty?: string;
 }
 
+// Source badge icons
+const SourceIcon = ({ source }: { source: string }) => {
+  if (source === 'recurring') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+  if (source === 'import') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  );
+  // manual
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+};
+
 export default function Transactions() {
   const { t } = useTranslation();
+  const { showToast } = useCoinToast();
   const [searchParams] = useSearchParams();
   const defaultType = (searchParams.get('type') as TransactionType) || 'expense';
 
@@ -34,13 +59,15 @@ export default function Transactions() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState({ amount: '', description: '', category: '' });
   const [showForm, setShowForm] = useState(true);
+  const [enteringId, setEnteringId] = useState<string | null>(null);
+  const [exitingId, setExitingId] = useState<string | null>(null);
 
   const loadTransactions = useCallback(() => {
     const filters: Record<string, string> = { month };
     if (filterCategory) filters.category = filterCategory;
     if (filterType) filters.type = filterType;
     if (filterPayment) filters.paymentMethod = filterPayment;
-    window.api.financeGetTransactions(filters).then(setTransactions);
+    window.api.financeGetTransactions(filters).then((data) => setTransactions(data as TransactionRow[]));
   }, [month, filterCategory, filterType, filterPayment]);
 
   useEffect(() => {
@@ -53,8 +80,9 @@ export default function Transactions() {
     type: TransactionType; amount: number; category: string; description: string;
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
   }) => {
+    let newId: string;
     if (data.paymentMethod === 'credit_card' && data.installments > 1) {
-      await window.api.financeCreateInstallmentGroup({
+      newId = await window.api.financeCreateInstallmentGroup({
         description: data.description || data.category,
         totalAmount: data.amount * data.installments,
         installmentCount: data.installments,
@@ -64,7 +92,7 @@ export default function Transactions() {
         startDate: data.date,
       });
     } else {
-      await window.api.financeAddTransaction({
+      newId = await window.api.financeAddTransaction({
         type: data.type,
         amount: data.amount,
         currency: data.currency,
@@ -75,11 +103,25 @@ export default function Transactions() {
       });
     }
     loadTransactions();
+    // Brief entering animation
+    setEnteringId(newId);
+    setTimeout(() => setEnteringId(null), 400);
+    // Toast
+    const formatted = `$${data.amount.toLocaleString(data.currency === 'USD' ? 'en-US' : 'es-AR')}`;
+    showToast(
+      data.type === 'income' ? 'income' : 'expense',
+      `${formatted} ${t('coinify.in')} ${data.category}`
+    );
   };
 
   const handleDelete = async (id: string) => {
-    await window.api.financeDeleteTransaction(id);
-    loadTransactions();
+    setExitingId(id);
+    // Wait for exit animation
+    setTimeout(async () => {
+      await window.api.financeDeleteTransaction(id);
+      setExitingId(null);
+      loadTransactions();
+    }, 300);
   };
 
   const startEdit = (tx: TransactionRow) => {
@@ -115,27 +157,27 @@ export default function Transactions() {
   return (
     <div>
       {/* Toggle form + Month nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
-        <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+        <button className="rpg-button coin-month-nav__btn"
           onClick={() => setShowForm(!showForm)}>
-          {showForm ? '▲' : '+ ' + t('coinify.quickAdd')}
+          {showForm ? '\u25B2' : `+ ${t('coinify.quickAdd')}`}
         </button>
       </div>
 
-      {/* Quick Add Form */}
-      {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
+      {/* Quick Add Form with collapse animation */}
+      <div className={`coin-quick-add-form ${showForm ? 'coin-quick-add-form--open' : 'coin-quick-add-form--closed'}`}>
+        {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
+      </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
-          className="rpg-select" style={{ fontSize: '0.85rem' }}>
+      <div className="coin-filters">
+        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rpg-select">
           <option value="">{t('coinify.expense')} / {t('coinify.income')}</option>
           <option value="expense">{t('coinify.expense')}</option>
           <option value="income">{t('coinify.income')}</option>
         </select>
-        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)}
-          className="rpg-select" style={{ fontSize: '0.85rem' }}>
+        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="rpg-select">
           <option value="">{t('coinify.paymentMethod')}</option>
           <option value="cash">{t('coinify.cash')}</option>
           <option value="debit">{t('coinify.debit')}</option>
@@ -145,60 +187,73 @@ export default function Transactions() {
       </div>
 
       {/* Transaction List */}
-      <div>
+      <div className="coin-tx-list">
         {transactions.length === 0 ? (
-          <p style={{ opacity: 0.5, fontStyle: 'italic', textAlign: 'center', padding: 24 }}>
-            {t('coinify.noTransactions')}
-          </p>
+          <p className="coin-empty">{t('coinify.noTransactions')}</p>
         ) : (
-          transactions.map((tx) => (
-            <div key={tx.id} className="rpg-card" style={{ marginBottom: 8, padding: 12 }}>
-              {editingId === tx.id ? (
-                /* Edit mode */
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="number" value={editFields.amount}
-                    onChange={(e) => setEditFields({ ...editFields, amount: e.target.value })}
-                    className="rpg-input" style={{ width: 90, fontSize: '0.85rem' }} />
-                  <input type="text" value={editFields.description}
-                    onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
-                    className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
-                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-                    onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
-                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-                    onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
-                </div>
-              ) : (
-                /* View mode */
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.8rem', opacity: 0.5, width: 70, flexShrink: 0 }}>{tx.date.slice(5)}</span>
-                  <span style={{ flex: 1, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
-                    {tx.description || tx.category}
-                    {tx.forThirdParty && (
-                      <span style={{ marginLeft: 8, fontSize: '0.75rem', padding: '1px 6px', borderRadius: 3, background: 'rgba(201, 168, 76, 0.2)', color: 'var(--rpg-gold)' }}>
-                        → {tx.forThirdParty}
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', background: 'var(--rpg-gold)', color: 'var(--rpg-ink)', padding: '1px 6px', borderRadius: 3 }}>
-                    {tx.category}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{paymentMethodLabel(tx.paymentMethod)}</span>
-                  <span style={{
-                    fontFamily: 'Fira Code, monospace',
-                    fontSize: '0.85rem',
-                    color: tx.type === 'income' ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)',
-                  }}>
-                    {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
-                    {tx.currency === 'USD' && ' USD'}
-                  </span>
-                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '2px 6px', opacity: 0.5 }}
-                    onClick={() => startEdit(tx)}>✎</button>
-                  <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '2px 6px', opacity: 0.5 }}
-                    onClick={() => handleDelete(tx.id)}>✕</button>
-                </div>
-              )}
-            </div>
-          ))
+          transactions.map((tx) => {
+            const isEntering = enteringId === tx.id;
+            const isExiting = exitingId === tx.id;
+            const isEditing = editingId === tx.id;
+
+            return (
+              <div
+                key={tx.id}
+                className={[
+                  'coin-tx',
+                  tx.type === 'income' ? 'coin-tx--income' : 'coin-tx--expense',
+                  isEntering ? 'coin-tx--entering' : '',
+                  isExiting ? 'coin-tx--exiting' : '',
+                  isEditing ? 'coin-tx--editing' : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {isEditing ? (
+                  <div className="coin-tx__edit-row">
+                    <input type="number" value={editFields.amount}
+                      onChange={(e) => setEditFields({ ...editFields, amount: e.target.value })}
+                      className="rpg-input" style={{ width: 90, fontSize: '0.85rem' }} />
+                    <input type="text" value={editFields.description}
+                      onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
+                      className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
+                    <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+                      onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
+                    <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+                      onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="coin-tx__date">{tx.date.slice(5)}</span>
+                    <span className="coin-tx__desc" title={tx.description}>
+                      {tx.description || tx.category}
+                      {tx.forThirdParty && (
+                        <span className="coin-tx__badge coin-tx__badge--third-party">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          </svg>
+                          {' '}{tx.forThirdParty}
+                        </span>
+                      )}
+                    </span>
+                    <span className="coin-tx__badge coin-tx__badge--category">{tx.category}</span>
+                    <span className="coin-tx__badge coin-tx__badge--source">
+                      <SourceIcon source={tx.source} />
+                    </span>
+                    <span className="coin-tx__payment-method">{paymentMethodLabel(tx.paymentMethod)}</span>
+                    <span className={`coin-tx__amount ${tx.type === 'income' ? 'coin-tx__amount--income' : 'coin-tx__amount--expense'}`}>
+                      {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
+                      {tx.currency === 'USD' && ' USD'}
+                    </span>
+                    <div className="coin-tx__actions">
+                      <button className="rpg-button coin-tx__action-btn" style={{ fontSize: '0.8rem', padding: '2px 6px' }}
+                        onClick={() => startEdit(tx)}>{'\u270E'}</button>
+                      <button className="rpg-button coin-tx__action-btn" style={{ fontSize: '0.8rem', padding: '2px 6px' }}
+                        onClick={() => handleDelete(tx.id)}>{'\u2715'}</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

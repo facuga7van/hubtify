@@ -149,12 +149,22 @@ export interface HubtifyApi {
   notificationsSend: (title: string, body: string) => Promise<boolean>;
 
   // Dollar
-  dollarGetRates: () => Promise<{ success: boolean; rates?: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
+  dollarGetRates: () => Promise<{ success: boolean; rates: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
 
-  // Finance
-  financeGetTransactions: (month: string) => Promise<unknown[]>;
+  // Finance - Transactions
+  financeGetTransactions: (filters: Record<string, unknown>) => Promise<unknown[]>;
   financeAddTransaction: (tx: Record<string, unknown>) => Promise<string>;
+  financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => Promise<void>;
   financeDeleteTransaction: (id: string) => Promise<void>;
+
+  // Finance - Installments
+  financeGetInstallmentGroups: () => Promise<unknown[]>;
+  financeGetInstallmentsForMonth: (month: string) => Promise<unknown[]>;
+  financeGetInstallmentProjection: (months: number) => Promise<Array<{ month: string; total: number }>>;
+  financeCreateInstallmentGroup: (group: Record<string, unknown>) => Promise<string>;
+  financeDeleteInstallmentGroup: (id: string) => Promise<void>;
+
+  // Finance - Loans
   financeGetLoans: (filter?: Record<string, unknown>) => Promise<unknown[]>;
   financeGetLoansByPerson: (name: string) => Promise<unknown[]>;
   financeAddLoan: (loan: Record<string, unknown>) => Promise<string>;
@@ -162,19 +172,32 @@ export interface HubtifyApi {
   financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => Promise<string>;
   financeGetLoanPayments: (loanId: string) => Promise<unknown[]>;
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => Promise<string>;
-  financeGetIncomeSources: () => Promise<unknown[]>;
-  financeAddIncomeSource: (src: Record<string, unknown>) => Promise<string>;
-  financeToggleIncomeSource: (id: string) => Promise<void>;
+  financeGetActiveLoanSummary: () => Promise<unknown>;
+
+  // Finance - Recurring
+  financeGetRecurring: () => Promise<unknown[]>;
+  financeAddRecurring: (rec: Record<string, unknown>) => Promise<string>;
+  financeUpdateRecurringAmount: (id: string, newAmount: number) => Promise<void>;
+  financeToggleRecurring: (id: string) => Promise<void>;
+  financeDeleteRecurring: (id: string) => Promise<void>;
+  financeGenerateRecurringForMonth: (month: string) => Promise<void>;
+  financeGetRecurringAmountHistory: (id: string) => Promise<unknown[]>;
+
+  // Finance - Import
+  financeImportParsePDF: (filePath: string) => Promise<ParsedRow[]>;
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ count: number }>;
+  financeGetCategoryMappings: () => Promise<unknown[]>;
+  financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
+
+  // Finance - Dashboard
+  financeGetMonthlyBalance: (month?: string) => Promise<unknown>;
+  financeGetCategoryBreakdown: (month?: string) => Promise<unknown[]>;
+  financeGetProjection: (months: number) => Promise<unknown[]>;
+
+  // Finance - Backward compat
   financeGetCategories: () => Promise<string[]>;
   financeGetMonthlyTotal: () => Promise<number>;
   financeGetActiveLoansCount: () => Promise<number>;
-  financeGetMonthlyBalance: (month?: string) => Promise<{ expenses: number; income: number; balance: number }>;
-  financeGetCategoryBreakdown: (month?: string) => Promise<Array<{ category: string; total: number }>>;
-  financeUpdateTransaction: (id: string, fields: Record<string, unknown>) => Promise<void>;
-  financeGetInstallmentsForMonth: (month: string) => Promise<unknown[]>;
-  financeGetInstallmentProjection: (months: number) => Promise<Array<{ month: string; total: number }>>;
-  financeImportParsePDF: (filePath: string) => Promise<ParsedRow[]>;
-  financeImportConfirm: (rows: ParsedRow[], statementMonth: string, fileName: string) => Promise<{ count: number }>;
 
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
@@ -187,7 +210,7 @@ export interface HubtifyApi {
 
 // ── Nutrition AI Types ──────────────────────────────────────
 
-export interface EstimationItem {
+interface EstimationItem {
   name: string;
   calories: number;
 }

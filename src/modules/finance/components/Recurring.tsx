@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './shared/CategorySelect';
+import { useCoinToast } from './CoinToastProvider';
 import type { Currency, TransactionType } from '../types';
 
 interface RecurringRow {
@@ -22,13 +23,14 @@ interface AmountHistoryRow {
 
 export default function Recurring() {
   const { t } = useTranslation();
+  const { showToast } = useCoinToast();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const [items, setItems] = useState<RecurringRow[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [generateMsg, setGenerateMsg] = useState('');
+  const [showCoinDrop, setShowCoinDrop] = useState(false);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -50,12 +52,10 @@ export default function Recurring() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = () => {
-    window.api.financeGetRecurring().then((rows: RecurringRow[]) => setItems(rows));
+    window.api.financeGetRecurring().then((rows) => setItems(rows as RecurringRow[]));
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,18 +64,10 @@ export default function Recurring() {
     setFormSubmitting(true);
     try {
       await window.api.financeAddRecurring({
-        name: formName,
-        type: formType,
-        amount: parsed,
-        currency: formCurrency,
-        category: formCategory,
+        name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory,
       });
-      setFormName('');
-      setFormAmount('');
-      setFormType('expense');
-      setFormCurrency('ARS');
-      setFormCategory('Otros');
-      setShowForm(false);
+      setFormName(''); setFormAmount(''); setFormType('expense');
+      setFormCurrency('ARS'); setFormCategory('Otros'); setShowForm(false);
       load();
     } finally {
       setFormSubmitting(false);
@@ -119,7 +111,7 @@ export default function Recurring() {
       return;
     }
     if (!history[id]) {
-      const rows: AmountHistoryRow[] = await window.api.financeGetRecurringAmountHistory(id);
+      const rows = await window.api.financeGetRecurringAmountHistory(id) as AmountHistoryRow[];
       setHistory((prev) => ({ ...prev, [id]: rows }));
     }
     setExpandedHistory(id);
@@ -127,12 +119,14 @@ export default function Recurring() {
 
   const handleGenerate = async () => {
     setGenerating(true);
-    setGenerateMsg('');
     try {
       await window.api.financeGenerateRecurringForMonth(currentMonth);
-      setGenerateMsg(t('coinify.recurringGenerated'));
+      showToast('generated', t('coinify.recurringGenerated'));
+      // Trigger coin drop animation
+      setShowCoinDrop(true);
+      setTimeout(() => setShowCoinDrop(false), 600);
     } catch {
-      setGenerateMsg(t('coinify.recurringGenerateError'));
+      // error handled silently
     } finally {
       setGenerating(false);
     }
@@ -149,15 +143,12 @@ export default function Recurring() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ color: 'var(--rpg-gold)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0 }}>
+      <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
+        <h2 style={{ color: 'var(--rpg-wood)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0 }}>
           {t('coinify.recurringLabel')}
         </h2>
-        <button
-          className="rpg-button"
-          style={{ fontSize: '0.85rem', padding: '4px 12px' }}
-          onClick={() => setShowForm((v) => !v)}
-        >
+        <button className="rpg-button" style={{ fontSize: '0.85rem', padding: '4px 12px' }}
+          onClick={() => setShowForm((v) => !v)}>
           {showForm ? t('coinify.cancel') : `+ ${t('coinify.addRecurring')}`}
         </button>
       </div>
@@ -169,200 +160,116 @@ export default function Recurring() {
             {t('coinify.addRecurring')}
           </div>
 
-          <input
-            type="text"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-            placeholder={t('coinify.name')}
-            className="rpg-input"
-            style={{ width: '100%', marginBottom: 10, boxSizing: 'border-box' }}
-            required
-          />
+          <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
+            placeholder={t('coinify.name')} className="rpg-input coin-quick-add-form__field" required />
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <button
-              type="button"
-              onClick={() => setFormType('expense')}
-              className="rpg-button"
-              style={{
-                flex: 1,
-                fontSize: '0.85rem',
-                padding: '4px 8px',
-                background: formType === 'expense' ? 'var(--rpg-gold-dark)' : undefined,
-                color: formType === 'expense' ? 'var(--rpg-ink)' : undefined,
-              }}
-            >
+          <div className="coin-quick-add-form__type-row">
+            <button type="button" onClick={() => setFormType('expense')}
+              className={`rpg-button ${formType === 'expense' ? 'rpg-btn-active' : ''}`} style={{ flex: 1 }}>
               {t('coinify.expense')}
             </button>
-            <button
-              type="button"
-              onClick={() => setFormType('income')}
-              className="rpg-button"
-              style={{
-                flex: 1,
-                fontSize: '0.85rem',
-                padding: '4px 8px',
-                background: formType === 'income' ? 'var(--rpg-gold-dark)' : undefined,
-                color: formType === 'income' ? 'var(--rpg-ink)' : undefined,
-              }}
-            >
+            <button type="button" onClick={() => setFormType('income')}
+              className={`rpg-button ${formType === 'income' ? 'rpg-btn-active' : ''}`} style={{ flex: 1 }}>
               {t('coinify.income')}
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <input
-              type="number"
-              value={formAmount}
-              onChange={(e) => setFormAmount(e.target.value)}
-              placeholder={t('coinify.amount')}
-              className="rpg-input"
-              style={{ flex: 1 }}
-              min="0"
-              step="0.01"
-              required
-            />
-            <select
-              value={formCurrency}
-              onChange={(e) => setFormCurrency(e.target.value as Currency)}
-              className="rpg-select"
-              style={{ width: 80 }}
-            >
+          <div className="coin-quick-add-form__amount-row">
+            <input type="number" value={formAmount} onChange={(e) => setFormAmount(e.target.value)}
+              placeholder={t('coinify.amount')} className="rpg-input" style={{ flex: 1 }} min="0" step="0.01" required />
+            <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value as Currency)}
+              className="rpg-select" style={{ width: 80 }}>
               <option value="ARS">ARS</option>
               <option value="USD">USD</option>
             </select>
           </div>
 
-          <div style={{ marginBottom: 12 }}>
+          <div className="coin-quick-add-form__field">
             <CategorySelect value={formCategory} onChange={setFormCategory} />
           </div>
 
-          <button
-            type="submit"
-            className="rpg-button"
-            style={{ width: '100%' }}
-            disabled={formSubmitting}
-          >
+          <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={formSubmitting}>
             {formSubmitting ? t('coinify.saving') : t('coinify.save')}
           </button>
         </form>
       )}
 
       {/* Generate Button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <button
-          className="rpg-button"
-          onClick={handleGenerate}
-          disabled={generating}
-        >
-          {generating ? t('coinify.generating') : t('coinify.generateForMonth')}
-        </button>
-        {generateMsg && (
-          <span style={{ fontSize: '0.85rem', color: 'var(--rpg-gold)' }}>{generateMsg}</span>
-        )}
+      <div className="coin-recurring__generate-row">
+        <div className="coin-recurring__drop-container">
+          <button className="rpg-button" onClick={handleGenerate} disabled={generating}>
+            {generating ? t('coinify.generating') : t('coinify.generateForMonth')}
+          </button>
+          {showCoinDrop && (
+            <>
+              <div className="coin-recurring__drop-coin" />
+              <div className="coin-recurring__drop-coin" />
+              <div className="coin-recurring__drop-coin" />
+            </>
+          )}
+        </div>
       </div>
 
       {/* List */}
       {items.length === 0 ? (
-        <p style={{ opacity: 0.5, fontStyle: 'italic', textAlign: 'center', padding: 24 }}>
-          {t('coinify.noRecurring')}
-        </p>
+        <p className="coin-empty">{t('coinify.noRecurring')}</p>
       ) : (
-        <div>
+        <div className="coin-recurring-list">
           {items.map((item) => (
-            <div key={item.id} className="rpg-card" style={{ padding: 12, marginBottom: 8 }}>
-              {/* Main Row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div
+              key={item.id}
+              className={`rpg-card coin-recurring ${isActive(item) ? 'coin-recurring--active' : 'coin-recurring--paused'}`}
+            >
+              <div className="coin-recurring__main-row">
                 {/* Active Toggle */}
                 <button
-                  className="rpg-button"
+                  className={`rpg-button coin-recurring__toggle ${isActive(item) ? 'coin-recurring__toggle--active' : 'coin-recurring__toggle--paused'}`}
                   onClick={() => handleToggle(item.id)}
                   title={isActive(item) ? t('coinify.pause') : t('coinify.activate')}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    padding: 0,
-                    fontSize: '0.75rem',
-                    opacity: isActive(item) ? 1 : 0.3,
-                    color: isActive(item) ? 'var(--rpg-xp-green)' : undefined,
-                  }}
                 >
-                  {isActive(item) ? '>' : '||'}
+                  {isActive(item) ? '\u25B6' : '\u23F8'}
                 </button>
 
                 {/* Name */}
-                <span style={{ flex: 1, fontSize: '0.9rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.name}
-                </span>
+                <span className="coin-recurring__name">{item.name}</span>
 
                 {/* Type Badge */}
-                <span style={{
-                  fontSize: '0.75rem',
-                  padding: '1px 8px',
-                  borderRadius: 3,
-                  fontWeight: 600,
-                  background: item.type === 'income' ? 'rgba(45,90,39,0.15)' : 'rgba(139,32,32,0.15)',
-                  color: item.type === 'income' ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)',
-                }}>
+                <span className={`coin-recurring__type-badge ${item.type === 'income' ? 'coin-recurring__type-badge--income' : 'coin-recurring__type-badge--expense'}`}>
                   {item.type === 'income' ? t('coinify.income') : t('coinify.expense')}
                 </span>
 
                 {/* Category */}
-                <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-                  {item.category}
-                </span>
+                <span className="coin-recurring__category">{item.category}</span>
 
                 {/* Amount -- click to edit inline */}
                 {editingId === item.id ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input
-                      type="number"
-                      value={editingAmount}
+                    <input type="number" value={editingAmount}
                       onChange={(e) => setEditingAmount(e.target.value)}
-                      className="rpg-input"
-                      style={{ width: 100, fontSize: '0.85rem' }}
-                      min="0"
-                      step="0.01"
-                      autoFocus
+                      className="rpg-input" style={{ width: 100, fontSize: '0.85rem' }}
+                      min="0" step="0.01" autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') saveEdit(item.id);
                         if (e.key === 'Escape') cancelEdit();
                       }}
                     />
-                    <button
-                      className="rpg-button"
-                      onClick={() => saveEdit(item.id)}
-                      style={{ padding: '2px 8px', fontSize: '0.8rem', color: 'var(--rpg-xp-green)' }}
-                    >
-                      ok
-                    </button>
-                    <button
-                      className="rpg-button"
-                      onClick={cancelEdit}
-                      style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: 0.4 }}
-                    >
-                      x
-                    </button>
+                    <button className="rpg-button" onClick={() => saveEdit(item.id)}
+                      style={{ padding: '2px 8px', fontSize: '0.8rem', color: 'var(--rpg-xp-green)' }}>ok</button>
+                    <button className="rpg-button" onClick={cancelEdit}
+                      style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: 0.4 }}>x</button>
                   </div>
                 ) : (
-                  <button
-                    className="rpg-button"
-                    onClick={() => startEdit(item)}
-                    style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.85rem', padding: '2px 8px', background: 'transparent', border: 'none' }}
-                    title={t('coinify.editAmount')}
-                  >
+                  <button className="coin-recurring__amount-btn" onClick={() => startEdit(item)}
+                    title={t('coinify.editAmount')}>
                     {formatAmount(item.amount, item.currency)}
                     <span style={{ marginLeft: 4, fontSize: '0.7rem', opacity: 0.3 }}>{item.currency}</span>
                   </button>
                 )}
 
                 {/* History Toggle */}
-                <button
-                  className="rpg-button"
-                  onClick={() => toggleHistory(item.id)}
+                <button className="rpg-button" onClick={() => toggleHistory(item.id)}
                   style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.5 }}
-                  title={t('coinify.amountHistory')}
-                >
+                  title={t('coinify.amountHistory')}>
                   hist
                 </button>
 
@@ -370,50 +277,37 @@ export default function Recurring() {
                 {deletingId === item.id ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>{t('coinify.confirmDelete')}</span>
-                    <button
-                      className="rpg-button"
-                      onClick={() => handleDelete(item.id)}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}
-                    >
+                    <button className="rpg-button" onClick={() => handleDelete(item.id)}
+                      style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>
                       {t('coinify.yes')}
                     </button>
-                    <button
-                      className="rpg-button"
-                      onClick={() => setDeletingId(null)}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.4 }}
-                    >
+                    <button className="rpg-button" onClick={() => setDeletingId(null)}
+                      style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
                       {t('coinify.no')}
                     </button>
                   </div>
                 ) : (
-                  <button
-                    className="rpg-button"
-                    onClick={() => setDeletingId(item.id)}
+                  <button className="rpg-button" onClick={() => setDeletingId(item.id)}
                     style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)', opacity: 0.6 }}
-                    title={t('coinify.delete')}
-                  >
-                    x
-                  </button>
+                    title={t('coinify.delete')}>x</button>
                 )}
               </div>
 
-              {/* Amount History */}
+              {/* Amount History Timeline */}
               {expandedHistory === item.id && (
-                <div style={{ paddingTop: 8, marginTop: 8, borderTop: '1px solid var(--rpg-parchment-dark)' }}>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.5, margin: 0, marginBottom: 6 }}>
-                    {t('coinify.amountHistory')}
-                  </p>
+                <div className="coin-recurring__timeline">
+                  <p className="coin-recurring__timeline-title">{t('coinify.amountHistory')}</p>
                   {(history[item.id] ?? []).length === 0 ? (
                     <p style={{ fontSize: '0.8rem', opacity: 0.3, margin: 0 }}>{t('coinify.noHistory')}</p>
                   ) : (
                     <div>
                       {history[item.id].map((h) => (
-                        <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', opacity: 0.7, marginBottom: 2 }}>
-                          <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-hp-red)' }}>
+                        <div key={h.id} className="coin-recurring__timeline-item">
+                          <span className="coin-recurring__amount-change coin-recurring__amount-change--old">
                             {formatAmount(h.previousAmount, item.currency)}
                           </span>
-                          <span style={{ opacity: 0.3 }}>-&gt;</span>
-                          <span style={{ fontFamily: 'Fira Code, monospace', color: 'var(--rpg-xp-green)' }}>
+                          <span style={{ opacity: 0.3 }}>{'\u2192'}</span>
+                          <span className="coin-recurring__amount-change coin-recurring__amount-change--new">
                             {formatAmount(h.newAmount, item.currency)}
                           </span>
                           <span style={{ marginLeft: 'auto', opacity: 0.3 }}>

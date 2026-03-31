@@ -1,16 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import PageHeader from '../../../shared/components/PageHeader';
 import { MonthNavigator } from './shared/MonthNavigator';
+import { AnimatedNumber } from './shared/AnimatedNumber';
+import { CoinStatCard } from './shared/CoinStatCard';
 
 interface InstallmentRow {
   id: string;
@@ -40,9 +36,23 @@ function parseInstallmentNumber(row: InstallmentRow): { current: number; total: 
   return { current, total: row.installments };
 }
 
+// Chain icon SVG
+const ChainIcon = ({ broken }: { broken: boolean }) => (
+  <svg
+    width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke={broken ? 'var(--rpg-xp-green)' : 'var(--rpg-gold-dark)'}
+    strokeWidth="1.5" strokeLinecap="round"
+    className={broken ? 'coin-installment__chain-icon' : ''}
+  >
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+);
+
 export default function Installments() {
   const { t } = useTranslation();
-  const [month, setMonth] = useState(todayMonth);
+  const currentMonth = todayMonth();
+  const [month, setMonth] = useState(currentMonth);
   const [rows, setRows] = useState<InstallmentRow[]>([]);
   const [projection, setProjection] = useState<ProjectionMonth[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,17 +76,12 @@ export default function Installments() {
       const data = await window.api.financeGetInstallmentProjection(12);
       setProjection(data as ProjectionMonth[]);
     } catch {
-      // projection is non-critical, silently ignore
+      // non-critical
     }
   }, []);
 
-  useEffect(() => {
-    loadRows(month);
-  }, [month, loadRows]);
-
-  useEffect(() => {
-    loadProjection();
-  }, [loadProjection]);
+  useEffect(() => { loadRows(month); }, [month, loadRows]);
+  useEffect(() => { loadProjection(); }, [loadProjection]);
 
   const ownRows = rows.filter((r) => !r.forThirdParty);
   const thirdPartyRows = rows.filter((r) => !!r.forThirdParty);
@@ -84,23 +89,23 @@ export default function Installments() {
   const totalThirdParty = thirdPartyRows.reduce((acc, r) => acc + r.amount, 0);
   const net = totalOwn + totalThirdParty;
 
-  const fmt = (n: number) => `$${n.toLocaleString('es-AR')}`;
-
   const projectionLabel = (m: string) => {
     const [y, mo] = m.split('-').map(Number);
     return new Date(y, mo - 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
   };
 
+  // RPG gold color for chart bars
+  const GOLD = 'var(--rpg-gold)';
+  const GOLD_HIGHLIGHT = 'var(--rpg-gold-light)';
+
   return (
     <div>
       <PageHeader title={t('coinify.installments')} subtitle={t('coinify.installmentsSubtitle', 'Cuotas del mes')} />
 
-      {/* Month navigator */}
       <div style={{ marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
       </div>
 
-      {/* Error state */}
       {error && (
         <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
           <p style={{ color: 'var(--rpg-hp-red)', marginBottom: 8 }}>{t('common.somethingWentWrong')}</p>
@@ -111,76 +116,47 @@ export default function Installments() {
       {/* Installment list */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-            <rect x="2" y="3" width="12" height="10" rx="1" />
-            <path d="M5 7h6M5 10h4" />
-          </svg>
+          <ChainIcon broken={false} />
           {t('coinify.installments', 'Cuotas')} ({rows.length})
         </div>
 
         {loading ? (
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('common.loading')}</p>
+          <div className="coin-skeleton coin-skeleton--card" />
         ) : rows.length === 0 ? (
-          <p style={{ opacity: 0.5, fontStyle: 'italic' }}>
-            {t('coinify.noInstallments', 'No hay cuotas este mes')}
-          </p>
+          <p className="coin-empty">{t('coinify.noInstallments', 'No hay cuotas este mes')}</p>
         ) : (
-          <div>
+          <div className="coin-installment-list">
             {rows.map((row) => {
               const { current, total } = parseInstallmentNumber(row);
+              const isComplete = current === total;
+              const progressPct = (current / total) * 100;
+
               return (
                 <div
                   key={row.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '8px 0',
-                    borderBottom: '1px solid var(--rpg-parchment-dark)',
-                    gap: 8,
-                  }}
+                  className={`coin-installment ${isComplete ? 'coin-installment--complete' : ''}`}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                      {row.description}
-                    </span>
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        fontSize: '0.78rem',
-                        opacity: 0.6,
-                        fontFamily: 'Fira Code, monospace',
-                      }}
-                    >
-                      Cuota {current}/{total}
+                  <div className="coin-installment__desc">
+                    <ChainIcon broken={isComplete} />
+                    {' '}{row.description}
+                    <span className="coin-installment__counter">
+                      {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
                     </span>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <div className="coin-installment__right">
                     {row.forThirdParty && (
-                      <span
-                        style={{
-                          fontSize: '0.75rem',
-                          background: 'var(--rpg-gold)',
-                          color: 'var(--rpg-ink)',
-                          padding: '1px 6px',
-                          borderRadius: 3,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        → {row.forThirdParty}
+                      <span className="coin-tx__badge coin-tx__badge--third-party">
+                        {'\u2192'} {row.forThirdParty}
                       </span>
                     )}
-                    <span
-                      style={{
-                        fontFamily: 'Fira Code, monospace',
-                        fontSize: '0.9rem',
-                        color: 'var(--rpg-hp-red)',
-                        minWidth: 70,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {fmt(row.amount)}
+                    <div className="coin-installment__progress">
+                      <div
+                        className="coin-installment__progress-fill"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                    <span className="coin-installment__amount">
+                      ${row.amount.toLocaleString('es-AR')}
                     </span>
                   </div>
                 </div>
@@ -190,51 +166,50 @@ export default function Installments() {
         )}
       </div>
 
-      {/* Month summary */}
+      {/* Month summary stat cards */}
       {rows.length > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
-          <div className="rpg-card rpg-stat-card">
-            <div className="rpg-stat-number" style={{ color: 'var(--rpg-hp-red)', fontSize: '1.1rem' }}>
-              {fmt(totalOwn)}
-            </div>
-            <div className="rpg-stat-label">
-              {t('coinify.ownInstallments', 'Cuotas propias')}
-            </div>
-          </div>
-          <div className="rpg-card rpg-stat-card">
-            <div className="rpg-stat-number" style={{ color: 'var(--rpg-gold)', fontSize: '1.1rem' }}>
-              {fmt(totalThirdParty)}
-            </div>
-            <div className="rpg-stat-label">
-              {t('coinify.thirdPartyInstallments', 'Cuotas de terceros')}
-            </div>
-          </div>
-          <div className="rpg-card rpg-stat-card">
-            <div className="rpg-stat-number" style={{ fontSize: '1.1rem' }}>
-              {fmt(net)}
-            </div>
-            <div className="rpg-stat-label">
-              {t('coinify.netInstallments', 'Total neto')}
-            </div>
-          </div>
+        <div className="coin-installment-summary">
+          <CoinStatCard
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="m11 19-6-6" /><path d="m5 21-2-2" /><path d="m8 16-4 4" /><path d="M9.5 17.5 21 6V3h-3L6.5 14.5" />
+              </svg>
+            }
+            label={t('coinify.ownInstallments', 'Cuotas propias')}
+            value={totalOwn}
+            color="red"
+          />
+          <CoinStatCard
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+              </svg>
+            }
+            label={t('coinify.thirdPartyInstallments', 'Cuotas de terceros')}
+            value={totalThirdParty}
+            color="gold"
+          />
+          <CoinStatCard
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" /><path d="M12 6v12M8 10h8" />
+              </svg>
+            }
+            label={t('coinify.netInstallments', 'Total neto')}
+            value={net}
+            color={net > 0 ? 'red' : 'gold'}
+          />
         </div>
       )}
 
-      {/* 12-month projection */}
+      {/* 12-month projection chart */}
       {projection.length > 0 && (
-        <div className="rpg-card">
+        <div className="rpg-card coin-installment__chart">
           <div className="rpg-card-title">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
               <path d="M2 13L5 9l3 2 3-5 3 3" />
             </svg>
-            {t('coinify.installmentProjection', 'Proyección 12 meses')}
+            {t('coinify.installmentProjection', 'Proyeccion 12 meses')}
           </div>
           <div style={{ marginTop: 12 }}>
             <ResponsiveContainer width="100%" height={200}>
@@ -242,23 +217,14 @@ export default function Installments() {
                 data={projection.map((p) => ({
                   name: projectionLabel(p.month),
                   total: p.total,
+                  month: p.month,
                 }))}
                 margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--rpg-parchment-dark)" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={60}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
-                />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }} axisLine={false} tickLine={false}
+                  width={60} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   contentStyle={{
                     background: 'var(--rpg-parchment)',
@@ -266,14 +232,19 @@ export default function Installments() {
                     borderRadius: 6,
                     fontSize: '0.85rem',
                   }}
-                  formatter={(value: number) => [fmt(value), t('coinify.netInstallments', 'Total')]}
+                  formatter={(value) => [`$${(value as number).toLocaleString('es-AR')}`, t('coinify.netInstallments', 'Total')]}
                   labelStyle={{ color: 'var(--rpg-gold)', marginBottom: 2 }}
                 />
-                <Bar
-                  dataKey="total"
-                  fill="var(--rpg-gold)"
-                  radius={[3, 3, 0, 0]}
-                />
+                <Bar dataKey="total" radius={[3, 3, 0, 0]}>
+                  {projection.map((p, i) => (
+                    <Cell
+                      key={i}
+                      fill={p.month === currentMonth ? GOLD_HIGHLIGHT : GOLD}
+                      stroke={p.month === currentMonth ? 'var(--rpg-gold)' : 'none'}
+                      strokeWidth={p.month === currentMonth ? 2 : 0}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

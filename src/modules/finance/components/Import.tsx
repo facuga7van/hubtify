@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useCoinToast } from './CoinToastProvider';
 import type { ParsedRow } from '../../../../shared/types';
 import { CATEGORIES } from '../types';
 
@@ -10,6 +11,7 @@ interface RowState extends ParsedRow {
 
 export default function Import() {
   const { t } = useTranslation();
+  const { showToast } = useCoinToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
@@ -24,6 +26,7 @@ export default function Import() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [showSeal, setShowSeal] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,6 +38,7 @@ export default function Import() {
     setRows([]);
     setParseError('');
     setSuccessCount(null);
+    setShowSeal(false);
 
     setParsing(true);
     try {
@@ -80,6 +84,11 @@ export default function Import() {
       setFileName('');
       setFilePath('');
       if (fileInputRef.current) fileInputRef.current.value = '';
+
+      // Seal animation + toast
+      setShowSeal(true);
+      setTimeout(() => setShowSeal(false), 600);
+      showToast('imported', t('coinify.importSuccess', { count: result.count }));
     } catch {
       setImportError(t('coinify.importErrorConfirm'));
     } finally {
@@ -108,42 +117,29 @@ export default function Import() {
 
   const includedCount = rows.filter((r) => r.included).length;
 
-  const thStyle: React.CSSProperties = {
-    textAlign: 'left' as const,
-    padding: '6px 8px',
-    borderBottom: '2px solid var(--rpg-gold-dark)',
-    fontFamily: 'Cinzel, serif',
-    fontSize: '0.8rem',
-  };
-
-  const tdStyle: React.CSSProperties = {
-    padding: '6px 8px',
-    borderBottom: '1px solid var(--rpg-parchment-dark)',
-  };
-
   return (
     <div>
-      <h2 style={{ color: 'var(--rpg-gold)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0, marginBottom: 16 }}>
+      <h2 style={{ color: 'var(--rpg-wood)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0, marginBottom: 16 }}>
         {t('coinify.importTitle')}
       </h2>
 
-      {/* File picker */}
-      <div className="rpg-card" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-        <label className="rpg-button" style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* File picker — styled drop zone */}
+      <div className="coin-import-drop">
+        <label className="rpg-button coin-import-drop__label">
           {t('coinify.importSelectFile')}
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf"
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }}
+            className="coin-import-drop__input"
             onChange={handleFileChange}
           />
         </label>
-        <span style={{ fontSize: '0.85rem', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="coin-import-drop__filename">
           {fileName || t('coinify.importNoFile')}
         </span>
         {parsing && (
-          <span style={{ fontSize: '0.85rem', color: 'var(--rpg-gold)' }}>{t('coinify.importParsing')}</span>
+          <span className="coin-import-drop__parsing">{t('coinify.importParsing')}</span>
         )}
       </div>
 
@@ -155,41 +151,40 @@ export default function Import() {
       {/* Preview table */}
       {rows.length > 0 && (
         <div>
-          <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 12 }}>
+          <p className="coin-import-preview-count">
             {t('coinify.importPreview')} -- {includedCount} / {rows.length}
           </p>
 
           <div className="rpg-card" style={{ padding: 12, marginBottom: 16, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table className="coin-import-table">
               <thead>
                 <tr>
-                  <th style={thStyle}>{t('coinify.importColInclude')}</th>
-                  <th style={thStyle}>{t('coinify.importColDate')}</th>
-                  <th style={thStyle}>{t('coinify.importColMerchant')}</th>
-                  <th style={thStyle}>{t('coinify.importColInstallment')}</th>
-                  <th style={thStyle}>{t('coinify.importColAmount')}</th>
-                  <th style={thStyle}>{t('coinify.importColCurrency')}</th>
-                  <th style={thStyle}>{t('coinify.importColCategory')}</th>
+                  <th>{t('coinify.importColInclude')}</th>
+                  <th>{t('coinify.importColDate')}</th>
+                  <th>{t('coinify.importColMerchant')}</th>
+                  <th>{t('coinify.importColInstallment')}</th>
+                  <th>{t('coinify.importColAmount')}</th>
+                  <th>{t('coinify.importColCurrency')}</th>
+                  <th>{t('coinify.importColCategory')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, idx) => (
-                  <tr key={idx} style={!row.included ? { opacity: 0.4 } : undefined}>
-                    <td style={tdStyle}>
-                      <input
-                        type="checkbox"
-                        checked={row.included}
-                        onChange={() => toggleRow(idx)}
-                      />
+                  <tr
+                    key={idx}
+                    className={`coin-import-row ${!row.included ? 'coin-import-row--excluded' : ''}`}
+                  >
+                    <td>
+                      <input type="checkbox" checked={row.included} onChange={() => toggleRow(idx)} />
                     </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', opacity: 0.7 }}>{row.date}</td>
-                    <td style={{ ...tdStyle, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.merchant}>
+                    <td style={{ whiteSpace: 'nowrap', opacity: 0.7 }}>{row.date}</td>
+                    <td className="coin-import-row__merchant" title={row.merchant}>
                       {row.merchant}
                     </td>
-                    <td style={{ ...tdStyle, opacity: 0.5 }}>{formatInstallment(row)}</td>
-                    <td style={{ ...tdStyle, fontFamily: 'Fira Code, monospace' }}>{formatAmount(row)}</td>
-                    <td style={{ ...tdStyle, opacity: 0.5 }}>{formatCurrency(row)}</td>
-                    <td style={tdStyle}>
+                    <td className="coin-import-row__installment">{formatInstallment(row)}</td>
+                    <td className="coin-import-row__amount">{formatAmount(row)}</td>
+                    <td className="coin-import-row__currency">{formatCurrency(row)}</td>
+                    <td>
                       <select
                         value={row.category}
                         onChange={(e) => setCategory(idx, e.target.value)}
@@ -209,9 +204,9 @@ export default function Import() {
           </div>
 
           {/* Month selector + confirm */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>{t('coinify.importStatementMonth')}</label>
+          <div className="coin-import-confirm-row">
+            <div className="coin-import-confirm-row__month">
+              <label className="coin-import-confirm-row__month-label">{t('coinify.importStatementMonth')}</label>
               <input
                 type="month"
                 value={statementMonth}
@@ -226,6 +221,13 @@ export default function Import() {
               disabled={importing || includedCount === 0}
             >
               {importing ? t('coinify.importImporting') : `${t('coinify.importConfirm')} (${includedCount})`}
+              {showSeal && (
+                <span className="coin-import-seal">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold)" strokeWidth="2" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
+                  </svg>
+                </span>
+              )}
             </button>
           </div>
 
@@ -237,10 +239,11 @@ export default function Import() {
 
       {/* Success message */}
       {successCount !== null && (
-        <div className="rpg-card" style={{ padding: 16 }}>
-          <p style={{ color: 'var(--rpg-xp-green)', fontSize: '0.85rem', margin: 0 }}>
-            {t('coinify.importSuccess', { count: successCount })}
-          </p>
+        <div className="rpg-card coin-import-success">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-xp-green)" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
+          </svg>
+          {t('coinify.importSuccess', { count: successCount })}
         </div>
       )}
     </div>

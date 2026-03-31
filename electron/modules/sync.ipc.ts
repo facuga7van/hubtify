@@ -99,7 +99,6 @@ const USER_DATA_TABLES = [
   'habit_checks',
   'finance_transactions',
   'finance_loans',
-  'finance_income_sources',
   'finance_categories',
   'nutrition_profile',
   'food_log',
@@ -472,8 +471,8 @@ export function registerSyncIpcHandlers(): void {
         for (const c of d.dailyClosed) {
           const exists = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(c.date);
           if (!exists) {
-            db.prepare('INSERT INTO nutrition_daily_closed (date, closed_at, calories_in, tdee, balance, xp_earned, hp_change, steps, gym, weight_logged) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-              c.date, c.closed_at, c.calories_in, c.tdee, c.balance, c.xp_earned, c.hp_change, c.steps, c.gym, c.weight_logged
+            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_total, hp_change, consumed, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0
             );
           }
         }

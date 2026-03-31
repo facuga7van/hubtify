@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AnimatedNumber } from './shared/AnimatedNumber';
 
 export default function DashboardWidget() {
   const { t } = useTranslation();
@@ -13,8 +14,12 @@ export default function DashboardWidget() {
 
   return (
     <div>
-      <div className="rpg-stat-number">
-        {total !== null ? `$${total.toLocaleString('es-AR')}` : '...'}
+      <div className="coin-stat__number coin-stat__number--gold">
+        {total !== null ? (
+          <AnimatedNumber value={total} />
+        ) : (
+          <span className="coin-skeleton coin-skeleton--number" />
+        )}
       </div>
       <div className="rpg-stat-label">
         {t('coinify.thisMonth')} · {loansCount} {t('coinify.activeLoans')}
