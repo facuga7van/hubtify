@@ -45,6 +45,15 @@ export default function Layout() {
     const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
     const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
     const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
+
+    // Also actively check on mount — the passive listener may have missed
+    // the message if it was sent before React mounted
+    window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
+      if (res?.available && res.version) {
+        setUpdateAvailable({ version: res.version });
+      }
+    }).catch(() => { /* not available in dev */ });
+
     return () => { c1(); c2(); c3(); };
   }, []);
 

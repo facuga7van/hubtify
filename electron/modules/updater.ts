@@ -72,23 +72,20 @@ export function initAutoUpdater(win: BrowserWindow): void {
   cleanupOldInstallers();
 
   if (app.isPackaged) {
-    // Wait for renderer to be ready before sending messages
+    // Wait for React to mount and register IPC listeners before sending.
+    // did-finish-load fires when HTML is parsed but BEFORE React mounts.
+    // A 3s delay ensures useEffect listeners are registered.
     const check = () => {
       getLatestRelease().then(release => {
-        console.log('[Updater] Check result:', release?.version, 'local:', app.getVersion(), 'newer:', release ? isNewer(release.version, app.getVersion()) : false);
         if (release && isNewer(release.version, app.getVersion())) {
           mainWindow?.webContents.send('updater:update-available', {
             version: release.version,
           });
         }
-      }).catch((err) => console.error('[Updater] Failed to check for updates:', err.message));
+      }).catch(() => { /* silent */ });
     };
 
-    if (win.webContents.isLoading()) {
-      win.webContents.once('did-finish-load', check);
-    } else {
-      check();
-    }
+    setTimeout(check, 3000);
   }
 }
 
