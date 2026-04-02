@@ -22,6 +22,8 @@ export interface Transaction {
   source: TransactionSource;
   recurringId?: string;
   importBatchId?: string;
+  creditCardId?: string;
+  impactsBalance?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +80,26 @@ export interface CategoryMapping {
   id: string;
   merchantPattern: string;
   category: string;
+  createdAt: string;
+}
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  closingDay: number;
+  createdAt: string;
+}
+
+export interface CreditCardStatement {
+  id: string;
+  creditCardId: string;
+  creditCardName?: string;
+  periodMonth: string;
+  calculatedAmount: number;
+  paidAmount: number | null;
+  status: 'pending' | 'paid';
+  paidDate: string | null;
+  transactionId: string | null;
   createdAt: string;
 }
 
