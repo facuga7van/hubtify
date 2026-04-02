@@ -21,6 +21,7 @@ interface TransactionRow {
   installments?: number;
   installmentGroupId?: string;
   forThirdParty?: string;
+  impactsBalance?: number;
 }
 
 // Source badge icons
@@ -260,6 +261,15 @@ export default function Transactions() {
                       <SourceIcon source={tx.source} />
                     </span>
                     <span className="coin-tx__payment-method">{paymentMethodLabel(tx.paymentMethod)}</span>
+                    {tx.impactsBalance === 0 && (
+                      <span style={{
+                        fontSize: '0.65rem', padding: '1px 4px', borderRadius: 3,
+                        background: 'var(--rpg-parchment-dark)', color: 'var(--rpg-ink)',
+                        marginLeft: 4, opacity: 0.7,
+                      }}>
+                        {t('coinify.ccTracking')}
+                      </span>
+                    )}
                     <span className={`coin-tx__amount ${tx.type === 'income' ? 'coin-tx__amount--income' : 'coin-tx__amount--expense'}`}>
                       {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
                       {tx.currency === 'USD' && ' USD'}
