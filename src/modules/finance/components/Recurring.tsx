@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './shared/CategorySelect';
 import { useToast } from '../../../shared/components/useToast';
+import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { Currency, TransactionType } from '../types';
 
 interface RecurringRow {
@@ -11,6 +12,7 @@ interface RecurringRow {
   amount: number;
   currency: string;
   category: string;
+  billingDay: number;
   active: boolean | number;
 }
 
@@ -38,6 +40,7 @@ export default function Recurring() {
   const [formAmount, setFormAmount] = useState('');
   const [formCurrency, setFormCurrency] = useState<Currency>('ARS');
   const [formCategory, setFormCategory] = useState('Otros');
+  const [formBillingDay, setFormBillingDay] = useState(1);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
   // Inline edit state
@@ -57,6 +60,12 @@ export default function Recurring() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, []);
+
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(formAmount);
@@ -64,10 +73,10 @@ export default function Recurring() {
     setFormSubmitting(true);
     try {
       await window.api.financeAddRecurring({
-        name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory,
+        name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory, billingDay: formBillingDay,
       });
       setFormName(''); setFormAmount(''); setFormType('expense');
-      setFormCurrency('ARS'); setFormCategory('Otros'); setShowForm(false);
+      setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setShowForm(false);
       load();
     } finally {
       setFormSubmitting(false);
@@ -155,37 +164,40 @@ export default function Recurring() {
 
       {/* Add Form */}
       {showForm && (
-        <form onSubmit={handleAddSubmit} className="rpg-card" style={{ padding: 16, marginBottom: 16 }}>
-          <div className="rpg-card-title" style={{ fontSize: '0.85rem', marginBottom: 12 }}>
+        <form onSubmit={handleAddSubmit} className="rpg-card coin-quick-add-form" style={{ padding: '10px 12px', marginBottom: 12 }}>
+          <div className="coin-quick-add-form__title">
             {t('coinify.addRecurring')}
           </div>
 
-          <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
-            placeholder={t('coinify.name')} className="rpg-input coin-quick-add-form__field" required />
-
-          <div className="coin-quick-add-form__type-row">
+          <div className="coin-quick-add-form__row">
+            <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
+              placeholder={t('coinify.name')} className="rpg-input" style={{ flex: 1 }} required />
             <button type="button" onClick={() => setFormType('expense')}
-              className={`rpg-button ${formType === 'expense' ? 'rpg-btn-active' : ''}`} style={{ flex: 1 }}>
+              className={`rpg-button ${formType === 'expense' ? 'rpg-btn-active' : ''}`}>
               {t('coinify.expense')}
             </button>
             <button type="button" onClick={() => setFormType('income')}
-              className={`rpg-button ${formType === 'income' ? 'rpg-btn-active' : ''}`} style={{ flex: 1 }}>
+              className={`rpg-button ${formType === 'income' ? 'rpg-btn-active' : ''}`}>
               {t('coinify.income')}
             </button>
           </div>
 
-          <div className="coin-quick-add-form__amount-row">
-            <input type="number" value={formAmount} onChange={(e) => setFormAmount(e.target.value)}
-              placeholder={t('coinify.amount')} className="rpg-input" style={{ flex: 1 }} min="0" step="0.01" required />
+          <div className="coin-quick-add-form__row">
+            <RpgNumberInput value={formAmount} onChange={setFormAmount}
+              placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
             <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value as Currency)}
-              className="rpg-select" style={{ width: 80 }}>
+              className="rpg-select" style={{ width: 70 }}>
               <option value="ARS">ARS</option>
               <option value="USD">USD</option>
             </select>
+            <CategorySelect value={formCategory} onChange={setFormCategory} />
           </div>
 
-          <div className="coin-quick-add-form__field">
-            <CategorySelect value={formCategory} onChange={setFormCategory} />
+          <div className="coin-quick-add-form__row">
+            <label style={{ fontSize: '0.8rem', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
+            <input type="number" className="rpg-input" value={formBillingDay}
+              onChange={(e) => setFormBillingDay(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
+              style={{ width: 60 }} min={1} max={28} />
           </div>
 
           <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={formSubmitting}>
@@ -240,14 +252,17 @@ export default function Recurring() {
 
                 {/* Category */}
                 <span className="coin-recurring__category">{item.category}</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+                  {t('coinify.billingDay')}: {item.billingDay}
+                </span>
 
                 {/* Amount -- click to edit inline */}
                 {editingId === item.id ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input type="number" value={editingAmount}
-                      onChange={(e) => setEditingAmount(e.target.value)}
-                      className="rpg-input" style={{ width: 100, fontSize: '0.85rem' }}
-                      min="0" step="0.01" autoFocus
+                    <RpgNumberInput value={editingAmount}
+                      onChange={setEditingAmount}
+                      style={{ width: 100 }} fontSize="0.85rem"
+                      min={0} step={0.01} autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') saveEdit(item.id);
                         if (e.key === 'Escape') cancelEdit();
