@@ -67,18 +67,72 @@ export default function Transactions() {
   const [enteringType, setEnteringType] = useState<TransactionType | null>(null);
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  // Accordion collapsed state with localStorage persistence
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('coinify_collapsed_sections');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      localStorage.setItem('coinify_collapsed_sections', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
   const loadTransactions = useCallback(() => {
-    const filters: Record<string, string> = { month };
-    if (filterCategory) filters.category = filterCategory;
-    if (filterType) filters.type = filterType;
-    if (filterPayment) filters.paymentMethod = filterPayment;
-    window.api.financeGetTransactions(filters).then((data) => setTransactions(data as TransactionRow[]));
-  }, [month, filterCategory, filterType, filterPayment]);
+    window.api.financeGetTransactions({ month }).then((data) => setTransactions(data as TransactionRow[]));
+  }, [month]);
+
+  // Split transactions into recurring vs normal, apply filters client-side to normal only
+  const recurringTx = transactions.filter((tx) => tx.source === 'recurring');
+  const normalTx = transactions.filter((tx) => tx.source !== 'recurring');
+  const filteredNormalTx = normalTx.filter((tx) => {
+    if (filterCategory && tx.category !== filterCategory) return false;
+    if (filterType && tx.type !== filterType) return false;
+    if (filterPayment && tx.paymentMethod !== filterPayment) return false;
+    return true;
+  });
+
+  // Inline section header component
+  const SectionHeader = ({ sectionKey, title, count }: { sectionKey: string; title: string; count: number }) => {
+    const isCollapsed = collapsedSections.has(sectionKey);
+    return (
+      <div
+        onClick={() => toggleSection(sectionKey)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+          cursor: 'pointer', borderBottom: '1px solid var(--rpg-parchment-dark)',
+          userSelect: 'none', marginTop: 8,
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
+          strokeWidth="1.5" strokeLinecap="round"
+          style={{ transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+          <path d="M3 1l4 4-4 4" />
+        </svg>
+        <span style={{ fontWeight: 'bold', flex: 1, fontFamily: 'Cinzel, serif', fontSize: '0.9rem' }}>
+          {title}
+        </span>
+        <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{count}</span>
+      </div>
+    );
+  };
 
   useEffect(() => {
     loadTransactions();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     window.api.financeGenerateRecurringForMonth(currentMonth);
+  }, [loadTransactions]);
+
+  useEffect(() => {
+    const handler = () => loadTransactions();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
   }, [loadTransactions]);
 
   // Trigger slide-in animation when a new transaction row mounts
@@ -173,6 +227,81 @@ export default function Transactions() {
     return labels[pm] || pm;
   };
 
+  const renderTxRow = (tx: TransactionRow) => {
+    const isExiting = exitingId === tx.id;
+    const isEditing = editingId === tx.id;
+
+    return (
+      <div
+        key={tx.id}
+        ref={(el) => {
+          if (el) rowRefs.current.set(tx.id, el);
+          else rowRefs.current.delete(tx.id);
+        }}
+        className={[
+          'coin-tx',
+          tx.type === 'income' ? 'coin-tx--income' : 'coin-tx--expense',
+          isExiting ? 'coin-tx--exiting' : '',
+          isEditing ? 'coin-tx--editing' : '',
+        ].filter(Boolean).join(' ')}
+      >
+        {isEditing ? (
+          <div className="coin-tx__edit-row">
+            <RpgNumberInput value={editFields.amount}
+              onChange={(v) => setEditFields({ ...editFields, amount: v })}
+              style={{ width: 90 }} fontSize="0.85rem" min={0} step={0.01} />
+            <input type="text" value={editFields.description}
+              onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
+              className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
+            <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
+            <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
+          </div>
+        ) : (
+          <>
+            <span className="coin-tx__date">{tx.date.slice(5)}</span>
+            <span className="coin-tx__desc" title={tx.description}>
+              {tx.description || tx.category}
+              {!!tx.forThirdParty && (
+                <span className="coin-tx__badge coin-tx__badge--third-party">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  </svg>
+                  {' '}{tx.forThirdParty}
+                </span>
+              )}
+            </span>
+            <span className="coin-tx__badge coin-tx__badge--category">{tx.category}</span>
+            <span className="coin-tx__badge coin-tx__badge--source">
+              <SourceIcon source={tx.source} />
+            </span>
+            <span className="coin-tx__payment-method">{paymentMethodLabel(tx.paymentMethod)}</span>
+            {tx.impactsBalance === 0 && (
+              <span style={{
+                fontSize: '0.65rem', padding: '1px 4px', borderRadius: 3,
+                background: 'var(--rpg-parchment-dark)', color: 'var(--rpg-ink)',
+                marginLeft: 4, opacity: 0.7,
+              }}>
+                {t('coinify.ccTracking')}
+              </span>
+            )}
+            <span className={`coin-tx__amount ${tx.type === 'income' ? 'coin-tx__amount--income' : 'coin-tx__amount--expense'}`}>
+              {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
+              {tx.currency === 'USD' && ' USD'}
+            </span>
+            <div className="coin-tx__actions">
+              <button className="rpg-button coin-tx__action-btn" style={{ fontSize: '0.8rem', padding: '2px 6px' }}
+                onClick={() => startEdit(tx)}>{'\u270E'}</button>
+              <button className="rpg-button coin-tx__action-btn" style={{ fontSize: '0.8rem', padding: '2px 6px' }}
+                onClick={() => handleDelete(tx.id)}>{'\u2715'}</button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Toggle form + Month nav */}
@@ -189,104 +318,47 @@ export default function Transactions() {
         {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
       </div>
 
-      {/* Filters */}
-      <div className="coin-filters">
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rpg-select">
-          <option value="">{t('coinify.expense')} / {t('coinify.income')}</option>
-          <option value="expense">{t('coinify.expense')}</option>
-          <option value="income">{t('coinify.income')}</option>
-        </select>
-        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="rpg-select">
-          <option value="">{t('coinify.paymentMethod')}</option>
-          <option value="cash">{t('coinify.cash')}</option>
-          <option value="debit">{t('coinify.debit')}</option>
-          <option value="transfer">{t('coinify.transfer')}</option>
-          <option value="credit_card">{t('coinify.creditCard')}</option>
-        </select>
-      </div>
+      {/* Recurring Section */}
+      <SectionHeader sectionKey="recurring" title={t('coinify.recurringLabel')} count={recurringTx.length} />
+      {!collapsedSections.has('recurring') && (
+        <div data-anim="stagger-child" className="coin-tx-list">
+          {recurringTx.length === 0 ? (
+            <p className="coin-empty">{t('coinify.noTransactions')}</p>
+          ) : (
+            recurringTx.map((tx) => renderTxRow(tx))
+          )}
+        </div>
+      )}
 
-      {/* Transaction List */}
-      <div data-anim="stagger-child" className="coin-tx-list">
-        {transactions.length === 0 ? (
-          <p className="coin-empty">{t('coinify.noTransactions')}</p>
-        ) : (
-          transactions.map((tx) => {
-            const isEntering = enteringId === tx.id;
-            const isExiting = exitingId === tx.id;
-            const isEditing = editingId === tx.id;
+      {/* Transactions Section */}
+      <SectionHeader sectionKey="transactions" title={t('coinify.transactions')} count={filteredNormalTx.length} />
+      {!collapsedSections.has('transactions') && (
+        <>
+          {/* Filters */}
+          <div className="coin-filters">
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rpg-select">
+              <option value="">{t('coinify.expense')} / {t('coinify.income')}</option>
+              <option value="expense">{t('coinify.expense')}</option>
+              <option value="income">{t('coinify.income')}</option>
+            </select>
+            <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="rpg-select">
+              <option value="">{t('coinify.paymentMethod')}</option>
+              <option value="cash">{t('coinify.cash')}</option>
+              <option value="debit">{t('coinify.debit')}</option>
+              <option value="transfer">{t('coinify.transfer')}</option>
+              <option value="credit_card">{t('coinify.creditCard')}</option>
+            </select>
+          </div>
 
-            return (
-              <div
-                key={tx.id}
-                ref={(el) => {
-                  if (el) rowRefs.current.set(tx.id, el);
-                  else rowRefs.current.delete(tx.id);
-                }}
-                className={[
-                  'coin-tx',
-                  tx.type === 'income' ? 'coin-tx--income' : 'coin-tx--expense',
-                  isExiting ? 'coin-tx--exiting' : '',
-                  isEditing ? 'coin-tx--editing' : '',
-                ].filter(Boolean).join(' ')}
-              >
-                {isEditing ? (
-                  <div className="coin-tx__edit-row">
-                    <RpgNumberInput value={editFields.amount}
-                      onChange={(v) => setEditFields({ ...editFields, amount: v })}
-                      style={{ width: 90 }} fontSize="0.85rem" min={0} step={0.01} />
-                    <input type="text" value={editFields.description}
-                      onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
-                      className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
-                    <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-                      onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
-                    <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-                      onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="coin-tx__date">{tx.date.slice(5)}</span>
-                    <span className="coin-tx__desc" title={tx.description}>
-                      {tx.description || tx.category}
-                      {!!tx.forThirdParty && (
-                        <span className="coin-tx__badge coin-tx__badge--third-party">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          </svg>
-                          {' '}{tx.forThirdParty}
-                        </span>
-                      )}
-                    </span>
-                    <span className="coin-tx__badge coin-tx__badge--category">{tx.category}</span>
-                    <span className="coin-tx__badge coin-tx__badge--source">
-                      <SourceIcon source={tx.source} />
-                    </span>
-                    <span className="coin-tx__payment-method">{paymentMethodLabel(tx.paymentMethod)}</span>
-                    {tx.impactsBalance === 0 && (
-                      <span style={{
-                        fontSize: '0.65rem', padding: '1px 4px', borderRadius: 3,
-                        background: 'var(--rpg-parchment-dark)', color: 'var(--rpg-ink)',
-                        marginLeft: 4, opacity: 0.7,
-                      }}>
-                        {t('coinify.ccTracking')}
-                      </span>
-                    )}
-                    <span className={`coin-tx__amount ${tx.type === 'income' ? 'coin-tx__amount--income' : 'coin-tx__amount--expense'}`}>
-                      {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString(tx.currency === 'USD' ? 'en-US' : 'es-AR')}
-                      {tx.currency === 'USD' && ' USD'}
-                    </span>
-                    <div className="coin-tx__actions">
-                      <button className="rpg-button coin-tx__action-btn" style={{ fontSize: '0.8rem', padding: '2px 6px' }}
-                        onClick={() => startEdit(tx)}>{'\u270E'}</button>
-                      <button className="rpg-button coin-tx__action-btn" style={{ fontSize: '0.8rem', padding: '2px 6px' }}
-                        onClick={() => handleDelete(tx.id)}>{'\u2715'}</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+          <div data-anim="stagger-child" className="coin-tx-list">
+            {filteredNormalTx.length === 0 ? (
+              <p className="coin-empty">{t('coinify.noTransactions')}</p>
+            ) : (
+              filteredNormalTx.map((tx) => renderTxRow(tx))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
