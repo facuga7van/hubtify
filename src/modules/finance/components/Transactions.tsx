@@ -6,6 +6,7 @@ import { QuickAddForm } from './shared/QuickAddForm';
 import { useToast } from '../../../shared/components/useToast';
 import type { TransactionType, PaymentMethod, Currency } from '../types';
 import { addTransaction } from '../../../shared/animations/feedback';
+import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 
 interface TransactionRow {
   id: string;
@@ -91,6 +92,7 @@ export default function Transactions() {
   const handleAdd = async (data: {
     type: TransactionType; amount: number; category: string; description: string;
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
+    creditCardId?: string;
   }) => {
     let newId: string;
     if (data.paymentMethod === 'credit_card' && data.installments > 1) {
@@ -102,6 +104,7 @@ export default function Transactions() {
         currency: data.currency,
         category: data.category,
         startDate: data.date,
+        creditCardId: data.creditCardId,
       });
     } else {
       newId = await window.api.financeAddTransaction({
@@ -112,6 +115,7 @@ export default function Transactions() {
         description: data.description,
         date: data.date,
         paymentMethod: data.paymentMethod,
+        creditCardId: data.creditCardId,
       });
     }
     loadTransactions();
@@ -226,9 +230,9 @@ export default function Transactions() {
               >
                 {isEditing ? (
                   <div className="coin-tx__edit-row">
-                    <input type="number" value={editFields.amount}
-                      onChange={(e) => setEditFields({ ...editFields, amount: e.target.value })}
-                      className="rpg-input" style={{ width: 90, fontSize: '0.85rem' }} />
+                    <RpgNumberInput value={editFields.amount}
+                      onChange={(v) => setEditFields({ ...editFields, amount: v })}
+                      style={{ width: 90 }} fontSize="0.85rem" min={0} step={0.01} />
                     <input type="text" value={editFields.description}
                       onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
                       className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
@@ -242,7 +246,7 @@ export default function Transactions() {
                     <span className="coin-tx__date">{tx.date.slice(5)}</span>
                     <span className="coin-tx__desc" title={tx.description}>
                       {tx.description || tx.category}
-                      {tx.forThirdParty && (
+                      {!!tx.forThirdParty && (
                         <span className="coin-tx__badge coin-tx__badge--third-party">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

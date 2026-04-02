@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './CategorySelect';
+import { CreditCardSelect } from './CreditCardSelect';
+import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
 
 interface QuickAddFormProps {
@@ -13,6 +15,7 @@ interface QuickAddFormProps {
     currency: Currency;
     paymentMethod: PaymentMethod;
     installments: number;
+    creditCardId?: string;
   }) => void;
   defaultType?: TransactionType;
 }
@@ -29,6 +32,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const [currency, setCurrency] = useState<Currency>('ARS');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [installments, setInstallments] = useState(1);
+  const [creditCardId, setCreditCardId] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,11 +48,13 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       currency,
       paymentMethod,
       installments: paymentMethod === 'credit_card' ? installments : 1,
+      creditCardId: paymentMethod === 'credit_card' ? creditCardId : undefined,
     });
 
     setAmount('');
     setDescription('');
     setInstallments(1);
+    setCreditCardId('');
   };
 
   return (
@@ -76,8 +82,8 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
       {/* Amount + currency */}
       <div className="coin-quick-add-form__amount-row">
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-          placeholder={t('coinify.amount')} className="rpg-input" style={{ flex: 1 }} min="0" step="0.01" required />
+        <RpgNumberInput value={amount} onChange={setAmount}
+          placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
         <select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}
           className="rpg-select" style={{ width: 80 }}>
           <option value="ARS">ARS</option>
@@ -85,37 +91,36 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
         </select>
       </div>
 
-      {/* Category */}
-      <div className="coin-quick-add-form__field">
+      {/* Category + Description */}
+      <div className="coin-quick-add-form__row">
         <CategorySelect value={category} onChange={setCategory} />
+        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+          placeholder={t('coinify.description')} className="rpg-input" style={{ flex: 1 }} />
       </div>
 
-      {/* Description */}
-      <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-        placeholder={t('coinify.description')} className="rpg-input coin-quick-add-form__field" />
-
-      {/* Date */}
-      <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-        className="rpg-input coin-quick-add-form__field" />
-
-      {/* Payment method */}
-      <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-        className="rpg-select coin-quick-add-form__field">
-        <option value="cash">{t('coinify.cash')}</option>
-        <option value="debit">{t('coinify.debit')}</option>
-        <option value="transfer">{t('coinify.transfer')}</option>
-        <option value="credit_card">{t('coinify.creditCard')}</option>
-      </select>
-
-      {/* Installments (conditional) */}
-      {paymentMethod === 'credit_card' && (
-        <div className="coin-quick-add-form__installment-row">
-          <label style={{ fontSize: '0.85rem' }}>{t('coinify.installments')}</label>
-          <input type="number" value={installments}
-            onChange={(e) => setInstallments(Math.max(1, parseInt(e.target.value) || 1))}
-            className="rpg-input" style={{ width: 80 }} min="1" />
-        </div>
-      )}
+      {/* Date + Payment method */}
+      <div className="coin-quick-add-form__row">
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+          className="rpg-input" style={{ flex: 1 }} />
+        <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+          className="rpg-select" style={{ flex: 1 }}>
+          <option value="cash">{t('coinify.cash')}</option>
+          <option value="debit">{t('coinify.debit')}</option>
+          <option value="transfer">{t('coinify.transfer')}</option>
+          <option value="credit_card">{t('coinify.creditCard')}</option>
+        </select>
+        {paymentMethod === 'credit_card' && (
+          <>
+            <label style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{t('coinify.installments')}</label>
+            <RpgNumberInput value={String(installments)}
+              onChange={(v) => setInstallments(Math.max(1, parseInt(v) || 1))}
+              style={{ width: 60 }} min={1} />
+          </>
+        )}
+        {paymentMethod === 'credit_card' && (
+          <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />
+        )}
+      </div>
 
       {/* Submit */}
       <button type="submit" className="rpg-button" style={{ width: '100%' }}>{t('coinify.add')}</button>
