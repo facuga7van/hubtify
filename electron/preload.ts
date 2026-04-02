@@ -104,6 +104,7 @@ const api = {
   financeGetInstallmentProjection: (months: number) => ipcRenderer.invoke('finance:getInstallmentProjection', months),
   financeCreateInstallmentGroup: (group: Record<string, unknown>) => ipcRenderer.invoke('finance:createInstallmentGroup', group),
   financeDeleteInstallmentGroup: (id: string) => ipcRenderer.invoke('finance:deleteInstallmentGroup', id),
+  financeUpdateInstallmentAmount: (txId: string, newAmount: number) => ipcRenderer.invoke('finance:updateInstallmentAmount', txId, newAmount),
 
   // Finance - Loans
   financeGetLoans: (filter?: Record<string, unknown>) => ipcRenderer.invoke('finance:getLoans', filter),
@@ -139,6 +140,18 @@ const api = {
   financeGetMonthlyTotal: () => ipcRenderer.invoke('finance:getMonthlyTotal'),
   financeGetActiveLoansCount: () => ipcRenderer.invoke('finance:getActiveLoansCount'),
   financeGetCategories: () => ipcRenderer.invoke('finance:getCategories'),
+  financeAddCategory: (name: string) => ipcRenderer.invoke('finance:addCategory', name),
+  financeDeleteCategory: (name: string) => ipcRenderer.invoke('finance:deleteCategory', name),
+
+  // Finance - Credit Cards
+  financeGetCreditCards: () => ipcRenderer.invoke('finance:getCreditCards'),
+  financeAddCreditCard: (card: Record<string, unknown>) => ipcRenderer.invoke('finance:addCreditCard', card),
+  financeUpdateCreditCard: (id: string, fields: Record<string, unknown>) => ipcRenderer.invoke('finance:updateCreditCard', id, fields),
+  financeDeleteCreditCard: (id: string) => ipcRenderer.invoke('finance:deleteCreditCard', id),
+  financeGetCreditCardStatements: (filters?: Record<string, unknown>) => ipcRenderer.invoke('finance:getCreditCardStatements', filters),
+  financeGetStatementDetail: (id: string) => ipcRenderer.invoke('finance:getStatementDetail', id),
+  financeGenerateStatement: (cardId: string, periodMonth: string) => ipcRenderer.invoke('finance:generateStatement', cardId, periodMonth),
+  financePayStatement: (id: string, paidAmount: number) => ipcRenderer.invoke('finance:payStatement', id, paidAmount),
 
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),

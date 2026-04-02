@@ -163,6 +163,7 @@ export interface HubtifyApi {
   financeGetInstallmentProjection: (months: number) => Promise<Array<{ month: string; total: number }>>;
   financeCreateInstallmentGroup: (group: Record<string, unknown>) => Promise<string>;
   financeDeleteInstallmentGroup: (id: string) => Promise<void>;
+  financeUpdateInstallmentAmount: (txId: string, newAmount: number) => Promise<void>;
 
   // Finance - Loans
   financeGetLoans: (filter?: Record<string, unknown>) => Promise<unknown[]>;
@@ -196,8 +197,20 @@ export interface HubtifyApi {
 
   // Finance - Backward compat
   financeGetCategories: () => Promise<string[]>;
+  financeAddCategory: (name: string) => Promise<void>;
+  financeDeleteCategory: (name: string) => Promise<void>;
   financeGetMonthlyTotal: () => Promise<number>;
   financeGetActiveLoansCount: () => Promise<number>;
+
+  // Finance - Credit Cards
+  financeGetCreditCards: () => Promise<unknown[]>;
+  financeAddCreditCard: (card: Record<string, unknown>) => Promise<string>;
+  financeUpdateCreditCard: (id: string, fields: Record<string, unknown>) => Promise<void>;
+  financeDeleteCreditCard: (id: string) => Promise<void>;
+  financeGetCreditCardStatements: (filters?: Record<string, unknown>) => Promise<unknown[]>;
+  financeGetStatementDetail: (id: string) => Promise<unknown>;
+  financeGenerateStatement: (cardId: string, periodMonth: string) => Promise<string | null>;
+  financePayStatement: (id: string, paidAmount: number) => Promise<void>;
 
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
