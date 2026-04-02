@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MonthNavigator } from './shared/MonthNavigator';
@@ -130,11 +130,26 @@ export default function Dashboard() {
   }, [month]);
 
   // Fetch static data (projection, loans, installment count)
-  useEffect(() => {
+  const loadStaticData = useCallback(() => {
     window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[]));
     window.api.financeGetActiveLoanSummary().then((data) => setLoans(data as LoanSummary));
     window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length));
   }, []);
+
+  useEffect(() => { loadStaticData(); }, [loadStaticData]);
+
+  // Auto-generate recurring transactions for the current month (idempotent)
+  useEffect(() => {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    window.api.financeGenerateRecurringForMonth(month);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => { loadStaticData(); isFirstLoad.current = true; };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadStaticData]);
 
   // Trend calculation
   const trendPct = (() => {
