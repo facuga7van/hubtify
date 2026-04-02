@@ -50,6 +50,8 @@ function copyExternalModules(buildPath: string): void {
   }
 }
 
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
@@ -57,7 +59,7 @@ const config: ForgeConfig = {
     },
     icon: path.resolve(__dirname, 'assets/icon'),
     extraResource: ['./assets/icon.ico'],
-    appVersion: '0.5.2',
+    appVersion: pkg.version,
     appCopyright: 'Hubtify',
     win32metadata: {
       CompanyName: 'Hubtify',

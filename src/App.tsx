@@ -16,7 +16,6 @@ import { nutritionModule } from './modules/nutrition';
 import Today from './modules/nutrition/components/Today';
 import NutritionCharts from './modules/nutrition/components/NutritionCharts';
 import NutritionSettings from './modules/nutrition/components/NutritionSettings';
-import NutriToastProvider from './modules/nutrition/components/NutriToastProvider';
 import { financeModule } from './modules/finance';
 import FinanceLayout from './modules/finance/components/FinanceLayout';
 import FinanceDashboard from './modules/finance/components/Dashboard';
@@ -70,7 +69,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/character" element={<CharacterPage />} />
           <Route path="/quests" element={<TaskList />} />
-          <Route path="/nutrition" element={<NutriToastProvider><Outlet /></NutriToastProvider>}>
+          <Route path="/nutrition" element={<Outlet />}>
             <Route index element={<Today />} />
             <Route path="dashboard" element={<NutritionCharts />} />
             <Route path="settings" element={<NutritionSettings />} />

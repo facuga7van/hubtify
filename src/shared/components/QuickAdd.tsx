@@ -60,7 +60,6 @@ export default function QuickAdd({ onClose }: Props) {
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.6)', zIndex: 99998,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '20vh',
-      animation: 'contentFadeIn 0.1s ease',
     }} onClick={onClose}>
       <div style={{
         backgroundImage: `url(${bgUrl})`,

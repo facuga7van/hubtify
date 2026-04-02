@@ -49,3 +49,21 @@ export function playDelete() {
     getSound('delete', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3).play();
   } catch { /* Sound not available */ }
 }
+
+const pageFlipSources = [
+  () => new URL('../assets/fx/page-flip.mp3', import.meta.url).href,
+  () => new URL('../assets/fx/page-flip-2.mp3', import.meta.url).href,
+  () => new URL('../assets/fx/page-flip-3.mp3', import.meta.url).href,
+];
+let lastPageFlipIndex = -1;
+
+export function playPageFlip() {
+  if (!soundEnabled) return;
+  try {
+    // Pick a random variant, avoiding the same one twice in a row
+    let idx = Math.floor(Math.random() * pageFlipSources.length);
+    if (idx === lastPageFlipIndex) idx = (idx + 1) % pageFlipSources.length;
+    lastPageFlipIndex = idx;
+    getSound(`pageFlip${idx}`, pageFlipSources[idx](), 0.18).play();
+  } catch { /* Sound not available */ }
+}

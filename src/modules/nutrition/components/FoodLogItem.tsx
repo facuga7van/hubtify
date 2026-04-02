@@ -1,5 +1,6 @@
-import { useState, memo } from 'react';
+import { useState, memo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { registerFood } from '../../../shared/animations/feedback';
 
 interface FoodEntry {
   id: number; time: string; description: string; calories: number;
@@ -12,14 +13,24 @@ interface Props {
   onUpdate: (id: number, fields: { description?: string; calories?: number }) => void;
   readOnly?: boolean;
   className?: string;
+  isNew?: boolean;
 }
 
-export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly, className }: Props) {
+export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly, className, isNew }: Props) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editCals, setEditCals] = useState(String(entry.calories));
   const [editDesc, setEditDesc] = useState(entry.description);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isNew && rowRef.current) {
+      registerFood(rowRef.current);
+    }
+  // Only fire on mount when isNew is true
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sourceIcon = entry.source === 'ai_estimate'
     ? <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.2" strokeLinecap="round"><circle cx="7" cy="7" r="5"/><path d="M7 4v3l2 1"/></svg>
@@ -36,7 +47,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly, 
 
   if (editing) {
     return (
-      <div className={`nutri-pulse-gold ${className || ''}`} style={{
+      <div ref={rowRef} className={`nutri-pulse-gold ${className || ''}`} style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0',
         borderBottom: '1px solid var(--rpg-parchment-dark)',
       }}>
@@ -54,7 +65,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, readOnly, 
   }
 
   return (
-    <div className={className || ''} style={{
+    <div ref={rowRef} className={className || ''} style={{
       display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
       borderBottom: '1px solid var(--rpg-parchment-dark)',
     }}>

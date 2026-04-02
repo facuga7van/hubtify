@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { useScrollReveal } from '../../../shared/animations/useScrollReveal';
 import { CSS } from '@dnd-kit/utilities';
 import PageHeader from '../../../shared/components/PageHeader';
 import Checkbox from '../../../shared/components/Checkbox';
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
-import XpToast, { type XpToastData } from './XpToast';
+import { useToast } from '../../../shared/components/useToast';
+import type { XpToastData } from '../types';
 import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
 import HabitTracker from './HabitTracker';
@@ -17,6 +19,7 @@ import { playTaskComplete, playDelete } from '../../../shared/audio';
 
 export default function TaskList() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasksMap, setSubtasksMap] = useState<Record<string, Subtask[]>>({});
   const [categories, setCategories] = useState<string[]>([]);
@@ -27,7 +30,6 @@ export default function TaskList() {
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const [activeProjectId, setActiveProjectId] = useState<string | null | undefined>(undefined); // undefined = all, null = unassigned
   const [filter, setFilter] = useState('');
-  const [toastData, setToastData] = useState<XpToastData | null>(null);
   const [todayCount, setTodayCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -42,6 +44,7 @@ export default function TaskList() {
     } catch { return new Set(); }
   });
   const formRef = useRef<HTMLDivElement>(null);
+  const { containerRef: listContainerRef, disableScrollTrigger, enableScrollTrigger } = useScrollReveal('[data-anim="quest-card"]');
 
   const loadTasks = useCallback(async () => {
     try {
@@ -147,7 +150,7 @@ export default function TaskList() {
         timestamp: Date.now(),
       });
       playTaskComplete();
-      setToastData({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null });
+      toast({ type: 'xp', message: `+${xp} XP`, details: { xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || undefined } });
     } else {
       await window.api.questsSetTaskStatus(task.id, false);
       await window.api.processRpgEvent({
@@ -241,7 +244,7 @@ export default function TaskList() {
     onToggleSelect: () => setSelectedIds((prev) => {
       const next = new Set(prev); next.has(task.id) ? next.delete(task.id) : next.add(task.id); return next;
     }),
-    onShowToast: setToastData,
+    onShowToast: (d: XpToastData) => toast({ type: 'xp', message: `+${d.xp} XP`, details: { xp: d.xp, bonusTier: d.bonusTier, comboMultiplier: d.comboMultiplier, streakMilestone: d.streakMilestone || undefined } }),
     onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); },
     drawingCount: drawingCounts[task.id] ?? 0,
     onOpenNotes: () => setNotesTaskId(task.id),
@@ -256,7 +259,7 @@ export default function TaskList() {
   );
 
   return (
-    <div>
+    <div ref={listContainerRef}>
       <PageHeader title={t('questify.title')} subtitle={t('questify.subtitle')}
         actions={
           <select
@@ -287,7 +290,7 @@ export default function TaskList() {
         }
       />
       <HabitTracker onXpGained={() => loadTasks()} />
-      <div ref={formRef}>
+      <div ref={formRef} data-anim="stagger-child">
         <TaskForm
           editingTask={editingTask}
           categories={categories}
@@ -298,7 +301,7 @@ export default function TaskList() {
       </div>
 
       {/* Tabs + filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div data-anim="stagger-child" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="rpg-button"
           onClick={() => setActiveTab('pending')}
           style={{ opacity: activeTab === 'pending' ? 1 : 0.6 }}>
@@ -377,7 +380,7 @@ export default function TaskList() {
                   </span>
                 </div>
                 {!isCollapsed && (
-                  <DndContext collisionDetection={closestCenter} onDragEnd={(event) => onDragEndInSection(event, sectionTasks)}>
+                  <DndContext collisionDetection={closestCenter} onDragStart={disableScrollTrigger} onDragEnd={(event) => { enableScrollTrigger(); onDragEndInSection(event, sectionTasks); }}>
                     <SortableContext items={sectionTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                       {sectionTasks.map((task) => (
                         <SortableTaskItem key={task.id} {...taskItemProps(task)} />
@@ -390,7 +393,7 @@ export default function TaskList() {
           })
         ) : activeTab === 'pending' ? (
           /* Single project view — flat list */
-          <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <DndContext collisionDetection={closestCenter} onDragStart={disableScrollTrigger} onDragEnd={(event) => { enableScrollTrigger(); onDragEnd(event); }}>
             <SortableContext items={pending.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {pending.map((task) => (
                 <SortableTaskItem key={task.id} {...taskItemProps(task)} />
@@ -403,7 +406,7 @@ export default function TaskList() {
           const isExpanded = expandedIds.has(task.id);
           const subs = subtasksMap[task.id] ?? [];
           return (
-            <div key={task.id} className="rpg-card quest-card-stagger" style={{ marginBottom: 8, opacity: 0.7 }}>
+            <div key={task.id} data-anim="quest-card" className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isExpanded ? 8 : 0 }}>
                 <Checkbox checked onChange={() => handleComplete(task)} />
                 <svg onClick={() => toggleExpand(task.id)} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
@@ -425,7 +428,7 @@ export default function TaskList() {
                     taskId={task.id}
                     subtasks={subs}
                     countCompletedToday={todayCount}
-                    onShowToast={setToastData}
+                    onShowToast={(d: XpToastData) => toast({ type: 'xp', message: `+${d.xp} XP`, details: { xp: d.xp, bonusTier: d.bonusTier, comboMultiplier: d.comboMultiplier, streakMilestone: d.streakMilestone || undefined } })}
                     onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
                   />
                 </div>
@@ -440,8 +443,6 @@ export default function TaskList() {
           </p>
         )}
       </>)}
-
-      <XpToast data={toastData} />
 
       {showProjectManager && (
         <ProjectManager
@@ -475,10 +476,20 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const [animatingComplete, setAnimatingComplete] = useState(false);
+
+  const handleCheckboxComplete = useCallback(() => {
+    if (animatingComplete) return;
+    setAnimatingComplete(true);
+    // Let the quill animation play (300ms draw + 150ms splatter), then persist
+    setTimeout(() => {
+      onComplete();
+    }, 500);
+  }, [animatingComplete, onComplete]);
 
   return (
-    <div ref={setNodeRef} style={{ ...style, marginBottom: 8 }} {...attributes}
-      className={`rpg-card quest-card-stagger${task.dueDate && getDueDateStatus(task.dueDate) === 'overdue' ? ' quest-card--overdue' : ''}`}>
+    <div ref={setNodeRef} data-anim="quest-card" style={{ ...style, marginBottom: 8 }} {...attributes}
+      className={`rpg-card${task.dueDate && getDueDateStatus(task.dueDate) === 'overdue' ? ' quest-card--overdue' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: expanded ? 8 : 0 }}>
         <svg {...listeners} width="14" height="14" viewBox="0 0 14 14"
           style={{ cursor: 'grab', opacity: 0.4, flexShrink: 0 }}
@@ -487,7 +498,7 @@ function SortableTaskItem({ task, expanded, selected, subtasks, todayCount,
           <circle cx="4" cy="7" r="1.2"/><circle cx="10" cy="7" r="1.2"/>
           <circle cx="4" cy="11" r="1.2"/><circle cx="10" cy="11" r="1.2"/>
         </svg>
-        <Checkbox onChange={onComplete} />
+        <Checkbox checked={animatingComplete} onChange={handleCheckboxComplete} />
         <svg onClick={onToggleExpand} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
           style={{ transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.4, flexShrink: 0, cursor: 'pointer' }}>
           <path d="M3 1l4 4-4 4"/>

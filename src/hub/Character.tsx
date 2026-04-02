@@ -164,7 +164,6 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     if (!dbLoaded || appRef.current) return;
 
     const app = new Application();
-    appRef.current = app;
 
     (async () => {
       const canvas = document.createElement('canvas');
@@ -173,6 +172,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       canvas.style.borderRadius = '50%';
 
       await app.init({ canvas, background: '#c0a080', width: 100, height: 100 });
+      appRef.current = app; // Only assign AFTER init so app.screen is available
       pixiContainerRef.current?.appendChild(canvas);
 
       const cx = app.screen.width / 2;
@@ -251,7 +251,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
 
       {/* Customization panel */}
       {canCustomize && showCustomizer && (
-        <div className="rpg-card" style={{ marginTop: 12, animation: 'contentFadeIn 0.2s ease' }}>
+        <div className="rpg-card" style={{ marginTop: 12 }}>
           <div className="rpg-card-title">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
               <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>

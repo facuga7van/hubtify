@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCoinToast } from './CoinToastProvider';
+import { useToast } from '../../../shared/components/useToast';
 import type { ParsedRow } from '../../../../shared/types';
 import { CATEGORIES } from '../types';
 
@@ -11,7 +11,7 @@ interface RowState extends ParsedRow {
 
 export default function Import() {
   const { t } = useTranslation();
-  const { showToast } = useCoinToast();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
@@ -88,7 +88,7 @@ export default function Import() {
       // Seal animation + toast
       setShowSeal(true);
       setTimeout(() => setShowSeal(false), 600);
-      showToast('imported', t('coinify.importSuccess', { count: result.count }));
+      toast({ type: 'coin', message: t('coinify.importSuccess', { count: result.count }), details: { transactionType: 'imported' } });
     } catch {
       setImportError(t('coinify.importErrorConfirm'));
     } finally {

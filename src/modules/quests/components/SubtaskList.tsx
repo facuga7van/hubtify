@@ -1,14 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
 import Checkbox from '../../../shared/components/Checkbox';
-import type { XpToastData } from './XpToast';
+import type { XpToastData } from '../types';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
 import { TierBadge, tierXp, calculateXpForAction } from '../utils';
 import { todayDateString } from '../../../../shared/date-utils';
+import { completeTask } from '../../../shared/animations/feedback';
 
 interface Props {
   taskId: string;
@@ -17,6 +18,9 @@ interface Props {
   onShowToast: (data: XpToastData) => void;
   onSubtaskChanged: () => void;
 }
+
+// Duration of the QuillCheckbox draw animation (ms) — must match QuillCheckbox.tsx
+const QUILL_DRAW_MS = 300;
 
 export default function SubtaskList({ taskId, subtasks, countCompletedToday, onShowToast, onSubtaskChanged }: Props) {
   const { t } = useTranslation();
@@ -38,7 +42,11 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
     onSubtaskChanged();
   };
 
-  const handleComplete = async (subtask: Subtask) => {
+  const handleComplete = async (
+    subtask: Subtask,
+    rowEl?: HTMLElement | null,
+    textEl?: HTMLElement | null,
+  ) => {
     const tier = subtask.tier as TaskTier;
     if (!subtask.status) {
       const today = todayDateString();
@@ -51,7 +59,17 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
         timestamp: Date.now(),
       });
 
-      onShowToast({ xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null });
+      const toastData: XpToastData = { xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null };
+
+      // Chain: quill animation (300ms) → strikethrough → toast
+      if (rowEl && textEl) {
+        setTimeout(() => {
+          const tl = completeTask(rowEl, textEl);
+          tl.eventCallback('onComplete', () => onShowToast(toastData));
+        }, QUILL_DRAW_MS);
+      } else {
+        onShowToast(toastData);
+      }
     } else {
       await window.api.questsSetSubtaskStatus(subtask.id, false);
       await window.api.processRpgEvent({
@@ -129,22 +147,34 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
 }
 
 function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
-  subtask: Subtask; onComplete: (s: Subtask) => void;
+  subtask: Subtask; onComplete: (s: Subtask, rowEl?: HTMLElement | null, textEl?: HTMLElement | null) => void;
   onEdit: (s: Subtask) => void; onDelete: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [animatingComplete, setAnimatingComplete] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
+  const rowRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  const handleCheckboxComplete = useCallback(() => {
+    if (animatingComplete) return;
+    setAnimatingComplete(true);
+    setTimeout(() => {
+      onComplete(subtask, rowRef.current, textRef.current);
+    }, 500);
+  }, [animatingComplete, onComplete, subtask]);
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="subtask-item">
+    <div ref={(el) => { setNodeRef(el); rowRef.current = el; }} style={style} {...attributes} className="subtask-item">
       <div onPointerDown={(e) => e.stopPropagation()}>
-        <Checkbox onChange={() => onComplete(subtask)} />
+        <Checkbox checked={animatingComplete} onChange={handleCheckboxComplete} />
       </div>
       <div {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '0 4px', opacity: 0.3 }}>
         <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>
       </div>
-      <span className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
+      <span ref={textRef} className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
         {subtask.name}
       </span>
       <TierBadge tier={subtask.tier} />

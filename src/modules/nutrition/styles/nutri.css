@@ -1,21 +1,6 @@
 /* ── Nutrify Module Styles ── */
 
 /* Keyframes */
-@keyframes nutriStaggerIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes nutriSlideIn {
-  from { opacity: 0; transform: translateY(-12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes nutriFadeOut {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(-20px); }
-}
-
 @keyframes nutriPulseGold {
   0%, 100% { outline-color: var(--rpg-gold); }
   50% { outline-color: var(--rpg-gold-light); box-shadow: 0 0 6px rgba(201, 168, 76, 0.4); }
@@ -24,11 +9,6 @@
 @keyframes nutriShimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
-}
-
-@keyframes nutriToastIn {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
 }
 
 /* ── Skeleton Loading ── */
@@ -64,26 +44,6 @@
   width: 100%;
 }
 
-/* ── Staggered Section Entry ── */
-.nutri-section {
-  animation: nutriStaggerIn 0.35s ease both;
-}
-
-.nutri-stagger-1 { animation-delay: 0ms; }
-.nutri-stagger-2 { animation-delay: 50ms; }
-.nutri-stagger-3 { animation-delay: 100ms; }
-.nutri-stagger-4 { animation-delay: 150ms; }
-.nutri-stagger-5 { animation-delay: 200ms; }
-
-/* ── Food Item Animations ── */
-.nutri-food-enter {
-  animation: nutriSlideIn 0.3s ease both;
-}
-
-.nutri-food-exit {
-  animation: nutriFadeOut 0.3s ease both;
-}
-
 /* ── Inline Edit Pulse ── */
 .nutri-pulse-gold {
   animation: nutriPulseGold 1.5s infinite;
@@ -106,7 +66,6 @@
   font-family: 'Fira Code', monospace;
   font-size: 0.9rem;
   z-index: 1000;
-  animation: nutriToastIn 0.3s ease-out;
   display: flex;
   align-items: center;
   gap: 8px;

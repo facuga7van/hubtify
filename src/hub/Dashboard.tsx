@@ -52,7 +52,7 @@ export default function Dashboard() {
 
       {/* Stats row */}
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div data-anim="stagger-child" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
           <div className="rpg-card rpg-stat-card">
             <div className="rpg-stat-number">{stats.level}</div>
             <div className="rpg-stat-label">{t('rpg.level')}</div>
@@ -80,7 +80,7 @@ export default function Dashboard() {
 
       {/* XP History chart */}
       {chartData.length > 0 && (
-        <div className="rpg-card" style={{ marginBottom: 16 }}>
+        <div data-anim="stagger-child" className="rpg-card" style={{ marginBottom: 16 }}>
           <div className="rpg-card-title">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
               <rect x="1" y="8" width="3" height="6"/><rect x="6" y="4" width="3" height="10"/><rect x="11" y="1" width="3" height="13"/>
@@ -99,7 +99,7 @@ export default function Dashboard() {
       )}
 
       {/* Module widgets */}
-      <div className="dashboard-grid">
+      <div data-anim="stagger-child" className="dashboard-grid">
         <div className="rpg-card dashboard-widget" onClick={() => navigate('/quests')}>
           <div className="rpg-card-title">
             <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

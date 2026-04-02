@@ -101,7 +101,7 @@ export default function NutritionCharts() {
       <PageHeader title={t('nutrify.dashboard')} subtitle={t('nutrify.dashboardSub')} actions={backButton} />
 
       {/* Stats row */}
-      <div className="nutri-section nutri-stagger-1">
+      <div>
         <div className="nutri-stats-grid">
           <CoinStatCard icon={fireIcon} label={t('nutrify.dayStreak')} value={streak} color="gold" prefix="" />
           <CoinStatCard
@@ -117,7 +117,7 @@ export default function NutritionCharts() {
       </div>
 
       {/* Calories chart */}
-      <div className="nutri-section nutri-stagger-2">
+      <div>
         {chartData.length > 0 && (
           <div className="rpg-card" style={{ marginBottom: 16 }}>
             <div className="rpg-card-title">{t('nutrify.calories30')}</div>
@@ -137,7 +137,7 @@ export default function NutritionCharts() {
       </div>
 
       {/* Weight chart */}
-      <div className="nutri-section nutri-stagger-3">
+      <div>
         {weights.length >= 1 && (
           <div className="rpg-card">
             <div className="rpg-card-title">{t('nutrify.weightTrend')}</div>

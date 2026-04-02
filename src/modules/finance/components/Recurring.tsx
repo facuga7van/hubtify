@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './shared/CategorySelect';
-import { useCoinToast } from './CoinToastProvider';
+import { useToast } from '../../../shared/components/useToast';
 import type { Currency, TransactionType } from '../types';
 
 interface RecurringRow {
@@ -23,7 +23,7 @@ interface AmountHistoryRow {
 
 export default function Recurring() {
   const { t } = useTranslation();
-  const { showToast } = useCoinToast();
+  const { toast } = useToast();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -121,7 +121,7 @@ export default function Recurring() {
     setGenerating(true);
     try {
       await window.api.financeGenerateRecurringForMonth(currentMonth);
-      showToast('generated', t('coinify.recurringGenerated'));
+      toast({ type: 'coin', message: t('coinify.recurringGenerated'), details: { transactionType: 'generated' } });
       // Trigger coin drop animation
       setShowCoinDrop(true);
       setTimeout(() => setShowCoinDrop(false), 600);

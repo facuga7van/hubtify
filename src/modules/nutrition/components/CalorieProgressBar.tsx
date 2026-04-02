@@ -1,4 +1,6 @@
+import { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { barGleam } from '../../../shared/animations/feedback';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -43,6 +45,16 @@ function statusMessage(t: (k: string) => string, goal: Goal, consumed: number, t
 
 export default function CalorieProgressBar({ consumed, tdee, deficitTargetKcal }: Props) {
   const { t } = useTranslation();
+  const barFillRef = useRef<HTMLDivElement>(null);
+  const prevConsumedRef = useRef(consumed);
+
+  useEffect(() => {
+    if (consumed > prevConsumedRef.current && barFillRef.current) {
+      barGleam(barFillRef.current, 0.4);
+    }
+    prevConsumedRef.current = consumed;
+  }, [consumed]);
+
   if (tdee <= 0) return null;
 
   const goal = getGoal(deficitTargetKcal);
@@ -84,7 +96,7 @@ export default function CalorieProgressBar({ consumed, tdee, deficitTargetKcal }
       {/* Bar */}
       <div style={{ position: 'relative' }}>
         <div className="rpg-bar" style={{ height: 22 }}>
-          <div style={{
+          <div ref={barFillRef} style={{
             height: '100%', borderRadius: 2,
             width: `${consumedPct}%`,
             background: barColor,

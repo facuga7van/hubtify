@@ -1,3 +1,4 @@
+
 .app-layout {
   display: flex;
   width: 100vw;
@@ -287,15 +288,6 @@
   background-size: 600px;
   background-repeat: repeat;
   background-color: var(--rpg-parchment);
-}
-
-.main-content > * {
-  animation: contentFadeIn 0.2s ease;
-}
-
-@keyframes contentFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Responsive ───────────────────────────────────── */

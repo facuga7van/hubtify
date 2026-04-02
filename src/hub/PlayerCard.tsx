@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import HpBar from '../shared/components/HpBar';
 import XpBar from '../shared/components/XpBar';
@@ -8,16 +8,31 @@ import AccountDropdown from './AccountDropdown';
 import type { PlayerStats } from '../../shared/types';
 import type { AuthUser } from '../shared/hooks/useAuth';
 import { useAuthContext } from '../shared/AuthContext';
+import { streakAchieved } from '../shared/animations/epic';
 
 interface PlayerCardProps {
   stats: PlayerStats | null;
   collapsed?: boolean;
 }
 
+const STREAK_MILESTONES = [3, 7, 14, 30];
+
 export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
   const { t } = useTranslation();
   const { user: authUser, logout, switching, switchAccount, getCachedAccounts } = useAuthContext();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const streakRef = useRef<HTMLDivElement>(null);
+  const prevStreakRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!stats) return;
+    const prev = prevStreakRef.current;
+    const curr = stats.streak;
+    prevStreakRef.current = curr;
+    if (prev > 0 && STREAK_MILESTONES.includes(curr) && curr > prev && streakRef.current) {
+      streakAchieved(streakRef.current, curr);
+    }
+  }, [stats?.streak]);
 
   if (!stats) {
     return <Loading />;
@@ -39,7 +54,7 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
           <Character size={72} />
         </div>
         {stats.streak > 0 && (
-          <div className="player-card__streak">
+          <div ref={streakRef} className="player-card__streak">
             <svg width="12" height="12" viewBox="0 0 14 14" fill="#e67e22" style={{ flexShrink: 0 }}>
               <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
             </svg>

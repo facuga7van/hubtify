@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useNutriToast } from './NutriToastProvider';
+import { useToast } from '../../../shared/components/useToast';
 import PageHeader from '../../../shared/components/PageHeader';
 import CalorieProgressBar from './CalorieProgressBar';
 import FoodLogItem from './FoodLogItem';
@@ -64,7 +64,7 @@ export default function Today() {
   const [frequentSearch, setFrequentSearch] = useState('');
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
-  const { showToast } = useNutriToast();
+  const { toast } = useToast();
 
   const loadData = useCallback(async (d: string) => {
     const [foodList, sum, met, freq, prof, tgt] = await Promise.all([
@@ -172,7 +172,7 @@ export default function Today() {
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
 
-    showToast('success', `+${calories} kcal`);
+    toast({ type: 'nutri', message: `+${calories} kcal` });
     setFoodInput('');
     setEstimation(null);
     setEditCalories('');
@@ -193,7 +193,7 @@ export default function Today() {
       type: 'MEAL_LOGGED', moduleId: 'nutrition',
       payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
     });
-    showToast('success', `+${food.calories} kcal`);
+    toast({ type: 'nutri', message: `+${food.calories} kcal` });
     const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
     if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
     loadData(date);
@@ -266,7 +266,7 @@ export default function Today() {
         payload: { xp, hp },
         timestamp: Date.now(),
       });
-      showToast('info', `+${xp} XP`);
+      toast({ type: 'info', message: `+${xp} XP` });
       window.dispatchEvent(new Event('rpg:statsChanged'));
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
@@ -353,7 +353,7 @@ export default function Today() {
       />
 
       {/* Date navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div data-anim="stagger-child" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}
           aria-label="Previous day">
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -375,13 +375,13 @@ export default function Today() {
         </button>
       </div>
 
-      <div className="nutri-section nutri-stagger-1">
+      <div data-anim="stagger-child">
         <CalorieProgressBar consumed={consumed} tdee={summary?.tdee ?? 0} deficitTargetKcal={deficitTargetKcal} />
       </div>
 
       {/* ── Food input ──────────────────────────────── */}
       {!dayClosed && (
-      <div className="nutri-section nutri-stagger-2">
+      <div data-anim="stagger-child">
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title" style={{ marginBottom: 6 }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
@@ -452,11 +452,11 @@ export default function Today() {
       )}
 
       {/* Food log */}
-      <div className="nutri-section nutri-stagger-3">
+      <div>
       <div className="rpg-card" style={{ marginBottom: 16 }}>
         <div className="rpg-card-title">{t('nutrify.foodLog')}</div>
         {foods.length === 0 && <p style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('nutrify.noFood')}</p>}
-        {foods.map((f) => <FoodLogItem key={f.id} entry={f} className={removingId === f.id ? 'nutri-food-exit' : lastAddedId === f.id ? 'nutri-food-enter' : ''} readOnly={!!dayClosed} onDelete={handleDelete} onUpdate={async (id, fields) => {
+        {foods.map((f) => <FoodLogItem key={f.id} entry={f} isNew={lastAddedId === f.id} className="" readOnly={!!dayClosed} onDelete={handleDelete} onUpdate={async (id, fields) => {
           await window.api.nutritionUpdateFood(id, fields);
           loadData(date);
         }} />)}
@@ -465,7 +465,7 @@ export default function Today() {
 
       {/* Frequent foods */}
       {frequentFoods.length > 0 && (
-        <div className="nutri-section nutri-stagger-4">
+        <div>
         <div className="rpg-card" style={{ marginBottom: 16 }}>
           <div className="rpg-card-title">{t('nutrify.frequentFoods')}</div>
           <input type="text" placeholder={t('common.search')} value={frequentSearch}
@@ -484,7 +484,7 @@ export default function Today() {
 
 
       {/* Close Day */}
-      <div className="nutri-section nutri-stagger-5">
+      <div>
       <div className="rpg-card">
         <div className="rpg-card-title">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">

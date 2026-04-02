@@ -75,6 +75,8 @@ export function useAuth() {
         email: cred.user.email ?? email,
         firebaseAppName: getActiveAppName(),
       });
+      await window.api.syncSetCurrentUser(cred.user.uid);
+      await syncPull(cred.user.uid);
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: getErrorKey(err) };
@@ -90,6 +92,8 @@ export function useAuth() {
         email: cred.user.email ?? email,
         firebaseAppName: getActiveAppName(),
       });
+      await window.api.syncSetCurrentUser(cred.user.uid);
+      await syncPull(cred.user.uid);
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: getErrorKey(err) };

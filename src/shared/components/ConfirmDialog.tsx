@@ -44,7 +44,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.75)', zIndex: 99999,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'contentFadeIn 0.15s ease',
         }} onClick={() => handleResult(false)}>
           <div style={{
             backgroundImage: `url(${new URL('../../assets/bg.jpg', import.meta.url).href})`,

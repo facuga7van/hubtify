@@ -1,8 +1,9 @@
-import { NavLink } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
 import Tooltip from '../shared/components/Tooltip';
+import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
 import './styles/layout.css';
 
 interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; }
@@ -45,7 +46,7 @@ const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boo
   { path: '/', key: 'nav.home', icon: 'home' },
   { path: '/quests', key: 'nav.questify', icon: 'sword' },
   { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
-  { path: '/finance', key: 'nav.coinify', icon: 'coins', comingSoon: true },
+  { path: '/finance', key: 'nav.coinify', icon: 'coins' },
   { path: '/achievements', key: 'nav.achievements', icon: 'trophy', comingSoon: true },
   { path: '/village', key: 'nav.village', icon: 'village', comingSoon: true },
   { path: '/character', key: 'nav.character', icon: 'shield' },
@@ -54,6 +55,8 @@ const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boo
 
 export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
+  const animatedNavigate = useAnimatedNavigate();
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
@@ -79,15 +82,16 @@ export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
               </div>
             </Tooltip>
           ) : (
-            <NavLink
+            <div
               key={item.path}
-              to={item.path}
-              className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
+              className={`sidebar-nav-item ${location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path)) ? 'active' : ''}`}
               title={collapsed ? t(item.key) : undefined}
+              onClick={() => animatedNavigate(item.path)}
+              style={{ cursor: 'pointer' }}
             >
               <NavIcon name={item.icon} />
               {!collapsed && <span>{t(item.key)}</span>}
-            </NavLink>
+            </div>
           )
         ))}
       </nav>

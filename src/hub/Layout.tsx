@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
@@ -11,6 +11,10 @@ import './styles/components.css';
 import { playLevelUp } from '../shared/audio';
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts';
 import QuickAdd from '../shared/components/QuickAdd';
+import ToastProvider from '../shared/components/ToastProvider';
+import AnimatedOutlet, { AnimatedNavigateContext, type AnimatedOutletHandle } from '../shared/components/AnimatedOutlet';
+import { gsap } from 'gsap';
+import { levelUp as animateLevelUp } from '../shared/animations/epic';
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -20,6 +24,10 @@ export default function Layout() {
   const location = useLocation();
 
   const { user: authUser } = useAuthContext();
+  const outletHandleRef = useRef<AnimatedOutletHandle>(null);
+  const animatedNavigate = useCallback((to: string) => {
+    outletHandleRef.current?.animatedNavigate(to)
+  }, []);
 
   useKeyboardShortcuts();
 
@@ -180,21 +188,66 @@ export default function Layout() {
     retrySyncPull();
   }, [retrySyncPull]);
 
-  const levelUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const levelUpOverlayRef = useRef<HTMLDivElement>(null);
+  const levelUpBookRef = useRef<HTMLDivElement>(null);
+  const levelUpTextRef = useRef<HTMLDivElement>(null);
+  const levelUpTimelineRef = useRef<gsap.core.Timeline | null>(null);
+
   useEffect(() => {
     if (stats && prevLevelRef.current > 0 && stats.level > prevLevelRef.current) {
       setLevelUp(stats.level);
-      playLevelUp();
-      if (levelUpTimerRef.current) clearTimeout(levelUpTimerRef.current);
-      levelUpTimerRef.current = setTimeout(() => setLevelUp(null), 3000);
     }
     if (stats) prevLevelRef.current = stats.level;
-    return () => {
-      if (levelUpTimerRef.current) clearTimeout(levelUpTimerRef.current);
-    };
   }, [stats]);
 
+  // Fire GSAP animation once the overlay is rendered (levelUp != null)
+  useEffect(() => {
+    if (!levelUp) return;
+    if (!levelUpOverlayRef.current || !levelUpBookRef.current || !levelUpTextRef.current) return;
+
+    // Kill any running timeline
+    if (levelUpTimelineRef.current) {
+      levelUpTimelineRef.current.kill();
+      levelUpTimelineRef.current = null;
+    }
+
+    // Play sound at phase 3 (text reveal at 0.6s)
+    const soundTimeout = setTimeout(() => playLevelUp(), 600);
+
+    levelUpTimelineRef.current = animateLevelUp(
+      levelUpOverlayRef.current,
+      levelUpBookRef.current,
+      levelUpTextRef.current,
+      () => {
+        clearTimeout(soundTimeout);
+        setLevelUp(null);
+      },
+    );
+
+    return () => {
+      clearTimeout(soundTimeout);
+    };
+  }, [levelUp]);
+
+  const handleDismissLevelUp = useCallback(() => {
+    if (!levelUpOverlayRef.current) return;
+    if (levelUpTimelineRef.current) {
+      levelUpTimelineRef.current.kill();
+      levelUpTimelineRef.current = null;
+    }
+    gsap.to(levelUpOverlayRef.current, {
+      opacity: 0,
+      duration: 0.3,
+      onComplete: () => {
+        if (levelUpOverlayRef.current) levelUpOverlayRef.current.style.display = 'none';
+        setLevelUp(null);
+      },
+    });
+  }, []);
+
   return (
+    <AnimatedNavigateContext.Provider value={animatedNavigate}>
+    <ToastProvider>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
@@ -223,29 +276,94 @@ export default function Layout() {
               </button>
             </div>
           )}
-          <Outlet />
+          <AnimatedOutlet ref={outletHandleRef} />
         </main>
       </div>
 
-      {levelUp && (
-        <div style={{
-          position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(44, 24, 16, 0.7)', zIndex: 9999,
-          animation: 'fadeIn 0.3s ease',
-        }} onClick={() => setLevelUp(null)}>
-          <div style={{
-            textAlign: 'center', color: 'var(--rpg-gold-light)',
-            animation: 'levelUpScale 0.5s ease',
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: 8 }}>⚔</div>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: '2rem', fontWeight: 'bold', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
-              {t('rpg.levelUp')}
-            </div>
-            <div style={{ fontFamily: 'Fira Code, monospace', fontSize: '1.5rem', marginTop: 8 }}>
-              {t('rpg.level')} {levelUp}
-            </div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 12 }}>
-              {t('rpg.clickDismiss')}
+      {/* Level-up epic overlay — always in DOM when levelUp != null, hidden via display:none until GSAP shows it */}
+      {levelUp !== null && (
+        <div
+          ref={levelUpOverlayRef}
+          onClick={handleDismissLevelUp}
+          style={{
+            position: 'fixed', inset: 0, display: 'none',
+            alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(58, 35, 18, 0.88)',
+            zIndex: 9999, cursor: 'pointer',
+          }}
+        >
+          {/* Book container */}
+          <div
+            ref={levelUpBookRef}
+            style={{
+              position: 'relative',
+              width: 240, height: 180,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {/* Left cover */}
+            <div
+              data-book="left"
+              style={{
+                position: 'absolute', left: 0, top: 0,
+                width: '50%', height: '100%',
+                background: 'linear-gradient(135deg, #c8a96e 0%, #a07840 50%, #7a5a28 100%)',
+                border: '2px solid rgba(212,160,23,0.6)',
+                borderRight: '1px solid rgba(212,160,23,0.3)',
+                borderRadius: '4px 0 0 4px',
+                transformOrigin: 'left center',
+              }}
+            />
+            {/* Right cover */}
+            <div
+              data-book="right"
+              style={{
+                position: 'absolute', right: 0, top: 0,
+                width: '50%', height: '100%',
+                background: 'linear-gradient(225deg, #c8a96e 0%, #a07840 50%, #7a5a28 100%)',
+                border: '2px solid rgba(212,160,23,0.6)',
+                borderLeft: '1px solid rgba(212,160,23,0.3)',
+                borderRadius: '0 4px 4px 0',
+                transformOrigin: 'right center',
+              }}
+            />
+
+            {/* Level text area */}
+            <div
+              ref={levelUpTextRef}
+              style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                opacity: 0, pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            >
+              {/* SVG path for stroke draw-in effect */}
+              <svg width="200" height="60" viewBox="0 0 200 60" style={{ overflow: 'visible' }}>
+                <path
+                  d="M20 40 Q40 10 60 35 Q80 55 100 30 Q120 10 140 35 Q160 55 180 30"
+                  fill="none"
+                  stroke="rgba(212,160,23,0.6)"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              <div style={{
+                fontFamily: 'Cinzel, serif', fontSize: '1.5rem', fontWeight: 'bold',
+                color: 'var(--rpg-gold-light)', textShadow: '0 2px 12px rgba(0,0,0,0.7)',
+                marginTop: 8,
+              }}>
+                {t('rpg.levelUp')}
+              </div>
+              <div style={{
+                fontFamily: 'Fira Code, monospace', fontSize: '1.1rem',
+                color: 'var(--rpg-gold)', marginTop: 4,
+              }}>
+                {t('rpg.level')} {levelUp}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: 10, color: 'var(--rpg-parchment)' }}>
+                {t('rpg.clickDismiss')}
+              </div>
             </div>
           </div>
         </div>
@@ -296,5 +414,7 @@ export default function Layout() {
       )}
 
     </div>
+    </ToastProvider>
+    </AnimatedNavigateContext.Provider>
   );
 }

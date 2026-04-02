@@ -1,69 +1,56 @@
-import { useState, useEffect, useRef } from 'react';
+import { useRef, useState } from 'react';
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
 
 interface AnimatedNumberProps {
   value: number;
-  duration?: number;
   prefix?: string;
+  duration?: number;
   locale?: string;
   className?: string;
-}
-
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
+  ease?: string;
 }
 
 export function AnimatedNumber({
   value,
-  duration = 600,
   prefix = '$',
+  duration = 600,
   locale = 'es-AR',
   className,
+  ease = 'power3.out',
 }: AnimatedNumberProps) {
-  const [display, setDisplay] = useState('');
-  const prevValueRef = useRef(0);
-  const rafRef = useRef<number>(0);
+  const [display, setDisplay] = useState(value);
+  const proxyRef = useRef({ value: 0 });
+  const containerRef = useRef<HTMLSpanElement>(null);
 
-  useEffect(() => {
-    // Zero: display immediately, no animation
-    if (value === 0) {
-      setDisplay(formatValue(0, prefix, locale));
-      prevValueRef.current = 0;
-      return;
-    }
-
-    const from = prevValueRef.current;
-    const to = value;
-    const startTime = performance.now();
-
-    function animate(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = easeOutCubic(progress);
-      const current = from + (to - from) * eased;
-
-      setDisplay(formatValue(current, prefix, locale));
-
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate);
-      } else {
-        prevValueRef.current = to;
+  useGSAP(
+    () => {
+      if (value === 0 && proxyRef.current.value === 0) {
+        setDisplay(0);
+        return;
       }
-    }
 
-    rafRef.current = requestAnimationFrame(animate);
+      gsap.to(proxyRef.current, {
+        value,
+        duration: duration / 1000,
+        ease,
+        onUpdate: () => setDisplay(Math.round(proxyRef.current.value)),
+      });
+    },
+    { dependencies: [value, duration, ease], scope: containerRef }
+  );
 
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [value, duration, prefix, locale]);
+  const formatted = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(display));
 
-  return <span className={className}>{display}</span>;
-}
-
-function formatValue(n: number, prefix: string, locale: string): string {
-  const abs = Math.abs(Math.round(n));
-  const formatted = abs.toLocaleString(locale);
   // Sign before prefix: -$15,000 not $-15,000
-  if (n < 0) return `-${prefix}${formatted}`;
-  return `${prefix}${formatted}`;
+  const signed = display < 0 ? `-${prefix}${formatted}` : `${prefix}${formatted}`;
+
+  return (
+    <span ref={containerRef} className={className}>
+      {signed}
+    </span>
+  );
 }

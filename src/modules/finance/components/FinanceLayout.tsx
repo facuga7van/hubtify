@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CoinToastProvider } from './CoinToastProvider';
 
 const tabs = [
   { path: '/finance', label: 'coinify.dashboard', end: true },
@@ -32,9 +31,7 @@ export default function FinanceLayout() {
       </nav>
 
       <div className="coin-layout__content">
-        <CoinToastProvider>
-          <Outlet />
-        </CoinToastProvider>
+        <Outlet />
       </div>
     </div>
   );

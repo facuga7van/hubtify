@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CATEGORIES } from '../types';
-import { useCoinToast } from './CoinToastProvider';
+import { useToast } from '../../../shared/components/useToast';
 import type { LoanDirection, LoanType, Currency } from '../types';
+import { loanPaidOff } from '../../../shared/animations/epic';
 
 interface LoanRow {
   id: string;
@@ -55,7 +56,7 @@ const LargeShieldIcon = () => (
 
 export default function Loans() {
   const { t } = useTranslation();
-  const { showToast } = useCoinToast();
+  const { toast } = useToast();
   const today = new Date().toISOString().split('T')[0];
 
   const [direction, setDirection] = useState<LoanDirection>('lent');
@@ -68,6 +69,7 @@ export default function Loans() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(today);
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  const loanRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Form state
   const [formPerson, setFormPerson] = useState('');
@@ -124,11 +126,19 @@ export default function Loans() {
     if (!window.confirm(t('coinify.settleConfirm'))) return;
     setSettlingId(id);
     await window.api.financeSettleLoan(id);
-    showToast('settled', t('coinify.loanSettled'));
+    toast({ type: 'coin', message: t('coinify.loanSettled'), details: { transactionType: 'settled' } });
+
+    // Fire epic animation on the row element if available
+    const rowEl = loanRowRefs.current.get(id);
+    const animDuration = rowEl ? 1200 : 0;
+    if (rowEl) {
+      loanPaidOff(rowEl);
+    }
+
     setTimeout(() => {
       setSettlingId(null);
       loadLoans();
-    }, 600);
+    }, animDuration + 100);
   };
 
   const openPayment = async (loanId: string) => {
@@ -194,7 +204,14 @@ export default function Loans() {
 
           {/* Single loans */}
           {singleLoans.map((loan) => (
-            <div key={loan.id} className="coin-loan__row">
+            <div
+              key={loan.id}
+              className="coin-loan__row"
+              ref={(el) => {
+                if (el) loanRowRefs.current.set(loan.id, el);
+                else loanRowRefs.current.delete(loan.id);
+              }}
+            >
               <span className="coin-tx__badge coin-tx__badge--category">
                 {t('coinify.singlePayment') || 'Pago unico'}
               </span>

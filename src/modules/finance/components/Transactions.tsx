@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { QuickAddForm } from './shared/QuickAddForm';
-import { useCoinToast } from './CoinToastProvider';
+import { useToast } from '../../../shared/components/useToast';
 import type { TransactionType, PaymentMethod, Currency } from '../types';
+import { addTransaction } from '../../../shared/animations/feedback';
 
 interface TransactionRow {
   id: string;
@@ -46,7 +47,7 @@ const SourceIcon = ({ source }: { source: string }) => {
 
 export default function Transactions() {
   const { t } = useTranslation();
-  const { showToast } = useCoinToast();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const defaultType = (searchParams.get('type') as TransactionType) || 'expense';
 
@@ -61,6 +62,8 @@ export default function Transactions() {
   const [showForm, setShowForm] = useState(true);
   const [enteringId, setEnteringId] = useState<string | null>(null);
   const [exitingId, setExitingId] = useState<string | null>(null);
+  const [enteringType, setEnteringType] = useState<TransactionType | null>(null);
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const loadTransactions = useCallback(() => {
     const filters: Record<string, string> = { month };
@@ -75,6 +78,15 @@ export default function Transactions() {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     window.api.financeGenerateRecurringForMonth(currentMonth);
   }, [loadTransactions]);
+
+  // Trigger slide-in animation when a new transaction row mounts
+  useEffect(() => {
+    if (!enteringId) return;
+    const el = rowRefs.current.get(enteringId);
+    if (!el) return;
+    const flashColor = enteringType === 'income' ? '#d4a017' : '#e74c3c';
+    addTransaction(el, { el, color: flashColor });
+  }, [enteringId, enteringType, transactions]);
 
   const handleAdd = async (data: {
     type: TransactionType; amount: number; category: string; description: string;
@@ -105,13 +117,15 @@ export default function Transactions() {
     loadTransactions();
     // Brief entering animation
     setEnteringId(newId);
-    setTimeout(() => setEnteringId(null), 400);
+    setEnteringType(data.type);
+    setTimeout(() => { setEnteringId(null); setEnteringType(null); }, 600);
     // Toast
     const formatted = `$${data.amount.toLocaleString(data.currency === 'USD' ? 'en-US' : 'es-AR')}`;
-    showToast(
-      data.type === 'income' ? 'income' : 'expense',
-      `${formatted} ${t('coinify.in')} ${data.category}`
-    );
+    toast({
+      type: 'coin',
+      message: `${formatted} ${t('coinify.in')} ${data.category}`,
+      details: { transactionType: data.type === 'income' ? 'income' : 'expense' },
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -157,7 +171,7 @@ export default function Transactions() {
   return (
     <div>
       {/* Toggle form + Month nav */}
-      <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
+      <div data-anim="stagger-child" className="coin-dashboard__header" style={{ marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
         <button className="rpg-button coin-month-nav__btn"
           onClick={() => setShowForm(!showForm)}>
@@ -187,7 +201,7 @@ export default function Transactions() {
       </div>
 
       {/* Transaction List */}
-      <div className="coin-tx-list">
+      <div data-anim="stagger-child" className="coin-tx-list">
         {transactions.length === 0 ? (
           <p className="coin-empty">{t('coinify.noTransactions')}</p>
         ) : (
@@ -199,10 +213,13 @@ export default function Transactions() {
             return (
               <div
                 key={tx.id}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(tx.id, el);
+                  else rowRefs.current.delete(tx.id);
+                }}
                 className={[
                   'coin-tx',
                   tx.type === 'income' ? 'coin-tx--income' : 'coin-tx--expense',
-                  isEntering ? 'coin-tx--entering' : '',
                   isExiting ? 'coin-tx--exiting' : '',
                   isEditing ? 'coin-tx--editing' : '',
                 ].filter(Boolean).join(' ')}

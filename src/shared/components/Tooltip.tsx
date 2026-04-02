@@ -1,78 +1,61 @@
 import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   text: string;
   children: ReactNode;
 }
 
-interface TooltipPos {
-  left: number;
-  top: number;
-  transformX: string;
-  transformY: string;
-}
-
 export default function Tooltip({ text, children }: Props) {
-  const [pos, setPos] = useState<TooltipPos | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [show, setShow] = useState(false);
+  const wrapperRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
 
-  const handleEnter = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const firstChild = el.firstElementChild as HTMLElement | null;
-    const rect = firstChild?.getBoundingClientRect() ?? el.getBoundingClientRect();
-
-    const gap = 8;
+  const positionTip = useCallback(() => {
+    if (!wrapperRef.current || !tipRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const tip = tipRef.current;
+    const tipW = tip.offsetWidth;
+    const tipH = tip.offsetHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
 
-    // Estimate tooltip width (~250px max for dollar text)
-    const estimatedWidth = 280;
-    const estimatedHeight = 30;
+    // Prefer below, then above
+    let left = rect.left + rect.width / 2 - tipW / 2;
+    let top = rect.bottom + 6;
 
-    // Try right, then left, then bottom, then top
-    const spaceRight = vw - rect.right - gap;
-    const spaceLeft = rect.left - gap;
-    const spaceBottom = vh - rect.bottom - gap;
-    const spaceTop = rect.top - gap;
-
-    if (spaceRight >= estimatedWidth) {
-      // Right
-      setPos({ left: rect.right + gap, top: centerY, transformX: '0', transformY: '-50%' });
-    } else if (spaceLeft >= estimatedWidth) {
-      // Left
-      setPos({ left: rect.left - gap, top: centerY, transformX: '-100%', transformY: '-50%' });
-    } else if (spaceBottom >= estimatedHeight) {
-      // Bottom
-      setPos({ left: centerX, top: rect.bottom + gap, transformX: '-50%', transformY: '0' });
-    } else if (spaceTop >= estimatedHeight) {
-      // Top
-      setPos({ left: centerX, top: rect.top - gap, transformX: '-50%', transformY: '-100%' });
-    } else {
-      // Fallback: bottom center clamped
-      setPos({ left: centerX, top: rect.bottom + gap, transformX: '-50%', transformY: '0' });
+    if (top + tipH > vh - 8) {
+      top = rect.top - tipH - 6;
     }
+
+    // Clamp horizontal
+    if (left < 8) left = 8;
+    if (left + tipW > vw - 8) left = vw - tipW - 8;
+
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+    tip.style.opacity = '1';
   }, []);
 
   return (
-    <div
-      ref={ref}
-      onMouseEnter={handleEnter}
-      onMouseLeave={() => setPos(null)}
-      style={{ display: 'contents' }}
+    <span
+      ref={wrapperRef}
+      onMouseEnter={() => {
+        setShow(true);
+        requestAnimationFrame(() => requestAnimationFrame(positionTip));
+      }}
+      onMouseLeave={() => setShow(false)}
+      style={{ display: 'inline-flex' }}
     >
       {children}
-      {pos && (
+      {show && createPortal(
         <div
-          ref={tooltipRef}
+          ref={tipRef}
           style={{
             position: 'fixed',
-            left: pos.left,
-            top: pos.top,
-            transform: `translate(${pos.transformX}, ${pos.transformY})`,
+            left: 0,
+            top: 0,
+            opacity: 0,
             background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
             border: '1px solid var(--rpg-gold-dark)',
             borderRadius: 'var(--rpg-radius)',
@@ -84,12 +67,12 @@ export default function Tooltip({ text, children }: Props) {
             zIndex: 9999,
             pointerEvents: 'none',
             boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            maxWidth: 'calc(100vw - 16px)',
           }}
         >
           {text}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </span>
   );
 }
