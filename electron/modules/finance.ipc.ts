@@ -783,6 +783,7 @@ export function registerFinanceIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, name, type, amount, currency, category, active,
+             billing_day AS billingDay,
              created_at AS createdAt
       FROM finance_recurring
       ORDER BY created_at ASC
@@ -796,14 +797,15 @@ export function registerFinanceIpcHandlers(): void {
     amount: number;
     currency?: string;
     category?: string;
+    billingDay?: number;
   }) => {
     const db = getDb();
     const id = rec.id ?? genId();
     const now = new Date().toISOString();
     db.prepare(`
       INSERT OR IGNORE INTO finance_recurring
-        (id, name, type, amount, currency, category, active, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        (id, name, type, amount, currency, category, billing_day, active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
     `).run(
       id,
       rec.name,
@@ -811,6 +813,7 @@ export function registerFinanceIpcHandlers(): void {
       rec.amount,
       rec.currency ?? 'ARS',
       rec.category ?? 'Otros',
+      rec.billingDay ?? 1,
       now,
     );
     return id;
@@ -848,7 +851,7 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:generateRecurringForMonth', (_e, month: string) => {
     const db = getDb();
     const actives = db.prepare(`
-      SELECT id, name, type, amount, currency, category
+      SELECT id, name, type, amount, currency, category, billing_day AS billingDay
       FROM finance_recurring
       WHERE active = 1
     `).all() as Array<{
@@ -858,6 +861,7 @@ export function registerFinanceIpcHandlers(): void {
       amount: number;
       currency: string;
       category: string;
+      billingDay: number;
     }>;
 
     const now = new Date().toISOString();
@@ -886,7 +890,7 @@ export function registerFinanceIpcHandlers(): void {
         rec.currency,
         rec.category,
         rec.name,
-        `${month}-01`,
+        `${month}-${String(rec.billingDay ?? 1).padStart(2, '0')}`,
         'cash',
         'recurring',
         1,
