@@ -8,6 +8,18 @@ function genId(): string {
 }
 
 export function registerFinanceIpcHandlers(): void {
+  /** Given a transaction date and a card's closing day, returns the statement period_month (YYYY-MM) */
+  function getStatementPeriod(txDate: string, closingDay: number): string {
+    const [y, m, d] = txDate.split('-').map(Number);
+    if (d <= closingDay) {
+      const dt = new Date(y, m, 1); // next month (m is 1-based, Date uses 0-based so m gives next month)
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    } else {
+      const dt = new Date(y, m + 1, 1); // month+2
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    }
+  }
+
   // ── Transactions ────────────────────────────────────
 
   ipcHandle('finance:getTransactions', (_e, filters: {
@@ -260,6 +272,126 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:deleteCreditCard', (_e, id: string) => {
     const db = getDb();
     db.prepare('DELETE FROM finance_credit_cards WHERE id = ?').run(id);
+  });
+
+  // ── Credit Card Statements ─────────────────────────
+
+  ipcHandle('finance:getCreditCardStatements', (_e, filters: {
+    creditCardId?: string;
+    periodMonth?: string;
+    status?: 'pending' | 'paid';
+  } = {}) => {
+    const db = getDb();
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filters.creditCardId) { conditions.push('s.credit_card_id = ?'); params.push(filters.creditCardId); }
+    if (filters.periodMonth) { conditions.push('s.period_month = ?'); params.push(filters.periodMonth); }
+    if (filters.status) { conditions.push('s.status = ?'); params.push(filters.status); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    return db.prepare(`
+      SELECT s.id, s.credit_card_id AS creditCardId, c.name AS creditCardName,
+             s.period_month AS periodMonth, s.calculated_amount AS calculatedAmount,
+             s.paid_amount AS paidAmount, s.status, s.paid_date AS paidDate,
+             s.transaction_id AS transactionId, s.created_at AS createdAt
+      FROM finance_credit_card_statements s
+      JOIN finance_credit_cards c ON c.id = s.credit_card_id
+      ${where}
+      ORDER BY s.period_month DESC, c.name ASC
+    `).all(...params);
+  });
+
+  ipcHandle('finance:getStatementDetail', (_e, statementId: string) => {
+    const db = getDb();
+    const statement = db.prepare(`
+      SELECT s.id, s.credit_card_id AS creditCardId, s.period_month AS periodMonth,
+             s.calculated_amount AS calculatedAmount, s.paid_amount AS paidAmount,
+             s.status, c.closing_day AS closingDay, c.name AS creditCardName
+      FROM finance_credit_card_statements s
+      JOIN finance_credit_cards c ON c.id = s.credit_card_id
+      WHERE s.id = ?
+    `).get(statementId) as { creditCardId: string; periodMonth: string; closingDay: number } | undefined;
+
+    if (!statement) return null;
+
+    const transactions = db.prepare(`
+      SELECT id, type, amount, currency, category, description, date,
+             payment_method AS paymentMethod, source, installments,
+             installment_group_id AS installmentGroupId,
+             created_at AS createdAt
+      FROM finance_transactions
+      WHERE credit_card_id = ? AND impacts_balance = 0
+      ORDER BY date DESC, created_at DESC
+    `).all(statement.creditCardId);
+
+    const filtered = (transactions as Array<{ date: string; [key: string]: unknown }>).filter((tx) => {
+      return getStatementPeriod(tx.date, statement.closingDay) === statement.periodMonth;
+    });
+
+    return { statement, transactions: filtered };
+  });
+
+  ipcHandle('finance:generateStatement', (_e, creditCardId: string, periodMonth: string) => {
+    const db = getDb();
+    const card = db.prepare('SELECT id, closing_day AS closingDay FROM finance_credit_cards WHERE id = ?').get(creditCardId) as { id: string; closingDay: number } | undefined;
+    if (!card) return null;
+
+    const existing = db.prepare(
+      'SELECT id FROM finance_credit_card_statements WHERE credit_card_id = ? AND period_month = ?'
+    ).get(creditCardId, periodMonth);
+    if (existing) return (existing as { id: string }).id;
+
+    const allTx = db.prepare(`
+      SELECT date, amount FROM finance_transactions
+      WHERE credit_card_id = ? AND impacts_balance = 0
+    `).all(creditCardId) as Array<{ date: string; amount: number }>;
+
+    const total = allTx
+      .filter((tx) => getStatementPeriod(tx.date, card.closingDay) === periodMonth)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const statementId = genId();
+    const txId = genId();
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO finance_transactions
+        (id, type, amount, currency, category, description, date, payment_method,
+         source, installments, installment_group_id, for_third_party, recurring_id,
+         import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+      VALUES (?, 'expense', ?, 'ARS', 'Pago Tarjeta', ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?)
+    `).run(txId, total, `Pago tarjeta - ${periodMonth}`, `${periodMonth}-01`, now, now);
+
+    db.prepare(`
+      INSERT INTO finance_credit_card_statements
+        (id, credit_card_id, period_month, calculated_amount, status, transaction_id, created_at)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?)
+    `).run(statementId, creditCardId, periodMonth, total, txId, now);
+
+    return statementId;
+  });
+
+  ipcHandle('finance:payStatement', (_e, statementId: string, paidAmount: number) => {
+    const db = getDb();
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+
+    const stmt = db.prepare(
+      'SELECT transaction_id AS transactionId FROM finance_credit_card_statements WHERE id = ?'
+    ).get(statementId) as { transactionId: string } | undefined;
+
+    if (!stmt) return;
+
+    db.prepare(`
+      UPDATE finance_credit_card_statements
+      SET paid_amount = ?, status = 'paid', paid_date = ?
+      WHERE id = ?
+    `).run(paidAmount, today, statementId);
+
+    db.prepare(`
+      UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?
+    `).run(paidAmount, now, stmt.transactionId);
   });
 
   // ── Backward compat (dashboard widget) ─────────────
