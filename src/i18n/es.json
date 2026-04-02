@@ -326,7 +326,9 @@
     "statementPaid": "Pagado",
     "statementPending": "Pendiente",
     "noStatements": "No hay resúmenes para este período",
-    "ccTracking": "TC"
+    "ccTracking": "TC",
+    "customLastAmount": "Última cuota diferente",
+    "installmentAmount": "Monto cuota $"
   },
   "character": {
     "title": "Personaje",

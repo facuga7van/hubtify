@@ -326,7 +326,9 @@
     "statementPaid": "Paid",
     "statementPending": "Pending",
     "noStatements": "No statements for this period",
-    "ccTracking": "CC"
+    "ccTracking": "CC",
+    "customLastAmount": "Different last installment",
+    "installmentAmount": "Amount per installment $"
   },
   "character": {
     "title": "Character",

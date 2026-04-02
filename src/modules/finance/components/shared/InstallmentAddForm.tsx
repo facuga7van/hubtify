@@ -30,6 +30,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
   const [installmentCount, setInstallmentCount] = useState('');
   const [firstAmount, setFirstAmount] = useState('');
   const [lastAmount, setLastAmount] = useState('');
+  const [customLastAmount, setCustomLastAmount] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -119,6 +120,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             max={120}
             step={1}
             placeholder={t('coinify.installmentCount', 'Cuotas')}
+            style={{ minWidth: 90 }}
             required
           />
           <RpgNumberInput
@@ -126,9 +128,44 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             onChange={setFirstAmount}
             min={0}
             step={100}
-            placeholder={t('coinify.firstAmount', '1ra cuota $')}
+            placeholder={customLastAmount
+              ? t('coinify.firstAmount', '1ra cuota $')
+              : t('coinify.installmentAmount', 'Monto cuota $')}
             required
           />
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.8rem' }}>
+          <div style={{
+            width: 32, height: 18, borderRadius: 9, position: 'relative',
+            background: customLastAmount ? 'var(--rpg-gold, #c8a96e)' : 'var(--rpg-parchment-dark, #8b7355)',
+            transition: 'background 0.2s ease',
+          }}>
+            <div style={{
+              position: 'absolute', top: 2, left: customLastAmount ? 16 : 2,
+              width: 14, height: 14, borderRadius: '50%',
+              background: '#fff',
+              transition: 'left 0.2s ease',
+            }} />
+          </div>
+          <input
+            type="checkbox"
+            checked={customLastAmount}
+            onChange={(e) => {
+              setCustomLastAmount(e.target.checked);
+              if (!e.target.checked) setLastAmount('');
+            }}
+            style={{ display: 'none' }}
+          />
+          {t('coinify.customLastAmount', 'Última cuota diferente')}
+        </label>
+
+        <div style={{
+          overflow: 'hidden',
+          maxHeight: customLastAmount ? 60 : 0,
+          opacity: customLastAmount ? 1 : 0,
+          transition: 'max-height 0.3s ease, opacity 0.2s ease',
+        }}>
           <RpgNumberInput
             value={lastAmount}
             onChange={setLastAmount}
