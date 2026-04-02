@@ -72,13 +72,23 @@ export function initAutoUpdater(win: BrowserWindow): void {
   cleanupOldInstallers();
 
   if (app.isPackaged) {
-    getLatestRelease().then(release => {
-      if (release && isNewer(release.version, app.getVersion())) {
-        mainWindow?.webContents.send('updater:update-available', {
-          version: release.version,
-        });
-      }
-    }).catch((err) => console.error('[Updater] Failed to check for updates:', err.message));
+    // Wait for renderer to be ready before sending messages
+    const check = () => {
+      getLatestRelease().then(release => {
+        console.log('[Updater] Check result:', release?.version, 'local:', app.getVersion(), 'newer:', release ? isNewer(release.version, app.getVersion()) : false);
+        if (release && isNewer(release.version, app.getVersion())) {
+          mainWindow?.webContents.send('updater:update-available', {
+            version: release.version,
+          });
+        }
+      }).catch((err) => console.error('[Updater] Failed to check for updates:', err.message));
+    };
+
+    if (win.webContents.isLoading()) {
+      win.webContents.once('did-finish-load', check);
+    } else {
+      check();
+    }
   }
 }
 
