@@ -211,4 +211,11 @@ export const financeMigrations: Migration[] = [
       INSERT OR IGNORE INTO finance_categories (name) VALUES ('Pago Tarjeta');
     `,
   },
+  {
+    namespace: 'finance',
+    version: 6,
+    up: `
+      ALTER TABLE finance_recurring ADD COLUMN billing_day INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];
