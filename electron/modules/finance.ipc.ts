@@ -62,6 +62,8 @@ export function registerFinanceIpcHandlers(): void {
              for_third_party AS forThirdParty,
              recurring_id AS recurringId,
              import_batch_id AS importBatchId,
+             credit_card_id AS creditCardId,
+             impacts_balance AS impactsBalance,
              created_at AS createdAt, updated_at AS updatedAt
       FROM finance_transactions
       ${where}
@@ -83,6 +85,8 @@ export function registerFinanceIpcHandlers(): void {
     forThirdParty?: boolean;
     recurringId?: string | null;
     importBatchId?: string | null;
+    creditCardId?: string | null;
+    impactsBalance?: boolean;
   }) => {
     const db = getDb();
     const id = genId();
@@ -91,8 +95,8 @@ export function registerFinanceIpcHandlers(): void {
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, for_third_party, recurring_id,
-         import_batch_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       tx.type,
@@ -108,6 +112,8 @@ export function registerFinanceIpcHandlers(): void {
       tx.forThirdParty ? 1 : 0,
       tx.recurringId ?? null,
       tx.importBatchId ?? null,
+      tx.creditCardId ?? null,
+      (tx.impactsBalance === false || tx.paymentMethod === 'credit_card') ? 0 : 1,
       now,
       now,
     );
@@ -147,7 +153,7 @@ export function registerFinanceIpcHandlers(): void {
              COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
              COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
       FROM finance_transactions
-      WHERE date LIKE ?
+      WHERE date LIKE ? AND impacts_balance = 1
       GROUP BY currency
     `).all(`${m}%`) as Array<{ currency: string; income: number; expenses: number }>;
 
@@ -173,7 +179,7 @@ export function registerFinanceIpcHandlers(): void {
       SELECT category, currency,
              COALESCE(SUM(amount), 0) AS total
       FROM finance_transactions
-      WHERE type = 'expense' AND date LIKE ?
+      WHERE type = 'expense' AND date LIKE ? AND category != 'Pago Tarjeta'
       GROUP BY category, currency
       ORDER BY category ASC
     `).all(`${m}%`) as Array<{ category: string; currency: string; total: number }>;
@@ -400,7 +406,7 @@ export function registerFinanceIpcHandlers(): void {
     const db = getDb();
     const month = todayDateString().slice(0, 7);
     const result = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND currency = 'ARS' AND date LIKE ?"
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND currency = 'ARS' AND impacts_balance = 1 AND date LIKE ?"
     ).get(`${month}%`) as { total: number };
     return result.total;
   });
@@ -484,6 +490,7 @@ export function registerFinanceIpcHandlers(): void {
     startDate: string;
     forThirdParty?: boolean;
     paymentMethod?: string;
+    creditCardId?: string | null;
   }) => {
     const db = getDb();
     const groupId = genId();
@@ -512,8 +519,11 @@ export function registerFinanceIpcHandlers(): void {
     const startMonth = parseInt(monthStr, 10) - 1; // 0-based
     const startDay = parseInt(dayStr, 10);
 
+    const isCreditCard = (group.paymentMethod ?? 'credit_card') === 'credit_card' && group.creditCardId;
+    const monthOffset = isCreditCard ? 1 : 0;
+
     for (let i = 0; i < group.installmentCount; i++) {
-      const txDate = new Date(startYear, startMonth + i, startDay);
+      const txDate = new Date(startYear, startMonth + i + monthOffset, startDay);
       const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
       const txId = genId();
       const cuotaAmount = group.installmentAmounts?.[i] ?? group.installmentAmount;
@@ -522,8 +532,8 @@ export function registerFinanceIpcHandlers(): void {
         INSERT INTO finance_transactions
           (id, type, amount, currency, category, description, date, payment_method,
            source, installments, installment_group_id, for_third_party, recurring_id,
-           import_batch_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         txId,
         'expense',
@@ -539,6 +549,8 @@ export function registerFinanceIpcHandlers(): void {
         group.forThirdParty ? 1 : 0,
         null,
         null,
+        isCreditCard ? group.creditCardId : null,
+        isCreditCard ? 0 : 1,
         now,
         now,
       );
