@@ -23,7 +23,7 @@ export interface Transaction {
   recurringId?: string;
   importBatchId?: string;
   creditCardId?: string;
-  impactsBalance?: boolean;
+  impactsBalance?: number;
   createdAt: string;
   updatedAt: string;
 }
