@@ -218,6 +218,50 @@ export function registerFinanceIpcHandlers(): void {
       .map((r) => r.name);
   });
 
+  ipcHandle('finance:addCategory', (_e, name: string) => {
+    const db = getDb();
+    db.prepare('INSERT OR IGNORE INTO finance_categories (name) VALUES (?)').run(name.trim());
+  });
+
+  ipcHandle('finance:deleteCategory', (_e, name: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM finance_categories WHERE name = ?').run(name);
+  });
+
+  // ── Credit Cards ──────────────────────────────────
+
+  ipcHandle('finance:getCreditCards', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, name, closing_day AS closingDay, created_at AS createdAt
+      FROM finance_credit_cards
+      ORDER BY created_at ASC
+    `).all();
+  });
+
+  ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number }) => {
+    const db = getDb();
+    const id = genId();
+    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day) VALUES (?, ?, ?)').run(id, card.name.trim(), card.closingDay);
+    return id;
+  });
+
+  ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number }) => {
+    const db = getDb();
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (fields.name !== undefined) { sets.push('name = ?'); vals.push(fields.name.trim()); }
+    if (fields.closingDay !== undefined) { sets.push('closing_day = ?'); vals.push(fields.closingDay); }
+    if (sets.length === 0) return;
+    vals.push(id);
+    db.prepare(`UPDATE finance_credit_cards SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+  });
+
+  ipcHandle('finance:deleteCreditCard', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM finance_credit_cards WHERE id = ?').run(id);
+  });
+
   // ── Backward compat (dashboard widget) ─────────────
 
   ipcHandle('finance:getMonthlyTotal', () => {
@@ -263,7 +307,10 @@ export function registerFinanceIpcHandlers(): void {
              t.created_at AS createdAt, t.updated_at AS updatedAt,
              g.description AS groupDescription,
              g.total_installments AS installmentCount,
-             g.total_amount AS groupTotalAmount
+             g.total_amount AS groupTotalAmount,
+             (CAST(SUBSTR(t.date, 1, 4) AS INTEGER) - CAST(SUBSTR(g.date, 1, 4) AS INTEGER)) * 12
+               + (CAST(SUBSTR(t.date, 6, 2) AS INTEGER) - CAST(SUBSTR(g.date, 6, 2) AS INTEGER))
+               + 1 AS installmentNumber
       FROM finance_transactions t
       JOIN finance_installment_groups g ON g.id = t.installment_group_id
       WHERE t.installment_group_id IS NOT NULL AND t.date LIKE ?
@@ -299,14 +346,19 @@ export function registerFinanceIpcHandlers(): void {
     totalAmount: number;
     installmentCount: number;
     installmentAmount: number;
+    installmentAmounts?: number[];
     currency?: string;
     category?: string;
     startDate: string;
     forThirdParty?: boolean;
+    paymentMethod?: string;
   }) => {
     const db = getDb();
     const groupId = genId();
     const now = new Date().toISOString();
+    const totalAmount = group.installmentAmounts
+      ? group.installmentAmounts.reduce((a, b) => a + b, 0)
+      : group.totalAmount;
 
     db.prepare(`
       INSERT INTO finance_installment_groups
@@ -315,7 +367,7 @@ export function registerFinanceIpcHandlers(): void {
     `).run(
       groupId,
       group.description,
-      group.totalAmount,
+      totalAmount,
       group.currency ?? 'ARS',
       group.installmentCount,
       group.category ?? 'Otros',
@@ -332,6 +384,7 @@ export function registerFinanceIpcHandlers(): void {
       const txDate = new Date(startYear, startMonth + i, startDay);
       const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
       const txId = genId();
+      const cuotaAmount = group.installmentAmounts?.[i] ?? group.installmentAmount;
 
       db.prepare(`
         INSERT INTO finance_transactions
@@ -342,12 +395,12 @@ export function registerFinanceIpcHandlers(): void {
       `).run(
         txId,
         'expense',
-        group.installmentAmount,
+        cuotaAmount,
         group.currency ?? 'ARS',
         group.category ?? 'Otros',
         `${group.description} (Cuota ${i + 1}/${group.installmentCount})`,
         txDateStr,
-        'credit_card',
+        group.paymentMethod ?? 'credit_card',
         'manual',
         group.installmentCount,
         groupId,
@@ -367,6 +420,14 @@ export function registerFinanceIpcHandlers(): void {
     // Application-level cascade: delete linked transactions first, then the group
     db.prepare('DELETE FROM finance_transactions WHERE installment_group_id = ?').run(id);
     db.prepare('DELETE FROM finance_installment_groups WHERE id = ?').run(id);
+  });
+
+  ipcHandle('finance:updateInstallmentAmount', (_e, txId: string, newAmount: number) => {
+    const db = getDb();
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?
+    `).run(newAmount, now, txId);
   });
 
   // ── Loans ────────────────────────────────────────────
@@ -585,6 +646,7 @@ export function registerFinanceIpcHandlers(): void {
   });
 
   ipcHandle('finance:addRecurring', (_e, rec: {
+    id?: string;
     name: string;
     type: 'expense' | 'income';
     amount: number;
@@ -592,10 +654,10 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
   }) => {
     const db = getDb();
-    const id = genId();
+    const id = rec.id ?? genId();
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO finance_recurring
+      INSERT OR IGNORE INTO finance_recurring
         (id, name, type, amount, currency, category, active, created_at)
       VALUES (?, ?, ?, ?, ?, ?, 1, ?)
     `).run(
