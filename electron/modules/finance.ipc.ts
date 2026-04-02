@@ -519,7 +519,7 @@ export function registerFinanceIpcHandlers(): void {
     const startMonth = parseInt(monthStr, 10) - 1; // 0-based
     const startDay = parseInt(dayStr, 10);
 
-    const isCreditCard = (group.paymentMethod ?? 'credit_card') === 'credit_card' && group.creditCardId;
+    const isCreditCard = group.paymentMethod === 'credit_card' && group.creditCardId;
     const monthOffset = isCreditCard ? 1 : 0;
 
     for (let i = 0; i < group.installmentCount; i++) {
