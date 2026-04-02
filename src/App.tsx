@@ -24,6 +24,7 @@ import Installments from './modules/finance/components/Installments';
 import Loans from './modules/finance/components/Loans';
 import Recurring from './modules/finance/components/Recurring';
 import Import from './modules/finance/components/Import';
+import CreditCards from './modules/finance/components/CreditCards';
 import { useAuthContext } from './shared/AuthContext';
 
 function AuthPageWrapper() {
@@ -78,6 +79,7 @@ export default function App() {
             <Route index element={<FinanceDashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="installments" element={<Installments />} />
+            <Route path="cards" element={<CreditCards />} />
             <Route path="loans" element={<Loans />} />
             <Route path="recurring" element={<Recurring />} />
             <Route path="import" element={<Import />} />

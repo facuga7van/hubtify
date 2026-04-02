@@ -5,6 +5,7 @@ const tabs = [
   { path: '/finance', label: 'coinify.dashboard', end: true },
   { path: '/finance/transactions', label: 'coinify.transactions' },
   { path: '/finance/installments', label: 'coinify.installments' },
+  { path: '/finance/cards', label: 'coinify.creditCards' },
   { path: '/finance/loans', label: 'coinify.loans' },
   { path: '/finance/recurring', label: 'coinify.recurringLabel' },
   { path: '/finance/import', label: 'coinify.import' },
