@@ -31,11 +31,13 @@ export default function CreditCards() {
   const handleGenerate = async (cardId: string) => {
     await window.api.financeGenerateStatement(cardId, month);
     loadStatements();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const handlePaid = () => {
     setSelectedStatement(null);
     loadStatements();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   return (
@@ -99,7 +101,7 @@ export default function CreditCards() {
       </div>
 
       {showManager && (
-        <CreditCardManager cards={cards} onClose={() => setShowManager(false)} onSaved={() => { loadCards(); loadStatements(); }} />
+        <CreditCardManager cards={cards} onClose={() => setShowManager(false)} onSaved={() => { loadCards(); loadStatements(); window.dispatchEvent(new Event('finance:dataChanged')); }} />
       )}
 
       {selectedStatement && (

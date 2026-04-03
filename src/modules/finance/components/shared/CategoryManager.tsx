@@ -18,12 +18,14 @@ export default function CategoryManager({ categories, onClose, onSaved }: Props)
     await window.api.financeAddCategory(newName.trim());
     setNewName('');
     onSaved();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const handleDelete = async (name: string) => {
     await window.api.financeDeleteCategory(name);
     setConfirmingDelete(null);
     onSaved();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   return createPortal(

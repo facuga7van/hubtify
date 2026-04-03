@@ -129,6 +129,7 @@ export default function Loans() {
     setFormPerson(''); setFormAmount(''); setFormDescription('');
     setFormInstallments(1); setShowForm(false);
     loadLoans();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const handleSettle = async (id: string) => {
@@ -148,6 +149,7 @@ export default function Loans() {
     setTimeout(() => {
       setSettlingId(null);
       loadLoans();
+      window.dispatchEvent(new Event('finance:dataChanged'));
     }, animDuration + 100);
   };
 
@@ -169,6 +171,7 @@ export default function Loans() {
     setPayments((prev) => ({ ...prev, [loanId]: rows as LoanPaymentRow[] }));
     setPayingLoanId(null);
     loadLoans();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const formatAmount = (amount: number, currency: Currency) => {

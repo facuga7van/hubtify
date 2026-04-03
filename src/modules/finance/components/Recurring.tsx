@@ -78,6 +78,7 @@ export default function Recurring() {
       setFormName(''); setFormAmount(''); setFormType('expense');
       setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setShowForm(false);
       load();
+      window.dispatchEvent(new Event('finance:dataChanged'));
     } finally {
       setFormSubmitting(false);
     }
@@ -86,6 +87,7 @@ export default function Recurring() {
   const handleToggle = async (id: string) => {
     await window.api.financeToggleRecurring(id);
     load();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const startEdit = (item: RecurringRow) => {
@@ -98,6 +100,7 @@ export default function Recurring() {
     if (!isNaN(parsed) && parsed > 0) {
       await window.api.financeUpdateRecurringAmount(id, parsed);
       load();
+      window.dispatchEvent(new Event('finance:dataChanged'));
     }
     setEditingId(null);
     setEditingAmount('');
@@ -112,6 +115,7 @@ export default function Recurring() {
     await window.api.financeDeleteRecurring(id);
     setDeletingId(null);
     load();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const toggleHistory = async (id: string) => {
@@ -131,6 +135,7 @@ export default function Recurring() {
     try {
       await window.api.financeGenerateRecurringForMonth(currentMonth);
       toast({ type: 'coin', message: t('coinify.recurringGenerated'), details: { transactionType: 'generated' } });
+      window.dispatchEvent(new Event('finance:dataChanged'));
       // Trigger coin drop animation
       setShowCoinDrop(true);
       setTimeout(() => setShowCoinDrop(false), 600);

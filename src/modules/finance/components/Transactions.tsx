@@ -174,6 +174,7 @@ export default function Transactions() {
       });
     }
     loadTransactions();
+    window.dispatchEvent(new Event('finance:dataChanged'));
     // Brief entering animation
     setEnteringId(newId);
     setEnteringType(data.type);
@@ -194,6 +195,7 @@ export default function Transactions() {
       await window.api.financeDeleteTransaction(id);
       setExitingId(null);
       loadTransactions();
+      window.dispatchEvent(new Event('finance:dataChanged'));
     }, 300);
   };
 
@@ -217,6 +219,7 @@ export default function Transactions() {
     });
     setEditingId(null);
     loadTransactions();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const paymentMethodLabel = (pm: string) => {

@@ -136,6 +136,7 @@ export default function Installments() {
             setShowForm(false);
             loadRows(month);
             loadProjection();
+            window.dispatchEvent(new Event('finance:dataChanged'));
           }} />
         </div>
       )}
@@ -207,6 +208,7 @@ export default function Installments() {
                                   setEditingId(null);
                                   loadRows(month);
                                   loadProjection();
+                                  window.dispatchEvent(new Event('finance:dataChanged'));
                                 });
                               }
                             }
