@@ -121,6 +121,7 @@ const USER_DATA_TABLES = [
 export function registerSyncIpcHandlers(): void {
   ipcHandle('sync:clearUserData', () => {
     const db = getDb();
+    db.pragma('foreign_keys = OFF');
     const tx = db.transaction(() => {
       for (const table of USER_DATA_TABLES) {
         db.prepare(`DELETE FROM ${table}`).run();
@@ -129,6 +130,7 @@ export function registerSyncIpcHandlers(): void {
       db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
     });
     tx();
+    db.pragma('foreign_keys = ON');
     return { success: true };
   });
 
