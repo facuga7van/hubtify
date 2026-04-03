@@ -464,7 +464,8 @@
 .coin-projection__row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .coin-projection__month-label {
@@ -476,7 +477,9 @@
 
 .coin-projection__bar {
   flex: 1;
-  height: 14px;
+  min-width: 0;
+  max-width: 120px;
+  height: 12px;
   background: var(--rpg-parchment-dark);
   border-radius: 3px;
   overflow: hidden;
@@ -496,11 +499,12 @@
 }
 
 .coin-projection__value {
-  width: 80px;
+  min-width: 90px;
   text-align: right;
   font-family: 'Fira Code', monospace;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .coin-loans-summary {
