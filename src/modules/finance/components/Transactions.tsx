@@ -318,18 +318,6 @@ export default function Transactions() {
         {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
       </div>
 
-      {/* Recurring Section */}
-      <SectionHeader sectionKey="recurring" title={t('coinify.recurringLabel')} count={recurringTx.length} />
-      {!collapsedSections.has('recurring') && (
-        <div data-anim="stagger-child" className="coin-tx-list">
-          {recurringTx.length === 0 ? (
-            <p className="coin-empty">{t('coinify.noTransactions')}</p>
-          ) : (
-            recurringTx.map((tx) => renderTxRow(tx))
-          )}
-        </div>
-      )}
-
       {/* Transactions Section */}
       <SectionHeader sectionKey="transactions" title={t('coinify.transactions')} count={filteredNormalTx.length} />
       {!collapsedSections.has('transactions') && (
@@ -358,6 +346,18 @@ export default function Transactions() {
             )}
           </div>
         </>
+      )}
+
+      {/* Recurring Section */}
+      <SectionHeader sectionKey="recurring" title={t('coinify.recurringLabel')} count={recurringTx.length} />
+      {!collapsedSections.has('recurring') && (
+        <div data-anim="stagger-child" className="coin-tx-list">
+          {recurringTx.length === 0 ? (
+            <p className="coin-empty">{t('coinify.noTransactions')}</p>
+          ) : (
+            recurringTx.map((tx) => renderTxRow(tx))
+          )}
+        </div>
       )}
     </div>
   );
