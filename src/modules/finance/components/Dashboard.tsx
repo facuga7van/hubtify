@@ -145,6 +145,17 @@ export default function Dashboard() {
     window.api.financeGenerateRecurringForMonth(month);
   }, []);
 
+  // Auto-generate credit card statements for the current month (idempotent)
+  useEffect(() => {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    window.api.financeGetCreditCards().then((cards) => {
+      for (const card of cards as Array<{ id: string }>) {
+        window.api.financeGenerateStatement(card.id, currentMonth);
+      }
+    });
+  }, []);
+
   useEffect(() => {
     const handler = () => { loadStaticData(); isFirstLoad.current = true; };
     window.addEventListener('account:switched', handler);
