@@ -97,7 +97,7 @@ const AnimatedOutlet = forwardRef<AnimatedOutletHandle>(function AnimatedOutlet(
     const cover = document.createElement('div')
     cover.setAttribute('data-flip-cover', '')
     cover.innerHTML = oldHtml
-    cover.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${w}px;height:${h}px;z-index:9998;pointer-events:none;overflow:hidden;${pageBgStyle(pad)}`
+    cover.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;z-index:9998;pointer-events:none;overflow:hidden;background:var(--rpg-parchment,#f5f0e1) url(${bgTexture}) repeat;background-size:600px;padding:${pad};box-sizing:border-box;width:${w}px;height:${h}px;`
     document.body.appendChild(cover)
 
     // Navigate — cover is showing old content so user sees nothing change
