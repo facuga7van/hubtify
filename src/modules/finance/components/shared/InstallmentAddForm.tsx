@@ -127,7 +127,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             value={firstAmount}
             onChange={setFirstAmount}
             min={0}
-            step={100}
+            step={1}
             placeholder={customLastAmount
               ? t('coinify.firstAmount', '1ra cuota $')
               : t('coinify.installmentAmount', 'Monto cuota $')}
@@ -170,7 +170,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             value={lastAmount}
             onChange={setLastAmount}
             min={0}
-            step={100}
+            step={1}
             placeholder={t('coinify.lastAmount', 'Ultima cuota $')}
           />
         </div>

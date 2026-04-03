@@ -195,7 +195,7 @@ export default function Installments() {
                           value={editAmount}
                           onChange={setEditAmount}
                           min={0}
-                          step={100}
+                          step={1}
                           autoFocus
                           style={{ width: 100 }}
                           onKeyDown={(e) => {
