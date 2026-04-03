@@ -4,9 +4,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import PageHeader from '../../../shared/components/PageHeader';
+import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 import { CoinStatCard } from './shared/CoinStatCard';
+import InstallmentAddForm from './shared/InstallmentAddForm';
 
 interface InstallmentRow {
   id: string;
@@ -15,6 +17,8 @@ interface InstallmentRow {
   currency: string;
   category: string;
   installments: number;
+  installmentCount?: number;
+  installmentNumber?: number;
   installmentGroupId: string;
   forThirdParty?: string;
   date: string;
@@ -31,9 +35,11 @@ function todayMonth(): string {
 }
 
 function parseInstallmentNumber(row: InstallmentRow): { current: number; total: number } {
-  const raw = row as InstallmentRow & { installmentNumber?: number };
-  const current = raw.installmentNumber ?? 1;
-  return { current, total: row.installments };
+  return { current: row.installmentNumber ?? 1, total: row.installmentCount ?? row.installments };
+}
+
+function cleanDescription(desc: string): string {
+  return desc.replace(/\s*\(Cuota \d+\/\d+\)\s*$/, '');
 }
 
 // Chain icon SVG
@@ -57,6 +63,9 @@ export default function Installments() {
   const [projection, setProjection] = useState<ProjectionMonth[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
 
   const loadRows = useCallback(async (m: string) => {
     setLoading(true);
@@ -83,6 +92,12 @@ export default function Installments() {
   useEffect(() => { loadRows(month); }, [month, loadRows]);
   useEffect(() => { loadProjection(); }, [loadProjection]);
 
+  useEffect(() => {
+    const handler = () => { loadRows(month); loadProjection(); };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [month, loadRows, loadProjection]);
+
   const ownRows = rows.filter((r) => !r.forThirdParty);
   const thirdPartyRows = rows.filter((r) => !!r.forThirdParty);
   const totalOwn = ownRows.reduce((acc, r) => acc + r.amount, 0);
@@ -105,6 +120,25 @@ export default function Installments() {
       <div style={{ marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
       </div>
+
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+        <button
+          className="rpg-button"
+          onClick={() => setShowForm(!showForm)}
+        >
+          {showForm ? t('common.cancel') : t('coinify.addInstallment', 'Nueva cuota')}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ marginBottom: 16 }}>
+          <InstallmentAddForm onCreated={() => {
+            setShowForm(false);
+            loadRows(month);
+            loadProjection();
+          }} />
+        </div>
+      )}
 
       {error && (
         <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
@@ -138,7 +172,7 @@ export default function Installments() {
                 >
                   <div className="coin-installment__desc">
                     <ChainIcon broken={isComplete} />
-                    {' '}{row.description}
+                    {' '}{cleanDescription(row.description)}
                     <span className="coin-installment__counter">
                       {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
                     </span>
@@ -155,9 +189,44 @@ export default function Installments() {
                         style={{ width: `${progressPct}%` }}
                       />
                     </div>
-                    <span className="coin-installment__amount">
-                      ${row.amount.toLocaleString('es-AR')}
-                    </span>
+                    {editingId === row.id ? (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <RpgNumberInput
+                          value={editAmount}
+                          onChange={setEditAmount}
+                          min={0}
+                          step={100}
+                          autoFocus
+                          style={{ width: 100 }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const val = parseFloat(editAmount);
+                              if (val > 0) {
+                                window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
+                                  setEditingId(null);
+                                  loadRows(month);
+                                  loadProjection();
+                                });
+                              }
+                            }
+                            if (e.key === 'Escape') setEditingId(null);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <span
+                        className="coin-installment__amount"
+                        style={{ cursor: 'pointer' }}
+                        title={t('coinify.clickToEdit', 'Click para editar')}
+                        onClick={() => {
+                          setEditingId(row.id);
+                          setEditAmount(String(row.amount));
+                        }}
+                      >
+                        ${row.amount.toLocaleString('es-AR')}
+                      </span>
+                    )}
                   </div>
                 </div>
               );

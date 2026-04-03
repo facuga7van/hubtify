@@ -702,6 +702,10 @@
   opacity: 1;
 }
 
+.coin-quick-add-form.rpg-card {
+  padding: 10px 12px;
+}
+
 .coin-quick-add-form--closed {
   max-height: 0;
   opacity: 0;
@@ -711,39 +715,61 @@
 
 .coin-quick-add-form__title {
   font-family: 'Cinzel', serif;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--rpg-wood);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border-bottom: 1px solid rgba(201, 168, 76, 0.25);
-  padding-bottom: 8px;
+  padding-bottom: 6px;
 }
 
 .coin-quick-add-form__type-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.coin-quick-add-form__type-row .rpg-button {
+  padding: 4px 10px;
+  font-size: 0.75rem;
 }
 
 .coin-quick-add-form__amount-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.coin-quick-add-form__row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .coin-quick-add-form__field {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .coin-quick-add-form__installment-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.coin-quick-add-form .rpg-input,
+.coin-quick-add-form .rpg-select {
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
+.coin-quick-add-form .rpg-button[type="submit"] {
+  padding: 5px 12px;
+  font-size: 0.8rem;
 }
 
 /* ── Filters ────────────────────────────────────────────────── */
@@ -1376,7 +1402,8 @@
 /* ── Shared: CategorySelect ─────────────────────────────────── */
 
 .coin-category-select {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── Finance Layout ─────────────────────────────────────────── */
