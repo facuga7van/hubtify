@@ -334,7 +334,8 @@
     "customLastAmount": "Different last installment",
     "installmentAmount": "Amount per installment $",
     "pendingCC": "CC Pending",
-    "deleteTransactionConfirm": "Delete this transaction?"
+    "deleteTransactionConfirm": "Delete this transaction?",
+    "searchTransactions": "Search transactions..."
   },
   "character": {
     "title": "Character",

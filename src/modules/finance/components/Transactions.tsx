@@ -61,6 +61,7 @@ export default function Transactions() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState({ amount: '', description: '', category: '', date: '', paymentMethod: '' });
   const [showForm, setShowForm] = useState(true);
@@ -97,7 +98,13 @@ export default function Transactions() {
     if (filterCategory && tx.category !== filterCategory) return false;
     if (filterType && tx.type !== filterType) return false;
     if (filterPayment && tx.paymentMethod !== filterPayment) return false;
+    if (searchQuery && !(tx.description?.toLowerCase().includes(searchQuery.toLowerCase()) || tx.category?.toLowerCase().includes(searchQuery.toLowerCase()))) return false;
     return true;
+  });
+  const filteredRecurringTx = recurringTx.filter((tx) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return tx.description?.toLowerCase().includes(q) || tx.category?.toLowerCase().includes(q);
   });
 
   // Inline section header component
@@ -340,6 +347,17 @@ export default function Transactions() {
         {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
       </div>
 
+      {/* Search */}
+      <div style={{ marginBottom: 8 }}>
+        <input
+          className="rpg-input"
+          placeholder={t('coinify.searchTransactions')}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ width: '100%' }}
+        />
+      </div>
+
       {/* Transactions Section */}
       <SectionHeader sectionKey="transactions" title={t('coinify.transactions')} count={filteredNormalTx.length} />
       {!collapsedSections.has('transactions') && (
@@ -371,13 +389,13 @@ export default function Transactions() {
       )}
 
       {/* Recurring Section */}
-      <SectionHeader sectionKey="recurring" title={t('coinify.recurringLabel')} count={recurringTx.length} />
+      <SectionHeader sectionKey="recurring" title={t('coinify.recurringLabel')} count={filteredRecurringTx.length} />
       {!collapsedSections.has('recurring') && (
         <div data-anim="stagger-child" className="coin-tx-list">
-          {recurringTx.length === 0 ? (
+          {filteredRecurringTx.length === 0 ? (
             <p className="coin-empty">{t('coinify.noTransactions')}</p>
           ) : (
-            recurringTx.map((tx) => renderTxRow(tx))
+            filteredRecurringTx.map((tx) => renderTxRow(tx))
           )}
         </div>
       )}
