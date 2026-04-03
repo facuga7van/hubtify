@@ -332,7 +332,8 @@
     "noStatements": "No hay resúmenes para este período",
     "ccTracking": "TC",
     "customLastAmount": "Última cuota diferente",
-    "installmentAmount": "Monto cuota $"
+    "installmentAmount": "Monto cuota $",
+    "pendingCC": "TC Pendiente"
   },
   "character": {
     "title": "Personaje",

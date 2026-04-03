@@ -77,6 +77,12 @@ const ScaleIcon = () => (
   </svg>
 );
 
+const CreditCardIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
+  </svg>
+);
+
 const ChestIcon = () => (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3" /><path d="M3 16v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" />
@@ -98,6 +104,7 @@ export default function Dashboard() {
   const [projection, setProjection] = useState<ProjectionMonth[]>([]);
   const [loans, setLoans] = useState<LoanSummary>({ lent: 0, borrowed: 0 });
   const [installmentCount, setInstallmentCount] = useState(0);
+  const [pendingCC, setPendingCC] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fadeState, setFadeState] = useState<'in' | 'out'>('in');
   const isFirstLoad = useRef(true);
@@ -134,6 +141,10 @@ export default function Dashboard() {
     window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[]));
     window.api.financeGetActiveLoanSummary().then((data) => setLoans(data as LoanSummary));
     window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length));
+    window.api.financeGetCreditCardStatements({ status: 'pending' }).then((data) => {
+      const total = (data as Array<{ calculatedAmount: number }>).reduce((sum, s) => sum + s.calculatedAmount, 0);
+      setPendingCC(total);
+    });
   }, []);
 
   useEffect(() => { loadStaticData(); }, [loadStaticData]);
@@ -281,6 +292,12 @@ export default function Dashboard() {
               value={installmentCount}
               color="gold"
               prefix=""
+            />
+            <CoinStatCard
+              icon={<CreditCardIcon />}
+              label={t('coinify.pendingCC')}
+              value={pendingCC}
+              color="red"
             />
             <CoinStatCard
               icon={<ScaleIcon />}

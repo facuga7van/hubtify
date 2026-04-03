@@ -332,7 +332,8 @@
     "noStatements": "No statements for this period",
     "ccTracking": "CC",
     "customLastAmount": "Different last installment",
-    "installmentAmount": "Amount per installment $"
+    "installmentAmount": "Amount per installment $",
+    "pendingCC": "CC Pending"
   },
   "character": {
     "title": "Character",
