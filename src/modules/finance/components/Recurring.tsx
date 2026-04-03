@@ -195,9 +195,9 @@ export default function Recurring() {
 
           <div className="coin-quick-add-form__row">
             <label style={{ fontSize: '0.8rem', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
-            <input type="number" className="rpg-input" value={formBillingDay}
-              onChange={(e) => setFormBillingDay(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
-              style={{ width: 60 }} min={1} max={28} />
+            <RpgNumberInput value={String(formBillingDay)}
+              onChange={(v) => setFormBillingDay(Math.min(28, Math.max(1, parseInt(v) || 1)))}
+              style={{ width: 70 }} min={1} max={28} step={1} />
           </div>
 
           <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={formSubmitting}>

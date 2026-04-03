@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { CreditCard } from '../../types';
+import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 
 interface Props {
   cards: CreditCard[];
@@ -64,9 +65,9 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
                 <input className="rpg-input" value={editName}
                   onChange={(e) => setEditName(e.target.value)} style={{ flex: 1 }}
                   onKeyDown={(e) => e.key === 'Enter' && handleUpdate()} />
-                <input type="number" className="rpg-input" value={editClosingDay}
-                  onChange={(e) => setEditClosingDay(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
-                  style={{ width: 60 }} min={1} max={28} />
+                <RpgNumberInput value={String(editClosingDay)}
+                  onChange={(v) => setEditClosingDay(Math.min(28, Math.max(1, parseInt(v) || 1)))}
+                  style={{ width: 70 }} min={1} max={28} step={1} />
                 <button className="rpg-button" onClick={handleUpdate}
                   style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
                   OK
@@ -110,10 +111,9 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
           <input className="rpg-input" placeholder={t('coinify.cardName')} value={newName}
             onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
-          <input type="number" className="rpg-input" placeholder={t('coinify.closingDay')}
-            value={newClosingDay}
-            onChange={(e) => setNewClosingDay(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
-            style={{ width: 60 }} min={1} max={28} />
+          <RpgNumberInput value={String(newClosingDay)}
+            onChange={(v) => setNewClosingDay(Math.min(28, Math.max(1, parseInt(v) || 1)))}
+            style={{ width: 70 }} min={1} max={28} step={1} />
           <button className="rpg-button" onClick={handleCreate} disabled={!newName.trim()}>
             + {t('coinify.newCard')}
           </button>
