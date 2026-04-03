@@ -125,6 +125,7 @@ export function registerFinanceIpcHandlers(): void {
     description?: string;
     category?: string;
     paymentMethod?: string;
+    date?: string;
   }) => {
     const db = getDb();
     const sets: string[] = ['updated_at = ?'];
@@ -133,6 +134,7 @@ export function registerFinanceIpcHandlers(): void {
     if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
     if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
     if (fields.paymentMethod !== undefined) { sets.push('payment_method = ?'); vals.push(fields.paymentMethod); }
+    if (fields.date !== undefined) { sets.push('date = ?'); vals.push(fields.date); }
     vals.push(id);
     db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   });

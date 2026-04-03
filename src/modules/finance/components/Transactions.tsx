@@ -60,7 +60,7 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState({ amount: '', description: '', category: '' });
+  const [editFields, setEditFields] = useState({ amount: '', description: '', category: '', date: '', paymentMethod: '' });
   const [showForm, setShowForm] = useState(true);
   const [enteringId, setEnteringId] = useState<string | null>(null);
   const [exitingId, setExitingId] = useState<string | null>(null);
@@ -205,6 +205,8 @@ export default function Transactions() {
       amount: String(tx.amount),
       description: tx.description || '',
       category: tx.category,
+      date: tx.date,
+      paymentMethod: tx.paymentMethod,
     });
   };
 
@@ -216,6 +218,8 @@ export default function Transactions() {
       amount,
       description: editFields.description,
       category: editFields.category,
+      date: editFields.date,
+      paymentMethod: editFields.paymentMethod,
     });
     setEditingId(null);
     loadTransactions();
@@ -256,6 +260,17 @@ export default function Transactions() {
             <input type="text" value={editFields.description}
               onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
               className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
+            <input type="date" className="rpg-input" value={editFields.date}
+              onChange={(e) => setEditFields({ ...editFields, date: e.target.value })}
+              style={{ width: 130, fontSize: '0.85rem' }} />
+            <select className="rpg-select" value={editFields.paymentMethod}
+              onChange={(e) => setEditFields({ ...editFields, paymentMethod: e.target.value })}
+              style={{ fontSize: '0.85rem' }}>
+              <option value="cash">{t('coinify.cash')}</option>
+              <option value="debit">{t('coinify.debit')}</option>
+              <option value="transfer">{t('coinify.transfer')}</option>
+              <option value="credit_card">{t('coinify.creditCard')}</option>
+            </select>
             <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
               onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
             <button className="rpg-button" style={{ fontSize: '0.8rem', padding: '4px 8px' }}
