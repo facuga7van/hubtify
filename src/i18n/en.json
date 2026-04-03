@@ -333,7 +333,8 @@
     "ccTracking": "CC",
     "customLastAmount": "Different last installment",
     "installmentAmount": "Amount per installment $",
-    "pendingCC": "CC Pending"
+    "pendingCC": "CC Pending",
+    "deleteTransactionConfirm": "Delete this transaction?"
   },
   "character": {
     "title": "Character",

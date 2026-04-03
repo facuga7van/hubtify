@@ -7,6 +7,7 @@ import { useToast } from '../../../shared/components/useToast';
 import type { TransactionType, PaymentMethod, Currency } from '../types';
 import { addTransaction } from '../../../shared/animations/feedback';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 
 interface TransactionRow {
   id: string;
@@ -50,6 +51,7 @@ const SourceIcon = ({ source }: { source: string }) => {
 export default function Transactions() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const defaultType = (searchParams.get('type') as TransactionType) || 'expense';
 
@@ -189,6 +191,8 @@ export default function Transactions() {
   };
 
   const handleDelete = async (id: string) => {
+    const ok = await confirm({ message: t('coinify.deleteTransactionConfirm'), danger: true, confirmText: t('coinify.delete') });
+    if (!ok) return;
     setExitingId(id);
     // Wait for exit animation
     setTimeout(async () => {

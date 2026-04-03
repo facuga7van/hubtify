@@ -333,7 +333,8 @@
     "ccTracking": "TC",
     "customLastAmount": "Última cuota diferente",
     "installmentAmount": "Monto cuota $",
-    "pendingCC": "TC Pendiente"
+    "pendingCC": "TC Pendiente",
+    "deleteTransactionConfirm": "¿Eliminar esta transacción?"
   },
   "character": {
     "title": "Personaje",
