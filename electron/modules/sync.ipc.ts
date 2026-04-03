@@ -108,6 +108,14 @@ const USER_DATA_TABLES = [
   'nutrition_daily_summary',
   'nutrition_daily_closed',
   'dollar_cache',
+  'finance_recurring',
+  'finance_recurring_amount_history',
+  'finance_installment_groups',
+  'finance_loan_payments',
+  'finance_category_mappings',
+  'finance_import_batches',
+  'finance_credit_cards',
+  'finance_credit_card_statements',
 ];
 
 export function registerSyncIpcHandlers(): void {
@@ -481,5 +489,208 @@ export function registerSyncIpcHandlers(): void {
 
     tx();
     return { changed: true };
+  });
+
+  // ── Finance Sync ──────────────────────────────────────
+
+  ipcHandle('sync:getAllFinanceData', () => {
+    const db = getDb();
+
+    const transactions = db.prepare(`
+      SELECT id, type, amount, currency, category, description, date,
+             payment_method AS paymentMethod, source, installments,
+             installment_group_id AS installmentGroupId,
+             for_third_party AS forThirdParty,
+             recurring_id AS recurringId,
+             import_batch_id AS importBatchId,
+             credit_card_id AS creditCardId,
+             impacts_balance AS impactsBalance,
+             created_at AS createdAt, updated_at AS updatedAt
+      FROM finance_transactions ORDER BY date DESC
+    `).all();
+
+    const loans = db.prepare(`
+      SELECT id, person_name AS personName, direction, type, amount, currency,
+             date, description, settled, installment_group_id AS installmentGroupId,
+             settled_date AS settledDate, created_at AS createdAt
+      FROM finance_loans ORDER BY date DESC
+    `).all();
+
+    const loanPayments = db.prepare(`
+      SELECT id, loan_id AS loanId, amount, currency, date, note,
+             created_at AS createdAt
+      FROM finance_loan_payments ORDER BY date ASC
+    `).all();
+
+    const recurring = db.prepare(`
+      SELECT id, name, type, amount, currency, category, active,
+             billing_day AS billingDay,
+             created_at AS createdAt
+      FROM finance_recurring ORDER BY created_at ASC
+    `).all();
+
+    const recurringHistory = db.prepare(`
+      SELECT id, recurring_id AS recurringId, amount, currency,
+             effective_date AS effectiveDate, created_at AS createdAt
+      FROM finance_recurring_amount_history ORDER BY effective_date ASC
+    `).all();
+
+    const installmentGroups = db.prepare(`
+      SELECT id, description, total_amount AS totalAmount, currency,
+             total_installments AS totalInstallments, category, date,
+             created_at AS createdAt
+      FROM finance_installment_groups ORDER BY date DESC
+    `).all();
+
+    const categoryMappings = db.prepare(`
+      SELECT id, keyword, category, created_at AS createdAt
+      FROM finance_category_mappings
+    `).all();
+
+    const categories = db.prepare(`SELECT name FROM finance_categories`).all();
+
+    const creditCards = db.prepare(`SELECT * FROM finance_credit_cards`).all();
+
+    const creditCardStatements = db.prepare(`SELECT * FROM finance_credit_card_statements`).all();
+
+    return {
+      transactions, loans, loanPayments, recurring, recurringHistory,
+      installmentGroups, categoryMappings, categories, creditCards,
+      creditCardStatements,
+    };
+  });
+
+  ipcHandle('sync:mergeFinanceData', (_e, data: Record<string, unknown[]>) => {
+    const db = getDb();
+    let changed = false;
+    const now = new Date().toISOString();
+
+    const tx = db.transaction(() => {
+      if (data.categories && Array.isArray(data.categories)) {
+        const stmt = db.prepare(`INSERT OR IGNORE INTO finance_categories (name) VALUES (?)`);
+        for (const c of data.categories as Array<{ name: string }>) {
+          stmt.run(c.name);
+        }
+      }
+
+      if (data.recurring && Array.isArray(data.recurring)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_recurring
+            (id, name, type, amount, currency, category, active, billing_day, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const r of data.recurring as Array<Record<string, unknown>>) {
+          stmt.run(r.id, r.name, r.type, r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1, r.createdAt ?? now);
+          changed = true;
+        }
+      }
+
+      if (data.recurringHistory && Array.isArray(data.recurringHistory)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_recurring_amount_history
+            (id, recurring_id, amount, currency, effective_date, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        for (const h of data.recurringHistory as Array<Record<string, unknown>>) {
+          stmt.run(h.id, h.recurringId, h.amount, h.currency ?? 'ARS', h.effectiveDate, h.createdAt ?? now);
+        }
+      }
+
+      // Installment groups must come before transactions that reference them
+      if (data.installmentGroups && Array.isArray(data.installmentGroups)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_installment_groups
+            (id, description, total_amount, currency, total_installments, category, date, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const g of data.installmentGroups as Array<Record<string, unknown>>) {
+          stmt.run(g.id, g.description, g.totalAmount, g.currency ?? 'ARS', g.totalInstallments, g.category ?? 'Otros', g.date, g.createdAt ?? now);
+          changed = true;
+        }
+      }
+
+      if (data.transactions && Array.isArray(data.transactions)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_transactions
+            (id, type, amount, currency, category, description, date, payment_method,
+             source, installments, installment_group_id, for_third_party,
+             recurring_id, import_batch_id, credit_card_id, impacts_balance,
+             created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const t of data.transactions as Array<Record<string, unknown>>) {
+          stmt.run(
+            t.id, t.type, t.amount, t.currency ?? 'ARS', t.category ?? 'Otros',
+            t.description ?? '', t.date, t.paymentMethod ?? 'cash',
+            t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
+            t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
+            t.creditCardId ?? null, t.impactsBalance ?? 1,
+            t.createdAt ?? now, t.updatedAt ?? now,
+          );
+          changed = true;
+        }
+      }
+
+      if (data.loans && Array.isArray(data.loans)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_loans
+            (id, person_name, direction, type, amount, currency, date, description,
+             settled, installment_group_id, settled_date, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const l of data.loans as Array<Record<string, unknown>>) {
+          stmt.run(
+            l.id, l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
+            l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
+            l.settledDate ?? null, l.createdAt ?? now,
+          );
+          changed = true;
+        }
+      }
+
+      if (data.loanPayments && Array.isArray(data.loanPayments)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_loan_payments
+            (id, loan_id, amount, currency, date, note, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const p of data.loanPayments as Array<Record<string, unknown>>) {
+          stmt.run(p.id, p.loanId, p.amount, p.currency ?? 'ARS', p.date, p.note ?? '', p.createdAt ?? now);
+        }
+      }
+
+      if (data.categoryMappings && Array.isArray(data.categoryMappings)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_category_mappings (id, keyword, category, created_at)
+          VALUES (?, ?, ?, ?)
+        `);
+        for (const m of data.categoryMappings as Array<Record<string, unknown>>) {
+          stmt.run(m.id, m.keyword, m.category, m.createdAt ?? now);
+        }
+      }
+
+      if (data.creditCards && Array.isArray(data.creditCards)) {
+        const cols = db.prepare(`PRAGMA table_info(finance_credit_cards)`).all() as Array<{ name: string }>;
+        const colNames = cols.map(c => c.name);
+        const placeholders = colNames.map(() => '?').join(', ');
+        const stmt = db.prepare(`INSERT OR IGNORE INTO finance_credit_cards (${colNames.join(', ')}) VALUES (${placeholders})`);
+        for (const card of data.creditCards as Array<Record<string, unknown>>) {
+          stmt.run(...colNames.map(col => card[col] ?? null));
+        }
+      }
+
+      if (data.creditCardStatements && Array.isArray(data.creditCardStatements)) {
+        const cols = db.prepare(`PRAGMA table_info(finance_credit_card_statements)`).all() as Array<{ name: string }>;
+        const colNames = cols.map(c => c.name);
+        const placeholders = colNames.map(() => '?').join(', ');
+        const stmt = db.prepare(`INSERT OR IGNORE INTO finance_credit_card_statements (${colNames.join(', ')}) VALUES (${placeholders})`);
+        for (const s of data.creditCardStatements as Array<Record<string, unknown>>) {
+          stmt.run(...colNames.map(col => s[col] ?? null));
+        }
+      }
+    });
+
+    tx();
+    return { success: true, changed };
   });
 }
