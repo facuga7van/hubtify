@@ -125,9 +125,11 @@ export default function Today() {
     const handler = () => loadData(date);
     window.addEventListener('nutrition:settingsChanged', handler);
     window.addEventListener('sync:questsUpdated', handler);
+    window.addEventListener('account:switched', handler);
     return () => {
       window.removeEventListener('nutrition:settingsChanged', handler);
       window.removeEventListener('sync:questsUpdated', handler);
+      window.removeEventListener('account:switched', handler);
     };
   }, [date, loadData]);
 

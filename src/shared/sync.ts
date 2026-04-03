@@ -11,23 +11,23 @@ interface SyncSettings {
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const [stats, questData, charData, nutritionData, financeTx, loans, recurring] = await Promise.all([
+    const [stats, questData, charData, nutritionData, financeData] = await Promise.all([
       window.api.getRpgStats(),
       window.api.syncGetAllQuestData(),
       window.api.characterLoad(),
       window.api.syncGetAllNutritionData(),
-      window.api.financeGetTransactions({ month: new Date().toISOString().slice(0, 7) }),
-      window.api.financeGetLoans(),
-      window.api.financeGetRecurring(),
+      window.api.syncGetAllFinanceData(),
     ]);
 
-    const userRef = doc(getActiveFirestore(), 'hubtify_users', uid);
+    const db = getActiveFirestore();
+    const userRef = doc(db, 'hubtify_users', uid);
+
+    // Main document — everything except finance
     await setDoc(userRef, {
       playerStats: stats,
       characterData: charData,
       questify: questData,
       nutrify: nutritionData,
-      coinify: { transactions: financeTx, loans, recurring },
       settings: {
         language: localStorage.getItem('hubtify_lang') || 'es',
         sound: localStorage.getItem('hubtify_sound') !== 'false',
@@ -37,6 +37,10 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       },
       lastSyncAt: new Date().toISOString(),
     }, { merge: true });
+
+    // Finance subcollection document — avoids 1MB Firestore limit
+    const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
+    await setDoc(financeRef, financeData);
 
     return { success: true };
   } catch (err: unknown) {
@@ -48,11 +52,13 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
 
 export async function syncPull(uid: string): Promise<{ success: boolean; hasData?: boolean; changed?: boolean; error?: string }> {
   try {
-    const userRef = doc(getActiveFirestore(), 'hubtify_users', uid);
+    const db = getActiveFirestore();
+    const userRef = doc(db, 'hubtify_users', uid);
     const snap = await getDoc(userRef);
     if (!snap.exists()) return { success: true, hasData: false };
 
     const data = snap.data();
+    let changed = false;
 
     if (data.playerStats) {
       await window.api.syncRestoreStats(data.playerStats);
@@ -62,23 +68,32 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
       await window.api.characterSave(data.characterData);
     }
 
-    // Merge quest data (tasks, subtasks, projects, categories, habits, habitChecks)
-    let changed = false;
     if (data.questify) {
       const result = await window.api.syncMergeQuestData(data.questify);
-      changed = result.changed;
+      if (result.changed) changed = true;
     }
 
-    // Restore nutrition data
     if (data.nutrify) {
       const nutritionResult = await window.api.syncMergeNutritionData(data.nutrify);
       if (nutritionResult.changed) changed = true;
     }
 
-    // Restore finance recurring
-    if (data.coinify?.recurring && Array.isArray(data.coinify.recurring)) {
-      for (const rec of data.coinify.recurring) {
-        try { await window.api.financeAddRecurring(rec); } catch { /* already exists */ }
+    // Finance — read from subcollection
+    const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
+    const financeSnap = await getDoc(financeRef);
+    if (financeSnap.exists()) {
+      const financeData = financeSnap.data() as Record<string, unknown[]>;
+      const financeResult = await window.api.syncMergeFinanceData(financeData);
+      if (financeResult.changed) changed = true;
+    } else if (data.coinify) {
+      // Backward compat: old accounts have finance in main doc
+      const legacyData: Record<string, unknown[]> = {};
+      if (data.coinify.transactions) legacyData.transactions = data.coinify.transactions;
+      if (data.coinify.loans) legacyData.loans = data.coinify.loans;
+      if (data.coinify.recurring) legacyData.recurring = data.coinify.recurring;
+      if (Object.keys(legacyData).length > 0) {
+        const financeResult = await window.api.syncMergeFinanceData(legacyData);
+        if (financeResult.changed) changed = true;
       }
     }
 

@@ -129,6 +129,9 @@ export function useAuth() {
           email: nextUser.email,
           displayName: nextUser.displayName,
         });
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+        window.dispatchEvent(new Event('sync:questsUpdated'));
+        window.dispatchEvent(new Event('account:switched'));
       } else {
         // Token expired, remove stale account
         removeCachedAccount(next.uid);
@@ -179,6 +182,7 @@ export function useAuth() {
 
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('sync:questsUpdated'));
+      window.dispatchEvent(new Event('account:switched'));
 
       return { success: true };
     } finally {
@@ -220,6 +224,7 @@ export function useAuth() {
 
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('sync:questsUpdated'));
+      window.dispatchEvent(new Event('account:switched'));
 
       return { success: true };
     } catch (err: unknown) {

@@ -132,6 +132,8 @@ export interface HubtifyApi {
   syncMergeQuestData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
   syncGetAllNutritionData: () => Promise<Record<string, unknown>>;
   syncMergeNutritionData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
+  syncGetAllFinanceData: () => Promise<Record<string, unknown[]>>;
+  syncMergeFinanceData: (data: Record<string, unknown[]>) => Promise<{ success: boolean; changed: boolean }>;
   syncClearUserData: () => Promise<{ success: boolean }>;
   syncSetCurrentUser: (uid: string) => Promise<void>;
   syncGetCurrentUser: () => Promise<string | null>;
