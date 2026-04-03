@@ -128,9 +128,11 @@ export default function Layout() {
     const handler = () => debouncedPush();
     window.addEventListener('rpg:statsChanged', handler);
     window.addEventListener('quests:dataChanged', handler);
+    window.addEventListener('finance:dataChanged', handler);
     return () => {
       window.removeEventListener('rpg:statsChanged', handler);
       window.removeEventListener('quests:dataChanged', handler);
+      window.removeEventListener('finance:dataChanged', handler);
     };
   }, [debouncedPush]);
 
