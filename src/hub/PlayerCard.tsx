@@ -67,19 +67,30 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
       <div className="player-card__info">
         <div className="player-card__level">{t('common.levelPrefix')}{stats.level}</div>
         {!collapsed ? (
-          <button
-            className="player-card__title player-card__title--clickable"
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-          >
-            {stats.title}
-            <svg
-              width="10" height="10" viewBox="0 0 10 10" fill="none"
-              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-              style={{ marginLeft: 4, transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          <div style={{ position: 'relative' }}>
+            <button
+              className="player-card__title player-card__title--clickable"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              <path d="M3 4l2 2 2-2"/>
-            </svg>
-          </button>
+              {stats.title}
+              <svg
+                width="10" height="10" viewBox="0 0 10 10" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                style={{ marginLeft: 4, transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              >
+                <path d="M3 4l2 2 2-2"/>
+              </svg>
+            </button>
+            {dropdownOpen && authUser && !switching && (
+              <AccountDropdown
+                activeUser={authUser}
+                cachedAccounts={getCachedAccounts()}
+                onSwitch={switchAccount}
+                onLogout={logout}
+                onClose={() => setDropdownOpen(false)}
+              />
+            )}
+          </div>
         ) : (
           <div className="player-card__title">{stats.title}</div>
         )}
@@ -108,16 +119,6 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
         </div>
       )}
 
-      {/* Account dropdown */}
-      {dropdownOpen && authUser && !switching && (
-        <AccountDropdown
-          activeUser={authUser}
-          cachedAccounts={getCachedAccounts()}
-          onSwitch={switchAccount}
-          onLogout={logout}
-          onClose={() => setDropdownOpen(false)}
-        />
-      )}
     </div>
   );
 }

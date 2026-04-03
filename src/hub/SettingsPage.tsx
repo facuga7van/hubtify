@@ -178,7 +178,7 @@ export default function SettingsPage() {
           <div style={{ textAlign: 'center', padding: 12 }}>
             <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: 12 }}>{t('settings.notLoggedIn')}</p>
             <a href="#/login" className="rpg-button" style={{ textDecoration: 'none', display: 'inline-block' }}>
-              {t('auth.loginForSync')}
+              {t('auth.loginRequired')}
             </a>
           </div>
         )}

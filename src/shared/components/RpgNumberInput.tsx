@@ -11,9 +11,11 @@ interface Props {
   autoFocus?: boolean;
   fontSize?: string;
   style?: React.CSSProperties;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  required?: boolean;
 }
 
-export default function RpgNumberInput({ value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, fontSize, style }: Props) {
+export default function RpgNumberInput({ value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, fontSize, style, onKeyDown, required }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,6 +81,8 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
           ...(fontSize ? { fontSize } : {}),
         }}
         autoFocus={autoFocus}
+        onKeyDown={onKeyDown}
+        required={required}
       />
       {suffix && (
         <span style={{

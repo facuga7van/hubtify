@@ -15,22 +15,22 @@ const BORDER: Record<ToastData['type'], string> = {
 
 // ── Default icons per type ────────────────────────────────────────────────────
 const DEFAULT_ICON: Record<ToastData['type'], string> = {
-  xp:      '⚔',
-  coin:    '💰',
-  nutri:   '🍕',
-  success: '✅',
-  warning: '⚠️',
-  info:    'ℹ️',
+  xp:      '\u2694',
+  coin:    '\u272A',
+  nutri:   '\u2663',
+  success: '\u2714',
+  warning: '\u26A0',
+  info:    '\u2139',
 }
 
 // ── Transaction-type icon overrides for coin toasts ──────────────────────────
 type TransactionType = NonNullable<NonNullable<ToastData['details']>['transactionType']>
 const TRANSACTION_ICON: Record<TransactionType, string> = {
-  expense:   '💸',
-  income:    '💵',
-  settled:   '🤝',
-  imported:  '📥',
-  generated: '⚙️',
+  expense:   '\u2212',
+  income:    '\u002B',
+  settled:   '\u2611',
+  imported:  '\u21E9',
+  generated: '\u2699',
 }
 
 interface Props {
