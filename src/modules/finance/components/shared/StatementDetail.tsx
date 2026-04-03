@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CreditCardStatement } from '../../types';
+import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 
 interface Props {
   statement: CreditCardStatement;
@@ -71,9 +72,9 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
         {statement.status === 'pending' && (
           <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
             <label style={{ fontSize: '0.8rem' }}>{t('coinify.paidAmount')}:</label>
-            <input type="number" className="rpg-input" value={payAmount}
-              onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
-              style={{ width: 120 }} step="0.01" />
+            <RpgNumberInput value={String(payAmount)}
+              onChange={(v) => setPayAmount(parseFloat(v) || 0)}
+              style={{ width: 130 }} step={0.01} min={0} />
             <button className="rpg-button" onClick={handlePay} disabled={paying}>
               {t('coinify.payStatement')}
             </button>
