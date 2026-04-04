@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../../shared/components/PageHeader';
@@ -39,7 +39,7 @@ export default function NutritionCharts() {
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoadError(false);
     const end = todayDateString();
     const start = new Date();
@@ -55,10 +55,20 @@ export default function NutritionCharts() {
       setWeights(wts as WeightEntry[]);
       setStreak(str);
       setLoading(false);
-    }).catch(() => setLoadError(true));
-  };
+    }).catch(() => {
+      setLoadError(true);
+      setLoading(false);
+    });
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [load]);
 
   const chartData = summaries.map((s) => ({
     date: s.date.slice(5), // MM-DD

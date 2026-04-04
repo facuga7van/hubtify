@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import HpBar from '../shared/components/HpBar';
@@ -14,15 +14,22 @@ export default function CharacterPage() {
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
   const [loadError, setLoadError] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoadError(false);
     Promise.all([
       window.api.getRpgStats().then(setStats),
       window.api.getRpgHistory(20).then(setHistory),
     ]).catch(() => setLoadError(true));
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [load]);
 
   if (loadError) return (
     <div style={{ padding: 24, textAlign: 'center' }}>

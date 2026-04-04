@@ -61,7 +61,7 @@ export interface ParsedRow {
 
 export interface HubtifyApi {
   getRpgStats: () => Promise<PlayerStats>;
-  processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number }>;
+  processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number }>;
   getRpgHistory: (limit: number) => Promise<RpgEventRecord[]>;
   rpgGetDashboardStats: () => Promise<{ xpToday: number; xpHistory: Array<{ date: string; xp: number }>; eventsToday: number }>;
   runMigrations: (migrations: Migration[]) => Promise<void>;
@@ -187,7 +187,7 @@ export interface HubtifyApi {
   financeGetRecurringAmountHistory: (id: string) => Promise<unknown[]>;
 
   // Finance - Import
-  financeImportParsePDF: (filePath: string) => Promise<ParsedRow[]>;
+  financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string } | null>;
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ count: number }>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;

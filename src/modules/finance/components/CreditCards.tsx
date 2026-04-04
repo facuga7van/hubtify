@@ -28,6 +28,13 @@ export default function CreditCards() {
   useEffect(() => { loadCards(); }, [loadCards]);
   useEffect(() => { loadStatements(); }, [loadStatements]);
 
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => { loadCards(); loadStatements(); };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadCards, loadStatements]);
+
   const handleGenerate = async (cardId: string) => {
     await window.api.financeGenerateStatement(cardId, month);
     loadStatements();

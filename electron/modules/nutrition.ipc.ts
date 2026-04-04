@@ -1,7 +1,7 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 
-import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob } from '../../shared/date-utils';
+import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
 
 export function registerNutritionIpcHandlers(): void {
   // ── Profile ────────────────────────────────────────
@@ -12,6 +12,7 @@ export function registerNutritionIpcHandlers(): void {
     if (!row) return null;
     return {
       dateOfBirth: row.date_of_birth, weightCheckDay: row.weight_check_day,
+      weightPopupEnabled: row.weight_popup_enabled ?? 1,
       sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal,
@@ -21,22 +22,23 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:saveProfile', (_e, profile: {
     dateOfBirth: string; sex: string; heightCm: number; initialWeightKg: number;
     activityLevel: string; deficitTargetKcal?: number;
-    weightCheckDay?: number;
+    weightCheckDay?: number; weightPopupEnabled?: boolean;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
     const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
     if (isNaN(dobDate.getTime()) || dobDate > new Date() || dobDate.getFullYear() < 1900) throw new Error('Invalid date of birth');
-    if (!Number.isFinite(profile.heightCm) || profile.heightCm < 50 || profile.heightCm > 250) throw new Error('Invalid height: must be between 50 and 250 cm');
+    if (!Number.isFinite(profile.heightCm) || profile.heightCm < 100 || profile.heightCm > 250) throw new Error('Invalid height: must be between 100 and 250 cm');
     if (!Number.isFinite(profile.initialWeightKg) || profile.initialWeightKg < 10 || profile.initialWeightKg > 500) throw new Error('Invalid weight: must be between 10 and 500 kg');
     if (profile.deficitTargetKcal !== undefined && (!Number.isFinite(profile.deficitTargetKcal) || Math.abs(profile.deficitTargetKcal) > 2000)) throw new Error('Invalid deficit/surplus target: must be between -2000 and 2000 kcal');
     const age = getAgeFromDob(profile.dateOfBirth);
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
+    const weightPopupEnabled = profile.weightPopupEnabled !== false ? 1 : 0;
     const db = getDb();
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled);
 
     // Recalc today's summary with new profile
     const today = todayDateString();
@@ -50,6 +52,7 @@ export function registerNutritionIpcHandlers(): void {
     frequentFoodId?: number;
   }) => {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
+    if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
     const db = getDb();
     const date = entry.date ?? todayDateString();
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -109,9 +112,12 @@ export function registerNutritionIpcHandlers(): void {
   });
 
   ipcHandle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number }) => {
+    const trimmedName = typeof food.name === 'string' ? food.name.trim() : '';
+    if (!trimmedName) throw new Error('Invalid name: must be a non-empty string');
+    if (!Number.isFinite(food.calories) || food.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
     db.prepare('INSERT INTO frequent_foods (name, calories, created_at) VALUES (?, ?, ?)')
-      .run(food.name, food.calories, new Date().toISOString());
+      .run(trimmedName, food.calories, new Date().toISOString());
   });
 
   ipcHandle('nutrition:deleteFrequentFood', (_e, id: number) => {
@@ -151,6 +157,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:saveWeeklyMetrics', (_e, metrics: { date?: string; weightKg?: number; waistCm?: number }) => {
     if (metrics.weightKg !== undefined && (!Number.isFinite(metrics.weightKg) || metrics.weightKg <= 0)) throw new Error('Invalid weight: must be > 0');
+    if (metrics.waistCm != null && (!Number.isFinite(metrics.waistCm) || metrics.waistCm < 30 || metrics.waistCm > 250)) throw new Error('Invalid waist: must be between 30 and 250 cm');
     const db = getDb();
     const date = metrics.date ?? getMondayOfWeek();
     db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm) VALUES (?, ?, ?)')
@@ -282,15 +289,16 @@ export function registerNutritionIpcHandlers(): void {
         const deficitPct = (target - consumed) / target;
         if (deficitPct <= 0.05) {
           xpPrecision = 30; // perfect precision
+          xpBonus = 15;
         } else if (deficitPct <= 0.15) {
           xpPrecision = 30;
           xpBonus = 10;
         } else if (deficitPct <= 0.30) {
           xpPrecision = 30;
-          xpBonus = 15;
+          xpBonus = 5;
         } else {
           xpPrecision = 20; // undereating
-          xpBonus = 5;
+          xpBonus = 0;
         }
       } else {
         const overPct = (consumed - target) / target;
@@ -322,14 +330,14 @@ export function registerNutritionIpcHandlers(): void {
 
       // Save close record
       db.prepare(`
-        INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_total, hp_change, consumed, target)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpTotal, hpChange, consumed, Math.round(target));
+        INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange, consumed, Math.round(target));
 
       return {
         success: true,
         breakdown: {
-          xpPrecision, xpSteps, xpGym, xpWeight, xpTotal, hpChange,
+          xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange,
           consumed, target: Math.round(target),
           precisionPct: target > 0 ? Math.round(Math.abs(consumed - target) / target * 100) : 0,
         },
@@ -339,8 +347,9 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:shouldAskWeight', () => {
     const db = getDb();
-    const profile = db.prepare('SELECT weight_check_day FROM nutrition_profile WHERE id = 1').get() as { weight_check_day: number } | undefined;
+    const profile = db.prepare('SELECT weight_check_day, weight_popup_enabled FROM nutrition_profile WHERE id = 1').get() as { weight_check_day: number; weight_popup_enabled: number } | undefined;
     if (!profile) return { shouldAsk: false };
+    if (!profile.weight_popup_enabled) return { shouldAsk: false };
 
     const checkDay = profile.weight_check_day ?? 1;
     const today = new Date();
@@ -373,7 +382,8 @@ export function registerNutritionIpcHandlers(): void {
       return {
         xpPrecision: row.xp_precision, xpSteps: row.xp_steps,
         xpGym: row.xp_gym, xpWeight: row.xp_weight,
-        xpTotal: row.xp_total, hpChange: row.hp_change,
+        xpBonus: row.xp_bonus ?? 0, xpTotal: row.xp_total,
+        hpChange: row.hp_change,
         consumed: row.consumed, target: row.target,
       };
     } catch (err) {
@@ -422,11 +432,12 @@ function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: strin
   const base = baseFactor[baseLevel] ?? 1.2;
 
   // Get last 14 days of metrics
+  const fourteenDaysAgo = daysAgoDateString(13);
   const recentMetrics = db.prepare(`
     SELECT steps, gym FROM nutrition_daily_metrics
-    WHERE date >= DATE('now', '-13 days')
+    WHERE date >= ?
     ORDER BY date DESC
-  `).all() as Array<{ steps: number | null; gym: number }>;
+  `).all(fourteenDaysAgo) as Array<{ steps: number | null; gym: number }>;
 
   if (recentMetrics.length < 3) {
     // Not enough history, use base level as-is

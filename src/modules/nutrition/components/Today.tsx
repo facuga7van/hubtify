@@ -44,7 +44,7 @@ export default function Today() {
   // Close Day
   const [dayClosed, setDayClosed] = useState<{
     xpPrecision: number; xpSteps: number; xpGym: number; xpWeight: number;
-    xpTotal: number; hpChange: number; consumed: number; target: number;
+    xpBonus: number; xpTotal: number; hpChange: number; consumed: number; target: number;
   } | null>(null);
   const [closeResult, setCloseResult] = useState<typeof dayClosed | null>(null);
 
@@ -67,24 +67,40 @@ export default function Today() {
   const { toast } = useToast();
 
   const loadData = useCallback(async (d: string) => {
-    const [foodList, sum, met, freq, prof, tgt] = await Promise.all([
+    const [foodList, sum, met, freq, prof, tgt, closedDay] = await Promise.all([
       window.api.nutritionGetFoodByDate(d),
       window.api.nutritionGetSummary(d),
       window.api.nutritionGetDailyMetrics(d),
       window.api.nutritionGetFrequentFoods(),
       window.api.nutritionGetProfile(),
       window.api.nutritionGetTodayTarget(),
+      window.api.nutritionIsDayClosed(d),
     ]);
     setFoods(foodList as FoodEntry[]);
     setSummary(sum as DailySummary | null);
     setMetrics(met as DailyMetrics);
     setFrequentFoods(freq as FrequentFood[]);
     setHasProfile(!!prof);
-    setTarget(tgt as number ?? 0);
     setDeficitTargetKcal((prof as NutritionProfile | null)?.deficitTargetKcal ?? 0);
     setCloseResult(null);
+
+    const closed = closedDay as typeof dayClosed;
+    setDayClosed(closed);
+
+    // For past dates with a closed day, use the stored target from that day.
+    // For past dates with a summary (has TDEE), compute target from that day's TDEE.
+    // Otherwise fall back to today's target.
+    const isPastDate = d < todayDateString();
+    const deficitKcal = (prof as NutritionProfile | null)?.deficitTargetKcal ?? 0;
+    if (isPastDate && closed?.target) {
+      setTarget(closed.target);
+    } else if (isPastDate && (sum as DailySummary | null)?.tdee) {
+      setTarget((sum as DailySummary).tdee - deficitKcal);
+    } else {
+      setTarget(tgt as number ?? 0);
+    }
+
     setLoading(false);
-    window.api.nutritionIsDayClosed(d).then((r) => setDayClosed(r as typeof dayClosed)).catch(console.error);
   }, []);
 
   useEffect(() => { loadData(date); }, [date, loadData]);
@@ -124,11 +140,11 @@ export default function Today() {
   useEffect(() => {
     const handler = () => loadData(date);
     window.addEventListener('nutrition:settingsChanged', handler);
-    window.addEventListener('sync:questsUpdated', handler);
+    window.addEventListener('sync:nutritionUpdated', handler);
     window.addEventListener('account:switched', handler);
     return () => {
       window.removeEventListener('nutrition:settingsChanged', handler);
-      window.removeEventListener('sync:questsUpdated', handler);
+      window.removeEventListener('sync:nutritionUpdated', handler);
       window.removeEventListener('account:switched', handler);
     };
   }, [date, loadData]);
@@ -161,45 +177,59 @@ export default function Today() {
   const handleConfirmEstimation = async () => {
     if (!estimation) return;
     const calories = parseInt(editCalories) || estimation.totalCalories;
+    if (calories <= 0) {
+      toast({ type: 'warning', message: t('nutrify.invalidCalories', 'Las calorías deben ser mayores a 0') });
+      return;
+    }
 
-    await window.api.nutritionLogFood({
-      date,
-      description: foodInput.trim(),
-      calories,
-      source: 'ai_estimate',
-    });
+    try {
+      await window.api.nutritionLogFood({
+        date,
+        description: foodInput.trim(),
+        calories,
+        source: 'ai_estimate',
+      });
 
-    await window.api.processRpgEvent({
-      type: 'MEAL_LOGGED', moduleId: 'nutrition',
-      payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
-    });
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+      });
 
-    toast({ type: 'nutri', message: `+${calories} kcal` });
-    setFoodInput('');
-    setEstimation(null);
-    setEditCalories('');
-    const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
-    if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
-    loadData(date);
-    window.dispatchEvent(new Event('rpg:statsChanged'));
+      toast({ type: 'nutri', message: `+${calories} kcal` });
+      setFoodInput('');
+      setEstimation(null);
+      setEditCalories('');
+      const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+      if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
+      loadData(date);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch (err) {
+      console.error('[Nutrition] confirmEstimation error:', err);
+      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+    }
   };
 
   // ── Quick log (frequent food) ────────────────────
   const handleLogFrequent = async (food: FrequentFood) => {
-    await window.api.nutritionLogFood({
-      date, description: food.name, calories: food.calories, source: 'frequent',
-      frequentFoodId: food.id,
-    });
-    await window.api.nutritionIncrementFrequentUsage(food.id);
-    await window.api.processRpgEvent({
-      type: 'MEAL_LOGGED', moduleId: 'nutrition',
-      payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
-    });
-    toast({ type: 'nutri', message: `+${food.calories} kcal` });
-    const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
-    if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
-    loadData(date);
-    window.dispatchEvent(new Event('rpg:statsChanged'));
+    try {
+      await window.api.nutritionLogFood({
+        date, description: food.name, calories: food.calories, source: 'frequent',
+        frequentFoodId: food.id,
+      });
+      await window.api.nutritionIncrementFrequentUsage(food.id);
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+      });
+      toast({ type: 'nutri', message: `+${food.calories} kcal` });
+      const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+      if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
+      loadData(date);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch (err) {
+      console.error('[Nutrition] logFrequent error:', err);
+      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+    }
   };
 
   const handleDelete = (id: number) => {
@@ -611,9 +641,10 @@ export default function Today() {
   );
 }
 
-function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: number; xpGym: number; xpWeight: number; xpTotal: number; hpChange: number; consumed: number; target: number }; t: (key: string) => string }) {
+function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: number; xpGym: number; xpWeight: number; xpBonus?: number; xpTotal: number; hpChange: number; consumed: number; target: number }; t: (key: string) => string }) {
   const rows = [
     { label: t('nutrify.xpPrecision'), value: data.xpPrecision, desc: `${data.consumed} / ${data.target} kcal` },
+    { label: t('nutrify.xpBonus', 'Bonus precisión'), value: data.xpBonus ?? 0 },
     { label: t('nutrify.xpSteps'), value: data.xpSteps },
     { label: t('nutrify.xpGym'), value: data.xpGym },
     { label: t('nutrify.xpWeight'), value: data.xpWeight },

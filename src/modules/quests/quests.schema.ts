@@ -150,4 +150,44 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed_at);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 9,
+    up: `
+      CREATE TABLE IF NOT EXISTS task_categories_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        project_id TEXT DEFAULT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT '',
+        deleted_at TEXT DEFAULT NULL,
+        UNIQUE(name, project_id)
+      );
+
+      INSERT OR IGNORE INTO task_categories_new (id, name, project_id, created_at, updated_at, deleted_at)
+        SELECT LOWER(HEX(RANDOMBLOB(4))) || '-' || LOWER(HEX(RANDOMBLOB(2))) || '-4' || SUBSTR(LOWER(HEX(RANDOMBLOB(2))),2) || '-' || SUBSTR('89ab', ABS(RANDOM()) % 4 + 1, 1) || SUBSTR(LOWER(HEX(RANDOMBLOB(2))),2) || '-' || LOWER(HEX(RANDOMBLOB(6))),
+               name, project_id, created_at, updated_at, deleted_at
+        FROM task_categories;
+
+      DROP TABLE task_categories;
+      ALTER TABLE task_categories_new RENAME TO task_categories;
+
+      CREATE INDEX IF NOT EXISTS idx_categories_project ON task_categories(project_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_name_project ON task_categories(name, project_id);
+      CREATE INDEX IF NOT EXISTS idx_categories_deleted ON task_categories(deleted_at);
+    `,
+  },
+  {
+    namespace: 'quests',
+    version: 10,
+    up: `
+      ALTER TABLE task_drawings ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE task_drawings ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      UPDATE task_drawings SET updated_at = created_at WHERE updated_at = '';
+      CREATE INDEX IF NOT EXISTS idx_drawings_deleted ON task_drawings(deleted_at);
+
+      ALTER TABLE habits ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      UPDATE habits SET updated_at = created_at WHERE updated_at = '';
+    `,
+  },
 ];

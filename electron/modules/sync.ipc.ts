@@ -42,6 +42,7 @@ interface SyncProject {
 }
 
 interface SyncCategory {
+  id: string;
   name: string;
   projectId: string | null;
   createdAt: string;
@@ -55,6 +56,7 @@ interface SyncHabit {
   frequency: string;
   timesPerWeek: number;
   createdAt: string;
+  updatedAt: string;
   deletedAt: string | null;
 }
 
@@ -73,6 +75,20 @@ interface SyncDrawing {
   data: string;
   order: number;
   createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+interface SyncRpgEvent {
+  id: number;
+  moduleId: string;
+  eventType: string;
+  xpGained: number;
+  hpChange: number;
+  comboMultiplier: number;
+  bonusMultiplier: number;
+  payload: string;
+  createdAt: string;
 }
 
 interface SyncQuestData {
@@ -83,6 +99,7 @@ interface SyncQuestData {
   habits: SyncHabit[];
   habitChecks: SyncHabitCheck[];
   drawings: SyncDrawing[];
+  rpgEvents?: SyncRpgEvent[];
 }
 
 const USER_DATA_TABLES = [
@@ -116,22 +133,26 @@ const USER_DATA_TABLES = [
   'finance_import_batches',
   'finance_credit_cards',
   'finance_credit_card_statements',
+  'finance_income_sources',
 ];
 
 export function registerSyncIpcHandlers(): void {
   ipcHandle('sync:clearUserData', () => {
     const db = getDb();
     db.pragma('foreign_keys = OFF');
-    const tx = db.transaction(() => {
-      for (const table of USER_DATA_TABLES) {
-        db.prepare(`DELETE FROM ${table}`).run();
-      }
-      db.prepare(`INSERT OR IGNORE INTO player_stats (user_id) VALUES ('default')`).run();
-      db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
-    });
-    tx();
-    db.pragma('foreign_keys = ON');
-    return { success: true };
+    try {
+      const tx = db.transaction(() => {
+        for (const table of USER_DATA_TABLES) {
+          db.prepare(`DELETE FROM ${table}`).run();
+        }
+        db.prepare(`INSERT OR IGNORE INTO player_stats (user_id) VALUES ('default')`).run();
+        db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
+      });
+      tx();
+      return { success: true };
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
   });
 
   ipcHandle('sync:setCurrentUser', (_e, uid: string) => {
@@ -183,14 +204,14 @@ export function registerSyncIpcHandlers(): void {
     `).all();
 
     const categories = db.prepare(`
-      SELECT name, project_id AS projectId,
+      SELECT id, name, project_id AS projectId,
              created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM task_categories
     `).all();
 
     const habits = db.prepare(`
       SELECT id, name, frequency, times_per_week AS timesPerWeek,
-             created_at AS createdAt, deleted_at AS deletedAt
+             created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM habits
     `).all();
 
@@ -201,11 +222,20 @@ export function registerSyncIpcHandlers(): void {
     `).all();
 
     const drawings = db.prepare(`
-      SELECT id, task_id AS taskId, data, draw_order AS "order", created_at AS createdAt
+      SELECT id, task_id AS taskId, data, draw_order AS "order",
+             created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM task_drawings
     `).all();
 
-    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings };
+    const rpgEvents = db.prepare(`
+      SELECT id, module_id AS moduleId, event_type AS eventType,
+             xp_gained AS xpGained, hp_change AS hpChange,
+             combo_multiplier AS comboMultiplier, bonus_multiplier AS bonusMultiplier,
+             payload, created_at AS createdAt
+      FROM rpg_events ORDER BY id ASC
+    `).all();
+
+    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents };
   });
 
   // Merges remote quest data with local using last-write-wins
@@ -292,36 +322,25 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
-      // ── Merge categories (keyed by name + projectId) ──
+      // ── Merge categories (keyed by id) ──
       if (remote.categories?.length) {
-        const getCategoryWithProject = db.prepare('SELECT name, updated_at FROM task_categories WHERE name = ? AND project_id = ?');
-        const getCategoryNoProject = db.prepare('SELECT name, updated_at FROM task_categories WHERE name = ? AND project_id IS NULL');
+        const getCategory = db.prepare('SELECT id, updated_at FROM task_categories WHERE id = ?');
         const insertCategory = db.prepare(`
-          INSERT INTO task_categories (name, project_id, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT OR IGNORE INTO task_categories (id, name, project_id, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
-        const updateCategoryWithProject = db.prepare(`
-          UPDATE task_categories SET updated_at = ?, deleted_at = ?
-          WHERE name = ? AND project_id = ?
-        `);
-        const updateCategoryNoProject = db.prepare(`
-          UPDATE task_categories SET updated_at = ?, deleted_at = ?
-          WHERE name = ? AND project_id IS NULL
+        const updateCategory = db.prepare(`
+          UPDATE task_categories SET name = ?, project_id = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
         `);
 
         for (const rc of remote.categories) {
-          const local = rc.projectId != null
-            ? getCategoryWithProject.get(rc.name, rc.projectId) as { name: string; updated_at: string } | undefined
-            : getCategoryNoProject.get(rc.name) as { name: string; updated_at: string } | undefined;
+          const local = getCategory.get(rc.id) as { id: string; updated_at: string } | undefined;
           if (!local) {
-            insertCategory.run(rc.name, rc.projectId, rc.createdAt, rc.updatedAt, rc.deletedAt);
+            insertCategory.run(rc.id, rc.name, rc.projectId, rc.createdAt, rc.updatedAt, rc.deletedAt);
             changed = true;
           } else if (rc.updatedAt > local.updated_at) {
-            if (rc.projectId != null) {
-              updateCategoryWithProject.run(rc.updatedAt, rc.deletedAt, rc.name, rc.projectId);
-            } else {
-              updateCategoryNoProject.run(rc.updatedAt, rc.deletedAt, rc.name);
-            }
+            updateCategory.run(rc.name, rc.projectId, rc.updatedAt, rc.deletedAt, rc.id);
             changed = true;
           }
         }
@@ -329,42 +348,47 @@ export function registerSyncIpcHandlers(): void {
 
       // ── Merge habits ──
       if (remote.habits?.length) {
-        const getHabit = db.prepare('SELECT id, created_at, deleted_at FROM habits WHERE id = ?');
+        const getHabit = db.prepare('SELECT id, updated_at FROM habits WHERE id = ?');
         const insertHabit = db.prepare(`
-          INSERT INTO habits (id, name, frequency, times_per_week, created_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO habits (id, name, frequency, times_per_week, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
         const updateHabit = db.prepare(`
-          UPDATE habits SET name = ?, frequency = ?, times_per_week = ?, deleted_at = ?
+          UPDATE habits SET name = ?, frequency = ?, times_per_week = ?, updated_at = ?, deleted_at = ?
           WHERE id = ?
         `);
 
         for (const rh of remote.habits) {
-          const local = getHabit.get(rh.id) as { id: string; created_at: string; deleted_at: string | null } | undefined;
+          const local = getHabit.get(rh.id) as { id: string; updated_at: string } | undefined;
           if (!local) {
-            insertHabit.run(rh.id, rh.name, rh.frequency, rh.timesPerWeek, rh.createdAt, rh.deletedAt);
+            insertHabit.run(rh.id, rh.name, rh.frequency, rh.timesPerWeek, rh.createdAt, rh.updatedAt ?? rh.createdAt, rh.deletedAt);
             changed = true;
-          } else {
-            // For habits without updated_at, use deletedAt comparison
-            const remoteDeleted = rh.deletedAt != null;
-            const localDeleted = local.deleted_at != null;
-            if (remoteDeleted !== localDeleted) {
-              updateHabit.run(rh.name, rh.frequency, rh.timesPerWeek, rh.deletedAt, rh.id);
-              changed = true;
-            }
+          } else if ((rh.updatedAt ?? rh.createdAt) > local.updated_at) {
+            updateHabit.run(rh.name, rh.frequency, rh.timesPerWeek, rh.updatedAt ?? rh.createdAt, rh.deletedAt, rh.id);
+            changed = true;
           }
         }
       }
 
-      // ── Merge drawings (immutable — insert if not exists) ──
+      // ── Merge drawings ──
       if (remote.drawings?.length) {
-        const getDrawing = db.prepare('SELECT id FROM task_drawings WHERE id = ?');
-        const insertDrawing = db.prepare('INSERT INTO task_drawings (id, task_id, data, draw_order, created_at) VALUES (?, ?, ?, ?, ?)');
+        const getDrawing = db.prepare('SELECT id, updated_at FROM task_drawings WHERE id = ?');
+        const insertDrawing = db.prepare(`
+          INSERT INTO task_drawings (id, task_id, data, draw_order, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        const updateDrawing = db.prepare(`
+          UPDATE task_drawings SET data = ?, draw_order = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
+        `);
 
         for (const rd of remote.drawings) {
-          const exists = getDrawing.get(rd.id);
-          if (!exists) {
-            insertDrawing.run(rd.id, rd.taskId, rd.data, rd.order, rd.createdAt);
+          const local = getDrawing.get(rd.id) as { id: string; updated_at: string } | undefined;
+          if (!local) {
+            insertDrawing.run(rd.id, rd.taskId, rd.data, rd.order, rd.createdAt, rd.updatedAt ?? rd.createdAt, rd.deletedAt ?? null);
+            changed = true;
+          } else if ((rd.updatedAt ?? rd.createdAt) > local.updated_at) {
+            updateDrawing.run(rd.data, rd.order, rd.updatedAt ?? rd.createdAt, rd.deletedAt ?? null, rd.id);
             changed = true;
           }
         }
@@ -389,6 +413,24 @@ export function registerSyncIpcHandlers(): void {
             changed = true;
           } else if (rc.updatedAt > local.updated_at) {
             updateCheck.run(rc.deletedAt, rc.updatedAt, rc.id);
+            changed = true;
+          }
+        }
+      }
+
+      // ── Merge RPG events (insert if not exists by id) ──
+      if (remote.rpgEvents?.length) {
+        const getEvent = db.prepare('SELECT id FROM rpg_events WHERE id = ?');
+        const insertEvent = db.prepare(`
+          INSERT INTO rpg_events (id, module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        for (const re of remote.rpgEvents) {
+          const exists = getEvent.get(re.id);
+          if (!exists) {
+            insertEvent.run(re.id, re.moduleId, re.eventType, re.xpGained, re.hpChange,
+              re.comboMultiplier, re.bonusMultiplier, re.payload, re.createdAt);
             changed = true;
           }
         }
@@ -481,8 +523,8 @@ export function registerSyncIpcHandlers(): void {
         for (const c of d.dailyClosed) {
           const exists = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(c.date);
           if (!exists) {
-            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_total, hp_change, consumed, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0
+            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0
             );
           }
         }
@@ -582,8 +624,8 @@ export function registerSyncIpcHandlers(): void {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of data.recurring as Array<Record<string, unknown>>) {
-          stmt.run(r.id, r.name, r.type, r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1, r.createdAt ?? now);
-          changed = true;
+          const result = stmt.run(r.id, r.name, r.type, r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1, r.createdAt ?? now);
+          if (result.changes > 0) changed = true;
         }
       }
 
@@ -606,8 +648,8 @@ export function registerSyncIpcHandlers(): void {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const g of data.installmentGroups as Array<Record<string, unknown>>) {
-          stmt.run(g.id, g.description, g.totalAmount, g.currency ?? 'ARS', g.totalInstallments, g.category ?? 'Otros', g.date, g.createdAt ?? now);
-          changed = true;
+          const result = stmt.run(g.id, g.description, g.totalAmount, g.currency ?? 'ARS', g.totalInstallments, g.category ?? 'Otros', g.date, g.createdAt ?? now);
+          if (result.changes > 0) changed = true;
         }
       }
 
@@ -621,7 +663,7 @@ export function registerSyncIpcHandlers(): void {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const t of data.transactions as Array<Record<string, unknown>>) {
-          stmt.run(
+          const result = stmt.run(
             t.id, t.type, t.amount, t.currency ?? 'ARS', t.category ?? 'Otros',
             t.description ?? '', t.date, t.paymentMethod ?? 'cash',
             t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
@@ -629,7 +671,7 @@ export function registerSyncIpcHandlers(): void {
             t.creditCardId ?? null, t.impactsBalance ?? 1,
             t.createdAt ?? now, t.updatedAt ?? now,
           );
-          changed = true;
+          if (result.changes > 0) changed = true;
         }
       }
 
@@ -641,12 +683,12 @@ export function registerSyncIpcHandlers(): void {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const l of data.loans as Array<Record<string, unknown>>) {
-          stmt.run(
+          const result = stmt.run(
             l.id, l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
             l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
             l.settledDate ?? null, l.createdAt ?? now,
           );
-          changed = true;
+          if (result.changes > 0) changed = true;
         }
       }
 

@@ -154,6 +154,7 @@ export default function Layout() {
         setStats(freshStats);
         if (result.changed) {
           window.dispatchEvent(new Event('sync:questsUpdated'));
+          window.dispatchEvent(new Event('sync:nutritionUpdated'));
         }
       } catch { /* Silent fail */ }
     };
@@ -189,6 +190,7 @@ export default function Layout() {
       setStats(freshStats);
       if (result.changed) {
         window.dispatchEvent(new Event('sync:questsUpdated'));
+        window.dispatchEvent(new Event('sync:nutritionUpdated'));
       }
     } catch {
       setSyncError(true);

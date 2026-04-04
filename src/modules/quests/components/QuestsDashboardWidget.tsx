@@ -28,6 +28,13 @@ export default function QuestsDashboardWidget() {
     return () => window.removeEventListener('sync:questsUpdated', handler);
   }, [loadCounts]);
 
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => loadCounts();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadCounts]);
+
   if (loading) return <Loading size="sm" />;
   if (loadError) return <p style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>;
 

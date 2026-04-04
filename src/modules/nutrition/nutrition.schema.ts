@@ -89,4 +89,18 @@ export const nutritionMigrations: Migration[] = [
       ) || '-01-01' WHERE date_of_birth IS NULL;
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 4,
+    up: `
+      ALTER TABLE nutrition_daily_closed ADD COLUMN xp_bonus INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    namespace: 'nutrition',
+    version: 5,
+    up: `
+      ALTER TABLE nutrition_profile ADD COLUMN weight_popup_enabled INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];

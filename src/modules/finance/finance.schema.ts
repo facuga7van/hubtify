@@ -218,4 +218,11 @@ export const financeMigrations: Migration[] = [
       ALTER TABLE finance_recurring ADD COLUMN billing_day INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    namespace: 'finance',
+    version: 7,
+    up: `
+      ALTER TABLE finance_recurring_amount_history ADD COLUMN previous_amount REAL;
+    `,
+  },
 ];

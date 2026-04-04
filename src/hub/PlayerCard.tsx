@@ -104,7 +104,7 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
 
       {stats.dailyCombo > 0 && (
         <div className="player-card__combo">
-          {t('common.combo')}{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(stats.dailyCombo, 4)]} ({stats.dailyCombo})
+          {t('common.combo')}{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(Math.max(stats.dailyCombo - 1, 0), 4)]} ({stats.dailyCombo})
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './shared/CategorySelect';
 import { useToast } from '../../../shared/components/useToast';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { Currency, TransactionType } from '../types';
 
@@ -26,6 +27,7 @@ interface AmountHistoryRow {
 export default function Recurring() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -50,9 +52,6 @@ export default function Recurring() {
   // History state
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, AmountHistoryRow[]>>({});
-
-  // Delete confirmation
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = () => {
     window.api.financeGetRecurring().then((rows) => setItems(rows as RecurringRow[]));
@@ -112,8 +111,9 @@ export default function Recurring() {
   };
 
   const handleDelete = async (id: string) => {
+    const ok = await confirm({ message: t('coinify.confirmDelete'), danger: true, confirmText: t('coinify.delete') });
+    if (!ok) return;
     await window.api.financeDeleteRecurring(id);
-    setDeletingId(null);
     load();
     window.dispatchEvent(new Event('finance:dataChanged'));
   };
@@ -294,23 +294,9 @@ export default function Recurring() {
                 </button>
 
                 {/* Delete */}
-                {deletingId === item.id ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>{t('coinify.confirmDelete')}</span>
-                    <button className="rpg-button" onClick={() => handleDelete(item.id)}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>
-                      {t('coinify.yes')}
-                    </button>
-                    <button className="rpg-button" onClick={() => setDeletingId(null)}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
-                      {t('coinify.no')}
-                    </button>
-                  </div>
-                ) : (
-                  <button className="rpg-button" onClick={() => setDeletingId(item.id)}
-                    style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)', opacity: 0.6 }}
-                    title={t('coinify.delete')}>x</button>
-                )}
+                <button className="rpg-button" onClick={() => handleDelete(item.id)}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)', opacity: 0.6 }}
+                  title={t('coinify.delete')}>x</button>
               </div>
 
               {/* Amount History Timeline */}

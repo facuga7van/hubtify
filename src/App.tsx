@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, Outlet } from 'react-router-dom';
 import Layout from './hub/Layout';
 import Onboarding from './hub/Onboarding';
@@ -40,6 +40,22 @@ function AddAccountPageWrapper() {
 export default function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('hubtify_onboarded') === 'true');
   const { user, loading } = useAuthContext();
+
+  // Re-read onboarded flag after login/account switch (syncPull may restore it from cloud)
+  useEffect(() => {
+    if (!user) return;
+    const checkOnboarded = () => {
+      const flag = localStorage.getItem('hubtify_onboarded') === 'true';
+      setOnboarded(flag);
+    };
+    // Check after a short delay to allow syncPull to write localStorage
+    const timer = setTimeout(checkOnboarded, 500);
+    window.addEventListener('account:switched', checkOnboarded);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('account:switched', checkOnboarded);
+    };
+  }, [user]);
 
   // Show loading while Firebase checks auth state
   if (loading) return null;

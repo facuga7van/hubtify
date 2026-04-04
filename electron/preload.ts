@@ -128,7 +128,7 @@ const api = {
   financeGetRecurringAmountHistory: (id: string) => ipcRenderer.invoke('finance:getRecurringAmountHistory', id),
 
   // Finance - Import
-  financeImportParsePDF: (filePath: string) => ipcRenderer.invoke('finance:importParsePDF', filePath),
+  financeImportSelectAndParsePDF: () => ipcRenderer.invoke('finance:importSelectAndParsePDF'),
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName),
   financeGetCategoryMappings: () => ipcRenderer.invoke('finance:getCategoryMappings'),
   financeUpdateCategoryMapping: (pattern: string, category: string) => ipcRenderer.invoke('finance:updateCategoryMapping', pattern, category),

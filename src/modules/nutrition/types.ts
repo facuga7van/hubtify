@@ -7,6 +7,7 @@ export interface NutritionProfile {
   deficitTargetKcal: number;
   dateOfBirth: string;
   weightCheckDay: number;
+  weightPopupEnabled: number;
 }
 
 export interface FrequentFood {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../../../../shared/components/ConfirmDialog';
 import type { CreditCard } from '../../types';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 
@@ -12,9 +13,9 @@ interface Props {
 
 export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [newName, setNewName] = useState('');
   const [newClosingDay, setNewClosingDay] = useState(1);
-  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editClosingDay, setEditClosingDay] = useState(1);
@@ -28,8 +29,9 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
   };
 
   const handleDelete = async (id: string) => {
+    const ok = await confirm({ message: t('coinify.confirmDelete'), danger: true, confirmText: t('coinify.delete') });
+    if (!ok) return;
     await window.api.financeDeleteCreditCard(id);
-    setConfirmingDelete(null);
     onSaved();
   };
 
@@ -82,26 +84,10 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
                 <span style={{ flex: 1, fontWeight: 'bold', cursor: 'pointer' }} onClick={() => startEdit(card)}>
                   {card.name} <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>({t('coinify.closingDay')}: {card.closingDay})</span>
                 </span>
-                {confirmingDelete === card.id ? (
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>
-                      {t('coinify.confirmDelete')}
-                    </span>
-                    <button className="rpg-button" onClick={() => handleDelete(card.id)}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>
-                      {t('coinify.yes')}
-                    </button>
-                    <button className="rpg-button" onClick={() => setConfirmingDelete(null)}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
-                      {t('coinify.no')}
-                    </button>
-                  </div>
-                ) : (
-                  <button className="rpg-button" onClick={() => setConfirmingDelete(card.id)}
-                    style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
-                    {t('coinify.delete')}
-                  </button>
-                )}
+                <button className="rpg-button" onClick={() => handleDelete(card.id)}
+                  style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
+                  {t('coinify.delete')}
+                </button>
               </>
             )}
           </div>

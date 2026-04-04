@@ -199,6 +199,19 @@ export default function Installments() {
                           step={1}
                           autoFocus
                           style={{ width: 100 }}
+                          onBlur={() => {
+                            const val = parseFloat(editAmount);
+                            if (val > 0) {
+                              window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
+                                setEditingId(null);
+                                loadRows(month);
+                                loadProjection();
+                                window.dispatchEvent(new Event('finance:dataChanged'));
+                              });
+                            } else {
+                              setEditingId(null);
+                            }
+                          }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();

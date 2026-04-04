@@ -74,7 +74,7 @@ export type BonusTier = 'normal' | 'good' | 'critical' | 'legendary';
 
 export interface XpToastData {
   xp: number;
-  bonusTier: BonusTier;
+  bonusTier?: BonusTier;
   comboMultiplier: number;
   streakMilestone?: number | null;
 }

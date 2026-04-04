@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/PageHeader';
@@ -24,6 +24,7 @@ export default function NutritionSettings() {
 
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [weightCheckDay, setWeightCheckDay] = useState(1);
+  const [weightPopupEnabled, setWeightPopupEnabled] = useState(true);
   const [sex, setSex] = useState<'M' | 'F'>('M');
   const [height, setHeight] = useState(170);
   const [weight, setWeight] = useState(70);
@@ -31,12 +32,15 @@ export default function NutritionSettings() {
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
 
-  useEffect(() => {
+  const loadProfile = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     window.api.nutritionGetProfile().then((prof) => {
       if (prof) {
         const p = prof as NutritionProfile;
         setDateOfBirth(p.dateOfBirth || '');
         setWeightCheckDay(p.weightCheckDay || 1);
+        setWeightPopupEnabled(p.weightPopupEnabled !== 0);
         setSex(p.sex);
         setHeight(p.heightCm);
         setWeight(p.initialWeightKg);
@@ -50,6 +54,15 @@ export default function NutritionSettings() {
     }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  // Reload profile when account is switched — prevents saving to wrong account
+  useEffect(() => {
+    const handler = () => loadProfile();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadProfile]);
+
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
@@ -60,7 +73,7 @@ export default function NutritionSettings() {
         : 0;
 
       await window.api.nutritionSaveProfile({
-        dateOfBirth, weightCheckDay, sex, heightCm: height, initialWeightKg: weight,
+        dateOfBirth, weightCheckDay, weightPopupEnabled, sex, heightCm: height, initialWeightKg: weight,
         activityLevel: activity, deficitTargetKcal,
       });
       setSaved(true);
@@ -163,16 +176,27 @@ export default function NutritionSettings() {
         )}
       </div>
 
-      {/* Weight check-in day */}
+      {/* Weight check-in */}
       <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>
-          {t('nutrify.weightCheckDay')}
-          <select value={weightCheckDay} onChange={(e) => setWeightCheckDay(+e.target.value)} className="rpg-input">
-            {[1, 2, 3, 4, 5, 6, 7].map(d => (
-              <option key={d} value={d}>{t(`nutrify.weekdays.${d}`)}</option>
-            ))}
-          </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 12, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={weightPopupEnabled}
+            onChange={(e) => setWeightPopupEnabled(e.target.checked)}
+            style={{ width: 18, height: 18, accentColor: 'var(--rpg-gold)' }}
+          />
+          {t('nutrify.weightPopupEnabled', 'Recordatorio de pesaje')}
         </label>
+        {weightPopupEnabled && (
+          <label style={labelStyle}>
+            {t('nutrify.weightCheckDay')}
+            <select value={weightCheckDay} onChange={(e) => setWeightCheckDay(+e.target.value)} className="rpg-input">
+              {[1, 2, 3, 4, 5, 6, 7].map(d => (
+                <option key={d} value={d}>{t(`nutrify.weekdays.${d}`)}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {/* Save */}

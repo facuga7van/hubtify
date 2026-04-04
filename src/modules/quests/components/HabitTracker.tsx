@@ -45,6 +45,13 @@ export default function HabitTracker({ onXpGained }: Props) {
     return () => window.removeEventListener('sync:questsUpdated', handler);
   }, [loadHabits]);
 
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => loadHabits();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadHabits]);
+
   const toggleCollapsed = () => {
     setCollapsed(prev => {
       const next = !prev;

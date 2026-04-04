@@ -1,6 +1,8 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
+import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
+import fs from 'fs';
 
 // ── Types ───────────────────────────────────────────
 
@@ -172,17 +174,30 @@ function suggestCategory(merchant: string, mappings: Map<string, string>): strin
 // ── IPC Handlers ────────────────────────────────────
 
 export function registerFinanceImportIpcHandlers(): void {
-  ipcHandle('finance:importParsePDF', async (_e, filePath: string) => {
-    const fs = await import('fs');
-    const pdfParse = (await import('pdf-parse')).default;
+  ipcHandle('finance:importSelectAndParsePDF', async () => {
+    const win = BrowserWindow.getFocusedWindow();
+    const { filePaths, canceled } = await dialog.showOpenDialog(win!, {
+      title: 'Seleccionar PDF de resumen',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || filePaths.length === 0) return null;
+
+    const filePath = filePaths[0];
+    const fileName = filePath.split(/[/\\]/).pop() || 'unknown.pdf';
+
     const buffer = fs.readFileSync(filePath);
-    const data = await pdfParse(buffer);
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: new Uint8Array(buffer), verbosity: 0 });
+    await parser.load();
+    const data = await parser.getText();
 
     const db = getDb();
     const mappingsRaw = db
-      .prepare('SELECT merchant_pattern, category FROM finance_category_mappings')
-      .all() as Array<{ merchant_pattern: string; category: string }>;
-    const mappings = new Map(mappingsRaw.map(r => [r.merchant_pattern, r.category]));
+      .prepare('SELECT keyword, category FROM finance_category_mappings')
+      .all() as Array<{ keyword: string; category: string }>;
+    const mappings = new Map(mappingsRaw.map(r => [r.keyword, r.category]));
 
     // Add default mappings (only if not already customised)
     const defaults: [string, string][] = [
@@ -206,7 +221,7 @@ export function registerFinanceImportIpcHandlers(): void {
       const parsed = parseGaliciaLine(line, mappings);
       if (parsed) rows.push(parsed);
     }
-    return rows;
+    return { rows, fileName };
   });
 
   ipcHandle(
@@ -216,9 +231,9 @@ export function registerFinanceImportIpcHandlers(): void {
       const batchId = crypto.randomUUID();
 
       db.prepare(
-        `INSERT INTO finance_import_batches (id, file_name, statement_month, transaction_count, created_at)
-         VALUES (?, ?, ?, ?, datetime('now'))`,
-      ).run(batchId, fileName, statementMonth, rows.length);
+        `INSERT INTO finance_import_batches (id, source, filename, row_count, created_at)
+         VALUES (?, 'galicia_visa', ?, ?, datetime('now'))`,
+      ).run(batchId, fileName, rows.length);
 
       for (const row of rows) {
         if (row.isExcluded) continue;
@@ -239,7 +254,7 @@ export function registerFinanceImportIpcHandlers(): void {
           row.merchant,
           row.date,
           batchId,
-          row.installmentTotal ?? null,
+          row.installmentTotal ?? 1,
         );
 
         // Installment group matching — handled in a later task
@@ -253,7 +268,7 @@ export function registerFinanceImportIpcHandlers(): void {
     const db = getDb();
     return db
       .prepare(
-        'SELECT id, merchant_pattern AS merchantPattern, category, created_at AS createdAt FROM finance_category_mappings ORDER BY merchant_pattern',
+        'SELECT id, keyword AS merchantPattern, category, created_at AS createdAt FROM finance_category_mappings ORDER BY keyword',
       )
       .all();
   });
@@ -263,15 +278,15 @@ export function registerFinanceImportIpcHandlers(): void {
     (_e, merchantPattern: string, category: string) => {
       const db = getDb();
       const existing = db
-        .prepare('SELECT id FROM finance_category_mappings WHERE merchant_pattern = ?')
+        .prepare('SELECT id FROM finance_category_mappings WHERE keyword = ?')
         .get(merchantPattern);
       if (existing) {
         db.prepare(
-          'UPDATE finance_category_mappings SET category = ? WHERE merchant_pattern = ?',
+          'UPDATE finance_category_mappings SET category = ? WHERE keyword = ?',
         ).run(category, merchantPattern);
       } else {
         db.prepare(
-          `INSERT INTO finance_category_mappings (id, merchant_pattern, category, created_at)
+          `INSERT INTO finance_category_mappings (id, keyword, category, created_at)
            VALUES (?, ?, ?, datetime('now'))`,
         ).run(crypto.randomUUID(), merchantPattern, category);
       }

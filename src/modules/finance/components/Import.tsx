@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import type { ParsedRow } from '../../../../shared/types';
@@ -12,13 +12,11 @@ interface RowState extends ParsedRow {
 export default function Import() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const [fileName, setFileName] = useState('');
-  const [filePath, setFilePath] = useState('');
   const [rows, setRows] = useState<RowState[]>([]);
   const [statementMonth, setStatementMonth] = useState(defaultMonth);
   const [parsing, setParsing] = useState(false);
@@ -28,13 +26,23 @@ export default function Import() {
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [showSeal, setShowSeal] = useState(false);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Reset all state when account is switched
+  useEffect(() => {
+    const handler = () => {
+      setFileName('');
+      setRows([]);
+      setParseError('');
+      setImportError('');
+      setSuccessCount(null);
+      setShowSeal(false);
+      setParsing(false);
+      setImporting(false);
+    };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, []);
 
-    const path = (file as File & { path: string }).path;
-    setFileName(file.name);
-    setFilePath(path);
+  const handleSelectFile = async () => {
     setRows([]);
     setParseError('');
     setSuccessCount(null);
@@ -42,14 +50,20 @@ export default function Import() {
 
     setParsing(true);
     try {
-      const parsed = await window.api.financeImportParsePDF(path);
-      const rowStates: RowState[] = parsed.map((r) => ({
+      const result = await window.api.financeImportSelectAndParsePDF();
+      if (!result) {
+        setParsing(false);
+        return; // user cancelled dialog
+      }
+      setFileName(result.fileName);
+      const rowStates: RowState[] = result.rows.map((r) => ({
         ...r,
         included: !r.isExcluded,
         category: r.suggestedCategory,
       }));
       setRows(rowStates);
-    } catch {
+    } catch (err) {
+      console.error('[Import] PDF parse failed:', err);
       setParseError(t('coinify.importErrorParse'));
     } finally {
       setParsing(false);
@@ -82,8 +96,6 @@ export default function Import() {
       setSuccessCount(result.count);
       setRows([]);
       setFileName('');
-      setFilePath('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
 
       // Seal animation + toast
       setShowSeal(true);
@@ -125,16 +137,9 @@ export default function Import() {
 
       {/* File picker — styled drop zone */}
       <div className="coin-import-drop">
-        <label className="rpg-button coin-import-drop__label">
+        <button className="rpg-button coin-import-drop__label" onClick={handleSelectFile} disabled={parsing}>
           {t('coinify.importSelectFile')}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            className="coin-import-drop__input"
-            onChange={handleFileChange}
-          />
-        </label>
+        </button>
         <span className="coin-import-drop__filename">
           {fileName || t('coinify.importNoFile')}
         </span>

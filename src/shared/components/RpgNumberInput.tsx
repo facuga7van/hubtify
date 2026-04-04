@@ -73,6 +73,10 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
         max={max}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+          onKeyDown?.(e);
+        }}
         placeholder={placeholder}
         className="rpg-input rpg-number-input"
         style={{
@@ -81,7 +85,6 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
           ...(fontSize ? { fontSize } : {}),
         }}
         autoFocus={autoFocus}
-        onKeyDown={onKeyDown}
         required={required}
       />
       {suffix && (

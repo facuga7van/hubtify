@@ -14,7 +14,7 @@ import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
 import HabitTracker from './HabitTracker';
 import { type Task, type TaskTier, type Subtask, type Project, XP_MAP } from '../types';
-import { TierBadge, calculateXpForAction, getDueDateStatus } from '../utils';
+import { TierBadge, getDueDateStatus, bonusMultiplierToTier } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
 
 export default function TaskList() {
@@ -31,12 +31,12 @@ export default function TaskList() {
   const [activeProjectId, setActiveProjectId] = useState<string | null | undefined>(undefined); // undefined = all, null = unassigned
   const [filter, setFilter] = useState('');
   const [todayCount, setTodayCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [notesTaskId, setNotesTaskId] = useState<string | null>(null);
   const [drawingCounts, setDrawingCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const completingRef = useRef(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('questify_collapsed_projects');
@@ -80,6 +80,13 @@ export default function TaskList() {
     return () => window.removeEventListener('sync:questsUpdated', handler);
   }, [loadTasks]);
 
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => loadTasks();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadTasks]);
+
   useEffect(() => {
     if (editingTask && formRef.current) {
       formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -109,15 +116,13 @@ export default function TaskList() {
   const pending = useMemo(() =>
     filteredByProject.filter((t) => !t.status)
       .sort((a, b) => a.order - b.order)
-      .filter((t) => !filter || t.category === filter)
-      .filter((t) => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase())),
-    [filteredByProject, filter, searchQuery]
+      .filter((t) => !filter || t.category === filter),
+    [filteredByProject, filter]
   );
 
   const completed = useMemo(() =>
-    filteredByProject.filter((t) => t.status)
-      .filter((t) => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase())),
-    [filteredByProject, searchQuery]
+    filteredByProject.filter((t) => t.status),
+    [filteredByProject]
   );
 
   // Group pending by project for global view
@@ -142,15 +147,14 @@ export default function TaskList() {
   const handleComplete = async (task: Task) => {
     const newStatus = !task.status;
     if (newStatus) {
-      const { xp, bonus, comboMult } = calculateXpForAction(task.tier, todayCount);
       await window.api.questsSetTaskStatus(task.id, true);
       const result = await window.api.processRpgEvent({
         type: 'TASK_COMPLETED', moduleId: 'quests',
-        payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
+        payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
         timestamp: Date.now(),
       });
       playTaskComplete();
-      toast({ type: 'xp', message: `+${xp} XP`, details: { xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || undefined } });
+      toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
     } else {
       await window.api.questsSetTaskStatus(task.id, false);
       await window.api.processRpgEvent({
@@ -408,7 +412,11 @@ export default function TaskList() {
           return (
             <div key={task.id} data-anim="quest-card" className="rpg-card" style={{ marginBottom: 8, opacity: 0.7 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isExpanded ? 8 : 0 }}>
-                <Checkbox checked onChange={() => handleComplete(task)} />
+                <Checkbox checked onChange={() => {
+                  if (completingRef.current) return;
+                  completingRef.current = true;
+                  handleComplete(task).finally(() => { completingRef.current = false; });
+                }} />
                 <svg onClick={() => toggleExpand(task.id)} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
                   style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.4, flexShrink: 0, cursor: 'pointer' }}>
                   <path d="M3 1l4 4-4 4"/>

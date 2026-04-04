@@ -162,6 +162,9 @@
     "xpSteps": "Steps",
     "xpGym": "Gym",
     "xpWeight": "Weight logged",
+    "xpBonus": "Precision bonus",
+    "invalidCalories": "Calories must be greater than 0",
+    "logError": "Error logging food",
     "setupStep1": "Body data",
     "setupStep2": "Goal and exercise",
     "goal": "Goal",
@@ -194,6 +197,7 @@
       "invalid": "Enter a valid weight (30-300 kg)"
     },
     "weightCheckDay": "Weekly weigh-in day",
+    "weightPopupEnabled": "Weigh-in reminder",
     "weekdays": {
       "1": "Monday",
       "2": "Tuesday",

@@ -7,7 +7,7 @@ import SubtaskInlineForm from './SubtaskInlineForm';
 import Checkbox from '../../../shared/components/Checkbox';
 import type { XpToastData } from '../types';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
-import { TierBadge, tierXp, calculateXpForAction } from '../utils';
+import { TierBadge, tierXp, bonusMultiplierToTier } from '../utils';
 import { todayDateString } from '../../../../shared/date-utils';
 import { completeTask } from '../../../shared/animations/feedback';
 
@@ -50,16 +50,15 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
     const tier = subtask.tier as TaskTier;
     if (!subtask.status) {
       const today = todayDateString();
-      const { xp, bonus, comboMult } = calculateXpForAction(tier, countCompletedToday);
 
       await window.api.questsSetSubtaskStatus(subtask.id, true, today);
       const result = await window.api.processRpgEvent({
         type: 'SUBTASK_COMPLETED', moduleId: 'quests',
-        payload: { xp, hp: 0, subtaskId: subtask.id, tier },
+        payload: { xp: XP_MAP[tier], hp: 0, subtaskId: subtask.id, tier },
         timestamp: Date.now(),
       });
 
-      const toastData: XpToastData = { xp, bonusTier: bonus.tier, comboMultiplier: comboMult, streakMilestone: result.milestoneXp || null };
+      const toastData: XpToastData = { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || null };
 
       // Chain: quill animation (300ms) → strikethrough → toast
       if (rowEl && textEl) {

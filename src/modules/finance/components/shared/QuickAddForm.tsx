@@ -38,6 +38,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     e.preventDefault();
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed <= 0) return;
+    if (paymentMethod === 'credit_card' && !creditCardId) return;
 
     onSubmit({
       type,

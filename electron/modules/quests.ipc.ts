@@ -48,7 +48,7 @@ export function registerQuestsIpcHandlers(): void {
         task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now, id
       );
     } else {
-      const maxOrder = db.prepare('SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks').get() as { next: number };
+      const maxOrder = db.prepare('SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks WHERE deleted_at IS NULL').get() as { next: number };
       db.prepare(`
         INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
@@ -106,7 +106,7 @@ export function registerQuestsIpcHandlers(): void {
     const id = genId();
     const now = new Date().toISOString();
     const maxOrder = db.prepare(
-      'SELECT COALESCE(MAX(subtask_order), -1) + 1 AS next FROM subtasks WHERE task_id = ?'
+      'SELECT COALESCE(MAX(subtask_order), -1) + 1 AS next FROM subtasks WHERE task_id = ? AND deleted_at IS NULL'
     ).get(taskId) as { next: number };
 
     db.prepare(`
@@ -162,17 +162,25 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:getCategories', (_e, projectId?: string | null) => {
     const db = getDb();
     if (projectId === undefined) {
-      return (db.prepare('SELECT name FROM task_categories WHERE deleted_at IS NULL ORDER BY created_at ASC').all() as { name: string }[])
+      return (db.prepare('SELECT id, name FROM task_categories WHERE deleted_at IS NULL ORDER BY created_at ASC').all() as { id: string; name: string }[])
         .map((r) => r.name);
     } else {
-      return (db.prepare('SELECT name FROM task_categories WHERE deleted_at IS NULL AND project_id IS ? ORDER BY created_at ASC').all(projectId) as { name: string }[])
+      return (db.prepare('SELECT id, name FROM task_categories WHERE deleted_at IS NULL AND project_id IS ? ORDER BY created_at ASC').all(projectId) as { id: string; name: string }[])
         .map((r) => r.name);
     }
   });
 
   ipcHandle('quests:ensureCategory', (_e, name: string, projectId?: string | null) => {
     const db = getDb();
-    db.prepare('INSERT OR IGNORE INTO task_categories (name, project_id) VALUES (?, ?)').run(name, projectId ?? null);
+    const pid = projectId ?? null;
+    const existing = db.prepare(
+      'SELECT id FROM task_categories WHERE name = ? AND project_id IS ? AND deleted_at IS NULL'
+    ).get(name, pid);
+    if (existing) return;
+    const id = genId();
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO task_categories (id, name, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(id, name, pid, now, now);
   });
 
   // ── Stats helpers ──────────────────────────────────
@@ -184,7 +192,7 @@ export function registerQuestsIpcHandlers(): void {
       "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
     ).get(today) as { c: number };
     const subtaskCount = db.prepare(
-      "SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND deleted_at IS NULL AND completed_at = ?"
+      "SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
     ).get(today) as { c: number };
     return taskCount.c + subtaskCount.c;
   });
@@ -225,7 +233,7 @@ export function registerQuestsIpcHandlers(): void {
       db.prepare('UPDATE projects SET name = ?, color = ?, updated_at = ? WHERE id = ?')
         .run(project.name, project.color, now, id);
     } else {
-      const maxOrder = db.prepare('SELECT COALESCE(MAX(project_order), -1) + 1 AS next FROM projects').get() as { next: number };
+      const maxOrder = db.prepare('SELECT COALESCE(MAX(project_order), -1) + 1 AS next FROM projects WHERE deleted_at IS NULL').get() as { next: number };
       db.prepare('INSERT INTO projects (id, name, color, project_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
         .run(id, project.name, project.color, maxOrder.next, now, now);
     }
@@ -236,6 +244,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const now = new Date().toISOString();
     db.prepare('UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+    db.prepare('UPDATE tasks SET project_id = NULL, updated_at = ? WHERE project_id = ?').run(now, id);
   });
 
   ipcHandle('quests:syncProjectOrders', (_e, orders: Array<{ id: string; order: number }>) => {
@@ -256,13 +265,13 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, task_id AS taskId, data, draw_order AS "order", created_at AS createdAt
-      FROM task_drawings WHERE task_id = ? ORDER BY draw_order ASC
+      FROM task_drawings WHERE task_id = ? AND deleted_at IS NULL ORDER BY draw_order ASC
     `).all(taskId);
   });
 
   ipcHandle('quests:getDrawingCount', (_e, taskId: string) => {
     const db = getDb();
-    const result = db.prepare('SELECT COUNT(*) AS c FROM task_drawings WHERE task_id = ?').get(taskId) as { c: number };
+    const result = db.prepare('SELECT COUNT(*) AS c FROM task_drawings WHERE task_id = ? AND deleted_at IS NULL').get(taskId) as { c: number };
     return result.c;
   });
 
@@ -275,7 +284,7 @@ export function registerQuestsIpcHandlers(): void {
       return drawing.id;
     } else {
       const id = genId();
-      const maxOrder = db.prepare('SELECT COALESCE(MAX(draw_order), -1) + 1 AS next FROM task_drawings WHERE task_id = ?')
+      const maxOrder = db.prepare('SELECT COALESCE(MAX(draw_order), -1) + 1 AS next FROM task_drawings WHERE task_id = ? AND deleted_at IS NULL')
         .get(drawing.taskId) as { next: number };
       db.prepare('INSERT INTO task_drawings (id, task_id, data, draw_order, created_at) VALUES (?, ?, ?, ?, ?)')
         .run(id, drawing.taskId, drawing.data, maxOrder.next, now);
@@ -285,12 +294,13 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcHandle('quests:deleteDrawing', (_e, id: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM task_drawings WHERE id = ?').run(id);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE task_drawings SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
   });
 
   ipcHandle('quests:getAllDrawingCounts', () => {
     const db = getDb();
-    return db.prepare('SELECT task_id, COUNT(*) as count FROM task_drawings GROUP BY task_id').all();
+    return db.prepare('SELECT task_id, COUNT(*) as count FROM task_drawings WHERE deleted_at IS NULL GROUP BY task_id').all();
   });
 
   // ── Habits ───────────────────────────────────────
@@ -361,7 +371,7 @@ export function registerQuestsIpcHandlers(): void {
             return { ...h, streak: 0, checkedToday, checksThisPeriod, targetThisPeriod };
           }
         }
-        const d = new Date(startDate);
+        const d = new Date(startDate + 'T00:00:00');
         while (true) {
           if (!dates.has(formatDateString(d))) break;
           streak++;
@@ -416,19 +426,19 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const id = genId();
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO habits (id, name, frequency, times_per_week, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, habit.name, habit.frequency, habit.timesPerWeek, now);
+    db.prepare('INSERT INTO habits (id, name, frequency, times_per_week, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, habit.name, habit.frequency, habit.timesPerWeek, now, now);
     return id;
   });
 
   ipcHandle('quests:updateHabit', (_e, id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => {
     const db = getDb();
-    const fields: string[] = [];
-    const values: unknown[] = [];
+    const now = new Date().toISOString();
+    const fields: string[] = ['updated_at = ?'];
+    const values: unknown[] = [now];
     if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
     if (updates.frequency !== undefined) { fields.push('frequency = ?'); values.push(updates.frequency); }
     if (updates.timesPerWeek !== undefined) { fields.push('times_per_week = ?'); values.push(updates.timesPerWeek); }
-    if (fields.length === 0) return;
     db.prepare(`UPDATE habits SET ${fields.join(', ')} WHERE id = ?`).run(...values, id);
   });
 

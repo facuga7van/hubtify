@@ -13,7 +13,7 @@ import {
   daysDiff,
 } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEvent, RpgEventRecord } from '../../shared/types';
-import { todayDateString } from '../../shared/date-utils';
+import { todayDateString, localTimestamp, daysAgoDateString } from '../../shared/date-utils';
 
 function defaultStats(): PlayerStats {
   return {
@@ -127,10 +127,11 @@ export function registerRpgHandlers(): void {
       const newHp = clampHp((stats.hp as number) + hpChange);
       const oldLevel = stats.level as number;
 
+      const now = localTimestamp();
       db.prepare(`
-        INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(event.moduleId, event.type, totalXpGained, hpChange, comboMultiplier, bonusMultiplier, JSON.stringify(event.payload));
+        INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(event.moduleId, event.type, totalXpGained, hpChange, comboMultiplier, bonusMultiplier, JSON.stringify(event.payload), now);
 
       if (isUndo) {
         db.prepare(`
@@ -162,6 +163,8 @@ export function registerRpgHandlers(): void {
         leveledUp: finalLevel > oldLevel,
         newTitle: finalTitle !== (stats.title as string) ? finalTitle : null,
         milestoneXp,
+        comboMultiplier,
+        bonusMultiplier,
       };
     });
 
@@ -171,11 +174,11 @@ export function registerRpgHandlers(): void {
       console.error(`[RPG] Error processing event "${event.type}":`, err);
       try {
         db.prepare(`
-          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload)
-          VALUES (?, ?, 0, 0, 1.0, 1.0, ?)
-        `).run(event.moduleId, event.type, JSON.stringify(event.payload));
+          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
+          VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?)
+        `).run(event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp());
       } catch { /* best effort logging */ }
-      return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0 };
+      return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0, comboMultiplier: 1.0, bonusMultiplier: 1.0 };
     }
   });
 
@@ -200,13 +203,14 @@ export function registerRpgHandlers(): void {
     ).get(today) as { total: number };
 
     // XP per day for last 7 days
+    const sixDaysAgo = daysAgoDateString(6);
     const xpHistory = db.prepare(`
       SELECT DATE(created_at) AS date, COALESCE(SUM(xp_gained), 0) AS xp
       FROM rpg_events
-      WHERE DATE(created_at) >= DATE('now', '-6 days')
+      WHERE DATE(created_at) >= ?
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).all() as Array<{ date: string; xp: number }>;
+    `).all(sixDaysAgo) as Array<{ date: string; xp: number }>;
 
     // Events today count
     const eventsToday = db.prepare(

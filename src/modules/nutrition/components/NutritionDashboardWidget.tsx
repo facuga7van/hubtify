@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 
@@ -10,7 +10,7 @@ export default function NutritionDashboardWidget() {
 
   const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     Promise.all([
       window.api.nutritionGetTodayCalories(),
       window.api.nutritionGetTodayTarget(),
@@ -20,6 +20,15 @@ export default function NutritionDashboardWidget() {
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadData]);
 
   if (loading) return (
     <div>

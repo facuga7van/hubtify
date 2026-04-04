@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 
@@ -7,10 +7,19 @@ export default function DashboardWidget() {
   const [total, setTotal] = useState<number | null>(null);
   const [loansCount, setLoansCount] = useState(0);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     window.api.financeGetMonthlyTotal().then(setTotal);
     window.api.financeGetActiveLoansCount().then(setLoansCount);
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Reload data when account is switched
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadData]);
 
   return (
     <div>

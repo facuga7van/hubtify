@@ -8,14 +8,18 @@ function genId(): string {
 }
 
 export function registerFinanceIpcHandlers(): void {
-  /** Given a transaction date and a card's closing day, returns the statement period_month (YYYY-MM) */
+  /** Given a transaction date and a card's closing day, returns the statement period_month (YYYY-MM).
+   *  Convention: for closingDay=15, the January statement covers Dec 16 – Jan 15.
+   *  So a tx on Jan 10 (d <= closingDay) belongs to January ("2025-01"),
+   *  and a tx on Jan 20 (d > closingDay) belongs to February ("2025-02"). */
   function getStatementPeriod(txDate: string, closingDay: number): string {
     const [y, m, d] = txDate.split('-').map(Number);
     if (d <= closingDay) {
-      const dt = new Date(y, m, 1); // next month (m is 1-based, Date uses 0-based so m gives next month)
-      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      // Transaction falls within the current month's statement period
+      return `${y}-${String(m).padStart(2, '0')}`;
     } else {
-      const dt = new Date(y, m + 1, 1); // month+2
+      // Transaction falls after closing day → next month's statement
+      const dt = new Date(y, m, 1); // m is 1-based, Date 0-based, so this gives next month
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
     }
   }
@@ -88,6 +92,9 @@ export function registerFinanceIpcHandlers(): void {
     creditCardId?: string | null;
     impactsBalance?: boolean;
   }) => {
+    if (!Number.isFinite(tx.amount) || tx.amount <= 0) {
+      throw new Error('Amount must be a positive finite number');
+    }
     const db = getDb();
     const id = genId();
     const now = new Date().toISOString();
@@ -126,6 +133,7 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
     paymentMethod?: string;
     date?: string;
+    creditCardId?: string | null;
   }) => {
     const db = getDb();
     const sets: string[] = ['updated_at = ?'];
@@ -133,7 +141,18 @@ export function registerFinanceIpcHandlers(): void {
     if (fields.amount !== undefined) { sets.push('amount = ?'); vals.push(fields.amount); }
     if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
     if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
-    if (fields.paymentMethod !== undefined) { sets.push('payment_method = ?'); vals.push(fields.paymentMethod); }
+    if (fields.paymentMethod !== undefined) {
+      sets.push('payment_method = ?'); vals.push(fields.paymentMethod);
+      if (fields.paymentMethod === 'credit_card') {
+        sets.push('impacts_balance = ?'); vals.push(0);
+        sets.push('credit_card_id = ?'); vals.push(fields.creditCardId ?? null);
+      } else {
+        sets.push('impacts_balance = ?'); vals.push(1);
+        sets.push('credit_card_id = ?'); vals.push(null);
+      }
+    } else if (fields.creditCardId !== undefined) {
+      sets.push('credit_card_id = ?'); vals.push(fields.creditCardId);
+    }
     if (fields.date !== undefined) { sets.push('date = ?'); vals.push(fields.date); }
     vals.push(id);
     db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
@@ -245,6 +264,12 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:deleteCategory', (_e, name: string) => {
     const db = getDb();
+    const usage = db.prepare(
+      'SELECT COUNT(*) AS c FROM finance_transactions WHERE category = ?'
+    ).get(name) as { c: number };
+    if (usage.c > 0) {
+      throw new Error(`Cannot delete category in use by ${usage.c} transactions`);
+    }
     db.prepare('DELETE FROM finance_categories WHERE name = ?').run(name);
   });
 
@@ -279,7 +304,12 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:deleteCreditCard', (_e, id: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM finance_credit_cards WHERE id = ?').run(id);
+    const trx = db.transaction(() => {
+      db.prepare('DELETE FROM finance_credit_card_statements WHERE credit_card_id = ?').run(id);
+      db.prepare('UPDATE finance_transactions SET credit_card_id = NULL, impacts_balance = 1 WHERE credit_card_id = ?').run(id);
+      db.prepare('DELETE FROM finance_credit_cards WHERE id = ?').run(id);
+    });
+    trx();
   });
 
   // ── Credit Card Statements ─────────────────────────
@@ -345,42 +375,51 @@ export function registerFinanceIpcHandlers(): void {
     const card = db.prepare('SELECT id, closing_day AS closingDay FROM finance_credit_cards WHERE id = ?').get(creditCardId) as { id: string; closingDay: number } | undefined;
     if (!card) return null;
 
-    const existing = db.prepare(
-      'SELECT id FROM finance_credit_card_statements WHERE credit_card_id = ? AND period_month = ?'
-    ).get(creditCardId, periodMonth);
-    if (existing) return (existing as { id: string }).id;
-
-    const allTx = db.prepare(`
-      SELECT date, amount FROM finance_transactions
-      WHERE credit_card_id = ? AND impacts_balance = 0
-    `).all(creditCardId) as Array<{ date: string; amount: number }>;
-
-    const total = allTx
-      .filter((tx) => getStatementPeriod(tx.date, card.closingDay) === periodMonth)
-      .reduce((sum, tx) => sum + tx.amount, 0);
-
     const statementId = genId();
     const txId = genId();
     const now = new Date().toISOString();
 
-    db.prepare(`
-      INSERT INTO finance_transactions
-        (id, type, amount, currency, category, description, date, payment_method,
-         source, installments, installment_group_id, for_third_party, recurring_id,
-         import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-      VALUES (?, 'expense', ?, 'ARS', 'Pago Tarjeta', ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?)
-    `).run(txId, total, `Pago tarjeta - ${periodMonth}`, `${periodMonth}-01`, now, now);
+    const trx = db.transaction(() => {
+      const existing = db.prepare(
+        'SELECT id FROM finance_credit_card_statements WHERE credit_card_id = ? AND period_month = ?'
+      ).get(creditCardId, periodMonth);
+      if (existing) return (existing as { id: string }).id;
 
-    db.prepare(`
-      INSERT INTO finance_credit_card_statements
-        (id, credit_card_id, period_month, calculated_amount, status, transaction_id, created_at)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?)
-    `).run(statementId, creditCardId, periodMonth, total, txId, now);
+      const allTx = db.prepare(`
+        SELECT date, amount FROM finance_transactions
+        WHERE credit_card_id = ? AND impacts_balance = 0
+      `).all(creditCardId) as Array<{ date: string; amount: number }>;
 
-    return statementId;
+      const total = allTx
+        .filter((tx) => getStatementPeriod(tx.date, card.closingDay) === periodMonth)
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+      if (total === 0) return null;
+
+      db.prepare(`
+        INSERT INTO finance_transactions
+          (id, type, amount, currency, category, description, date, payment_method,
+           source, installments, installment_group_id, for_third_party, recurring_id,
+           import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+        VALUES (?, 'expense', ?, 'ARS', 'Pago Tarjeta', ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?)
+      `).run(txId, total, `Pago tarjeta - ${periodMonth}`, `${periodMonth}-01`, now, now);
+
+      db.prepare(`
+        INSERT INTO finance_credit_card_statements
+          (id, credit_card_id, period_month, calculated_amount, status, transaction_id, created_at)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?)
+      `).run(statementId, creditCardId, periodMonth, total, txId, now);
+
+      return statementId;
+    });
+
+    return trx();
   });
 
   ipcHandle('finance:payStatement', (_e, statementId: string, paidAmount: number) => {
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+      throw new Error('Pay amount must be a positive finite number');
+    }
     const db = getDb();
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
@@ -696,6 +735,7 @@ export function registerFinanceIpcHandlers(): void {
     startDate: string;
     personName: string;
     direction?: 'lent' | 'borrowed';
+    creditCardId?: string | null;
   }) => {
     const db = getDb();
     const currency = data.currency ?? 'ARS';
@@ -728,8 +768,8 @@ export function registerFinanceIpcHandlers(): void {
           INSERT INTO finance_transactions
             (id, type, amount, currency, category, description, date, payment_method,
              source, installments, installment_group_id, for_third_party, recurring_id,
-             import_batch_id, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           txId,
           'expense',
@@ -745,6 +785,8 @@ export function registerFinanceIpcHandlers(): void {
           1,
           null,
           null,
+          data.creditCardId ?? null,
+          0,
           now,
           now,
         );
@@ -826,13 +868,15 @@ export function registerFinanceIpcHandlers(): void {
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
     const historyId = genId();
+    const current = db.prepare('SELECT amount FROM finance_recurring WHERE id = ?').get(id) as { amount: number } | undefined;
+    const previousAmount = current?.amount ?? 0;
     db.prepare(`
       INSERT INTO finance_recurring_amount_history
-        (id, recurring_id, amount, currency, effective_date, created_at)
-      SELECT ?, id, ?, currency, ?, ?
+        (id, recurring_id, previous_amount, amount, currency, effective_date, created_at)
+      SELECT ?, id, ?, ?, currency, ?, ?
       FROM finance_recurring
       WHERE id = ?
-    `).run(historyId, newAmount, today, now, id);
+    `).run(historyId, previousAmount, newAmount, today, now, id);
     db.prepare(`UPDATE finance_recurring SET amount = ? WHERE id = ?`).run(newAmount, id);
   });
 
@@ -847,6 +891,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:deleteRecurring', (_e, id: string) => {
     const db = getDb();
+    db.prepare('UPDATE finance_transactions SET recurring_id = NULL WHERE recurring_id = ?').run(id);
     db.prepare('DELETE FROM finance_recurring WHERE id = ?').run(id);
   });
 
@@ -912,8 +957,9 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getRecurringAmountHistory', (_e, recurringId: string) => {
     const db = getDb();
     return db.prepare(`
-      SELECT id, recurring_id AS recurringId, amount, currency,
-             effective_date AS effectiveDate, created_at AS createdAt
+      SELECT id, recurring_id AS recurringId,
+             previous_amount AS previousAmount, amount AS newAmount,
+             currency, effective_date AS changedAt, created_at AS createdAt
       FROM finance_recurring_amount_history
       WHERE recurring_id = ?
       ORDER BY created_at DESC

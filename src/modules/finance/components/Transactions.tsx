@@ -134,7 +134,8 @@ export default function Transactions() {
 
   useEffect(() => {
     loadTransactions();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const freshNow = new Date();
+    const currentMonth = `${freshNow.getFullYear()}-${String(freshNow.getMonth() + 1).padStart(2, '0')}`;
     window.api.financeGenerateRecurringForMonth(currentMonth);
   }, [loadTransactions]);
 

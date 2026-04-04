@@ -1,7 +1,7 @@
 {
   "name": "hubtify",
   "productName": "Hubtify",
-  "version": "0.5.10",
+  "version": "0.5.11",
   "description": "Gamified life hub — quests, nutrition, and finance in one RPG app",
   "main": ".vite/build/main.js",
   "private": true,
@@ -63,6 +63,7 @@
     "howler": "^2.2.4",
     "i18next": "^25.10.2",
     "page-flip": "^2.0.7",
+    "pdf-parse": "^2.4.5",
     "pixi.js": "^8.17.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

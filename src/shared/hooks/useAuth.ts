@@ -102,6 +102,10 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     const currentUser = user;
+
+    // Sign out FIRST — if this fails, data is still intact
+    await signOut(getActiveAuth());
+
     if (currentUser) {
       removeCachedAccount(currentUser.uid);
     }
@@ -110,7 +114,6 @@ export function useAuth() {
     localStorage.removeItem('questify_habits_collapsed');
     localStorage.removeItem('questify_collapsed_projects');
     localStorage.removeItem('hubtify_weight_dismiss_date');
-    await signOut(getActiveAuth());
 
     // Switch to next cached account if available
     const remaining = getStoredAccounts();
@@ -131,6 +134,7 @@ export function useAuth() {
         });
         window.dispatchEvent(new Event('rpg:statsChanged'));
         window.dispatchEvent(new Event('sync:questsUpdated'));
+        window.dispatchEvent(new Event('sync:nutritionUpdated'));
         window.dispatchEvent(new Event('account:switched'));
       } else {
         // Token expired, remove stale account
@@ -146,28 +150,25 @@ export function useAuth() {
     if (!user) return;
     setSwitching(true);
     try {
-      // Push current account data
+      // Validate target account BEFORE clearing any data
+      const targetAuth = getAuth(getOrCreateApp(appName));
+      const targetUser = targetAuth.currentUser;
+
+      if (!targetUser) {
+        // Token expired — remove stale account, no data was touched
+        const accounts = getStoredAccounts();
+        const stale = accounts.find(a => a.firebaseAppName === appName);
+        if (stale) removeCachedAccount(stale.uid);
+        return { success: false, expired: true };
+      }
+
+      // Target is valid — now safe to push and clear current data
       await syncPush(user.uid);
       await window.api.syncClearUserData();
 
       // Switch to target app
       setActiveAppName(appName);
       setActiveAppVersion(v => v + 1);
-      const targetAuth = getAuth(getOrCreateApp(appName));
-      const targetUser = targetAuth.currentUser;
-
-      if (!targetUser) {
-        // Token expired — remove from store
-        const accounts = getStoredAccounts();
-        const stale = accounts.find(a => a.firebaseAppName === appName);
-        if (stale) removeCachedAccount(stale.uid);
-        // Restore original app
-        const currentAccount = getStoredAccounts()[0];
-        if (currentAccount) {
-          setActiveAppName(currentAccount.firebaseAppName);
-        }
-        return { success: false, expired: true };
-      }
 
       // Pull new account data
       touchAccount(targetUser.uid);
@@ -182,9 +183,13 @@ export function useAuth() {
 
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('sync:questsUpdated'));
+      window.dispatchEvent(new Event('sync:nutritionUpdated'));
       window.dispatchEvent(new Event('account:switched'));
 
       return { success: true };
+    } catch (err) {
+      console.error('Failed to switch account:', err);
+      return { success: false, error: 'auth.errors.switchFailed' };
     } finally {
       setSwitching(false);
     }
@@ -224,6 +229,7 @@ export function useAuth() {
 
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('sync:questsUpdated'));
+      window.dispatchEvent(new Event('sync:nutritionUpdated'));
       window.dispatchEvent(new Event('account:switched'));
 
       return { success: true };

@@ -162,6 +162,9 @@
     "xpSteps": "Pasos",
     "xpGym": "Gimnasio",
     "xpWeight": "Peso registrado",
+    "xpBonus": "Bonus precisión",
+    "invalidCalories": "Las calorías deben ser mayores a 0",
+    "logError": "Error al registrar comida",
     "setupStep1": "Datos corporales",
     "setupStep2": "Objetivo y ejercicio",
     "goal": "Objetivo",
@@ -194,6 +197,7 @@
       "invalid": "Ingresá un peso válido (30-300 kg)"
     },
     "weightCheckDay": "Día de pesaje semanal",
+    "weightPopupEnabled": "Recordatorio de pesaje",
     "weekdays": {
       "1": "Lunes",
       "2": "Martes",

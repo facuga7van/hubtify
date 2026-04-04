@@ -50,9 +50,16 @@ export function calculateXpForAction(tier: number, todayCount: number): { xp: nu
   return { xp, bonus, comboMult };
 }
 
+export function bonusMultiplierToTier(multiplier: number): 'normal' | 'good' | 'critical' | 'legendary' {
+  if (multiplier >= 3.0) return 'legendary';
+  if (multiplier >= 2.0) return 'critical';
+  if (multiplier >= 1.5) return 'good';
+  return 'normal';
+}
+
 export function getDueDateStatus(dueDate: string): 'overdue' | 'today' | 'this-week' | 'later' {
   const now = new Date();
-  const due = new Date(dueDate);
+  const due = new Date(dueDate + 'T00:00:00');
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);
   todayEnd.setDate(todayEnd.getDate() + 1);

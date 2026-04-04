@@ -151,7 +151,7 @@ app.whenReady().then(() => {
         db.prepare(`INSERT INTO finance_transactions
           (id, type, amount, currency, category, description, date, payment_method, source, recurring_id, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', ?, datetime('now'), datetime('now'))`)
-          .run(id, rec.type, rec.amount, rec.currency ?? 'ARS', rec.category ?? 'Outros', rec.name, `${currentMonth}-01`, rec.id);
+          .run(id, rec.type, rec.amount, rec.currency ?? 'ARS', rec.category ?? 'Otros', rec.name, `${currentMonth}-01`, rec.id);
       }
     }
   } catch (e) {
