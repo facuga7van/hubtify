@@ -54,6 +54,7 @@ export default function Today() {
   const [closeDayPopup, setCloseDayPopup] = useState(false);
   const [popupSteps, setPopupSteps] = useState('');
   const [popupGym, setPopupGym] = useState(false);
+  const [pendingDays, setPendingDays] = useState<string[]>([]);
 
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
@@ -105,40 +106,21 @@ export default function Today() {
 
   useEffect(() => { loadData(date); }, [date, loadData]);
 
-  // Auto-close past days that have food but weren't closed
-  useEffect(() => {
-    (async () => {
-      const today = todayDateString();
-      for (let i = 1; i <= 7; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const pastDate = formatDateString(d);
-        if (pastDate >= today) continue;
-        const closed = await window.api.nutritionIsDayClosed(pastDate);
-        if (closed) continue;
-        const foods = await window.api.nutritionGetFoodByDate(pastDate);
-        if ((foods as unknown[]).length === 0) continue;
-        // Auto-close this day
-        const result = await window.api.nutritionCloseDay(pastDate);
-        if (result.success && result.breakdown) {
-          const b = result.breakdown as { xpTotal: number; hpChange: number };
-          await window.api.processRpgEvent({
-            type: 'DAY_SUMMARY', moduleId: 'nutrition',
-            payload: { xp: b.xpTotal, hp: b.hpChange },
-            timestamp: Date.now(),
-          });
-          window.dispatchEvent(new Event('rpg:statsChanged'));
-        }
-      }
-    })();
-  // Intentionally runs once on mount: auto-closes unclosed past days (up to 7 days back).
-  // No reactive deps needed — uses only date arithmetic and IPC calls.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const loadPendingDays = useCallback(async () => {
+    const days = await window.api.nutritionGetPendingDays();
+    setPendingDays(days);
   }, []);
+
+  useEffect(() => {
+    loadPendingDays();
+  }, [date, loadPendingDays]);
 
   // Reload when settings change or sync completes
   useEffect(() => {
-    const handler = () => loadData(date);
+    const handler = () => {
+      loadData(date);
+      loadPendingDays();
+    };
     window.addEventListener('nutrition:settingsChanged', handler);
     window.addEventListener('sync:nutritionUpdated', handler);
     window.addEventListener('account:switched', handler);
@@ -147,7 +129,7 @@ export default function Today() {
       window.removeEventListener('sync:nutritionUpdated', handler);
       window.removeEventListener('account:switched', handler);
     };
-  }, [date, loadData]);
+  }, [date, loadData, loadPendingDays]);
 
   const goDay = (offset: number) => {
     const [y, m, d] = date.split('-').map(Number);
