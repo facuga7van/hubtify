@@ -266,6 +266,7 @@ export default function Today() {
     setCloseDayPopup(false);
     // Now close the day
     await doCloseDay();
+    loadPendingDays();
   };
 
   const doCloseDay = async () => {
@@ -618,13 +619,36 @@ export default function Today() {
           <div style={{
             background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
             border: '2px solid var(--rpg-gold-dark)',
-            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 340,
+            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 380,
             textAlign: 'center', color: 'var(--rpg-parchment)',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
           }}>
             <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 16, color: 'var(--rpg-gold-light)' }}>
-              {t('nutrify.closeDay')}
+              {isPending ? t('nutrify.confirmDaySummary') : t('nutrify.closeDay')}
             </h3>
+
+            {isPending && (
+              <div style={{ marginBottom: 16, textAlign: 'left', fontSize: '0.85rem', lineHeight: 1.8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ opacity: 0.7 }}>{t('nutrify.caloriesConsumed')}</span>
+                  <span style={{ fontWeight: 600 }}>{consumed} kcal</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ opacity: 0.7 }}>{t('nutrify.confirmTargetLabel')}</span>
+                  <span style={{ fontWeight: 600 }}>{target} kcal</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 4, marginTop: 4 }}>
+                  <span style={{ opacity: 0.7 }}>{t('nutrify.balance')}</span>
+                  <span style={{ fontWeight: 700, color: (target - consumed) >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)' }}>
+                    {target - consumed >= 0 ? '+' : ''}{target - consumed} kcal
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
+                  {t('nutrify.confirmDayPrompt')}
+                </p>
+              </div>
+            )}
+
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 12, fontSize: '0.9rem' }}>
               <span>{t('nutrify.steps')}</span>
               <RpgNumberInput
@@ -641,7 +665,7 @@ export default function Today() {
               <span>{t('nutrify.gym')}</span>
             </div>
             <button className="rpg-button" onClick={handleCloseDayConfirm} style={{ width: '100%', marginBottom: 8 }}>
-              {t('nutrify.closeDayButton')}
+              {isPending ? t('nutrify.confirmDay') : t('nutrify.closeDayButton')}
             </button>
             <button onClick={() => setCloseDayPopup(false)} className="rpg-button"
               style={{ width: '100%', padding: '4px 8px', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
