@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 interface MonthNavigatorProps {
   month: string;
   onChange: (month: string) => void;
+  compact?: boolean;
 }
 
-export function MonthNavigator({ month, onChange }: MonthNavigatorProps) {
+export function MonthNavigator({ month, onChange, compact }: MonthNavigatorProps) {
   const { t } = useTranslation();
 
   const navigate = (delta: number) => {
@@ -16,6 +17,7 @@ export function MonthNavigator({ month, onChange }: MonthNavigatorProps) {
 
   const label = (() => {
     const [y, m] = month.split('-').map(Number);
+    if (compact) return `${String(m).padStart(2, '0')}/${y}`;
     return new Date(y, m - 1).toLocaleDateString(undefined, {
       month: 'long',
       year: 'numeric',

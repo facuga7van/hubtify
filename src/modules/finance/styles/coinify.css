@@ -796,6 +796,43 @@
   flex-direction: column;
 }
 
+.coin-installment-group {
+  margin-bottom: 4px;
+}
+
+.coin-installment-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 4px;
+  border-bottom: 2px solid var(--rpg-gold-dark);
+  margin-bottom: 2px;
+}
+
+.coin-installment-group__title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--rpg-gold-dark);
+  font-family: 'Cinzel', serif;
+}
+
+.coin-installment-group__delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.coin-installment-group__delete:hover {
+  opacity: 1 !important;
+}
+
 .coin-installment {
   display: flex;
   justify-content: space-between;
@@ -1473,4 +1510,233 @@
   font-style: italic;
   text-align: center;
   padding: 24px;
+}
+
+/* ── Responsive: Narrow mode ────────────────────────────────── */
+
+@media (max-width: 500px) {
+  /* Layout: tabs scroll horizontally */
+  .coin-layout__nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .coin-layout__nav::-webkit-scrollbar {
+    display: none;
+  }
+  .coin-layout__tab {
+    font-size: 0.7rem;
+    padding: 6px 10px;
+  }
+  .coin-layout__content {
+    padding: 10px;
+  }
+
+  /* Dashboard header: stack vertically */
+  .coin-dashboard__header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  /* Hero: smaller balance font */
+  .coin-hero {
+    padding: 14px;
+  }
+  .coin-hero__balance {
+    font-size: 1.4rem;
+  }
+  .coin-hero__balance-usd {
+    font-size: 0.85rem;
+  }
+  .coin-hero__icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Stat cards: 2 columns always */
+  .coin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .coin-stat {
+    padding: 10px 6px;
+  }
+  .coin-stat__number {
+    font-size: 1rem;
+  }
+  .coin-stat__label {
+    font-size: 0.7rem;
+  }
+  .coin-stat__icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Donut chart: stack vertically */
+  .coin-donut-wrap {
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  /* Transactions: edit row wraps */
+  .coin-tx__edit-row {
+    flex-wrap: wrap;
+  }
+  .coin-tx__edit-row .rpg-input,
+  .coin-tx__edit-row .rpg-select,
+  .coin-tx__edit-row .coin-category-select {
+    min-width: 0;
+    flex: 1 1 45%;
+  }
+  .coin-tx {
+    padding: 8px;
+    gap: 6px;
+  }
+  .coin-tx__date {
+    width: auto;
+    font-size: 0.75rem;
+  }
+  .coin-tx__desc {
+    font-size: 0.8rem;
+  }
+  .coin-tx__badge--category {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+  }
+  .coin-tx__badge--source {
+    display: none;
+  }
+  .coin-tx__payment-method {
+    display: none;
+  }
+  .coin-tx__amount {
+    font-size: 0.8rem;
+  }
+
+  /* Quick add form: rows wrap */
+  .coin-quick-add-form__row {
+    flex-wrap: wrap;
+  }
+  .coin-quick-add-form__row > * {
+    min-width: 0;
+    flex: 1 1 45%;
+  }
+  .coin-quick-add-form__amount-row {
+    flex-wrap: wrap;
+  }
+
+  /* Filters: wrap */
+  .coin-filters {
+    flex-wrap: wrap;
+  }
+  .coin-filters .rpg-select {
+    flex: 1 1 45%;
+    min-width: 0;
+  }
+
+  /* Recurring: main row wraps */
+  .coin-recurring__main-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .coin-recurring__name {
+    flex: 1 1 60%;
+  }
+
+  /* Installments */
+  .coin-installment {
+    flex-wrap: wrap;
+    padding: 8px 0;
+  }
+  .coin-installment__desc {
+    flex: 1 1 100%;
+    font-size: 0.85rem;
+  }
+  .coin-installment__right {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  .coin-installment__progress {
+    width: 60px;
+  }
+
+  /* Loans */
+  .coin-loan__row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Import */
+  .coin-import-drop {
+    flex-direction: column;
+    padding: 14px;
+    gap: 8px;
+    text-align: center;
+  }
+  .coin-import-table {
+    font-size: 0.75rem;
+  }
+  .coin-import-table th,
+  .coin-import-table td {
+    padding: 4px 4px;
+  }
+  .coin-import-row__merchant {
+    max-width: 100px;
+  }
+  .coin-import-confirm-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Dollar strip: hide in narrow (moved to dropdown) */
+  .coin-dollar-strip {
+    display: none;
+  }
+
+  /* Projection */
+  .coin-projection__month-label {
+    width: 50px;
+    font-size: 0.7rem;
+  }
+  .coin-projection__value {
+    min-width: 70px;
+    font-size: 0.7rem;
+  }
+  .coin-projection__bar {
+    max-width: 80px;
+  }
+
+  /* Quick actions: stack */
+  .coin-quick-actions {
+    flex-direction: column;
+  }
+  .coin-quick-actions .rpg-button {
+    width: 100%;
+  }
+
+  /* Credit card manager modal */
+  .coin-section .rpg-card {
+    padding: 8px;
+  }
+}
+
+/* Even narrower */
+@media (max-width: 380px) {
+  .coin-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .coin-hero__balance {
+    font-size: 1.2rem;
+  }
+  .coin-tx__actions {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+  }
+  .coin-tx {
+    position: relative;
+    padding-right: 50px;
+  }
 }

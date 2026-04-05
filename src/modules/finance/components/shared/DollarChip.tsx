@@ -1,5 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
-import Tooltip from '../../../../shared/components/Tooltip';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 
 interface Rate {
   nombre: string;
@@ -48,21 +47,61 @@ export function DollarChip() {
     });
   }, []);
 
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
   if (rates.length === 0) return null;
 
+  // Find the "Blue" rate as the featured one (most commonly used in Argentina)
+  const featured = rates.find((r) => r.nombre === 'Blue') || rates[0];
+
   return (
-    <div className="coin-dollar-strip">
-      {rates.map((rate) => {
-        const Icon = RATE_ICONS[rate.nombre];
-        return (
-          <Tooltip key={rate.nombre} text={`${rate.nombre} — Compra: $${rate.compra.toLocaleString('es-AR')} / Venta: $${rate.venta.toLocaleString('es-AR')}`}>
-            <div className="coin-dollar-chip">
-              {Icon ? <Icon /> : null}
-              <span className="coin-dollar-chip__value">${rate.venta.toLocaleString('es-AR')}</span>
-            </div>
-          </Tooltip>
-        );
-      })}
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        className="rpg-button"
+        onClick={() => setOpen(!open)}
+        style={{ fontSize: '0.75rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
+      >
+        <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
+          USD ${featured.venta.toLocaleString('es-AR')}
+        </span>
+        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d={open ? 'M2 7l3-3 3 3' : 'M2 3l3 3 3-3'} />
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100,
+          background: 'var(--rpg-parchment)', border: '2px solid var(--rpg-gold-dark)',
+          borderRadius: 'var(--rpg-radius)', boxShadow: 'var(--rpg-shadow)', padding: 8,
+          minWidth: 180,
+        }}>
+          {rates.map((rate) => {
+            const Icon = RATE_ICONS[rate.nombre];
+            return (
+              <div key={rate.nombre} style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
+                fontSize: '0.78rem', borderBottom: '1px solid var(--rpg-parchment-dark)',
+              }}>
+                {Icon && <Icon size={12} />}
+                <span style={{ flex: 1, opacity: 0.7 }}>{rate.nombre}</span>
+                <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
+                  ${rate.venta.toLocaleString('es-AR')}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

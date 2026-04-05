@@ -7,8 +7,6 @@ const tabs = [
   { path: '/finance/installments', label: 'coinify.installments' },
   { path: '/finance/cards', label: 'coinify.creditCards' },
   { path: '/finance/loans', label: 'coinify.loans' },
-  { path: '/finance/recurring', label: 'coinify.recurringLabel' },
-  { path: '/finance/import', label: 'coinify.import' },
 ];
 
 export default function FinanceLayout() {

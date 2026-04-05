@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import Import from './Import';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { QuickAddForm } from './shared/QuickAddForm';
 import { useToast } from '../../../shared/components/useToast';
@@ -8,6 +10,7 @@ import type { TransactionType, PaymentMethod, Currency } from '../types';
 import { addTransaction } from '../../../shared/animations/feedback';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { CategorySelect } from './shared/CategorySelect';
 
 interface TransactionRow {
   id: string;
@@ -52,7 +55,9 @@ export default function Transactions() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [showImport, setShowImport] = useState(false);
   const defaultType = (searchParams.get('type') as TransactionType) || 'expense';
 
   const now = new Date();
@@ -62,6 +67,15 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleMonthChange = (newMonth: string) => {
+    setMonth(newMonth);
+    setFilterCategory('');
+    setFilterType('');
+    setFilterPayment('');
+    setSearchQuery('');
+  };
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState({ amount: '', description: '', category: '', date: '', paymentMethod: '' });
   const [showForm, setShowForm] = useState(true);
@@ -225,7 +239,10 @@ export default function Transactions() {
   const saveEdit = async () => {
     if (!editingId) return;
     const amount = parseFloat(editFields.amount);
-    if (!isFinite(amount) || amount <= 0) return;
+    if (!isFinite(amount) || amount <= 0) {
+      toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
+      return;
+    }
     await window.api.financeUpdateTransaction(editingId, {
       amount,
       description: editFields.description,
@@ -272,6 +289,8 @@ export default function Transactions() {
             <input type="text" value={editFields.description}
               onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
               className="rpg-input" style={{ flex: 1, fontSize: '0.85rem' }} />
+            <CategorySelect value={editFields.category}
+              onChange={(cat) => setEditFields({ ...editFields, category: cat })} />
             <input type="date" className="rpg-input" value={editFields.date}
               onChange={(e) => setEditFields({ ...editFields, date: e.target.value })}
               style={{ width: 130, fontSize: '0.85rem' }} />
@@ -336,11 +355,19 @@ export default function Transactions() {
     <div>
       {/* Toggle form + Month nav */}
       <div data-anim="stagger-child" className="coin-dashboard__header" style={{ marginBottom: 16 }}>
-        <MonthNavigator month={month} onChange={setMonth} />
-        <button className="rpg-button coin-month-nav__btn"
-          onClick={() => setShowForm(!showForm)}>
-          {showForm ? '\u25B2' : `+ ${t('coinify.quickAdd')}`}
-        </button>
+        <MonthNavigator month={month} onChange={handleMonthChange} />
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button className="rpg-button coin-month-nav__btn" onClick={() => navigate('/finance/recurring')}>
+            {t('coinify.recurringLabel')}
+          </button>
+          <button className="rpg-button coin-month-nav__btn" onClick={() => setShowImport(true)}>
+            {t('coinify.import')}
+          </button>
+          <button className="rpg-button coin-month-nav__btn"
+            onClick={() => setShowForm(!showForm)}>
+            {showForm ? '\u25B2' : `+ ${t('coinify.quickAdd')}`}
+          </button>
+        </div>
       </div>
 
       {/* Quick Add Form with collapse animation */}
@@ -399,6 +426,23 @@ export default function Transactions() {
             filteredRecurringTx.map((tx) => renderTxRow(tx))
           )}
         </div>
+      )}
+
+      {showImport && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.7)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowImport(false)}>
+          <div className="rpg-card" style={{ width: 700, maxHeight: '85vh', overflow: 'auto', padding: 20 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontFamily: 'Cinzel, serif', color: 'var(--rpg-wood)' }}>{t('coinify.import')}</span>
+              <button className="rpg-button" onClick={() => setShowImport(false)} style={{ padding: '2px 8px' }}>{'\u2715'}</button>
+            </div>
+            <Import />
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

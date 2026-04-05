@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
+import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
 
@@ -22,6 +23,7 @@ interface QuickAddFormProps {
 
 export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddFormProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const today = new Date().toISOString().split('T')[0];
 
   const [type, setType] = useState<TransactionType>(defaultType);
@@ -37,8 +39,14 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(amount);
-    if (isNaN(parsed) || parsed <= 0) return;
-    if (paymentMethod === 'credit_card' && !creditCardId) return;
+    if (isNaN(parsed) || parsed <= 0) {
+      toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
+      return;
+    }
+    if (paymentMethod === 'credit_card' && !creditCardId) {
+      toast({ type: 'warning', message: t('coinify.validationCreditCard', 'Seleccioná una tarjeta') });
+      return;
+    }
 
     onSubmit({
       type,

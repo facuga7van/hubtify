@@ -68,8 +68,8 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
                   onChange={(e) => setEditName(e.target.value)} style={{ flex: 1 }}
                   onKeyDown={(e) => e.key === 'Enter' && handleUpdate()} />
                 <RpgNumberInput value={String(editClosingDay)}
-                  onChange={(v) => setEditClosingDay(Math.min(28, Math.max(1, parseInt(v) || 1)))}
-                  style={{ width: 70 }} min={1} max={28} step={1} />
+                  onChange={(v) => setEditClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
+                  style={{ width: 70 }} min={1} max={31} step={1} />
                 <button className="rpg-button" onClick={handleUpdate}
                   style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
                   OK
@@ -98,8 +98,8 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
             onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <RpgNumberInput value={String(newClosingDay)}
-            onChange={(v) => setNewClosingDay(Math.min(28, Math.max(1, parseInt(v) || 1)))}
-            style={{ width: 70 }} min={1} max={28} step={1} />
+            onChange={(v) => setNewClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
+            style={{ width: 70 }} min={1} max={31} step={1} />
           <button className="rpg-button" onClick={handleCreate} disabled={!newName.trim()}>
             + {t('coinify.newCard')}
           </button>

@@ -217,11 +217,19 @@ export function registerFinanceImportIpcHandlers(): void {
 
     const lines = data.text.split('\n').filter((l: string) => l.trim());
     const rows: ParsedRow[] = [];
+    const skippedLines: string[] = [];
+    const datePrefix = /^\d{2}-\d{2}-\d{2}\s/;
     for (const line of lines) {
-      const parsed = parseGaliciaLine(line, mappings);
-      if (parsed) rows.push(parsed);
+      const trimmed = line.trim();
+      const parsed = parseGaliciaLine(trimmed, mappings);
+      if (parsed) {
+        rows.push(parsed);
+      } else if (datePrefix.test(trimmed)) {
+        // Line starts with a date but couldn't be parsed — potentially lost data
+        skippedLines.push(trimmed);
+      }
     }
-    return { rows, fileName };
+    return { rows, fileName, skippedLines };
   });
 
   ipcHandle(
@@ -235,11 +243,26 @@ export function registerFinanceImportIpcHandlers(): void {
          VALUES (?, 'galicia_visa', ?, ?, datetime('now'))`,
       ).run(batchId, fileName, rows.length);
 
+      const dupCheck = db.prepare(
+        `SELECT COUNT(*) as cnt FROM finance_transactions
+         WHERE date = ? AND description = ? AND amount = ? AND source = 'import'`,
+      );
+
+      let duplicateCount = 0;
+
       for (const row of rows) {
         if (row.isExcluded) continue;
-        const txId = crypto.randomUUID();
         const amount = row.amountARS ?? row.amountUSD ?? 0;
         const currency = row.amountUSD ? 'USD' : 'ARS';
+
+        // Check for duplicate
+        const existing = dupCheck.get(row.date, row.merchant, Math.abs(amount)) as { cnt: number };
+        if (existing.cnt > 0) {
+          duplicateCount++;
+          continue;
+        }
+
+        const txId = crypto.randomUUID();
 
         db.prepare(
           `INSERT INTO finance_transactions
@@ -260,7 +283,8 @@ export function registerFinanceImportIpcHandlers(): void {
         // Installment group matching — handled in a later task
       }
 
-      return { batchId, count: rows.filter(r => !r.isExcluded).length };
+      const inserted = rows.filter(r => !r.isExcluded).length - duplicateCount;
+      return { batchId, count: inserted, duplicateCount };
     },
   );
 

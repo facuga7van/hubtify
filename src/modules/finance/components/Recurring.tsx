@@ -45,9 +45,13 @@ export default function Recurring() {
   const [formBillingDay, setFormBillingDay] = useState(1);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Inline edit state
+  // Inline edit state (amount)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingAmount, setEditingAmount] = useState('');
+
+  // Inline edit state (fields)
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
+  const [editRecurringFields, setEditRecurringFields] = useState({ name: '', type: '' as TransactionType, category: '', billingDay: 1 });
 
   // History state
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
@@ -68,7 +72,10 @@ export default function Recurring() {
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(formAmount);
-    if (isNaN(parsed) || parsed <= 0) return;
+    if (isNaN(parsed) || parsed <= 0) {
+      toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
+      return;
+    }
     setFormSubmitting(true);
     try {
       await window.api.financeAddRecurring({
@@ -108,6 +115,36 @@ export default function Recurring() {
   const cancelEdit = () => {
     setEditingId(null);
     setEditingAmount('');
+  };
+
+  const startRecurringEdit = (item: RecurringRow) => {
+    setEditingRecurringId(item.id);
+    setEditRecurringFields({
+      name: item.name,
+      type: item.type,
+      category: item.category,
+      billingDay: item.billingDay,
+    });
+  };
+
+  const saveRecurringEdit = async (id: string) => {
+    if (!editRecurringFields.name.trim()) {
+      toast({ type: 'warning', message: t('coinify.validationName', 'Ingresá un nombre') });
+      return;
+    }
+    await window.api.financeUpdateRecurring(id, {
+      name: editRecurringFields.name,
+      type: editRecurringFields.type,
+      category: editRecurringFields.category,
+      billingDay: editRecurringFields.billingDay,
+    });
+    setEditingRecurringId(null);
+    load();
+    window.dispatchEvent(new Event('finance:dataChanged'));
+  };
+
+  const cancelRecurringEdit = () => {
+    setEditingRecurringId(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -201,8 +238,8 @@ export default function Recurring() {
           <div className="coin-quick-add-form__row">
             <label style={{ fontSize: '0.8rem', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
             <RpgNumberInput value={String(formBillingDay)}
-              onChange={(v) => setFormBillingDay(Math.min(28, Math.max(1, parseInt(v) || 1)))}
-              style={{ width: 70 }} min={1} max={28} step={1} />
+              onChange={(v) => setFormBillingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
+              style={{ width: 70 }} min={1} max={31} step={1} />
           </div>
 
           <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={formSubmitting}>
@@ -247,19 +284,49 @@ export default function Recurring() {
                   {isActive(item) ? '\u25B6' : '\u23F8'}
                 </button>
 
-                {/* Name */}
-                <span className="coin-recurring__name">{item.name}</span>
-
-                {/* Type Badge */}
-                <span className={`coin-recurring__type-badge ${item.type === 'income' ? 'coin-recurring__type-badge--income' : 'coin-recurring__type-badge--expense'}`}>
-                  {item.type === 'income' ? t('coinify.income') : t('coinify.expense')}
-                </span>
-
-                {/* Category */}
-                <span className="coin-recurring__category">{item.category}</span>
-                <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-                  {t('coinify.billingDay')}: {item.billingDay}
-                </span>
+                {/* Name, Type, Category, Billing Day — editable or read-only */}
+                {editingRecurringId === item.id ? (
+                  <>
+                    <input type="text" value={editRecurringFields.name}
+                      onChange={(e) => setEditRecurringFields((f) => ({ ...f, name: e.target.value }))}
+                      className="rpg-input" style={{ flex: 1, minWidth: 80, fontSize: '0.85rem' }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveRecurringEdit(item.id);
+                        if (e.key === 'Escape') cancelRecurringEdit();
+                      }}
+                    />
+                    <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'expense' }))}
+                      className={`rpg-button ${editRecurringFields.type === 'expense' ? 'rpg-btn-active' : ''}`}
+                      style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                      {t('coinify.expense')}
+                    </button>
+                    <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'income' }))}
+                      className={`rpg-button ${editRecurringFields.type === 'income' ? 'rpg-btn-active' : ''}`}
+                      style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                      {t('coinify.income')}
+                    </button>
+                    <CategorySelect value={editRecurringFields.category}
+                      onChange={(v) => setEditRecurringFields((f) => ({ ...f, category: v }))} />
+                    <RpgNumberInput value={String(editRecurringFields.billingDay)}
+                      onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
+                      style={{ width: 55 }} fontSize="0.8rem" min={1} max={31} step={1} />
+                    <button className="rpg-button" onClick={() => saveRecurringEdit(item.id)}
+                      style={{ padding: '2px 8px', fontSize: '0.8rem', color: 'var(--rpg-xp-green)' }}>ok</button>
+                    <button className="rpg-button" onClick={cancelRecurringEdit}
+                      style={{ padding: '2px 8px', fontSize: '0.8rem', opacity: 0.4 }}>x</button>
+                  </>
+                ) : (
+                  <>
+                    <span className="coin-recurring__name">{item.name}</span>
+                    <span className={`coin-recurring__type-badge ${item.type === 'income' ? 'coin-recurring__type-badge--income' : 'coin-recurring__type-badge--expense'}`}>
+                      {item.type === 'income' ? t('coinify.income') : t('coinify.expense')}
+                    </span>
+                    <span className="coin-recurring__category">{item.category}</span>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+                      {t('coinify.billingDay')}: {item.billingDay}
+                    </span>
+                  </>
+                )}
 
                 {/* Amount -- click to edit inline */}
                 {editingId === item.id ? (
@@ -283,6 +350,15 @@ export default function Recurring() {
                     title={t('coinify.editAmount')}>
                     {formatAmount(item.amount, item.currency)}
                     <span style={{ marginLeft: 4, fontSize: '0.7rem', opacity: 0.3 }}>{item.currency}</span>
+                  </button>
+                )}
+
+                {/* Edit fields */}
+                {editingRecurringId !== item.id && (
+                  <button className="rpg-button" onClick={() => startRecurringEdit(item)}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.5 }}
+                    title={t('coinify.editRecurring', 'Editar recurrente')}>
+                    {'\u270E'}
                   </button>
                 )}
 

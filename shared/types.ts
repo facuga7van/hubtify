@@ -181,20 +181,23 @@ export interface HubtifyApi {
   financeGetRecurring: () => Promise<unknown[]>;
   financeAddRecurring: (rec: Record<string, unknown>) => Promise<string>;
   financeUpdateRecurringAmount: (id: string, newAmount: number) => Promise<void>;
+  financeUpdateRecurring: (id: string, fields: Record<string, unknown>) => Promise<void>;
   financeToggleRecurring: (id: string) => Promise<void>;
   financeDeleteRecurring: (id: string) => Promise<void>;
   financeGenerateRecurringForMonth: (month: string) => Promise<void>;
   financeGetRecurringAmountHistory: (id: string) => Promise<unknown[]>;
 
   // Finance - Import
-  financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string } | null>;
-  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ count: number }>;
+  financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ count: number; duplicateCount: number }>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
 
   // Finance - Dashboard
   financeGetMonthlyBalance: (month?: string) => Promise<unknown>;
   financeGetCategoryBreakdown: (month?: string) => Promise<unknown[]>;
+  financeGetBalanceForRange: (startMonth: string, endMonth: string) => Promise<{ ARS: { income: number; expenses: number; balance: number }; USD: { income: number; expenses: number; balance: number } }>;
+  financeGetCategoryBreakdownForRange: (startMonth: string, endMonth: string) => Promise<Array<{ category: string; ARS: number; USD: number }>>;
   financeGetProjection: (months: number) => Promise<unknown[]>;
 
   // Finance - Backward compat

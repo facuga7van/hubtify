@@ -5,6 +5,16 @@ import CreditCardManager from './shared/CreditCardManager';
 import StatementDetail from './shared/StatementDetail';
 import { MonthNavigator } from './shared/MonthNavigator';
 
+function getStatementPeriodRange(month: string, closingDay: number): { from: string; to: string } {
+  const [year, mon] = month.split('-').map(Number);
+  // Period covers: previous month (closingDay+1) to current month (closingDay)
+  const prevDate = new Date(year, mon - 2, closingDay + 1); // mon-2 because Date is 0-based and we want previous month
+  const toDate = new Date(year, mon - 1, closingDay);
+
+  const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return { from: fmt(prevDate), to: fmt(toDate) };
+}
+
 export default function CreditCards() {
   const { t } = useTranslation();
   const [cards, setCards] = useState<CreditCard[]>([]);
@@ -66,16 +76,21 @@ export default function CreditCards() {
 
           return (
             <div key={card.id} className="rpg-card" style={{ marginBottom: 8, padding: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div>
                   <span style={{ fontWeight: 'bold' }}>{card.name}</span>
                   <span style={{ fontSize: '0.75rem', opacity: 0.7, marginLeft: 8 }}>
                     {t('coinify.closingDay')}: {card.closingDay}
+                    {' · '}
+                    {(() => {
+                      const range = getStatementPeriodRange(month, card.closingDay);
+                      return `${range.from} → ${range.to}`;
+                    })()}
                   </span>
                 </div>
 
                 {stmt ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 'bold' }}>
                       ${stmt.calculatedAmount.toLocaleString('es-AR')}
                     </span>

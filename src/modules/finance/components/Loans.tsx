@@ -333,7 +333,7 @@ export default function Loans() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <input type="text" value={formPerson} onChange={(e) => setFormPerson(e.target.value)}
                   placeholder={t('coinify.personName')} className="rpg-input" style={{ flex: 1 }} required />
                 <button type="button" onClick={() => setFormDirection('lent')}
@@ -357,7 +357,7 @@ export default function Loans() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <RpgNumberInput value={formAmount} onChange={setFormAmount}
                   placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
                 <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value as Currency)}
@@ -379,7 +379,7 @@ export default function Loans() {
                 <CategorySelect value={formCategory} onChange={setFormCategory} />
               )}
 
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <input type="text" value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
                   placeholder={t('coinify.description') || 'Descripcion'} className="rpg-input" style={{ flex: 1 }} />
                 <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="rpg-input" />
@@ -402,7 +402,7 @@ export default function Loans() {
             </svg>
             {t('coinify.markPayment') || 'Registrar pago'}
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <RpgNumberInput value={paymentAmount} onChange={setPaymentAmount}
               placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} />
             <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="rpg-input" />

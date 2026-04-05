@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import PageHeader from '../../../shared/components/PageHeader';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
+import { useToast } from '../../../shared/components/useToast';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 import { CoinStatCard } from './shared/CoinStatCard';
@@ -55,8 +57,24 @@ const ChainIcon = ({ broken }: { broken: boolean }) => (
   </svg>
 );
 
+// Trash icon SVG
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+
+interface InstallmentGroup {
+  groupId: string;
+  description: string;
+  rows: InstallmentRow[];
+}
+
 export default function Installments() {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const confirm = useConfirm();
   const currentMonth = todayMonth();
   const [month, setMonth] = useState(currentMonth);
   const [rows, setRows] = useState<InstallmentRow[]>([]);
@@ -97,6 +115,31 @@ export default function Installments() {
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [month, loadRows, loadProjection]);
+
+  // Group rows by installmentGroupId
+  const groups = useMemo<InstallmentGroup[]>(() => {
+    const map = new Map<string, InstallmentRow[]>();
+    for (const row of rows) {
+      const gid = row.installmentGroupId;
+      if (!map.has(gid)) map.set(gid, []);
+      map.get(gid)!.push(row);
+    }
+    return Array.from(map.entries()).map(([groupId, groupRows]) => ({
+      groupId,
+      description: cleanDescription(groupRows[0].description),
+      rows: groupRows,
+    }));
+  }, [rows]);
+
+  const handleDeleteGroup = async (groupId: string) => {
+    const ok = await confirm({ message: t('coinify.deleteInstallmentGroupConfirm', '¿Eliminar este grupo de cuotas? Se borrarán todas las transacciones asociadas.'), danger: true, confirmText: t('coinify.delete') });
+    if (!ok) return;
+    await window.api.financeDeleteInstallmentGroup(groupId);
+    loadRows(month);
+    loadProjection();
+    window.dispatchEvent(new Event('finance:dataChanged'));
+    toast({ type: 'coin', message: t('coinify.installmentGroupDeleted', 'Grupo de cuotas eliminado') });
+  };
 
   const ownRows = rows.filter((r) => !r.forThirdParty);
   const thirdPartyRows = rows.filter((r) => !!r.forThirdParty);
@@ -161,91 +204,108 @@ export default function Installments() {
           <p className="coin-empty">{t('coinify.noInstallments', 'No hay cuotas este mes')}</p>
         ) : (
           <div className="coin-installment-list">
-            {rows.map((row) => {
-              const { current, total } = parseInstallmentNumber(row);
-              const isComplete = current === total;
-              const progressPct = (current / total) * 100;
-
-              return (
-                <div
-                  key={row.id}
-                  className={`coin-installment ${isComplete ? 'coin-installment--complete' : ''}`}
-                >
-                  <div className="coin-installment__desc">
-                    <ChainIcon broken={isComplete} />
-                    {' '}{cleanDescription(row.description)}
-                    <span className="coin-installment__counter">
-                      {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
-                    </span>
-                  </div>
-                  <div className="coin-installment__right">
-                    {row.forThirdParty && (
-                      <span className="coin-tx__badge coin-tx__badge--third-party">
-                        {'\u2192'} {row.forThirdParty}
-                      </span>
-                    )}
-                    <div className="coin-installment__progress">
-                      <div
-                        className="coin-installment__progress-fill"
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                    {editingId === row.id ? (
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <RpgNumberInput
-                          value={editAmount}
-                          onChange={setEditAmount}
-                          min={0}
-                          step={1}
-                          autoFocus
-                          style={{ width: 100 }}
-                          onBlur={() => {
-                            const val = parseFloat(editAmount);
-                            if (val > 0) {
-                              window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
-                                setEditingId(null);
-                                loadRows(month);
-                                loadProjection();
-                                window.dispatchEvent(new Event('finance:dataChanged'));
-                              });
-                            } else {
-                              setEditingId(null);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const val = parseFloat(editAmount);
-                              if (val > 0) {
-                                window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
-                                  setEditingId(null);
-                                  loadRows(month);
-                                  loadProjection();
-                                  window.dispatchEvent(new Event('finance:dataChanged'));
-                                });
-                              }
-                            }
-                            if (e.key === 'Escape') setEditingId(null);
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <span
-                        className="coin-installment__amount"
-                        style={{ cursor: 'pointer' }}
-                        title={t('coinify.clickToEdit', 'Click para editar')}
-                        onClick={() => {
-                          setEditingId(row.id);
-                          setEditAmount(String(row.amount));
-                        }}
-                      >
-                        ${row.amount.toLocaleString('es-AR')}
-                      </span>
-                    )}
-                  </div>
+            {groups.map((group) => (
+              <div key={group.groupId} className="coin-installment-group">
+                <div className="coin-installment-group__header">
+                  <span className="coin-installment-group__title">
+                    <ChainIcon broken={false} />
+                    {' '}{group.description}
+                  </span>
+                  <button
+                    className="rpg-button coin-installment-group__delete"
+                    onClick={() => handleDeleteGroup(group.groupId)}
+                    title={t('coinify.deleteInstallmentGroup', 'Eliminar grupo de cuotas')}
+                    style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)', opacity: 0.6 }}
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
-              );
-            })}
+                {group.rows.map((row) => {
+                  const { current, total } = parseInstallmentNumber(row);
+                  const isComplete = current === total;
+                  const progressPct = (current / total) * 100;
+
+                  return (
+                    <div
+                      key={row.id}
+                      className={`coin-installment ${isComplete ? 'coin-installment--complete' : ''}`}
+                    >
+                      <div className="coin-installment__desc">
+                        <ChainIcon broken={isComplete} />
+                        <span className="coin-installment__counter">
+                          {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
+                        </span>
+                      </div>
+                      <div className="coin-installment__right">
+                        {row.forThirdParty && (
+                          <span className="coin-tx__badge coin-tx__badge--third-party">
+                            {'\u2192'} {row.forThirdParty}
+                          </span>
+                        )}
+                        <div className="coin-installment__progress">
+                          <div
+                            className="coin-installment__progress-fill"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+                        {editingId === row.id ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <RpgNumberInput
+                              value={editAmount}
+                              onChange={setEditAmount}
+                              min={0}
+                              step={1}
+                              autoFocus
+                              style={{ width: 100 }}
+                              onBlur={() => {
+                                const val = parseFloat(editAmount);
+                                if (val > 0) {
+                                  window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
+                                    setEditingId(null);
+                                    loadRows(month);
+                                    loadProjection();
+                                    window.dispatchEvent(new Event('finance:dataChanged'));
+                                  });
+                                } else {
+                                  setEditingId(null);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const val = parseFloat(editAmount);
+                                  if (val > 0) {
+                                    window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
+                                      setEditingId(null);
+                                      loadRows(month);
+                                      loadProjection();
+                                      window.dispatchEvent(new Event('finance:dataChanged'));
+                                    });
+                                  }
+                                }
+                                if (e.key === 'Escape') setEditingId(null);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span
+                            className="coin-installment__amount"
+                            style={{ cursor: 'pointer' }}
+                            title={t('coinify.clickToEdit', 'Click para editar')}
+                            onClick={() => {
+                              setEditingId(row.id);
+                              setEditAmount(String(row.amount));
+                            }}
+                          >
+                            ${row.amount.toLocaleString('es-AR')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
       </div>

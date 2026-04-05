@@ -97,6 +97,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  const [rangeMode, setRangeMode] = useState<'month' | 'quarter' | 'year' | 'all'>('month');
 
   const [balance, setBalance] = useState<MonthlyBalance | null>(null);
   const [prevBalance, setPrevBalance] = useState<MonthlyBalance | null>(null);
@@ -118,23 +119,50 @@ export default function Dashboard() {
       }
       setLoading(true);
 
-      const prevMonth = getPrevMonth(month);
-      const [bal, prev, cats] = await Promise.all([
-        window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
-        window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
-        window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
-      ]);
+      if (rangeMode === 'month') {
+        const prevMonth = getPrevMonth(month);
+        const [bal, prev, cats] = await Promise.all([
+          window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
+          window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
+          window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
+        ]);
+        setBalance(bal);
+        setPrevBalance(prev);
+        setCategories(cats);
+      } else {
+        let startMonth: string;
+        let endMonth: string;
 
-      setBalance(bal);
-      setPrevBalance(prev);
-      setCategories(cats);
+        if (rangeMode === 'quarter') {
+          const [y, m] = month.split('-').map(Number);
+          const start = new Date(y, m - 3, 1);
+          startMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+          endMonth = month;
+        } else if (rangeMode === 'year') {
+          const y = month.split('-')[0];
+          startMonth = `${y}-01`;
+          endMonth = `${y}-12`;
+        } else {
+          startMonth = '2020-01';
+          endMonth = '2099-12';
+        }
+
+        const [bal, cats] = await Promise.all([
+          window.api.financeGetBalanceForRange(startMonth, endMonth) as Promise<MonthlyBalance>,
+          window.api.financeGetCategoryBreakdownForRange(startMonth, endMonth) as Promise<CategoryBreakdown[]>,
+        ]);
+        setBalance(bal);
+        setPrevBalance(null);
+        setCategories(cats);
+      }
+
       setLoading(false);
       setFadeState('in');
       isFirstLoad.current = false;
     };
 
     fetchData();
-  }, [month]);
+  }, [month, rangeMode]);
 
   // Fetch static data (projection, loans, installment count)
   const loadStaticData = useCallback(() => {
@@ -203,7 +231,18 @@ export default function Dashboard() {
     return (
       <div className="coin-dashboard coin-dashboard--loading">
         <div className="coin-dashboard__header">
-          <MonthNavigator month={month} onChange={setMonth} />
+          {rangeMode === 'month' && <MonthNavigator month={month} onChange={setMonth} compact />}
+          <select
+            className="rpg-select"
+            value={rangeMode}
+            onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
+            style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+          >
+            <option value="month">{t('coinify.range_month')}</option>
+            <option value="quarter">{t('coinify.range_quarter')}</option>
+            <option value="year">{t('coinify.range_year')}</option>
+            <option value="all">{t('coinify.range_all')}</option>
+          </select>
           <DollarChip />
         </div>
         <div className="coin-skeleton coin-skeleton--card" style={{ height: 120 }} />
@@ -227,7 +266,18 @@ export default function Dashboard() {
     <div className="coin-dashboard">
       {/* Header */}
       <div className="coin-dashboard__header">
-        <MonthNavigator month={month} onChange={setMonth} />
+        {rangeMode === 'month' && <MonthNavigator month={month} onChange={setMonth} compact />}
+        <select
+          className="rpg-select"
+          value={rangeMode}
+          onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
+          style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+        >
+          <option value="month">{t('coinify.range_month')}</option>
+          <option value="quarter">{t('coinify.range_quarter')}</option>
+          <option value="year">{t('coinify.range_year')}</option>
+          <option value="all">{t('coinify.range_all')}</option>
+        </select>
         <DollarChip />
       </div>
 

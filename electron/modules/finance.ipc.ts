@@ -216,6 +216,40 @@ export function registerFinanceIpcHandlers(): void {
     return Array.from(map.entries()).map(([category, amounts]) => ({ category, ...amounts }));
   });
 
+  ipcHandle('finance:getBalanceForRange', (_e, startMonth: string, endMonth: string) => {
+    const db = getDb();
+    const row = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN type = 'income' AND currency = 'ARS' THEN amount ELSE 0 END), 0) AS incomeARS,
+        COALESCE(SUM(CASE WHEN type = 'expense' AND currency = 'ARS' THEN amount ELSE 0 END), 0) AS expensesARS,
+        COALESCE(SUM(CASE WHEN type = 'income' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS incomeUSD,
+        COALESCE(SUM(CASE WHEN type = 'expense' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS expensesUSD
+      FROM finance_transactions
+      WHERE impacts_balance = 1 AND date >= ? AND date < ?
+    `).get(`${startMonth}-01`, `${endMonth}-32`) as {
+      incomeARS: number; expensesARS: number; incomeUSD: number; expensesUSD: number;
+    };
+
+    return {
+      ARS: { income: row.incomeARS, expenses: row.expensesARS, balance: row.incomeARS - row.expensesARS },
+      USD: { income: row.incomeUSD, expenses: row.expensesUSD, balance: row.incomeUSD - row.expensesUSD },
+    };
+  });
+
+  ipcHandle('finance:getCategoryBreakdownForRange', (_e, startMonth: string, endMonth: string) => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT category,
+        COALESCE(SUM(CASE WHEN currency = 'ARS' THEN amount ELSE 0 END), 0) AS "ARS",
+        COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END), 0) AS "USD"
+      FROM finance_transactions
+      WHERE type = 'expense' AND impacts_balance = 1 AND category != 'Pago Tarjeta'
+        AND date >= ? AND date < ?
+      GROUP BY category
+      ORDER BY "ARS" DESC
+    `).all(`${startMonth}-01`, `${endMonth}-32`);
+  });
+
   ipcHandle('finance:getProjection', (_e, months: number) => {
     const db = getDb();
     const today = todayDateString(); // YYYY-MM-DD
@@ -878,6 +912,26 @@ export function registerFinanceIpcHandlers(): void {
       WHERE id = ?
     `).run(historyId, previousAmount, newAmount, today, now, id);
     db.prepare(`UPDATE finance_recurring SET amount = ? WHERE id = ?`).run(newAmount, id);
+  });
+
+  ipcHandle('finance:updateRecurring', (_e, id: string, fields: {
+    name?: string;
+    type?: 'expense' | 'income';
+    category?: string;
+    billingDay?: number;
+  }) => {
+    const db = getDb();
+    const sets: string[] = [];
+    const params: unknown[] = [];
+
+    if (fields.name !== undefined) { sets.push('name = ?'); params.push(fields.name); }
+    if (fields.type !== undefined) { sets.push('type = ?'); params.push(fields.type); }
+    if (fields.category !== undefined) { sets.push('category = ?'); params.push(fields.category); }
+    if (fields.billingDay !== undefined) { sets.push('billing_day = ?'); params.push(fields.billingDay); }
+
+    if (sets.length === 0) return;
+    params.push(id);
+    db.prepare(`UPDATE finance_recurring SET ${sets.join(', ')} WHERE id = ?`).run(...params);
   });
 
   ipcHandle('finance:toggleRecurring', (_e, id: string) => {

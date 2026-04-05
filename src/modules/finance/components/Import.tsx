@@ -25,12 +25,16 @@ export default function Import() {
   const [importError, setImportError] = useState('');
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [showSeal, setShowSeal] = useState(false);
+  const [skippedLines, setSkippedLines] = useState<string[]>([]);
+  const [skippedExpanded, setSkippedExpanded] = useState(false);
 
   // Reset all state when account is switched
   useEffect(() => {
     const handler = () => {
       setFileName('');
       setRows([]);
+      setSkippedLines([]);
+      setSkippedExpanded(false);
       setParseError('');
       setImportError('');
       setSuccessCount(null);
@@ -44,6 +48,8 @@ export default function Import() {
 
   const handleSelectFile = async () => {
     setRows([]);
+    setSkippedLines([]);
+    setSkippedExpanded(false);
     setParseError('');
     setSuccessCount(null);
     setShowSeal(false);
@@ -56,6 +62,8 @@ export default function Import() {
         return; // user cancelled dialog
       }
       setFileName(result.fileName);
+      setSkippedLines(result.skippedLines ?? []);
+      setSkippedExpanded(false);
       const rowStates: RowState[] = result.rows.map((r) => ({
         ...r,
         included: !r.isExcluded,
@@ -96,11 +104,15 @@ export default function Import() {
       setSuccessCount(result.count);
       setRows([]);
       setFileName('');
+      setSkippedLines([]);
 
       // Seal animation + toast
       setShowSeal(true);
       setTimeout(() => setShowSeal(false), 600);
       toast({ type: 'coin', message: t('coinify.importSuccess', { count: result.count }), details: { transactionType: 'imported' } });
+      if (result.duplicateCount > 0) {
+        toast({ type: 'warning', message: t('coinify.importDuplicatesSkipped', { count: result.duplicateCount }) });
+      }
     } catch {
       setImportError(t('coinify.importErrorConfirm'));
     } finally {
@@ -207,6 +219,56 @@ export default function Import() {
               </tbody>
             </table>
           </div>
+
+          {/* Skipped lines warning */}
+          {skippedLines.length > 0 && (
+            <div
+              className="rpg-card"
+              style={{
+                padding: 12,
+                marginBottom: 16,
+                borderColor: 'var(--rpg-gold)',
+                borderWidth: 2,
+                background: 'rgba(255, 193, 7, 0.08)',
+              }}
+            >
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                onClick={() => setSkippedExpanded((v) => !v)}
+              >
+                <span style={{ color: 'var(--rpg-gold)', fontSize: '1rem' }}>
+                  {skippedExpanded ? '\u25BC' : '\u25B6'}
+                </span>
+                <span style={{ color: 'var(--rpg-gold)', fontWeight: 600, fontSize: '0.85rem' }}>
+                  {t('coinify.importSkippedLines', { count: skippedLines.length })}
+                </span>
+              </div>
+              {skippedExpanded && (
+                <div style={{ marginTop: 8 }}>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--rpg-wood)', opacity: 0.8, margin: '0 0 6px' }}>
+                    {t('coinify.importSkippedLinesHint')}
+                  </p>
+                  <ul style={{ margin: 0, padding: '0 0 0 8px', listStyle: 'none' }}>
+                    {skippedLines.map((line, i) => (
+                      <li
+                        key={i}
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.75rem',
+                          padding: '2px 0',
+                          color: 'var(--rpg-wood)',
+                          opacity: 0.9,
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Month selector + confirm */}
           <div className="coin-import-confirm-row">

@@ -122,6 +122,7 @@ const api = {
   financeGetRecurring: () => ipcRenderer.invoke('finance:getRecurring'),
   financeAddRecurring: (rec: Record<string, unknown>) => ipcRenderer.invoke('finance:addRecurring', rec),
   financeUpdateRecurringAmount: (id: string, newAmount: number) => ipcRenderer.invoke('finance:updateRecurringAmount', id, newAmount),
+  financeUpdateRecurring: (id: string, fields: Record<string, unknown>) => ipcRenderer.invoke('finance:updateRecurring', id, fields),
   financeToggleRecurring: (id: string) => ipcRenderer.invoke('finance:toggleRecurring', id),
   financeDeleteRecurring: (id: string) => ipcRenderer.invoke('finance:deleteRecurring', id),
   financeGenerateRecurringForMonth: (month: string) => ipcRenderer.invoke('finance:generateRecurringForMonth', month),
@@ -136,6 +137,8 @@ const api = {
   // Finance - Dashboard
   financeGetMonthlyBalance: (month?: string) => ipcRenderer.invoke('finance:getMonthlyBalance', month),
   financeGetCategoryBreakdown: (month?: string) => ipcRenderer.invoke('finance:getCategoryBreakdown', month),
+  financeGetBalanceForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getBalanceForRange', startMonth, endMonth),
+  financeGetCategoryBreakdownForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getCategoryBreakdownForRange', startMonth, endMonth),
   financeGetProjection: (months: number) => ipcRenderer.invoke('finance:getProjection', months),
 
   // Finance - Backward compat
