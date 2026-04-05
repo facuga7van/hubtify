@@ -125,6 +125,7 @@ export interface HubtifyApi {
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
+  nutritionGetPendingDays: () => Promise<string[]>;
 
   // Sync
   syncRestoreStats: (stats: Record<string, unknown>) => Promise<{ success: boolean }>;

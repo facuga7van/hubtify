@@ -67,6 +67,7 @@ const api = {
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
+  nutritionGetPendingDays: () => ipcRenderer.invoke('nutrition:getPendingDays'),
   // Character
   characterSave: (data: Record<string, unknown>) => ipcRenderer.invoke('character:save', data),
   characterLoad: () => ipcRenderer.invoke('character:load'),
