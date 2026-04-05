@@ -396,11 +396,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:getPendingDays', () => {
     const db = getDb();
     const today = todayDateString();
-    const sevenAgo = (() => {
-      const d = new Date();
-      d.setDate(d.getDate() - 7);
-      return formatDateString(d);
-    })();
+    const sevenAgo = daysAgoDateString(7);
 
     const rows = db.prepare(`
       SELECT DISTINCT f.date

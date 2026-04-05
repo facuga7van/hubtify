@@ -106,6 +106,10 @@ export default function Today() {
 
   useEffect(() => { loadData(date); }, [date, loadData]);
 
+  useEffect(() => {
+    setCloseDayPopup(false);
+  }, [date]);
+
   const loadPendingDays = useCallback(async () => {
     const days = await window.api.nutritionGetPendingDays();
     setPendingDays(days);
@@ -556,7 +560,11 @@ export default function Today() {
             <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: 10 }}>
               {t('nutrify.closeDayDesc')}
             </p>
-            <button className="rpg-button" onClick={() => setCloseDayPopup(true)}
+            <button className="rpg-button" onClick={() => {
+              setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
+              setPopupGym(!!metrics.gym);
+              setCloseDayPopup(true);
+            }}
               disabled={consumed === 0}
               style={{ padding: '8px 24px' }}>
               {isPending ? t('nutrify.confirmDay') : t('nutrify.closeDayButton')}
