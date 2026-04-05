@@ -295,6 +295,8 @@ export default function Today() {
     ), [frequentFoods, frequentSearch]);
 
   const pendingBeforeCount = pendingDays.filter(d => d < date).length;
+  const isToday = date === todayDateString();
+  const isPending = pendingDays.includes(date);
 
   if (loading) return (
     <div>
@@ -403,6 +405,20 @@ export default function Today() {
           </svg>
         </button>
       </div>
+
+      {isPending && (
+        <div data-anim="stagger-child" style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+          marginBottom: 12, borderRadius: 'var(--rpg-radius)',
+          background: 'rgba(255, 193, 7, 0.1)', border: '1px solid var(--rpg-gold)',
+          fontSize: '0.85rem', color: 'var(--rpg-gold)',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="8" r="7"/><path d="M8 5v3"/><circle cx="8" cy="11" r="0.5" fill="currentColor"/>
+          </svg>
+          {t('nutrify.pendingConfirmation')}
+        </div>
+      )}
 
       <div data-anim="stagger-child">
         <CalorieProgressBar consumed={consumed} tdee={summary?.tdee ?? 0} deficitTargetKcal={deficitTargetKcal} />
@@ -519,7 +535,7 @@ export default function Today() {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
             <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
           </svg>
-          {t('nutrify.closeDay')}
+          {isPending ? t('nutrify.confirmDay') : t('nutrify.closeDay')}
         </div>
 
         {dayClosed ? (
@@ -542,7 +558,7 @@ export default function Today() {
             <button className="rpg-button" onClick={() => setCloseDayPopup(true)}
               disabled={consumed === 0}
               style={{ padding: '8px 24px' }}>
-              {t('nutrify.closeDayButton')}
+              {isPending ? t('nutrify.confirmDay') : t('nutrify.closeDayButton')}
             </button>
           </div>
         )}
