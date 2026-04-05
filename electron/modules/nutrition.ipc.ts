@@ -392,6 +392,27 @@ export function registerNutritionIpcHandlers(): void {
       return null;
     }
   });
+
+  ipcHandle('nutrition:getPendingDays', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const sevenAgo = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      return formatDateString(d);
+    })();
+
+    const rows = db.prepare(`
+      SELECT DISTINCT f.date
+      FROM food_log f
+      LEFT JOIN nutrition_daily_closed c ON c.date = f.date
+      WHERE c.date IS NULL
+        AND f.date >= ? AND f.date < ?
+      ORDER BY f.date ASC
+    `).all(sevenAgo, today) as { date: string }[];
+
+    return rows.map(r => r.date);
+  });
 }
 
 // ── Helpers ────────────────────────────────────────
