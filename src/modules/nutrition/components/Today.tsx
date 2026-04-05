@@ -294,6 +294,8 @@ export default function Today() {
       !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
     ), [frequentFoods, frequentSearch]);
 
+  const pendingBeforeCount = pendingDays.filter(d => d < date).length;
+
   if (loading) return (
     <div>
       <PageHeader
@@ -368,11 +370,24 @@ export default function Today() {
 
       {/* Date navigation */}
       <div data-anim="stagger-child" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <button className="rpg-button" onClick={() => goDay(-1)} style={{ padding: '6px 10px' }}
-          aria-label="Previous day">
+        <button className="rpg-button" onClick={() => goDay(-1)}
+          style={{ padding: '6px 10px', position: 'relative' }}
+          aria-label={`Previous day${pendingBeforeCount > 0 ? `, ${pendingBeforeCount} pending` : ''}`}>
           <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 1L1 6l5 5M1 6h14"/>
           </svg>
+          {pendingBeforeCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -6, right: -6,
+              background: 'var(--rpg-gold)', color: 'var(--rpg-wood-dark, #2c1810)',
+              borderRadius: '50%', width: 18, height: 18,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.7rem', fontWeight: 700,
+              border: '1.5px solid var(--rpg-gold-dark)',
+            }}>
+              {pendingBeforeCount}
+            </span>
+          )}
         </button>
         <button className="rpg-button" onClick={() => setDate(todayDateString())}
           style={{ padding: '4px 8px', fontSize: '0.75rem', opacity: date === todayDateString() ? 0.5 : 1 }}>
