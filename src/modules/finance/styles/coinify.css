@@ -1408,13 +1408,6 @@
 
 /* ── Shared: DollarChip ─────────────────────────────────────── */
 
-.coin-dollar-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
 .coin-dollar-chip {
   display: inline-flex;
   align-items: center;
@@ -1688,11 +1681,6 @@
   .coin-import-confirm-row {
     flex-direction: column;
     gap: 8px;
-  }
-
-  /* Dollar strip: hide in narrow (moved to dropdown) */
-  .coin-dollar-strip {
-    display: none;
   }
 
   /* Projection */

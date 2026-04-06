@@ -7,6 +7,11 @@ function genId(): string {
   return crypto.randomUUID();
 }
 
+function nextMonthFirstDay(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+}
+
 export function registerFinanceIpcHandlers(): void {
   /** Given a transaction date and a card's closing day, returns the statement period_month (YYYY-MM).
    *  Convention: for closingDay=15, the January statement covers Dec 16 – Jan 15.
@@ -218,6 +223,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getBalanceForRange', (_e, startMonth: string, endMonth: string) => {
     const db = getDb();
+    const nextMonth = nextMonthFirstDay(endMonth);
     const row = db.prepare(`
       SELECT
         COALESCE(SUM(CASE WHEN type = 'income' AND currency = 'ARS' THEN amount ELSE 0 END), 0) AS incomeARS,
@@ -226,7 +232,7 @@ export function registerFinanceIpcHandlers(): void {
         COALESCE(SUM(CASE WHEN type = 'expense' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS expensesUSD
       FROM finance_transactions
       WHERE impacts_balance = 1 AND date >= ? AND date < ?
-    `).get(`${startMonth}-01`, `${endMonth}-32`) as {
+    `).get(`${startMonth}-01`, nextMonth) as {
       incomeARS: number; expensesARS: number; incomeUSD: number; expensesUSD: number;
     };
 
@@ -238,6 +244,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getCategoryBreakdownForRange', (_e, startMonth: string, endMonth: string) => {
     const db = getDb();
+    const nextMonth = nextMonthFirstDay(endMonth);
     return db.prepare(`
       SELECT category,
         COALESCE(SUM(CASE WHEN currency = 'ARS' THEN amount ELSE 0 END), 0) AS "ARS",
@@ -247,7 +254,7 @@ export function registerFinanceIpcHandlers(): void {
         AND date >= ? AND date < ?
       GROUP BY category
       ORDER BY "ARS" DESC
-    `).all(`${startMonth}-01`, `${endMonth}-32`);
+    `).all(`${startMonth}-01`, nextMonth);
   });
 
   ipcHandle('finance:getProjection', (_e, months: number) => {
@@ -920,14 +927,17 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
     billingDay?: number;
   }) => {
+    const allowed = new Set(['name', 'type', 'category', 'billingDay']);
+    const safe = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.has(k))) as typeof fields;
+
     const db = getDb();
     const sets: string[] = [];
     const params: unknown[] = [];
 
-    if (fields.name !== undefined) { sets.push('name = ?'); params.push(fields.name); }
-    if (fields.type !== undefined) { sets.push('type = ?'); params.push(fields.type); }
-    if (fields.category !== undefined) { sets.push('category = ?'); params.push(fields.category); }
-    if (fields.billingDay !== undefined) { sets.push('billing_day = ?'); params.push(fields.billingDay); }
+    if (safe.name !== undefined) { sets.push('name = ?'); params.push(safe.name); }
+    if (safe.type !== undefined) { sets.push('type = ?'); params.push(safe.type); }
+    if (safe.category !== undefined) { sets.push('category = ?'); params.push(safe.category); }
+    if (safe.billingDay !== undefined) { sets.push('billing_day = ?'); params.push(safe.billingDay); }
 
     if (sets.length === 0) return;
     params.push(id);
