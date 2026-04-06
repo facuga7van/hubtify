@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './shared/CategorySelect';
 import { useToast } from '../../../shared/components/useToast';
@@ -26,6 +27,7 @@ interface AmountHistoryRow {
 
 export default function Recurring() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const confirm = useConfirm();
   const now = new Date();
@@ -193,6 +195,11 @@ export default function Recurring() {
 
   return (
     <div>
+      <button className="rpg-button" onClick={() => navigate('/finance/transactions')}
+        style={{ padding: '4px 10px', fontSize: '0.8rem', marginBottom: 12, opacity: 0.7 }}>
+        ← {t('coinify.transactions')}
+      </button>
+
       {/* Header */}
       <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
         <h2 style={{ color: 'var(--rpg-wood)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0 }}>

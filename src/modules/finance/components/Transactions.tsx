@@ -351,6 +351,19 @@ export default function Transactions() {
     );
   };
 
+  useEffect(() => {
+    if (!showImport) return;
+    document.body.style.overflow = 'hidden';
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowImport(false);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [showImport]);
+
   return (
     <div>
       {/* Toggle form + Month nav */}
