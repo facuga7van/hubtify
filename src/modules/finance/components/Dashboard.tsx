@@ -98,6 +98,7 @@ export default function Dashboard() {
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [rangeMode, setRangeMode] = useState<'month' | 'quarter' | 'year' | 'all'>('month');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [balance, setBalance] = useState<MonthlyBalance | null>(null);
   const [prevBalance, setPrevBalance] = useState<MonthlyBalance | null>(null);
@@ -113,56 +114,61 @@ export default function Dashboard() {
   // Fetch month-dependent data
   useEffect(() => {
     const fetchData = async () => {
-      if (!isFirstLoad.current) {
-        setFadeState('out');
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      setLoading(true);
+      try {
+        if (!isFirstLoad.current) {
+          setFadeState('out');
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        setLoading(true);
 
-      if (rangeMode === 'month') {
-        const prevMonth = getPrevMonth(month);
-        const [bal, prev, cats] = await Promise.all([
-          window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
-          window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
-          window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
-        ]);
-        setBalance(bal);
-        setPrevBalance(prev);
-        setCategories(cats);
-      } else {
-        let startMonth: string;
-        let endMonth: string;
-
-        if (rangeMode === 'quarter') {
-          const [y, m] = month.split('-').map(Number);
-          const start = new Date(y, m - 3, 1);
-          startMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-          endMonth = month;
-        } else if (rangeMode === 'year') {
-          const y = month.split('-')[0];
-          startMonth = `${y}-01`;
-          endMonth = `${y}-12`;
+        if (rangeMode === 'month') {
+          const prevMonth = getPrevMonth(month);
+          const [bal, prev, cats] = await Promise.all([
+            window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
+            window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
+            window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
+          ]);
+          setBalance(bal);
+          setPrevBalance(prev);
+          setCategories(cats);
         } else {
-          startMonth = '2020-01';
-          endMonth = '2099-12';
+          let startMonth: string;
+          let endMonth: string;
+
+          if (rangeMode === 'quarter') {
+            const [y, m] = month.split('-').map(Number);
+            const start = new Date(y, m - 3, 1);
+            startMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+            endMonth = month;
+          } else if (rangeMode === 'year') {
+            const y = month.split('-')[0];
+            startMonth = `${y}-01`;
+            endMonth = `${y}-12`;
+          } else {
+            startMonth = '2020-01';
+            endMonth = '2099-12';
+          }
+
+          const [bal, cats] = await Promise.all([
+            window.api.financeGetBalanceForRange(startMonth, endMonth) as Promise<MonthlyBalance>,
+            window.api.financeGetCategoryBreakdownForRange(startMonth, endMonth) as Promise<CategoryBreakdown[]>,
+          ]);
+          setBalance(bal);
+          setPrevBalance(null);
+          setCategories(cats);
         }
 
-        const [bal, cats] = await Promise.all([
-          window.api.financeGetBalanceForRange(startMonth, endMonth) as Promise<MonthlyBalance>,
-          window.api.financeGetCategoryBreakdownForRange(startMonth, endMonth) as Promise<CategoryBreakdown[]>,
-        ]);
-        setBalance(bal);
-        setPrevBalance(null);
-        setCategories(cats);
+        isFirstLoad.current = false;
+      } catch {
+        setFadeState('in');
+      } finally {
+        setLoading(false);
+        setFadeState('in');
       }
-
-      setLoading(false);
-      setFadeState('in');
-      isFirstLoad.current = false;
     };
 
     fetchData();
-  }, [month, rangeMode]);
+  }, [month, rangeMode, refreshKey]);
 
   // Fetch static data (projection, loans, installment count)
   const loadStaticData = useCallback(() => {
@@ -196,7 +202,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const handler = () => { loadStaticData(); isFirstLoad.current = true; };
+    const handler = () => { loadStaticData(); isFirstLoad.current = true; setRefreshKey(k => k + 1); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [loadStaticData]);
@@ -225,6 +231,20 @@ export default function Dashboard() {
   const hasUsd = balance ? (balance.USD.income > 0 || balance.USD.expenses > 0) : false;
   const netLoans = loans.lent - loans.borrowed;
 
+  const rangeModeSelect = (
+    <select
+      className="rpg-select"
+      value={rangeMode}
+      onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
+      style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+    >
+      <option value="month">{t('coinify.range_month')}</option>
+      <option value="quarter">{t('coinify.range_quarter')}</option>
+      <option value="year">{t('coinify.range_year')}</option>
+      <option value="all">{t('coinify.range_all')}</option>
+    </select>
+  );
+
   // ── Skeleton ──
 
   if (loading && isFirstLoad.current) {
@@ -232,17 +252,7 @@ export default function Dashboard() {
       <div className="coin-dashboard coin-dashboard--loading">
         <div className="coin-dashboard__header">
           {rangeMode === 'month' && <MonthNavigator month={month} onChange={setMonth} compact />}
-          <select
-            className="rpg-select"
-            value={rangeMode}
-            onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
-            style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-          >
-            <option value="month">{t('coinify.range_month')}</option>
-            <option value="quarter">{t('coinify.range_quarter')}</option>
-            <option value="year">{t('coinify.range_year')}</option>
-            <option value="all">{t('coinify.range_all')}</option>
-          </select>
+          {rangeModeSelect}
           <DollarChip />
         </div>
         <div className="coin-skeleton coin-skeleton--card" style={{ height: 120 }} />
@@ -267,17 +277,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="coin-dashboard__header">
         {rangeMode === 'month' && <MonthNavigator month={month} onChange={setMonth} compact />}
-        <select
-          className="rpg-select"
-          value={rangeMode}
-          onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
-          style={{ fontSize: '0.8rem', padding: '4px 8px' }}
-        >
-          <option value="month">{t('coinify.range_month')}</option>
-          <option value="quarter">{t('coinify.range_quarter')}</option>
-          <option value="year">{t('coinify.range_year')}</option>
-          <option value="all">{t('coinify.range_all')}</option>
-        </select>
+        {rangeModeSelect}
         <DollarChip />
       </div>
 

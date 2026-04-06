@@ -134,15 +134,19 @@ export default function Recurring() {
       toast({ type: 'warning', message: t('coinify.validationName', 'Ingresá un nombre') });
       return;
     }
-    await window.api.financeUpdateRecurring(id, {
-      name: editRecurringFields.name,
-      type: editRecurringFields.type,
-      category: editRecurringFields.category,
-      billingDay: editRecurringFields.billingDay,
-    });
-    setEditingRecurringId(null);
-    load();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+    try {
+      await window.api.financeUpdateRecurring(id, {
+        name: editRecurringFields.name,
+        type: editRecurringFields.type,
+        category: editRecurringFields.category,
+        billingDay: editRecurringFields.billingDay,
+      });
+      setEditingRecurringId(null);
+      load();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch {
+      toast({ type: 'warning', message: 'Error al guardar' });
+    }
   };
 
   const cancelRecurringEdit = () => {

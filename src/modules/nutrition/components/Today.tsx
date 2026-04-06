@@ -264,13 +264,15 @@ export default function Today() {
   };
 
   const handleCloseDayConfirm = async () => {
-    // Save metrics from popup before closing the day
-    const stepsVal = popupSteps ? parseInt(popupSteps) : null;
-    await window.api.nutritionSaveDailyMetrics({ ...metrics, steps: stepsVal, gym: popupGym, date });
-    setCloseDayPopup(false);
-    // Now close the day
-    await doCloseDay();
-    loadPendingDays();
+    try {
+      const stepsVal = popupSteps ? parseInt(popupSteps) : null;
+      await window.api.nutritionSaveDailyMetrics({ ...metrics, steps: stepsVal, gym: popupGym, date });
+      setCloseDayPopup(false);
+      await doCloseDay();
+      loadPendingDays();
+    } catch {
+      toast({ type: 'warning', message: 'Error al confirmar el día' });
+    }
   };
 
   const doCloseDay = async () => {
@@ -416,7 +418,7 @@ export default function Today() {
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
           marginBottom: 12, borderRadius: 'var(--rpg-radius)',
           background: 'rgba(255, 193, 7, 0.1)', border: '1px solid var(--rpg-gold)',
-          fontSize: '0.85rem', color: 'var(--rpg-gold)',
+          fontSize: '0.85rem', color: 'var(--rpg-wood)', fontWeight: 600,
         }}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <circle cx="8" cy="8" r="7"/><path d="M8 5v3"/><circle cx="8" cy="11" r="0.5" fill="currentColor"/>
