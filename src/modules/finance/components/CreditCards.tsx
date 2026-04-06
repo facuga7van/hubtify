@@ -7,9 +7,12 @@ import { MonthNavigator } from './shared/MonthNavigator';
 
 function getStatementPeriodRange(month: string, closingDay: number): { from: string; to: string } {
   const [year, mon] = month.split('-').map(Number);
-  // Period covers: previous month (closingDay+1) to current month (closingDay)
-  const prevDate = new Date(year, mon - 2, closingDay + 1); // mon-2 because Date is 0-based and we want previous month
-  const toDate = new Date(year, mon - 1, closingDay);
+  const daysInPrev = new Date(year, mon - 1, 0).getDate();
+  const daysInCurr = new Date(year, mon, 0).getDate();
+  const clampedPrev = Math.min(closingDay + 1, daysInPrev);
+  const clampedCurr = Math.min(closingDay, daysInCurr);
+  const prevDate = new Date(year, mon - 2, clampedPrev);
+  const toDate = new Date(year, mon - 1, clampedCurr);
 
   const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
   return { from: fmt(prevDate), to: fmt(toDate) };
@@ -73,6 +76,7 @@ export default function CreditCards() {
 
         {cards.map((card) => {
           const stmt = statements.find((s) => s.creditCardId === card.id);
+          const range = getStatementPeriodRange(month, card.closingDay);
 
           return (
             <div key={card.id} className="rpg-card" style={{ marginBottom: 8, padding: 12 }}>
@@ -82,10 +86,7 @@ export default function CreditCards() {
                   <span style={{ fontSize: '0.75rem', opacity: 0.7, marginLeft: 8 }}>
                     {t('coinify.closingDay')}: {card.closingDay}
                     {' · '}
-                    {(() => {
-                      const range = getStatementPeriodRange(month, card.closingDay);
-                      return `${range.from} → ${range.to}`;
-                    })()}
+                    {`${range.from} → ${range.to}`}
                   </span>
                 </div>
 
