@@ -373,14 +373,16 @@ export function autoResolve(db: Database.Database): number {
       }
 
       if (n.type === 'finance_installment_due') {
-        const tx = db
+        const threeDaysFromNow = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const upcoming = db
           .prepare(
             `SELECT 1 FROM finance_transactions
-             WHERE installment_group_id = ? AND date < DATE('now')
+             WHERE installment_group_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL
              LIMIT 1`
           )
-          .get(n.ref_id);
-        if (tx) shouldResolve = true;
+          .get(n.ref_id, todayStr, threeDaysFromNow);
+        if (!upcoming) shouldResolve = true;
       }
 
       if (n.type === 'finance_card_closing') {
