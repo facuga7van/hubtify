@@ -44,12 +44,21 @@ function runNotificationCheck(): number {
       `).get() as { count: number }).count;
 
       if (totalActive > 0 && Notification.isSupported()) {
-        new Notification({
+        const nativeNotif = new Notification({
           title: 'Hubtify',
           body: getEngineLocale() === 'en'
             ? `You have ${totalActive} pending ${totalActive === 1 ? 'item' : 'items'}.`
             : `Tenés ${totalActive} ${totalActive === 1 ? 'cosa pendiente' : 'cosas pendientes'}.`,
-        }).show();
+        });
+        nativeNotif.on('click', () => {
+          const mainWin = BrowserWindow.getAllWindows()[0];
+          if (mainWin) {
+            if (mainWin.isMinimized()) mainWin.restore();
+            mainWin.show();
+            mainWin.focus();
+          }
+        });
+        nativeNotif.show();
         lastNativeNotificationTime = now;
       }
     }
@@ -105,6 +114,10 @@ export function registerNotificationIpcHandlers(): void {
   ipcHandle('notifications:dismiss', (_e, id: string) => {
     const db = getDb();
     db.prepare(`UPDATE notifications SET status = 'dismissed', updated_at = datetime('now') WHERE id = ?`).run(id);
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      win.webContents.send('notifications:updated');
+    }
   });
 
   ipcHandle('notifications:snooze', (_e, id: string) => {
@@ -114,6 +127,10 @@ export function registerNotificationIpcHandlers(): void {
       SET status = 'snoozed', snoozed_until = datetime('now', '+6 hours'), updated_at = datetime('now')
       WHERE id = ?
     `).run(id);
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      win.webContents.send('notifications:updated');
+    }
   });
 
   ipcHandle('notifications:runCheck', () => {
