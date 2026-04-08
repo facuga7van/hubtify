@@ -247,7 +247,7 @@ export function deduplicateAndInsert(
 ): number {
   const checkStmt = db.prepare(
     `SELECT 1 FROM notifications
-     WHERE type = ? AND ref_id = ? AND status IN ('active', 'snoozed')
+     WHERE type = ? AND ref_id = ? AND status IN ('active', 'snoozed', 'dismissed')
      LIMIT 1`
   );
 
