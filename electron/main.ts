@@ -7,7 +7,7 @@ import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
 import { characterMigrations } from '../src/modules/character/character.schema';
 import { notificationsMigrations } from './modules/notifications.schema';
-import { clearReminderInterval } from './modules/notifications.ipc';
+import { startNotificationEngine, stopNotificationEngine } from './modules/notifications.ipc';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 
 // Handle Squirrel events (Windows installer lifecycle)
@@ -164,11 +164,13 @@ app.whenReady().then(() => {
   createWindow();
 
   if (mainWindow) initAutoUpdater(mainWindow);
+
+  startNotificationEngine();
 });
 
 app.on('before-quit', () => {
   isQuitting = true;
-  clearReminderInterval();
+  stopNotificationEngine();
   closeDb();
 });
 
