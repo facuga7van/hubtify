@@ -48,12 +48,29 @@ CREATE TABLE notifications (
   status TEXT NOT NULL DEFAULT 'active',  -- active, snoozed, resolved, dismissed
   snoozed_until TEXT,          -- ISO datetime, null si no está snoozed
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),  -- para sync conflict resolution (last-write-wins)
   resolved_at TEXT,
-  ref_id TEXT                  -- ID del recurso relacionado para deduplicación y auto-resolve
+  ref_id TEXT,                 -- ID del recurso relacionado para deduplicación y auto-resolve
+  deleted_at TEXT              -- soft delete para sync multi-account
 );
+
+CREATE INDEX idx_notifications_type_ref ON notifications(type, ref_id);
 ```
 
 IMPORTANTE: Esta tabla DEBE agregarse a `USER_DATA_TABLES` en `electron/modules/sync.ipc.ts` e incluirse en los sync handlers correspondientes.
+
+Migración: `{ namespace: 'notifications', version: 1, up: '...' }`. Debe importarse y ejecutarse en `electron/main.ts` via `runModuleMigrations()`.
+
+### Sync Handlers
+
+Las notificaciones abarcan todos los módulos, por lo que necesitan sus propios sync handlers separados:
+- `sync:getAllNotificationData` / `sync:mergeNotificationData`
+- Firestore subcollection: `hubtify_users/{uid}/notifications/data`
+- El merge handler debe usar el patrón `INSERT OR IGNORE`
+
+### Cleanup / Retención
+
+En cada ciclo de polling, eliminar notificaciones resolved o dismissed con más de 30 días de antigüedad (`resolved_at` o `updated_at` > 30 días).
 
 ## Notification Engine — Evaluadores
 
@@ -106,7 +123,7 @@ evaluateFinanceNotifications(db) → [...]
    - Ruta: `/nutrition`
 
 5. **Sin comidas registradas** (`nutri_no_meals`)
-   - Condición: `DATE('now')` no tiene registros en food_log Y hora actual >= 20:00
+   - Condición: `DATE('now')` no tiene registros en food_log Y hora actual >= 20:00. IMPORTANTE: el check de "hora actual >= 20:00" NO puede hacerse en SQLite (usa UTC). Este check debe hacerse en JavaScript usando la timezone local del usuario (`new Date().getHours() >= 20`). La query SQLite solo verifica la ausencia de registros; el filtro horario se aplica en JS.
    - Título: "No registraste comidas hoy"
    - ref_id: date string (YYYY-MM-DD)
    - Ruta: `/nutrition`
@@ -114,9 +131,9 @@ evaluateFinanceNotifications(db) → [...]
 #### Coinify
 
 6. **Cuotas próximas** (`finance_installment_due`)
-   - Condición: Cuotas con vencimiento en próximos 3 días
+   - Condición: No existe tabla `finance_installments`. Las cuotas se modelan como filas individuales en `finance_transactions` que comparten un `installment_group_id` apuntando a `finance_installment_groups`. Buscar transacciones con `installment_group_id IS NOT NULL` cuya `date` esté dentro de los próximos 3 días.
    - Título: "Cuota de {nombre} vence en {X} días"
-   - ref_id: installment ID
+   - ref_id: `installment_group_id` (no el ID de la transacción individual)
    - Ruta: `/finance`
 
 7. **Cierre de tarjeta** (`finance_card_closing`)
@@ -126,13 +143,13 @@ evaluateFinanceNotifications(db) → [...]
    - Ruta: `/finance`
 
 8. **Préstamo pendiente** (`finance_loan_pending`)
-   - Condición: Préstamos con `status = 'active'` creados hace más de 30 días
+   - Condición: La tabla `finance_loans` usa `settled INTEGER NOT NULL DEFAULT 0` (0 = activo, 1 = saldado), NO `status = 'active'`. Condición: `settled = 0 AND created_at < DATE('now', '-30 days')`
    - Título: "Préstamo con {nombre} lleva un mes abierto"
    - ref_id: loan ID
    - Ruta: `/finance`
 
 9. **Recurrente no registrado** (`finance_recurring_missing`)
-   - Condición: Gasto recurrente configurado para este mes sin transacción asociada, pasada la fecha esperada
+   - Condición: La tabla `finance_recurring` tiene columna `billing_day`. Verificar si existe alguna transacción con `source = 'recurring'` AND `recurring_id = {id}` para el mes actual. Si hoy > `billing_day` y no existe transacción matching para el mes actual, disparar la notificación. Nota: la auto-generación en `main.ts` ya crea estas transacciones automáticamente, por lo que esta notificación se dispara solo si la auto-generación falló o el usuario borró la transacción.
    - Título: "Gasto recurrente {nombre} no se registró este mes"
    - ref_id: recurring ID
    - Ruta: `/finance`
@@ -153,10 +170,11 @@ evaluateFinanceNotifications(db) → [...]
 
 ## UI — Centro de Notificaciones
 
-### Campanita
+### Campanita (NotificationBell)
 - Ubicada en el sidebar, arriba de la navegación de módulos
 - Badge numérico con count de notificaciones activas (no resolved, no dismissed, no snoozed)
 - Sin badge si no hay notificaciones
+- DEBE escuchar `account:switched` y recargar el count (igual que NotificationCenter)
 
 ### Panel (Drawer)
 - Se abre al clickear la campanita, sobre el contenido actual (no reemplaza la vista)
@@ -186,6 +204,8 @@ Valores guardados en localStorage:
 - `hubtify_notifications_inapp` (boolean)
 - `hubtify_notifications_system` (boolean)
 
+Nota: Los settings son GLOBALES (no per-account), almacenados en localStorage. Esto es intencional — las preferencias de notificación aplican a la instalación de la app, no a cuentas individuales.
+
 ## IPC Channels Nuevos
 
 - `notifications:getAll` → retorna notificaciones activas + snoozed vencidos
@@ -193,6 +213,30 @@ Valores guardados en localStorage:
 - `notifications:snooze(id)` → marca como snoozed con snoozed_until = now + 6h
 - `notifications:runCheck` → fuerza un ciclo de evaluación (para cuando se abre el centro)
 - `notifications:getCount` → retorna count de activas (para el badge)
+
+Nota: El handler existente `notifications:send` se mantiene para notificaciones ad-hoc del sistema. El handler `notifications:setReminders` es reemplazado por el nuevo engine.
+
+### TypeScript Interface
+
+Definir en `shared/types.ts`:
+
+```typescript
+interface AppNotification {
+  id: string;
+  type: string;
+  module: string;
+  title: string;
+  body: string;
+  actionRoute: string;
+  status: 'active' | 'snoozed' | 'resolved' | 'dismissed';
+  snoozedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  deletedAt: string | null;
+  refId: string | null;
+}
+```
 
 ## Archivos a crear/modificar
 
@@ -220,7 +264,7 @@ Valores guardados en localStorage:
 - DB: snake_case en SQL, camelCase en JS via aliases
 - IDs: `crypto.randomUUID()` via `genId()`
 - Handler wrapper: `ipcHandle()` de `electron/ipc/ipc-handle.ts`
-- account:switched listener en NotificationCenter
+- account:switched listener en NotificationCenter Y NotificationBell (ambos deben recargar datos)
 - Tabla en USER_DATA_TABLES + sync handlers
 - i18n con fallback: `t('key', 'Texto por defecto')`
 - CSS con prefijo: `.notif-*`
