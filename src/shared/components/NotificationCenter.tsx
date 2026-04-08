@@ -18,7 +18,8 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 function timeAgo(createdAt: string, t: (key: string, fallback: string, opts?: Record<string, unknown>) => string): string {
-  const diff = Date.now() - new Date(createdAt).getTime();
+  const utcDate = createdAt.endsWith('Z') ? createdAt : createdAt + 'Z';
+  const diff = Date.now() - new Date(utcDate).getTime();
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return t('notifications.justNow', 'recién');
   if (minutes < 60) return t('notifications.minutesAgo', `hace ${minutes} min`, { count: minutes });
