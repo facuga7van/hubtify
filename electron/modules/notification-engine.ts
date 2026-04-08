@@ -364,10 +364,11 @@ export function autoResolve(db: Database.Database): number {
       }
 
       if (n.type === 'nutri_no_meals') {
+        const todayStr = new Date().toISOString().slice(0, 10);
         const count = db
           .prepare(`SELECT COUNT(*) AS cnt FROM food_log WHERE date = ?`)
           .get(n.ref_id) as { cnt: number };
-        if (count.cnt > 0) shouldResolve = true;
+        if (count.cnt > 0 || n.ref_id !== todayStr) shouldResolve = true;
       }
 
       if (n.type === 'finance_loan_pending') {
