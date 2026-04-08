@@ -6,6 +6,7 @@ import { questsMigrations } from '../src/modules/quests/quests.schema';
 import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
 import { characterMigrations } from '../src/modules/character/character.schema';
+import { notificationsMigrations } from './modules/notifications.schema';
 import { clearReminderInterval } from './modules/notifications.ipc';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 
@@ -135,6 +136,7 @@ app.whenReady().then(() => {
   runModuleMigrations(nutritionMigrations);
   runModuleMigrations(financeMigrations);
   runModuleMigrations(characterMigrations);
+  runModuleMigrations(notificationsMigrations);
 
   // Auto-generate recurring transactions for current month
   try {
