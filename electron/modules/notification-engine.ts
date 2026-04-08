@@ -3,6 +3,61 @@ import crypto from 'crypto';
 
 const genId = (): string => crypto.randomUUID();
 
+let currentLocale: 'es' | 'en' = 'es';
+
+export function setEngineLocale(locale: string): void {
+  currentLocale = locale === 'en' ? 'en' : 'es';
+}
+
+export function getEngineLocale(): 'es' | 'en' {
+  return currentLocale;
+}
+
+const MESSAGES: Record<string, Record<'es' | 'en', { title: (name: string) => string; body: string }>> = {
+  quest_due_soon: {
+    es: { title: (name) => `Tarea "${name}" vence mañana`, body: 'Completala antes de que venza.' },
+    en: { title: (name) => `Task "${name}" is due tomorrow`, body: 'Complete it before the deadline.' },
+  },
+  quest_overdue: {
+    es: { title: (name) => `Tarea "${name}" está vencida`, body: 'Esta tarea ya pasó su fecha de vencimiento.' },
+    en: { title: (name) => `Task "${name}" is overdue`, body: 'This task is past its due date.' },
+  },
+  quest_stale: {
+    es: { title: (name) => `Tarea "${name}" no avanza`, body: 'Esta tarea no se actualiza hace más de una semana.' },
+    en: { title: (name) => `Task "${name}" is stale`, body: 'This task hasn\'t been updated in over a week.' },
+  },
+  nutri_pending: {
+    es: { title: (date) => `Día ${date} sin cerrar`, body: 'Registraste comidas pero no cerraste el día.' },
+    en: { title: (date) => `Day ${date} not closed`, body: 'You logged meals but didn\'t close the day.' },
+  },
+  nutri_no_meals: {
+    es: { title: () => 'No registraste comidas hoy', body: 'Todavía estás a tiempo de estimar las calorías del día.' },
+    en: { title: () => 'No meals logged today', body: 'You still have time to estimate today\'s calories.' },
+  },
+  finance_installment_due: {
+    es: { title: (name) => `Cuota de ${name} próxima a vencer`, body: 'Revisá tus pagos pendientes.' },
+    en: { title: (name) => `Installment for ${name} is due soon`, body: 'Check your pending payments.' },
+  },
+  finance_card_closing: {
+    es: { title: (name) => `Tu tarjeta ${name} cierra pronto`, body: 'Revisá los consumos antes del cierre.' },
+    en: { title: (name) => `Card ${name} is closing soon`, body: 'Review your charges before closing.' },
+  },
+  finance_loan_pending: {
+    es: { title: (name) => `Préstamo con ${name} lleva más de un mes`, body: 'Considerá saldar este préstamo.' },
+    en: { title: (name) => `Loan with ${name} has been open for over a month`, body: 'Consider settling this loan.' },
+  },
+  finance_recurring_missing: {
+    es: { title: (name) => `Gasto recurrente "${name}" no registrado`, body: 'No se generó la transacción recurrente para este mes.' },
+    en: { title: (name) => `Recurring expense "${name}" not registered`, body: 'The recurring transaction for this month was not generated.' },
+  },
+};
+
+function msg(type: string, name: string = ''): { title: string; body: string } {
+  const m = MESSAGES[type]?.[currentLocale] ?? MESSAGES[type]?.es;
+  if (!m) return { title: type, body: '' };
+  return { title: m.title(name), body: m.body };
+}
+
 export interface NotificationCandidate {
   type: string;
   module: string;
@@ -30,8 +85,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
     candidates.push({
       type: 'quest_due_soon',
       module: 'quests',
-      title: `Tarea ${t.name} vence mañana`,
-      body: `La tarea "${t.name}" vence mañana. ¡No te olvides!`,
+      ...msg('quest_due_soon', t.name),
       actionRoute: '/quests',
       refId: t.id,
     });
@@ -50,8 +104,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
     candidates.push({
       type: 'quest_overdue',
       module: 'quests',
-      title: `Tarea ${t.name} está vencida`,
-      body: `La tarea "${t.name}" ya pasó su fecha límite.`,
+      ...msg('quest_overdue', t.name),
       actionRoute: '/quests',
       refId: t.id,
     });
@@ -70,8 +123,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
     candidates.push({
       type: 'quest_stale',
       module: 'quests',
-      title: `Tarea ${t.name} no avanza`,
-      body: `La tarea "${t.name}" lleva más de 7 días sin cambios.`,
+      ...msg('quest_stale', t.name),
       actionRoute: '/quests',
       refId: t.id,
     });
@@ -100,8 +152,7 @@ export function evaluateNutritionNotifications(db: Database.Database): Notificat
     candidates.push({
       type: 'nutri_pending',
       module: 'nutrition',
-      title: `Día ${row.date} sin cerrar`,
-      body: `Tenés comidas registradas el ${row.date} pero no cerraste el día.`,
+      ...msg('nutri_pending', row.date),
       actionRoute: '/nutrition',
       refId: row.date,
     });
@@ -118,8 +169,7 @@ export function evaluateNutritionNotifications(db: Database.Database): Notificat
       candidates.push({
         type: 'nutri_no_meals',
         module: 'nutrition',
-        title: 'No registraste comidas hoy',
-        body: 'Ya son más de las 20hs y no registraste ninguna comida.',
+        ...msg('nutri_no_meals'),
         actionRoute: '/nutrition',
         refId: today,
       });
@@ -151,8 +201,7 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
     candidates.push({
       type: 'finance_installment_due',
       module: 'finance',
-      title: `Cuota próxima: ${ig.description}`,
-      body: `Tenés una cuota de "${ig.description}" que vence el ${ig.date}.`,
+      ...msg('finance_installment_due', ig.description),
       actionRoute: '/finance',
       refId: ig.id,
     });
@@ -170,8 +219,7 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
       candidates.push({
         type: 'finance_card_closing',
         module: 'finance',
-        title: `Cierre de tarjeta: ${cc.name}`,
-        body: `La tarjeta "${cc.name}" cierra en ${daysUntilClosing} día${daysUntilClosing > 1 ? 's' : ''}.`,
+        ...msg('finance_card_closing', cc.name),
         actionRoute: '/finance',
         refId: cc.id,
       });
@@ -192,8 +240,7 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
     candidates.push({
       type: 'finance_loan_pending',
       module: 'finance',
-      title: `Préstamo pendiente: ${loan.person_name}`,
-      body: `El préstamo de ${loan.currency} ${loan.amount} con ${loan.person_name} lleva más de 30 días.`,
+      ...msg('finance_loan_pending', loan.person_name),
       actionRoute: '/finance',
       refId: loan.id,
     });
@@ -227,8 +274,7 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
         candidates.push({
           type: 'finance_recurring_missing',
           module: 'finance',
-          title: `Recurrente faltante: ${rec.name}`,
-          body: `No se registró "${rec.name}" este mes (día de facturación: ${rec.billing_day}).`,
+          ...msg('finance_recurring_missing', rec.name),
           actionRoute: '/finance',
           refId: rec.id,
         });

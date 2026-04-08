@@ -18,7 +18,7 @@ import { gsap } from 'gsap';
 import { levelUp as animateLevelUp } from '../shared/animations/epic';
 
 export default function Layout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const prevLevelRef = useRef<number>(0);
@@ -31,6 +31,10 @@ export default function Layout() {
   }, []);
 
   useKeyboardShortcuts();
+
+  useEffect(() => {
+    window.api.notificationsSetLocale?.(i18n.language);
+  }, [i18n.language]);
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);

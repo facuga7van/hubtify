@@ -175,6 +175,7 @@ export interface HubtifyApi {
   notificationsRunCheck: () => Promise<void>;
   notificationsGetCount: () => Promise<number>;
   notificationsSetSystemEnabled: (enabled: boolean) => Promise<void>;
+  notificationsSetLocale: (locale: string) => Promise<void>;
   onNotificationsUpdated: (callback: () => void) => () => void;
 
   // Dollar

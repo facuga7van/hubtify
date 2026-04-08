@@ -8,6 +8,8 @@ import {
   deduplicateAndInsert,
   autoResolve,
   cleanupOldNotifications,
+  setEngineLocale,
+  getEngineLocale,
 } from './notification-engine';
 import type { AppNotification } from '../../shared/types';
 
@@ -44,7 +46,9 @@ function runNotificationCheck(): number {
       if (totalActive > 0 && Notification.isSupported()) {
         new Notification({
           title: 'Hubtify',
-          body: `Tenés ${totalActive} ${totalActive === 1 ? 'cosa pendiente' : 'cosas pendientes'}.`,
+          body: getEngineLocale() === 'en'
+            ? `You have ${totalActive} pending ${totalActive === 1 ? 'item' : 'items'}.`
+            : `Tenés ${totalActive} ${totalActive === 1 ? 'cosa pendiente' : 'cosas pendientes'}.`,
         }).show();
         lastNativeNotificationTime = now;
       }
@@ -128,5 +132,9 @@ export function registerNotificationIpcHandlers(): void {
 
   ipcHandle('notifications:setSystemEnabled', (_e, enabled: boolean) => {
     systemNotificationsEnabled = enabled;
+  });
+
+  ipcHandle('notifications:setLocale', (_e, locale: string) => {
+    setEngineLocale(locale);
   });
 }

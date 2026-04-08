@@ -98,6 +98,7 @@ const api = {
   notificationsRunCheck: () => ipcRenderer.invoke('notifications:runCheck'),
   notificationsGetCount: () => ipcRenderer.invoke('notifications:getCount'),
   notificationsSetSystemEnabled: (enabled: boolean) => ipcRenderer.invoke('notifications:setSystemEnabled', enabled),
+  notificationsSetLocale: (locale: string) => ipcRenderer.invoke('notifications:setLocale', locale),
   onNotificationsUpdated: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('notifications:updated', handler);
