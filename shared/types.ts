@@ -156,6 +156,8 @@ export interface HubtifyApi {
   syncClearUserData: () => Promise<{ success: boolean }>;
   syncSetCurrentUser: (uid: string) => Promise<void>;
   syncGetCurrentUser: () => Promise<string | null>;
+  syncGetAllNotificationData: () => Promise<Record<string, unknown>[]>;
+  syncMergeNotificationData: (data: Record<string, unknown>[]) => Promise<{ changed: boolean }>;
 
   // Backup
   backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;

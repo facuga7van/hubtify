@@ -134,6 +134,7 @@ const USER_DATA_TABLES = [
   'finance_credit_cards',
   'finance_credit_card_statements',
   'finance_income_sources',
+  'notifications',
 ];
 
 export function registerSyncIpcHandlers(): void {
@@ -736,5 +737,54 @@ export function registerSyncIpcHandlers(): void {
 
     tx();
     return { success: true, changed };
+  });
+
+  ipcHandle('sync:getAllNotificationData', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT id, type, module, title, body,
+             action_route, status, snoozed_until,
+             created_at, updated_at, resolved_at,
+             deleted_at, ref_id
+      FROM notifications
+    `).all();
+  });
+
+  ipcHandle('sync:mergeNotificationData', (_e, remote: Record<string, unknown>[]) => {
+    const db = getDb();
+    let changed = false;
+
+    const tx = db.transaction(() => {
+      for (const r of remote) {
+        const local = db.prepare('SELECT updated_at FROM notifications WHERE id = ?')
+          .get(r.id as string) as { updated_at: string } | undefined;
+
+        if (!local) {
+          db.prepare(`
+            INSERT OR IGNORE INTO notifications
+              (id, type, module, title, body, action_route, status,
+               snoozed_until, created_at, updated_at, resolved_at, deleted_at, ref_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            r.id, r.type, r.module, r.title, r.body,
+            r.action_route, r.status, r.snoozed_until,
+            r.created_at, r.updated_at, r.resolved_at,
+            r.deleted_at, r.ref_id
+          );
+          changed = true;
+        } else if (r.updated_at && new Date(r.updated_at as string) > new Date(local.updated_at)) {
+          db.prepare(`
+            UPDATE notifications SET
+              status = ?, snoozed_until = ?, updated_at = ?,
+              resolved_at = ?, deleted_at = ?
+            WHERE id = ?
+          `).run(r.status, r.snoozed_until, r.updated_at, r.resolved_at, r.deleted_at, r.id);
+          changed = true;
+        }
+      }
+    });
+    tx();
+
+    return { changed };
   });
 }

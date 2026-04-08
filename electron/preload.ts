@@ -83,6 +83,8 @@ const api = {
   syncClearUserData: () => ipcRenderer.invoke('sync:clearUserData'),
   syncSetCurrentUser: (uid: string) => ipcRenderer.invoke('sync:setCurrentUser', uid),
   syncGetCurrentUser: () => ipcRenderer.invoke('sync:getCurrentUser'),
+  syncGetAllNotificationData: () => ipcRenderer.invoke('sync:getAllNotificationData'),
+  syncMergeNotificationData: (data: Record<string, unknown>[]) => ipcRenderer.invoke('sync:mergeNotificationData', data),
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),
