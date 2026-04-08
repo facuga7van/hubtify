@@ -1,0 +1,150 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
+import type { AppNotification } from '../../../shared/types';
+import '../styles/notifications.css';
+
+interface NotificationCenterProps {
+  open: boolean;
+  onClose: () => void;
+  onNavigate: (route: string) => void;
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  quests: 'Questify',
+  nutrition: 'Nutrify',
+  finance: 'Coinify',
+};
+
+function timeAgo(createdAt: string, t: (key: string, fallback: string, opts?: Record<string, unknown>) => string): string {
+  const diff = Date.now() - new Date(createdAt).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return t('notifications.justNow', 'recién');
+  if (minutes < 60) return t('notifications.minutesAgo', `hace ${minutes} min`, { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('notifications.hoursAgo', `hace ${hours}h`, { count: hours });
+  const days = Math.floor(hours / 24);
+  return t('notifications.daysAgo', `hace ${days}d`, { count: days });
+}
+
+export default function NotificationCenter({ open, onClose, onNavigate }: NotificationCenterProps) {
+  const { t } = useTranslation();
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      await window.api.notificationsRunCheck();
+      const all = await window.api.notificationsGetAll();
+      setNotifications(all);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (open) loadNotifications();
+  }, [open, loadNotifications]);
+
+  useEffect(() => {
+    const handler = () => { if (open) loadNotifications(); };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [open, loadNotifications]);
+
+  useGSAP(() => {
+    if (!drawerRef.current || !overlayRef.current) return;
+    if (open) {
+      gsap.fromTo(overlayRef.current, { opacity: 0 }, { opacity: 1, duration: 0.2 });
+      gsap.fromTo(drawerRef.current, { x: '100%' }, { x: '0%', duration: 0.3, ease: 'power2.out' });
+    }
+  }, [open]);
+
+  const handleClose = useCallback(() => {
+    if (!drawerRef.current || !overlayRef.current) { onClose(); return; }
+    gsap.to(overlayRef.current, { opacity: 0, duration: 0.2 });
+    gsap.to(drawerRef.current, { x: '100%', duration: 0.25, ease: 'power2.in', onComplete: onClose });
+  }, [onClose]);
+
+  const handleDismiss = useCallback(async (id: string) => {
+    await window.api.notificationsDismiss(id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const handleSnooze = useCallback(async (id: string) => {
+    await window.api.notificationsSnooze(id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const handleGo = useCallback((route: string) => {
+    onNavigate(route);
+    handleClose();
+  }, [onNavigate, handleClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, handleClose]);
+
+  if (!open) return null;
+
+  const grouped = notifications.reduce<Record<string, AppNotification[]>>((acc, n) => {
+    (acc[n.module] ??= []).push(n);
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <div className="notif-overlay" ref={overlayRef} onClick={handleClose} />
+      <div className="notif-drawer" ref={drawerRef}>
+        <div className="notif-drawer-header">
+          <span>{t('notifications.title', 'Notificaciones')}</span>
+          <button className="notif-drawer-close" onClick={handleClose}>✕</button>
+        </div>
+
+        <div className="notif-drawer-list">
+          {notifications.length === 0 ? (
+            <div className="notif-empty">
+              <svg width="40" height="40" viewBox="0 0 16 16" fill="none"
+                stroke="var(--rpg-gold-dark)" strokeWidth="1" strokeLinecap="round">
+                <path d="M8 1a4 4 0 00-4 4v3l-1 2h10l-1-2V5a4 4 0 00-4-4z" />
+                <path d="M6 12a2 2 0 004 0" />
+                <path d="M4 4l8 8" />
+              </svg>
+              <div className="notif-empty-title">{t('notifications.allCaughtUp', 'Todo al día')}</div>
+              <div className="notif-empty-desc">{t('notifications.allCaughtUpDesc', 'No tenés notificaciones pendientes.')}</div>
+            </div>
+          ) : (
+            Object.entries(grouped).map(([mod, items]) => (
+              <div key={mod} className="notif-module-group">
+                <div className="notif-module-label">{MODULE_LABELS[mod] ?? mod}</div>
+                {items.map(n => (
+                  <div key={n.id} className="notif-item">
+                    <div className="notif-item-title">{n.title}</div>
+                    <div className="notif-item-body">{n.body}</div>
+                    <div className="notif-item-time">{timeAgo(n.createdAt, t)}</div>
+                    <div className="notif-item-actions">
+                      <button className="notif-action-go" onClick={() => handleGo(n.actionRoute)}>
+                        {t('notifications.go', 'Ir')}
+                      </button>
+                      <button onClick={() => handleSnooze(n.id)}>
+                        {t('notifications.snooze', 'Silenciar 6h')}
+                      </button>
+                      <button onClick={() => handleDismiss(n.id)}>
+                        {t('notifications.dismiss', 'Descartar')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

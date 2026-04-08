@@ -15,6 +15,18 @@
     "character": "Character",
     "settings": "Settings"
   },
+  "notifications": {
+    "title": "Notifications",
+    "allCaughtUp": "All caught up",
+    "allCaughtUpDesc": "No pending notifications.",
+    "dismiss": "Dismiss",
+    "snooze": "Snooze 6h",
+    "go": "Go",
+    "justNow": "just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
   "questify": {
     "title": "Questify",
     "subtitle": "Manage your daily adventures",
@@ -536,8 +548,10 @@
     "importFailed": "Import failed",
     "importConfirm": "Import backup? This will replace all current data.",
     "notifications": "Notifications",
-    "reminders": "Reminders",
-    "remindersDesc": "Get notifications every 3 hours to log food and quests",
+    "notificationsInApp": "In-App Notifications",
+    "notificationsInAppDesc": "Notification center with pending items",
+    "notificationsSystem": "System Notifications",
+    "notificationsSystemDesc": "Windows native notifications",
     "shortcuts": "Keyboard Shortcuts",
     "updateAvailable": "New version available: v{{version}}",
     "downloading": "Downloading... {{percent}}%",

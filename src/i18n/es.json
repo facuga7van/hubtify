@@ -15,6 +15,18 @@
     "character": "Personaje",
     "settings": "Ajustes"
   },
+  "notifications": {
+    "title": "Notificaciones",
+    "allCaughtUp": "Todo al día",
+    "allCaughtUpDesc": "No tenés notificaciones pendientes.",
+    "dismiss": "Descartar",
+    "snooze": "Silenciar 6h",
+    "go": "Ir",
+    "justNow": "recién",
+    "minutesAgo": "hace {{count}} min",
+    "hoursAgo": "hace {{count}}h",
+    "daysAgo": "hace {{count}}d"
+  },
   "questify": {
     "title": "Questify",
     "subtitle": "Gestiona tus aventuras diarias",
@@ -537,8 +549,10 @@
     "importFailed": "Error al importar",
     "importConfirm": "¿Importar respaldo? Esto reemplazará todos los datos actuales.",
     "notifications": "Notificaciones",
-    "reminders": "Recordatorios",
-    "remindersDesc": "Recibir notificaciones cada 3 horas para registrar comidas y quests",
+    "notificationsInApp": "Notificaciones en la app",
+    "notificationsInAppDesc": "Centro de notificaciones con items pendientes",
+    "notificationsSystem": "Notificaciones del sistema",
+    "notificationsSystemDesc": "Notificaciones nativas de Windows",
     "shortcuts": "Atajos de teclado",
     "updateAvailable": "Nueva versión disponible: v{{version}}",
     "downloading": "Descargando... {{percent}}%",

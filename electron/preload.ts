@@ -83,14 +83,26 @@ const api = {
   syncClearUserData: () => ipcRenderer.invoke('sync:clearUserData'),
   syncSetCurrentUser: (uid: string) => ipcRenderer.invoke('sync:setCurrentUser', uid),
   syncGetCurrentUser: () => ipcRenderer.invoke('sync:getCurrentUser'),
+  syncGetAllNotificationData: () => ipcRenderer.invoke('sync:getAllNotificationData'),
+  syncMergeNotificationData: (data: Record<string, unknown>[]) => ipcRenderer.invoke('sync:mergeNotificationData', data),
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),
   backupImport: () => ipcRenderer.invoke('backup:import'),
 
   // Notifications
-  notificationsSetReminders: (enabled: boolean) => ipcRenderer.invoke('notifications:setReminders', enabled),
   notificationsSend: (title: string, body: string) => ipcRenderer.invoke('notifications:send', title, body),
+  notificationsGetAll: () => ipcRenderer.invoke('notifications:getAll'),
+  notificationsDismiss: (id: string) => ipcRenderer.invoke('notifications:dismiss', id),
+  notificationsSnooze: (id: string) => ipcRenderer.invoke('notifications:snooze', id),
+  notificationsRunCheck: () => ipcRenderer.invoke('notifications:runCheck'),
+  notificationsGetCount: () => ipcRenderer.invoke('notifications:getCount'),
+  notificationsSetSystemEnabled: (enabled: boolean) => ipcRenderer.invoke('notifications:setSystemEnabled', enabled),
+  onNotificationsUpdated: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('notifications:updated', handler);
+    return () => { ipcRenderer.removeListener('notifications:updated', handler); };
+  },
 
   // Dollar
   dollarGetRates: () => ipcRenderer.invoke('dollar:getRates'),

@@ -11,7 +11,8 @@ export default function SettingsPage() {
   const confirm = useConfirm();
   const { user: authUser, logout } = useAuthContext();
   const [soundEnabled, setSoundEnabled] = useState(() => isSoundEnabled());
-  const [remindersEnabled, setRemindersEnabled] = useState(() => localStorage.getItem('hubtify_reminders') === 'true');
+  const [notifInApp, setNotifInApp] = useState(() => localStorage.getItem('hubtify_notifications_inapp') !== 'false');
+  const [notifSystem, setNotifSystem] = useState(() => localStorage.getItem('hubtify_notifications_system') !== 'false');
   const [syncStatus, setSyncStatus] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -125,16 +126,29 @@ export default function SettingsPage() {
         </div>
         <div style={rowStyle}>
           <div>
-            <div style={labelStyle}>{t('settings.reminders')}</div>
-            <div style={descStyle}>{t('settings.remindersDesc')}</div>
+            <div style={labelStyle}>{t('settings.notificationsInApp', 'Notificaciones en la app')}</div>
+            <div style={descStyle}>{t('settings.notificationsInAppDesc', 'Centro de notificaciones con items pendientes')}</div>
           </div>
           <button className="rpg-button" onClick={() => {
-            const next = !remindersEnabled;
-            setRemindersEnabled(next);
-            localStorage.setItem('hubtify_reminders', next ? 'true' : 'false');
-            window.api.notificationsSetReminders(next);
+            const next = !notifInApp;
+            setNotifInApp(next);
+            localStorage.setItem('hubtify_notifications_inapp', next ? 'true' : 'false');
           }} style={{ minWidth: 60 }}>
-            {remindersEnabled ? t('settings.toggleOn') : t('settings.toggleOff')}
+            {notifInApp ? t('settings.toggleOn') : t('settings.toggleOff')}
+          </button>
+        </div>
+        <div style={rowStyle}>
+          <div>
+            <div style={labelStyle}>{t('settings.notificationsSystem', 'Notificaciones del sistema')}</div>
+            <div style={descStyle}>{t('settings.notificationsSystemDesc', 'Notificaciones nativas de Windows')}</div>
+          </div>
+          <button className="rpg-button" onClick={() => {
+            const next = !notifSystem;
+            setNotifSystem(next);
+            localStorage.setItem('hubtify_notifications_system', next ? 'true' : 'false');
+            window.api.notificationsSetSystemEnabled?.(next);
+          }} style={{ minWidth: 60 }}>
+            {notifSystem ? t('settings.toggleOn') : t('settings.toggleOff')}
           </button>
         </div>
       </div>

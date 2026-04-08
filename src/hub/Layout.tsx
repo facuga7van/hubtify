@@ -11,6 +11,7 @@ import './styles/components.css';
 import { playLevelUp } from '../shared/audio';
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts';
 import QuickAdd from '../shared/components/QuickAdd';
+import NotificationCenter from '../shared/components/NotificationCenter';
 import ToastProvider from '../shared/components/ToastProvider';
 import AnimatedOutlet, { AnimatedNavigateContext, type AnimatedOutletHandle } from '../shared/components/AnimatedOutlet';
 import { gsap } from 'gsap';
@@ -32,6 +33,7 @@ export default function Layout() {
   useKeyboardShortcuts();
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Auto-updater
   const [syncError, setSyncError] = useState(false);
@@ -166,11 +168,9 @@ export default function Layout() {
     };
   }, [authUser]);
 
-  // Enable reminders if previously set
   useEffect(() => {
-    if (localStorage.getItem('hubtify_reminders') === 'true') {
-      window.api.notificationsSetReminders(true).catch(console.error);
-    }
+    const enabled = localStorage.getItem('hubtify_notifications_system') !== 'false';
+    window.api.notificationsSetSystemEnabled?.(enabled);
   }, []);
 
   const retrySyncPull = useCallback(async () => {
@@ -265,7 +265,7 @@ export default function Layout() {
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
         <div className="sidebar-wrapper">
-          <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+          <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onBellClick={() => setShowNotifications(true)} />
           <button onClick={toggleSidebar} className={`sidebar-toggle ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
             title={sidebarCollapsed ? 'Expand' : 'Collapse'}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
@@ -383,6 +383,12 @@ export default function Layout() {
       )}
 
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
+
+        <NotificationCenter
+          open={showNotifications}
+          onClose={() => setShowNotifications(false)}
+          onNavigate={animatedNavigate}
+        />
 
       {/* Update popup */}
       {updateAvailable && (
