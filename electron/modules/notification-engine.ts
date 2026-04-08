@@ -115,6 +115,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
       `SELECT id, name FROM tasks
        WHERE status = 0
          AND updated_at < datetime('now', '-7 days')
+         AND updated_at >= datetime('now', '-30 days')
          AND deleted_at IS NULL`
     )
     .all() as { id: string; name: string }[];
