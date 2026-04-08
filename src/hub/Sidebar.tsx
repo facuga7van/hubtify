@@ -1,12 +1,13 @@
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
+import NotificationBell from '../shared/components/NotificationBell';
 import type { PlayerStats } from '../../shared/types';
 import Tooltip from '../shared/components/Tooltip';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
 import './styles/layout.css';
 
-interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; }
+interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; onBellClick?: () => void; }
 
 function NavIcon({ name }: { name: string }) {
   const s = { width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -53,14 +54,22 @@ const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boo
   { path: '/settings', key: 'nav.settings', icon: 'settings' },
 ];
 
-export default function Sidebar({ stats, collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: SidebarProps) {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const animatedNavigate = useAnimatedNavigate();
 
+  const notifInApp = localStorage.getItem('hubtify_notifications_inapp') !== 'false';
+
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <PlayerCard stats={stats} collapsed={collapsed} />
+
+      {notifInApp && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+          <NotificationBell onClick={() => onBellClick?.()} />
+        </div>
+      )}
 
       {!collapsed && (
         <div style={{ padding: '4px 14px', opacity: 0.3 }}>
