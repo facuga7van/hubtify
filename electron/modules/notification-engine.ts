@@ -215,7 +215,11 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
     .all() as { id: string; name: string; closing_day: number }[];
 
   for (const cc of creditCards) {
-    const daysUntilClosing = ((cc.closing_day - currentDay) + 31) % 31;
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), cc.closing_day);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, cc.closing_day);
+    const target = thisMonth.getTime() >= now.getTime() ? thisMonth : nextMonth;
+    const daysUntilClosing = Math.ceil((target.getTime() - now.getTime()) / 86400000);
     if (daysUntilClosing > 0 && daysUntilClosing <= 2) {
       candidates.push({
         type: 'finance_card_closing',
