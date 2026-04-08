@@ -44,6 +44,24 @@ export interface Migration {
   up: string;
 }
 
+// ── Notification Types ────────────────────────────────────
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  module: string;
+  title: string;
+  body: string;
+  actionRoute: string;
+  status: 'active' | 'snoozed' | 'resolved' | 'dismissed';
+  snoozedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  deletedAt: string | null;
+  refId: string | null;
+}
+
 // ── Finance Import Types ────────────────────────────────────
 
 export interface ParsedRow {
@@ -148,8 +166,14 @@ export interface HubtifyApi {
   characterLoad: () => Promise<unknown>;
 
   // Notifications
-  notificationsSetReminders: (enabled: boolean) => Promise<{ success: boolean }>;
   notificationsSend: (title: string, body: string) => Promise<boolean>;
+  notificationsGetAll: () => Promise<AppNotification[]>;
+  notificationsDismiss: (id: string) => Promise<void>;
+  notificationsSnooze: (id: string) => Promise<void>;
+  notificationsRunCheck: () => Promise<void>;
+  notificationsGetCount: () => Promise<number>;
+  notificationsSetSystemEnabled: (enabled: boolean) => Promise<void>;
+  onNotificationsUpdated: (callback: () => void) => () => void;
 
   // Dollar
   dollarGetRates: () => Promise<{ success: boolean; rates: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
