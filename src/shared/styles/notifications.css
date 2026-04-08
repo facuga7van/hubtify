@@ -1,0 +1,191 @@
+/* ── Notification Bell ────────────────────────────────── */
+
+.notif-bell {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.notif-bell:hover {
+  background: rgba(var(--rpg-gold-rgb, 184, 157, 100), 0.15);
+}
+
+.notif-bell-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--rpg-hp-red, #c44);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: bold;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+/* ── Notification Center Drawer ───────────────────────── */
+
+.notif-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.notif-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 90vw;
+  background: var(--rpg-parchment, #f5e6c8);
+  border-left: 2px solid var(--rpg-gold-dark, #8b7355);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.notif-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--rpg-gold-dark, #8b7355);
+  font-family: Cinzel, serif;
+  font-size: 1rem;
+  color: var(--rpg-wood, #5c3d2e);
+}
+
+.notif-drawer-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--rpg-wood, #5c3d2e);
+  font-size: 1.2rem;
+  padding: 4px;
+}
+
+.notif-drawer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.notif-module-group {
+  margin-bottom: 12px;
+}
+
+.notif-module-label {
+  font-family: Cinzel, serif;
+  font-size: 0.75rem;
+  color: var(--rpg-gold-dark, #8b7355);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  opacity: 0.7;
+}
+
+.notif-item {
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(var(--rpg-gold-rgb, 184, 157, 100), 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  transition: background 0.2s;
+}
+
+.notif-item:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.notif-item-title {
+  font-family: Cinzel, serif;
+  font-size: 0.85rem;
+  color: var(--rpg-wood, #5c3d2e);
+  margin-bottom: 2px;
+}
+
+.notif-item-body {
+  font-family: 'Crimson Text', serif;
+  font-size: 0.8rem;
+  color: var(--rpg-wood, #5c3d2e);
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+
+.notif-item-time {
+  font-size: 0.65rem;
+  color: var(--rpg-gold-dark, #8b7355);
+  opacity: 0.5;
+  margin-bottom: 6px;
+}
+
+.notif-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.notif-item-actions button {
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--rpg-gold-dark, #8b7355);
+  background: transparent;
+  color: var(--rpg-wood, #5c3d2e);
+  cursor: pointer;
+  font-family: 'Crimson Text', serif;
+  transition: background 0.2s;
+}
+
+.notif-item-actions button:hover {
+  background: rgba(var(--rpg-gold-rgb, 184, 157, 100), 0.2);
+}
+
+.notif-item-actions button.notif-action-go {
+  background: var(--rpg-gold-dark, #8b7355);
+  color: var(--rpg-parchment, #f5e6c8);
+}
+
+.notif-item-actions button.notif-action-go:hover {
+  opacity: 0.9;
+}
+
+.notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+  text-align: center;
+  padding: 40px;
+}
+
+.notif-empty svg {
+  margin-bottom: 12px;
+}
+
+.notif-empty-title {
+  font-family: Cinzel, serif;
+  font-size: 1rem;
+  color: var(--rpg-wood, #5c3d2e);
+}
+
+.notif-empty-desc {
+  font-family: 'Crimson Text', serif;
+  font-size: 0.85rem;
+  color: var(--rpg-wood, #5c3d2e);
+}
