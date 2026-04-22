@@ -67,3 +67,47 @@ export function playPageFlip() {
     getSound(`pageFlip${idx}`, pageFlipSources[idx](), 0.18).play();
   } catch { /* Sound not available */ }
 }
+
+/* ── Cauldron sounds ── */
+
+export function playCauldronStart() {
+  if (!soundEnabled) return;
+  try {
+    getSound('cauldronStart', new URL('../assets/fx/brew-start.mp3', import.meta.url).href, 0.35).play();
+  } catch { /* Sound not available */ }
+}
+
+export function playCauldronComplete() {
+  if (!soundEnabled) return;
+  try {
+    getSound('cauldronComplete', new URL('../assets/fx/brew-complete.mp3', import.meta.url).href, 0.45).play();
+  } catch { /* Sound not available */ }
+}
+
+export function playCauldronBreakEnd() {
+  if (!soundEnabled) return;
+  try {
+    getSound('cauldronBreakEnd', new URL('../assets/fx/break-end.mp3', import.meta.url).href, 0.4).play();
+  } catch { /* Sound not available */ }
+}
+
+export function playCauldronCycleEnd() {
+  if (!soundEnabled) return;
+  try {
+    getSound('cauldronCycleEnd', new URL('../assets/fx/cycle-complete.mp3', import.meta.url).href, 0.5).play();
+  } catch { /* Sound not available */ }
+}
+
+export function playCauldronWarning() {
+  if (!soundEnabled) return;
+  try {
+    getSound('cauldronWarning', new URL('../assets/fx/brew-warning.mp3', import.meta.url).href, 0.2).play();
+  } catch { /* Sound not available */ }
+}
+
+export function playCauldronPause() {
+  if (!soundEnabled) return;
+  try {
+    getSound('cauldronPause', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.25).play();
+  } catch { /* Sound not available */ }
+}
