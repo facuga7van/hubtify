@@ -9,20 +9,23 @@ import type { PlayerStats } from '../../shared/types';
 import type { AuthUser } from '../shared/hooks/useAuth';
 import { useAuthContext } from '../shared/AuthContext';
 import { streakAchieved } from '../shared/animations/epic';
+import NotificationBell from '../shared/components/NotificationBell';
 
 interface PlayerCardProps {
   stats: PlayerStats | null;
   collapsed?: boolean;
+  onBellClick?: () => void;
 }
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
 
-export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
+export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCardProps) {
   const { t } = useTranslation();
   const { user: authUser, logout, switching, switchAccount, getCachedAccounts } = useAuthContext();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const streakRef = useRef<HTMLDivElement>(null);
   const prevStreakRef = useRef<number>(0);
+  const notifInApp = localStorage.getItem('hubtify_notifications_inapp') !== 'false';
 
   useEffect(() => {
     if (!stats) return;
@@ -67,7 +70,12 @@ export default function PlayerCard({ stats, collapsed }: PlayerCardProps) {
       <div className="player-card__info">
         <div className="player-card__level">{t('common.levelPrefix')}{stats.level}</div>
         {!collapsed ? (
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            {notifInApp && onBellClick && (
+              <div style={{ position: 'absolute', left: -28, top: '50%', transform: 'translateY(-50%)' }}>
+                <NotificationBell onClick={onBellClick} />
+              </div>
+            )}
             <button
               className="player-card__title player-card__title--clickable"
               onClick={() => setDropdownOpen(!dropdownOpen)}
