@@ -25,6 +25,8 @@ import Loans from './modules/finance/components/Loans';
 import Recurring from './modules/finance/components/Recurring';
 import Import from './modules/finance/components/Import';
 import CreditCards from './modules/finance/components/CreditCards';
+import CauldronPage from './modules/cauldron/components/CauldronPage';
+import './modules/cauldron/styles/cauldron.css';
 import { useAuthContext } from './shared/AuthContext';
 
 function AuthPageWrapper() {
@@ -100,6 +102,7 @@ export default function App() {
             <Route path="recurring" element={<Recurring />} />
             <Route path="import" element={<Import />} />
           </Route>
+          <Route path="/cauldron" element={<CauldronPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Route>

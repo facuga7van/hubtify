@@ -1,0 +1,756 @@
+/* ══════════════════════════════════════════════════════════════
+   Cauldron Module — Pomodoro Timer with RPG Theme
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Page Layout ───────────────────────────────────────── */
+
+.cauldron-page {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── 2. SVG Cauldron Timer ────────────────────────────────── */
+
+.cauldron-timer-container {
+  position: relative;
+  width: 280px;
+  height: 320px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cauldron-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.cauldron-liquid-fill {
+  transition: y 0.5s ease, height 0.5s ease;
+}
+
+.cauldron-wave {
+  animation: cauldron-wave 3s linear infinite;
+}
+
+@keyframes cauldron-wave {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.cauldron-rim-glow {
+  animation: cauldron-rim-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cauldron-rim-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.cauldron-time-display {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Fira Code', monospace;
+  font-size: 2.2rem;
+  color: var(--rpg-parchment);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.cauldron-session-label {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--rpg-parchment);
+  opacity: 0.8;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Session type color modifiers */
+.cauldron-work .cauldron-liquid-fill { fill: var(--rpg-hp-red); }
+.cauldron-work .cauldron-wave { fill: var(--rpg-hp-red-light); }
+.cauldron-work .cauldron-rim-glow { stroke: var(--rpg-hp-red-light); }
+.cauldron-work .cauldron-session-label { color: #f4a0a0; }
+
+.cauldron-break .cauldron-liquid-fill { fill: var(--rpg-xp-green); }
+.cauldron-break .cauldron-wave { fill: var(--rpg-xp-green-light); }
+.cauldron-break .cauldron-rim-glow { stroke: var(--rpg-xp-green-light); }
+.cauldron-break .cauldron-session-label { color: #a0f4a0; }
+
+.cauldron-long-break .cauldron-liquid-fill { fill: var(--rpg-gold-dark); }
+.cauldron-long-break .cauldron-wave { fill: var(--rpg-gold); }
+.cauldron-long-break .cauldron-rim-glow { stroke: var(--rpg-gold-light); }
+.cauldron-long-break .cauldron-session-label { color: var(--rpg-gold-light); }
+
+/* ── 3. Particle Effects ─────────────────────────────────── */
+
+/* Bubbles inside the cauldron pot */
+.cauldron-bubbles {
+  position: absolute;
+  bottom: 20%;
+  left: 25%;
+  width: 50%;
+  height: 40%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cauldron-bubble {
+  position: absolute;
+  bottom: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  animation: cauldron-bubble-rise 3s ease-in infinite;
+}
+
+@keyframes cauldron-bubble-rise {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-120px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+.cauldron-bubble:nth-child(1) { left: 10%; width: 8px; height: 8px; animation-duration: 2.5s; animation-delay: 0s; }
+.cauldron-bubble:nth-child(2) { left: 30%; width: 6px; height: 6px; animation-duration: 3s; animation-delay: 0.5s; }
+.cauldron-bubble:nth-child(3) { left: 50%; width: 10px; height: 10px; animation-duration: 2s; animation-delay: 1s; }
+.cauldron-bubble:nth-child(4) { left: 70%; width: 7px; height: 7px; animation-duration: 3.5s; animation-delay: 0.3s; }
+.cauldron-bubble:nth-child(5) { left: 20%; width: 12px; height: 12px; animation-duration: 2.8s; animation-delay: 1.5s; }
+.cauldron-bubble:nth-child(6) { left: 60%; width: 14px; height: 14px; animation-duration: 4s; animation-delay: 0.8s; }
+
+/* Steam above the cauldron rim */
+.cauldron-steam {
+  position: absolute;
+  top: 5%;
+  left: 20%;
+  width: 60%;
+  height: 30%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cauldron-steam-puff {
+  position: absolute;
+  bottom: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  animation: cauldron-steam-rise 4s ease-out infinite;
+}
+
+@keyframes cauldron-steam-rise {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-60px) scale(2.5);
+    opacity: 0;
+  }
+}
+
+.cauldron-steam-puff:nth-child(1) { left: 15%; width: 14px; height: 14px; animation-duration: 3.5s; animation-delay: 0s; }
+.cauldron-steam-puff:nth-child(2) { left: 40%; width: 18px; height: 18px; animation-duration: 4s; animation-delay: 1s; }
+.cauldron-steam-puff:nth-child(3) { left: 65%; width: 12px; height: 12px; animation-duration: 3s; animation-delay: 0.5s; }
+.cauldron-steam-puff:nth-child(4) { left: 30%; width: 20px; height: 20px; animation-duration: 5s; animation-delay: 2s; }
+.cauldron-steam-puff:nth-child(5) { left: 75%; width: 10px; height: 10px; animation-duration: 3.8s; animation-delay: 1.5s; }
+
+/* ── 4. Glow Backdrop ────────────────────────────────────── */
+
+.cauldron-glow-backdrop {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.5s ease;
+}
+
+.cauldron-work .cauldron-glow-backdrop {
+  background: radial-gradient(circle, rgba(180, 40, 40, 0.15), transparent 70%);
+}
+
+.cauldron-break .cauldron-glow-backdrop {
+  background: radial-gradient(circle, rgba(40, 180, 40, 0.15), transparent 70%);
+}
+
+.cauldron-long-break .cauldron-glow-backdrop {
+  background: radial-gradient(circle, rgba(180, 150, 40, 0.15), transparent 70%);
+}
+
+/* ── 5. Controls ─────────────────────────────────────────── */
+
+.cauldron-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.cauldron-controls .rpg-button {
+  min-width: 100px;
+}
+
+/* ── 6. Cycle Dots ───────────────────────────────────────── */
+
+.cauldron-cycles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cauldron-cycle-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--rpg-gold-dark);
+  background: var(--rpg-parchment-dark);
+  transition: all 0.3s ease;
+}
+
+.cauldron-cycle-dot.active {
+  border-color: var(--rpg-gold);
+  background: var(--rpg-gold);
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.5);
+}
+
+.cauldron-cycle-dot.completed {
+  background: var(--rpg-xp-green);
+  border-color: var(--rpg-xp-green);
+}
+
+/* ── 7. Ticker Marquee ───────────────────────────────────── */
+
+.cauldron-ticker {
+  overflow: hidden;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  height: 28px;
+  background: rgba(44, 24, 16, 0.6);
+  border-radius: 4px;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  display: flex;
+  align-items: center;
+}
+
+.cauldron-ticker-content {
+  display: flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  color: var(--rpg-gold);
+  animation: cauldron-ticker-scroll 15s linear infinite;
+}
+
+@keyframes cauldron-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.cauldron-ticker-text {
+  display: inline-block;
+  padding: 0 24px;
+}
+
+/* ── 8. Presets Section ──────────────────────────────────── */
+
+.cauldron-presets {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cauldron-preset-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, var(--rpg-wood-light) 0%, var(--rpg-wood) 100%);
+  border: 2px solid rgba(166, 138, 62, 0.4);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.cauldron-preset-pill:hover {
+  border-color: var(--rpg-gold);
+}
+
+.cauldron-preset-pill.selected {
+  border-color: var(--rpg-gold);
+  box-shadow: 0 0 10px rgba(201, 168, 76, 0.25);
+}
+
+.cauldron-preset-pill-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.8rem;
+  color: var(--rpg-gold-light);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.cauldron-preset-pill-time {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.65rem;
+  color: var(--rpg-parchment);
+  opacity: 0.7;
+}
+
+.cauldron-preset-pill-actions {
+  display: flex;
+  gap: 1px;
+  margin-left: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.cauldron-preset-pill:hover .cauldron-preset-pill-actions {
+  opacity: 1;
+}
+
+.cauldron-preset-action-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--rpg-parchment);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.65rem;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.cauldron-preset-action-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cauldron-create-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 2px dashed rgba(166, 138, 62, 0.3);
+  border-radius: 50%;
+  color: var(--rpg-wood);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.cauldron-create-pill:hover {
+  border-color: var(--rpg-gold-dark);
+  color: var(--rpg-gold-dark);
+}
+
+/* Cycle preview bar (used in editor only now) */
+.cauldron-cycle-preview {
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.cauldron-cycle-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.cauldron-cycle-segment.work { background: var(--rpg-hp-red); }
+.cauldron-cycle-segment.break { background: var(--rpg-xp-green); }
+.cauldron-cycle-segment.long-break { background: var(--rpg-gold); }
+
+/* ── 9. Preset Editor (Inline) ───────────────────────────── */
+
+.cauldron-preset-editor {
+  background: linear-gradient(180deg, var(--rpg-wood-light) 0%, var(--rpg-wood) 100%);
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: var(--rpg-radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  margin-top: 16px;
+  padding: 20px;
+}
+
+.cauldron-editor-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  color: var(--rpg-gold-light);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  margin-bottom: 16px;
+}
+
+.cauldron-editor-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cauldron-number-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cauldron-stepper-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--rpg-parchment);
+}
+
+.cauldron-stepper-label.stepper-work { color: #faa; }
+.cauldron-stepper-label.stepper-break { color: #afa; }
+.cauldron-stepper-label.stepper-long-break { color: var(--rpg-gold-light); }
+.cauldron-stepper-label.stepper-cycles { color: var(--rpg-parchment); }
+
+.cauldron-stepper-controls {
+  display: flex;
+  align-items: center;
+}
+
+.cauldron-stepper-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rpg-wood-light);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: var(--rpg-radius);
+  font-family: 'Cinzel', serif;
+  color: var(--rpg-parchment);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.cauldron-stepper-btn:hover {
+  border-color: rgba(201, 168, 76, 0.5);
+}
+
+.cauldron-stepper-input {
+  width: 50px;
+  text-align: center;
+  background: var(--rpg-ink);
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: var(--rpg-radius);
+  color: var(--rpg-parchment);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+  padding: 4px;
+  margin: 0 4px;
+}
+
+/* Hide number input spinners */
+.cauldron-stepper-input::-webkit-outer-spin-button,
+.cauldron-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.cauldron-stepper-input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.cauldron-editor-preview {
+  margin-top: 12px;
+}
+
+.cauldron-editor-preview-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--rpg-parchment);
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.cauldron-editor-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* .cauldron-create-btn removed — replaced by .cauldron-create-pill */
+
+/* ── 10. Stats Section ───────────────────────────────────── */
+
+.cauldron-stats {
+  background: linear-gradient(180deg, var(--rpg-wood-light) 0%, var(--rpg-wood) 100%);
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: var(--rpg-radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+}
+
+.cauldron-stats-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: var(--rpg-gold-light);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cauldron-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.cauldron-stat {
+  text-align: center;
+}
+
+.cauldron-stat-value {
+  font-family: 'Fira Code', monospace;
+  font-size: 2rem;
+  color: var(--rpg-gold-light);
+  text-shadow: 0 0 12px rgba(201, 168, 76, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.cauldron-stat-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--rpg-parchment);
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+/* ── 11. Floating Timer ──────────────────────────────────── */
+
+.cauldron-floating-timer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--rpg-wood);
+  border: 1px solid var(--rpg-gold-dark);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.cauldron-floating-timer:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.cauldron-floating-timer.work {
+  border-color: var(--rpg-hp-red);
+  box-shadow: 0 0 15px rgba(180, 40, 40, 0.3);
+}
+
+.cauldron-floating-timer.break {
+  border-color: var(--rpg-xp-green);
+  box-shadow: 0 0 15px rgba(40, 180, 40, 0.3);
+}
+
+.cauldron-floating-timer.long-break {
+  border-color: var(--rpg-gold);
+  box-shadow: 0 0 15px rgba(180, 150, 40, 0.3);
+}
+
+@keyframes cauldron-floating-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(201, 168, 76, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(201, 168, 76, 0.5);
+  }
+}
+
+.cauldron-floating-timer.active {
+  animation: cauldron-floating-pulse 2s ease-in-out infinite;
+}
+
+.cauldron-floating-timer.active.work {
+  animation-name: cauldron-floating-pulse-work;
+}
+
+.cauldron-floating-timer.active.break {
+  animation-name: cauldron-floating-pulse-break;
+}
+
+.cauldron-floating-timer.active.long-break {
+  animation-name: cauldron-floating-pulse-long-break;
+}
+
+@keyframes cauldron-floating-pulse-work {
+  0%, 100% { box-shadow: 0 0 15px rgba(180, 40, 40, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(180, 40, 40, 0.5); }
+}
+
+@keyframes cauldron-floating-pulse-break {
+  0%, 100% { box-shadow: 0 0 15px rgba(40, 180, 40, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(40, 180, 40, 0.5); }
+}
+
+@keyframes cauldron-floating-pulse-long-break {
+  0%, 100% { box-shadow: 0 0 15px rgba(180, 150, 40, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(180, 150, 40, 0.5); }
+}
+
+.cauldron-floating-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 0 24px 24px;
+  transition: width 0.3s ease;
+}
+
+.cauldron-floating-progress.work { background: var(--rpg-hp-red); }
+.cauldron-floating-progress.break { background: var(--rpg-xp-green); }
+.cauldron-floating-progress.long-break { background: var(--rpg-gold); }
+
+.cauldron-floating-time {
+  font-family: 'Fira Code', monospace;
+  font-size: 1rem;
+  color: var(--rpg-parchment);
+  min-width: 50px;
+  text-align: center;
+}
+
+.cauldron-floating-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  color: var(--rpg-gold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cauldron-floating-btn {
+  background: none;
+  border: none;
+  color: var(--rpg-parchment);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.cauldron-floating-btn:hover {
+  opacity: 1;
+}
+
+/* ── 12. Dashboard Widget ────────────────────────────────── */
+
+.cauldron-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s ease;
+}
+
+.cauldron-widget:hover {
+  transform: translateY(-1px);
+}
+
+.cauldron-widget-icon {
+  width: 24px;
+  height: 24px;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.cauldron-widget-count {
+  font-family: 'Fira Code', monospace;
+  font-size: 1.5rem;
+  color: var(--rpg-gold-light);
+}
+
+.cauldron-widget-label {
+  font-size: 0.75rem;
+  color: var(--rpg-parchment);
+  opacity: 0.85;
+}
+
+.cauldron-widget-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--rpg-radius);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.85rem;
+  color: var(--rpg-parchment);
+}
+
+/* ── 13. Reduced Motion ──────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .cauldron-wave,
+  .cauldron-bubble,
+  .cauldron-steam-puff,
+  .cauldron-ticker-content,
+  .cauldron-floating-timer.active,
+  .cauldron-rim-glow {
+    animation: none !important;
+  }
+
+  .cauldron-liquid-fill,
+  .cauldron-cycle-dot,
+  .cauldron-preset-pill,
+  .cauldron-cycle-segment {
+    transition-duration: 0.01ms !important;
+  }
+}

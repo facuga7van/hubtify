@@ -14,6 +14,7 @@ import QuickAdd from '../shared/components/QuickAdd';
 import NotificationCenter from '../shared/components/NotificationCenter';
 import ToastProvider from '../shared/components/ToastProvider';
 import AnimatedOutlet, { AnimatedNavigateContext, type AnimatedOutletHandle } from '../shared/components/AnimatedOutlet';
+import CauldronFloatingTimer from '../modules/cauldron/components/CauldronFloatingTimer';
 import { gsap } from 'gsap';
 import { levelUp as animateLevelUp } from '../shared/animations/epic';
 
@@ -135,10 +136,12 @@ export default function Layout() {
     window.addEventListener('rpg:statsChanged', handler);
     window.addEventListener('quests:dataChanged', handler);
     window.addEventListener('finance:dataChanged', handler);
+    window.addEventListener('cauldron:dataChanged', handler);
     return () => {
       window.removeEventListener('rpg:statsChanged', handler);
       window.removeEventListener('quests:dataChanged', handler);
       window.removeEventListener('finance:dataChanged', handler);
+      window.removeEventListener('cauldron:dataChanged', handler);
     };
   }, [debouncedPush]);
 
@@ -161,6 +164,7 @@ export default function Layout() {
         if (result.changed) {
           window.dispatchEvent(new Event('sync:questsUpdated'));
           window.dispatchEvent(new Event('sync:nutritionUpdated'));
+          window.dispatchEvent(new Event('sync:cauldronUpdated'));
         }
       } catch { /* Silent fail */ }
     };
@@ -195,6 +199,7 @@ export default function Layout() {
       if (result.changed) {
         window.dispatchEvent(new Event('sync:questsUpdated'));
         window.dispatchEvent(new Event('sync:nutritionUpdated'));
+        window.dispatchEvent(new Event('sync:cauldronUpdated'));
       }
     } catch {
       setSyncError(true);
@@ -387,6 +392,8 @@ export default function Layout() {
       )}
 
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
+
+      <CauldronFloatingTimer />
 
         <NotificationCenter
           open={showNotifications}

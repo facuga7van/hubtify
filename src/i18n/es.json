@@ -12,6 +12,7 @@
     "coinify": "Coinify",
     "achievements": "Logros",
     "village": "Aldea",
+    "cauldron": "Caldero",
     "character": "Personaje",
     "settings": "Ajustes"
   },
@@ -402,6 +403,48 @@
     "tired": "Cansado",
     "healthy": "Saludable",
     "radiant": "Radiante"
+  },
+  "cauldron": {
+    "break": "Descanso",
+    "cycle": "Ciclo {{current}} de {{total}}",
+    "longBreak": "Descanso largo",
+    "pause": "Pausar",
+    "pomodoroComplete": "¡Poción completada!",
+    "presets": {
+      "breakMin": "Descanso (min)",
+      "classic": "Clásico",
+      "createRecipe": "Crear Receta",
+      "cycles": "Ciclos",
+      "deleteConfirm": "¿Estás seguro de eliminar esta receta?",
+      "editRecipe": "Editar Receta",
+      "longBreakMin": "Descanso largo (min)",
+      "longFocus": "Enfoque Largo",
+      "name": "Nombre",
+      "quickSprint": "Sprint Rápido",
+      "title": "Recetas",
+      "workMin": "Enfoque (min)"
+    },
+    "resume": "Continuar",
+    "skip": "Saltar",
+    "startBrew": "Iniciar Poción",
+    "stats": {
+      "title": "Registro de Pociones",
+      "today": "Hoy",
+      "total": "Total",
+      "week": "Esta Semana"
+    },
+    "stop": "Detener",
+    "ticker": {
+      "brewing": "Preparando poción de enfoque...",
+      "cycle": "Ciclo {{current}} de {{total}}",
+      "resting": "Los ingredientes reposan...",
+      "today": "{{count}} pociones hoy"
+    },
+    "title": "El Caldero",
+    "widget": {
+      "title": "Caldero"
+    },
+    "work": "Enfoque"
   },
   "auth": {
     "welcomeBack": "Bienvenido de vuelta, aventurero",

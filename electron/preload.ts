@@ -85,6 +85,8 @@ const api = {
   syncGetCurrentUser: () => ipcRenderer.invoke('sync:getCurrentUser'),
   syncGetAllNotificationData: () => ipcRenderer.invoke('sync:getAllNotificationData'),
   syncMergeNotificationData: (data: Record<string, unknown>[]) => ipcRenderer.invoke('sync:mergeNotificationData', data),
+  syncGetAllCauldronData: () => ipcRenderer.invoke('sync:getAllCauldronData'),
+  syncMergeCauldronData: (data: Record<string, unknown>) => ipcRenderer.invoke('sync:mergeCauldronData', data),
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),
@@ -103,6 +105,28 @@ const api = {
     const handler = () => callback();
     ipcRenderer.on('notifications:updated', handler);
     return () => { ipcRenderer.removeListener('notifications:updated', handler); };
+  },
+
+  // Cauldron
+  cauldronGetPresets: () => ipcRenderer.invoke('cauldron:getPresets'),
+  cauldronUpsertPreset: (preset: Record<string, unknown>) => ipcRenderer.invoke('cauldron:upsertPreset', preset),
+  cauldronDeletePreset: (id: string) => ipcRenderer.invoke('cauldron:deletePreset', id),
+  cauldronStart: (presetId: string) => ipcRenderer.invoke('cauldron:start', presetId),
+  cauldronPause: () => ipcRenderer.invoke('cauldron:pause'),
+  cauldronResume: () => ipcRenderer.invoke('cauldron:resume'),
+  cauldronSkip: () => ipcRenderer.invoke('cauldron:skip'),
+  cauldronStop: () => ipcRenderer.invoke('cauldron:stop'),
+  cauldronGetState: () => ipcRenderer.invoke('cauldron:getState'),
+  cauldronGetStats: () => ipcRenderer.invoke('cauldron:getStats'),
+  onCauldronTick: (callback: (state: unknown) => void) => {
+    const handler = (_e: unknown, state: unknown) => callback(state);
+    ipcRenderer.on('cauldron:tick', handler);
+    return () => { ipcRenderer.removeListener('cauldron:tick', handler); };
+  },
+  onCauldronSessionEnd: (callback: (result: unknown) => void) => {
+    const handler = (_e: unknown, result: unknown) => callback(result);
+    ipcRenderer.on('cauldron:sessionEnd', handler);
+    return () => { ipcRenderer.removeListener('cauldron:sessionEnd', handler); };
   },
 
   // Dollar

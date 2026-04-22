@@ -135,6 +135,7 @@ export function useAuth() {
         window.dispatchEvent(new Event('rpg:statsChanged'));
         window.dispatchEvent(new Event('sync:questsUpdated'));
         window.dispatchEvent(new Event('sync:nutritionUpdated'));
+        window.dispatchEvent(new Event('sync:cauldronUpdated'));
         window.dispatchEvent(new Event('account:switched'));
       } else {
         // Token expired, remove stale account
@@ -184,6 +185,7 @@ export function useAuth() {
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('sync:questsUpdated'));
       window.dispatchEvent(new Event('sync:nutritionUpdated'));
+      window.dispatchEvent(new Event('sync:cauldronUpdated'));
       window.dispatchEvent(new Event('account:switched'));
 
       return { success: true };
@@ -230,6 +232,7 @@ export function useAuth() {
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('sync:questsUpdated'));
       window.dispatchEvent(new Event('sync:nutritionUpdated'));
+      window.dispatchEvent(new Event('sync:cauldronUpdated'));
       window.dispatchEvent(new Event('account:switched'));
 
       return { success: true };

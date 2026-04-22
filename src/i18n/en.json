@@ -12,6 +12,7 @@
     "coinify": "Coinify",
     "achievements": "Achievements",
     "village": "Village",
+    "cauldron": "Cauldron",
     "character": "Character",
     "settings": "Settings"
   },
@@ -402,6 +403,48 @@
     "tired": "Tired",
     "healthy": "Healthy",
     "radiant": "Radiant"
+  },
+  "cauldron": {
+    "break": "Break",
+    "cycle": "Cycle {{current}} of {{total}}",
+    "longBreak": "Long Break",
+    "pause": "Pause",
+    "pomodoroComplete": "Brew complete!",
+    "presets": {
+      "breakMin": "Break (min)",
+      "classic": "Classic",
+      "createRecipe": "Create Recipe",
+      "cycles": "Cycles",
+      "deleteConfirm": "Are you sure you want to delete this recipe?",
+      "editRecipe": "Edit Recipe",
+      "longBreakMin": "Long Break (min)",
+      "longFocus": "Long Focus",
+      "name": "Name",
+      "quickSprint": "Quick Sprint",
+      "title": "Presets",
+      "workMin": "Focus (min)"
+    },
+    "resume": "Resume",
+    "skip": "Skip",
+    "startBrew": "Start Brew",
+    "stats": {
+      "title": "Brewing Log",
+      "today": "Today",
+      "total": "Total",
+      "week": "This Week"
+    },
+    "stop": "Stop",
+    "ticker": {
+      "brewing": "Brewing focus potion...",
+      "cycle": "Cycle {{current}} of {{total}}",
+      "resting": "Ingredients settling...",
+      "today": "{{count}} brews today"
+    },
+    "title": "The Cauldron",
+    "widget": {
+      "title": "Cauldron"
+    },
+    "work": "Focus"
   },
   "auth": {
     "welcomeBack": "Welcome back, adventurer",

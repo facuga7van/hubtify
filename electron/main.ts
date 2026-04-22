@@ -7,6 +7,7 @@ import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
 import { characterMigrations } from '../src/modules/character/character.schema';
 import { notificationsMigrations } from './modules/notifications.schema';
+import { cauldronMigrations } from '../src/modules/cauldron/cauldron.schema';
 import { startNotificationEngine, stopNotificationEngine } from './modules/notifications.ipc';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 
@@ -137,6 +138,7 @@ app.whenReady().then(() => {
   runModuleMigrations(financeMigrations);
   runModuleMigrations(characterMigrations);
   runModuleMigrations(notificationsMigrations);
+  runModuleMigrations(cauldronMigrations);
 
   // Auto-generate recurring transactions for current month
   try {

@@ -7,6 +7,7 @@ import Loading from '../shared/components/Loading';
 import QuestsDashboardWidget from '../modules/quests/components/QuestsDashboardWidget';
 import NutritionDashboardWidget from '../modules/nutrition/components/NutritionDashboardWidget';
 import FinanceDashboardWidget from '../modules/finance/components/DashboardWidget';
+import CauldronDashboardWidget from '../modules/cauldron/components/CauldronDashboardWidget';
 import type { PlayerStats } from '../../shared/types';
 import './styles/components.css';
 
@@ -135,6 +136,16 @@ export default function Dashboard() {
             Coinify
           </div>
           <FinanceDashboardWidget />
+        </div>
+
+        <div className="rpg-card dashboard-widget" onClick={() => navigate('/cauldron')}>
+          <div className="rpg-card-title">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 7c0-2 1.8-4 4-4s4 2 4 4"/><ellipse cx="9" cy="12" rx="5" ry="3"/><path d="M4 12v1c0 1.7 2.2 3 5 3s5-1.3 5-3v-1"/><path d="M3 6l-1-2M15 6l1-2"/>
+            </svg>
+            Cauldron
+          </div>
+          <CauldronDashboardWidget />
         </div>
 
         <div className="rpg-card dashboard-widget" onClick={() => navigate('/character')}>

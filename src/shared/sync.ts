@@ -11,12 +11,13 @@ interface SyncSettings {
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const [stats, questData, charData, nutritionData, financeData] = await Promise.all([
+    const [stats, questData, charData, nutritionData, financeData, cauldronData] = await Promise.all([
       window.api.getRpgStats(),
       window.api.syncGetAllQuestData(),
       window.api.characterLoad(),
       window.api.syncGetAllNutritionData(),
       window.api.syncGetAllFinanceData(),
+      window.api.syncGetAllCauldronData(),
     ]);
 
     const db = getActiveFirestore();
@@ -41,6 +42,10 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
     // Finance subcollection document — avoids 1MB Firestore limit
     const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
     await setDoc(financeRef, financeData);
+
+    // Cauldron subcollection document
+    const cauldronRef = doc(db, 'hubtify_users', uid, 'cauldron', 'data');
+    await setDoc(cauldronRef, cauldronData);
 
     return { success: true };
   } catch (err: unknown) {
@@ -95,6 +100,15 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
         const financeResult = await window.api.syncMergeFinanceData(legacyData);
         if (financeResult.changed) changed = true;
       }
+    }
+
+    // Cauldron — read from subcollection
+    const cauldronRef = doc(db, 'hubtify_users', uid, 'cauldron', 'data');
+    const cauldronSnap = await getDoc(cauldronRef);
+    if (cauldronSnap.exists()) {
+      const cauldronData = cauldronSnap.data() as Record<string, unknown>;
+      const cauldronResult = await window.api.syncMergeCauldronData(cauldronData);
+      if (cauldronResult.changed) changed = true;
     }
 
     // Restore settings

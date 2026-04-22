@@ -1,7 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
-import NotificationBell from '../shared/components/NotificationBell';
 import type { PlayerStats } from '../../shared/types';
 import Tooltip from '../shared/components/Tooltip';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
@@ -33,6 +32,16 @@ function NavIcon({ name }: { name: string }) {
     case 'village': return (
       <svg {...s} viewBox="0 0 18 18"><path d="M2 16h14"/><path d="M4 16V9l3-3 3 3v7"/><path d="M7 12h0"/><path d="M12 16v-5l2.5-2L17 11v5"/><path d="M7 6V3"/></svg>
     );
+    case 'cauldron': return (
+      <svg {...s} viewBox="0 0 24 24">
+        <path d="M8 2h8M10 2v4M14 2v4" />
+        <path d="M5 8h14" />
+        <path d="M6 8c0 0-1 4-1 8 0 3 3 6 7 6s7-3 7-6c0-4-1-8-1-8" />
+        <circle cx="10" cy="14" r="1" fill="currentColor" />
+        <circle cx="14" cy="16" r="1" fill="currentColor" />
+        <circle cx="11" cy="18" r="0.5" fill="currentColor" />
+      </svg>
+    );
     case 'settings': return (
       <svg {...s} viewBox="0 0 24 24">
         <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
@@ -48,6 +57,7 @@ const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boo
   { path: '/quests', key: 'nav.questify', icon: 'sword' },
   { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
   { path: '/finance', key: 'nav.coinify', icon: 'coins' },
+  { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron' },
   { path: '/achievements', key: 'nav.achievements', icon: 'trophy', comingSoon: true },
   { path: '/village', key: 'nav.village', icon: 'village', comingSoon: true },
   { path: '/character', key: 'nav.character', icon: 'shield' },
@@ -59,17 +69,9 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
   const location = useLocation();
   const animatedNavigate = useAnimatedNavigate();
 
-  const notifInApp = localStorage.getItem('hubtify_notifications_inapp') !== 'false';
-
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
-      <PlayerCard stats={stats} collapsed={collapsed} />
-
-      {notifInApp && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
-          <NotificationBell onClick={() => onBellClick?.()} />
-        </div>
-      )}
+      <PlayerCard stats={stats} collapsed={collapsed} onBellClick={() => onBellClick?.()} />
 
       {!collapsed && (
         <div style={{ padding: '4px 14px', opacity: 0.3 }}>

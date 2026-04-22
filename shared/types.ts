@@ -75,6 +75,55 @@ export interface ParsedRow {
   suggestedCategory: string;
 }
 
+// ── Cauldron Types ────────────────────────────────────────
+
+export type CauldronTimerStatus = 'idle' | 'work' | 'work_paused' | 'on_break' | 'break_paused';
+
+export interface CauldronTimerState {
+  status: CauldronTimerStatus;
+  remainingMs: number;
+  totalMs: number;
+  currentCycle: number;
+  totalCycles: number;
+  sessionType: 'work' | 'break' | 'long_break';
+  presetId: string | null;
+  presetName: string | null;
+}
+
+export interface CauldronPreset {
+  id: string;
+  name: string;
+  workMinutes: number;
+  breakMinutes: number;
+  longBreakMinutes: number;
+  cyclesBeforeLong: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CauldronSession {
+  id: string;
+  presetId: string | null;
+  type: 'work' | 'break' | 'long_break';
+  durationMinutes: number;
+  completed: boolean;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface CauldronStats {
+  today: number;
+  week: number;
+  total: number;
+}
+
+export interface CauldronSessionEndResult {
+  sessionType: 'work' | 'break' | 'long_break';
+  completed: boolean;
+  nextType: 'work' | 'break' | 'long_break' | null;
+}
+
 // ── API Types ──────────────────────────────────────────────
 
 export interface HubtifyApi {
@@ -158,6 +207,8 @@ export interface HubtifyApi {
   syncGetCurrentUser: () => Promise<string | null>;
   syncGetAllNotificationData: () => Promise<Record<string, unknown>[]>;
   syncMergeNotificationData: (data: Record<string, unknown>[]) => Promise<{ changed: boolean }>;
+  syncGetAllCauldronData: () => Promise<Record<string, unknown>>;
+  syncMergeCauldronData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
 
   // Backup
   backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
@@ -244,6 +295,20 @@ export interface HubtifyApi {
   financeGetStatementDetail: (id: string) => Promise<unknown>;
   financeGenerateStatement: (cardId: string, periodMonth: string) => Promise<string | null>;
   financePayStatement: (id: string, paidAmount: number) => Promise<void>;
+
+  // Cauldron
+  cauldronGetPresets: () => Promise<CauldronPreset[]>;
+  cauldronUpsertPreset: (preset: Record<string, unknown>) => Promise<string>;
+  cauldronDeletePreset: (id: string) => Promise<void>;
+  cauldronStart: (presetId: string) => Promise<CauldronTimerState>;
+  cauldronPause: () => Promise<CauldronTimerState>;
+  cauldronResume: () => Promise<CauldronTimerState>;
+  cauldronSkip: () => Promise<CauldronTimerState>;
+  cauldronStop: () => Promise<void>;
+  cauldronGetState: () => Promise<CauldronTimerState>;
+  cauldronGetStats: () => Promise<CauldronStats>;
+  onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
+  onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
 
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;

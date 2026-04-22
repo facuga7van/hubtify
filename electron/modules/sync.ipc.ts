@@ -135,6 +135,8 @@ const USER_DATA_TABLES = [
   'finance_credit_card_statements',
   'finance_income_sources',
   'notifications',
+  'cauldron_presets',
+  'cauldron_sessions',
 ];
 
 export function registerSyncIpcHandlers(): void {
@@ -784,6 +786,41 @@ export function registerSyncIpcHandlers(): void {
       }
     });
     tx();
+
+    return { changed };
+  });
+
+  // ── Cauldron Sync ──────────────────────────────────────
+
+  ipcHandle('sync:getAllCauldronData', () => {
+    const db = getDb();
+    return {
+      cauldron_presets: db.prepare('SELECT * FROM cauldron_presets').all(),
+      cauldron_sessions: db.prepare('SELECT * FROM cauldron_sessions').all(),
+    };
+  });
+
+  ipcHandle('sync:mergeCauldronData', (_e, data: Record<string, unknown>) => {
+    const db = getDb();
+    let changed = false;
+
+    const presets = data.cauldron_presets as Array<Record<string, unknown>> | undefined;
+    if (presets?.length) {
+      const stmt = db.prepare(`INSERT OR REPLACE INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const p of presets) {
+        stmt.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.is_default, p.created_at, p.updated_at, p.deleted_at);
+      }
+      changed = true;
+    }
+
+    const sessions = data.cauldron_sessions as Array<Record<string, unknown>> | undefined;
+    if (sessions?.length) {
+      const stmt = db.prepare(`INSERT OR REPLACE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const s of sessions) {
+        stmt.run(s.id, s.preset_id, s.type, s.duration_minutes, s.completed, s.started_at, s.completed_at, s.created_at, s.updated_at, s.deleted_at);
+      }
+      changed = true;
+    }
 
     return { changed };
   });
