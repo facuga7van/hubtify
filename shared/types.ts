@@ -345,6 +345,9 @@ export interface HubtifyApi {
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
   onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
 
+  // Feedback
+  feedbackSend: (data: { type: string; description: string; email?: string }) => Promise<{ success: boolean }>;
+
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
   updaterDownload: () => Promise<string>;

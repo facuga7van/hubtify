@@ -9,6 +9,7 @@ import { registerNotificationIpcHandlers } from '../modules/notifications.ipc';
 import { registerDollarIpcHandlers } from '../modules/dollar.ipc';
 import { registerSyncIpcHandlers } from '../modules/sync.ipc';
 import { registerCauldronIpcHandlers } from '../modules/cauldron.ipc';
+import { registerFeedbackIpcHandlers } from '../modules/feedback.ipc';
 
 export function registerAllIpcHandlers(): void {
   registerRpgHandlers();
@@ -22,4 +23,5 @@ export function registerAllIpcHandlers(): void {
   registerDollarIpcHandlers();
   registerSyncIpcHandlers();
   registerCauldronIpcHandlers();
+  registerFeedbackIpcHandlers();
 }

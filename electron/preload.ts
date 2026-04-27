@@ -221,6 +221,9 @@ const api = {
   financeGenerateStatement: (cardId: string, periodMonth: string) => ipcRenderer.invoke('finance:generateStatement', cardId, periodMonth),
   financePayStatement: (id: string, paidAmount: number) => ipcRenderer.invoke('finance:payStatement', id, paidAmount),
 
+  // Feedback
+  feedbackSend: (data: { type: string; description: string; email?: string }) => ipcRenderer.invoke('feedback:send', data),
+
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),
   updaterDownload: () => ipcRenderer.invoke('updater:download') as Promise<string>,

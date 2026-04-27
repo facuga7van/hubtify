@@ -7,6 +7,7 @@ import { useConfirm } from '../shared/components/ConfirmDialog';
 import { useToast } from '../shared/components/useToast';
 import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/audio';
 import { useTour } from '../shared/components/tour';
+import FeedbackDialog from './FeedbackDialog';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -22,6 +23,7 @@ export default function SettingsPage() {
   const [notifQuests, setNotifQuests] = useState(() => localStorage.getItem('hubtify_notifications_module_quests') !== 'false');
   const [notifNutrition, setNotifNutrition] = useState(() => localStorage.getItem('hubtify_notifications_module_nutrition') !== 'false');
   const [notifFinance, setNotifFinance] = useState(() => localStorage.getItem('hubtify_notifications_module_finance') !== 'false');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -346,6 +348,25 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Feedback */}
+      <div className="rpg-card settings-section">
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <path d="M2 13h12M4 9l2-6h4l2 6M5.5 9h5M3 13l1.5-4M13 13l-1.5-4"/>
+          </svg>
+          {t('settings.feedback', 'Feedback')}
+        </div>
+        <div className="settings-row">
+          <div>
+            <div className="settings-row__label">{t('settings.feedbackSendButton', 'Enviar Feedback')}</div>
+            <div className="settings-row__desc">{t('settings.feedbackDesc', 'Envianos tu opinión, reportá bugs o sugerí features')}</div>
+          </div>
+          <button className="rpg-btn-sm" onClick={() => setFeedbackOpen(true)}>
+            {t('settings.feedbackSendButton', 'Enviar Feedback')}
+          </button>
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="rpg-card settings-section settings-section--danger">
         <div className="rpg-card-title settings-danger-title">
@@ -386,6 +407,14 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <FeedbackDialog
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onSent={() => {
+          setFeedbackOpen(false);
+          toast({ message: t('settings.feedbackSent', '¡Feedback enviado!'), type: 'success' });
+        }}
+      />
     </div>
   );
 }

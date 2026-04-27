@@ -1012,7 +1012,24 @@
     "downloadUpdate": "Download",
     "installAndRestart": "Install and restart",
     "restartTour": "Restart Tour",
-    "restartTourDesc": "Replay the guided tour of all modules"
+    "restartTourDesc": "Replay the guided tour of all modules",
+
+    "feedback": "Feedback",
+    "feedbackDesc": "Send your opinion, report bugs or suggest features",
+    "feedbackTitle": "Send Feedback",
+    "feedbackType": "Type",
+    "feedbackBug": "Bug / Error",
+    "feedbackFeature": "Suggestion / Feature",
+    "feedbackOther": "Other",
+    "feedbackDescLabel": "Description",
+    "feedbackDescPlaceholder": "Tell us what happened or what you'd like...",
+    "feedbackEmail": "Email (optional)",
+    "feedbackEmailPlaceholder": "So we can get back to you",
+    "feedbackSubmit": "Send",
+    "feedbackSending": "Sending...",
+    "feedbackSent": "Feedback sent! Thanks for your input.",
+    "feedbackError": "Could not send feedback. Try again later.",
+    "feedbackSendButton": "Send Feedback"
   },
   "tour": {
     "welcome": {

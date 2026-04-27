@@ -116,7 +116,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
   }
 
   return (
-    <div ref={rowRef} className={`nutri-meal-item-wrap ${className || ''}`}>
+    <div ref={rowRef} className={`nutri-meal-item-wrap ${className || ''}`} style={mealDropdown ? { position: 'relative', zIndex: 'var(--z-dropdown-top)' } : undefined}>
       <div className="nutri-meal-row">
         <div className="nutri-meal-ico" ref={dropdownRef} style={{ position: 'relative' }}>
           <span

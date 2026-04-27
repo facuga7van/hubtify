@@ -1013,7 +1013,24 @@
     "downloadUpdate": "Descargar",
     "installAndRestart": "Instalar y reiniciar",
     "restartTour": "Reiniciar Tour",
-    "restartTourDesc": "Reproducir el tour guiado de todos los módulos"
+    "restartTourDesc": "Reproducir el tour guiado de todos los módulos",
+
+    "feedback": "Feedback",
+    "feedbackDesc": "Envianos tu opinión, reportá bugs o sugerí features",
+    "feedbackTitle": "Enviar Feedback",
+    "feedbackType": "Tipo",
+    "feedbackBug": "Bug / Error",
+    "feedbackFeature": "Sugerencia / Feature",
+    "feedbackOther": "Otro",
+    "feedbackDescLabel": "Descripción",
+    "feedbackDescPlaceholder": "Contanos qué pasó o qué te gustaría...",
+    "feedbackEmail": "Email (opcional)",
+    "feedbackEmailPlaceholder": "Para que podamos responderte",
+    "feedbackSubmit": "Enviar",
+    "feedbackSending": "Enviando...",
+    "feedbackSent": "¡Feedback enviado! Gracias por tu aporte.",
+    "feedbackError": "No se pudo enviar el feedback. Intentá de nuevo más tarde.",
+    "feedbackSendButton": "Enviar Feedback"
   },
   "tour": {
     "welcome": {
