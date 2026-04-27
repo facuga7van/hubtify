@@ -1559,7 +1559,7 @@
   position: absolute;
   top: 100%;
   left: 0;
-  z-index: 20;
+  z-index: var(--z-dropdown);
   background: var(--parch-0, #f5e7c0);
   border: 1px solid var(--gold-dark, #8a7030);
   border-radius: 4px;

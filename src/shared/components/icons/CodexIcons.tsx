@@ -445,6 +445,29 @@ export function GemBrilliant(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+export function Gear(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      {/* Outer gear teeth — 6 notches */}
+      <path d="M10.5 2.5 L10.5 4.5 Q12 5 13.5 4.5 L13.5 2.5" />
+      <path d="M10.5 21.5 L10.5 19.5 Q12 19 13.5 19.5 L13.5 21.5" />
+      <path d="M2.5 10.5 L4.5 10.5 Q5 12 4.5 13.5 L2.5 13.5" />
+      <path d="M21.5 10.5 L19.5 10.5 Q19 12 19.5 13.5 L21.5 13.5" />
+      <path d="M4.8 5.5 L6.2 6.9 Q7.4 6 7.6 5.5 L6.2 4.1" />
+      <path d="M19.2 18.5 L17.8 17.1 Q16.6 18 16.4 18.5 L17.8 19.9" />
+      <path d="M19.2 5.5 L17.8 6.9 Q16.6 6 16.4 5.5 L17.8 4.1" />
+      <path d="M4.8 18.5 L6.2 17.1 Q7.4 18 7.6 18.5 L6.2 19.9" />
+      {/* Gear body ring */}
+      <circle cx="12" cy="12" r="7" strokeWidth="1.4" />
+      {/* Inner axle hole */}
+      <circle cx="12" cy="12" r="2.5" />
+      {/* Rivet details */}
+      <circle cx="12" cy="7" r=".5" fill="currentColor" fillOpacity=".15" />
+      <circle cx="12" cy="17" r=".5" fill="currentColor" fillOpacity=".15" />
+    </svg>
+  );
+}
+
 export function HelpSeal(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...defaults} {...props}>

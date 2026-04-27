@@ -199,7 +199,7 @@ export function TourOverlay() {
           NOTE: The dark overlay intentionally blocks clicks outside the spotlight.
           The highlighted element is NOT interactive during the tour — this is by design
           to prevent users from accidentally navigating away mid-tour. */}
-      <svg className="tour-spotlight__svg" style={{ position: 'fixed', inset: 0, zIndex: 10001, pointerEvents: 'none' }}>
+      <svg className="tour-spotlight__svg" style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}>
         <defs>
           <mask id={`tour-mask-${maskId}`}>
             <rect x="0" y="0" width="100%" height="100%" fill="white" />

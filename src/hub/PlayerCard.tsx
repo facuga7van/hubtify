@@ -57,7 +57,7 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
   const translatedTitle = t(getTitleKey(stats.level), stats.title);
 
   return (
-    <div className={`player-card ${collapsed ? 'player-card--collapsed' : ''}`} style={{ position: 'relative' }} data-tour="player-card">
+    <div className={`player-card ${collapsed ? 'player-card--collapsed' : ''}`} style={{ position: 'relative' }}>
       {/* Profile block */}
       <div className="player-card__profile">
         {/* Avatar with gold border */}

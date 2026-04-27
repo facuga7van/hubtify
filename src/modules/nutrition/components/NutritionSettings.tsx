@@ -6,6 +6,7 @@ import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import MealScheduleEditor from './shared/MealScheduleEditor';
 import HelpBubble from '../../../shared/components/HelpBubble';
+import { Gear, Shield, Compass, Chalice, Scale } from '../../../shared/components/icons';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
 import type { NutritionProfile } from '../types';
@@ -48,7 +49,10 @@ export default function NutritionSettings() {
   const loadProfile = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    window.api.nutritionGetProfile().then((prof) => {
+    Promise.all([
+      window.api.nutritionGetProfile(),
+      window.api.nutritionGetWeights(),
+    ]).then(([prof, weights]) => {
       if (prof) {
         const p = prof as NutritionProfile;
         setDateOfBirth(p.dateOfBirth || '');
@@ -56,7 +60,12 @@ export default function NutritionSettings() {
         setWeightPopupEnabled(p.weightPopupEnabled !== 0);
         setSex(p.sex);
         setHeight(p.heightCm);
-        setWeight(p.initialWeightKg);
+
+        // Use latest logged weight if available, otherwise initial
+        const weightList = weights as Array<{ weightKg: number }>;
+        const latestWeight = weightList.length > 0 ? weightList[weightList.length - 1].weightKg : null;
+        setWeight(latestWeight ?? p.initialWeightKg);
+
         setActivity(p.activityLevel);
 
         const deficit = p.deficitTargetKcal;
@@ -127,7 +136,7 @@ export default function NutritionSettings() {
       <div className="nutri-page-head">
         <div>
           <h1 className="nutri-page-title">
-            <span className="nutri-title-ico">{'\u2699'}</span> {t('nutrify.profileSettings', 'Configuración Nutrify')}
+            <span className="nutri-title-ico"><Gear width={18} height={18} /></span> {t('nutrify.profileSettings', 'Configuración Nutrify')}
           </h1>
           <div className="nutri-page-sub">{t('nutrify.profileSettingsSub', 'Ajustá tus datos corporales y objetivo calórico')}</div>
         </div>
@@ -142,7 +151,7 @@ export default function NutritionSettings() {
       <div className="nutri-card">
         <HelpBubble text={t('nutrify.bodyDataHelp', 'Tus datos físicos calculan el BMR (metabolismo basal) con Mifflin-St Jeor y el TDEE según tu actividad.')} />
         <h3 className="nutri-card-title">
-          <span className="nutri-t-ico">{'\u2659'}</span> {t('nutrify.bodyInfo', 'Datos Corporales')}
+          <span className="nutri-t-ico"><Shield width={14} height={14} /></span> {t('nutrify.bodyInfo', 'Datos Corporales')}
         </h3>
 
         <div className="nutri-config-grid">
@@ -167,7 +176,7 @@ export default function NutritionSettings() {
 
           <div className="nutri-field">
             <label className="nutri-label">{t('nutrify.height', 'Altura')}</label>
-            <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={100} max={250} suffix="cm" />
+            <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={50} max={250} suffix="cm" />
           </div>
 
           <div className="nutri-field">
@@ -208,7 +217,7 @@ export default function NutritionSettings() {
       <div className="nutri-card">
         <HelpBubble text={t('nutrify.goalHelp', 'Déficit: menos que TDEE para bajar. Mantenimiento: igual. Superávit: más para ganar masa.')} />
         <h3 className="nutri-card-title">
-          <span className="nutri-t-ico">{'\u25ce'}</span> {t('nutrify.goal', 'Objetivo')}
+          <span className="nutri-t-ico"><Compass width={14} height={14} /></span> {t('nutrify.goal', 'Objetivo')}
         </h3>
 
         <div className="nutri-goal-toggle">
@@ -248,7 +257,7 @@ export default function NutritionSettings() {
       <div className="nutri-card">
         <HelpBubble text={t('nutrify.mealScheduleHelp', 'Horarios de cada comida. Al registrar un alimento, el sistema asigna el momento según la hora actual.')} />
         <h3 className="nutri-card-title">
-          <span className="nutri-t-ico">{'\u2615'}</span> {t('nutrify.mealSchedule', 'Horario de comidas')}
+          <span className="nutri-t-ico"><Chalice width={14} height={14} /></span> {t('nutrify.mealSchedule', 'Horario de comidas')}
           <span className="nutri-card-subtitle">{t('nutrify.mealScheduleDesc', 'Configurá los horarios de cada comida')}</span>
         </h3>
         <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} />
@@ -258,7 +267,7 @@ export default function NutritionSettings() {
       <div className="nutri-card">
         <HelpBubble text={t('nutrify.weightReminderHelp', 'Te recuerda pesarte el día configurado. Pesarte regularmente mejora la precisión del TDEE.')} />
         <h3 className="nutri-card-title">
-          <span className="nutri-t-ico">{'\u25f7'}</span> {t('nutrify.weightReminderTitle', 'Recordatorio de Pesaje')}
+          <span className="nutri-t-ico"><Scale width={14} height={14} /></span> {t('nutrify.weightReminderTitle', 'Recordatorio de Pesaje')}
         </h3>
 
         <div

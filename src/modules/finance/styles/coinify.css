@@ -1258,7 +1258,7 @@
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: var(--z-dropdown);
   max-height: 180px;
   overflow-y: auto;
   background: var(--parch-1);

@@ -357,6 +357,39 @@
   border: 1px dashed rgba(245, 231, 192, 0.45);
 }
 
+/* Interactive seal button */
+.qb-seal--btn {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.qb-seal--btn:hover {
+  transform: rotate(-6deg) scale(1.08);
+  box-shadow:
+    inset -4px -6px 10px rgba(0, 0, 0, 0.45),
+    inset 4px 6px 10px rgba(255, 255, 255, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.qb-seal--btn:active {
+  transform: rotate(-6deg) scale(0.93);
+}
+
+.qb-seal--pressed {
+  animation: sealPress 0.5s ease;
+}
+
+@keyframes sealPress {
+  0%   { transform: rotate(-6deg) scale(1); }
+  15%  { transform: rotate(-8deg) scale(0.88); }
+  35%  { transform: rotate(-4deg) scale(1.1); }
+  55%  { transform: rotate(-7deg) scale(0.96); }
+  75%  { transform: rotate(-5deg) scale(1.03); }
+  100% { transform: rotate(-6deg) scale(1); }
+}
+
 /* ── column layouts ───────────────────────────────── */
 .qb-col-2 {
   display: grid;
@@ -373,7 +406,10 @@
 /* ── stat cartouche box ───────────────────────────── */
 .qb-cartouche {
   position: relative;
+  overflow: hidden;
+  width: 100%;
   padding: 10px 12px 9px;
+  box-sizing: border-box;
   background: rgba(245, 231, 192, 0.55);
   border: 1px solid rgba(74, 55, 32, 0.5);
   box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6), 2px 2px 0 rgba(30, 19, 9, 0.08);
@@ -416,22 +452,24 @@
   margin-top: 1px;
 }
 
-/* corner dingbats */
+/* corner dingbats — kept inside the cartouche boundary */
 .qb-cartouche-dingbat-tl {
   position: absolute;
-  top: -4px;
-  left: -4px;
+  top: 1px;
+  left: 2px;
   color: var(--ink-faded);
   font-size: var(--fs-label);
+  line-height: 1;
   pointer-events: none;
 }
 
 .qb-cartouche-dingbat-br {
   position: absolute;
-  bottom: -6px;
-  right: -2px;
+  bottom: 1px;
+  right: 2px;
   color: var(--ink-faded);
   font-size: var(--fs-label);
+  line-height: 1;
   pointer-events: none;
 }
 

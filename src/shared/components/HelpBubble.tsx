@@ -8,23 +8,32 @@ interface HelpBubbleProps {
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
   /** 'sealed' = circle with border (for cards), 'inline' = bare icon (for titles) */
   variant?: 'sealed' | 'inline';
-  /** Optional className for the trigger button */
+  /** Optional className for the trigger */
   className?: string;
 }
 
 /**
- * Small circular "?" button that opens a click-based tooltip.
+ * Small circular "?" icon that shows a tooltip on hover.
  * Place inside any `position: relative` container.
  */
 export default function HelpBubble({ text, position = 'top-right', variant = 'sealed', className = '' }: HelpBubbleProps) {
+  const [hidden, setHidden] = useState(() => localStorage.getItem('hubtify_help_bubbles') === 'false');
   const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handler = () => setHidden(localStorage.getItem('hubtify_help_bubbles') === 'false');
+    window.addEventListener('helpBubbles:changed', handler);
+    return () => window.removeEventListener('helpBubbles:changed', handler);
+  }, []);
+
+  if (hidden) return null;
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const tipId = useId();
 
   const positionTip = useCallback(() => {
-    if (!btnRef.current || !tipRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
+    if (!triggerRef.current || !tipRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
     const tip = tipRef.current;
     const tipW = tip.offsetWidth;
     const tipH = tip.offsetHeight;
@@ -32,16 +41,13 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     const vh = window.innerHeight;
     const gap = 8;
 
-    // Default: below the button, centered horizontally
     let top = rect.bottom + gap;
     let left = rect.left + rect.width / 2 - tipW / 2;
 
-    // If overflows bottom, place above
     if (top + tipH > vh - 12) {
       top = rect.top - tipH - gap;
     }
 
-    // Clamp horizontal
     if (left < 12) left = 12;
     if (left + tipW > vw - 12) left = vw - tipW - 12;
 
@@ -49,28 +55,6 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     tip.style.top = `${top}px`;
   }, []);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        btnRef.current?.contains(e.target as Node) ||
-        tipRef.current?.contains(e.target as Node)
-      ) return;
-      setOpen(false);
-    };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleEsc);
-    };
-  }, [open]);
-
-  // Reposition on scroll/resize while open
   useEffect(() => {
     if (!open) return;
     const reposition = () => requestAnimationFrame(positionTip);
@@ -82,27 +66,26 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     };
   }, [open, positionTip]);
 
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    if (next) {
-      requestAnimationFrame(() => requestAnimationFrame(positionTip));
-    }
+  const show = () => {
+    setOpen(true);
+    requestAnimationFrame(() => requestAnimationFrame(positionTip));
   };
 
   return (
     <>
-      <button
-        ref={btnRef}
-        type="button"
+      <span
+        ref={triggerRef}
         className={`${variant === 'inline' ? 'help-bubble-inline' : `help-bubble help-bubble--${position}`} ${className}`}
-        onClick={toggle}
-        aria-expanded={open}
+        onMouseEnter={show}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={show}
+        onBlur={() => setOpen(false)}
         aria-describedby={open ? tipId : undefined}
         aria-label="Help"
+        tabIndex={0}
       >
         <HelpSeal width={variant === 'inline' ? 12 : 14} height={variant === 'inline' ? 12 : 14} />
-      </button>
+      </span>
       {open && createPortal(
         <div ref={tipRef} id={tipId} role="tooltip" className="help-bubble__tip">
           {text}

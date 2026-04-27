@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const { user: authUser, logout } = useAuthContext();
   const [fontScale, setFontScale] = useState(() => localStorage.getItem('hubtify_font_scale') || '1');
   const [soundEnabled, setSoundEnabled] = useState(() => isSoundEnabled());
+  const [helpBubbles, setHelpBubbles] = useState(() => localStorage.getItem('hubtify_help_bubbles') !== 'false');
   const [notifInApp, setNotifInApp] = useState(() => localStorage.getItem('hubtify_notifications_inapp') !== 'false');
   const [notifSystem, setNotifSystem] = useState(() => localStorage.getItem('hubtify_notifications_system') !== 'false');
   const [notifQuests, setNotifQuests] = useState(() => localStorage.getItem('hubtify_notifications_module_quests') !== 'false');
@@ -151,6 +152,31 @@ export default function SettingsPage() {
           <button className={`settings-toggle${soundEnabled ? ' settings-toggle--on' : ''}`} onClick={toggleSound}>
             <span className="settings-toggle__thumb" />
             <span className="settings-toggle__text">{soundEnabled ? t('settings.toggleOn') : t('settings.toggleOff')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Help Bubbles */}
+      <div className="rpg-card settings-section">
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <circle cx="8" cy="8" r="6"/><path d="M6 6a2 2 0 013.5 1.5c0 1-1.5 1-1.5 2.5M8 12h.01"/>
+          </svg>
+          {t('settings.helpBubbles', 'Burbujas de ayuda')}
+        </div>
+        <div className="settings-row">
+          <div>
+            <div className="settings-row__label">{t('settings.helpBubblesLabel', 'Mostrar burbujas de ayuda')}</div>
+            <div className="settings-row__desc">{t('settings.helpBubblesDesc', 'Íconos de ayuda con información sobre cada sección')}</div>
+          </div>
+          <button className={`settings-toggle${helpBubbles ? ' settings-toggle--on' : ''}`} onClick={() => {
+            const next = !helpBubbles;
+            setHelpBubbles(next);
+            localStorage.setItem('hubtify_help_bubbles', next ? 'true' : 'false');
+            window.dispatchEvent(new Event('helpBubbles:changed'));
+          }}>
+            <span className="settings-toggle__thumb" />
+            <span className="settings-toggle__text">{helpBubbles ? t('settings.toggleOn') : t('settings.toggleOff')}</span>
           </button>
         </div>
       </div>

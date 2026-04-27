@@ -154,28 +154,33 @@
   transform: scale(0.5);
 }
 
-/* Wax-red level badge on avatar */
+/* Medieval seal level badge on avatar */
 .player-card__level-badge {
   position: absolute;
   bottom: -3px; right: -6px;
-  min-width: 22px;
-  padding: 1px 5px;
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
-  border: 1px solid var(--parch-0);
-  border-radius: 10px;
+  min-width: 20px; height: 20px;
+  padding: 0 4px;
+  background: linear-gradient(160deg, var(--leather-light) 0%, var(--leather-dark) 100%);
+  border: 1.5px solid var(--gold);
+  border-radius: 50%;
   font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-label);
+  font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.03em;
-  color: var(--parch-0);
+  color: var(--gold-light);
   text-align: center;
-  line-height: 1.2;
-  box-shadow: 0 1px 3px rgba(0,0,0,.5);
-  transition: font-size .28s, bottom .28s, right .28s;
+  line-height: 17px;
+  box-shadow:
+    0 0 0 2px var(--leather-dark),
+    0 1px 4px rgba(0,0,0,.6),
+    inset 0 1px 0 rgba(255,255,255,.08);
+  transition: all .28s cubic-bezier(.4,.1,.2,1);
 }
 
 .sidebar:not(.sidebar--collapsed) .player-card__level-badge {
-  font-size: var(--fs-label);
+  min-width: 24px; height: 24px;
+  font-size: 11px;
+  line-height: 21px;
   bottom: -4px; right: -8px;
 }
 
@@ -324,27 +329,29 @@
   height: 100%;
   position: relative;
   transition: width .4s ease;
+  animation: sidebar-bar-stripe 1.5s linear infinite;
 }
 
-/* Hatch overlay on all bar fills */
-.sidebar-bar__fill::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.08) 4px 5px);
+@keyframes sidebar-bar-stripe {
+  to { background-position: 11.31px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-bar__fill { animation: none; }
 }
 
 .sidebar-bar__fill--hp {
-  background: linear-gradient(180deg, var(--rubric-light) 0%, var(--rubric) 100%);
+  background: repeating-linear-gradient(135deg, var(--rubric-light) 0 4px, var(--rubric) 4px 8px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 0 6px rgba(194,58,58,.4);
 }
 
 .sidebar-bar__fill--xp {
-  background: linear-gradient(180deg, var(--moss-light) 0%, var(--moss) 100%);
+  background: repeating-linear-gradient(135deg, var(--moss-light) 0 4px, var(--moss) 4px 8px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 0 6px rgba(111,140,74,.4);
 }
 
 .sidebar-bar__fill--gold {
-  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  background: repeating-linear-gradient(135deg, var(--gold-light) 0 4px, var(--gold) 4px 8px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 0 6px rgba(224,192,104,.4);
 }
 

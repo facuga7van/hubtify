@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,11 +10,13 @@ import {
 } from '../shared/components/codex';
 import { Sword, Bread, Coin, Cauldron, Crown, Flame, Heart, Scroll, Quill } from '../shared/components/icons';
 import HelpBubble from '../shared/components/HelpBubble';
+import Tooltip from '../shared/components/Tooltip';
 import QuestsDashboardWidget from '../modules/quests/components/QuestsDashboardWidget';
 import NutritionDashboardWidget from '../modules/nutrition/components/NutritionDashboardWidget';
 import FinanceDashboardWidget from '../modules/finance/components/DashboardWidget';
 import CauldronDashboardWidget from '../modules/cauldron/components/CauldronDashboardWidget';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
+import { playSealPress } from '../shared/audio';
 import './styles/components.css';
 
 interface QuickStats {
@@ -116,6 +118,36 @@ function XpLedger({ data, t }: { data: Array<{ date: string; xp: number }>; t: (
         ))}
       </div>
     </div>
+  );
+}
+
+/* ── Interactive Seal (wax stamp press) ───────────────────── */
+
+function SealButton({ level }: { level: number }) {
+  const [pressed, setPressed] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleClick = () => {
+    playSealPress();
+    setPressed(true);
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setPressed(false), 500);
+  };
+
+  return (
+    <button
+      type="button"
+      className={`qb-seal qb-seal--btn${pressed ? ' qb-seal--pressed' : ''}`}
+      onClick={handleClick}
+      aria-label={`Level ${level}`}
+    >
+      <div style={{ textAlign: 'center', lineHeight: 1 }}>
+        <div style={{ fontSize: 'var(--fs-label)', letterSpacing: '.1em', fontFamily: "'IM Fell English SC', serif", opacity: 0.85 }}>
+          LVL
+        </div>
+        <div style={{ fontSize: 'var(--fs-hero)' }}>{level}</div>
+      </div>
+    </button>
   );
 }
 
@@ -257,14 +289,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="qb-seal">
-            <div style={{ textAlign: 'center', lineHeight: 1 }}>
-              <div style={{ fontSize: 'var(--fs-label)', letterSpacing: '.1em', fontFamily: "'IM Fell English SC', serif", opacity: 0.85 }}>
-                LVL
-              </div>
-              <div style={{ fontSize: 'var(--fs-hero)' }}>{level}</div>
-            </div>
-          </div>
+          <SealButton level={level} />
           <div
             style={{
               position: 'absolute',
@@ -284,17 +309,17 @@ export default function Dashboard() {
 
       {/* ── row 2: stat cartouches ────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
-        <Cartouche label={t('dashboard.cartLevel', 'NIVEL')} value={level} foot={stats?.title} icon={<Crown width={14} height={14} />} />
-        <Cartouche label={t('dashboard.cartXp', 'XP HODIE')} value={`+${xpToday}`} foot={t('dashboard.cartXpFoot', 'ganados al sol')} icon={<Sword width={14} height={14} />} tone="sage" />
-        <Cartouche label={t('dashboard.cartStreak', 'RACHA')} value={streak} foot={t('dashboard.cartStreakFoot', 'días de gloria')} icon={<Flame width={14} height={14} />} />
-        <Cartouche label={t('dashboard.cartHp', 'VITA')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" />
+        <Tooltip text={t('dashboard.cartLevelTip', 'Nivel actual del héroe')}><Cartouche label={t('dashboard.cartLevel', 'NIVEL')} value={level} foot={stats?.title} icon={<Crown width={14} height={14} />} /></Tooltip>
+        <Tooltip text={t('dashboard.cartXpTip', 'Experiencia ganada hoy')}><Cartouche label={t('dashboard.cartXp', 'XP HODIE')} value={`+${xpToday}`} foot={t('dashboard.cartXpFoot', 'ganados al sol')} icon={<Sword width={14} height={14} />} tone="sage" /></Tooltip>
+        <Tooltip text={t('dashboard.cartStreakTip', 'Días consecutivos de actividad')}><Cartouche label={t('dashboard.cartStreak', 'RACHA')} value={streak} foot={t('dashboard.cartStreakFoot', 'días de gloria')} icon={<Flame width={14} height={14} />} /></Tooltip>
+        <Tooltip text={t('dashboard.cartHpTip', 'Salud actual del héroe')}><Cartouche label={t('dashboard.cartHp', 'VITA')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" /></Tooltip>
       </div>
 
       {/* ── row 2b: quick module stats (H3) ────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
-        <Cartouche label={t('dashboard.cartDueToday', 'MISIONES HOY')} value={quickStats.tasksDueToday} foot={t('dashboard.cartDueTodayFoot', 'pendientes al sol')} icon={<Sword width={14} height={14} />} />
-        <Cartouche label={t('dashboard.cartMeals', 'PROVISIONES')} value={quickStats.mealsToday} foot={t('dashboard.cartMealsFoot', 'registradas hoy')} icon={<Bread width={14} height={14} />} tone="sage" />
-        <Cartouche label={t('dashboard.cartTransactions', 'TRANSACCIONES')} value={quickStats.transactionsToday} foot={t('dashboard.cartTransactionsFoot', 'movimientos del día')} icon={<Coin width={14} height={14} />} tone="gold" />
+        <Tooltip text={t('dashboard.cartDueTodayTip', 'Misiones pendientes para hoy')}><Cartouche label={t('dashboard.cartDueToday', 'MISIONES HOY')} value={quickStats.tasksDueToday} foot={t('dashboard.cartDueTodayFoot', 'pendientes al sol')} icon={<Sword width={14} height={14} />} /></Tooltip>
+        <Tooltip text={t('dashboard.cartMealsTip', 'Comidas registradas hoy')}><Cartouche label={t('dashboard.cartMeals', 'PROVISIONES')} value={quickStats.mealsToday} foot={t('dashboard.cartMealsFoot', 'registradas hoy')} icon={<Bread width={14} height={14} />} tone="sage" /></Tooltip>
+        <Tooltip text={t('dashboard.cartTransactionsTip', 'Movimientos financieros del día')}><Cartouche label={t('dashboard.cartTransactions', 'TRANSACCIONES')} value={quickStats.transactionsToday} foot={t('dashboard.cartTransactionsFoot', 'movimientos del día')} icon={<Coin width={14} height={14} />} tone="gold" /></Tooltip>
       </div>
 
       <QBDividerSection />

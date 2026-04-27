@@ -24,7 +24,7 @@ const NATIVE_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
 function runNotificationCheck(): number {
   const db = getDb();
 
-  autoResolve(db);
+  const resolvedCount = autoResolve(db);
 
   const candidates = [
     ...(enabledModules.quests ? evaluateQuestNotifications(db) : []),
@@ -63,7 +63,10 @@ function runNotificationCheck(): number {
         lastNativeNotificationTime = now;
       }
     }
+  }
 
+  // Broadcast whenever count changed — new notifications OR resolved ones
+  if (newCount > 0 || resolvedCount > 0) {
     const windows = BrowserWindow.getAllWindows();
     for (const win of windows) {
       win.webContents.send('notifications:updated');

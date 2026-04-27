@@ -775,6 +775,7 @@ export default function CauldronPage() {
   const handleStop = async () => {
     await window.api.cauldronStop();
     setTimerState(null);
+    playCauldronPause();
   };
 
   /* -- Preset handlers -- */

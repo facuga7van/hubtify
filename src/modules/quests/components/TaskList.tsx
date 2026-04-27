@@ -598,9 +598,6 @@ export default function TaskList() {
           {/* Quick actions */}
           <Section title={t('questify.actions', 'ACCIONES')} icon={<Sword width={12} height={12} style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('questify.actionsHelp', 'Accesos directos para gestionar proyectos, notas y configuración de misiones.')} />}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span className="quest-cauldron-link" onClick={() => animatedNavigate('/cauldron')}>
-                {'\u2697'} {t('nav.cauldron', 'Caldero')}
-              </span>
               <Rune>
                 <span style={{ cursor: 'pointer' }} onClick={() => setShowProjectManager(true)}>
                   {t('questify.manageProjects')}

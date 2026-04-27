@@ -6,7 +6,7 @@ import type { PlayerStats } from '../../shared/types';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
-import { Scroll, Shield, Sword, Bread, Coin, Crown, Tower } from '../shared/components/icons';
+import { Scroll, Shield, Sword, Bread, Coin, Crown, Tower, Cauldron } from '../shared/components/icons';
 import Tooltip from '../shared/components/Tooltip';
 import './styles/layout.css';
 
@@ -36,6 +36,7 @@ const NAV_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement
   sword: Sword,
   bread: Bread,
   coin: Coin,
+  cauldron: Cauldron,
   crown: Crown,
   tower: Tower,
 };
@@ -54,6 +55,7 @@ const navKeys: Array<{ path: string; key: string; icon: string; label: string; c
   { path: '/quests', key: 'nav.questify', icon: 'sword', label: 'MISIONES' },
   { path: '/nutrition', key: 'nav.nutrify', icon: 'bread', label: 'PROVISIONES' },
   { path: '/finance', key: 'nav.coinify', icon: 'coin', label: 'TESORO' },
+  { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron', label: 'CALDERO' },
   { path: '/achievements', key: 'nav.achievements', icon: 'crown', label: 'LOGROS', comingSoon: true },
   { path: '/village', key: 'nav.village', icon: 'tower', label: 'ALDEA', comingSoon: true },
 ];
@@ -103,57 +105,59 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
-      <PlayerCard stats={stats} collapsed={collapsed} onBellClick={() => onBellClick?.()} />
+      <div data-tour="player-card">
+        <PlayerCard stats={stats} collapsed={collapsed} onBellClick={() => onBellClick?.()} />
 
-      {/* Stat bars — visible only when expanded */}
-      {stats && (() => {
-        const xpCurrent = xpThreshold(stats.level);
-        const xpNext = xpThreshold(stats.level + 1);
-        const xpProgress = xpNext > xpCurrent
-          ? Math.round(((stats.xp - xpCurrent) / (xpNext - xpCurrent)) * 100)
-          : 100;
+        {/* Stat bars — visible only when expanded */}
+        {stats && (() => {
+          const xpCurrent = xpThreshold(stats.level);
+          const xpNext = xpThreshold(stats.level + 1);
+          const xpProgress = xpNext > xpCurrent
+            ? Math.round(((stats.xp - xpCurrent) / (xpNext - xpCurrent)) * 100)
+            : 100;
 
-        return (
-        <div className="sidebar-bars">
-          <div className="sidebar-bar">
-            <div className="sidebar-bar__row">
-              <span className="sidebar-bar__label">VITA</span>
-              <span className="sidebar-bar__val">{stats.hp} / {stats.maxHp}</span>
-            </div>
-            <div className="sidebar-bar__track">
-              <div className="sidebar-bar__fill sidebar-bar__fill--hp" style={{ width: `${Math.round((stats.hp / stats.maxHp) * 100)}%` }} />
-            </div>
-          </div>
-          <div className="sidebar-bar">
-            <div className="sidebar-bar__row">
-              <span className="sidebar-bar__label">XP</span>
-              <span className="sidebar-bar__val">{stats.xp} / {xpNext}</span>
-            </div>
-            <div className="sidebar-bar__track">
-              <div className="sidebar-bar__fill sidebar-bar__fill--xp" style={{ width: `${xpProgress}%` }} />
-            </div>
-          </div>
-          {nextRank && (
-            <div className="sidebar-bar__next-rank">
-              {nextRank.levelsAway} {nextRank.levelsAway === 1
-                ? t('sidebar.levelTo', 'nivel para')
-                : t('sidebar.levelsTo', 'niveles para')} <span className="sidebar-bar__next-rank-title">{t(nextRank.nextTitleKey, nextRank.nextTitleFallback)}</span>
-            </div>
-          )}
-          {stats.streak > 0 && (
+          return (
+          <div className="sidebar-bars">
             <div className="sidebar-bar">
               <div className="sidebar-bar__row">
-                <span className="sidebar-bar__label">{t('rpg.streak', 'RACHA').toUpperCase()}</span>
-                <span className="sidebar-bar__val">{stats.streak} {t('rpg.days', 'días')}</span>
+                <span className="sidebar-bar__label">VITA</span>
+                <span className="sidebar-bar__val">{stats.hp} / {stats.maxHp}</span>
               </div>
               <div className="sidebar-bar__track">
-                <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * 3.3, 100)}%` }} />
+                <div className="sidebar-bar__fill sidebar-bar__fill--hp" style={{ width: `${Math.round((stats.hp / stats.maxHp) * 100)}%` }} />
               </div>
             </div>
-          )}
-        </div>
-        );
-      })()}
+            <div className="sidebar-bar">
+              <div className="sidebar-bar__row">
+                <span className="sidebar-bar__label">XP</span>
+                <span className="sidebar-bar__val">{stats.xp} / {xpNext}</span>
+              </div>
+              <div className="sidebar-bar__track">
+                <div className="sidebar-bar__fill sidebar-bar__fill--xp" style={{ width: `${xpProgress}%` }} />
+              </div>
+            </div>
+            {nextRank && (
+              <div className="sidebar-bar__next-rank">
+                {nextRank.levelsAway} {nextRank.levelsAway === 1
+                  ? t('sidebar.levelTo', 'nivel para')
+                  : t('sidebar.levelsTo', 'niveles para')} <span className="sidebar-bar__next-rank-title">{t(nextRank.nextTitleKey, nextRank.nextTitleFallback)}</span>
+              </div>
+            )}
+            {stats.streak > 0 && (
+              <div className="sidebar-bar">
+                <div className="sidebar-bar__row">
+                  <span className="sidebar-bar__label">{t('rpg.streak', 'RACHA').toUpperCase()}</span>
+                  <span className="sidebar-bar__val">{stats.streak} {t('rpg.days', 'días')}</span>
+                </div>
+                <div className="sidebar-bar__track">
+                  <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * 3.3, 100)}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+          );
+        })()}
+      </div>
 
       <div className="sidebar-divider" />
 

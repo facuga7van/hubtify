@@ -120,6 +120,15 @@ export function playCauldronResume() {
   } catch { /* Sound not available */ }
 }
 
+/* ── Seal press ── */
+
+export function playSealPress() {
+  if (!soundEnabled) return;
+  try {
+    playWithJitter(getSound('sealPress', new URL('../assets/fx/paper-scrape.mp3', import.meta.url).href, 0.025), 1.0, 0.15);
+  } catch { /* Sound not available */ }
+}
+
 /* ── Coin clink ── */
 
 export function playCoinClink() {
