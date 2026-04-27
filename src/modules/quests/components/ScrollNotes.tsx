@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import HelpBubble from '../../../shared/components/HelpBubble';
 import parchmentBg from '../../../assets/bg.jpg';
 
 interface Drawing {
@@ -66,6 +67,12 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   }, [taskId]);
 
   useEffect(() => { loadDrawings(); }, [loadDrawings]);
+
+  useEffect(() => {
+    const handler = () => loadDrawings();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadDrawings]);
 
   // Paint current drawing onto canvas — wait for both data and bg texture
   useEffect(() => {
@@ -224,7 +231,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         backgroundRepeat: 'repeat',
         borderRadius: 6, padding: '16px 20px',
         boxShadow: '0 12px 40px rgba(44,24,16,0.6), 0 0 0 1px rgba(201,168,76,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
-        border: '3px solid var(--rpg-gold-dark)',
+        border: '3px solid var(--gold-dark)',
         minWidth: CANVAS_W + 40,
         position: 'relative',
       }} onClick={(e) => e.stopPropagation()}>
@@ -232,7 +239,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         {/* Decorative top edge */}
         <div style={{
           position: 'absolute', top: -3, left: 20, right: 20, height: 3,
-          background: 'linear-gradient(90deg, transparent, var(--rpg-gold) 30%, var(--rpg-gold) 70%, transparent)',
+          background: 'linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold) 70%, transparent)',
         }} />
 
         {/* Header */}
@@ -240,28 +247,29 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
           {drawings.length > 1 && (
             <button className="rpg-button" onClick={() => goPage(-1)}
               disabled={currentIdx === 0}
-              style={{ padding: '3px 10px', fontSize: '0.9rem' }}>
+              style={{ padding: '3px 10px', fontSize: 'var(--fs-quote)' }}>
               ‹
             </button>
           )}
           <span style={{
             flex: 1, textAlign: 'center',
-            fontFamily: 'Crimson Text, serif', fontSize: '0.95rem',
-            color: 'var(--rpg-ink-light)', opacity: 0.7,
+            fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-body)',
+            color: 'var(--ink-soft)',
           }}>
             {drawings.length > 0
               ? t('questify.noteOf', { current: currentIdx + 1, total: drawings.length })
               : t('questify.noNotes')}
+            {' '}<HelpBubble variant="inline" text={t('questify.scrollNotesHelp', 'Pergaminos: dibujá apuntes a mano alzada para cada misión. Podés crear varias páginas.')} />
           </span>
           {drawings.length > 1 && (
             <button className="rpg-button" onClick={() => goPage(1)}
               disabled={currentIdx >= drawings.length - 1}
-              style={{ padding: '3px 10px', fontSize: '0.9rem' }}>
+              style={{ padding: '3px 10px', fontSize: 'var(--fs-quote)' }}>
               ›
             </button>
           )}
           <button className="rpg-button" onClick={handleNewNote}
-            style={{ padding: '4px 12px', fontSize: '0.8rem' }}>
+            style={{ padding: '4px 12px', fontSize: 'var(--fs-label)' }}>
             + {t('questify.newNote')}
           </button>
         </div>
@@ -289,7 +297,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         {drawings.length === 0 && (
           <div style={{
             width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: 0.5, fontStyle: 'italic', fontFamily: 'Crimson Text, serif',
+            opacity: 0.65, fontStyle: 'italic', fontFamily: "'IM Fell English', serif",
           }}>
             {t('questify.noNotes')}
           </div>
@@ -302,7 +310,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
             <button className="rpg-button" onClick={() => setTool('pen')}
               style={{
                 padding: '4px 8px', opacity: tool === 'pen' ? 1 : 0.5,
-                background: tool === 'pen' ? 'var(--rpg-gold)' : undefined,
+                background: tool === 'pen' ? 'var(--gold)' : undefined,
               }}
               title="Lapiz">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
@@ -314,7 +322,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
             <button className="rpg-button" onClick={() => setTool('eraser')}
               style={{
                 padding: '4px 8px', opacity: tool === 'eraser' ? 1 : 0.5,
-                background: tool === 'eraser' ? 'var(--rpg-gold)' : undefined,
+                background: tool === 'eraser' ? 'var(--gold)' : undefined,
               }}
               title="Goma">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
@@ -327,7 +335,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
             {/* Clear */}
             <button className="rpg-button" onClick={handleClear}
-              style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: 0.6 }}>
+              style={{ padding: '4px 10px', fontSize: 'var(--fs-label)', opacity: 0.6 }}>
               {t('questify.clearCanvas')}
             </button>
 

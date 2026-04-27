@@ -22,8 +22,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return this.props.fallback ?? (
         <div className="rpg-card" style={{ margin: 24, textAlign: 'center', padding: 32 }}>
-          <h3 style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{i18n.t('common.somethingWentWrong')}</h3>
-          <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: 16 }}>
+          <h3 style={{ marginBottom: 12, color: 'var(--rubric)' }}>{i18n.t('common.somethingWentWrong')}</h3>
+          <p style={{ fontSize: 'var(--fs-quote)', marginBottom: 16 }}>
             {this.state.error?.message}
           </p>
           <button className="rpg-button" onClick={() => this.setState({ hasError: false, error: null })}>

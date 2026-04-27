@@ -9,12 +9,13 @@ export interface QuillCheckboxProps {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   size?: number;
+  onDrawComplete?: () => void;
 }
 
-// Colors
-const COLOR_PARCHMENT = '#f5f0e1';
-const COLOR_GOLD = '#d4a017';
-const COLOR_SEPIA = '#8b7355';
+// Codex palette colors
+const COLOR_PARCHMENT = '#f5e7c0'; // var(--parch-0)
+const COLOR_GOLD = '#a88a3c';      // var(--gold)
+const COLOR_SEPIA = '#4a3520';     // var(--ink-soft)
 
 // Checkmark path: two segments — M6,13 L10,17 and L10,17 L18,7
 // Total path for a polyline M6,13 L10,17 L18,7 inside a 24x24 viewBox
@@ -65,6 +66,7 @@ export default function QuillCheckbox({
   onChange,
   disabled = false,
   size = 24,
+  onDrawComplete,
 }: QuillCheckboxProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const checkPathRef = useRef<SVGPolylineElement>(null);
@@ -120,6 +122,7 @@ export default function QuillCheckbox({
           strokeDashoffset: 0,
           duration: 0.3,
           ease: 'power1.inOut',
+          onComplete: () => onDrawComplete?.(),
         });
 
         // 2. Wet ink sharpening in parallel

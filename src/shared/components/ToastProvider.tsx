@@ -7,13 +7,19 @@ import type { ToastData } from './useToast'
 const MAX_VISIBLE = 3
 const AUTO_DISMISS_MS = 2500
 
+interface TimerState {
+  timeout: ReturnType<typeof setTimeout>
+  startedAt: number
+  remaining: number
+}
+
 interface Props {
   children: React.ReactNode
 }
 
 export default function ToastProvider({ children }: Props) {
   const [queue, setQueue] = useState<ToastData[]>([])
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const timersRef = useRef<Map<string, TimerState>>(new Map())
   const elementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
 
   const removeToast = useCallback((id: string) => {
@@ -35,6 +41,14 @@ export default function ToastProvider({ children }: Props) {
     }
   }, [])
 
+  const startTimer = useCallback((id: string, duration: number) => {
+    const timeout = setTimeout(() => {
+      removeToast(id)
+      timersRef.current.delete(id)
+    }, duration)
+    timersRef.current.set(id, { timeout, startedAt: Date.now(), remaining: duration })
+  }, [removeToast])
+
   const toast = useCallback((data: Omit<ToastData, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const newToast: ToastData = { ...data, id }
@@ -44,9 +58,9 @@ export default function ToastProvider({ children }: Props) {
       // If over max, schedule removal of oldest (no animation needed — it's already off-screen or covered)
       if (next.length > MAX_VISIBLE) {
         const overflow = next.shift()!
-        const timer = timersRef.current.get(overflow.id)
-        if (timer) {
-          clearTimeout(timer)
+        const state = timersRef.current.get(overflow.id)
+        if (state) {
+          clearTimeout(state.timeout)
           timersRef.current.delete(overflow.id)
         }
         elementRefs.current.delete(overflow.id)
@@ -54,20 +68,35 @@ export default function ToastProvider({ children }: Props) {
       return next
     })
 
-    const timer = setTimeout(() => {
-      removeToast(id)
-      timersRef.current.delete(id)
-    }, AUTO_DISMISS_MS)
-    timersRef.current.set(id, timer)
-  }, [removeToast])
+    startTimer(id, AUTO_DISMISS_MS)
+  }, [removeToast, startTimer])
 
   const handleDismiss = useCallback((id: string) => {
-    const timer = timersRef.current.get(id)
-    if (timer) {
-      clearTimeout(timer)
+    const state = timersRef.current.get(id)
+    if (state) {
+      clearTimeout(state.timeout)
       timersRef.current.delete(id)
     }
     removeToast(id)
+  }, [removeToast])
+
+  const pauseTimer = useCallback((id: string) => {
+    const state = timersRef.current.get(id)
+    if (!state) return
+    clearTimeout(state.timeout)
+    const elapsed = Date.now() - state.startedAt
+    state.remaining = Math.max(state.remaining - elapsed, 0)
+  }, [])
+
+  const resumeTimer = useCallback((id: string) => {
+    const state = timersRef.current.get(id)
+    if (!state) return
+    const timeout = setTimeout(() => {
+      removeToast(id)
+      timersRef.current.delete(id)
+    }, state.remaining)
+    state.timeout = timeout
+    state.startedAt = Date.now()
   }, [removeToast])
 
   return (
@@ -76,6 +105,8 @@ export default function ToastProvider({ children }: Props) {
 
       {/* Fixed bottom-right container — toasts stack upward */}
       <div
+        role="status"
+        aria-live="polite"
         style={{
           position: 'fixed',
           bottom: 20,
@@ -83,7 +114,7 @@ export default function ToastProvider({ children }: Props) {
           display: 'flex',
           flexDirection: 'column-reverse',
           gap: 8,
-          zIndex: 10000,
+          zIndex: 10003,
           pointerEvents: 'none',
         }}
       >
@@ -92,6 +123,8 @@ export default function ToastProvider({ children }: Props) {
             key={data.id}
             ref={el => { elementRefs.current.set(data.id, el) }}
             style={{ pointerEvents: 'auto' }}
+            onMouseEnter={() => pauseTimer(data.id)}
+            onMouseLeave={() => resumeTimer(data.id)}
           >
             <Toast
               data={data}

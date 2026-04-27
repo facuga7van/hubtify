@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '../../utils/format';
 
 interface BalanceBarProps {
   income: number;
@@ -32,8 +33,8 @@ export function BalanceBar({ income, expenses }: BalanceBarProps) {
       />
       {hovered && (
         <div className="coin-balance-bar__tooltip">
-          {t('coinify.income')}: ${income.toLocaleString('es-AR')} &nbsp;|&nbsp;
-          {t('coinify.expense')}: ${expenses.toLocaleString('es-AR')}
+          {t('coinify.income')}: {formatCurrency(income)} &nbsp;|&nbsp;
+          {t('coinify.expense')}: {formatCurrency(expenses)}
         </div>
       )}
     </div>

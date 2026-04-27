@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
 import type { ParsedRow } from '../../../../shared/types';
 import { CATEGORIES } from '../types';
+import { formatCurrency } from '../utils/format';
 
 interface RowState extends ParsedRow {
   included: boolean;
@@ -120,13 +122,13 @@ export default function Import() {
     }
   };
 
-  const formatAmount = (row: RowState) => {
-    if (row.amountUSD != null) return `$${row.amountUSD.toLocaleString('en-US')}`;
-    if (row.amountARS != null) return `$${row.amountARS.toLocaleString('es-AR')}`;
+  const formatRowAmount = (row: RowState) => {
+    if (row.amountUSD != null) return formatCurrency(row.amountUSD, { currency: 'USD' });
+    if (row.amountARS != null) return formatCurrency(row.amountARS);
     return '-';
   };
 
-  const formatCurrency = (row: RowState) => {
+  const formatRowCurrency = (row: RowState) => {
     if (row.amountUSD != null) return 'USD';
     if (row.amountARS != null) return 'ARS';
     return '-';
@@ -142,8 +144,9 @@ export default function Import() {
   const includedCount = rows.filter((r) => r.included).length;
 
   return (
-    <div>
-      <h2 style={{ color: 'var(--rpg-wood)', fontSize: '1.1rem', fontFamily: 'Cinzel, serif', margin: 0, marginBottom: 16 }}>
+    <div style={{ position: 'relative' }}>
+      <HelpBubble text={t('coinify.importHelp', 'Importá el PDF de tu resumen de tarjeta. El sistema extrae movimientos y sugiere categorías.')} />
+      <h2 style={{ color: 'var(--leather)', fontSize: 'var(--fs-nav)', fontFamily: "'UnifrakturCook', cursive", margin: 0, marginBottom: 16 }}>
         {t('coinify.importTitle')}
       </h2>
 
@@ -162,7 +165,7 @@ export default function Import() {
 
       {/* Parse error */}
       {parseError && (
-        <p style={{ fontSize: '0.85rem', color: 'var(--rpg-hp-red)', marginBottom: 12 }}>{parseError}</p>
+        <p style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)', marginBottom: 12 }}>{parseError}</p>
       )}
 
       {/* Preview table */}
@@ -199,14 +202,14 @@ export default function Import() {
                       {row.merchant}
                     </td>
                     <td className="coin-import-row__installment">{formatInstallment(row)}</td>
-                    <td className="coin-import-row__amount">{formatAmount(row)}</td>
-                    <td className="coin-import-row__currency">{formatCurrency(row)}</td>
+                    <td className="coin-import-row__amount">{formatRowAmount(row)}</td>
+                    <td className="coin-import-row__currency">{formatRowCurrency(row)}</td>
                     <td>
                       <select
                         value={row.category}
                         onChange={(e) => setCategory(idx, e.target.value)}
                         className="rpg-select"
-                        style={{ fontSize: '0.75rem' }}
+                        style={{ fontSize: 'var(--fs-label)' }}
                         disabled={!row.included}
                       >
                         {CATEGORIES.map((cat) => (
@@ -227,7 +230,7 @@ export default function Import() {
               style={{
                 padding: 12,
                 marginBottom: 16,
-                borderColor: 'var(--rpg-gold)',
+                borderColor: 'var(--gold)',
                 borderWidth: 2,
                 background: 'rgba(255, 193, 7, 0.08)',
               }}
@@ -236,16 +239,16 @@ export default function Import() {
                 style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
                 onClick={() => setSkippedExpanded((v) => !v)}
               >
-                <span style={{ color: 'var(--rpg-gold)', fontSize: '1rem' }}>
+                <span style={{ color: 'var(--gold)', fontSize: 'var(--fs-sub)' }}>
                   {skippedExpanded ? '\u25BC' : '\u25B6'}
                 </span>
-                <span style={{ color: 'var(--rpg-gold)', fontWeight: 600, fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--gold)', fontWeight: 600, fontSize: 'var(--fs-label)' }}>
                   {t('coinify.importSkippedLines', { count: skippedLines.length })}
                 </span>
               </div>
               {skippedExpanded && (
                 <div style={{ marginTop: 8 }}>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--rpg-wood)', opacity: 0.8, margin: '0 0 6px' }}>
+                  <p style={{ fontSize: 'var(--fs-label)', color: 'var(--leather)', opacity: 0.8, margin: '0 0 6px' }}>
                     {t('coinify.importSkippedLinesHint')}
                   </p>
                   <ul style={{ margin: 0, padding: '0 0 0 8px', listStyle: 'none' }}>
@@ -254,9 +257,9 @@ export default function Import() {
                         key={i}
                         style={{
                           fontFamily: 'monospace',
-                          fontSize: '0.75rem',
+                          fontSize: 'var(--fs-label)',
                           padding: '2px 0',
-                          color: 'var(--rpg-wood)',
+                          color: 'var(--leather)',
                           opacity: 0.9,
                           wordBreak: 'break-all',
                         }}
@@ -279,7 +282,7 @@ export default function Import() {
                 value={statementMonth}
                 onChange={(e) => setStatementMonth(e.target.value)}
                 className="rpg-input"
-                style={{ fontSize: '0.85rem' }}
+                style={{ fontSize: 'var(--fs-label)' }}
               />
             </div>
             <button
@@ -290,7 +293,7 @@ export default function Import() {
               {importing ? t('coinify.importImporting') : `${t('coinify.importConfirm')} (${includedCount})`}
               {showSeal && (
                 <span className="coin-import-seal">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold)" strokeWidth="2" strokeLinecap="round">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round">
                     <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
                   </svg>
                 </span>
@@ -299,7 +302,7 @@ export default function Import() {
           </div>
 
           {importError && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--rpg-hp-red)' }}>{importError}</p>
+            <p style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>{importError}</p>
           )}
         </div>
       )}
@@ -307,7 +310,7 @@ export default function Import() {
       {/* Success message */}
       {successCount !== null && (
         <div className="rpg-card coin-import-success">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-xp-green)" strokeWidth="2" strokeLinecap="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--moss)" strokeWidth="2" strokeLinecap="round">
             <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
           </svg>
           {t('coinify.importSuccess', { count: successCount })}

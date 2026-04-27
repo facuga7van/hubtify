@@ -245,7 +245,7 @@ export function registerFinanceImportIpcHandlers(): void {
 
       const dupCheck = db.prepare(
         `SELECT COUNT(*) as cnt FROM finance_transactions
-         WHERE date = ? AND description = ? AND amount = ? AND source = 'import'`,
+         WHERE deleted_at IS NULL AND date = ? AND description = ? AND amount = ? AND source = 'import'`,
       );
 
       let duplicateCount = 0;

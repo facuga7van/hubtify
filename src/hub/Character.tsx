@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Application, Assets, Sprite, type Renderer } from 'pixi.js';
+import HelpBubble from '../shared/components/HelpBubble';
 
 import faceImg from '../assets/pixi/face.png';
 import neckImg from '../assets/pixi/neck.png';
@@ -57,8 +58,9 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
   // Keep ref in sync with state
   useEffect(() => { charDataRef.current = charData; }, [charData]);
 
-  // Load from SQLite on mount
-  useEffect(() => {
+  // Load from SQLite on mount + account switch
+  const loadCharacter = useCallback(() => {
+    setDbLoaded(false);
     window.api.characterLoad().then((data) => {
       if (data && typeof data === 'object') {
         const d = data as CharacterData;
@@ -74,17 +76,36 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     }).catch(console.error).finally(() => setDbLoaded(true));
   }, []);
 
-  // Listen for changes from other Character instances
+  useEffect(() => { loadCharacter(); }, [loadCharacter]);
+
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
+    const handler = () => loadCharacter();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadCharacter]);
+
+  // Listen for changes from other Character instances (same window + other windows)
+  useEffect(() => {
+    // Same-window sync via CustomEvent
+    const localHandler = (e: Event) => {
+      const d = (e as CustomEvent<CharacterData>).detail;
+      setCharData(d);
+      charDataRef.current = d;
+    };
+    // Cross-window sync via BroadcastChannel
+    const bcHandler = (e: MessageEvent) => {
       if (e.data && typeof e.data === 'object' && e.data.type === 'char-updated') {
         const d = e.data.charData as CharacterData;
         setCharData(d);
         charDataRef.current = d;
       }
     };
-    charChannel.addEventListener('message', handler);
-    return () => charChannel.removeEventListener('message', handler);
+    window.addEventListener('character:updated', localHandler);
+    charChannel.addEventListener('message', bcHandler);
+    return () => {
+      window.removeEventListener('character:updated', localHandler);
+      charChannel.removeEventListener('message', bcHandler);
+    };
   }, []);
 
   const loadAllHair = useCallback(async (bIdx: number, bClr: number, fIdx: number, fClr: number) => {
@@ -167,12 +188,17 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
 
     (async () => {
       const canvas = document.createElement('canvas');
+
+      const dpr = window.devicePixelRatio || 1;
+      const res = (size / 100) * dpr;
+      await app.init({ canvas, background: '#c0a080', width: 100, height: 100, resolution: res });
+
+      // Set CSS size after init — canvas has 100*res physical pixels, displayed at size CSS px
       canvas.style.width = `${size}px`;
       canvas.style.height = `${size}px`;
       canvas.style.borderRadius = '50%';
 
-      await app.init({ canvas, background: '#c0a080', width: 100, height: 100 });
-      appRef.current = app; // Only assign AFTER init so app.screen is available
+      appRef.current = app;
       pixiContainerRef.current?.appendChild(canvas);
 
       const cx = app.screen.width / 2;
@@ -216,6 +242,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       const wrapped = raw < 1 ? max : raw > max ? 1 : raw;
       const next = { ...prev, [field]: wrapped };
       window.api.characterSave(next).catch(console.error);
+      window.dispatchEvent(new CustomEvent('character:updated', { detail: next }));
       charChannel.postMessage({ type: 'char-updated', charData: next });
       return next;
     });
@@ -231,7 +258,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
             background: '#c0a080', borderRadius: '50%', zIndex: 10,
           }}>
             <div style={{
-              width: 20, height: 20, border: '2px solid var(--rpg-gold-dark)',
+              width: 20, height: 20, border: '2px solid var(--gold-dark)',
               borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite',
             }} />
           </div>
@@ -241,11 +268,12 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
 
       {/* Customize button */}
       {canCustomize && (
-        <div style={{ textAlign: 'center', marginTop: 12 }}>
+        <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <button className="rpg-button" onClick={() => setShowCustomizer(!showCustomizer)}
-            style={{ fontSize: '0.8rem', padding: '6px 16px' }}>
+            style={{ fontSize: 'var(--fs-label)', padding: '6px 16px' }}>
             {showCustomizer ? t('character.done') : t('character.customize')}
           </button>
+          <HelpBubble variant="inline" text={t('character.customizerHelp', 'Personalizá tu avatar. Los cambios se guardan y sincronizan automáticamente.')} />
         </div>
       )}
 
@@ -253,7 +281,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       {canCustomize && showCustomizer && (
         <div className="rpg-card" style={{ marginTop: 12 }}>
           <div className="rpg-card-title">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--gold-dark)" strokeWidth="1.3" strokeLinecap="round">
               <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
             </svg>
             {t('character.customizeTitle')}
@@ -283,14 +311,14 @@ function ControlRow({ label, value, onPrev, onNext }: {
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <span style={{ fontSize: '0.85rem', color: 'var(--rpg-ink-light)' }}>{label}</span>
+      <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button className="rpg-button" onClick={onPrev} style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+        <button className="rpg-button" onClick={onPrev} style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}
           aria-label={`Previous ${label}`}>
           <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 1L2 5l4 4"/></svg>
         </button>
-        <span style={{ fontFamily: 'Fira Code, monospace', fontSize: '0.85rem', minWidth: 24, textAlign: 'center' }}>{value}</span>
-        <button className="rpg-button" onClick={onNext} style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+        <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 'var(--fs-label)', minWidth: 24, textAlign: 'center' }}>{value}</span>
+        <button className="rpg-button" onClick={onNext} style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}
           aria-label={`Next ${label}`}>
           <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 1l4 4-4 4"/></svg>
         </button>

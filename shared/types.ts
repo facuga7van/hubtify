@@ -124,6 +124,16 @@ export interface CauldronSessionEndResult {
   nextType: 'work' | 'break' | 'long_break' | null;
 }
 
+export interface CauldronSessionsPage {
+  sessions: CauldronSession[];
+  hasMore: boolean;
+}
+
+export interface CauldronWeeklyFocusDay {
+  label: string;
+  value: number;
+}
+
 // ── API Types ──────────────────────────────────────────────
 
 export interface HubtifyApi {
@@ -150,6 +160,8 @@ export interface HubtifyApi {
   questsSyncSubtaskOrders: (taskId: string, orderedIds: string[]) => Promise<void>;
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
+  questsGetHabitHeatmap: (days?: number) => Promise<{ days: Array<{ date: string; count: number }>; totalHabits: number }>;
+  questsGetHabitStreaks: () => Promise<Array<{ name: string; streak: number }>>;
   questsGetHabits: () => Promise<unknown[]>;
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => Promise<string>;
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => Promise<void>;
@@ -167,6 +179,8 @@ export interface HubtifyApi {
   questsCountCompletedToday: () => Promise<number>;
   questsGetPendingCount: () => Promise<number>;
   questsGetCompletedTodayCount: () => Promise<number>;
+  questsGetOverdueCount: () => Promise<number>;
+  questsGetDueTodayCount: () => Promise<number>;
 
   // Nutrition
   nutritionGetProfile: () => Promise<unknown>;
@@ -174,6 +188,7 @@ export interface HubtifyApi {
   nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
   nutritionDeleteFood: (id: number) => Promise<void>;
+  nutritionDeleteByDate: (date: string) => Promise<void>;
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => Promise<void>;
   nutritionGetFrequentFoods: () => Promise<unknown[]>;
   nutritionCreateFrequentFood: (food: Record<string, unknown>) => Promise<void>;
@@ -187,12 +202,16 @@ export interface HubtifyApi {
   nutritionGetSummaryRange: (start: string, end: string) => Promise<unknown[]>;
   nutritionGetWeights: () => Promise<unknown[]>;
   nutritionGetStreak: () => Promise<number>;
+  nutritionGetWeekCalories: () => Promise<number[]>;
   nutritionGetTodayCalories: () => Promise<number>;
+  nutritionGetTodayMealsCount: () => Promise<number>;
   nutritionGetTodayTarget: () => Promise<number | null>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
+  nutritionGetRecentFoods: () => Promise<Array<{ description: string; calories: number; source: string }>>;
   nutritionGetPendingDays: () => Promise<string[]>;
+  nutritionGetMealSchedule: () => Promise<import('./meal-utils').MealSchedule>;
 
   // Sync
   syncRestoreStats: (stats: Record<string, unknown>) => Promise<{ success: boolean }>;
@@ -217,16 +236,21 @@ export interface HubtifyApi {
   // Character
   characterSave: (data: Record<string, unknown>) => Promise<void>;
   characterLoad: () => Promise<unknown>;
+  characterGetName: () => Promise<string | null>;
+  characterSetName: (name: string) => Promise<void>;
+  characterGetUsername: () => Promise<string | null>;
+  characterSetUsername: (username: string) => Promise<void>;
 
   // Notifications
   notificationsSend: (title: string, body: string) => Promise<boolean>;
   notificationsGetAll: () => Promise<AppNotification[]>;
   notificationsDismiss: (id: string) => Promise<void>;
   notificationsSnooze: (id: string) => Promise<void>;
-  notificationsRunCheck: () => Promise<void>;
+  notificationsRunCheck: () => Promise<number>;
   notificationsGetCount: () => Promise<number>;
   notificationsSetSystemEnabled: (enabled: boolean) => Promise<void>;
   notificationsSetLocale: (locale: string) => Promise<void>;
+  notificationsSetModuleEnabled: (module: string, enabled: boolean) => Promise<void>;
   onNotificationsUpdated: (callback: () => void) => () => void;
 
   // Dollar
@@ -268,7 +292,7 @@ export interface HubtifyApi {
 
   // Finance - Import
   financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
-  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ count: number; duplicateCount: number }>;
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ batchId: string; count: number; duplicateCount: number }>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
 
@@ -279,12 +303,21 @@ export interface HubtifyApi {
   financeGetCategoryBreakdownForRange: (startMonth: string, endMonth: string) => Promise<Array<{ category: string; ARS: number; USD: number }>>;
   financeGetProjection: (months: number) => Promise<unknown[]>;
 
+  // Finance - Export
+  financeExportCsv: (month?: string) => Promise<{ success: boolean; canceled?: boolean; path?: string; count?: number; error?: string }>;
+
+  // Finance - Dashboard (new)
+  financeGetMonthlyExpenses: () => Promise<number[]>;
+  financeGetCategoryAverages: () => Promise<Record<string, number>>;
+  financeGetPreviousMonthSummary: () => Promise<{ income: number; expenses: number; month: string }>;
+
   // Finance - Backward compat
   financeGetCategories: () => Promise<string[]>;
   financeAddCategory: (name: string) => Promise<void>;
   financeDeleteCategory: (name: string) => Promise<void>;
   financeGetMonthlyTotal: () => Promise<number>;
   financeGetActiveLoansCount: () => Promise<number>;
+  financeGetTodayTransactionsCount: () => Promise<number>;
 
   // Finance - Credit Cards
   financeGetCreditCards: () => Promise<unknown[]>;
@@ -307,6 +340,8 @@ export interface HubtifyApi {
   cauldronStop: () => Promise<void>;
   cauldronGetState: () => Promise<CauldronTimerState>;
   cauldronGetStats: () => Promise<CauldronStats>;
+  cauldronGetSessions: (offset?: number, limit?: number) => Promise<CauldronSessionsPage>;
+  cauldronGetWeeklyFocusTime: () => Promise<CauldronWeeklyFocusDay[]>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
   onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
 
@@ -349,7 +384,13 @@ export const STREAK_MILESTONES: Record<number, number> = {
   3: 25, 7: 50, 14: 100, 30: 250, 60: 500, 100: 1000,
 };
 
-export const TITLE_THRESHOLDS: [number, string][] = [
-  [50, 'Leyenda'], [40, 'Hero'], [30, 'Champion'],
-  [20, 'Caballero'], [10, 'Guerrero'], [5, 'Escudero'], [1, 'Campesino'],
+/** [level_threshold, i18n_key, fallback_name] — sorted descending by level */
+export const TITLE_THRESHOLDS: [number, string, string][] = [
+  [50, 'rpg.titles.legend', 'Leyenda'],
+  [40, 'rpg.titles.hero', 'Hero'],
+  [30, 'rpg.titles.champion', 'Champion'],
+  [20, 'rpg.titles.knight', 'Caballero'],
+  [10, 'rpg.titles.warrior', 'Guerrero'],
+  [5, 'rpg.titles.squire', 'Escudero'],
+  [1, 'rpg.titles.peasant', 'Campesino'],
 ];

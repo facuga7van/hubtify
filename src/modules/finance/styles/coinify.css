@@ -1,26 +1,14 @@
-/* ══════════════════════════════════════════════════════════════
-   coinify.css — Coinify RPG Skin
+/* ═════════��════════════════════════════════════════════════════
+   coinify.css — Libro del Tesorero (Codex aesthetic)
    All classes prefixed with coin- to avoid collisions.
-   Imported in App.tsx alongside quests.css.
-   ══════════════════════════════════════════════════════════════ */
+   Uses codex design tokens: --ink, --parch-*, --rubric, --moss, --gold
+   ═════════════════════════════════��════════════════════════════ */
 
 /* ── Animations ─────────────────────────────────────────────── */
-
-@keyframes coinPulseGold {
-  0%, 100% { border-color: var(--rpg-gold); }
-  50%      { border-color: var(--rpg-gold-light); box-shadow: 0 0 8px rgba(201, 168, 76, 0.4); }
-}
 
 @keyframes coinShimmer {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
-}
-
-@keyframes coinChainBreak {
-  0%   { transform: scale(1); opacity: 1; }
-  30%  { transform: scale(1.3) rotate(10deg); }
-  60%  { transform: scale(0.9) rotate(-5deg); opacity: 0.7; }
-  100% { transform: scale(1) rotate(0deg); opacity: 0.5; }
 }
 
 @keyframes coinDrop {
@@ -29,15 +17,9 @@
   100% { opacity: 0; transform: translateY(35px) scale(0.5); }
 }
 
-@keyframes coinSeal {
-  0%   { opacity: 0; transform: scale(0.3) rotate(-30deg); }
-  50%  { opacity: 1; transform: scale(1.15) rotate(5deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-
-@keyframes coinFlashBorder {
-  0%   { border-color: var(--rpg-gold-light); box-shadow: 0 0 12px rgba(201, 168, 76, 0.6); }
-  100% { border-color: var(--rpg-gold-dark); box-shadow: var(--rpg-shadow); }
+@keyframes coinPulseGold {
+  0%, 100% { border-color: var(--gold); }
+  50%      { border-color: var(--gold-light); box-shadow: 0 0 8px rgba(168, 138, 60, 0.4); }
 }
 
 /* ── Skeleton Loading ───────────────────────────────────────── */
@@ -45,43 +27,82 @@
 .coin-skeleton {
   background: linear-gradient(
     90deg,
-    var(--rpg-parchment-dark) 25%,
-    var(--rpg-parchment-light) 50%,
-    var(--rpg-parchment-dark) 75%
+    var(--parch-2) 25%,
+    var(--parch-0) 50%,
+    var(--parch-2) 75%
   );
   background-size: 200% 100%;
   animation: coinShimmer 1.5s ease infinite;
-  border-radius: var(--rpg-radius);
-}
-
-.coin-skeleton--text {
-  height: 1em;
-  width: 60%;
-  border-radius: 3px;
 }
 
 .coin-skeleton--number {
   height: 2rem;
   width: 120px;
-  border-radius: 3px;
-}
-
-.coin-skeleton--bar {
-  height: 16px;
-  width: 100%;
-  border-radius: 3px;
-}
-
-.coin-skeleton--chart {
-  height: 180px;
-  width: 100%;
-  border-radius: var(--rpg-radius);
+  display: inline-block;
 }
 
 .coin-skeleton--card {
   height: 80px;
   width: 100%;
-  border-radius: var(--rpg-radius);
+}
+
+.coin-skeleton--chart {
+  height: 180px;
+  width: 100%;
+}
+
+/* ── Book override (remove extra padding from BookPage when inside finance) ── */
+
+.coin-book .qb-page {
+  padding-left: 80px;
+  padding-right: 40px;
+}
+
+/* ── Tab Navigation (codex styled, inside BookPage) ── */
+
+.coin-tab-nav {
+  display: flex;
+  gap: 0;
+  margin-bottom: 10px;
+  border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
+  position: relative;
+  z-index: 3;
+}
+
+.coin-tab-link {
+  padding: 6px 14px 8px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(13px * var(--font-scale));
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  color: var(--ink-soft);
+  border: 1px solid transparent;
+  border-bottom: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.coin-tab-link:hover {
+  color: var(--ink);
+  background: rgba(245, 231, 192, 0.5);
+}
+
+.coin-tab-link--active {
+  color: var(--rubric);
+  background: rgba(245, 231, 192, 0.6);
+  border-color: rgba(74, 55, 32, 0.5);
+  border-bottom: 1px solid var(--parch-0);
+  margin-bottom: -1.5px;
+  font-weight: bold;
+}
+
+/* ── Layout Content ─────────────────────────────────────────── */
+
+.coin-layout__content {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  z-index: 2;
 }
 
 /* ── Dashboard Layout ───────────────────────────────────────── */
@@ -89,7 +110,7 @@
 .coin-dashboard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .coin-dashboard--loading .coin-dashboard__content {
@@ -100,12 +121,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.coin-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: var(--fs-label);
+  white-space: nowrap;
 }
 
 .coin-dashboard__content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .coin-dashboard__content--fade-out {
@@ -113,441 +144,213 @@
   transition: opacity 0.15s ease;
 }
 
-.coin-dashboard__content--fade-in {
+.coin-dashboard__content--fade-in {}
+
+.coin-range-select {
+  font-size: var(--fs-label);
+  padding: 4px 8px;
 }
 
-/* ── Hero: Cofre del Mes ────────────────────────────────────── */
+/* ── Top Grid: Chest + Income + Expenses ── */
 
-.coin-hero {
-  border: 3px solid var(--rpg-gold);
-  background: linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 40%, var(--rpg-parchment-dark) 100%);
-  border-radius: var(--rpg-radius);
-  box-shadow: var(--rpg-shadow), var(--rpg-shadow-inset), 0 0 12px rgba(201, 168, 76, 0.15);
-  padding: 20px;
+.coin-top-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+/* ── Chest Button ── */
+
+.coin-chest-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.coin-chest-btn:hover {
+  transform: scale(1.06);
+}
+
+.coin-chest-btn:active {
+  transform: scale(0.95);
+}
+
+.coin-chest-btn--bounce {
+  animation: chestBounce 0.5s ease;
+}
+
+@keyframes chestBounce {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(0.9) rotate(-3deg); }
+  35%  { transform: scale(1.12) rotate(2deg); }
+  55%  { transform: scale(0.97) rotate(-1deg); }
+  75%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/* ── Treasure Chest Panel ── */
+
+.coin-chest-panel {
   position: relative;
-}
-
-.coin-hero::before {
-  content: '';
-  position: absolute;
-  top: 4px; left: 4px; right: 4px; bottom: 4px;
-  border: 1px solid rgba(201, 168, 76, 0.2);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.coin-hero__row {
+  border: 1.5px solid rgba(74, 55, 32, 0.5);
+  background: linear-gradient(180deg, rgba(245, 231, 192, 0.6), rgba(217, 195, 138, 0.4));
+  padding: 10px 14px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.7), 2px 2px 0 rgba(30, 19, 9, 0.1);
 }
 
-.coin-hero__icon {
-  flex-shrink: 0;
-  color: var(--rpg-gold);
-}
-
-.coin-hero__numbers {
+.coin-chest-panel__info {
   flex: 1;
+  min-width: 0;
 }
 
-.coin-hero__balance {
-  font-family: 'Fira Code', monospace;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--rpg-wood);
-  line-height: 1.1;
-}
-
-.coin-hero__balance--positive { color: var(--rpg-xp-green); }
-.coin-hero__balance--negative { color: var(--rpg-hp-red); }
-
-.coin-hero__balance-usd {
-  font-family: 'Fira Code', monospace;
-  font-size: 1rem;
-  color: var(--rpg-ink-light);
-  opacity: 0.7;
+.coin-chest-panel__balance {
   margin-top: 2px;
 }
 
-.coin-hero__trend {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  margin-top: 8px;
+.coin-chest-panel__amount {
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-display);
+  line-height: 1;
+  color: var(--ink);
 }
 
-.coin-hero__trend--up {
-  color: var(--rpg-xp-green);
+.coin-chest-panel__amount--positive { color: var(--ink); }
+.coin-chest-panel__amount--negative { color: var(--rubric); }
+
+.coin-chest-panel__usd {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
 }
 
-.coin-hero__trend--down {
-  color: var(--rpg-hp-red);
+.coin-chest-panel__vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.3em;
+  color: var(--ink-faded);
 }
 
-.coin-hero__trend-arrow {
-  font-size: 1rem;
-}
+/* ── Summary Card (income / expenses) ─��� */
 
-/* ── Balance Bar ────────────────────────────────────────────── */
-
-.coin-balance-bar {
-  display: flex;
-  height: 12px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--rpg-parchment-dark);
-  border: 1px solid rgba(201, 168, 76, 0.3);
-  margin-top: 12px;
+.coin-summary-card {
   position: relative;
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.5);
+  padding: 8px 12px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
 }
 
-.coin-balance-bar__segment {
-  height: 100%;
-  transition: width 0.5s ease;
-  min-width: 2px;
+.coin-summary-card__value {
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-stat);
+  line-height: 1.1;
+  margin: 2px 0 4px;
 }
 
-.coin-balance-bar__segment--income {
-  background: linear-gradient(180deg, var(--rpg-xp-green-light) 0%, var(--rpg-xp-green) 100%);
-}
+.coin-summary-card__value--sage { color: var(--moss); }
+.coin-summary-card__value--rubric { color: var(--rubric); }
 
-.coin-balance-bar__segment--expense {
-  background: linear-gradient(180deg, var(--rpg-hp-red-light) 0%, var(--rpg-hp-red) 100%);
-}
+/* ── Middle Grid ── */
 
-.coin-balance-bar__tooltip {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--rpg-wood);
-  color: var(--rpg-gold-light);
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-family: 'Fira Code', monospace;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 10;
-}
-
-.coin-balance-bar:hover .coin-balance-bar__tooltip {
-  opacity: 1;
-}
-
-/* ── Stat Cards Grid ────────────────────────────────────────── */
-
-.coin-stats-grid {
+.coin-middle-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
-@media (max-width: 700px) {
-  .coin-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* ── Category Legend ── */
+
+.coin-category-legend {
+  margin-top: 10px;
 }
 
-.coin-stat {
-  text-align: center;
-  padding: 14px 10px;
-  background: linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 40%, var(--rpg-parchment-dark) 100%);
-  border: 2px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
-  box-shadow: var(--rpg-shadow), var(--rpg-shadow-inset);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  cursor: default;
-  position: relative;
-}
-
-.coin-stat::before {
-  content: '';
-  position: absolute;
-  top: 3px; left: 3px; right: 3px; bottom: 3px;
-  border: 1px solid rgba(201, 168, 76, 0.15);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.coin-stat:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(44, 24, 16, 0.35), 0 0 0 1px var(--rpg-gold);
-}
-
-.coin-stat__icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 6px;
-  color: var(--rpg-gold-dark);
-}
-
-.coin-stat__number {
-  font-family: 'Fira Code', monospace;
-  font-size: 1.3rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.coin-stat__number--red { color: var(--rpg-hp-red); }
-.coin-stat__number--green { color: var(--rpg-xp-green); }
-.coin-stat__number--gold { color: var(--rpg-gold-dark); }
-
-.coin-stat__label {
-  font-size: 0.78rem;
-  opacity: 0.6;
-  margin-top: 4px;
-  font-family: 'Cinzel', serif;
-  letter-spacing: 0.02em;
-}
-
-/* ── Donut Chart ────────────────────────────────────────────── */
-
-.coin-donut-wrap {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 16px;
-  background: linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 40%, var(--rpg-parchment-dark) 100%);
-  border: 2px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
-  box-shadow: var(--rpg-shadow), var(--rpg-shadow-inset);
-  position: relative;
-}
-
-.coin-donut-wrap::before {
-  content: '';
-  position: absolute;
-  top: 3px; left: 3px; right: 3px; bottom: 3px;
-  border: 1px solid rgba(201, 168, 76, 0.15);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.coin-donut-wrap__title {
-  font-family: 'Cinzel', serif;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--rpg-wood);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid rgba(201, 168, 76, 0.25);
-  padding-bottom: 8px;
-}
-
-.coin-donut-center {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.coin-donut-center__total {
-  font-family: 'Fira Code', monospace;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--rpg-wood);
-}
-
-.coin-donut-center__label {
-  font-size: 0.65rem;
-  opacity: 0.5;
-  font-family: 'Cinzel', serif;
-}
-
-.coin-donut__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 24px;
-  opacity: 0.5;
-  font-style: italic;
-  text-align: center;
-}
-
-.coin-donut__empty-icon {
-  color: var(--rpg-gold-dark);
-  opacity: 0.4;
-}
-
-/* ── Legend ──────────────────────────────────────────────────── */
-
-.coin-legend {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.coin-category-legend__row {
+  display: grid;
+  grid-template-columns: 10px 1fr 60px 38px;
   gap: 6px;
-  min-width: 0;
-}
-
-.coin-legend__row {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
+  font-size: var(--fs-label);
+  padding: 2px 0;
 }
 
-.coin-legend__swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  flex-shrink: 0;
+.coin-category-legend__swatch {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
 }
 
-.coin-legend__label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.coin-legend__bar-wrap {
-  width: 60px;
-  height: 6px;
-  background: var(--rpg-parchment-dark);
-  border-radius: 3px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.coin-legend__bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.coin-legend__pct {
-  width: 36px;
+.coin-category-legend__amount {
+  font-size: var(--fs-label);
   text-align: right;
-  font-family: 'Fira Code', monospace;
-  font-size: 0.7rem;
-  opacity: 0.6;
-  flex-shrink: 0;
 }
 
-/* ── Projection & Loans Summary (Dashboard grid) ────────────── */
+.coin-category-legend__pct {
+  font-size: var(--fs-label);
+  text-align: right;
+  color: var(--ink-faded);
+}
+
+/* ── Bottom Grid ── */
 
 .coin-bottom-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
-@media (max-width: 700px) {
-  .coin-bottom-grid {
-    grid-template-columns: 1fr;
-  }
+/* ── Loan Mini Cards ── */
+
+.coin-loan-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.coin-projection {
-  padding: 16px;
+.coin-loan-mini {
+  padding: 8px 10px;
 }
 
-.coin-projection__bar-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.coin-loan-mini--sage {
+  border: 1px solid rgba(85, 107, 60, 0.5);
+  background: rgba(85, 107, 60, 0.1);
+}
+
+.coin-loan-mini--rubric {
+  border: 1px solid rgba(122, 30, 30, 0.5);
+  background: rgba(122, 30, 30, 0.1);
+}
+
+.coin-loan-mini__link {
   margin-top: 8px;
-}
-
-.coin-projection__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-}
-
-.coin-projection__month-label {
-  width: 70px;
-  font-size: 0.8rem;
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.coin-projection__bar {
-  flex: 1;
-  min-width: 0;
-  max-width: 120px;
-  height: 12px;
-  background: var(--rpg-parchment-dark);
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid rgba(201, 168, 76, 0.2);
-}
-
-.coin-projection__bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--rpg-gold-dark), var(--rpg-gold));
-  border-radius: 2px;
-  transition: width 0.5s ease;
-  position: relative;
-}
-
-.coin-projection__bar-fill:hover {
-  box-shadow: 0 0 6px rgba(201, 168, 76, 0.4);
-}
-
-.coin-projection__value {
-  min-width: 90px;
-  text-align: right;
-  font-family: 'Fira Code', monospace;
-  font-size: 0.78rem;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.coin-loans-summary {
-  padding: 16px;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: right;
+  opacity: 0.5;
+  transition: opacity 0.15s;
 }
 
-.coin-loans-summary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(44, 24, 16, 0.35), 0 0 0 1px var(--rpg-gold);
+.coin-loan-mini__link:hover {
+  opacity: 1;
 }
 
-.coin-loans-summary__row {
+/* ── Projection Labels ── */
+
+.coin-projection-labels {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-  padding: 4px 0;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 3px;
 }
 
-.coin-loans-summary__label {
-  opacity: 0.6;
-}
-
-.coin-loans-summary__value {
-  font-family: 'Fira Code', monospace;
-}
-
-.coin-loans-summary__value--green { color: var(--rpg-xp-green); }
-.coin-loans-summary__value--red { color: var(--rpg-hp-red); }
-
-.coin-loans-summary__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 16px;
-  opacity: 0.5;
-  font-style: italic;
-}
-
-/* ── Quick Actions ──────────────────────────────────────────── */
+/* ── Quick Actions ── */
 
 .coin-quick-actions {
   display: flex;
@@ -562,136 +365,173 @@
   gap: 6px;
 }
 
-/* ── Transactions ───────────────────────────────────────────── */
+/* ── Ledger (Transactions table) ── */
 
-.coin-tx-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.coin-ledger-header {
+  display: grid;
+  grid-template-columns: 60px 1fr 120px 90px;
+  padding: 6px 2px;
+  border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--rubric);
 }
 
-.coin-tx {
-  padding: 12px;
-  border-left: 4px solid var(--rpg-gold-dark);
-  background: linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 40%, var(--rpg-parchment-dark) 100%);
-  border-top: 1px solid rgba(201, 168, 76, 0.2);
-  border-right: 1px solid rgba(201, 168, 76, 0.2);
-  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
-  border-radius: 0 var(--rpg-radius) var(--rpg-radius) 0;
-  box-shadow: var(--rpg-shadow-inset);
+.coin-sort-header {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.coin-sort-header:hover {
+  color: var(--gold);
+}
+
+.coin-sort-arrow {
+  font-size: 0.65em;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+.coin-ledger {
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.45);
+  padding: 0 10px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+}
+
+.coin-ledger-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 7px 2px;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
+  font-size: calc(12.5px * var(--font-scale));
   transition: all 0.2s ease;
 }
 
-.coin-tx--income {
-  border-left-color: var(--rpg-xp-green);
+.coin-ledger-row:last-child {
+  border-bottom: none;
 }
 
-.coin-tx--expense {
-  border-left-color: var(--rpg-hp-red);
-}
+.coin-ledger-row--income { background: rgba(76, 110, 60, 0.08); }
+.coin-ledger-row--expense {}
 
-.coin-tx--entering {
-}
-
-.coin-tx--entering::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--rpg-gold-light);
-  border-radius: inherit;
-  animation: coinFlashBorder 0.6s ease forwards;
-  pointer-events: none;
-}
-
-.coin-tx--exiting {
-}
-
-.coin-tx--editing {
+.coin-ledger-row--editing {
   animation: coinPulseGold 1.5s ease infinite;
-  border: 2px solid var(--rpg-gold);
+  border: 1px solid var(--gold);
+  padding: 8px;
 }
 
-.coin-tx__date {
-  font-size: 0.8rem;
-  opacity: 0.5;
-  width: 70px;
+.coin-ledger-row--exiting {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.coin-ledger-row__day {
+  width: 36px;
   flex-shrink: 0;
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
 }
 
-.coin-tx__desc {
+.coin-ledger-row__desc {
   flex: 1;
-  font-size: 0.85rem;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
+  font-family: 'Cormorant Garamond', serif;
 }
 
-.coin-tx__badge {
-  font-size: 0.75rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(201, 168, 76, 0.2);
-  color: var(--rpg-gold-dark);
-  font-family: 'Cinzel', serif;
-  white-space: nowrap;
+.coin-ledger-row__third-party {
+  font-size: var(--fs-label);
+  opacity: 0.5;
+  color: var(--gold);
 }
 
-.coin-tx__badge--category {
-  background: var(--rpg-gold);
-  color: var(--rpg-ink);
+.coin-ledger-row__cat {
+  flex-shrink: 0;
 }
 
-.coin-tx__badge--third-party {
-  background: rgba(201, 168, 76, 0.15);
-  color: var(--rpg-gold);
-}
-
-.coin-tx__badge--source {
+.coin-ledger-row__source {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  opacity: 0.5;
-  background: transparent;
+  opacity: 0.4;
 }
 
-.coin-tx__amount {
-  font-family: 'Fira Code', monospace;
-  font-size: 0.85rem;
-  white-space: nowrap;
+.coin-ledger-row__payment {
+  font-size: var(--fs-label);
+  opacity: 0.4;
+  font-family: 'IM Fell English SC', serif;
 }
 
-.coin-tx__amount--income { color: var(--rpg-xp-green); }
-.coin-tx__amount--expense { color: var(--rpg-hp-red); }
+.coin-ledger-row__amount {
+  min-width: 70px;
+  text-align: right;
+  font-size: var(--fs-label);
+}
 
-.coin-tx__actions {
+.coin-ledger-row__amount--income { color: var(--moss); }
+.coin-ledger-row__amount--expense { color: var(--rubric); }
+
+.coin-ledger-row__actions {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
 }
 
-.coin-tx__action-btn {
-  opacity: 0.4;
-  transition: opacity 0.15s ease;
+.coin-ledger-row__action-btn {
+  opacity: 0.3;
+  font-size: var(--fs-label);
+  padding: 2px 6px;
+  transition: opacity 0.15s;
 }
 
-.coin-tx__action-btn:hover {
+.coin-ledger-row__action-btn:hover {
   opacity: 1;
 }
 
-.coin-tx__edit-row {
+.coin-ledger-row__edit {
   display: flex;
   gap: 8px;
   align-items: center;
   width: 100%;
 }
 
-.coin-tx__payment-method {
-  font-size: 0.75rem;
-  opacity: 0.5;
+.coin-ledger-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 2px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(74, 55, 32, 0.45);
+  user-select: none;
+  margin-top: 10px;
+}
+
+.coin-ledger-section-header__title {
+  flex: 1;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--rubric);
+}
+
+.coin-ledger-section-header__count {
+  font-size: var(--fs-label);
+  opacity: 0.4;
+  font-family: 'UnifrakturCook', serif;
+}
+
+.coin-ledger-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
 }
 
 /* ── Quick Add Form ─────────────────────────────────────────── */
@@ -706,10 +546,6 @@
   opacity: 1;
 }
 
-.coin-quick-add-form.rpg-card {
-  padding: 10px 12px;
-}
-
 .coin-quick-add-form--closed {
   max-height: 0;
   opacity: 0;
@@ -718,15 +554,15 @@
 }
 
 .coin-quick-add-form__title {
-  font-family: 'Cinzel', serif;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--rpg-wood);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--rubric);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
-  border-bottom: 1px solid rgba(201, 168, 76, 0.25);
+  border-bottom: 1px solid rgba(122, 30, 30, 0.35);
   padding-bottom: 6px;
 }
 
@@ -738,7 +574,7 @@
 
 .coin-quick-add-form__type-row .rpg-button {
   padding: 4px 10px;
-  font-size: 0.75rem;
+  font-size: var(--fs-label);
 }
 
 .coin-quick-add-form__amount-row {
@@ -768,12 +604,57 @@
 .coin-quick-add-form .rpg-input,
 .coin-quick-add-form .rpg-select {
   padding: 4px 8px;
-  font-size: 0.85rem;
+  font-size: var(--fs-label);
+}
+
+.coin-quick-add-form__toggle {
+  background: none;
+  border: none;
+  color: var(--ink-faded, #8a7a5a);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-label, 13px);
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 8px;
+  transition: color 0.15s;
+}
+
+.coin-quick-add-form__toggle:hover {
+  color: var(--gold, #a88a3c);
+}
+
+.coin-quick-add-form__advanced {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+  margin-bottom: 8px;
+  border-top: 1px dashed rgba(74, 55, 32, 0.2);
 }
 
 .coin-quick-add-form .rpg-button[type="submit"] {
   padding: 5px 12px;
-  font-size: 0.8rem;
+  font-size: var(--fs-label);
+}
+
+/* ── Codex Form (generic parchment form container) ─��� */
+
+.coin-codex-form {
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.5);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+}
+
+.coin-codex-form__title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--rubric);
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(122, 30, 30, 0.35);
+  padding-bottom: 6px;
 }
 
 /* ── Filters ────────────────────────────────────────────────── */
@@ -782,475 +663,40 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .coin-filters .rpg-select {
-  font-size: 0.85rem;
+  font-size: var(--fs-label);
 }
 
-/* ── Installments ───────────────────────────────────────────── */
+/* ── Import Overlay ─────────────────────────────────────────── */
 
-.coin-installment-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.coin-installment-group {
-  margin-bottom: 4px;
-}
-
-.coin-installment-group__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0 4px;
-  border-bottom: 2px solid var(--rpg-gold-dark);
-  margin-bottom: 2px;
-}
-
-.coin-installment-group__title {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 700;
-  font-size: 0.92rem;
-  color: var(--rpg-gold-dark);
-  font-family: 'Cinzel', serif;
-}
-
-.coin-installment-group__delete {
+.coin-import-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 19, 9, 0.75);
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s;
 }
 
-.coin-installment-group__delete:hover {
-  opacity: 1 !important;
-}
-
-.coin-installment {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--rpg-parchment-dark);
-  gap: 8px;
-}
-
-.coin-installment__desc {
-  flex: 1;
-  min-width: 0;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.coin-installment__counter {
-  font-size: 0.78rem;
-  opacity: 0.6;
-  font-family: 'Fira Code', monospace;
-  margin-left: 8px;
-}
-
-.coin-installment__right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.coin-installment__progress {
-  width: 80px;
-  height: 8px;
-  background: var(--rpg-parchment-dark);
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(201, 168, 76, 0.2);
-}
-
-.coin-installment__progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--rpg-gold-dark), var(--rpg-gold));
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.coin-installment--complete .coin-installment__progress-fill {
-  background: linear-gradient(90deg, var(--rpg-xp-green), var(--rpg-xp-green-light));
-}
-
-.coin-installment--complete .coin-installment__chain-icon {
-  animation: coinChainBreak 0.6s ease forwards;
-}
-
-.coin-installment__amount {
-  font-family: 'Fira Code', monospace;
-  font-size: 0.9rem;
-  color: var(--rpg-hp-red);
-  min-width: 70px;
-  text-align: right;
-}
-
-.coin-installment__chart {
-  margin-top: 12px;
-}
-
-/* Recharts RPG overrides for installment chart */
-.coin-installment__chart .recharts-bar-rectangle rect {
-  rx: 3;
-  ry: 3;
-}
-
-.coin-installment__chart .recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: var(--rpg-parchment) !important;
-  border: 1px solid var(--rpg-gold-dark) !important;
-  border-radius: 6px !important;
-  font-size: 0.85rem;
-}
-
-.coin-installment-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-@media (max-width: 700px) {
-  .coin-installment-summary {
-    grid-template-columns: 1fr;
-  }
-}
-
-.coin-installment-current-month {
-  border: 2px solid var(--rpg-gold) !important;
-  box-shadow: 0 0 8px rgba(201, 168, 76, 0.3);
-}
-
-/* ── Loans ──────────────────────────────────────────────────── */
-
-.coin-loan-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.coin-loan-tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.coin-loan-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.coin-loan-tab--active {
-  opacity: 1;
-}
-
-.coin-loan-tab--inactive {
-  opacity: 0.6;
-}
-
-.coin-loan {
-  margin-bottom: 12px;
-  padding: 16px;
-}
-
-.coin-loan__person-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: bold;
-  color: var(--rpg-gold);
-  border-bottom: 1px solid var(--rpg-parchment-dark);
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-}
-
-.coin-loan__avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--rpg-gold-dark), var(--rpg-gold));
-  color: var(--rpg-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Cinzel', serif;
-  font-weight: 700;
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.coin-loan__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--rpg-parchment-dark);
-}
-
-.coin-loan__bar {
-  width: 60px;
-  height: 6px;
-  background: var(--rpg-parchment-dark);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.coin-loan__bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.coin-loan__bar-fill--active {
-  background: var(--rpg-gold);
-}
-
-.coin-loan__bar-fill--complete {
-  background: var(--rpg-xp-green);
-}
-
-.coin-loan--settled {
-  animation: coinFlashBorder 0.6s ease;
-}
-
-.coin-loan--settling {
-  border-color: var(--rpg-gold-light);
-  box-shadow: 0 0 16px rgba(201, 168, 76, 0.4);
-}
-
-.coin-loan-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 40px 16px;
-  text-align: center;
-}
-
-.coin-loan-empty__icon {
-  color: var(--rpg-gold);
-  opacity: 0.4;
-}
-
-.coin-loan-empty__text {
-  font-family: 'Cinzel', serif;
-  font-size: 0.95rem;
-  opacity: 0.5;
-}
-
-.coin-loan__payment-history {
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--rpg-parchment-dark);
-}
-
-/* ── Recurring ──────────────────────────────────────────────── */
-
-.coin-recurring-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.coin-recurring {
-  padding: 12px;
-  border-left: 4px solid var(--rpg-gold-dark);
-  transition: all 0.3s ease;
-}
-
-.coin-recurring--active {
-  border-left-color: var(--rpg-xp-green);
-  box-shadow: var(--rpg-shadow-inset), -2px 0 8px rgba(45, 90, 39, 0.15);
-}
-
-.coin-recurring--paused {
-  border-left-color: #888;
-  opacity: 0.6;
-}
-
-.coin-recurring__main-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.coin-recurring__toggle {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  font-size: 0.75rem;
-  transition: all 0.3s ease;
-}
-
-.coin-recurring__toggle--active {
-  color: var(--rpg-xp-green);
-  opacity: 1;
-}
-
-.coin-recurring__toggle--paused {
-  opacity: 0.3;
-}
-
-.coin-recurring__name {
-  flex: 1;
-  font-size: 0.9rem;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.coin-recurring__type-badge {
-  font-size: 0.75rem;
-  padding: 1px 8px;
-  border-radius: 3px;
-  font-weight: 600;
-}
-
-.coin-recurring__type-badge--income {
-  background: rgba(45, 90, 39, 0.15);
-  color: var(--rpg-xp-green);
-}
-
-.coin-recurring__type-badge--expense {
-  background: rgba(139, 32, 32, 0.15);
-  color: var(--rpg-hp-red);
-}
-
-.coin-recurring__category {
-  font-size: 0.75rem;
-  opacity: 0.5;
-}
-
-.coin-recurring__amount-btn {
-  font-family: 'Fira Code', monospace;
-  font-size: 0.85rem;
-  padding: 2px 8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.coin-recurring__amount-change {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.coin-recurring__amount-change--old {
-  color: var(--rpg-hp-red);
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-
-.coin-recurring__amount-change--new {
-  color: var(--rpg-xp-green);
-}
-
-/* ── Recurring Timeline (amount history) ────────────────────── */
-
-.coin-recurring__timeline {
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--rpg-parchment-dark);
-}
-
-.coin-recurring__timeline-title {
-  font-size: 0.8rem;
-  opacity: 0.5;
-  margin: 0 0 6px 0;
-}
-
-.coin-recurring__timeline-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  opacity: 0.7;
-  margin-bottom: 4px;
-  padding-left: 12px;
-  position: relative;
-}
-
-.coin-recurring__timeline-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 6px;
-  height: 6px;
-  background: var(--rpg-gold-dark);
-  border-radius: 50%;
-  transform: translateY(-50%);
-}
-
-.coin-recurring__timeline-item:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  left: 2.5px;
-  top: calc(50% + 5px);
-  width: 1px;
-  height: calc(100% + 4px);
-  background: var(--rpg-gold-dark);
-  opacity: 0.3;
-}
-
-.coin-recurring__generate-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.coin-recurring__generate-msg {
-  font-size: 0.85rem;
-  color: var(--rpg-gold);
-}
-
-/* Coin drop effect container */
-.coin-recurring__drop-container {
-  position: relative;
-  display: inline-block;
-}
-
-.coin-recurring__drop-coin {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: var(--rpg-gold);
-  border-radius: 50%;
-  animation: coinDrop 0.5s ease forwards;
-  pointer-events: none;
-}
-
-.coin-recurring__drop-coin:nth-child(2) {
-  left: 10px;
-  animation-delay: 0.1s;
-}
-
-.coin-recurring__drop-coin:nth-child(3) {
-  left: -5px;
-  animation-delay: 0.2s;
+.coin-import-modal {
+  width: 700px;
+  max-height: 85vh;
+  overflow: auto;
+  padding: 20px;
+  border: 1.5px solid rgba(74, 55, 32, 0.5);
+  background: linear-gradient(180deg, var(--parch-0) 0%, var(--parch-1) 100%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Import ─────────────────────────────────────────────────── */
 
 .coin-import-drop {
-  border: 2px dashed var(--rpg-gold);
-  border-radius: var(--rpg-radius);
-  background: var(--rpg-parchment-light);
+  border: 2px dashed rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.45);
   padding: 20px;
   display: flex;
   align-items: center;
@@ -1260,19 +706,8 @@
 }
 
 .coin-import-drop:hover {
-  border-color: var(--rpg-gold-light);
-  background: var(--rpg-parchment);
-  box-shadow: 0 0 8px rgba(201, 168, 76, 0.2);
-}
-
-.coin-import-drop__input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
+  border-color: var(--gold);
+  background: rgba(245, 231, 192, 0.6);
 }
 
 .coin-import-drop__label {
@@ -1281,43 +716,42 @@
 }
 
 .coin-import-drop__filename {
-  font-size: 0.85rem;
+  font-size: var(--fs-label);
   opacity: 0.6;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: 'Cormorant Garamond', serif;
 }
 
 .coin-import-drop__parsing {
-  font-size: 0.85rem;
-  color: var(--rpg-gold);
+  font-size: var(--fs-label);
+  color: var(--gold);
 }
 
 .coin-import-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: var(--fs-label);
 }
 
 .coin-import-table th {
   text-align: left;
   padding: 6px 8px;
-  border-bottom: 2px solid var(--rpg-gold-dark);
-  font-family: 'Cinzel', serif;
-  font-size: 0.8rem;
+  border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--rubric);
 }
 
 .coin-import-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid var(--rpg-parchment-dark);
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
 }
 
 .coin-import-row:nth-child(even) {
   background: rgba(232, 213, 163, 0.3);
-}
-
-.coin-import-row:nth-child(odd) {
-  background: transparent;
 }
 
 .coin-import-row--excluded {
@@ -1334,10 +768,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: 'Cormorant Garamond', serif;
 }
 
 .coin-import-row__amount {
-  font-family: 'Fira Code', monospace;
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-label);
 }
 
 .coin-import-row__currency {
@@ -1363,14 +799,16 @@
 }
 
 .coin-import-confirm-row__month-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-label);
   opacity: 0.5;
+  font-family: 'IM Fell English SC', serif;
 }
 
 .coin-import-preview-count {
-  font-size: 0.85rem;
+  font-size: var(--fs-label);
   opacity: 0.6;
   margin-bottom: 12px;
+  font-family: 'Cormorant Garamond', serif;
 }
 
 .coin-import-seal {
@@ -1378,32 +816,397 @@
   animation: coinSeal 0.5s ease;
 }
 
+@keyframes coinSeal {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-30deg); }
+  50%  { opacity: 1; transform: scale(1.15) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
 .coin-import-success {
   padding: 16px;
-  color: var(--rpg-xp-green);
-  font-size: 0.85rem;
+  color: var(--moss);
+  font-size: var(--fs-label);
   display: flex;
   align-items: center;
   gap: 8px;
+  border: 1px solid rgba(85, 107, 60, 0.4);
+  background: rgba(85, 107, 60, 0.1);
 }
 
-/* ── Shared: MonthNavigator ─────────────────────────────────── */
+/* ── Month Navigator ─────────────────────────────────────────── */
 
 .coin-month-nav {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .coin-month-nav__label {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(13px * var(--font-scale));
+  letter-spacing: 0.1em;
+  color: var(--ink);
   text-transform: capitalize;
 }
 
 .coin-month-nav__btn {
-  font-size: 0.8rem;
+  font-size: var(--fs-label);
   padding: 4px 10px;
+}
+
+/* ── Installments ───────────────────────────────────────────── */
+
+.coin-installment-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.coin-installment-group {
+  margin-bottom: 4px;
+}
+
+.coin-installment-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 4px;
+  border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
+  margin-bottom: 2px;
+}
+
+.coin-installment-group__title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  color: var(--rubric);
+}
+
+.coin-installment-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
+  gap: 8px;
+}
+
+.coin-installment-row__counter {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.coin-installment-row__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.coin-installment-row__right .qb-gauge {
+  width: 80px;
+}
+
+.coin-installment-row__amount {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  min-width: 70px;
+  text-align: right;
+}
+
+.coin-installment-row--complete .coin-installment-row__amount {
+  color: var(--moss);
+}
+
+.coin-installment-summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+
+/* ── Loans ──────────────────────────────────────────────────── */
+
+.coin-loan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.coin-loan-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.coin-loan-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: var(--fs-label);
+}
+
+.coin-loan-tab--active {
+  opacity: 1;
+}
+
+.coin-loan-tab--inactive {
+  opacity: 0.5;
+}
+
+.coin-loan-card {
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.45);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+  transition: all 0.3s ease;
+}
+
+.coin-loan-card--settling {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 16px rgba(168, 138, 60, 0.4);
+}
+
+.coin-loan-card__person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(74, 55, 32, 0.4);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  color: var(--gold);
+}
+
+.coin-loan-card__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-quote);
+  flex-shrink: 0;
+}
+
+.coin-loan-card__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
+}
+
+.coin-loan-card__row:last-child {
+  border-bottom: none;
+}
+
+.coin-loan-card__row .qb-gauge {
+  width: 60px;
+}
+
+.coin-loan-card__amount {
+  font-size: var(--fs-label);
+  color: var(--gold);
+  min-width: 80px;
+  text-align: right;
+}
+
+.coin-loan-card__settled {
+  font-size: var(--fs-label);
+  color: var(--moss);
+}
+
+/* ── Credit Cards ───────────────────────────────────────────── */
+
+.coin-cc-card {
+  position: relative;
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.45);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+}
+
+.coin-cc-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.coin-cc-card__period {
+  margin-left: 8px;
+  font-size: var(--fs-label);
+  opacity: 0.6;
+}
+
+.coin-cc-card__stmt {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Recurring ───���──────────────────────────────────────────── */
+
+.coin-recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coin-recurring-card {
+  position: relative;
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.45);
+  padding: 10px 12px;
+  border-left: 3px solid var(--gold);
+  transition: all 0.3s ease;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+}
+
+.coin-recurring-card--active {
+  border-left-color: var(--moss);
+}
+
+.coin-recurring-card--paused {
+  border-left-color: var(--ink-faded);
+  opacity: 0.6;
+}
+
+.coin-recurring-card__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coin-recurring-card__toggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: var(--fs-label);
+  transition: all 0.3s ease;
+}
+
+.coin-recurring-card__toggle--active {
+  color: var(--moss);
+  opacity: 1;
+}
+
+.coin-recurring-card__toggle--paused {
+  opacity: 0.3;
+}
+
+.coin-recurring-card__name {
+  flex: 1;
+  font-size: var(--fs-label);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coin-recurring-card__amount-btn {
+  font-size: var(--fs-label);
+  padding: 2px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.coin-recurring-card__timeline {
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px dotted rgba(74, 55, 32, 0.4);
+}
+
+.coin-recurring-card__timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-label);
+  opacity: 0.7;
+  margin-bottom: 4px;
+  padding-left: 12px;
+  position: relative;
+}
+
+.coin-recurring-card__timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.coin-recurring__generate-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.coin-recurring__drop-container {
+  position: relative;
+  display: inline-block;
+}
+
+.coin-recurring__drop-coin {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--gold);
+  border-radius: 50%;
+  animation: coinDrop 0.5s ease forwards;
+  pointer-events: none;
+}
+
+.coin-recurring__drop-coin:nth-child(2) {
+  left: 10px;
+  animation-delay: 0.1s;
+}
+
+.coin-recurring__drop-coin:nth-child(3) {
+  left: -5px;
+  animation-delay: 0.2s;
+}
+
+/* ── Widget ──────────────────────────────���──────────────────── */
+
+.coin-widget__number {
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-hero);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.coin-widget__label {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 4px;
+}
+
+/* ── Empty States ───────��───────────────────────────────────── */
+
+.coin-empty-codex {
+  text-align: center;
+  padding: 20px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  color: var(--ink-faded);
+  opacity: 0.6;
 }
 
 /* ── Shared: DollarChip ─────────────────────────────────────── */
@@ -1413,23 +1216,21 @@
   align-items: center;
   gap: 5px;
   padding: 3px 8px;
-  background: linear-gradient(to bottom, var(--rpg-parchment-dark), var(--rpg-parchment));
-  border: 1px solid var(--rpg-gold-dark);
-  border-radius: 4px;
-  font-size: 0.72rem;
-  color: var(--rpg-ink);
+  background: rgba(245, 231, 192, 0.6);
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  font-size: var(--fs-label);
+  color: var(--ink);
   cursor: default;
-  transition: all var(--rpg-transition-fast) ease;
+  transition: all 0.15s ease;
 }
 
 .coin-dollar-chip:hover {
-  border-color: var(--rpg-gold-light);
-  box-shadow: 0 0 6px rgba(201, 168, 76, 0.3);
-  opacity: 1;
+  border-color: var(--gold);
+  background: rgba(245, 231, 192, 0.7);
 }
 
 .coin-dollar-chip__value {
-  font-family: 'Fira Code', monospace;
+  font-family: 'UnifrakturCook', serif;
   font-weight: 600;
 }
 
@@ -1440,291 +1241,200 @@
   min-width: 0;
 }
 
-/* ── Finance Layout ─────────────────────────────────────────── */
+/* ── Category Autocomplete ─────────────────────────────────── */
 
-.coin-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.coin-layout__nav {
-  display: flex;
-  gap: 0;
-  padding-left: 8px;
+.coin-category-autocomplete {
   position: relative;
-  z-index: 1;
-}
-
-.coin-layout__tab {
-  padding: 7px 16px 9px;
-  font-size: 0.8rem;
-  font-family: 'Cinzel', serif;
-  text-decoration: none;
-  white-space: nowrap;
-  border-radius: 6px 6px 0 0;
-  transition: all 0.15s ease;
-}
-
-.coin-layout__tab--active {
-  font-weight: 700;
-  color: var(--rpg-gold-light);
-  background: linear-gradient(180deg, var(--rpg-leather) 0%, var(--rpg-wood) 100%);
-  border-top: 2px solid var(--rpg-gold-dark);
-  border-left: 1px solid var(--rpg-gold-dark);
-  border-right: 1px solid var(--rpg-gold-dark);
-  border-bottom: 1px solid var(--rpg-wood);
-  margin-bottom: -1px;
-  position: relative;
-}
-
-.coin-layout__tab--inactive {
-  font-weight: 500;
-  color: var(--rpg-ink-light);
-  opacity: 0.85;
-  background: linear-gradient(180deg, rgba(139,90,43,0.4) 0%, rgba(139,90,43,0.18) 100%);
-  border-top: 2px solid rgba(201,168,76,0.5);
-  border-left: 1px solid rgba(201,168,76,0.45);
-  border-right: 1px solid rgba(201,168,76,0.45);
-  border-bottom: 1px solid rgba(201,168,76,0.3);
-}
-
-.coin-layout__content {
   flex: 1;
+  min-width: 0;
+}
+
+.coin-category-autocomplete__input {
+  width: 100%;
+}
+
+.coin-category-autocomplete__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 180px;
   overflow-y: auto;
-  padding: 16px;
-  border-top: 1px solid var(--rpg-gold-dark);
+  background: var(--parch-1);
+  border: 1px solid var(--ink-faded);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* ── Empty States ───────────────────────────────────────────── */
+.coin-category-autocomplete__option {
+  padding: 5px 8px;
+  font-size: var(--fs-body);
+  font-family: 'IM Fell English', serif;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s;
+}
 
-.coin-empty {
-  opacity: 0.5;
+.coin-category-autocomplete__option:hover {
+  background: var(--parch-2);
+}
+
+.coin-category-autocomplete__option--active {
+  background: var(--parch-2);
+  font-weight: 600;
+}
+
+.coin-category-autocomplete__empty {
+  padding: 5px 8px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
   font-style: italic;
-  text-align: center;
-  padding: 24px;
 }
 
-/* ── Responsive: Narrow mode ────────────────────────────────── */
+.coin-category-autocomplete__manage {
+  padding: 5px 8px;
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  cursor: pointer;
+  border-top: 1px solid var(--ink-faded);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.03em;
+}
 
-@media (max-width: 500px) {
-  /* Layout: tabs scroll horizontally */
-  .coin-layout__nav {
+.coin-category-autocomplete__manage:hover {
+  background: var(--parch-2);
+}
+
+/* ── Responsive: Narrow mode ─────���──────────────────────────── */
+
+@media (max-width: 700px) {
+  .coin-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coin-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coin-installment-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .coin-loan-mini-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coin-tab-nav {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
-  .coin-layout__nav::-webkit-scrollbar {
+
+  .coin-tab-nav::-webkit-scrollbar {
     display: none;
   }
-  .coin-layout__tab {
-    font-size: 0.7rem;
-    padding: 6px 10px;
-  }
-  .coin-layout__content {
-    padding: 10px;
+
+  .coin-chest-panel {
+    flex-wrap: wrap;
   }
 
-  /* Dashboard header: stack vertically */
+  .coin-chest-panel__vertical {
+    display: none;
+  }
+
+  .coin-chest-panel__amount {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 500px) {
+  .coin-book .qb-page {
+    padding-left: 50px;
+    padding-right: 20px;
+    padding-top: 30px;
+    padding-bottom: 30px;
+  }
+
   .coin-dashboard__header {
     flex-direction: column;
     gap: 8px;
     align-items: stretch;
   }
 
-  /* Hero: smaller balance font */
-  .coin-hero {
-    padding: 14px;
-  }
-  .coin-hero__balance {
-    font-size: 1.4rem;
-  }
-  .coin-hero__balance-usd {
-    font-size: 0.85rem;
-  }
-  .coin-hero__icon svg {
-    width: 28px;
-    height: 28px;
-  }
-
-  /* Stat cards: 2 columns always */
-  .coin-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-  .coin-stat {
-    padding: 10px 6px;
-  }
-  .coin-stat__number {
-    font-size: 1rem;
-  }
-  .coin-stat__label {
-    font-size: 0.7rem;
-  }
-  .coin-stat__icon svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  /* Donut chart: stack vertically */
-  .coin-donut-wrap {
+  .coin-quick-actions {
     flex-direction: column;
-    padding: 12px;
-    gap: 12px;
   }
 
-  /* Transactions: edit row wraps */
-  .coin-tx__edit-row {
-    flex-wrap: wrap;
+  .coin-quick-actions .rpg-button {
+    width: 100%;
   }
-  .coin-tx__edit-row .rpg-input,
-  .coin-tx__edit-row .rpg-select,
-  .coin-tx__edit-row .coin-category-select {
-    min-width: 0;
-    flex: 1 1 45%;
-  }
-  .coin-tx {
-    padding: 8px;
-    gap: 6px;
-  }
-  .coin-tx__date {
-    width: auto;
-    font-size: 0.75rem;
-  }
-  .coin-tx__desc {
-    font-size: 0.8rem;
-  }
-  .coin-tx__badge--category {
-    font-size: 0.65rem;
-    padding: 1px 4px;
-  }
-  .coin-tx__badge--source {
+
+  .coin-ledger-row__source,
+  .coin-ledger-row__payment {
     display: none;
   }
-  .coin-tx__payment-method {
-    display: none;
-  }
-  .coin-tx__amount {
-    font-size: 0.8rem;
-  }
 
-  /* Quick add form: rows wrap */
-  .coin-quick-add-form__row {
-    flex-wrap: wrap;
-  }
-  .coin-quick-add-form__row > * {
-    min-width: 0;
-    flex: 1 1 45%;
-  }
-  .coin-quick-add-form__amount-row {
+  .coin-ledger-row__edit {
     flex-wrap: wrap;
   }
 
-  /* Filters: wrap */
-  .coin-filters {
-    flex-wrap: wrap;
-  }
-  .coin-filters .rpg-select {
-    flex: 1 1 45%;
-    min-width: 0;
+  .coin-ledger-header {
+    grid-template-columns: 40px 1fr 70px;
   }
 
-  /* Recurring: main row wraps */
-  .coin-recurring__main-row {
+  .coin-recurring-card__main {
     flex-wrap: wrap;
     gap: 6px;
   }
-  .coin-recurring__name {
+
+  .coin-recurring-card__name {
     flex: 1 1 60%;
   }
 
-  /* Installments */
-  .coin-installment {
-    flex-wrap: wrap;
-    padding: 8px 0;
-  }
-  .coin-installment__desc {
-    flex: 1 1 100%;
-    font-size: 0.85rem;
-  }
-  .coin-installment__right {
-    flex: 1 1 100%;
-    justify-content: flex-end;
-  }
-  .coin-installment__progress {
-    width: 60px;
-  }
-
-  /* Loans */
-  .coin-loan__row {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  /* Import */
   .coin-import-drop {
     flex-direction: column;
     padding: 14px;
     gap: 8px;
     text-align: center;
   }
+
   .coin-import-table {
-    font-size: 0.75rem;
+    font-size: var(--fs-label);
   }
-  .coin-import-table th,
-  .coin-import-table td {
-    padding: 4px 4px;
-  }
-  .coin-import-row__merchant {
-    max-width: 100px;
-  }
+
   .coin-import-confirm-row {
     flex-direction: column;
     gap: 8px;
   }
 
-  /* Projection */
-  .coin-projection__month-label {
-    width: 50px;
-    font-size: 0.7rem;
-  }
-  .coin-projection__value {
-    min-width: 70px;
-    font-size: 0.7rem;
-  }
-  .coin-projection__bar {
-    max-width: 80px;
+  .coin-installment-row {
+    flex-wrap: wrap;
+    padding: 8px 0;
   }
 
-  /* Quick actions: stack */
-  .coin-quick-actions {
-    flex-direction: column;
-  }
-  .coin-quick-actions .rpg-button {
-    width: 100%;
-  }
-
-  /* Credit card manager modal */
-  .coin-section .rpg-card {
-    padding: 8px;
+  .coin-loan-card__row {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }
 
-/* Even narrower */
-@media (max-width: 380px) {
-  .coin-stats-grid {
-    grid-template-columns: 1fr;
-  }
-  .coin-hero__balance {
-    font-size: 1.2rem;
-  }
-  .coin-tx__actions {
-    position: absolute;
-    right: 8px;
-    top: 8px;
-  }
-  .coin-tx {
-    position: relative;
-    padding-right: 50px;
-  }
+/* ── C8: Month Comparison ─────────────────────────────────── */
+
+.coin-comparison-toggle {
+  text-align: center;
+  margin: 8px 0 4px;
+}
+
+.coin-comparison-toggle__btn {
+  opacity: 0.75;
+  font-size: var(--fs-label) !important;
+}
+
+.coin-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
 }

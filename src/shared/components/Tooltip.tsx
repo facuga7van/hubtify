@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 interface Props {
@@ -10,6 +10,7 @@ export default function Tooltip({ text, children }: Props) {
   const [show, setShow] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
+  const tipId = useId();
 
   const positionTip = useCallback(() => {
     if (!wrapperRef.current || !tipRef.current) return;
@@ -45,28 +46,36 @@ export default function Tooltip({ text, children }: Props) {
         requestAnimationFrame(() => requestAnimationFrame(positionTip));
       }}
       onMouseLeave={() => setShow(false)}
-      style={{ display: 'inline-flex' }}
+      onFocus={() => {
+        setShow(true);
+        requestAnimationFrame(() => requestAnimationFrame(positionTip));
+      }}
+      onBlur={() => setShow(false)}
+      aria-describedby={show ? tipId : undefined}
+      style={{ display: 'flex', minWidth: 0 }}
     >
       {children}
       {show && createPortal(
         <div
           ref={tipRef}
+          id={tipId}
+          role="tooltip"
           style={{
             position: 'fixed',
             left: 0,
             top: 0,
             opacity: 0,
-            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
-            border: '1px solid var(--rpg-gold-dark)',
-            borderRadius: 'var(--rpg-radius)',
+            background: 'linear-gradient(135deg, var(--leather) 0%, var(--leather-dark) 100%)',
+            border: '1px solid var(--gold-dark)',
+            borderRadius: '6px',
             padding: '4px 10px',
-            fontSize: '0.75rem',
-            color: 'var(--rpg-gold-light)',
-            fontFamily: 'Cinzel, serif',
+            fontSize: 'var(--fs-label)',
+            color: 'var(--gold-light)',
+            fontFamily: "'IM Fell English', serif",
             whiteSpace: 'nowrap',
             zIndex: 9999,
             pointerEvents: 'none',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            boxShadow: '0 2px 8px rgba(42, 29, 14, 0.5)',
           }}
         >
           {text}

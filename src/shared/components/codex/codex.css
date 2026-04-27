@@ -1,0 +1,606 @@
+/* ====== Codex — shared parchment/tome component styles ====== */
+
+/* ── flat page container (fills main-content) ────── */
+.qb-page {
+  position: relative;
+  padding: 24px 28px 32px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── corner iron brackets (subtle decoration) ─────── */
+.qb-corner {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.35;
+}
+
+.qb-corner svg {
+  width: 100%;
+  height: 100%;
+}
+
+.qb-corner--tl { top: 4px; left: 4px; }
+.qb-corner--tr { top: 4px; right: 4px; }
+.qb-corner--bl { bottom: 4px; left: 4px; }
+.qb-corner--br { bottom: 4px; right: 4px; }
+
+/* ── ink stain decorations ────────────────────────── */
+.qb-stain {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(1.2px);
+  mix-blend-mode: multiply;
+  opacity: 0.22;
+  background: radial-gradient(circle, rgba(58, 34, 16, 1) 0%, rgba(58, 34, 16, 0.2) 60%, transparent 80%);
+  z-index: 1;
+}
+
+/* ── page header ──────────────────────────────────── */
+.qb-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 4px;
+  position: relative;
+  z-index: 10;
+}
+
+.qb-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.qb-header-extra {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+}
+
+/* top rule ornament */
+.qb-rule {
+  height: 14px;
+  margin-bottom: 8px;
+  opacity: 0.75;
+  position: relative;
+  z-index: 2;
+}
+
+/* ── thumb tabs (inline row below header) ──────────── */
+.qb-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 3;
+}
+
+.qb-tab {
+  padding: 5px 14px;
+  background: var(--parch-2);
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  border-radius: 3px;
+  font-family: 'IM Fell English SC', 'UnifrakturCook', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  box-shadow: inset 0 0 0 1px rgba(244, 228, 193, 0.4);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.qb-tab:hover {
+  background: linear-gradient(90deg, var(--parch-3), var(--parch-2));
+}
+
+.qb-tab--active {
+  background: var(--rubric);
+  color: var(--parch-0);
+  border-color: var(--rubric);
+}
+
+.qb-tab--active:hover {
+  background: var(--rubric-light);
+}
+
+/* ── content zone (flows naturally, no separate scroll) ── */
+.qb-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── sections & panels ────────────────────────────── */
+.qb-section {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.qb-section-title {
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.18em;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  color: var(--rubric);
+  border-bottom: 1px solid rgba(122, 30, 30, 0.35);
+  padding-bottom: 3px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
+/* drop cap */
+.qb-dropcap::first-letter {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: 3.1em;
+  line-height: 0.85;
+  float: left;
+  color: var(--rubric);
+  padding: 4px 8px 0 0;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+/* ── rune pill / chip ─────────────────────────────── */
+.qb-rune {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  border-radius: 2px;
+  background: rgba(245, 231, 192, 0.5);
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.15em;
+  color: var(--ink-soft);
+}
+
+.qb-rune--rubric {
+  border-color: rgba(122, 30, 30, 0.45);
+  color: var(--rubric);
+  background: rgba(122, 30, 30, 0.12);
+}
+
+.qb-rune--sage {
+  border-color: rgba(85, 107, 60, 0.45);
+  color: var(--moss);
+  background: rgba(85, 107, 60, 0.12);
+}
+
+.qb-rune--gold {
+  border-color: rgba(168, 138, 60, 0.45);
+  color: var(--gold);
+  background: rgba(168, 138, 60, 0.12);
+}
+
+.qb-rune--ink {
+  border-color: rgba(42, 29, 14, 0.45);
+  color: var(--ink);
+  background: rgba(42, 29, 14, 0.08);
+}
+
+/* ── quill-tick checkbox ──────────────────────────── */
+.qb-check {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-soft);
+  background: rgba(245, 231, 192, 0.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.qb-check:hover {
+  background: rgba(245, 231, 192, 0.7);
+}
+
+.qb-check--done {
+  background: rgba(122, 30, 30, 0.22);
+  border-color: var(--rubric);
+}
+
+/* ── progress gauge ───────────────────────────────── */
+.qb-gauge {
+  position: relative;
+  height: 10px;
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.6);
+  box-shadow: inset 0 1px 2px rgba(74, 55, 32, 0.35);
+  overflow: hidden;
+}
+
+.qb-gauge-fill {
+  height: 100%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: width 0.3s ease;
+  background-size: 11.31px 11.31px;
+  animation: gauge-stripe-scroll 1.5s linear infinite;
+}
+
+@keyframes gauge-stripe-scroll {
+  to { background-position: 11.31px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qb-gauge-fill { animation: none; }
+}
+
+.qb-gauge-fill--ink {
+  background: repeating-linear-gradient(135deg, var(--ink-soft) 0 4px, var(--leather-dark) 4px 8px);
+}
+
+.qb-gauge-fill--rubric {
+  background: repeating-linear-gradient(135deg, var(--rubric) 0 4px, #5a1414 4px 8px);
+}
+
+.qb-gauge-fill--sage {
+  background: repeating-linear-gradient(135deg, var(--moss) 0 4px, #3d4d2a 4px 8px);
+}
+
+.qb-gauge-fill--gold {
+  background: repeating-linear-gradient(135deg, var(--gold) 0 4px, var(--gold-dark) 4px 8px);
+}
+
+/* pip marks at 25% intervals */
+.qb-gauge-pip {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 1px;
+  background: rgba(74, 55, 32, 0.35);
+}
+
+/* gauge label overlay */
+.qb-gauge-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.1em;
+  color: var(--parch-0);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+/* ── fine gradient rule ───────────────────────────── */
+.qb-hr {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(74, 55, 32, 0.45), transparent);
+  margin: 10px 0;
+}
+
+/* ── ribbon banner ────────────────────────────────── */
+.qb-banner {
+  position: relative;
+  display: inline-block;
+  padding: 6px 22px;
+  background: linear-gradient(180deg, var(--rubric) 0%, #5a1414 100%);
+  color: var(--parch-0);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.2em;
+  font-size: var(--fs-label);
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.35), 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.qb-banner::before,
+.qb-banner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: inherit;
+}
+
+.qb-banner::before {
+  left: -10px;
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+
+.qb-banner::after {
+  right: -10px;
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+}
+
+.qb-banner--sage {
+  background: linear-gradient(180deg, var(--moss) 0%, #3d4d2a 100%);
+}
+
+.qb-banner--gold {
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+}
+
+.qb-banner--ink {
+  background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
+}
+
+/* ── wax seal ─────────────────────────────────────── */
+.qb-seal {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%);
+  box-shadow:
+    inset -4px -6px 10px rgba(0, 0, 0, 0.45),
+    inset 4px 6px 10px rgba(255, 255, 255, 0.15),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-accent);
+  color: var(--parch-0);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+  position: relative;
+  transform: rotate(-6deg);
+}
+
+.qb-seal::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px dashed rgba(245, 231, 192, 0.45);
+}
+
+/* ── column layouts ───────────────────────────────── */
+.qb-col-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.qb-col-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+/* ── stat cartouche box ───────────────────────────── */
+.qb-cartouche {
+  position: relative;
+  padding: 10px 12px 9px;
+  background: rgba(245, 231, 192, 0.55);
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6), 2px 2px 0 rgba(30, 19, 9, 0.08);
+}
+
+.qb-cartouche-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.qb-cartouche-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.2em;
+  color: var(--ink-faded);
+}
+
+.qb-cartouche-icon {
+  color: var(--ink-faded);
+}
+
+.qb-cartouche-value {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-hero);
+  color: var(--ink);
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.qb-cartouche-value--rubric { color: var(--rubric); }
+.qb-cartouche-value--sage { color: var(--moss); }
+.qb-cartouche-value--gold { color: var(--gold); }
+
+.qb-cartouche-foot {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 1px;
+}
+
+/* corner dingbats */
+.qb-cartouche-dingbat-tl {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+  pointer-events: none;
+}
+
+.qb-cartouche-dingbat-br {
+  position: absolute;
+  bottom: -6px;
+  right: -2px;
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+  pointer-events: none;
+}
+
+/* ── stat box with corner marks ───────────────────── */
+.qb-stat-box {
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.45);
+  padding: 8px 10px;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+}
+
+.qb-stat-box-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.2em;
+  color: var(--ink-faded);
+}
+
+.qb-stat-box-value {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-stat);
+  color: var(--ink);
+  line-height: 1;
+  margin-top: 2px;
+}
+
+/* ── module card ──────────────────────────────────── */
+.qb-module-card {
+  position: relative;
+  background: rgba(245, 231, 192, 0.45);
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  padding: 12px 14px 10px;
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6), 2px 2px 0 rgba(30, 19, 9, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qb-module-card:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6), 2px 4px 12px rgba(30, 19, 9, 0.15);
+}
+
+.qb-module-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.qb-module-card-icon {
+  color: var(--rubric);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.qb-module-card-tome {
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.2em;
+  color: var(--ink-faded);
+}
+
+.qb-module-card-title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-nav);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.qb-module-card-latin {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 1px;
+}
+
+.qb-module-card-body {
+  border-top: 1px dotted rgba(74, 55, 32, 0.45);
+  padding-top: 8px;
+}
+
+/* ── ring gauge ───────────────────────────────────── */
+.qb-ring-gauge {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.qb-ring-gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.qb-ring-gauge-value {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.qb-ring-gauge-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.1em;
+  color: var(--ink-faded);
+  margin-top: 1px;
+}
+
+/* ── mini macro nutrient bar ──────────────────────── */
+.qb-mini-macro {
+  margin-bottom: 2px;
+}
+
+.qb-mini-macro-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-label);
+  margin-bottom: 1px;
+}
+
+.qb-mini-macro-label {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.qb-mini-macro-value {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-label);
+  color: var(--ink);
+}
+
+.qb-mini-macro .qb-gauge {
+  height: 5px;
+}
+
+/* ── small count box ──────────────────────────────── */
+.qb-small-count {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  background: rgba(245, 231, 192, 0.45);
+}
+
+.qb-small-count-value {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-nav);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.qb-small-count-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.15em;
+  color: var(--ink-faded);
+  margin-top: 1px;
+}
+
+/* ── divider section ──────────────────────────────── */
+.qb-divider-section {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+  opacity: 0.6;
+}

@@ -1,9 +1,9 @@
 /* ── RPG Card ─────────────────────────────────────── */
 .rpg-card {
-  background: linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 40%, var(--rpg-parchment-dark) 100%);
-  border: 2px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
-  box-shadow: var(--rpg-shadow), var(--rpg-shadow-inset);
+  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%);
+  border: 2px solid var(--gold-dark);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(42, 29, 14, 0.3), inset 0 1px 3px rgba(42, 29, 14, 0.1);
   padding: 16px;
   position: relative;
 }
@@ -13,50 +13,57 @@
   content: '';
   position: absolute;
   top: 3px; left: 3px; right: 3px; bottom: 3px;
-  border: 1px solid rgba(201, 168, 76, 0.15);
+  border: 1px solid rgba(168, 138, 60, 0.25);
   border-radius: 4px;
   pointer-events: none;
 }
 
 .rpg-card-title {
-  font-family: 'Cinzel', serif;
-  font-size: 1rem;
+  font-family: 'UnifrakturCook', cursive;
+  font-size: calc(1rem * var(--font-scale));
   font-weight: 700;
-  color: var(--rpg-wood);
+  color: var(--ink);
   margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
   letter-spacing: 0.03em;
-  border-bottom: 1px solid rgba(201, 168, 76, 0.25);
+  border-bottom: 1px solid rgba(168, 138, 60, 0.25);
   padding-bottom: 8px;
 }
 
 /* ── Progress Bars ────────────────────────────────── */
 .rpg-bar {
   height: 16px;
-  background: linear-gradient(180deg, var(--rpg-parchment-dark) 0%, var(--rpg-parchment) 100%);
-  border: 1px solid var(--rpg-wood-light);
-  border-radius: 3px;
+  background: var(--parch-2);
+  border: 1px solid rgba(74, 55, 32, 0.5);
   overflow: hidden;
   position: relative;
-  box-shadow: inset 0 1px 2px rgba(44, 24, 16, 0.2);
+  box-shadow: inset 0 1px 2px rgba(42, 29, 14, 0.25);
 }
 
 .rpg-bar-fill {
   height: 100%;
-  border-radius: 2px;
   transition: width 0.5s ease;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  background-size: 11.31px 11.31px; /* 8px × √2 for 135deg diagonal */
+  animation: bar-stripe-scroll 1.5s linear infinite;
 }
 
 .rpg-bar-fill--hp {
-  background: linear-gradient(180deg, var(--rpg-hp-red-light) 0%, var(--rpg-hp-red) 100%);
-  box-shadow: 0 0 6px rgba(139, 32, 32, 0.3);
+  background: repeating-linear-gradient(135deg, var(--rubric) 0 4px, #5a1414 4px 8px);
 }
 
 .rpg-bar-fill--xp {
-  background: linear-gradient(180deg, var(--rpg-xp-green-light) 0%, var(--rpg-xp-green) 100%);
-  box-shadow: 0 0 6px rgba(45, 90, 39, 0.3);
+  background: repeating-linear-gradient(135deg, var(--moss) 0 4px, #3d4d2a 4px 8px);
+}
+
+@keyframes bar-stripe-scroll {
+  to { background-position: 11.31px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-bar-fill { animation: none; }
 }
 
 .rpg-bar-label {
@@ -65,75 +72,84 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
+  font-size: var(--fs-label);
   font-weight: bold;
-  color: var(--rpg-parchment-light);
-  font-family: 'Fira Code', monospace;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  letter-spacing: 0.05em;
+  color: var(--parch-0);
+  font-family: 'IM Fell English SC', serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.1em;
 }
 
 /* ── RPG Button ───────────────────────────────────── */
 .rpg-button {
   padding: 8px 16px;
-  background: linear-gradient(180deg, var(--rpg-wood-light) 0%, var(--rpg-wood) 100%);
-  color: var(--rpg-gold-light);
-  border: 1px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
+  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
+  color: var(--gold);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
   cursor: pointer;
-  font-family: 'Cinzel', serif;
-  font-size: 0.8rem;
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(0.8rem * var(--font-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   transition: all 0.2s ease;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  box-shadow: 0 2px 4px rgba(44, 24, 16, 0.3);
+  box-shadow: 0 2px 4px rgba(42, 29, 14, 0.3);
 }
 
 .rpg-button:hover {
-  background: linear-gradient(180deg, var(--rpg-gold) 0%, var(--rpg-gold-dark) 100%);
-  color: var(--rpg-ink);
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: var(--ink);
   text-shadow: none;
-  box-shadow: 0 2px 8px rgba(201, 168, 76, 0.4);
+  box-shadow: 0 2px 8px rgba(168, 138, 60, 0.4);
   transform: translateY(-1px);
 }
 
 .rpg-button:active {
   transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(44, 24, 16, 0.3);
+  box-shadow: 0 1px 2px rgba(42, 29, 14, 0.3);
+}
+
+.rpg-button:disabled,
+.rpg-button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  pointer-events: none;
 }
 
 /* ── Button Small ─────────────────────────────────── */
 .rpg-btn-sm {
   padding: 4px 12px;
-  background: linear-gradient(to bottom, var(--rpg-wood-light), var(--rpg-wood));
-  color: var(--rpg-gold-light);
-  border: 1px solid var(--rpg-gold-dark);
+  background: linear-gradient(to bottom, var(--leather-light), var(--leather));
+  color: var(--gold-light);
+  border: 1px solid var(--gold-dark);
   border-radius: 4px;
-  font-family: 'Cinzel', serif;
+  font-family: 'IM Fell English SC', serif;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--fs-label);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .rpg-btn-sm:hover {
-  background: linear-gradient(to bottom, var(--rpg-gold-dark), var(--rpg-gold));
-  color: var(--rpg-wood);
+  background: linear-gradient(to bottom, var(--gold-dark), var(--gold));
+  color: var(--leather);
 }
 
 /* ── Button Active State ─────────────────────────── */
 .rpg-btn-active {
-  background: linear-gradient(to bottom, var(--rpg-gold-dark), var(--rpg-gold)) !important;
-  color: var(--rpg-wood) !important;
-  border-color: var(--rpg-gold-light) !important;
+  background: linear-gradient(to bottom, var(--gold-dark), var(--gold)) !important;
+  color: var(--leather) !important;
+  border-color: var(--gold-light) !important;
 }
 
 /* ── Card Small ───────────────────────────────────── */
 .rpg-card-sm {
-  background: linear-gradient(to bottom, var(--rpg-parchment-dark), var(--rpg-parchment));
-  border: 1px solid var(--rpg-gold-dark);
+  background: linear-gradient(to bottom, var(--parch-1), var(--parch-0));
+  border: 1px solid var(--gold-dark);
   border-radius: 4px;
-  color: var(--rpg-ink);
+  color: var(--ink);
 }
 
 /* ── Title Bar ────────────────────────────────────── */
@@ -142,17 +158,17 @@
   align-items: center;
   justify-content: space-between;
   height: 32px;
-  background: linear-gradient(180deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%);
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
   -webkit-app-region: drag;
   padding: 0 12px;
-  border-bottom: 1px solid var(--rpg-gold-dark);
+  border-bottom: 1px solid var(--gold-dark);
 }
 
 .title-bar-text {
-  font-family: 'Cinzel', serif;
-  font-size: 0.8rem;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
   font-weight: 700;
-  color: var(--rpg-gold);
+  color: var(--gold);
   letter-spacing: 0.1em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -168,24 +184,24 @@
   height: 24px;
   border: none;
   background: transparent;
-  color: var(--rpg-parchment);
+  color: var(--parch-0);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: var(--fs-label);
   border-radius: 3px;
   transition: all 0.15s ease;
   opacity: 0.7;
 }
 
 .title-bar-btn:hover {
-  background: rgba(201, 168, 76, 0.2);
+  background: rgba(168, 138, 60, 0.3);
   opacity: 1;
 }
 
 .title-bar-btn--close:hover {
-  background: var(--rpg-hp-red);
+  background: var(--rubric);
   color: white;
   opacity: 1;
 }
@@ -218,55 +234,66 @@
 
 .dashboard-widget:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(44, 24, 16, 0.35), 0 0 0 1px var(--rpg-gold);
+  box-shadow: 0 6px 20px rgba(42, 29, 14, 0.35), 0 0 0 1px var(--gold);
 }
 
 /* ── Utility Styles ───────────────────────────────── */
-.rpg-stat-number {
-  font-size: 1.5rem;
-  font-family: 'Fira Code', monospace;
-  color: var(--rpg-wood);
-}
-
-.rpg-stat-label {
-  font-size: 0.8rem;
-  opacity: 0.6;
-}
-
-.rpg-stat-card {
-  text-align: center;
-}
-
-.rpg-muted {
-  opacity: 0.5;
-  font-style: italic;
-}
-
 .rpg-input {
   padding: 6px 10px;
-  border: 1px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
-  background: var(--rpg-parchment);
-  font-family: 'Crimson Text', serif;
-  font-size: 0.9rem;
-  color: var(--rpg-ink);
-  box-shadow: var(--rpg-shadow-inset);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  background: var(--parch-0);
+  font-family: 'IM Fell English', serif;
+  font-size: calc(0.9rem * var(--font-scale));
+  color: var(--ink);
+  box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.15);
 }
 
 .rpg-input:focus {
   outline: none;
-  border-color: var(--rpg-gold);
-  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.3), var(--rpg-shadow-inset);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(168, 138, 60, 0.3), inset 0 1px 3px rgba(42, 29, 14, 0.15);
 }
 .rpg-select {
   padding: 6px 10px;
-  border: 1px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
-  background: var(--rpg-parchment);
-  font-family: 'Crimson Text', serif;
-  font-size: 0.9rem;
-  color: var(--rpg-ink);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  background: var(--parch-0);
+  font-family: 'IM Fell English', serif;
+  font-size: calc(0.9rem * var(--font-scale));
+  color: var(--ink);
   cursor: pointer;
+}
+
+/* ── Focus Visible ─────────────────────────────────── */
+.rpg-button:focus-visible,
+.rpg-input:focus-visible,
+.rpg-select:focus-visible {
+  outline: 2px solid var(--gold-light, #c4a84e);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(168, 138, 60, 0.3);
+}
+
+.sidebar-nav-item:focus-visible {
+  outline: 2px solid var(--gold, #a88a3c);
+  outline-offset: -2px;
+  background: rgba(168, 138, 60, 0.1);
+}
+
+.settings-toggle:focus-visible {
+  outline: 2px solid var(--gold-light, #c4a84e);
+  outline-offset: 2px;
+}
+
+.account-dropdown__item:focus-visible {
+  outline: 2px solid var(--gold, #a88a3c);
+  outline-offset: -2px;
+  background: rgba(168, 138, 60, 0.08);
+}
+
+.player-card__name:focus-visible {
+  outline: 2px solid var(--gold-light, #c4a84e);
+  outline-offset: 2px;
 }
 
 /* ── Page Header ──────────────────────────────────── */
@@ -277,7 +304,7 @@
 
 .page-header__ornament {
   height: 3px;
-  background: linear-gradient(90deg, transparent 0%, var(--rpg-gold-dark) 20%, var(--rpg-gold) 50%, var(--rpg-gold-dark) 80%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--gold-dark) 20%, var(--gold) 50%, var(--gold-dark) 80%, transparent 100%);
   margin-bottom: 16px;
   border-radius: 2px;
 }
@@ -287,17 +314,19 @@
 }
 
 .page-header__title {
-  font-family: 'Cinzel', serif;
-  font-size: 1.4rem;
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-accent);
   font-weight: 700;
-  color: var(--rpg-wood);
+  color: var(--ink);
   letter-spacing: 0.04em;
   margin: 0;
 }
 
 .page-header__subtitle {
-  font-size: 0.9rem;
-  color: var(--rpg-ink-light);
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-quote);
+  color: var(--ink-faded);
   opacity: 0.7;
   margin-top: 2px;
 }
@@ -319,4 +348,460 @@
   .page-header__actions {
     right: 0;
   }
+}
+
+/* ══════════════════════════════════════════════════════
+   AUTH PAGE — Parchment card on leather backdrop
+   ══════════════════════════════════════════════════════ */
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(58, 37, 19, 0.85) 0%, rgba(42, 29, 14, 0.95) 100%),
+    var(--leather-dark);
+  background-color: var(--leather-dark);
+}
+
+.auth-card {
+  width: 380px;
+  padding: 36px 32px;
+  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%);
+  border: 2px solid var(--gold-dark);
+  border-radius: 6px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(168, 138, 60, 0.1),
+    inset 0 1px 3px rgba(42, 29, 14, 0.1);
+  position: relative;
+}
+
+/* Inner border ornament */
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 1px solid rgba(168, 138, 60, 0.3);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.auth-card__ornament {
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold-dark) 25%, var(--gold) 50%, var(--gold-dark) 75%, transparent 100%);
+  border-radius: 1px;
+  margin: 8px 0;
+}
+
+.auth-card__title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: 2.2rem;
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.auth-card__subtitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-body);
+  color: var(--ink-faded);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-card__input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: var(--fs-body);
+}
+
+.auth-card__error {
+  color: var(--rubric);
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  margin: 0;
+}
+
+.auth-card__submit {
+  width: 100%;
+  padding: 12px;
+  font-size: var(--fs-body);
+  margin-top: 4px;
+}
+
+.auth-card__toggle-wrap {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.auth-card__toggle {
+  background: none;
+  border: none;
+  color: var(--gold-dark);
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(168, 138, 60, 0.4);
+  padding-bottom: 1px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.auth-card__toggle:hover {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.auth-card__back {
+  background: none;
+  border: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  transition: color 0.2s;
+}
+
+.auth-card__back:hover {
+  color: var(--ink);
+}
+
+/* ══════════════════════════════════════════════════════
+   ONBOARDING PAGE — Codex parchment wizard
+   ══════════════════════════════════════════════════════ */
+.onboarding-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.onboarding-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(58, 37, 19, 0.85) 0%, rgba(42, 29, 14, 0.95) 100%),
+    var(--leather-dark);
+  background-color: var(--leather-dark);
+}
+
+.onboarding-card {
+  max-width: 500px;
+  padding: 32px;
+  width: 90%;
+  overflow: hidden;
+}
+
+.onboarding__title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: 2.4rem;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.onboarding__step-title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-accent);
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.onboarding__tagline {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-sub);
+  color: var(--ink-faded);
+  margin-bottom: 24px;
+}
+
+.onboarding__lang-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.onboarding__btn-dim {
+  opacity: 0.45;
+}
+
+.onboarding__primary-btn {
+  padding: 10px 32px;
+  font-size: var(--fs-sub);
+}
+
+.onboarding__back-btn {
+  padding: 8px 20px;
+  opacity: 0.7;
+}
+
+.onboarding__nav-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.onboarding__module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.onboarding__module-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--gold-dark);
+  background: rgba(168, 138, 60, 0.1);
+  transition: background 0.2s;
+}
+
+.onboarding__module-item:hover {
+  background: rgba(168, 138, 60, 0.18);
+}
+
+.onboarding__module-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-quote);
+  font-weight: 700;
+  color: var(--leather);
+  letter-spacing: 0.04em;
+}
+
+.onboarding__module-desc {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* Step indicator dots — wax seal style */
+.onboarding__steps {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.onboarding__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--parch-2);
+  border: 1.5px solid var(--gold-dark);
+  transition: all 0.3s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.onboarding__dot--active {
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  border-color: rgba(194, 58, 58, 0.6);
+  box-shadow: 0 0 6px rgba(194, 58, 58, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  transform: scale(1.15);
+}
+
+.onboarding__dot--done {
+  background: var(--gold);
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 4px rgba(168, 138, 60, 0.3);
+}
+
+/* ══════════════════════════════════════════════════════
+   SETTINGS PAGE — Codex-styled configuration
+   ══════════════════════════════════════════════════════ */
+.settings-section {
+  margin-bottom: 20px;
+}
+
+.settings-section--danger {
+  border-color: var(--rubric);
+}
+
+.settings-section--danger::before {
+  border-color: rgba(122, 30, 30, 0.22);
+}
+
+.settings-danger-title {
+  color: var(--rubric) !important;
+  border-bottom-color: rgba(122, 30, 30, 0.35) !important;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(168, 138, 60, 0.25);
+  gap: 12px;
+}
+
+.settings-row--last {
+  border-bottom: none;
+}
+
+.settings-row__label {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.settings-row__desc {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 2px;
+}
+
+.settings-row__buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-btn--dim {
+  opacity: 0.45;
+}
+
+.settings-btn--danger {
+  background: linear-gradient(to bottom, var(--rubric-light), var(--rubric)) !important;
+  color: var(--parch-0) !important;
+  border-color: rgba(122, 30, 30, 0.6) !important;
+}
+
+.settings-btn--danger:hover {
+  background: linear-gradient(to bottom, var(--rubric), #5a0e0e) !important;
+  color: var(--parch-0) !important;
+}
+
+/* ── Codex Toggle Switch ─────────────────────────── */
+.settings-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.settings-toggle__thumb {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.15) 100%);
+  border: 1px solid var(--gold-dark);
+  transition: all 0.25s ease;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.settings-toggle__thumb::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--parch-1) 0%, var(--parch-2) 100%);
+  border: 1px solid var(--gold-dark);
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.settings-toggle--on .settings-toggle__thumb {
+  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
+  border-color: var(--gold);
+}
+
+.settings-toggle--on .settings-toggle__thumb::after {
+  left: 20px;
+  background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 100%);
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 6px rgba(168, 138, 60, 0.4);
+}
+
+.settings-toggle__text {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  color: var(--ink-faded);
+  min-width: 24px;
+}
+
+.settings-toggle--on .settings-toggle__text {
+  color: var(--ink);
+}
+
+/* ── Sync Status ─────────────────────────────────── */
+.settings-sync-status {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  margin-top: 8px;
+  text-align: center;
+  color: var(--moss);
+}
+
+.settings-sync-status--error {
+  color: var(--rubric);
+}
+
+/* ── Empty State ─────────────────────────────────── */
+.settings-empty {
+  text-align: center;
+  padding: 12px;
+}
+
+.settings-empty__text {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-quote);
+  color: var(--ink-faded);
+  margin-bottom: 12px;
+}
+
+/* ── Keyboard Shortcuts ──────────────────────────── */
+.settings-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-shortcut {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.settings-shortcut__label {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.settings-shortcut__key {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  padding: 2px 8px;
+  background: linear-gradient(180deg, var(--parch-0) 0%, var(--parch-1) 100%);
+  border: 1px solid var(--gold-dark);
+  border-radius: 3px;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(42, 29, 14, 0.15), inset 0 -1px 0 rgba(42, 29, 14, 0.1);
 }

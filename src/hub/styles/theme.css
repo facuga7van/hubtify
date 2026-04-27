@@ -1,67 +1,134 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:wght@400;600;700&family=Fira+Code:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=UnifrakturCook:wght@700&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Code:wght@400;700&display=swap');
 
 :root {
-  --rpg-parchment: #F4E4C1;
-  --rpg-parchment-dark: #E8D5A3;
-  --rpg-parchment-light: #FAF0DC;
-  --rpg-wood: #3B2314;
-  --rpg-wood-light: #5C3A1E;
-  --rpg-gold: #C9A84C;
-  --rpg-gold-light: #E0C068;
-  --rpg-gold-dark: #A68A3E;
-  --rpg-leather: #4A2D1A;
-  --rpg-leather-light: #6B3A2A;
-  --rpg-ink: #2C1810;
-  --rpg-ink-light: #4a3728;
-  --rpg-hp-red: #8B2020;
-  --rpg-hp-red-light: #C0392B;
-  --rpg-xp-green: #2D5A27;
-  --rpg-xp-green-light: #3D8B34;
-  --rpg-border: 2px solid var(--rpg-gold-dark);
-  --rpg-shadow: 0 2px 8px rgba(44, 24, 16, 0.35);
-  --rpg-shadow-inset: inset 0 1px 3px rgba(44, 24, 16, 0.15);
-  --rpg-radius: 6px;
-  --rpg-transition-fast: 0.15s;
-  --rpg-transition: 0.2s;
-  --rpg-transition-slow: 0.3s;
+  /* ── Font scale (presets: 0.85 / 1 / 1.15 / 1.3) ── */
+  --font-scale: 1;
+
+  /* ── Type Scale ────────────────────────────────────── */
+  --fs-timer:   64px;   /* Pomodoro timer face */
+  --fs-display: 34px;   /* Page titles (UnifrakturCook) */
+  --fs-hero:    28px;   /* Level number, big stat values */
+  --fs-stat:    24px;   /* Stat values, balance amounts */
+  --fs-accent:  22px;   /* Section titles, medium stats */
+  --fs-heading: 20px;   /* Subheadings, mid-size labels */
+  --fs-nav:     18px;   /* Nav items, card titles */
+  --fs-sub:     16px;   /* Subheaders, emphasis */
+  --fs-body:    15px;   /* Standard body text */
+  --fs-quote:   16px;   /* Epigraphs, quotes, secondary */
+  --fs-label:   13px;   /* Labels, hints, metadata — MINIMUM */
+
+  /* ── Codex palette ─────────────────────────────────── */
+  --ink: #2a1d0e;
+  --ink-soft: #4a3520;
+  --ink-faded: #7a6a55;
+  --rubric: #7a1e1e;
+  --rubric-light: #a43030;
+  --moss: #556b3c;
+  --moss-light: #6b8a4c;
+  --gold: #a88a3c;
+  --gold-light: #c4a84e;
+  --gold-dark: #8a7030;
+  --parch-0: #f5e7c0;
+  --parch-1: #e8d5a3;
+  --parch-2: #d4bc82;
+  --parch-3: #b89a6a;
+  --leather: #3a2513;
+  --leather-light: #5c3a1e;
+  --leather-dark: #2a1d0e;
+
+  /* ── Z-index scale ───────────────────────────────── */
+  --z-base:         1;      /* Local stacking (badges, decorative) */
+  --z-dropdown:     50;     /* Dropdowns, autocomplete */
+  --z-floating:     100;    /* Floating timer, sticky elements */
+  --z-sidebar:      999;    /* Sidebar navigation */
+  --z-overlay:      1000;   /* Modal overlays, notification backdrop */
+  --z-drawer:       1001;   /* Drawers above overlays */
+  --z-modal:        5000;   /* Full modals (import, project, scroll notes) */
+  --z-toast:        8000;   /* XP toasts, feedback toasts */
+  --z-dropdown-top: 9000;   /* Account dropdown, help tooltips */
+  --z-tour:         9500;   /* Onboarding tour overlay + tooltip */
+  --z-system-toast: 10003;  /* System toast container (topmost) */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: 'Crimson Text', 'Georgia', serif;
-  color: var(--rpg-ink);
+  font-family: 'IM Fell English', 'Cormorant Garamond', Georgia, serif;
+  color: var(--ink);
   overflow: hidden;
   user-select: none;
-  background-color: var(--rpg-parchment);
+  background-color: var(--parch-0);
 }
 
-h1, h2, h3, h4 {
-  font-family: 'Cinzel', 'Georgia', serif;
-  color: var(--rpg-wood);
+h1, h2, h3 {
+  font-family: 'UnifrakturCook', 'IM Fell English', cursive;
+  color: var(--ink);
   letter-spacing: 0.03em;
+}
+
+h4 {
+  font-family: 'IM Fell English SC', serif;
+  color: var(--ink-soft);
+  letter-spacing: 0.03em;
+}
+
+/* ── Typography utilities ────────────────────────── */
+.qb-eyebrow {
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rubric);
+}
+
+.qb-title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-display);
+  color: var(--ink);
+}
+
+.qb-subtitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: calc(var(--fs-quote) * var(--font-scale));
+  color: var(--ink-faded);
+}
+
+.qb-hand {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+}
+
+.qb-numeral {
+  font-family: 'UnifrakturCook', cursive;
+}
+
+.qb-small-caps {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
 }
 
 /* ── Scrollbar ─────────────────────────────────────── */
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track {
-  background: linear-gradient(180deg, var(--rpg-parchment-dark) 0%, var(--rpg-parchment) 100%);
-  border-left: 1px solid var(--rpg-gold-dark);
+  background: linear-gradient(180deg, var(--parch-0) 0%, var(--parch-1) 100%);
+  border-left: 1px solid var(--gold-dark);
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--rpg-leather-light) 0%, var(--rpg-leather) 100%);
+  background: linear-gradient(180deg, var(--parch-2) 0%, var(--parch-3) 100%);
   border-radius: 4px;
-  border: 1px solid var(--rpg-gold-dark);
+  border: 1px solid var(--gold-dark);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--rpg-wood-light) 0%, var(--rpg-wood) 100%);
+  background: linear-gradient(180deg, var(--parch-3) 0%, var(--leather-light) 100%);
 }
 
 /* ── Selection ─────────────────────────────────────── */
 ::selection {
-  background: var(--rpg-gold);
-  color: var(--rpg-ink);
+  background: var(--gold);
+  color: var(--ink);
 }
 
 /* ── Level-up animations ─────────────────────────── */

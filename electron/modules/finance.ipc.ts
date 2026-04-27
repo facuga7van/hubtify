@@ -1,6 +1,8 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
+import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
+import fs from 'fs';
 import { todayDateString } from '../../shared/date-utils';
 
 function genId(): string {
@@ -39,7 +41,7 @@ export function registerFinanceIpcHandlers(): void {
     installmentGroupId?: string;
   } = {}) => {
     const db = getDb();
-    const conditions: string[] = [];
+    const conditions: string[] = ['deleted_at IS NULL'];
     const params: unknown[] = [];
 
     if (filters.month) {
@@ -63,7 +65,7 @@ export function registerFinanceIpcHandlers(): void {
       params.push(filters.installmentGroupId);
     }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const where = `WHERE ${conditions.join(' AND ')}`;
     return db.prepare(`
       SELECT id, type, amount, currency, category, description, date,
              payment_method AS paymentMethod, source, installments,
@@ -165,7 +167,8 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:deleteTransaction', (_e, id: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM finance_transactions WHERE id = ?').run(id);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
   });
 
   // ── Dashboard / Stats ──────────────────────────────
@@ -179,7 +182,7 @@ export function registerFinanceIpcHandlers(): void {
              COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
              COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
       FROM finance_transactions
-      WHERE date LIKE ? AND impacts_balance = 1
+      WHERE deleted_at IS NULL AND date LIKE ? AND impacts_balance = 1
       GROUP BY currency
     `).all(`${m}%`) as Array<{ currency: string; income: number; expenses: number }>;
 
@@ -205,7 +208,7 @@ export function registerFinanceIpcHandlers(): void {
       SELECT category, currency,
              COALESCE(SUM(amount), 0) AS total
       FROM finance_transactions
-      WHERE type = 'expense' AND date LIKE ? AND category != 'Pago Tarjeta'
+      WHERE deleted_at IS NULL AND type = 'expense' AND date LIKE ? AND category != 'Pago Tarjeta'
       GROUP BY category, currency
       ORDER BY category ASC
     `).all(`${m}%`) as Array<{ category: string; currency: string; total: number }>;
@@ -231,7 +234,7 @@ export function registerFinanceIpcHandlers(): void {
         COALESCE(SUM(CASE WHEN type = 'income' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS incomeUSD,
         COALESCE(SUM(CASE WHEN type = 'expense' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS expensesUSD
       FROM finance_transactions
-      WHERE impacts_balance = 1 AND date >= ? AND date < ?
+      WHERE deleted_at IS NULL AND impacts_balance = 1 AND date >= ? AND date < ?
     `).get(`${startMonth}-01`, nextMonth) as {
       incomeARS: number; expensesARS: number; incomeUSD: number; expensesUSD: number;
     };
@@ -250,7 +253,7 @@ export function registerFinanceIpcHandlers(): void {
         COALESCE(SUM(CASE WHEN currency = 'ARS' THEN amount ELSE 0 END), 0) AS "ARS",
         COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END), 0) AS "USD"
       FROM finance_transactions
-      WHERE type = 'expense' AND impacts_balance = 1 AND category != 'Pago Tarjeta'
+      WHERE deleted_at IS NULL AND type = 'expense' AND impacts_balance = 1 AND category != 'Pago Tarjeta'
         AND date >= ? AND date < ?
       GROUP BY category
       ORDER BY "ARS" DESC
@@ -263,7 +266,7 @@ export function registerFinanceIpcHandlers(): void {
     const [year, month] = today.slice(0, 7).split('-').map(Number);
 
     const recurring = db.prepare(
-      "SELECT SUM(amount) AS total FROM finance_recurring WHERE active = 1 AND type = 'expense'"
+      "SELECT SUM(amount) AS total FROM finance_recurring WHERE deleted_at IS NULL AND active = 1 AND type = 'expense'"
     ).get() as { total: number | null };
     const recurringTotal = recurring.total ?? 0;
 
@@ -276,7 +279,7 @@ export function registerFinanceIpcHandlers(): void {
       const installmentRow = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) AS total
         FROM finance_transactions
-        WHERE installment_group_id IS NOT NULL AND date LIKE ?
+        WHERE deleted_at IS NULL AND installment_group_id IS NOT NULL AND date LIKE ?
       `).get(`${targetMonth}%`) as { total: number };
 
       projection.push({
@@ -294,24 +297,33 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getCategories', () => {
     const db = getDb();
-    return (db.prepare('SELECT name FROM finance_categories ORDER BY created_at ASC').all() as { name: string }[])
+    return (db.prepare('SELECT name FROM finance_categories WHERE deleted_at IS NULL ORDER BY created_at ASC').all() as { name: string }[])
       .map((r) => r.name);
   });
 
   ipcHandle('finance:addCategory', (_e, name: string) => {
     const db = getDb();
-    db.prepare('INSERT OR IGNORE INTO finance_categories (name) VALUES (?)').run(name.trim());
+    const trimmed = name.trim();
+    const now = new Date().toISOString();
+    // Check if soft-deleted category with same name exists — un-delete it
+    const deleted = db.prepare('SELECT name FROM finance_categories WHERE name = ? AND deleted_at IS NOT NULL').get(trimmed);
+    if (deleted) {
+      db.prepare('UPDATE finance_categories SET deleted_at = NULL, updated_at = ? WHERE name = ?').run(now, trimmed);
+    } else {
+      db.prepare('INSERT OR IGNORE INTO finance_categories (name, updated_at) VALUES (?, ?)').run(trimmed, now);
+    }
   });
 
   ipcHandle('finance:deleteCategory', (_e, name: string) => {
     const db = getDb();
     const usage = db.prepare(
-      'SELECT COUNT(*) AS c FROM finance_transactions WHERE category = ?'
+      'SELECT COUNT(*) AS c FROM finance_transactions WHERE category = ? AND deleted_at IS NULL'
     ).get(name) as { c: number };
     if (usage.c > 0) {
       throw new Error(`Cannot delete category in use by ${usage.c} transactions`);
     }
-    db.prepare('DELETE FROM finance_categories WHERE name = ?').run(name);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE finance_categories SET deleted_at = ?, updated_at = ? WHERE name = ?').run(now, now, name);
   });
 
   // ── Credit Cards ──────────────────────────────────
@@ -321,6 +333,7 @@ export function registerFinanceIpcHandlers(): void {
     return db.prepare(`
       SELECT id, name, closing_day AS closingDay, created_at AS createdAt
       FROM finance_credit_cards
+      WHERE deleted_at IS NULL
       ORDER BY created_at ASC
     `).all();
   });
@@ -328,27 +341,30 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number }) => {
     const db = getDb();
     const id = genId();
-    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day) VALUES (?, ?, ?)').run(id, card.name.trim(), card.closingDay);
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, card.name.trim(), card.closingDay, now, now);
     return id;
   });
 
   ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number }) => {
     const db = getDb();
-    const sets: string[] = [];
-    const vals: unknown[] = [];
+    const now = new Date().toISOString();
+    const sets: string[] = ['updated_at = ?'];
+    const vals: unknown[] = [now];
     if (fields.name !== undefined) { sets.push('name = ?'); vals.push(fields.name.trim()); }
     if (fields.closingDay !== undefined) { sets.push('closing_day = ?'); vals.push(fields.closingDay); }
-    if (sets.length === 0) return;
+    if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
     db.prepare(`UPDATE finance_credit_cards SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   });
 
   ipcHandle('finance:deleteCreditCard', (_e, id: string) => {
     const db = getDb();
+    const now = new Date().toISOString();
     const trx = db.transaction(() => {
-      db.prepare('DELETE FROM finance_credit_card_statements WHERE credit_card_id = ?').run(id);
-      db.prepare('UPDATE finance_transactions SET credit_card_id = NULL, impacts_balance = 1 WHERE credit_card_id = ?').run(id);
-      db.prepare('DELETE FROM finance_credit_cards WHERE id = ?').run(id);
+      db.prepare('UPDATE finance_credit_card_statements SET deleted_at = ?, updated_at = ? WHERE credit_card_id = ?').run(now, now, id);
+      db.prepare('UPDATE finance_transactions SET credit_card_id = NULL, impacts_balance = 1, updated_at = ? WHERE credit_card_id = ?').run(now, id);
+      db.prepare('UPDATE finance_credit_cards SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
     });
     trx();
   });
@@ -361,21 +377,21 @@ export function registerFinanceIpcHandlers(): void {
     status?: 'pending' | 'paid';
   } = {}) => {
     const db = getDb();
-    const conditions: string[] = [];
+    const conditions: string[] = ['s.deleted_at IS NULL'];
     const params: unknown[] = [];
 
     if (filters.creditCardId) { conditions.push('s.credit_card_id = ?'); params.push(filters.creditCardId); }
     if (filters.periodMonth) { conditions.push('s.period_month = ?'); params.push(filters.periodMonth); }
     if (filters.status) { conditions.push('s.status = ?'); params.push(filters.status); }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const where = `WHERE ${conditions.join(' AND ')}`;
     return db.prepare(`
       SELECT s.id, s.credit_card_id AS creditCardId, c.name AS creditCardName,
              s.period_month AS periodMonth, s.calculated_amount AS calculatedAmount,
              s.paid_amount AS paidAmount, s.status, s.paid_date AS paidDate,
              s.transaction_id AS transactionId, s.created_at AS createdAt
       FROM finance_credit_card_statements s
-      JOIN finance_credit_cards c ON c.id = s.credit_card_id
+      JOIN finance_credit_cards c ON c.id = s.credit_card_id AND c.deleted_at IS NULL
       ${where}
       ORDER BY s.period_month DESC, c.name ASC
     `).all(...params);
@@ -400,7 +416,7 @@ export function registerFinanceIpcHandlers(): void {
              installment_group_id AS installmentGroupId,
              created_at AS createdAt
       FROM finance_transactions
-      WHERE credit_card_id = ? AND impacts_balance = 0
+      WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
       ORDER BY date DESC, created_at DESC
     `).all(statement.creditCardId);
 
@@ -413,7 +429,7 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:generateStatement', (_e, creditCardId: string, periodMonth: string) => {
     const db = getDb();
-    const card = db.prepare('SELECT id, closing_day AS closingDay FROM finance_credit_cards WHERE id = ?').get(creditCardId) as { id: string; closingDay: number } | undefined;
+    const card = db.prepare('SELECT id, closing_day AS closingDay FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL').get(creditCardId) as { id: string; closingDay: number } | undefined;
     if (!card) return null;
 
     const statementId = genId();
@@ -422,13 +438,13 @@ export function registerFinanceIpcHandlers(): void {
 
     const trx = db.transaction(() => {
       const existing = db.prepare(
-        'SELECT id FROM finance_credit_card_statements WHERE credit_card_id = ? AND period_month = ?'
+        'SELECT id FROM finance_credit_card_statements WHERE credit_card_id = ? AND period_month = ? AND deleted_at IS NULL'
       ).get(creditCardId, periodMonth);
       if (existing) return (existing as { id: string }).id;
 
       const allTx = db.prepare(`
         SELECT date, amount FROM finance_transactions
-        WHERE credit_card_id = ? AND impacts_balance = 0
+        WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
       `).all(creditCardId) as Array<{ date: string; amount: number }>;
 
       const total = allTx
@@ -447,9 +463,9 @@ export function registerFinanceIpcHandlers(): void {
 
       db.prepare(`
         INSERT INTO finance_credit_card_statements
-          (id, credit_card_id, period_month, calculated_amount, status, transaction_id, created_at)
-        VALUES (?, ?, ?, ?, 'pending', ?, ?)
-      `).run(statementId, creditCardId, periodMonth, total, txId, now);
+          (id, credit_card_id, period_month, calculated_amount, status, transaction_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+      `).run(statementId, creditCardId, periodMonth, total, txId, now, now);
 
       return statementId;
     });
@@ -473,9 +489,9 @@ export function registerFinanceIpcHandlers(): void {
 
     db.prepare(`
       UPDATE finance_credit_card_statements
-      SET paid_amount = ?, status = 'paid', paid_date = ?
+      SET paid_amount = ?, status = 'paid', paid_date = ?, updated_at = ?
       WHERE id = ?
-    `).run(paidAmount, today, statementId);
+    `).run(paidAmount, today, now, statementId);
 
     db.prepare(`
       UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?
@@ -488,7 +504,7 @@ export function registerFinanceIpcHandlers(): void {
     const db = getDb();
     const month = todayDateString().slice(0, 7);
     const result = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE type = 'expense' AND currency = 'ARS' AND impacts_balance = 1 AND date LIKE ?"
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1 AND date LIKE ?"
     ).get(`${month}%`) as { total: number };
     return result.total;
   });
@@ -496,6 +512,13 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getActiveLoansCount', () => {
     const db = getDb();
     const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };
+    return result.c;
+  });
+
+  ipcHandle('finance:getTodayTransactionsCount', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const result = db.prepare('SELECT COUNT(*) AS c FROM finance_transactions WHERE deleted_at IS NULL AND date = ?').get(today) as { c: number };
     return result.c;
   });
 
@@ -509,7 +532,8 @@ export function registerFinanceIpcHandlers(): void {
              g.created_at AS createdAt,
              COUNT(t.id) AS transactionCount
       FROM finance_installment_groups g
-      LEFT JOIN finance_transactions t ON t.installment_group_id = g.id
+      LEFT JOIN finance_transactions t ON t.installment_group_id = g.id AND t.deleted_at IS NULL
+      WHERE g.deleted_at IS NULL
       GROUP BY g.id
       ORDER BY g.date DESC, g.created_at DESC
     `).all();
@@ -533,7 +557,7 @@ export function registerFinanceIpcHandlers(): void {
                + 1 AS installmentNumber
       FROM finance_transactions t
       JOIN finance_installment_groups g ON g.id = t.installment_group_id
-      WHERE t.installment_group_id IS NOT NULL AND t.date LIKE ?
+      WHERE t.deleted_at IS NULL AND t.installment_group_id IS NOT NULL AND t.date LIKE ?
       ORDER BY t.date DESC, t.created_at DESC
     `).all(`${month}%`);
   });
@@ -552,7 +576,7 @@ export function registerFinanceIpcHandlers(): void {
       const row = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) AS total
         FROM finance_transactions
-        WHERE installment_group_id IS NOT NULL AND date LIKE ?
+        WHERE deleted_at IS NULL AND installment_group_id IS NOT NULL AND date LIKE ?
       `).get(`${targetMonth}%`) as { total: number };
 
       projection.push({ month: targetMonth, total: row.total });
@@ -583,8 +607,8 @@ export function registerFinanceIpcHandlers(): void {
 
     db.prepare(`
       INSERT INTO finance_installment_groups
-        (id, description, total_amount, currency, total_installments, category, date, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       groupId,
       group.description,
@@ -593,6 +617,7 @@ export function registerFinanceIpcHandlers(): void {
       group.installmentCount,
       group.category ?? 'Otros',
       group.startDate,
+      now,
       now,
     );
 
@@ -643,9 +668,10 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:deleteInstallmentGroup', (_e, id: string) => {
     const db = getDb();
-    // Application-level cascade: delete linked transactions first, then the group
-    db.prepare('DELETE FROM finance_transactions WHERE installment_group_id = ?').run(id);
-    db.prepare('DELETE FROM finance_installment_groups WHERE id = ?').run(id);
+    const now = new Date().toISOString();
+    // Application-level cascade: soft-delete linked transactions first, then the group
+    db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE installment_group_id = ?').run(now, now, id);
+    db.prepare('UPDATE finance_installment_groups SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
   });
 
   ipcHandle('finance:updateInstallmentAmount', (_e, txId: string, newAmount: number) => {
@@ -790,9 +816,9 @@ export function registerFinanceIpcHandlers(): void {
       // 1. Create installment group
       db.prepare(`
         INSERT INTO finance_installment_groups
-          (id, description, total_amount, currency, total_installments, category, date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(groupId, data.description, totalAmount, currency, data.installmentCount, category, data.startDate, now);
+          (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(groupId, data.description, totalAmount, currency, data.installmentCount, category, data.startDate, now, now);
 
       // 2. Generate monthly transactions
       const [yearStr, monthStr, dayStr] = data.startDate.split('-');
@@ -871,6 +897,7 @@ export function registerFinanceIpcHandlers(): void {
              billing_day AS billingDay,
              created_at AS createdAt
       FROM finance_recurring
+      WHERE deleted_at IS NULL
       ORDER BY created_at ASC
     `).all();
   });
@@ -889,8 +916,8 @@ export function registerFinanceIpcHandlers(): void {
     const now = new Date().toISOString();
     db.prepare(`
       INSERT OR IGNORE INTO finance_recurring
-        (id, name, type, amount, currency, category, billing_day, active, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        (id, name, type, amount, currency, category, billing_day, active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(
       id,
       rec.name,
@@ -899,6 +926,7 @@ export function registerFinanceIpcHandlers(): void {
       rec.currency ?? 'ARS',
       rec.category ?? 'Otros',
       rec.billingDay ?? 1,
+      now,
       now,
     );
     return id;
@@ -918,7 +946,7 @@ export function registerFinanceIpcHandlers(): void {
       FROM finance_recurring
       WHERE id = ?
     `).run(historyId, previousAmount, newAmount, today, now, id);
-    db.prepare(`UPDATE finance_recurring SET amount = ? WHERE id = ?`).run(newAmount, id);
+    db.prepare(`UPDATE finance_recurring SET amount = ?, updated_at = ? WHERE id = ?`).run(newAmount, now, id);
   });
 
   ipcHandle('finance:updateRecurring', (_e, id: string, fields: {
@@ -931,32 +959,36 @@ export function registerFinanceIpcHandlers(): void {
     const safe = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.has(k))) as typeof fields;
 
     const db = getDb();
-    const sets: string[] = [];
-    const params: unknown[] = [];
+    const now = new Date().toISOString();
+    const sets: string[] = ['updated_at = ?'];
+    const params: unknown[] = [now];
 
     if (safe.name !== undefined) { sets.push('name = ?'); params.push(safe.name); }
     if (safe.type !== undefined) { sets.push('type = ?'); params.push(safe.type); }
     if (safe.category !== undefined) { sets.push('category = ?'); params.push(safe.category); }
     if (safe.billingDay !== undefined) { sets.push('billing_day = ?'); params.push(safe.billingDay); }
 
-    if (sets.length === 0) return;
+    if (sets.length === 1) return; // only updated_at, no real changes
     params.push(id);
     db.prepare(`UPDATE finance_recurring SET ${sets.join(', ')} WHERE id = ?`).run(...params);
   });
 
   ipcHandle('finance:toggleRecurring', (_e, id: string) => {
     const db = getDb();
+    const now = new Date().toISOString();
     db.prepare(`
       UPDATE finance_recurring
-      SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END
+      SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END,
+          updated_at = ?
       WHERE id = ?
-    `).run(id);
+    `).run(now, id);
   });
 
   ipcHandle('finance:deleteRecurring', (_e, id: string) => {
     const db = getDb();
-    db.prepare('UPDATE finance_transactions SET recurring_id = NULL WHERE recurring_id = ?').run(id);
-    db.prepare('DELETE FROM finance_recurring WHERE id = ?').run(id);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE finance_transactions SET recurring_id = NULL, updated_at = ? WHERE recurring_id = ?').run(now, id);
+    db.prepare('UPDATE finance_recurring SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
   });
 
   ipcHandle('finance:generateRecurringForMonth', (_e, month: string) => {
@@ -964,7 +996,7 @@ export function registerFinanceIpcHandlers(): void {
     const actives = db.prepare(`
       SELECT id, name, type, amount, currency, category, billing_day AS billingDay
       FROM finance_recurring
-      WHERE active = 1
+      WHERE deleted_at IS NULL AND active = 1
     `).all() as Array<{
       id: string;
       name: string;
@@ -982,7 +1014,7 @@ export function registerFinanceIpcHandlers(): void {
       const existing = db.prepare(`
         SELECT COUNT(*) AS c
         FROM finance_transactions
-        WHERE source = 'recurring' AND recurring_id = ? AND date LIKE ?
+        WHERE deleted_at IS NULL AND source = 'recurring' AND recurring_id = ? AND date LIKE ?
       `).get(rec.id, `${month}%`) as { c: number };
 
       if (existing.c > 0) continue;
@@ -1028,5 +1060,141 @@ export function registerFinanceIpcHandlers(): void {
       WHERE recurring_id = ?
       ORDER BY created_at DESC
     `).all(recurringId);
+  });
+
+  // ── C3: Monthly expenses sparkline (last 6 months) ────────
+
+  ipcHandle('finance:getMonthlyExpenses', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const [year, month] = today.slice(0, 7).split('-').map(Number);
+
+    const result: number[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(year, month - 1 - i, 1);
+      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const row = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM finance_transactions
+        WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
+          AND date LIKE ?
+      `).get(`${m}%`) as { total: number };
+      result.push(row.total);
+    }
+    return result;
+  });
+
+  // ── C7: Category averages (last 3 months) ─────────────────
+
+  ipcHandle('finance:getCategoryAverages', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const [year, month] = today.slice(0, 7).split('-').map(Number);
+
+    const months: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(year, month - 1 - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+
+    const likeConditions = months.map((m) => `date LIKE '${m}%'`).join(' OR ');
+
+    const rows = db.prepare(`
+      SELECT category, COALESCE(SUM(amount), 0) AS total
+      FROM finance_transactions
+      WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
+        AND category != 'Pago Tarjeta'
+        AND (${likeConditions})
+      GROUP BY category
+    `).all() as Array<{ category: string; total: number }>;
+
+    const averages: Record<string, number> = {};
+    for (const row of rows) {
+      averages[row.category] = row.total / 3;
+    }
+    return averages;
+  });
+
+  // ── C8: Previous month summary ────────────────────────────
+
+  ipcHandle('finance:getPreviousMonthSummary', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const [year, month] = today.slice(0, 7).split('-').map(Number);
+    const d = new Date(year, month - 2, 1);
+    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+    const row = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
+      FROM finance_transactions
+      WHERE deleted_at IS NULL AND currency = 'ARS' AND impacts_balance = 1 AND date LIKE ?
+    `).get(`${prevMonth}%`) as { income: number; expenses: number };
+
+    return { income: row.income, expenses: row.expenses, month: prevMonth };
+  });
+
+  // ── C5: Export CSV ──────────────────────────────────────────
+
+  ipcHandle('finance:exportCsv', async (_e, month?: string) => {
+    const db = getDb();
+    const m = month ?? todayDateString().slice(0, 7);
+
+    const rows = db.prepare(`
+      SELECT date, description, amount, currency, category, type,
+             payment_method AS paymentMethod
+      FROM finance_transactions
+      WHERE deleted_at IS NULL AND date LIKE ?
+      ORDER BY date ASC, created_at ASC
+    `).all(`${m}%`) as Array<{
+      date: string;
+      description: string;
+      amount: number;
+      currency: string;
+      category: string;
+      type: string;
+      paymentMethod: string;
+    }>;
+
+    if (rows.length === 0) {
+      return { success: false, error: 'no_data' };
+    }
+
+    const win = BrowserWindow.getFocusedWindow();
+    const { filePath, canceled } = await dialog.showSaveDialog(win!, {
+      title: 'Export CSV',
+      defaultPath: `coinify-${m}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    const escape = (val: string) => {
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const header = 'date,description,amount,currency,category,type,payment_method';
+    const csvRows = rows.map((r) =>
+      [
+        r.date,
+        escape(r.description),
+        r.amount.toString(),
+        r.currency,
+        escape(r.category),
+        r.type,
+        r.paymentMethod,
+      ].join(','),
+    );
+
+    const csv = [header, ...csvRows].join('\n');
+    fs.writeFileSync(filePath, csv, 'utf-8');
+
+    return { success: true, path: filePath, count: rows.length };
   });
 }

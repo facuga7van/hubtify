@@ -22,31 +22,38 @@ function getSound(name: string, src: string, volume = 0.5): Howl {
   return sounds[name];
 }
 
+/** Play with random pitch jitter (±0.1 around base rate) */
+function playWithJitter(howl: Howl, baseRate = 1.0, jitter = 0.2): void {
+  const rate = baseRate + (Math.random() * 2 - 1) * jitter;
+  const id = howl.play();
+  howl.rate(rate, id);
+}
+
 export function playTaskComplete() {
   if (!soundEnabled) return;
   try {
-    getSound('taskComplete', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.4).play();
+    playWithJitter(getSound('taskComplete', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.4));
   } catch { /* Sound not available */ }
 }
 
 export function playLevelUp() {
   if (!soundEnabled) return;
   try {
-    getSound('levelUp', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.5).play();
+    playWithJitter(getSound('levelUp', new URL('../assets/fx/levelup.mp3', import.meta.url).href, 0.15));
   } catch { /* Sound not available */ }
 }
 
 export function playWrite() {
   if (!soundEnabled) return;
   try {
-    getSound('write', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3).play();
+    playWithJitter(getSound('write', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3));
   } catch { /* Sound not available */ }
 }
 
 export function playDelete() {
   if (!soundEnabled) return;
   try {
-    getSound('delete', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3).play();
+    playWithJitter(getSound('delete', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.3));
   } catch { /* Sound not available */ }
 }
 
@@ -64,7 +71,7 @@ export function playPageFlip() {
     let idx = Math.floor(Math.random() * pageFlipSources.length);
     if (idx === lastPageFlipIndex) idx = (idx + 1) % pageFlipSources.length;
     lastPageFlipIndex = idx;
-    getSound(`pageFlip${idx}`, pageFlipSources[idx](), 0.18).play();
+    playWithJitter(getSound(`pageFlip${idx}`, pageFlipSources[idx](), 0.18));
   } catch { /* Sound not available */ }
 }
 
@@ -73,41 +80,51 @@ export function playPageFlip() {
 export function playCauldronStart() {
   if (!soundEnabled) return;
   try {
-    getSound('cauldronStart', new URL('../assets/fx/brew-start.mp3', import.meta.url).href, 0.35).play();
+    playWithJitter(getSound('cauldronStart', new URL('../assets/fx/start-fire.mp3', import.meta.url).href, 0.15));
   } catch { /* Sound not available */ }
 }
 
 export function playCauldronComplete() {
-  if (!soundEnabled) return;
-  try {
-    getSound('cauldronComplete', new URL('../assets/fx/brew-complete.mp3', import.meta.url).href, 0.45).play();
-  } catch { /* Sound not available */ }
+  // TODO: needs replacement audio file (brew-complete.mp3 removed)
 }
 
 export function playCauldronBreakEnd() {
-  if (!soundEnabled) return;
-  try {
-    getSound('cauldronBreakEnd', new URL('../assets/fx/break-end.mp3', import.meta.url).href, 0.4).play();
-  } catch { /* Sound not available */ }
+  // TODO: needs replacement audio file (break-end.mp3 removed)
 }
 
 export function playCauldronCycleEnd() {
   if (!soundEnabled) return;
   try {
-    getSound('cauldronCycleEnd', new URL('../assets/fx/cycle-complete.mp3', import.meta.url).href, 0.5).play();
+    playWithJitter(getSound('cauldronCycleEnd', new URL('../assets/fx/fanfare.wav', import.meta.url).href, 0.5));
   } catch { /* Sound not available */ }
 }
 
 export function playCauldronWarning() {
   if (!soundEnabled) return;
   try {
-    getSound('cauldronWarning', new URL('../assets/fx/brew-warning.mp3', import.meta.url).href, 0.2).play();
+    playWithJitter(getSound('cauldronWarning', new URL('../assets/fx/brew-warning.mp3', import.meta.url).href, 0.35));
   } catch { /* Sound not available */ }
 }
 
 export function playCauldronPause() {
   if (!soundEnabled) return;
   try {
-    getSound('cauldronPause', new URL('../assets/fx/write.mp3', import.meta.url).href, 0.25).play();
+    playWithJitter(getSound('cauldronPause', new URL('../assets/fx/brew-stop.mp3', import.meta.url).href, 0.15));
+  } catch { /* Sound not available */ }
+}
+
+export function playCauldronResume() {
+  if (!soundEnabled) return;
+  try {
+    playWithJitter(getSound('cauldronResume', new URL('../assets/fx/start-fire.mp3', import.meta.url).href, 0.06));
+  } catch { /* Sound not available */ }
+}
+
+/* ── Coin clink ── */
+
+export function playCoinClink() {
+  if (!soundEnabled) return;
+  try {
+    playWithJitter(getSound('coinClink', new URL('../assets/fx/coin-clink.mp3', import.meta.url).href, 0.06));
   } catch { /* Sound not available */ }
 }

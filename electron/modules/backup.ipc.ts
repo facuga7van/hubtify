@@ -1,11 +1,12 @@
-import { ipcMain, dialog, app } from 'electron';
+import { dialog, app } from 'electron';
 import { getDb } from '../ipc/db';
+import { ipcHandle } from '../ipc/ipc-handle';
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
 
 export function registerBackupIpcHandlers(): void {
-  ipcMain.handle('backup:export', async () => {
+  ipcHandle('backup:export', async () => {
     try {
       const { filePath, canceled } = await dialog.showSaveDialog({
         title: 'Export Backup',
@@ -35,7 +36,7 @@ export function registerBackupIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('backup:import', async () => {
+  ipcHandle('backup:import', async () => {
     try {
       const { filePaths, canceled } = await dialog.showOpenDialog({
         title: 'Import Backup',

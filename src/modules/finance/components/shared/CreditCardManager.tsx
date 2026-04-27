@@ -60,7 +60,7 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
         {cards.map((card) => (
           <div key={card.id} style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
-            borderBottom: '1px solid var(--rpg-parchment-dark)',
+            borderBottom: '1px solid var(--parch-1)',
           }}>
             {editingId === card.id ? (
               <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1 }}>
@@ -71,21 +71,21 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
                   onChange={(v) => setEditClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
                   style={{ width: 70 }} min={1} max={31} step={1} />
                 <button className="rpg-button" onClick={handleUpdate}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}>
                   OK
                 </button>
                 <button className="rpg-button" onClick={() => setEditingId(null)}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
+                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
                   {t('coinify.cancel')}
                 </button>
               </div>
             ) : (
               <>
                 <span style={{ flex: 1, fontWeight: 'bold', cursor: 'pointer' }} onClick={() => startEdit(card)}>
-                  {card.name} <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>({t('coinify.closingDay')}: {card.closingDay})</span>
+                  {card.name} <span style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>({t('coinify.closingDay')}: {card.closingDay})</span>
                 </span>
                 <button className="rpg-button" onClick={() => handleDelete(card.id)}
-                  style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
+                  style={{ padding: '3px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
                   {t('coinify.delete')}
                 </button>
               </>

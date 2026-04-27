@@ -1,13 +1,25 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import PageHeader from '../../../shared/components/PageHeader';
 import { getAgeFromDob } from '../../../../shared/date-utils';
 import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
+import MealScheduleEditor from './shared/MealScheduleEditor';
+import HelpBubble from '../../../shared/components/HelpBubble';
+import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
+import type { MealSchedule } from '../../../../shared/meal-utils';
 import type { NutritionProfile } from '../types';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
+
+const ACTIVITY_MULTIPLIERS: Record<string, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
+};
+
+const GOAL_ICONS: Record<Goal, string> = { deficit: '\u2193', maintain: '=', surplus: '\u2191' };
 
 export default function NutritionSettings() {
   const { t } = useTranslation();
@@ -31,6 +43,7 @@ export default function NutritionSettings() {
   const [activity, setActivity] = useState('moderate');
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
+  const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
 
   const loadProfile = useCallback(() => {
     setLoading(true);
@@ -50,13 +63,15 @@ export default function NutritionSettings() {
         if (deficit > 0) { setGoal('deficit'); setGoalAmount(deficit); }
         else if (deficit < 0) { setGoal('surplus'); setGoalAmount(Math.abs(deficit)); }
         else { setGoal('maintain'); setGoalAmount(0); }
+
+        if (p.mealSchedule) setMealSchedule(p.mealSchedule);
       }
     }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
-  // Reload profile when account is switched — prevents saving to wrong account
+  // Reload profile when account is switched
   useEffect(() => {
     const handler = () => loadProfile();
     window.addEventListener('account:switched', handler);
@@ -74,7 +89,7 @@ export default function NutritionSettings() {
 
       await window.api.nutritionSaveProfile({
         dateOfBirth, weightCheckDay, weightPopupEnabled, sex, heightCm: height, initialWeightKg: weight,
-        activityLevel: activity, deficitTargetKcal,
+        activityLevel: activity, deficitTargetKcal, mealSchedule,
       });
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
@@ -87,125 +102,191 @@ export default function NutritionSettings() {
     }
   };
 
-  if (loading) return <div style={{ padding: 24, opacity: 0.5 }}>{t('common.loading')}</div>;
+  // BMR / TDEE calculation (Mifflin-St Jeor, same formula as backend)
+  const age = dateOfBirth ? getAgeFromDob(dateOfBirth) : 0;
+  const { bmr, tdee, multiplier } = useMemo(() => {
+    if (!age || !weight || !height) return { bmr: 0, tdee: 0, multiplier: 0 };
+    const base = 10 * weight + 6.25 * height - 5 * age;
+    const rawBmr = Math.max(800, Math.min(3500, sex === 'M' ? base + 5 : base - 161));
+    const mult = ACTIVITY_MULTIPLIERS[activity] ?? 1.55;
+    return { bmr: Math.round(rawBmr), tdee: Math.round(rawBmr * mult), multiplier: mult };
+  }, [age, weight, height, sex, activity]);
+
+  if (loading) return <div style={{ padding: 24, fontFamily: "'IM Fell English', serif", color: 'var(--ink-faded)' }}>{t('common.loading')}</div>;
 
   if (loadError) return (
     <div style={{ padding: 24, textAlign: 'center' }}>
-      <p style={{ marginBottom: 12, color: 'var(--rpg-hp-red)' }}>{t('common.somethingWentWrong')}</p>
-      <button className="rpg-button" onClick={() => window.location.reload()}>{t('common.tryAgain')}</button>
+      <p style={{ marginBottom: 12, color: 'var(--rubric)' }}>{t('common.somethingWentWrong')}</p>
+      <button className="nutri-btn" onClick={() => window.location.reload()}>{t('common.tryAgain')}</button>
     </div>
   );
 
-  const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.9rem', marginBottom: 4 };
-
   return (
-    <div>
-      <PageHeader
-        title={t('nutrify.profileSettings')}
-        subtitle={t('nutrify.profileSettingsSub')}
-        actions={
-          <button className="rpg-button" onClick={() => navigate('/nutrition')}
-            style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
-            ← {t('common.back')}
+    <div className="nutri-page">
+      {/* ── Page Head ── */}
+      <div className="nutri-page-head">
+        <div>
+          <h1 className="nutri-page-title">
+            <span className="nutri-title-ico">{'\u2699'}</span> {t('nutrify.profileSettings', 'Configuración Nutrify')}
+          </h1>
+          <div className="nutri-page-sub">{t('nutrify.profileSettingsSub', 'Ajustá tus datos corporales y objetivo calórico')}</div>
+        </div>
+        <div className="nutri-head-actions">
+          <button className="nutri-btn nutri-btn-ghost" onClick={() => navigate('/nutrition')}>
+            {'\u2190'} {t('common.back', 'Volver')}
           </button>
-        }
-      />
+        </div>
+      </div>
 
-      {/* Body */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">{t('nutrify.bodyInfo')}</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <label style={{ ...labelStyle, flex: '2 1 0' }}>
-            {t('nutrify.dateOfBirth')}
+      {/* ── Body Data ── */}
+      <div className="nutri-card">
+        <HelpBubble text={t('nutrify.bodyDataHelp', 'Tus datos físicos calculan el BMR (metabolismo basal) con Mifflin-St Jeor y el TDEE según tu actividad.')} />
+        <h3 className="nutri-card-title">
+          <span className="nutri-t-ico">{'\u2659'}</span> {t('nutrify.bodyInfo', 'Datos Corporales')}
+        </h3>
+
+        <div className="nutri-config-grid">
+          <div className="nutri-field span-2">
+            <label className="nutri-label">{t('nutrify.dateOfBirth', 'Fecha de nacimiento')}</label>
             <RpgDatePicker value={dateOfBirth} onChange={setDateOfBirth}
               min="1900-01-01" max={new Date().toISOString().split('T')[0]} />
             {dateOfBirth && (
-              <span style={{ fontSize: '0.7rem', opacity: 0.6, marginTop: 2 }}>
-                {t('nutrify.calculatedAge', { age: getAgeFromDob(dateOfBirth) })}
+              <span className="nutri-field-hint">
+                {t('nutrify.calculatedAge', { age })}
               </span>
             )}
-          </label>
-          <label style={{ ...labelStyle, flex: '1 1 0' }}>
-            {t('nutrify.sex')}
-            <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} className="rpg-select" style={{ width: '100%' }}>
-              <option value="M">{t('nutrify.male')}</option>
-              <option value="F">{t('nutrify.female')}</option>
+          </div>
+
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.sex', 'Sexo')}</label>
+            <select value={sex} onChange={(e) => setSex(e.target.value as 'M' | 'F')} className="nutri-select">
+              <option value="M">{t('nutrify.male', 'Masculino')}</option>
+              <option value="F">{t('nutrify.female', 'Femenino')}</option>
             </select>
-          </label>
-          <label style={{ ...labelStyle, flex: '1 1 0' }}>
-            {t('nutrify.height')}
+          </div>
+
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.height', 'Altura')}</label>
             <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={100} max={250} suffix="cm" />
-          </label>
-          <label style={{ ...labelStyle, flex: '1 1 0' }}>
-            {t('nutrify.weight')}
+          </div>
+
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.weight', 'Peso')}</label>
             <RpgNumberInput value={String(weight)} onChange={(v) => setWeight(+v)} step={0.1} min={30} max={300} suffix="kg" />
-          </label>
-          <label style={{ ...labelStyle, flex: '1.5 1 0' }}>
-            {t('nutrify.activityLevel')}
-            <select value={activity} onChange={(e) => setActivity(e.target.value)} className="rpg-select" style={{ width: '100%' }}>
-              <option value="sedentary">{t('nutrify.sedentary')}</option>
-              <option value="light">{t('nutrify.light')}</option>
-              <option value="moderate">{t('nutrify.moderate')}</option>
-              <option value="active">{t('nutrify.active')}</option>
+          </div>
+
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.activityLevel', 'Actividad')}</label>
+            <select value={activity} onChange={(e) => setActivity(e.target.value)} className="nutri-select">
+              <option value="sedentary">{t('nutrify.sedentary', 'Sedentario')}</option>
+              <option value="light">{t('nutrify.light', 'Ligero')}</option>
+              <option value="moderate">{t('nutrify.moderate', 'Moderado')}</option>
+              <option value="active">{t('nutrify.active', 'Activo')}</option>
             </select>
-          </label>
-        </div>
-      </div>
-
-      {/* Goal */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">{t('nutrify.goal')}</div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {(['deficit', 'maintain', 'surplus'] as Goal[]).map((g) => (
-            <button key={g} className="rpg-button" onClick={() => setGoal(g)}
-              style={{ flex: 1, opacity: goal === g ? 1 : 0.5 }}>
-              {t(`nutrify.goal_${g}`)}
-            </button>
-          ))}
+          </div>
         </div>
 
-        {goal !== 'maintain' && (
-          <label style={labelStyle}>
-            {t('nutrify.goalAmount')} (kcal)
-            <input type="number" value={goalAmount} onChange={(e) => setGoalAmount(+e.target.value)}
-              className="rpg-input" min={100} max={1500} step={50} />
-            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-              {goal === 'deficit' ? t('nutrify.goalAmountDeficitHint') : t('nutrify.goalAmountSurplusHint')}
-            </span>
-          </label>
+        {/* TDEE display */}
+        {bmr > 0 && (
+          <div className="nutri-tdee-display">
+            <div>
+              <div className="tdee-label">{t('nutrify.tdeeCalculated', 'TDEE calculado')}</div>
+              <span className="nutri-field-hint">{t('nutrify.tdeeDesc', 'Energía total diaria según tu nivel de actividad')}</span>
+            </div>
+            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              <span className="tdee-val">{tdee.toLocaleString()}</span>{' '}
+              <span className="tdee-unit">kcal/{t('nutrify.today', 'hoy').toLowerCase().charAt(0) === 'h' ? 'día' : 'day'}</span>
+              <div className="nutri-field-hint">
+                BMR {bmr.toLocaleString()} {'\u00d7'}{multiplier} {t('nutrify.activityLevel', 'actividad').toLowerCase()}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Weight check-in */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 12, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={weightPopupEnabled}
-            onChange={(e) => setWeightPopupEnabled(e.target.checked)}
-            style={{ width: 18, height: 18, accentColor: 'var(--rpg-gold)' }}
-          />
-          {t('nutrify.weightPopupEnabled', 'Recordatorio de pesaje')}
-        </label>
+      {/* ── Goal ── */}
+      <div className="nutri-card">
+        <HelpBubble text={t('nutrify.goalHelp', 'Déficit: menos que TDEE para bajar. Mantenimiento: igual. Superávit: más para ganar masa.')} />
+        <h3 className="nutri-card-title">
+          <span className="nutri-t-ico">{'\u25ce'}</span> {t('nutrify.goal', 'Objetivo')}
+        </h3>
+
+        <div className="nutri-goal-toggle">
+          {(['deficit', 'maintain', 'surplus'] as Goal[]).map((g) => (
+            <button key={g} className={`nutri-goal-opt${goal === g ? ' active' : ''}`} onClick={() => setGoal(g)}>
+              <span className="opt-ico">{GOAL_ICONS[g]}</span> {t(`nutrify.goal_${g}`)}
+            </button>
+          ))}
+        </div>
+        <p className="nutri-goal-desc">{t(`nutrify.goalDesc_${goal}`)}</p>
+
+        {goal !== 'maintain' && (
+          <div style={{ marginTop: 14 }}>
+            <div className="nutri-field">
+              <label className="nutri-label">{t('nutrify.goalAmount', 'Cantidad')} (kcal)</label>
+              <input type="number" value={goalAmount} onChange={(e) => setGoalAmount(+e.target.value)}
+                className="nutri-input-box" min={100} max={1500} step={50} />
+              <span className="nutri-field-hint">
+                {goal === 'deficit' ? t('nutrify.goalAmountDeficitHint') : t('nutrify.goalAmountSurplusHint')}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {tdee > 0 && (
+          <div className="nutri-daily-target-preview">
+            {t('nutrify.dailyTarget', 'Daily target')}:{' '}
+            <strong>{Math.round(tdee + (goal === 'deficit' ? -goalAmount : goal === 'surplus' ? goalAmount : 0))} kcal</strong>
+            <span className="nutri-target-breakdown">
+              (TDEE {tdee} {goal === 'deficit' ? '-' : goal === 'surplus' ? '+' : '\u00b1'} {goal === 'maintain' ? 0 : goalAmount})
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Meal Schedule ── */}
+      <div className="nutri-card">
+        <HelpBubble text={t('nutrify.mealScheduleHelp', 'Horarios de cada comida. Al registrar un alimento, el sistema asigna el momento según la hora actual.')} />
+        <h3 className="nutri-card-title">
+          <span className="nutri-t-ico">{'\u2615'}</span> {t('nutrify.mealSchedule', 'Horario de comidas')}
+          <span className="nutri-card-subtitle">{t('nutrify.mealScheduleDesc', 'Configurá los horarios de cada comida')}</span>
+        </h3>
+        <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} />
+      </div>
+
+      {/* ── Weight Reminder ── */}
+      <div className="nutri-card">
+        <HelpBubble text={t('nutrify.weightReminderHelp', 'Te recuerda pesarte el día configurado. Pesarte regularmente mejora la precisión del TDEE.')} />
+        <h3 className="nutri-card-title">
+          <span className="nutri-t-ico">{'\u25f7'}</span> {t('nutrify.weightReminderTitle', 'Recordatorio de Pesaje')}
+        </h3>
+
+        <div
+          className={`nutri-check${weightPopupEnabled ? ' active' : ''}`}
+          onClick={() => setWeightPopupEnabled(!weightPopupEnabled)}
+        >
+          <div className="nutri-check-box">{weightPopupEnabled ? '\u2713' : ''}</div>
+          <div className="nutri-check-label">{t('nutrify.enableWeeklyReminder', 'Activar recordatorio semanal')}</div>
+        </div>
+
         {weightPopupEnabled && (
-          <label style={labelStyle}>
-            {t('nutrify.weightCheckDay')}
-            <select value={weightCheckDay} onChange={(e) => setWeightCheckDay(+e.target.value)} className="rpg-input">
+          <div className="nutri-field" style={{ marginTop: 12 }}>
+            <label className="nutri-label">{t('nutrify.weightCheckDay', 'Día de pesaje semanal')}</label>
+            <select value={weightCheckDay} onChange={(e) => setWeightCheckDay(+e.target.value)} className="nutri-select">
               {[1, 2, 3, 4, 5, 6, 7].map(d => (
                 <option key={d} value={d}>{t(`nutrify.weekdays.${d}`)}</option>
               ))}
             </select>
-          </label>
+          </div>
         )}
       </div>
 
-      {/* Save */}
+      {/* ── Save ── */}
       {saveError && (
-        <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', marginBottom: 8 }}>{saveError}</p>
+        <p style={{ color: 'var(--rubric)', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{saveError}</p>
       )}
-      <button className="rpg-button" onClick={handleSave} disabled={saving}
-        style={{ width: '100%', padding: '10px', fontSize: '1rem' }}>
-        {saving ? t('common.loading') : saved ? '✓ ' + t('nutrify.saved') : t('nutrify.saveProfile')}
+      <button className="nutri-action-bar" onClick={handleSave} disabled={saving}>
+        {saving ? t('common.loading') : saved ? '\u2713 ' + t('nutrify.saved') : t('nutrify.saveProfile')}
       </button>
     </div>
   );

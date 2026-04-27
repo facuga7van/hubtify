@@ -1,104 +1,1670 @@
-/* ── Nutrify Module Styles ── */
+/* ========================================================
+   Nutrify — Medieval Codex Theme
+   Uses codex tokens from hub/styles/theme.css
+   ======================================================== */
 
-/* Keyframes */
-@keyframes nutriPulseGold {
-  0%, 100% { outline-color: var(--rpg-gold); }
-  50% { outline-color: var(--rpg-gold-light); box-shadow: 0 0 6px rgba(201, 168, 76, 0.4); }
-}
+/* ── Keyframes ──────────────────────────────────────────── */
 
 @keyframes nutriShimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-/* ── Skeleton Loading ── */
-.nutri-skeleton {
-  background: linear-gradient(90deg, var(--rpg-parchment-dark) 25%, var(--rpg-parchment-light) 50%, var(--rpg-parchment-dark) 75%);
-  background-size: 200% 100%;
-  animation: nutriShimmer 1.5s ease infinite;
-  border-radius: var(--rpg-radius);
+@keyframes nutriPulseGold {
+  0%, 100% { outline-color: var(--gold); }
+  50% { outline-color: var(--gold-light); box-shadow: 0 0 6px rgba(201, 168, 76, 0.4); }
 }
 
-.nutri-skeleton--bar {
-  height: 22px;
-  width: 100%;
+@keyframes nutri-todayPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(122, 30, 30, 0.4), inset 1px 1px 0 rgba(255, 230, 180, 0.45); }
+  50%      { box-shadow: 0 0 14px rgba(122, 30, 30, 0.8), inset 1px 1px 0 rgba(255, 230, 180, 0.45); }
 }
 
-.nutri-skeleton--text {
-  height: 14px;
-  width: 65%;
+
+/* ═══════════════════════════════════════════════════════════
+   1. PAGE LAYOUT
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-page {
+  padding: 24px 28px 32px;
 }
 
-.nutri-skeleton--number {
-  height: 24px;
-  width: 80px;
+.nutri-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--ink-faded);
+  margin-bottom: 18px;
 }
 
-.nutri-skeleton--chart {
-  height: 250px;
-  width: 100%;
-}
-
-.nutri-skeleton--card {
-  height: 80px;
-  width: 100%;
-}
-
-/* ── Inline Edit Pulse ── */
-.nutri-pulse-gold {
-  animation: nutriPulseGold 1.5s infinite;
-  outline: 1px solid var(--rpg-gold);
-  outline-offset: -1px;
-  border-radius: var(--rpg-radius);
-}
-
-/* ── Toast ── */
-.nutri-toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 12px 20px;
-  background: var(--rpg-wood);
-  color: var(--rpg-gold-light);
-  border: 2px solid var(--rpg-gold);
-  border-radius: var(--rpg-radius);
-  box-shadow: 0 4px 20px rgba(44, 24, 16, 0.5);
-  font-family: 'Fira Code', monospace;
-  font-size: 0.9rem;
-  z-index: 1000;
+.nutri-page-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-accent);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.nutri-toast--success {
-  border-color: var(--rpg-xp-green);
-  box-shadow: 0 0 8px rgba(45, 90, 39, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+.nutri-title-ico {
+  color: var(--rubric);
+  font-size: var(--fs-nav);
 }
 
-.nutri-toast--info {
-  border-color: var(--rpg-gold);
-  box-shadow: 0 0 8px rgba(201, 168, 76, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+.nutri-page-sub {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+  margin-top: 2px;
 }
 
-.nutri-toast--warning {
-  border-color: #e67e22;
-  box-shadow: 0 0 8px rgba(230, 126, 34, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+.nutri-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.nutri-toast__icon {
+
+/* ═══════════════════════════════════════════════════════════
+   2. BUTTONS
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-btn {
+  font-family: 'IM Fell English SC', serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  color: var(--gold);
+  background: linear-gradient(180deg, var(--ink-soft), var(--ink));
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  padding: 6px 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(168, 138, 60, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.nutri-btn:hover {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: var(--ink);
+}
+
+.nutri-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.nutri-icon-only {
+  padding: 5px 8px;
+}
+
+.nutri-btn-primary {
+  font-size: var(--fs-label);
+  padding: 10px 16px;
+  background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.nutri-btn-primary:hover {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: var(--ink);
+}
+
+.nutri-btn-ghost {
+  background: transparent;
+  color: var(--ink-faded);
+  border-color: var(--ink-faded);
+  box-shadow: none;
+}
+
+.nutri-btn-ghost:hover {
+  background: rgba(74, 55, 32, 0.08);
+  color: var(--ink);
+}
+
+.nutri-btn.ghost {
+  background: transparent;
+  color: var(--ink-faded);
+  border-color: var(--ink-faded);
+  box-shadow: none;
+}
+
+.nutri-btn.ghost:hover {
+  background: rgba(74, 55, 32, 0.08);
+  color: var(--ink);
+}
+
+.nutri-btn-danger {
+  background: linear-gradient(180deg, var(--rubric-light), var(--rubric));
+  color: var(--parch-0);
+  border-color: var(--rubric);
+}
+
+.nutri-btn-danger:hover {
+  background: linear-gradient(180deg, var(--rubric), #5a1515);
+  color: var(--parch-0);
+}
+
+.nutri-btn-sm {
+  font-size: calc(var(--fs-label) * 0.85) !important;
+  padding: 3px 8px !important;
+  letter-spacing: 0.04em !important;
+  margin-left: auto;
+}
+
+
+/* ── Full-width action bar ── */
+
+.nutri-action-bar {
+  width: 100%;
+  padding: 12px 16px;
+  font-family: 'IM Fell English SC', serif;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: var(--fs-label);
+  color: var(--gold);
+  background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(168, 138, 60, 0.25);
+  transition: all 180ms ease;
+  margin-bottom: 20px;
+}
+
+.nutri-action-bar:hover {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: var(--ink);
+}
+
+.nutri-action-bar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   3. HERO CALORIE CARD
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-hero {
+  margin-bottom: 16px;
+}
+
+.nutri-hero-card {
+  background:
+    linear-gradient(180deg, rgba(245, 231, 192, 0.6), rgba(232, 213, 163, 0.5));
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 4px;
+  padding: 16px 20px;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.12),
+    inset 0 0 20px rgba(168, 138, 60, 0.1);
+  position: relative;
+}
+
+/* inner double-border line */
+.nutri-hero-card::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168, 138, 60, 0.25);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+
+/* ── Date navigation bar ── */
+
+.nutri-date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.nutri-day-btn {
+  width: 28px;
+  height: 28px;
+  font-family: 'IM Fell English SC', serif;
+  background: linear-gradient(180deg, var(--ink-soft), var(--ink));
+  border: 1.5px solid var(--gold);
+  color: var(--gold);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: var(--fs-quote);
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: background 150ms ease;
+}
+
+.nutri-day-btn:hover {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: var(--ink);
+}
+
+.nutri-day-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.nutri-date-pill {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 5px 14px;
+  background: rgba(245, 231, 192, 0.6);
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.nutri-date-pill:not(:disabled):hover {
+  background: rgba(168, 138, 60, 0.15);
+}
+
+.nutri-date-pill:disabled {
+  cursor: default;
+}
+
+.nutri-pending-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--rubric);
+  color: var(--parch-0);
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ink);
+}
+
+.nutri-pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  background: rgba(122, 30, 30, 0.12);
+  border: 1px solid rgba(122, 30, 30, 0.3);
+  border-radius: 3px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  font-style: italic;
+}
+
+
+/* ── Calorie ring + details ── */
+
+.nutri-cal-main {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.nutri-cal-ring {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  display: grid;
+  place-items: center;
+}
+
+.nutri-ring-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.nutri-ring-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-hero);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.nutri-ring-unit {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.2em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.nutri-ring-sub {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 3px;
+}
+
+
+/* ── Calorie details ── */
+
+.nutri-cal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutri-cal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nutri-cal-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-cal-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nutri-cal-val.green { color: var(--moss); }
+.nutri-cal-val.red   { color: var(--rubric); }
+
+.nutri-cal-pct {
+  color: var(--gold-dark);
+}
+
+.nutri-cal-hint {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* ── Status message ── */
+
+.nutri-status-message {
+  text-align: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin: 10px 0 0;
+  padding: 0 12px;
+}
+
+.nutri-status--good { color: var(--moss); }
+.nutri-status--warn { color: #e67e22; }
+.nutri-status--bad  { color: var(--rubric); }
+.nutri-status--muted { color: var(--ink-faded); }
+
+
+/* ═══════════════════════════════════════════════════════════
+   4. CARDS
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-card {
+  background:
+    linear-gradient(180deg, rgba(245, 231, 192, 0.55), rgba(232, 213, 163, 0.4));
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 4px;
+  padding: 14px 18px;
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.1),
+    inset 0 0 16px rgba(168, 138, 60, 0.04);
+  margin-bottom: 14px;
+  position: relative;
+}
+
+/* medieval double-border for chart cards */
+.nutri-card.medieval {
+  border-width: 2px;
+  border-color: var(--gold-dark);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    inset 0 0 25px rgba(138, 106, 61, 0.06);
+}
+
+.nutri-card.medieval::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168, 138, 60, 0.35);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.nutri-card-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-t-ico {
+  color: var(--rubric);
+  font-size: var(--fs-label);
+}
+
+.nutri-card-title .t-ico {
+  color: var(--rubric);
+  font-size: var(--fs-label);
+}
+
+.nutri-card-meta {
+  margin-left: auto;
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  letter-spacing: 0;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.nutri-card-subtitle {
+  margin-left: auto;
+  margin-right: 22px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  letter-spacing: 0;
+  font-weight: 400;
+  text-transform: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   5. FOOD INPUT
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-food-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.nutri-text-input {
+  font-family: 'IM Fell English', serif;
+  font-size: calc(var(--fs-quote) * var(--font-scale));
+  background: rgba(245, 231, 192, 0.7);
+  border: 1.5px solid var(--ink-faded);
+  border-radius: 3px;
+  padding: 9px 12px;
+  color: var(--ink);
+  width: 100%;
+  box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.08);
+  outline: none;
+}
+
+.nutri-text-input:focus {
+  border-color: var(--gold);
+  box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.08), 0 0 0 2px rgba(168, 138, 60, 0.3);
+}
+
+.nutri-text-input::placeholder {
+  color: var(--ink-faded);
+  font-style: italic;
+}
+
+
+/* ── Input mode toggle (AI / Manual) ── */
+
+.nutri-input-mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.nutri-mode-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--ink-faded);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  padding: 2px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.nutri-mode-btn.active {
+  color: var(--ink);
+  border-color: var(--gold);
+  background: rgba(168, 138, 60, 0.08);
+}
+
+.nutri-manual-inputs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.nutri-manual-cal {
+  width: 100px;
+  flex-shrink: 0;
+}
+
+
+/* ── Estimation result ── */
+
+.nutri-estimation {
+  margin-top: 12px;
+  padding: 10px 0 0;
+  border-top: 1px dashed var(--ink-faded);
+}
+
+.nutri-est-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.nutri-est-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 2px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+}
+
+.nutri-food-name { color: var(--ink); }
+.nutri-food-kcal {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  font-weight: 600;
+}
+
+.nutri-est-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ink-faded);
+}
+
+.nutri-est-total-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  letter-spacing: 0.06em;
+}
+
+.nutri-est-total-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nutri-total-input {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-quote);
+  font-weight: 700;
+  padding: 4px 10px;
+  width: 80px;
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  background: rgba(245, 231, 192, 0.7);
+  color: var(--ink);
+  text-align: right;
+}
+
+.nutri-est-unit {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-est-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.nutri-estimate-error {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(122, 30, 30, 0.12);
+  border: 1px solid rgba(122, 30, 30, 0.35);
+  border-radius: 3px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  font-style: italic;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   6. MEAL LOG
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-meal-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto 26px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.3);
+  transition: background 200ms ease;
+}
+
+.nutri-meal-row:last-child { border-bottom: none; }
+
+.nutri-meal-row:hover {
+  background: rgba(168, 138, 60, 0.05);
+}
+
+.nutri-meal-ico {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(168, 138, 60, 0.18), rgba(138, 106, 61, 0.1));
+  border: 1px solid rgba(138, 106, 61, 0.25);
+  font-size: var(--fs-quote);
+}
+
+.nutri-meal-name {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+}
+
+.nutri-meal-time {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-meal-kcal {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.nutri-meal-del {
+  background: transparent;
+  border: none;
+  color: var(--rubric);
+  cursor: pointer;
+  font-size: var(--fs-quote);
+  opacity: 0.4;
+  transition: opacity 150ms ease;
+}
+
+.nutri-meal-del:hover { opacity: 1; }
+
+.nutri-empty {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* ── Meal group headers (N5) ── */
+
+.nutri-meal-group {
+  margin-bottom: 4px;
+}
+
+.nutri-meal-group:last-child {
+  margin-bottom: 0;
+}
+
+.nutri-meal-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 4px;
+  margin-top: 6px;
+  border-bottom: 1px solid rgba(168, 138, 60, 0.25);
+}
+
+.nutri-meal-group:first-child .nutri-meal-group-header {
+  margin-top: 0;
+}
+
+.nutri-meal-group-emoji {
+  font-size: var(--fs-quote);
+}
+
+.nutri-meal-group-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.nutri-meal-group-kcal {
+  margin-left: auto;
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  font-weight: 600;
+}
+
+.nutri-meal-item-wrap {
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.3);
+}
+
+.nutri-meal-item-wrap:last-child { border-bottom: none; }
+
+.nutri-meal-item-wrap .nutri-meal-row {
+  border-bottom: none;
+}
+
+.nutri-breakdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 1px 4px;
+  margin-left: 4px;
+  cursor: pointer;
+  color: var(--ink-faded);
+  opacity: 0.5;
+  transition: opacity 150ms ease;
+  vertical-align: middle;
+}
+
+.nutri-breakdown-toggle:hover { opacity: 1; }
+
+.nutri-breakdown {
+  padding: 4px 12px 8px 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nutri-breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 8px;
+  border-left: 2px solid rgba(168, 138, 60, 0.3);
+}
+
+.nutri-breakdown-name {
+  font-family: 'IM Fell English', serif;
+  font-size: calc(var(--fs-label) * 0.95);
+  color: var(--ink-faded);
+}
+
+.nutri-breakdown-kcal {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(var(--fs-label) * 0.9);
+  color: var(--ink-faded);
+  font-weight: 600;
+}
+
+.nutri-pulse-gold {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  animation: nutriPulseGold 1.5s ease-in-out 2;
+  border-radius: 3px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   7. FREQUENT FOODS
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-frequent-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nutri-pill {
+  font-size: var(--fs-label) !important;
+  padding: 4px 10px !important;
+  letter-spacing: 0.04em !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   8. CLOSE DAY
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-close-day {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.nutri-close-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.nutri-close-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.nutri-cs-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+}
+
+.nutri-cs-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.nutri-cs-val.green { color: var(--moss); }
+.nutri-cs-val.red { color: var(--rubric); }
+.nutri-cs-val.gold { color: var(--gold-dark); }
+
+.nutri-cs-pct { color: var(--gold-dark); }
+
+.nutri-cs-sub {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 1px;
+}
+
+
+/* ── Reward breakdown ── */
+
+.nutri-reward-card {
+  padding: 12px 16px;
+  background: linear-gradient(180deg, rgba(168, 138, 60, 0.18), rgba(168, 138, 60, 0.04));
+  border: 1.5px solid rgba(168, 138, 60, 0.4);
+  border-radius: 4px;
+  min-width: 170px;
+}
+
+.nutri-reward-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  margin-bottom: 6px;
+}
+
+.nutri-reward-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.25);
+}
+
+.nutri-reward-row:last-child { border-bottom: none; }
+
+.nutri-reward-desc {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-left: 4px;
+}
+
+.nutri-reward-xp {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.nutri-reward-xp.green { color: var(--moss); }
+
+.nutri-reward-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid var(--ink-faded);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.nutri-reward-xp-total {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 700;
+}
+
+.nutri-reward-xp-total .green { color: var(--moss); }
+.nutri-reward-xp-total .red { color: var(--rubric); }
+
+
+/* ── Day status labels ── */
+
+.nutri-day-status {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  margin-bottom: 8px;
+}
+
+.nutri-day-success {
+  color: var(--moss);
+}
+
+.green { color: var(--moss); }
+.red { color: var(--rubric); }
+
+
+/* ═══════════════════════════════════════════════════════════
+   9. POPUPS (Weight / Close Day)
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 12, 5, 0.65);
+  display: grid;
+  place-items: center;
+  z-index: var(--z-overlay);
+}
+
+.nutri-popup {
+  background:
+    linear-gradient(180deg, var(--parch-0), var(--parch-1));
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  padding: 24px 28px;
+  max-width: 380px;
+  width: 90%;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 0 30px rgba(138, 106, 61, 0.15);
+}
+
+.nutri-popup-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-quote);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.08em;
+  margin: 0 0 12px;
+}
+
+.nutri-popup-hint {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin: 0 0 12px;
+}
+
+.nutri-popup-error {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  margin: 0 0 8px;
+}
+
+.nutri-popup-summary {
+  margin-bottom: 14px;
+  padding: 10px;
+  background: rgba(245, 231, 192, 0.5);
+  border: 1px dashed var(--ink-faded);
+  border-radius: 3px;
+}
+
+.nutri-popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.nutri-popup-row--border {
+  border-top: 1px dashed var(--ink-faded);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.nutri-popup-label {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-popup-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.nutri-popup-val.green { color: var(--moss); }
+.nutri-popup-val.red { color: var(--rubric); }
+
+.nutri-popup-prompt {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin: 8px 0 0;
+}
+
+.nutri-popup-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.nutri-popup-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   10. CONFIG / SETTINGS
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-config-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.nutri-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nutri-field.span-2 { grid-column: span 2; }
+
+.nutri-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  font-weight: 600;
+}
+
+.nutri-field-hint {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-select,
+.nutri-input-box {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  background: rgba(245, 231, 192, 0.6);
+  border: 1.5px solid var(--ink-faded);
+  border-radius: 3px;
+  padding: 8px 12px;
+  color: var(--ink);
+  width: 100%;
+  outline: none;
+  box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.06);
+  appearance: none;
+}
+
+.nutri-select:focus,
+.nutri-input-box:focus {
+  border-color: var(--gold);
+  box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.06), 0 0 0 2px rgba(168, 138, 60, 0.3);
+}
+
+
+/* ── TDEE display ── */
+
+.nutri-tdee-display {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(168, 138, 60, 0.1), rgba(168, 138, 60, 0.03));
+  border: 1px dashed rgba(168, 138, 60, 0.4);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tdee-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+}
+
+.tdee-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tdee-unit {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+
+/* ── TDEE preview (onboarding) ── */
+
+.nutri-tdee-preview {
+  text-align: center;
+  padding: 10px;
+  margin-top: 12px;
+  background: rgba(168, 138, 60, 0.06);
+  border: 1px dashed var(--gold);
+  border-radius: 4px;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.nutri-tdee-preview p {
+  margin: 4px 0;
+}
+
+.nutri-tdee-preview strong {
+  color: var(--gold);
+}
+
+
+/* ── Daily target preview (settings) ── */
+
+.nutri-daily-target-preview {
+  margin-top: 12px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-body);
+}
+
+.nutri-daily-target-preview strong {
+  color: var(--gold);
+  margin-left: 4px;
+}
+
+.nutri-target-breakdown {
+  opacity: 0.75;
+  font-size: var(--fs-label);
+  margin-left: 6px;
+}
+
+
+/* ── Goal toggle ── */
+
+.nutri-goal-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: rgba(245, 231, 192, 0.5);
+  border: 1.5px solid var(--ink-faded);
+  border-radius: 3px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.nutri-goal-opt {
+  padding: 10px 10px;
+  font-family: 'IM Fell English SC', serif;
+  font-weight: 700;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 150ms ease;
+}
+
+.nutri-goal-opt .opt-ico {
+  font-size: var(--fs-quote);
+  color: var(--gold-dark);
+}
+
+.nutri-goal-opt.active {
+  background: linear-gradient(180deg, var(--ink-soft), var(--ink));
+  color: var(--gold);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(168, 138, 60, 0.25);
+  border: 1px solid var(--gold);
+}
+
+.nutri-goal-opt.active .opt-ico { color: var(--gold); }
+
+.nutri-goal-desc {
+  text-align: center;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 4px;
+}
+
+
+/* ── Weight reminder checkbox ── */
+
+.nutri-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.nutri-check-box {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  background: rgba(245, 231, 192, 0.7);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 1px 2px rgba(42, 29, 14, 0.1);
+  color: var(--moss);
+  font-weight: 900;
+  font-size: var(--fs-label);
+}
+
+.nutri-check.active .nutri-check-box {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.nutri-check-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   11. CHARTS PAGE
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.nutri-chart-card { margin-bottom: 0; }
+.nutri-chart-card .nutri-card-title { margin-bottom: 4px; }
+.nutri-chart-card .chart-sub {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-bottom: 8px;
+}
+
+
+/* ── KPI strip ── */
+
+.nutri-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.nutri-kpi {
+  background:
+    linear-gradient(180deg, rgba(245, 231, 192, 0.7), rgba(232, 213, 163, 0.5));
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 3px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+/* scroll curled edges */
+.nutri-kpi.scroll-kpi::before,
+.nutri-kpi.scroll-kpi::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 5px;
+  pointer-events: none;
+}
+
+.nutri-kpi.scroll-kpi::before {
+  left: -1px;
+  background: linear-gradient(90deg, rgba(42, 29, 14, 0.25), transparent);
+  border-left: 2px solid var(--ink-soft);
+}
+
+.nutri-kpi.scroll-kpi::after {
+  right: -1px;
+  background: linear-gradient(270deg, rgba(42, 29, 14, 0.25), transparent);
+  border-right: 2px solid var(--ink-soft);
+}
+
+.nutri-kpi-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, var(--ink-soft), var(--ink));
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  font-size: var(--fs-quote);
+}
+
+.nutri-kpi-icon.seal-icon {
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light), var(--rubric) 70%);
+  color: var(--parch-0);
+  border: 1.5px solid var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(168, 138, 60, 0.25);
+  font-family: 'IM Fell English SC', serif;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+.nutri-kpi-body { display: flex; flex-direction: column; }
+
+.nutri-kpi-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-kpi-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.nutri-kpi-delta {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--moss);
+  margin-top: 2px;
+}
+
+.nutri-kpi-delta.down { color: var(--rubric); }
+
+
+/* ── Range tabs ── */
+
+.nutri-range-tabs {
+  display: inline-flex;
+  border: 1.5px solid var(--ink-faded);
+  border-radius: 3px;
+  padding: 2px;
+  background: rgba(245, 231, 192, 0.5);
+  gap: 2px;
+}
+
+.nutri-range-tab {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  color: var(--ink-faded);
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 150ms ease;
+}
+
+.nutri-range-tab.active {
+  background: linear-gradient(180deg, var(--ink-soft), var(--ink));
+  color: var(--gold);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   12. SKELETON LOADING
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-skeleton {
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(168, 138, 60, 0.1) 25%, rgba(168, 138, 60, 0.3) 50%, rgba(168, 138, 60, 0.1) 75%);
+  background-size: 200% 100%;
+  animation: nutriShimmer 1.5s infinite;
+}
+
+.nutri-skeleton--text {
+  height: 14px;
+  width: 100%;
+}
+
+.nutri-skeleton--bar {
+  height: 44px;
+  width: 100%;
+}
+
+.nutri-skeleton--card {
+  height: 64px;
+  width: 100%;
+}
+
+.nutri-skeleton--chart {
+  height: 180px;
+  width: 100%;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   13. FIELD VALIDATION ERRORS
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-field-error {
+  color: var(--rubric, #7a1e1e);
+  font-size: var(--fs-label, 13px);
+  font-style: italic;
+  display: block;
+  margin-top: 2px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   MEAL PICKER (FoodLogItem dropdown)
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-meal-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  background: var(--parch-0, #f5e7c0);
+  border: 1px solid var(--gold-dark, #8a7030);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px 0;
+  min-width: 130px;
+}
+
+.nutri-meal-picker-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label, 13px);
+  color: var(--ink, #2a1d0e);
+  transition: background 0.15s;
+}
+
+.nutri-meal-picker-opt:hover {
+  background: var(--parch-1, #e8d5a3);
+}
+
+.nutri-meal-picker-opt.active {
+  color: var(--gold-dark, #8a7030);
+  font-weight: 600;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   MEAL SCHEDULE EDITOR
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-meal-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutri-meal-schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  transition: opacity 0.2s;
+}
+
+.nutri-meal-schedule-row.disabled {
+  opacity: 0.45;
+}
+
+.nutri-meal-schedule-toggle {
+  cursor: pointer;
+}
+
+.nutri-meal-schedule-icon {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
-.nutri-toast__message {
+.nutri-meal-schedule-name {
   flex: 1;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body, 15px);
+  color: var(--ink, #2a1d0e);
+  min-width: 80px;
 }
 
-/* ── Stats Grid (Charts Dashboard) ── */
-.nutri-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+.nutri-meal-schedule-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nutri-meal-schedule-time {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label, 13px);
+  padding: 3px 6px;
+  border: 1px solid var(--gold-dark, #8a7030);
+  border-radius: 3px;
+  background: var(--parch-0, #f5e7c0);
+  color: var(--ink, #2a1d0e);
+  width: 90px;
+}
+
+.nutri-meal-schedule-sep {
+  color: var(--ink-faded, #7a6a55);
+  font-size: var(--fs-label, 13px);
+}
+
+.nutri-meal-schedule-catch {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label, 13px);
+  color: var(--ink-faded, #7a6a55);
+  font-style: italic;
+}
+
+.nutri-meal-overlap-warn {
+  color: var(--rubric);
+  font-size: var(--fs-label, 13px);
+  font-style: italic;
+  margin: 4px 0 0;
 }

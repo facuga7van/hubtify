@@ -3,14 +3,14 @@ import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import type { ToastData } from './useToast'
 
-// ── Border accent colours per type ────────────────────────────────────────────
+// ── Border accent colours per type (codex palette) ───────────────────────────
 const BORDER: Record<ToastData['type'], string> = {
-  xp:      '#d4a017',
-  coin:    '#b87333',
-  nutri:   '#27ae60',
-  success: '#27ae60',
-  warning: '#e67e22',
-  info:    '#2980b9',
+  xp:      'var(--moss)',
+  coin:    'var(--gold)',
+  nutri:   'var(--rubric)',
+  success: 'var(--moss)',
+  warning: 'var(--gold)',
+  info:    'var(--ink-soft)',
 }
 
 // ── Default icons per type ────────────────────────────────────────────────────
@@ -66,34 +66,39 @@ export default function Toast({ data, onDismiss, style }: Props) {
     <div
       ref={ref}
       onClick={onDismiss}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === 'Escape') onDismiss()
+      }}
       style={{
         display: 'flex',
         alignItems: 'flex-start',
         gap: 10,
         padding: '10px 14px',
-        background: 'linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 100%)',
-        border: `1px solid ${borderColor}`,
-        borderLeft: `4px solid ${borderColor}`,
-        borderRadius: 'var(--rpg-radius)',
-        boxShadow: 'var(--rpg-shadow)',
+        background: 'linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 100%)',
+        border: `1px solid var(--gold-dark)`,
+        borderLeft: `3px solid ${borderColor}`,
+        borderRadius: '6px',
+        boxShadow: '0 2px 8px rgba(42, 29, 14, 0.35)',
         cursor: 'pointer',
         minWidth: 240,
         maxWidth: 320,
         userSelect: 'none',
+        fontFamily: "'IM Fell English', serif",
         ...style,
       }}
     >
       {/* Icon */}
-      <span style={{ fontSize: '1.2rem', lineHeight: 1, flexShrink: 0, marginTop: 1 }}>
+      <span style={{ fontSize: 'var(--fs-nav)', lineHeight: 1, flexShrink: 0, marginTop: 1 }}>
         {resolvedIcon}
       </span>
 
       {/* Content */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{
-          fontFamily: 'Crimson Text, Georgia, serif',
-          fontSize: '0.9rem',
-          color: 'var(--rpg-ink)',
+          fontFamily: "'IM Fell English', serif",
+          fontSize: 'var(--fs-quote)',
+          color: 'var(--ink)',
           lineHeight: 1.3,
         }}>
           {data.message}
@@ -103,8 +108,8 @@ export default function Toast({ data, onDismiss, style }: Props) {
         {data.type === 'xp' && data.details && (
           <span style={{
             fontFamily: 'Fira Code, monospace',
-            fontSize: '0.72rem',
-            color: 'var(--rpg-ink-light)',
+            fontSize: 'var(--fs-label)',
+            color: 'var(--ink-faded)',
             opacity: 0.8,
           }}>
             {data.details.comboMultiplier != null && `×${data.details.comboMultiplier} combo`}

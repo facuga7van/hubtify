@@ -1,0 +1,473 @@
+/* ================================================================
+   Shared Chart Components — Codex Medieval Theme
+   Pure SVG + CSS charts for Hubtify
+   ================================================================ */
+
+/* ── Base Container ─────────────────────────────────── */
+.chart-container {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Circular Progress ──────────────────────────────── */
+.circular-progress {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-progress-svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.circular-progress-track {
+  fill: none;
+}
+
+.circular-progress-bar {
+  fill: none;
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.circular-progress-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* ── Castle Bar Chart ───────────────────────────────── */
+.castle-chart {
+  position: relative;
+  width: 100%;
+}
+
+.castle-chart-svg {
+  display: block;
+  width: 100%;
+}
+
+/* Stone texture patterns via gradient fills in SVG defs */
+.castle-bar {
+  transition: opacity 0.2s ease;
+}
+
+.castle-merlon {
+  /* Merlons inherit fill from parent bar status */
+}
+
+.castle-window {
+  fill: var(--ink);
+  stroke: var(--leather);
+  stroke-width: 0.3;
+}
+
+.castle-flag {
+  stroke: var(--leather);
+  stroke-width: 0.8;
+}
+
+.castle-goal-line {
+  stroke: var(--rubric);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 3;
+}
+
+.castle-label {
+  font-family: 'IM Fell English SC', serif;
+  font-weight: 700;
+  fill: var(--ink-soft);
+  letter-spacing: 1px;
+}
+
+.castle-value-label {
+  font-family: 'Fira Code', monospace;
+  font-weight: 700;
+  fill: var(--gold-light);
+}
+
+.castle-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+
+.castle-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.castle-legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border: 1px solid var(--ink-soft);
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 80% 100%, 60% 70%, 40% 100%, 20% 70%, 0 100%);
+}
+
+/* Simple (non-themed) bar styles */
+.castle-chart--simple .castle-chart-svg rect.simple-bar {
+  rx: 4;
+  ry: 4;
+}
+
+/* ── Treasure Line Chart ────────────────────────────── */
+.treasure-chart {
+  position: relative;
+  width: 100%;
+}
+
+.treasure-chart-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* Themed: parchment map look */
+.treasure-chart--themed .treasure-chart-wrap {
+  padding: 10px;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(138, 106, 61, 0.08), transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(138, 106, 61, 0.1), transparent 60%),
+    linear-gradient(180deg, var(--parch-0), var(--parch-2));
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  box-shadow: inset 0 0 18px rgba(74, 55, 32, 0.35);
+}
+
+.treasure-chart-svg {
+  display: block;
+  width: 100%;
+}
+
+.treasure-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.treasure-chart--themed .treasure-line {
+  stroke: var(--rubric);
+  stroke-dasharray: 6 3;
+}
+
+.treasure-chart--simple .treasure-line {
+  stroke: var(--gold-light);
+  stroke-dasharray: none;
+}
+
+.treasure-area {
+  opacity: 0.3;
+}
+
+.treasure-chart--themed .treasure-area {
+  fill: url(var(--area-gradient-ref));
+}
+
+.treasure-marker {
+  cursor: default;
+}
+
+.treasure-compass {
+  opacity: 0.8;
+}
+
+.treasure-flag {
+  /* Flag at "today" position */
+}
+
+.treasure-goal-line {
+  stroke: var(--moss);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  fill: none;
+}
+
+.treasure-x-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  fill: var(--ink-soft);
+  letter-spacing: 1px;
+}
+
+/* Map corners (burnt edges) */
+.treasure-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at center, transparent 40%, rgba(42, 29, 14, 0.55) 100%);
+  pointer-events: none;
+}
+
+.treasure-corner--tl { top: 0; left: 0; }
+.treasure-corner--tr { top: 0; right: 0; }
+.treasure-corner--bl { bottom: 0; left: 0; }
+.treasure-corner--br { bottom: 0; right: 0; }
+
+/* ── Heatmap Calendar ───────────────────────────────── */
+.heatmap-calendar {
+  width: 100%;
+}
+
+.heatmap-header {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.heatmap-divider {
+  border-bottom: 1px solid rgba(122, 30, 30, 0.35);
+  margin: 4px 0 8px;
+}
+
+.heatmap-day-label {
+  text-align: center;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--ink-faded);
+  letter-spacing: 0.5px;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+
+.heatmap-grid {
+  display: grid;
+  column-gap: 2px;
+  row-gap: 6px;
+  justify-items: center;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: 18px;
+  border-radius: 2px;
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  background: rgba(245, 231, 192, 0.6);
+  display: grid;
+  place-items: center;
+  font-size: 7px;
+  transition: box-shadow 0.2s ease;
+}
+
+.heatmap-cell--empty {
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+/* Themed: stone-carved cells (l0 only — other levels override below) */
+.heatmap-calendar--themed .heatmap-cell--l0 {
+  border: 1px solid var(--leather-light);
+  background: linear-gradient(135deg, rgba(245, 231, 192, 0.6), rgba(232, 213, 163, 0.4));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.25),
+    inset -1px -1px 0 rgba(42, 29, 14, 0.2);
+}
+
+/* Level colors */
+.heatmap-cell--l0 {
+  /* Base empty — inherits default */
+}
+
+.heatmap-cell--l1 {
+  background: rgba(168, 138, 60, 0.25);
+  border-color: rgba(168, 138, 60, 0.4);
+}
+
+.heatmap-cell--l2 {
+  background: rgba(168, 138, 60, 0.55);
+  border-color: rgba(168, 138, 60, 0.6);
+}
+
+.heatmap-cell--l3 {
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  border-color: var(--ink-soft);
+}
+
+.heatmap-cell--l4 {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  border-color: var(--ink-soft);
+}
+
+/* Themed stone-carved levels override */
+.heatmap-calendar--themed .heatmap-cell--l1 {
+  background: linear-gradient(135deg, #eacd85, #c9a75a);
+  border-color: var(--gold-dark);
+}
+
+.heatmap-calendar--themed .heatmap-cell--l2 {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  border-color: var(--ink-soft);
+}
+
+.heatmap-calendar--themed .heatmap-cell--l3 {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+  border-color: var(--ink-soft);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 215, 150, 0.35),
+    inset -1px -1px 0 rgba(42, 29, 14, 0.3);
+}
+
+.heatmap-calendar--themed .heatmap-cell--l4 {
+  background: linear-gradient(135deg, var(--gold-light), var(--leather-light));
+  border-color: var(--ink-soft);
+  box-shadow:
+    0 0 6px rgba(168, 138, 60, 0.5),
+    inset 1px 1px 0 rgba(255, 230, 180, 0.45),
+    inset -1px -1px 0 rgba(42, 29, 14, 0.35);
+}
+
+.heatmap-cell--miss {
+  background: rgba(122, 30, 30, 0.35);
+  border-color: rgba(122, 30, 30, 0.5);
+}
+
+.heatmap-calendar--themed .heatmap-cell--miss {
+  background: linear-gradient(135deg, rgba(122, 30, 30, 0.45), rgba(90, 20, 20, 0.55));
+  border-color: #4a0808;
+}
+
+.heatmap-cell--miss .heatmap-miss-mark {
+  color: var(--parch-0);
+  font-size: var(--fs-label);
+  font-weight: 900;
+  opacity: 0.85;
+}
+
+.heatmap-cell--today {
+  outline: 2px solid var(--rubric);
+  outline-offset: 1px;
+  animation: heatmapPulse 2s ease-in-out infinite;
+}
+
+.heatmap-cell--today .heatmap-today-mark {
+  color: var(--rubric);
+  font-size: var(--fs-label);
+  font-weight: 900;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Themed ornament on l4 cells */
+.heatmap-calendar--themed .heatmap-cell--l4 .heatmap-ornament {
+  color: var(--gold);
+  font-size: var(--fs-label);
+  text-shadow: 0 0 4px rgba(168, 138, 60, 0.6);
+}
+
+@keyframes heatmapPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 6px rgba(122, 30, 30, 0.4),
+      inset 1px 1px 0 rgba(255, 230, 180, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(122, 30, 30, 0.8),
+      inset 1px 1px 0 rgba(255, 230, 180, 0.45);
+  }
+}
+
+/* Legend */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.heatmap-legend-label {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.heatmap-legend-cell {
+  width: 14px !important;
+  height: 14px !important;
+  max-width: none !important;
+  aspect-ratio: auto !important;
+  border-radius: 2px;
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  display: inline-block;
+}
+
+.heatmap-legend-miss {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* ── Heatmap Tooltip ────────────────────────────────── */
+.heatmap-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%) translateY(-8px);
+  background: linear-gradient(135deg, var(--leather) 0%, var(--leather-dark) 100%);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: var(--fs-label);
+  color: var(--gold-light);
+  font-family: 'IM Fell English', serif;
+  white-space: pre-line;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(42, 29, 14, 0.5);
+  animation: heatmapTipIn 0.2s ease-out;
+}
+
+@keyframes heatmapTipIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(0);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%) translateY(-8px);
+  }
+}
+
+/* ── Reduced Motion ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .heatmap-cell--today {
+    animation: none;
+  }
+
+  .circular-progress-bar {
+    transition: none;
+  }
+}
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  .castle-legend,
+  .heatmap-legend {
+    font-size: var(--fs-label);
+    gap: 8px;
+  }
+
+  .heatmap-grid {
+    gap: 2px;
+  }
+}

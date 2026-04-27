@@ -10,6 +10,7 @@ import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
 import { TierBadge, tierXp, bonusMultiplierToTier } from '../utils';
 import { todayDateString } from '../../../../shared/date-utils';
 import { completeTask } from '../../../shared/animations/feedback';
+import { playTaskComplete } from '../../../shared/audio';
 
 interface Props {
   taskId: string;
@@ -18,9 +19,6 @@ interface Props {
   onShowToast: (data: XpToastData) => void;
   onSubtaskChanged: () => void;
 }
-
-// Duration of the QuillCheckbox draw animation (ms) — must match QuillCheckbox.tsx
-const QUILL_DRAW_MS = 300;
 
 export default function SubtaskList({ taskId, subtasks, countCompletedToday, onShowToast, onSubtaskChanged }: Props) {
   const { t } = useTranslation();
@@ -51,21 +49,20 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
     if (!subtask.status) {
       const today = todayDateString();
 
-      await window.api.questsSetSubtaskStatus(subtask.id, true, today);
-      const result = await window.api.processRpgEvent({
-        type: 'SUBTASK_COMPLETED', moduleId: 'quests',
-        payload: { xp: XP_MAP[tier], hp: 0, subtaskId: subtask.id, tier },
-        timestamp: Date.now(),
-      });
+      const [, result] = await Promise.all([
+        window.api.questsSetSubtaskStatus(subtask.id, true, today),
+        window.api.processRpgEvent({
+          type: 'SUBTASK_COMPLETED', moduleId: 'quests',
+          payload: { xp: XP_MAP[tier], hp: 0, subtaskId: subtask.id, tier },
+          timestamp: Date.now(),
+        }),
+      ]);
 
       const toastData: XpToastData = { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || null };
 
-      // Chain: quill animation (300ms) → strikethrough → toast
       if (rowEl && textEl) {
-        setTimeout(() => {
-          const tl = completeTask(rowEl, textEl);
-          tl.eventCallback('onComplete', () => onShowToast(toastData));
-        }, QUILL_DRAW_MS);
+        const tl = completeTask(rowEl, textEl);
+        tl.eventCallback('onComplete', () => onShowToast(toastData));
       } else {
         onShowToast(toastData);
       }
@@ -123,7 +120,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
         />
       ) : (
         <button className="rpg-button" disabled={atLimit} title={atLimit ? 'Max 30 subtasks reached' : undefined} onClick={() => setShowForm(true)}
-          style={{ fontSize: '0.8rem', padding: '4px 10px', marginTop: 6 }}>
+          style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', marginTop: 6 }}>
           {t('questify.addSubtask')}
         </button>
       )}
@@ -135,8 +132,8 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
           </button>
           {showCompleted && completed.map((subtask) => (
             <div key={subtask.id} className="subtask-item subtask-item--completed">
-              <Checkbox checked onChange={() => handleComplete(subtask)} />
-              <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{subtask.name}</span>
+              <div><Checkbox checked onChange={() => handleComplete(subtask)} /></div>
+              <span style={{ textDecoration: 'line-through', opacity: 0.7, flex: 1 }}>{subtask.name}</span>
             </div>
           ))}
         </div>
@@ -160,15 +157,17 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   const handleCheckboxComplete = useCallback(() => {
     if (animatingComplete) return;
     setAnimatingComplete(true);
-    setTimeout(() => {
-      onComplete(subtask, rowRef.current, textRef.current);
-    }, 500);
-  }, [animatingComplete, onComplete, subtask]);
+    playTaskComplete();
+  }, [animatingComplete]);
+
+  const handleDrawComplete = useCallback(() => {
+    onComplete(subtask, rowRef.current, textRef.current);
+  }, [onComplete, subtask]);
 
   return (
     <div ref={(el) => { setNodeRef(el); rowRef.current = el; }} style={style} {...attributes} className="subtask-item">
-      <div onPointerDown={(e) => e.stopPropagation()}>
-        <Checkbox checked={animatingComplete} onChange={handleCheckboxComplete} />
+      <div onPointerDown={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center' }}>
+        <Checkbox checked={animatingComplete} onChange={handleCheckboxComplete} onDrawComplete={handleDrawComplete} />
       </div>
       <div {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '0 4px', opacity: 0.3 }}>
         <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>
@@ -177,24 +176,24 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
         {subtask.name}
       </span>
       <TierBadge tier={subtask.tier} />
-      <span className="subtask-xp-hint" style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+      <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.7 }}>
         +{tierXp(subtask.tier)}
       </span>
       {confirmDelete ? (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
-          border: '1px solid var(--rpg-hp-red)', borderRadius: 'var(--rpg-radius)',
+          border: '1px solid var(--rubric)', borderRadius: '6px',
         }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--rpg-hp-red)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)', whiteSpace: 'nowrap' }}>
             {t('questify.subtaskDeleteConfirm')}
           </span>
           <button className="rpg-button" onClick={() => onDelete(subtask.id)}
-            style={{ background: 'var(--rpg-hp-red)', padding: '3px 10px', fontSize: '0.8rem' }}>
+            style={{ background: 'var(--rubric)', padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
             {t('questify.delete')}
           </button>
           <button className="rpg-button" onClick={() => setConfirmDelete(false)}
-            style={{ padding: '3px 10px', fontSize: '0.8rem', opacity: 0.7 }}>
+            style={{ padding: '3px 10px', fontSize: 'var(--fs-label)', opacity: 0.7 }}>
             {t('questify.cancel')}
           </button>
         </div>
@@ -203,7 +202,7 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
           style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
           onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
           onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
-          stroke="var(--rpg-hp-red)" strokeWidth="1.8" strokeLinecap="round">
+          stroke="var(--rubric)" strokeWidth="1.8" strokeLinecap="round">
           <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
         </svg>
       )}

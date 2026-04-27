@@ -4,6 +4,9 @@ import type { CreditCard, CreditCardStatement } from '../types';
 import CreditCardManager from './shared/CreditCardManager';
 import StatementDetail from './shared/StatementDetail';
 import { MonthNavigator } from './shared/MonthNavigator';
+import { Section, Rune } from '../../../shared/components/codex/CodexPrimitives';
+import HelpBubble from '../../../shared/components/HelpBubble';
+import { formatCurrency } from '../utils/format';
 
 function getStatementPeriodRange(month: string, closingDay: number): { from: string; to: string } {
   const [year, mon] = month.split('-').map(Number);
@@ -41,7 +44,6 @@ export default function CreditCards() {
   useEffect(() => { loadCards(); }, [loadCards]);
   useEffect(() => { loadStatements(); }, [loadStatements]);
 
-  // Reload data when account is switched
   useEffect(() => {
     const handler = () => { loadCards(); loadStatements(); };
     window.addEventListener('account:switched', handler);
@@ -61,9 +63,8 @@ export default function CreditCards() {
   };
 
   return (
-    <div className="coin-section">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 className="rpg-heading">{t('coinify.creditCards')}</h2>
+    <div>
+      <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
         <button className="rpg-button" onClick={() => setShowManager(true)}>
           {t('coinify.manageCreditCards')}
         </button>
@@ -72,55 +73,51 @@ export default function CreditCards() {
       <MonthNavigator month={month} onChange={setMonth} />
 
       <div style={{ marginTop: 16 }}>
-        <h3 className="rpg-heading" style={{ fontSize: '1rem' }}>{t('coinify.statements')}</h3>
+        <Section title={t('coinify.statements').toUpperCase()} rightSlot={<HelpBubble variant="inline" text={t('coinify.statementsHelp', 'Resumen por tarjeta: período de facturación, gastos del ciclo actual y estado de cierre.')} />}>
+          {cards.map((card) => {
+            const stmt = statements.find((s) => s.creditCardId === card.id);
+            const range = getStatementPeriodRange(month, card.closingDay);
 
-        {cards.map((card) => {
-          const stmt = statements.find((s) => s.creditCardId === card.id);
-          const range = getStatementPeriodRange(month, card.closingDay);
-
-          return (
-            <div key={card.id} className="rpg-card" style={{ marginBottom: 8, padding: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <span style={{ fontWeight: 'bold' }}>{card.name}</span>
-                  <span style={{ fontSize: '0.75rem', opacity: 0.7, marginLeft: 8 }}>
-                    {t('coinify.closingDay')}: {card.closingDay}
-                    {' · '}
-                    {`${range.from} → ${range.to}`}
-                  </span>
-                </div>
-
-                {stmt ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 'bold' }}>
-                      ${stmt.calculatedAmount.toLocaleString('es-AR')}
+            return (
+              <div key={card.id} className="coin-cc-card">
+                <div className="coin-cc-card__header">
+                  <div>
+                    <span className="qb-hand" style={{ fontWeight: 'bold' }}>{card.name}</span>
+                    <span className="qb-small-caps coin-cc-card__period">
+                      {t('coinify.closingDay')}: {card.closingDay}
+                      {' \u00B7 '}
+                      {`${range.from} \u2192 ${range.to}`}
                     </span>
-                    <span style={{
-                      fontSize: '0.75rem', padding: '2px 6px', borderRadius: 4,
-                      background: stmt.status === 'paid' ? 'var(--rpg-success, #4a7)' : 'var(--rpg-warning, #c84)',
-                      color: '#fff',
-                    }}>
-                      {stmt.status === 'paid' ? t('coinify.statementPaid') : t('coinify.statementPending')}
-                    </span>
-                    <button className="rpg-button" onClick={() => setSelectedStatement(stmt)}
-                      style={{ padding: '3px 8px', fontSize: '0.8rem' }}>
-                      {t('coinify.details')}
-                    </button>
                   </div>
-                ) : (
-                  <button className="rpg-button" onClick={() => handleGenerate(card.id)}
-                    style={{ fontSize: '0.8rem' }}>
-                    {t('coinify.generateStatement')}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
 
-        {cards.length === 0 && (
-          <p style={{ opacity: 0.6, fontStyle: 'italic' }}>{t('coinify.noStatements')}</p>
-        )}
+                  {stmt ? (
+                    <div className="coin-cc-card__stmt">
+                      <span className="qb-numeral" style={{ fontWeight: 'bold', fontSize: 'var(--fs-sub)' }}>
+                        {formatCurrency(stmt.calculatedAmount)}
+                      </span>
+                      <Rune tone={stmt.status === 'paid' ? 'sage' : 'rubric'}>
+                        {stmt.status === 'paid' ? t('coinify.statementPaid') : t('coinify.statementPending')}
+                      </Rune>
+                      <button className="rpg-button" onClick={() => setSelectedStatement(stmt)}
+                        style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>
+                        {t('coinify.details')}
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="rpg-button" onClick={() => handleGenerate(card.id)}
+                      style={{ fontSize: 'var(--fs-label)' }}>
+                      {t('coinify.generateStatement')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {cards.length === 0 && (
+            <p className="coin-empty-codex">{t('coinify.noStatements')}</p>
+          )}
+        </Section>
       </div>
 
       {showManager && (

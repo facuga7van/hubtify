@@ -1,0 +1,402 @@
+/* ====== Character Page — Ficha del Héroe ====== */
+
+/* ── two-column layout ─────────────────────────── */
+.hero-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 22px;
+}
+
+/* ── portrait panel (left column) ──────────────── */
+.hero-portrait-frame {
+  position: relative;
+  border: 1.5px solid rgba(74, 55, 32, 0.6);
+  padding: 16px 8px 8px;
+  background: rgba(245, 231, 192, 0.6);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 231, 192, 0.8),
+    0 3px 0 rgba(30, 19, 9, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-portrait-banner {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 20;
+}
+
+/* ── editable character name ──────────────────── */
+.hero-name-edit {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.hero-name-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+  padding: 4px 8px;
+  border-bottom: 1px dashed rgba(74, 55, 32, 0.4);
+  transition: border-color 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hero-name-button:hover {
+  border-bottom-color: var(--rubric);
+  color: var(--rubric);
+}
+
+.hero-name-placeholder {
+  font-style: italic;
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+}
+
+.hero-name-input {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+  background: rgba(245, 231, 192, 0.6);
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  padding: 4px 8px;
+  text-align: center;
+  width: 100%;
+  max-width: 200px;
+  outline: none;
+}
+
+.hero-name-input:focus {
+  border-color: var(--rubric);
+  box-shadow: 0 0 0 1px rgba(122, 30, 30, 0.2);
+}
+
+.hero-info {
+  text-align: center;
+  margin-top: 14px;
+}
+
+.hero-rank {
+  color: var(--rubric);
+}
+
+.hero-motto {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 3px;
+}
+
+/* ── HP / XP bars in portrait ─────────────────── */
+.hero-bars {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hero-bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-label);
+  margin-bottom: 3px;
+}
+
+.hero-bar-hint {
+  font-size: var(--fs-label);
+  margin-top: 2px;
+  color: var(--ink-faded);
+}
+
+/* ── wax seals row ────────────────────────────── */
+.hero-seals {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.hero-seal {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 50%, #5a0e0e 100%);
+  box-shadow:
+    inset -2px -3px 6px rgba(0, 0, 0, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-label);
+  color: var(--parch-0);
+}
+
+.hero-seals-hint {
+  text-align: center;
+  font-size: var(--fs-label);
+  margin-top: 4px;
+  color: var(--ink-faded);
+}
+
+/* ── virtues grid (2x3) ──────────────────────── */
+.hero-virtues-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+
+/* Tooltip span must stretch to fill grid cell */
+.hero-virtues-grid > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.hero-virtue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.hero-virtue-icon {
+  color: var(--rubric);
+  flex-shrink: 0;
+}
+
+.hero-virtue-body {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.hero-virtue-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-label);
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.hero-virtue-body .qb-gauge {
+  height: 14px;
+  width: 100%;
+}
+
+/* ── stats grid (4x2) ────────────────────────── */
+.hero-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.hero-stats-grid > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.hero-stats-grid .qb-stat-box {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── chronicle / gesta event list ─────────────── */
+.hero-chronicle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  column-gap: 24px;
+  font-size: var(--fs-quote);
+  font-family: 'IM Fell English', serif;
+}
+
+.hero-chronicle-row {
+  display: flex;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.35);
+}
+
+.hero-chronicle-icon {
+  color: var(--rubric);
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.hero-chronicle-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-chronicle-xp {
+  font-size: var(--fs-label);
+  color: var(--moss);
+  flex-shrink: 0;
+}
+
+/* ── title trail (progression path) ──────────── */
+.hero-title-trail {
+  position: relative;
+  padding: 18px 4px 4px;
+}
+
+.hero-title-trail-line {
+  position: absolute;
+  top: 32px;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 4px, transparent 4px 8px);
+  opacity: 0.5;
+}
+
+.hero-title-trail-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  position: relative;
+}
+
+.hero-title-trail-node {
+  text-align: center;
+}
+
+.hero-title-trail-dot {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-label);
+}
+
+.hero-title-trail-dot--current {
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  border: 1px solid var(--ink);
+  box-shadow: inset -1px -2px 4px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(245, 231, 192, 0.6);
+  color: var(--parch-0);
+}
+
+.hero-title-trail-dot--done {
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: var(--parch-0);
+}
+
+.hero-title-trail-dot--future {
+  background: var(--parch-1);
+  border: 1px dashed var(--ink-faded);
+  color: var(--ink-faded);
+}
+
+.hero-title-trail-label {
+  font-size: var(--fs-label);
+}
+
+.hero-title-trail-label--done {
+  color: var(--ink);
+}
+
+.hero-title-trail-label--future {
+  color: var(--ink-faded);
+}
+
+/* ── marginalia note ─────────────────────────── */
+.hero-marginalia {
+  position: absolute;
+  left: 10px;
+  bottom: -58px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  transform: rotate(1deg);
+}
+
+/* ── character customizer within codex ────────── */
+.hero-customizer {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.45);
+}
+
+.hero-customizer-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  color: var(--rubric);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-customizer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hero-customizer-label {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.hero-customizer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-customizer-value {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-quote);
+  min-width: 24px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.hero-customizer-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.6);
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.hero-customizer-btn:hover {
+  background: rgba(245, 231, 192, 0.8);
+}
+
+.hero-customizer-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+

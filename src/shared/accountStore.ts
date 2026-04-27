@@ -3,6 +3,7 @@ export interface CachedAccount {
   email: string;
   firebaseAppName: string;
   lastUsed: string;
+  username?: string;
 }
 
 const STORAGE_KEY = 'hubtify_accounts';

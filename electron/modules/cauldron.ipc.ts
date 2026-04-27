@@ -410,6 +410,72 @@ export function registerCauldronIpcHandlers(): void {
 
   // ─── Stats ───
 
+  ipcHandle('cauldron:getSessions', (_e, offset = 0, limit = 20) => {
+    const db = getDb();
+    const rows = db
+      .prepare(
+        `SELECT s.id, s.preset_id AS presetId, s.type, s.duration_minutes AS durationMinutes,
+                s.completed, s.started_at AS startedAt, s.completed_at AS completedAt,
+                p.name AS presetName
+         FROM cauldron_sessions s
+         LEFT JOIN cauldron_presets p ON s.preset_id = p.id
+         WHERE s.type = 'work' AND s.completed = 1 AND s.deleted_at IS NULL
+         ORDER BY s.started_at DESC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(limit + 1, offset) as Array<Record<string, unknown>>;
+
+    const hasMore = rows.length > limit;
+    const sessions = rows.slice(0, limit).map((r) => ({
+      id: r.id,
+      presetId: r.presetId,
+      type: r.type,
+      durationMinutes: r.durationMinutes,
+      completed: r.completed,
+      startedAt: r.startedAt,
+      completedAt: r.completedAt,
+      presetName: r.presetName ?? null,
+    }));
+
+    return { sessions, hasMore };
+  });
+
+  ipcHandle('cauldron:getWeeklyFocusTime', () => {
+    const db = getDb();
+    // Get Monday of current week
+    // SQLite: date('now', 'weekday 0', '-6 days') gives Monday
+    const rows = db
+      .prepare(
+        `WITH RECURSIVE dates(d, idx) AS (
+           SELECT date('now', 'weekday 1', '-7 days'), 0
+           UNION ALL
+           SELECT date(d, '+1 day'), idx + 1
+           FROM dates WHERE idx < 6
+         )
+         SELECT
+           dates.d AS day,
+           COALESCE(SUM(s.duration_minutes), 0) AS totalMinutes
+         FROM dates
+         LEFT JOIN cauldron_sessions s
+           ON date(s.started_at) = dates.d
+           AND s.type = 'work'
+           AND s.completed = 1
+           AND s.deleted_at IS NULL
+         GROUP BY dates.d
+         ORDER BY dates.d ASC`,
+      )
+      .all() as Array<{ day: string; totalMinutes: number }>;
+
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return rows.map((r) => {
+      const dt = new Date(r.day + 'T12:00:00');
+      return {
+        label: dayLabels[dt.getDay()],
+        value: r.totalMinutes,
+      };
+    });
+  });
+
   ipcHandle('cauldron:getStats', () => {
     const db = getDb();
 

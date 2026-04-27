@@ -18,14 +18,24 @@ export function CreditCardSelect({ value, onChange, className }: CreditCardSelec
     window.api.financeGetCreditCards().then((data) => {
       const typed = data as CreditCard[];
       setCards(typed);
-      if (typed.length > 0 && !value) {
-        onChange(typed[0].id);
-      }
     });
   }, []);
 
   useEffect(() => {
     loadCards();
+  }, [loadCards]);
+
+  // Auto-select first card when cards load and no value selected
+  useEffect(() => {
+    if (cards.length > 0 && !value) {
+      onChange(cards[0].id);
+    }
+  }, [cards, value, onChange]);
+
+  useEffect(() => {
+    const handler = () => loadCards();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
   }, [loadCards]);
 
   const handleChange = (val: string) => {

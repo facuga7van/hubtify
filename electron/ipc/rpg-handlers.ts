@@ -1,5 +1,5 @@
-import { ipcMain } from 'electron';
 import { getDb, runModuleMigrations } from './db';
+import { ipcHandle } from './ipc-handle';
 import {
   xpThreshold,
   getLevel,
@@ -45,13 +45,13 @@ function rowToStats(row: Record<string, unknown>): PlayerStats {
 }
 
 export function registerRpgHandlers(): void {
-  ipcMain.handle('rpg:getStats', (): PlayerStats => {
+  ipcHandle('rpg:getStats', (): PlayerStats => {
     const db = getDb();
     const row = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
     return row ? rowToStats(row) : defaultStats();
   });
 
-  ipcMain.handle('rpg:processEvent', (_e, event: RpgEvent) => {
+  ipcHandle('rpg:processEvent', (_e, event: RpgEvent) => {
     const db = getDb();
     const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED';
 
@@ -182,7 +182,7 @@ export function registerRpgHandlers(): void {
     }
   });
 
-  ipcMain.handle('rpg:getHistory', (_e, limit: number): RpgEventRecord[] => {
+  ipcHandle('rpg:getHistory', (_e, limit: number): RpgEventRecord[] => {
     const db = getDb();
     return db.prepare(
       `SELECT id, module_id AS moduleId, event_type AS eventType,
@@ -193,7 +193,7 @@ export function registerRpgHandlers(): void {
     ).all(limit) as RpgEventRecord[];
   });
 
-  ipcMain.handle('rpg:getDashboardStats', () => {
+  ipcHandle('rpg:getDashboardStats', () => {
     const db = getDb();
     const today = todayDateString();
 
@@ -224,16 +224,18 @@ export function registerRpgHandlers(): void {
     };
   });
 
-  ipcMain.handle('sync:restoreStats', (_e, stats: Record<string, unknown>) => {
+  ipcHandle('sync:restoreStats', (_e, stats: Record<string, unknown>) => {
     try {
       const db = getDb();
       db.prepare(`
-        UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?,
+        UPDATE player_stats SET level = ?, xp = ?, hp = ?, max_hp = ?, title = ?,
           streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?,
           total_tasks = ?, total_meals = ?, total_expenses = ?
         WHERE user_id = 'default'
       `).run(
-        stats.level ?? 1, stats.xp ?? 0, stats.hp ?? 100, stats.title ?? 'Campesino',
+        stats.level ?? 1, stats.xp ?? 0, stats.hp ?? 100,
+        stats.maxHp ?? stats.max_hp ?? 100,
+        stats.title ?? 'Campesino',
         stats.streak ?? 0, stats.dailyCombo ?? stats.daily_combo ?? 0,
         stats.comboDate ?? stats.combo_date ?? null,
         stats.streakLastDate ?? stats.streak_last_date ?? null,
@@ -248,7 +250,7 @@ export function registerRpgHandlers(): void {
     }
   });
 
-  ipcMain.handle('db:runMigrations', (_e, migrations) => {
+  ipcHandle('db:runMigrations', (_e, migrations) => {
     runModuleMigrations(migrations);
   });
 }

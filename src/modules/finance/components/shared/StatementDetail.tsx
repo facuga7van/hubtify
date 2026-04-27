@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CreditCardStatement } from '../../types';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
+import { formatCurrency } from '../../utils/format';
 
 interface Props {
   statement: CreditCardStatement;
@@ -20,6 +21,14 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
 
   useEffect(() => {
     window.api.financeGetStatementDetail(statement.id).then((d) => setDetail(d as typeof detail));
+  }, [statement.id]);
+
+  useEffect(() => {
+    const handler = () => {
+      window.api.financeGetStatementDetail(statement.id).then((d) => setDetail(d as typeof detail));
+    };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
   }, [statement.id]);
 
   const handlePay = async () => {
@@ -42,36 +51,36 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
 
         <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
           <div>
-            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{t('coinify.calculated')}</span>
-            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-              ${statement.calculatedAmount.toLocaleString('es-AR')}
+            <span style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>{t('coinify.calculated')}</span>
+            <div style={{ fontWeight: 'bold', fontSize: 'var(--fs-nav)' }}>
+              {formatCurrency(statement.calculatedAmount)}
             </div>
           </div>
           {statement.status === 'paid' && statement.paidAmount != null && (
             <div>
-              <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{t('coinify.paid')}</span>
-              <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                ${statement.paidAmount.toLocaleString('es-AR')}
+              <span style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>{t('coinify.paid')}</span>
+              <div style={{ fontWeight: 'bold', fontSize: 'var(--fs-nav)' }}>
+                {formatCurrency(statement.paidAmount)}
               </div>
             </div>
           )}
         </div>
 
-        <div style={{ borderTop: '1px solid var(--rpg-parchment-dark)', paddingTop: 8 }}>
+        <div style={{ borderTop: '1px solid var(--parch-1)', paddingTop: 8 }}>
           {detail?.transactions.map((tx) => (
             <div key={tx.id} style={{
               display: 'flex', justifyContent: 'space-between', padding: '4px 0',
-              fontSize: '0.85rem', borderBottom: '1px solid var(--rpg-parchment-dark)',
+              fontSize: 'var(--fs-label)', borderBottom: '1px solid var(--parch-1)',
             }}>
               <span>{tx.date} — {tx.description || tx.category}</span>
-              <span style={{ fontWeight: 'bold' }}>${tx.amount.toLocaleString('es-AR')}</span>
+              <span style={{ fontWeight: 'bold' }}>{formatCurrency(tx.amount)}</span>
             </div>
           ))}
         </div>
 
         {statement.status === 'pending' && (
           <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <label style={{ fontSize: '0.8rem' }}>{t('coinify.paidAmount')}:</label>
+            <label style={{ fontSize: 'var(--fs-label)' }}>{t('coinify.paidAmount')}:</label>
             <RpgNumberInput value={String(payAmount)}
               onChange={(v) => setPayAmount(parseFloat(v) || 0)}
               style={{ width: 130 }} step={0.01} min={0} />
@@ -82,7 +91,7 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
         )}
 
         {statement.status === 'paid' && (
-          <div style={{ marginTop: 12, textAlign: 'center', opacity: 0.7, fontStyle: 'italic' }}>
+          <div style={{ marginTop: 12, textAlign: 'center', opacity: 0.8, fontStyle: 'italic' }}>
             {t('coinify.statementPaid')} — {statement.paidDate}
           </div>
         )}

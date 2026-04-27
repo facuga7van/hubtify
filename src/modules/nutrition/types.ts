@@ -8,6 +8,7 @@ export interface NutritionProfile {
   dateOfBirth: string;
   weightCheckDay: number;
   weightPopupEnabled: number;
+  mealSchedule?: import('../../../shared/meal-utils').MealSchedule | null;
 }
 
 export interface FrequentFood {

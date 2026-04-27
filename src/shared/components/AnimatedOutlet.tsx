@@ -32,7 +32,7 @@ export interface AnimatedOutletHandle {
 }
 
 const pageBgStyle = (pad: string) =>
-  `width:100%;height:100%;background:var(--rpg-parchment,#f5f0e1) url(${bgTexture}) repeat;background-size:600px;padding:${pad};box-sizing:border-box;overflow:hidden;`
+  `width:100%;height:100%;background:var(--parch-0,#f5f0e1) url(${bgTexture}) repeat;background-size:600px;padding:${pad};box-sizing:border-box;overflow:hidden;`
 
 function createPageDiv(html: string, pad: string): HTMLElement {
   const page = document.createElement('div')
@@ -97,7 +97,7 @@ const AnimatedOutlet = forwardRef<AnimatedOutletHandle>(function AnimatedOutlet(
     const scrollTop = mainContent.scrollTop
     const cover = document.createElement('div')
     cover.setAttribute('data-flip-cover', '')
-    cover.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;z-index:9998;pointer-events:none;overflow:hidden;background:var(--rpg-parchment,#f5f0e1) url(${bgTexture}) repeat;background-size:600px;padding:${pad};box-sizing:border-box;width:${w}px;height:${h}px;`
+    cover.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;z-index:9998;pointer-events:none;overflow:hidden;background:var(--parch-0,#f5f0e1) url(${bgTexture}) repeat;background-size:600px;padding:${pad};box-sizing:border-box;width:${w}px;height:${h}px;`
     // Offset content to match the scroll position the user was at
     const wrapper = document.createElement('div')
     wrapper.style.cssText = `transform:translateY(-${scrollTop}px);`

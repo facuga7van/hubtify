@@ -1,5 +1,6 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
+import { recalcSummary } from './nutrition.ipc';
 
 interface SyncTask {
   id: string;
@@ -150,6 +151,14 @@ export function registerSyncIpcHandlers(): void {
         }
         db.prepare(`INSERT OR IGNORE INTO player_stats (user_id) VALUES ('default')`).run();
         db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
+        // Re-seed default cauldron presets after clearing
+        db.prepare(
+          `INSERT OR IGNORE INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default)
+           VALUES
+             ('preset-classic', 'Classic', 25, 5, 15, 4, 1),
+             ('preset-long-focus', 'Long Focus', 50, 10, 30, 3, 1),
+             ('preset-quick-sprint', 'Quick Sprint', 15, 3, 10, 4, 1)`,
+        ).run();
       });
       tx();
       return { success: true };
@@ -465,25 +474,33 @@ export function registerSyncIpcHandlers(): void {
     const d = data as any;
 
     const tx = db.transaction(() => {
-      // Profile
+      // Profile — restore ALL columns to avoid losing settings on pull
       if (d.profile) {
         const p = d.profile;
-        db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           p.age, p.sex, p.height_cm, p.initial_weight_kg, p.activity_level,
-          p.deficit_target_kcal ?? 500, p.date_of_birth ?? null, p.weight_check_day ?? 1
+          p.deficit_target_kcal ?? 500, p.gym_calories ?? 300, p.step_calories_factor ?? 0.04,
+          p.date_of_birth ?? null, p.weight_check_day ?? 1, p.weight_popup_enabled ?? 1,
+          p.meal_schedule ?? null
         );
       }
 
-      // Food log - merge by date+time+description
+      // Food log - merge by date+time+description+calories
+      const affectedDates = new Set<string>();
       if (Array.isArray(d.foodLog)) {
         for (const f of d.foodLog) {
-          const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ?').get(f.date, f.time, f.description);
+          const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?').get(f.date, f.time, f.description, f.calories);
           if (!exists) {
-            db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id) VALUES (?, ?, ?, ?, ?, ?)').run(
-              f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id
+            db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
+              f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null
             );
+            affectedDates.add(f.date);
           }
         }
+      }
+
+      for (const date of affectedDates) {
+        recalcSummary(db, date);
       }
 
       // Frequent foods - merge by name
@@ -491,8 +508,8 @@ export function registerSyncIpcHandlers(): void {
         for (const f of d.frequentFoods) {
           const exists = db.prepare('SELECT 1 FROM frequent_foods WHERE name = ?').get(f.name);
           if (!exists) {
-            db.prepare('INSERT INTO frequent_foods (name, calories, times_used, created_at) VALUES (?, ?, ?, ?)').run(
-              f.name, f.calories, f.times_used, f.created_at
+            db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at) VALUES (?, ?, ?, ?, ?)').run(
+              f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at
             );
           }
         }
@@ -552,7 +569,8 @@ export function registerSyncIpcHandlers(): void {
              import_batch_id AS importBatchId,
              credit_card_id AS creditCardId,
              impacts_balance AS impactsBalance,
-             created_at AS createdAt, updated_at AS updatedAt
+             created_at AS createdAt, updated_at AS updatedAt,
+             deleted_at AS deletedAt
       FROM finance_transactions ORDER BY date DESC
     `).all();
 
@@ -572,7 +590,8 @@ export function registerSyncIpcHandlers(): void {
     const recurring = db.prepare(`
       SELECT id, name, type, amount, currency, category, active,
              billing_day AS billingDay,
-             created_at AS createdAt
+             created_at AS createdAt, updated_at AS updatedAt,
+             deleted_at AS deletedAt
       FROM finance_recurring ORDER BY created_at ASC
     `).all();
 
@@ -585,7 +604,8 @@ export function registerSyncIpcHandlers(): void {
     const installmentGroups = db.prepare(`
       SELECT id, description, total_amount AS totalAmount, currency,
              total_installments AS totalInstallments, category, date,
-             created_at AS createdAt
+             created_at AS createdAt, updated_at AS updatedAt,
+             deleted_at AS deletedAt
       FROM finance_installment_groups ORDER BY date DESC
     `).all();
 
@@ -594,11 +614,23 @@ export function registerSyncIpcHandlers(): void {
       FROM finance_category_mappings
     `).all();
 
-    const categories = db.prepare(`SELECT name FROM finance_categories`).all();
+    const categories = db.prepare(`SELECT name, updated_at AS updatedAt, deleted_at AS deletedAt FROM finance_categories`).all();
 
-    const creditCards = db.prepare(`SELECT * FROM finance_credit_cards`).all();
+    const creditCards = db.prepare(`
+      SELECT id, name, closing_day AS closingDay,
+             created_at AS createdAt, updated_at AS updatedAt,
+             deleted_at AS deletedAt
+      FROM finance_credit_cards
+    `).all();
 
-    const creditCardStatements = db.prepare(`SELECT * FROM finance_credit_card_statements`).all();
+    const creditCardStatements = db.prepare(`
+      SELECT id, credit_card_id AS creditCardId, period_month AS periodMonth,
+             calculated_amount AS calculatedAmount, paid_amount AS paidAmount,
+             status, paid_date AS paidDate, transaction_id AS transactionId,
+             created_at AS createdAt, updated_at AS updatedAt,
+             deleted_at AS deletedAt
+      FROM finance_credit_card_statements
+    `).all();
 
     return {
       transactions, loans, loanPayments, recurring, recurringHistory,
@@ -614,21 +646,46 @@ export function registerSyncIpcHandlers(): void {
 
     const tx = db.transaction(() => {
       if (data.categories && Array.isArray(data.categories)) {
-        const stmt = db.prepare(`INSERT OR IGNORE INTO finance_categories (name) VALUES (?)`);
-        for (const c of data.categories as Array<{ name: string }>) {
-          stmt.run(c.name);
+        const getCat = db.prepare('SELECT name, updated_at FROM finance_categories WHERE name = ?');
+        const insertCat = db.prepare(`INSERT OR IGNORE INTO finance_categories (name, updated_at, deleted_at) VALUES (?, ?, ?)`);
+        const updateCat = db.prepare(`UPDATE finance_categories SET updated_at = ?, deleted_at = ? WHERE name = ?`);
+        for (const c of data.categories as Array<Record<string, unknown>>) {
+          const remoteUpdatedAt = (c.updatedAt as string) ?? now;
+          const remoteDeletedAt = (c.deletedAt as string) ?? null;
+          const local = getCat.get(c.name) as { name: string; updated_at: string } | undefined;
+          if (!local) {
+            insertCat.run(c.name, remoteUpdatedAt, remoteDeletedAt);
+            changed = true;
+          } else if (remoteUpdatedAt > (local.updated_at || '')) {
+            updateCat.run(remoteUpdatedAt, remoteDeletedAt, c.name);
+            changed = true;
+          }
         }
       }
 
       if (data.recurring && Array.isArray(data.recurring)) {
-        const stmt = db.prepare(`
+        const getRec = db.prepare('SELECT id, updated_at FROM finance_recurring WHERE id = ?');
+        const insertRec = db.prepare(`
           INSERT OR IGNORE INTO finance_recurring
-            (id, name, type, amount, currency, category, active, billing_day, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, name, type, amount, currency, category, active, billing_day, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const updateRec = db.prepare(`
+          UPDATE finance_recurring SET name = ?, type = ?, amount = ?, currency = ?, category = ?,
+                 active = ?, billing_day = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
         `);
         for (const r of data.recurring as Array<Record<string, unknown>>) {
-          const result = stmt.run(r.id, r.name, r.type, r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1, r.createdAt ?? now);
-          if (result.changes > 0) changed = true;
+          const remoteUpdatedAt = (r.updatedAt as string) ?? (r.createdAt as string) ?? now;
+          const remoteDeletedAt = (r.deletedAt as string) ?? null;
+          const local = getRec.get(r.id) as { id: string; updated_at: string } | undefined;
+          if (!local) {
+            const result = insertRec.run(r.id, r.name, r.type, r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1, r.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt);
+            if (result.changes > 0) changed = true;
+          } else if (remoteUpdatedAt > (local.updated_at || '')) {
+            updateRec.run(r.name, r.type, r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1, remoteUpdatedAt, remoteDeletedAt, r.id);
+            changed = true;
+          }
         }
       }
 
@@ -645,53 +702,100 @@ export function registerSyncIpcHandlers(): void {
 
       // Installment groups must come before transactions that reference them
       if (data.installmentGroups && Array.isArray(data.installmentGroups)) {
-        const stmt = db.prepare(`
+        const getIG = db.prepare('SELECT id, updated_at FROM finance_installment_groups WHERE id = ?');
+        const insertIG = db.prepare(`
           INSERT OR IGNORE INTO finance_installment_groups
-            (id, description, total_amount, currency, total_installments, category, date, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const updateIG = db.prepare(`
+          UPDATE finance_installment_groups SET description = ?, total_amount = ?, currency = ?,
+                 total_installments = ?, category = ?, date = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
         `);
         for (const g of data.installmentGroups as Array<Record<string, unknown>>) {
-          const result = stmt.run(g.id, g.description, g.totalAmount, g.currency ?? 'ARS', g.totalInstallments, g.category ?? 'Otros', g.date, g.createdAt ?? now);
-          if (result.changes > 0) changed = true;
+          const remoteUpdatedAt = (g.updatedAt as string) ?? (g.createdAt as string) ?? now;
+          const remoteDeletedAt = (g.deletedAt as string) ?? null;
+          const local = getIG.get(g.id) as { id: string; updated_at: string } | undefined;
+          if (!local) {
+            const result = insertIG.run(g.id, g.description, g.totalAmount, g.currency ?? 'ARS', g.totalInstallments, g.category ?? 'Otros', g.date, g.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt);
+            if (result.changes > 0) changed = true;
+          } else if (remoteUpdatedAt > (local.updated_at || '')) {
+            updateIG.run(g.description, g.totalAmount, g.currency ?? 'ARS', g.totalInstallments, g.category ?? 'Otros', g.date, remoteUpdatedAt, remoteDeletedAt, g.id);
+            changed = true;
+          }
         }
       }
 
       if (data.transactions && Array.isArray(data.transactions)) {
-        const stmt = db.prepare(`
+        const getTx = db.prepare('SELECT id, updated_at FROM finance_transactions WHERE id = ?');
+        const insertTx = db.prepare(`
           INSERT OR IGNORE INTO finance_transactions
             (id, type, amount, currency, category, description, date, payment_method,
              source, installments, installment_group_id, for_third_party,
              recurring_id, import_batch_id, credit_card_id, impacts_balance,
-             created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const updateTx = db.prepare(`
+          UPDATE finance_transactions SET type = ?, amount = ?, currency = ?, category = ?,
+            description = ?, date = ?, payment_method = ?, source = ?, installments = ?,
+            installment_group_id = ?, for_third_party = ?, recurring_id = ?,
+            import_batch_id = ?, credit_card_id = ?, impacts_balance = ?, updated_at = ?,
+            deleted_at = ?
+          WHERE id = ?
         `);
         for (const t of data.transactions as Array<Record<string, unknown>>) {
-          const result = stmt.run(
-            t.id, t.type, t.amount, t.currency ?? 'ARS', t.category ?? 'Otros',
-            t.description ?? '', t.date, t.paymentMethod ?? 'cash',
-            t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
-            t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
-            t.creditCardId ?? null, t.impactsBalance ?? 1,
-            t.createdAt ?? now, t.updatedAt ?? now,
-          );
-          if (result.changes > 0) changed = true;
+          const local = getTx.get(t.id) as { id: string; updated_at: string } | undefined;
+          const remoteUpdatedAt = (t.updatedAt as string) ?? now;
+          const remoteDeletedAt = (t.deletedAt as string) ?? null;
+          if (!local) {
+            const result = insertTx.run(
+              t.id, t.type, t.amount, t.currency ?? 'ARS', t.category ?? 'Otros',
+              t.description ?? '', t.date, t.paymentMethod ?? 'cash',
+              t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
+              t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
+              t.creditCardId ?? null, t.impactsBalance ?? 1,
+              t.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt,
+            );
+            if (result.changes > 0) changed = true;
+          } else if (remoteUpdatedAt > local.updated_at) {
+            updateTx.run(
+              t.type, t.amount, t.currency ?? 'ARS', t.category ?? 'Otros',
+              t.description ?? '', t.date, t.paymentMethod ?? 'cash',
+              t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
+              t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
+              t.creditCardId ?? null, t.impactsBalance ?? 1, remoteUpdatedAt,
+              remoteDeletedAt, t.id,
+            );
+            changed = true;
+          }
         }
       }
 
       if (data.loans && Array.isArray(data.loans)) {
-        const stmt = db.prepare(`
+        const getLoan = db.prepare('SELECT id, settled FROM finance_loans WHERE id = ?');
+        const insertLoan = db.prepare(`
           INSERT OR IGNORE INTO finance_loans
             (id, person_name, direction, type, amount, currency, date, description,
              settled, installment_group_id, settled_date, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
+        const settleLoan = db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?`);
         for (const l of data.loans as Array<Record<string, unknown>>) {
-          const result = stmt.run(
-            l.id, l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
-            l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
-            l.settledDate ?? null, l.createdAt ?? now,
-          );
-          if (result.changes > 0) changed = true;
+          const local = getLoan.get(l.id) as { id: string; settled: number } | undefined;
+          if (!local) {
+            const result = insertLoan.run(
+              l.id, l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
+              l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
+              l.settledDate ?? null, l.createdAt ?? now,
+            );
+            if (result.changes > 0) changed = true;
+          } else if (l.settled === 1 && local.settled === 0) {
+            // Settle is a one-way transition — remote settled wins
+            settleLoan.run(l.settledDate ?? now, l.id);
+            changed = true;
+          }
         }
       }
 
@@ -717,22 +821,65 @@ export function registerSyncIpcHandlers(): void {
       }
 
       if (data.creditCards && Array.isArray(data.creditCards)) {
-        const cols = db.prepare(`PRAGMA table_info(finance_credit_cards)`).all() as Array<{ name: string }>;
-        const colNames = cols.map(c => c.name);
-        const placeholders = colNames.map(() => '?').join(', ');
-        const stmt = db.prepare(`INSERT OR IGNORE INTO finance_credit_cards (${colNames.join(', ')}) VALUES (${placeholders})`);
+        const getCC = db.prepare('SELECT id, updated_at FROM finance_credit_cards WHERE id = ?');
+        const insertCC = db.prepare(`
+          INSERT OR IGNORE INTO finance_credit_cards
+            (id, name, closing_day, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const updateCC = db.prepare(`
+          UPDATE finance_credit_cards SET name = ?, closing_day = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
+        `);
         for (const card of data.creditCards as Array<Record<string, unknown>>) {
-          stmt.run(...colNames.map(col => card[col] ?? null));
+          const remoteUpdatedAt = (card.updatedAt as string) ?? (card.createdAt as string) ?? (card.created_at as string) ?? now;
+          const remoteDeletedAt = (card.deletedAt as string) ?? (card.deleted_at as string) ?? null;
+          const local = getCC.get(card.id ?? card.id) as { id: string; updated_at: string } | undefined;
+          if (!local) {
+            insertCC.run(card.id, card.name ?? card.name, card.closingDay ?? card.closing_day, card.createdAt ?? card.created_at ?? now, remoteUpdatedAt, remoteDeletedAt);
+            changed = true;
+          } else if (remoteUpdatedAt > (local.updated_at || '')) {
+            updateCC.run(card.name ?? card.name, card.closingDay ?? card.closing_day, remoteUpdatedAt, remoteDeletedAt, card.id);
+            changed = true;
+          }
         }
       }
 
       if (data.creditCardStatements && Array.isArray(data.creditCardStatements)) {
-        const cols = db.prepare(`PRAGMA table_info(finance_credit_card_statements)`).all() as Array<{ name: string }>;
-        const colNames = cols.map(c => c.name);
-        const placeholders = colNames.map(() => '?').join(', ');
-        const stmt = db.prepare(`INSERT OR IGNORE INTO finance_credit_card_statements (${colNames.join(', ')}) VALUES (${placeholders})`);
+        const getCCS = db.prepare('SELECT id, updated_at FROM finance_credit_card_statements WHERE id = ?');
+        const insertCCS = db.prepare(`
+          INSERT OR IGNORE INTO finance_credit_card_statements
+            (id, credit_card_id, period_month, calculated_amount, paid_amount,
+             status, paid_date, transaction_id, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const updateCCS = db.prepare(`
+          UPDATE finance_credit_card_statements SET calculated_amount = ?, paid_amount = ?,
+                 status = ?, paid_date = ?, transaction_id = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
+        `);
         for (const s of data.creditCardStatements as Array<Record<string, unknown>>) {
-          stmt.run(...colNames.map(col => s[col] ?? null));
+          const remoteUpdatedAt = (s.updatedAt as string) ?? (s.createdAt as string) ?? (s.created_at as string) ?? now;
+          const remoteDeletedAt = (s.deletedAt as string) ?? (s.deleted_at as string) ?? null;
+          const local = getCCS.get(s.id) as { id: string; updated_at: string } | undefined;
+          if (!local) {
+            insertCCS.run(
+              s.id, s.creditCardId ?? s.credit_card_id, s.periodMonth ?? s.period_month,
+              s.calculatedAmount ?? s.calculated_amount ?? 0, s.paidAmount ?? s.paid_amount ?? null,
+              s.status ?? 'pending', s.paidDate ?? s.paid_date ?? null,
+              s.transactionId ?? s.transaction_id ?? null,
+              s.createdAt ?? s.created_at ?? now, remoteUpdatedAt, remoteDeletedAt,
+            );
+            changed = true;
+          } else if (remoteUpdatedAt > (local.updated_at || '')) {
+            updateCCS.run(
+              s.calculatedAmount ?? s.calculated_amount ?? 0, s.paidAmount ?? s.paid_amount ?? null,
+              s.status ?? 'pending', s.paidDate ?? s.paid_date ?? null,
+              s.transactionId ?? s.transaction_id ?? null,
+              remoteUpdatedAt, remoteDeletedAt, s.id,
+            );
+            changed = true;
+          }
         }
       }
     });
@@ -806,20 +953,28 @@ export function registerSyncIpcHandlers(): void {
 
     const presets = data.cauldron_presets as Array<Record<string, unknown>> | undefined;
     if (presets?.length) {
-      const stmt = db.prepare(`INSERT OR REPLACE INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const getPreset = db.prepare('SELECT id, updated_at FROM cauldron_presets WHERE id = ?');
+      const insertPreset = db.prepare(`INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const updatePreset = db.prepare(`UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?, long_break_minutes = ?, cycles_before_long = ?, is_default = ?, updated_at = ?, deleted_at = ? WHERE id = ?`);
       for (const p of presets) {
-        stmt.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.is_default, p.created_at, p.updated_at, p.deleted_at);
+        const local = getPreset.get(p.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          insertPreset.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.is_default, p.created_at, p.updated_at, p.deleted_at);
+          changed = true;
+        } else if (p.updated_at && (!local.updated_at || p.updated_at > local.updated_at)) {
+          updatePreset.run(p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.is_default, p.updated_at, p.deleted_at, p.id);
+          changed = true;
+        }
       }
-      changed = true;
     }
 
     const sessions = data.cauldron_sessions as Array<Record<string, unknown>> | undefined;
     if (sessions?.length) {
-      const stmt = db.prepare(`INSERT OR REPLACE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const stmt = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const s of sessions) {
-        stmt.run(s.id, s.preset_id, s.type, s.duration_minutes, s.completed, s.started_at, s.completed_at, s.created_at, s.updated_at, s.deleted_at);
+        const result = stmt.run(s.id, s.preset_id, s.type, s.duration_minutes, s.completed, s.started_at, s.completed_at, s.created_at, s.updated_at, s.deleted_at);
+        if (result.changes > 0) changed = true;
       }
-      changed = true;
     }
 
     return { changed };

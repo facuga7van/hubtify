@@ -1,59 +1,122 @@
 import { gsap } from 'gsap'
+import { createParticleBurst, type ParticleBurst } from './particles'
+import { playLevelUp } from '../audio'
 
 export function levelUp(
   overlayEl: HTMLElement,
-  bookEl: HTMLElement,
-  levelTextEl: HTMLElement,
+  contentEl: HTMLElement,
+  levelNumber: number,
   onDismiss: () => void,
 ): gsap.core.Timeline {
-  const tl = gsap.timeline({ onComplete: onDismiss })
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-  // Phase 1: Darken overlay (200ms)
-  gsap.set(overlayEl, { opacity: 0, display: 'flex' })
-  tl.to(overlayEl, { opacity: 1, duration: 0.2 })
+  const flash = overlayEl.querySelector('[data-levelup="flash"]') as HTMLElement
+  const rays = overlayEl.querySelector('[data-levelup="rays"]') as HTMLElement
+  const shockwave = overlayEl.querySelector('[data-levelup="shockwave"]') as HTMLElement
+  const textContainer = overlayEl.querySelector('[data-levelup="text-container"]') as HTMLElement
+  const titleLetters = overlayEl.querySelectorAll('[data-levelup="title"] span')
+  const levelEl = overlayEl.querySelector('[data-levelup="level"]') as HTMLElement
+  const dismissEl = overlayEl.querySelector('[data-levelup="dismiss"]') as HTMLElement
 
-  // Phase 2: Book opens (500ms)
-  const leftCover = bookEl.querySelector('[data-book="left"]') as HTMLElement
-  const rightCover = bookEl.querySelector('[data-book="right"]') as HTMLElement
-  gsap.set([leftCover, rightCover], { rotateY: 0 })
-  tl.to(leftCover, {
-    rotateY: -105, duration: 0.5, ease: 'power3.out',
-    transformOrigin: 'left center', transformPerspective: 1200,
-  }, 0.2)
-  tl.to(rightCover, {
-    rotateY: 105, duration: 0.5, ease: 'power3.out',
-    transformOrigin: 'right center', transformPerspective: 1200,
-  }, 0.2)
+  let particles: ParticleBurst | null = null
 
-  // Phase 3: Level text draws in (400ms)
-  const textPath = levelTextEl.querySelector('path')
-  if (textPath) {
-    const length = textPath.getTotalLength()
-    gsap.set(textPath, { strokeDasharray: length, strokeDashoffset: length })
-    tl.to(textPath, { strokeDashoffset: 0, duration: 0.4, ease: 'power1.inOut' }, 0.6)
-  }
-  tl.to(levelTextEl, { opacity: 1, duration: 0.3 }, 0.6)
+  const tl = gsap.timeline({
+    onComplete: () => {
+      particles?.stop()
+      onDismiss()
+    },
+    data: { particles: null as ParticleBurst | null },
+  })
 
-  // Phase 4: Golden glow (300ms)
-  tl.fromTo(bookEl,
-    { boxShadow: '0 0 0 rgba(212,160,23,0)' },
-    { boxShadow: '0 0 80px rgba(212,160,23,0.6)', duration: 0.3, ease: 'power2.out' }, 1.0)
-  tl.to(bookEl, { boxShadow: '0 0 20px rgba(212,160,23,0.2)', duration: 0.3 }, 1.3)
+  // Phase 0: Show overlay, prep elements
+  gsap.set(overlayEl, { display: 'flex' })
+  gsap.set([flash, rays, shockwave, textContainer], { opacity: 0 })
+  gsap.set(titleLetters, { scale: 0, opacity: 0 })
+  gsap.set(levelEl, { scale: 0, opacity: 0 })
+  gsap.set(dismissEl, { opacity: 0 })
+  if (shockwave) gsap.set(shockwave, { scale: 0 })
 
-  // Phase 5: Golden mote particles (1000ms) — 18 DOM spans
-  for (let i = 0; i < 18; i++) {
-    const mote = document.createElement('span')
-    mote.style.cssText = `position:absolute;width:${2 + Math.random() * 4}px;height:${2 + Math.random() * 4}px;border-radius:50%;background:rgba(212,160,23,${0.5 + Math.random() * 0.5});pointer-events:none;`
-    bookEl.appendChild(mote)
-    const startX = -40 + Math.random() * 80
-    const startY = 20 + Math.random() * 40
-    gsap.set(mote, { x: startX, y: startY, opacity: 0 })
-    tl.to(mote, { y: startY - 60 - Math.random() * 40, x: startX + (-20 + Math.random() * 40), opacity: 1, duration: 0.3, ease: 'power1.out' }, 1.0 + Math.random() * 0.3)
-    tl.to(mote, { opacity: 0, duration: 0.4, onComplete: () => mote.remove() }, 1.4 + Math.random() * 0.3)
+  if (reducedMotion) {
+    // Reduced motion: simple fade, instant text, 2s dismiss
+    tl.to(overlayEl, { opacity: 1, duration: 0.3 })
+    tl.set(titleLetters, { scale: 1, opacity: 1 }, 0.3)
+    tl.set(levelEl, { scale: 1, opacity: 1 }, 0.3)
+    tl.set(textContainer, { opacity: 1 }, 0.3)
+    tl.call(() => playLevelUp(), [], 0.3)
+    tl.to(dismissEl, { opacity: 0.5, duration: 0.2 }, 0.5)
+    tl.to(overlayEl, {
+      opacity: 0, duration: 0.4,
+      onComplete: () => { overlayEl.style.display = 'none' },
+    }, '+=1.5')
+    return tl
   }
 
-  // Phase 6: Dismiss (400ms)
-  tl.to(overlayEl, { opacity: 0, duration: 0.4, onComplete: () => { overlayEl.style.display = 'none' } }, '+=0.3')
+  // Phase 1: Flash (0.00s — 0.15s)
+  tl.to(flash, { opacity: 0.8, duration: 0.07, ease: 'power2.in' }, 0)
+  tl.to(flash, { opacity: 0, duration: 0.08, ease: 'power1.out' }, 0.07)
+
+  // Phase 2: Shockwave (0.05s — 0.35s)
+  tl.to(shockwave, { opacity: 0.7, scale: 1, duration: 0.3, ease: 'power2.out' }, 0.05)
+  tl.to(shockwave, { opacity: 0, duration: 0.15 }, 0.25)
+
+  // Phase 3: Screen shake (0.10s — 0.35s)
+  tl.to(contentEl, {
+    keyframes: [
+      { x: -3, duration: 0.04 },
+      { x: 3, duration: 0.04 },
+      { x: -2, duration: 0.04 },
+      { x: 2, duration: 0.04 },
+      { x: -1, duration: 0.04 },
+      { x: 0, duration: 0.05 },
+    ],
+    ease: 'none',
+  }, 0.10)
+
+  // Phase 4: God rays (0.10s — continuous)
+  tl.to(rays, { opacity: 0.5, duration: 0.4, ease: 'power1.out' }, 0.10)
+  tl.to(rays, { rotation: 60, duration: 4.0, ease: 'none' }, 0.10)
+
+  // Phase 5: Canvas particles (0.15s)
+  tl.call(() => {
+    particles = createParticleBurst({ parent: overlayEl, count: 100 })
+    tl.data.particles = particles
+    particles.start()
+  }, [], 0.15)
+
+  // Phase 6: Sound (0.15s)
+  tl.call(() => playLevelUp(), [], 0.15)
+
+  // Phase 7: Text container visible
+  tl.set(textContainer, { opacity: 1 }, 0.25)
+
+  // Phase 7: "LEVEL UP" per-letter stagger (0.30s — 0.80s)
+  tl.to(titleLetters, {
+    scale: 1, opacity: 1,
+    duration: 0.4,
+    ease: 'elastic.out(1, 0.6)',
+    stagger: 0.04,
+  }, 0.30)
+
+  // Phase 8: Level number (0.80s — 1.10s)
+  tl.to(levelEl, {
+    scale: 1, opacity: 1,
+    duration: 0.3,
+    ease: 'back.out(2)',
+  }, 0.80)
+  // Overshoot settle
+  tl.fromTo(levelEl, { scale: 1.15 }, { scale: 1, duration: 0.15, ease: 'power2.out' }, 0.80)
+
+  // Phase 9: Dismiss hint (1.10s)
+  tl.to(dismissEl, { opacity: 0.5, duration: 0.2 }, 1.10)
+
+  // Phase 10: Auto-dismiss (4.10s — 4.50s)
+  tl.to(overlayEl, {
+    opacity: 0, duration: 0.4,
+    onComplete: () => {
+      overlayEl.style.display = 'none'
+      particles?.stop()
+    },
+  }, 4.10)
 
   return tl
 }

@@ -16,6 +16,7 @@ import type { AppNotification } from '../../shared/types';
 let pollingInterval: NodeJS.Timeout | null = null;
 let lastNativeNotificationTime = 0;
 let systemNotificationsEnabled = true;
+const enabledModules: Record<string, boolean> = { quests: true, nutrition: true, finance: true };
 
 const POLLING_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const NATIVE_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
@@ -26,9 +27,9 @@ function runNotificationCheck(): number {
   autoResolve(db);
 
   const candidates = [
-    ...evaluateQuestNotifications(db),
-    ...evaluateNutritionNotifications(db),
-    ...evaluateFinanceNotifications(db),
+    ...(enabledModules.quests ? evaluateQuestNotifications(db) : []),
+    ...(enabledModules.nutrition ? evaluateNutritionNotifications(db) : []),
+    ...(enabledModules.finance ? evaluateFinanceNotifications(db) : []),
   ];
 
   const newCount = deduplicateAndInsert(db, candidates);
@@ -73,7 +74,6 @@ function runNotificationCheck(): number {
 }
 
 export function startNotificationEngine(): void {
-  setTimeout(() => runNotificationCheck(), 5000);
   pollingInterval = setInterval(() => runNotificationCheck(), POLLING_INTERVAL_MS);
 }
 
@@ -153,5 +153,11 @@ export function registerNotificationIpcHandlers(): void {
 
   ipcHandle('notifications:setLocale', (_e, locale: string) => {
     setEngineLocale(locale);
+  });
+
+  ipcHandle('notifications:setModuleEnabled', (_e, module: string, enabled: boolean) => {
+    if (module in enabledModules) {
+      enabledModules[module] = enabled;
+    }
   });
 }

@@ -7,7 +7,7 @@ interface AuthContextValue {
   loading: boolean;
   switching: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, username?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   switchAccount: (appName: string) => Promise<{ success: boolean; expired?: boolean } | undefined>;
   addAccount: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;

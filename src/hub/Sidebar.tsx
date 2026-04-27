@@ -1,123 +1,251 @@
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PlayerCard from './PlayerCard';
 import type { PlayerStats } from '../../shared/types';
-import Tooltip from '../shared/components/Tooltip';
+import { TITLE_THRESHOLDS } from '../../shared/types';
+import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
+import { Scroll, Shield, Sword, Bread, Coin, Crown, Tower } from '../shared/components/icons';
+import Tooltip from '../shared/components/Tooltip';
 import './styles/layout.css';
 
 interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; onBellClick?: () => void; }
 
-function NavIcon({ name }: { name: string }) {
-  const s = { width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  switch (name) {
-    case 'home': return (
-      <svg {...s} viewBox="0 0 18 18"><path d="M3 9l6-6 6 6"/><path d="M5 8v7h3v-4h2v4h3V8"/></svg>
-    );
-    case 'sword': return (
-      <svg {...s} viewBox="0 0 18 18"><path d="M14 2l-8 8M6 10l-2 2 2 2 2-2M10.5 5.5l2 2M14 2l2 2-3 3"/></svg>
-    );
-    case 'goblet': return (
-      <svg {...s} viewBox="0 0 18 18"><path d="M6 3h6v4c0 2-1.5 3-3 3s-3-1-3-3V3z"/><path d="M9 10v3M6 13h6"/><path d="M12 5h2c1 0 1.5 1 1 2s-1.5 1.5-3 1.5M6 5H4c-1 0-1.5 1-1 2s1.5 1.5 3 1.5"/></svg>
-    );
-    case 'coins': return (
-      <svg {...s} viewBox="0 0 18 18"><ellipse cx="7" cy="10" rx="5" ry="3"/><path d="M2 10v2c0 1.7 2.2 3 5 3s5-1.3 5-3v-2"/><ellipse cx="11" cy="7" rx="5" ry="3"/><path d="M6 7v2c0 1.7 2.2 3 5 3s5-1.3 5-3V7"/></svg>
-    );
-    case 'shield': return (
-      <svg {...s} viewBox="0 0 18 18"><path d="M9 2L3 5v4c0 4 3 6 6 7 3-1 6-3 6-7V5L9 2z"/><path d="M7 9l2 2 3-4"/></svg>
-    );
-    case 'trophy': return (
-      <svg {...s} viewBox="0 0 18 18"><path d="M5 3h8v4c0 2.5-1.8 4-4 4s-4-1.5-4-4V3z"/><path d="M9 11v3M6 14h6"/><path d="M13 5h1.5c.8 0 1.3.8 1 1.5-.5 1-1.3 1.8-2.5 2M5 5H3.5c-.8 0-1.3.8-1 1.5.5 1 1.3 1.8 2.5 2"/></svg>
-    );
-    case 'village': return (
-      <svg {...s} viewBox="0 0 18 18"><path d="M2 16h14"/><path d="M4 16V9l3-3 3 3v7"/><path d="M7 12h0"/><path d="M12 16v-5l2.5-2L17 11v5"/><path d="M7 6V3"/></svg>
-    );
-    case 'cauldron': return (
-      <svg {...s} viewBox="0 0 24 24">
-        <path d="M8 2h8M10 2v4M14 2v4" />
-        <path d="M5 8h14" />
-        <path d="M6 8c0 0-1 4-1 8 0 3 3 6 7 6s7-3 7-6c0-4-1-8-1-8" />
-        <circle cx="10" cy="14" r="1" fill="currentColor" />
-        <circle cx="14" cy="16" r="1" fill="currentColor" />
-        <circle cx="11" cy="18" r="0.5" fill="currentColor" />
-      </svg>
-    );
-    case 'settings': return (
-      <svg {...s} viewBox="0 0 24 24">
-        <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-      </svg>
-    );
-    default: return null;
-  }
+/** Badge counts for sidebar nav items */
+interface SidebarBadges {
+  questsOverdue: number;
+  nutritionNoMeals: boolean;
 }
 
-const navKeys: Array<{ path: string; key: string; icon: string; comingSoon?: boolean }> = [
-  { path: '/', key: 'nav.home', icon: 'home' },
-  { path: '/quests', key: 'nav.questify', icon: 'sword' },
-  { path: '/nutrition', key: 'nav.nutrify', icon: 'goblet' },
-  { path: '/finance', key: 'nav.coinify', icon: 'coins' },
-  { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron' },
-  { path: '/achievements', key: 'nav.achievements', icon: 'trophy', comingSoon: true },
-  { path: '/village', key: 'nav.village', icon: 'village', comingSoon: true },
-  { path: '/character', key: 'nav.character', icon: 'shield' },
-  { path: '/settings', key: 'nav.settings', icon: 'settings' },
+/** Given current level, find the next title threshold and return info */
+function getNextRank(level: number): { nextTitleKey: string; nextTitleFallback: string; levelsAway: number } | null {
+  // TITLE_THRESHOLDS is sorted descending: [50, key, fallback], ...
+  for (let i = TITLE_THRESHOLDS.length - 1; i >= 0; i--) {
+    const [threshold, key, fallback] = TITLE_THRESHOLDS[i];
+    if (threshold > level) {
+      return { nextTitleKey: key, nextTitleFallback: fallback, levelsAway: threshold - level };
+    }
+  }
+  return null; // Already at max rank
+}
+
+const NAV_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
+  scroll: Scroll,
+  shield: Shield,
+  sword: Sword,
+  bread: Bread,
+  coin: Coin,
+  crown: Crown,
+  tower: Tower,
+};
+
+function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width={24} height={24} fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.26.6.77 1.02 1.51 1.08H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+  );
+}
+
+const navKeys: Array<{ path: string; key: string; icon: string; label: string; comingSoon?: boolean }> = [
+  { path: '/', key: 'nav.home', icon: 'scroll', label: 'TABLA' },
+  { path: '/quests', key: 'nav.questify', icon: 'sword', label: 'MISIONES' },
+  { path: '/nutrition', key: 'nav.nutrify', icon: 'bread', label: 'PROVISIONES' },
+  { path: '/finance', key: 'nav.coinify', icon: 'coin', label: 'TESORO' },
+  { path: '/achievements', key: 'nav.achievements', icon: 'crown', label: 'LOGROS', comingSoon: true },
+  { path: '/village', key: 'nav.village', icon: 'tower', label: 'ALDEA', comingSoon: true },
+];
+
+const bottomNavKeys: Array<{ path: string; key: string; icon: string; label: string }> = [
+  { path: '/character', key: 'nav.character', icon: 'shield', label: 'HÉROE' },
 ];
 
 export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: SidebarProps) {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const animatedNavigate = useAnimatedNavigate();
+  const [badges, setBadges] = useState<SidebarBadges>({ questsOverdue: 0, nutritionNoMeals: false });
+
+  const loadBadges = useCallback(() => {
+    Promise.all([
+      window.api.questsGetOverdueCount(),
+      window.api.nutritionGetTodayMealsCount(),
+    ]).then(([overdue, mealsCount]) => {
+      setBadges({ questsOverdue: overdue, nutritionNoMeals: mealsCount === 0 });
+    }).catch(() => { /* silent */ });
+  }, []);
+
+  // Load badges on mount + periodic refresh (30s)
+  useEffect(() => {
+    loadBadges();
+    const interval = setInterval(loadBadges, 30_000);
+    return () => clearInterval(interval);
+  }, [loadBadges]);
+
+  // Refresh on account switch + data changes that affect badges
+  useEffect(() => {
+    const handler = () => loadBadges();
+    window.addEventListener('account:switched', handler);
+    window.addEventListener('rpg:statsChanged', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener('rpg:statsChanged', handler);
+    };
+  }, [loadBadges]);
+
+  const isActive = (path: string) =>
+    location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
+
+  // H2: Next rank calculation
+  const nextRank = stats ? getNextRank(stats.level) : null;
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <PlayerCard stats={stats} collapsed={collapsed} onBellClick={() => onBellClick?.()} />
 
-      {!collapsed && (
-        <div style={{ padding: '4px 14px', opacity: 0.3 }}>
-          <img src={new URL('../../assets/footer.png', import.meta.url).href}
-            alt="" style={{ width: '100%', height: 'auto' }} />
-        </div>
-      )}
+      {/* Stat bars — visible only when expanded */}
+      {stats && (() => {
+        const xpCurrent = xpThreshold(stats.level);
+        const xpNext = xpThreshold(stats.level + 1);
+        const xpProgress = xpNext > xpCurrent
+          ? Math.round(((stats.xp - xpCurrent) / (xpNext - xpCurrent)) * 100)
+          : 100;
 
-      <nav className="sidebar-nav">
-        {navKeys.map((item) => (
-          item.comingSoon ? (
-            <Tooltip key={item.path} text={t('common.comingSoon')}>
-              <div
-                className="sidebar-nav-item"
-                style={{ opacity: 0.35, cursor: 'default' }}
-              >
-                <NavIcon name={item.icon} />
-                {!collapsed && <span>{t(item.key)}</span>}
-              </div>
-            </Tooltip>
-          ) : (
-            <div
-              key={item.path}
-              className={`sidebar-nav-item ${location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path)) ? 'active' : ''}`}
-              title={collapsed ? t(item.key) : undefined}
-              onClick={() => animatedNavigate(item.path)}
-              style={{ cursor: 'pointer' }}
-            >
-              <NavIcon name={item.icon} />
-              {!collapsed && <span>{t(item.key)}</span>}
+        return (
+        <div className="sidebar-bars">
+          <div className="sidebar-bar">
+            <div className="sidebar-bar__row">
+              <span className="sidebar-bar__label">VITA</span>
+              <span className="sidebar-bar__val">{stats.hp} / {stats.maxHp}</span>
             </div>
-          )
-        ))}
+            <div className="sidebar-bar__track">
+              <div className="sidebar-bar__fill sidebar-bar__fill--hp" style={{ width: `${Math.round((stats.hp / stats.maxHp) * 100)}%` }} />
+            </div>
+          </div>
+          <div className="sidebar-bar">
+            <div className="sidebar-bar__row">
+              <span className="sidebar-bar__label">XP</span>
+              <span className="sidebar-bar__val">{stats.xp} / {xpNext}</span>
+            </div>
+            <div className="sidebar-bar__track">
+              <div className="sidebar-bar__fill sidebar-bar__fill--xp" style={{ width: `${xpProgress}%` }} />
+            </div>
+          </div>
+          {nextRank && (
+            <div className="sidebar-bar__next-rank">
+              {nextRank.levelsAway} {nextRank.levelsAway === 1
+                ? t('sidebar.levelTo', 'nivel para')
+                : t('sidebar.levelsTo', 'niveles para')} <span className="sidebar-bar__next-rank-title">{t(nextRank.nextTitleKey, nextRank.nextTitleFallback)}</span>
+            </div>
+          )}
+          {stats.streak > 0 && (
+            <div className="sidebar-bar">
+              <div className="sidebar-bar__row">
+                <span className="sidebar-bar__label">{t('rpg.streak', 'RACHA').toUpperCase()}</span>
+                <span className="sidebar-bar__val">{stats.streak} {t('rpg.days', 'días')}</span>
+              </div>
+              <div className="sidebar-bar__track">
+                <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * 3.3, 100)}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+        );
+      })()}
+
+      <div className="sidebar-divider" />
+
+      {/* Nav */}
+      <nav className="sidebar-nav" data-tour="sidebar">
+        {navKeys.map((item) => {
+          const IconComp = NAV_ICONS[item.icon];
+          const tooltipText = collapsed
+            ? item.comingSoon ? `${t(item.key)} (${t('common.comingSoon')})` : t(item.key)
+            : undefined;
+
+          // H1: Badge logic per nav item
+          let badgeCount = 0;
+          let badgeDot = false;
+          if (item.path === '/quests') badgeCount = badges.questsOverdue;
+          if (item.path === '/nutrition') badgeDot = badges.nutritionNoMeals;
+
+          const navItem = (
+            <button
+              key={item.path}
+              className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''} ${item.comingSoon ? 'sidebar-nav-item--disabled' : ''}`}
+              title={tooltipText}
+              aria-current={isActive(item.path) ? 'page' : undefined}
+              onClick={item.comingSoon ? undefined : () => animatedNavigate(item.path)}
+            >
+              <span className="sidebar-nav-item__ico">
+                {IconComp && <IconComp width={18} height={18} />}
+                {badgeCount > 0 && (
+                  <span className="sidebar-badge sidebar-badge--count">{badgeCount > 9 ? '9+' : badgeCount}</span>
+                )}
+                {badgeDot && !badgeCount && (
+                  <span className="sidebar-badge sidebar-badge--dot" />
+                )}
+              </span>
+              <span className="sidebar-nav-item__label">{t(item.key)}</span>
+            </button>
+          );
+          if (item.comingSoon) {
+            return <Tooltip key={item.path} text={t('common.comingSoon')}>{navItem}</Tooltip>;
+          }
+          return navItem;
+        })}
       </nav>
 
-      {!collapsed && (
-        <div style={{ padding: '4px 14px', opacity: 0.3 }}>
-          <img src={new URL('../../assets/footer.png', import.meta.url).href}
-            alt="" style={{ width: '100%', height: 'auto' }} />
-        </div>
-      )}
+      <div className="sidebar-divider" />
 
+      {/* Bottom nav: Character + Settings */}
+      <nav className="sidebar-settings-area" aria-label="Secondary">
+        {bottomNavKeys.map((item) => {
+          const IconComp = NAV_ICONS[item.icon];
+          return (
+            <button
+              key={item.path}
+              className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''}`}
+              title={collapsed ? t(item.key) : undefined}
+              aria-current={isActive(item.path) ? 'page' : undefined}
+              onClick={() => animatedNavigate(item.path)}
+            >
+              <span className="sidebar-nav-item__ico">
+                {IconComp && <IconComp width={18} height={18} />}
+              </span>
+              <span className="sidebar-nav-item__label">{t(item.key)}</span>
+            </button>
+          );
+        })}
+        <button
+          className={`sidebar-nav-item ${isActive('/settings') ? 'active' : ''}`}
+          title={collapsed ? t('nav.settings') : undefined}
+          aria-current={isActive('/settings') ? 'page' : undefined}
+          onClick={() => animatedNavigate('/settings')}
+          data-tour="settings"
+        >
+          <span className="sidebar-nav-item__ico">
+            <SettingsIcon width={18} height={18} />
+          </span>
+          <span className="sidebar-nav-item__label">{t('nav.settings')}</span>
+        </button>
+      </nav>
+
+      {/* Footer — combo + language toggle */}
       <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
+        {stats && stats.dailyCombo > 0 && (
+          <div className="sidebar-footer__combo">
+            <span className="sidebar-footer__combo-num">
+              ×{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(Math.max(stats.dailyCombo - 1, 0), 4)]}
+            </span>
+            <span className="sidebar-footer__combo-txt">{t('rpg.todayCombo', "Today's Combo")}</span>
+          </div>
+        )}
+        <div className="sidebar-footer__bottom">
           {!collapsed && (
-            <div style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.35 }}>
+            <div style={{ fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", opacity: 0.5, color: 'var(--parch-0)' }}>
               v{APP_VERSION}
             </div>
           )}
@@ -125,11 +253,12 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
             const newLang = i18n.language === 'es' ? 'en' : 'es';
             i18n.changeLanguage(newLang);
             localStorage.setItem('hubtify_lang', newLang);
-          }} style={{ background: 'none', border: 'none', color: 'var(--rpg-gold)', cursor: 'pointer', fontSize: '0.75rem' }}>
-            {i18n.language === 'es' ? 'EN' : 'ES'}
+          }} className="sidebar-footer__lang" aria-label={t('nav.switchLanguage', 'Switch language')}>
+            {i18n.language === 'es' ? 'ES' : 'EN'}
           </button>
         </div>
       </div>
+
     </aside>
   );
 }

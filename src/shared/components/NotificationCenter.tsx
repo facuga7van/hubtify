@@ -104,14 +104,16 @@ export default function NotificationCenter({ open, onClose, onNavigate }: Notifi
       <div className="notif-drawer" ref={drawerRef}>
         <div className="notif-drawer-header">
           <span>{t('notifications.title', 'Notificaciones')}</span>
-          <button className="notif-drawer-close" onClick={handleClose}>✕</button>
+          <button className="notif-drawer-close" onClick={handleClose}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+          </button>
         </div>
 
         <div className="notif-drawer-list">
           {notifications.length === 0 ? (
             <div className="notif-empty">
               <svg width="40" height="40" viewBox="0 0 16 16" fill="none"
-                stroke="var(--rpg-gold-dark)" strokeWidth="1" strokeLinecap="round">
+                stroke="var(--gold-dark)" strokeWidth="1" strokeLinecap="round">
                 <path d="M8 1a4 4 0 00-4 4v3l-1 2h10l-1-2V5a4 4 0 00-4-4z" />
                 <path d="M6 12a2 2 0 004 0" />
                 <path d="M4 4l8 8" />

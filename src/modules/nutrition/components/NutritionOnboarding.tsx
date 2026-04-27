@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getAgeFromDob } from '../../../../shared/date-utils';
 import RpgDatePicker from '../../../shared/components/RpgDatePicker';
+import MealScheduleEditor from './shared/MealScheduleEditor';
+import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
+import type { MealSchedule } from '../../../../shared/meal-utils';
+
+const ACTIVITY_MULTIPLIERS: Record<string, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
+};
 
 interface Props { onComplete: () => void; }
 
@@ -20,8 +31,19 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   // Goal
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
+  const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateStep1 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!dateOfBirth) newErrors.dateOfBirth = t('nutrify.validation.dobRequired', 'Enter your date of birth');
+    if (height < 100 || height > 250) newErrors.height = t('nutrify.validation.heightRange', 'Height must be 100-250 cm');
+    if (weight < 30 || weight > 300) newErrors.weight = t('nutrify.validation.weightRange', 'Weight must be 30-300 kg');
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -34,7 +56,7 @@ export default function NutritionOnboarding({ onComplete }: Props) {
 
       await window.api.nutritionSaveProfile({
         dateOfBirth, sex, heightCm: height, initialWeightKg: weight,
-        activityLevel: activity, deficitTargetKcal,
+        activityLevel: activity, deficitTargetKcal, mealSchedule,
       });
       onComplete();
     } catch (err) {
@@ -44,22 +66,42 @@ export default function NutritionOnboarding({ onComplete }: Props) {
     }
   };
 
-  const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.9rem' };
+  // BMR / TDEE live preview (Mifflin-St Jeor)
+  const age = dateOfBirth ? getAgeFromDob(dateOfBirth) : 0;
+  const { tdee, dailyTarget } = useMemo(() => {
+    if (!age || !weight || !height) return { tdee: 0, dailyTarget: 0 };
+    const base = 10 * weight + 6.25 * height - 5 * age;
+    const bmr = Math.max(800, Math.min(3500, sex === 'M' ? base + 5 : base - 161));
+    const mult = ACTIVITY_MULTIPLIERS[activity] ?? 1.55;
+    const computedTdee = bmr * mult;
+    const adjustment = goal === 'deficit' ? -goalAmount
+      : goal === 'surplus' ? goalAmount
+      : 0;
+    return { tdee: Math.round(computedTdee), dailyTarget: Math.round(computedTdee + adjustment) };
+  }, [age, weight, height, sex, activity, goal, goalAmount]);
+
+  const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--fs-quote)' };
 
   return (
     <div className="rpg-card" style={{ maxWidth: 450, margin: '40px auto', padding: 24 }}>
       <h3 style={{ marginBottom: 4, textAlign: 'center' }}>{t('nutrify.nutritionSetup')}</h3>
-      <p style={{ textAlign: 'center', fontSize: '0.85rem', opacity: 0.6, marginBottom: 16 }}>
-        {step === 0 ? t('nutrify.setupStep1') : t('nutrify.setupStep2')}
+      <p style={{ textAlign: 'center', fontSize: 'var(--fs-label)', opacity: 0.75, marginBottom: 16 }}>
+        {step === 0 ? t('nutrify.setupStep1') : step === 1 ? t('nutrify.setupStep2') : t('nutrify.onboardingStep3', 'Horario de comidas')}
       </p>
 
       {step === 0 ? (
-        /* Step 1: Body info */
+        /* Step 0: Body info */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={labelStyle}>
             {t('nutrify.dateOfBirth')}
-            <RpgDatePicker value={dateOfBirth} onChange={setDateOfBirth}
+            <RpgDatePicker value={dateOfBirth} onChange={(val) => {
+              setDateOfBirth(val);
+              setErrors(prev => { const { dateOfBirth: _, ...rest } = prev; return rest; });
+            }}
               min="1900-01-01" max={new Date().toISOString().split('T')[0]} />
+            {errors.dateOfBirth && (
+              <span className="nutri-field-error">{errors.dateOfBirth}</span>
+            )}
           </label>
           <label style={labelStyle}>
             {t('nutrify.sex')}
@@ -70,13 +112,25 @@ export default function NutritionOnboarding({ onComplete }: Props) {
           </label>
           <label style={labelStyle}>
             {t('nutrify.height')}
-            <input type="number" value={height} onChange={(e) => setHeight(+e.target.value)}
+            <input type="number" value={height} onChange={(e) => {
+              setHeight(+e.target.value);
+              setErrors(prev => { const { height: _, ...rest } = prev; return rest; });
+            }}
               min={100} max={250} className="rpg-input" />
+            {errors.height && (
+              <span className="nutri-field-error">{errors.height}</span>
+            )}
           </label>
           <label style={labelStyle}>
             {t('nutrify.weight')}
-            <input type="number" value={weight} onChange={(e) => setWeight(+e.target.value)}
+            <input type="number" value={weight} onChange={(e) => {
+              setWeight(+e.target.value);
+              setErrors(prev => { const { weight: _, ...rest } = prev; return rest; });
+            }}
               min={30} max={300} className="rpg-input" />
+            {errors.weight && (
+              <span className="nutri-field-error">{errors.weight}</span>
+            )}
           </label>
           <label style={labelStyle}>
             {t('nutrify.activityLevel')}
@@ -88,21 +142,20 @@ export default function NutritionOnboarding({ onComplete }: Props) {
             </select>
           </label>
           <button className="rpg-button" onClick={() => {
-            if (!dateOfBirth || height < 100 || height > 250 || weight < 30 || weight > 300) return;
-            setStep(1);
+            if (validateStep1()) setStep(1);
           }} style={{ marginTop: 8 }}>
             {t('onboarding.continue')}
           </button>
         </div>
-      ) : (
-        /* Step 2: Goal */
+      ) : step === 1 ? (
+        /* Step 1: Goal */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={labelStyle}>
             {t('nutrify.goal')}
             <div style={{ display: 'flex', gap: 6 }}>
               {(['deficit', 'maintain', 'surplus'] as Goal[]).map((g) => (
                 <button key={g} className="rpg-button" onClick={() => setGoal(g)}
-                  style={{ flex: 1, opacity: goal === g ? 1 : 0.5, padding: '8px 4px', fontSize: '0.8rem' }}>
+                  style={{ flex: 1, opacity: goal === g ? 1 : 0.5, padding: '8px 4px', fontSize: 'var(--fs-label)' }}>
                   {t(`nutrify.goal_${g}`)}
                 </button>
               ))}
@@ -114,17 +167,38 @@ export default function NutritionOnboarding({ onComplete }: Props) {
               {t('nutrify.goalAmount')} (kcal)
               <input type="number" value={goalAmount} onChange={(e) => setGoalAmount(+e.target.value)}
                 min={100} max={1500} step={50} className="rpg-input" />
-              <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+              <span style={{ fontSize: 'var(--fs-label)', opacity: 0.65 }}>
                 {goal === 'deficit' ? t('nutrify.goalAmountDeficitHint') : t('nutrify.goalAmountSurplusHint')}
               </span>
             </label>
           )}
 
-          {error && (
-            <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', margin: 0 }}>{error}</p>
+          {tdee > 0 && (
+            <div className="nutri-tdee-preview">
+              <p>{t('nutrify.tdeePreview', 'Your estimated TDEE')}: <strong>{tdee} kcal/{t('nutrify.perDay', 'day')}</strong></p>
+              <p>{t('nutrify.dailyTarget', 'Daily target')}: <strong>{dailyTarget} kcal/{t('nutrify.perDay', 'day')}</strong></p>
+            </div>
           )}
+
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button className="rpg-button" onClick={() => setStep(0)} style={{ opacity: 0.7 }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
+            </button>
+            <button className="rpg-button" onClick={() => setStep(2)} style={{ flex: 1 }}>
+              {t('onboarding.continue')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Step 2: Meal Schedule */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} showDefaults />
+
+          {error && (
+            <p style={{ color: 'var(--rubric)', fontSize: 'var(--fs-label)', margin: 0 }}>{error}</p>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button className="rpg-button" onClick={() => setStep(1)} style={{ opacity: 0.7 }}>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
             </button>
             <button className="rpg-button" onClick={handleSubmit} disabled={submitting} style={{ flex: 1 }}>
@@ -136,11 +210,11 @@ export default function NutritionOnboarding({ onComplete }: Props) {
 
       {/* Step dots */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
-        {[0, 1].map((i) => (
+        {[0, 1, 2].map((i) => (
           <div key={i} style={{
             width: 6, height: 6, borderRadius: '50%',
-            background: i === step ? 'var(--rpg-gold)' : 'var(--rpg-parchment-dark)',
-            border: '1px solid var(--rpg-gold-dark)',
+            background: i === step ? 'var(--gold)' : 'var(--parch-1)',
+            border: '1px solid var(--gold-dark)',
           }} />
         ))}
       </div>

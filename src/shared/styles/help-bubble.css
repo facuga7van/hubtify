@@ -1,0 +1,102 @@
+/* ═══════════════════════════════════════════════════════════
+   HelpBubble — Reusable "?" info button + click tooltip
+   Place inside any position:relative container.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Trigger button ───────────────────────────────────────── */
+
+.help-bubble {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-dark);
+  background: linear-gradient(135deg, var(--parch-1) 0%, var(--parch-2) 100%);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
+  box-shadow: 0 1px 3px rgba(42, 29, 14, 0.15);
+  padding: 0;
+}
+
+.help-bubble:hover {
+  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 100%);
+  border-color: var(--gold);
+  box-shadow: 0 1px 6px rgba(168, 138, 60, 0.3);
+  color: var(--ink);
+}
+
+.help-bubble:active {
+  transform: scale(0.93);
+}
+
+/* ── Position variants ────────────────────────────────────── */
+
+.help-bubble--top-right    { top: 6px;  right: 6px; }
+.help-bubble--top-left     { top: 6px;  left: 6px; }
+.help-bubble--bottom-right { bottom: 6px; right: 6px; }
+.help-bubble--bottom-left  { bottom: 6px; left: 6px; }
+
+/* ── Inline variant (bare icon, flows with text) ─────────── */
+
+.help-bubble-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-dark);
+  background: linear-gradient(135deg, var(--parch-1) 0%, var(--parch-2) 100%);
+  padding: 0;
+  margin-left: 4px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  opacity: 1;
+  transition: opacity 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  box-shadow: 0 1px 2px rgba(42, 29, 14, 0.12);
+}
+
+.help-bubble-inline:hover {
+  opacity: 1;
+  color: var(--rubric);
+  border-color: var(--gold);
+  box-shadow: 0 1px 4px rgba(168, 138, 60, 0.25);
+}
+
+.help-bubble-inline:active {
+  transform: scale(0.93);
+}
+
+/* ── Tooltip (portal) ─────────────────────────────────────── */
+
+.help-bubble__tip {
+  position: fixed;
+  z-index: var(--z-dropdown-top);
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 8px 12px;
+  background: linear-gradient(135deg, var(--leather) 0%, var(--leather-dark) 100%);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  color: var(--gold-light);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  box-shadow: 0 4px 16px rgba(42, 29, 14, 0.5);
+  pointer-events: auto;
+  animation: helpBubbleFadeIn 0.15s ease-out;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+@keyframes helpBubbleFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

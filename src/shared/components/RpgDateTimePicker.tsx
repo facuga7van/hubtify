@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -40,6 +40,32 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
   const [minute, setMinute] = useState(parsed.minute);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState<{ top?: string; bottom?: string; left?: string; right?: string }>({ top: '100%', left: '0' });
+
+  const repositionPopup = useCallback(() => {
+    const trigger = ref.current;
+    const popup = popupRef.current;
+    if (!trigger || !popup) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const popupRect = popup.getBoundingClientRect();
+    const pos: { top?: string; bottom?: string; left?: string; right?: string } = {};
+    if (triggerRect.bottom + popupRect.height + 8 > window.innerHeight) {
+      pos.bottom = '100%';
+    } else {
+      pos.top = '100%';
+    }
+    if (triggerRect.left + popupRect.width > window.innerWidth) {
+      pos.right = '0';
+    } else {
+      pos.left = '0';
+    }
+    setPopupPos(pos);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (open) repositionPopup();
+  }, [open, repositionPopup]);
 
   const maxDay = daysInMonth(year, month);
 
@@ -80,15 +106,17 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
     : t('datePicker.selectDateTime');
 
   const sel: React.CSSProperties = {
-    padding: '4px 6px', border: '1px solid var(--rpg-gold-dark)',
-    borderRadius: 'var(--rpg-radius)', background: 'var(--rpg-parchment)',
-    fontFamily: "'Crimson Text', serif", fontSize: '0.85rem', color: 'var(--rpg-ink)',
+    padding: '4px 6px', border: '1px solid var(--gold-dark)',
+    borderRadius: '6px', background: 'var(--parch-0)',
+    fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)', color: 'var(--ink)',
     cursor: 'pointer', textAlign: 'center',
+    boxShadow: 'inset 0 1px 2px rgba(42, 29, 14, 0.1)',
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: '0.65rem', opacity: 0.5, textTransform: 'uppercase',
-    letterSpacing: '0.05em', marginBottom: 2,
+    fontFamily: "'IM Fell English SC', serif",
+    fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', textTransform: 'uppercase',
+    letterSpacing: '0.1em', marginBottom: 2,
   };
 
   const currentYear = new Date().getFullYear();
@@ -101,7 +129,7 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
         onClick={() => setOpen(!open)}
         style={{
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: '0.85rem', whiteSpace: 'nowrap',
+          fontSize: 'var(--fs-label)', whiteSpace: 'nowrap',
         }}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
@@ -112,11 +140,12 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
       </button>
 
       {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 100,
-          background: 'linear-gradient(135deg, var(--rpg-parchment-light) 0%, var(--rpg-parchment) 40%, var(--rpg-parchment-dark) 100%)',
-          border: '2px solid var(--rpg-gold-dark)', borderRadius: 'var(--rpg-radius)',
-          boxShadow: '0 4px 16px rgba(44, 24, 16, 0.4)', padding: 12, minWidth: 240,
+        <div ref={popupRef} style={{
+          position: 'absolute', ...popupPos, margin: popupPos.bottom ? '0 0 4px' : '4px 0 0', zIndex: 100,
+          background: 'linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%)',
+          border: '2px solid var(--gold-dark)', borderRadius: '6px',
+          boxShadow: '0 4px 16px rgba(42, 29, 14, 0.4), inset 0 0 20px rgba(90, 60, 30, 0.1)',
+          padding: 12, minWidth: 240,
         }}>
           {/* Date row */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -156,7 +185,7 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
                 ))}
               </select>
             </div>
-            <div style={{ fontSize: '1rem', fontWeight: 'bold', paddingBottom: 4 }}>:</div>
+            <div style={{ fontSize: 'var(--fs-sub)', fontWeight: 'bold', paddingBottom: 4 }}>:</div>
             <div>
               <div style={labelStyle}>{t('datePicker.min')}</div>
               <select style={{ ...sel, width: 52 }} value={minute} onChange={e => set('minute', +e.target.value)}>
@@ -166,6 +195,10 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
               </select>
             </div>
           </div>
+          <button type="button" className="rpg-button" onClick={() => setOpen(false)}
+            style={{ marginTop: 10, width: '100%', padding: '4px 0', fontSize: 'var(--fs-label)' }}>
+            OK
+          </button>
         </div>
       )}
     </div>

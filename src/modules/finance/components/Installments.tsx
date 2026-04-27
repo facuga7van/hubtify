@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
-import PageHeader from '../../../shared/components/PageHeader';
+import { CastleBarChart } from '../../../shared/components/charts';
+import type { BarDatum } from '../../../shared/components/charts';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
-import { CoinStatCard } from './shared/CoinStatCard';
 import InstallmentAddForm from './shared/InstallmentAddForm';
+import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
+import { Compass } from '../../../shared/components/icons';
+import HelpBubble from '../../../shared/components/HelpBubble';
+import { formatCurrency } from '../utils/format';
 
 interface InstallmentRow {
   id: string;
@@ -43,27 +44,6 @@ function parseInstallmentNumber(row: InstallmentRow): { current: number; total: 
 function cleanDescription(desc: string): string {
   return desc.replace(/\s*\(Cuota \d+\/\d+\)\s*$/, '');
 }
-
-// Chain icon SVG
-const ChainIcon = ({ broken }: { broken: boolean }) => (
-  <svg
-    width="16" height="16" viewBox="0 0 24 24" fill="none"
-    stroke={broken ? 'var(--rpg-xp-green)' : 'var(--rpg-gold-dark)'}
-    strokeWidth="1.5" strokeLinecap="round"
-    className={broken ? 'coin-installment__chain-icon' : ''}
-  >
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-  </svg>
-);
-
-// Trash icon SVG
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </svg>
-);
 
 interface InstallmentGroup {
   groupId: string;
@@ -116,7 +96,6 @@ export default function Installments() {
     return () => window.removeEventListener('account:switched', handler);
   }, [month, loadRows, loadProjection]);
 
-  // Group rows by installmentGroupId
   const groups = useMemo<InstallmentGroup[]>(() => {
     const map = new Map<string, InstallmentRow[]>();
     for (const row of rows) {
@@ -152,23 +131,24 @@ export default function Installments() {
     return new Date(y, mo - 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
   };
 
-  // RPG gold color for chart bars
-  const GOLD = 'var(--rpg-gold)';
-  const GOLD_HIGHLIGHT = 'var(--rpg-gold-light)';
+  const barData = useMemo<BarDatum[]>(
+    () =>
+      projection.map((p) => ({
+        label: projectionLabel(p.month),
+        value: p.total,
+        status: p.month === currentMonth ? ('ok' as const) : undefined,
+      })),
+    [projection, currentMonth]
+  );
 
   return (
     <div>
-      <PageHeader title={t('coinify.installments')} subtitle={t('coinify.installmentsSubtitle', 'Cuotas del mes')} />
-
       <div style={{ marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
       </div>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-        <button
-          className="rpg-button"
-          onClick={() => setShowForm(!showForm)}
-        >
+        <button className="rpg-button" onClick={() => setShowForm(!showForm)}>
           {showForm ? t('common.cancel') : t('coinify.addInstallment', 'Nueva cuota')}
         </button>
       </div>
@@ -185,79 +165,65 @@ export default function Installments() {
       )}
 
       {error && (
-        <div className="rpg-card" style={{ marginBottom: 16, textAlign: 'center' }}>
-          <p style={{ color: 'var(--rpg-hp-red)', marginBottom: 8 }}>{t('common.somethingWentWrong')}</p>
+        <div className="coin-codex-form" style={{ textAlign: 'center' }}>
+          <p style={{ color: 'var(--rubric)', marginBottom: 8 }}>{t('common.somethingWentWrong')}</p>
           <button className="rpg-button" onClick={() => loadRows(month)}>{t('common.tryAgain')}</button>
         </div>
       )}
 
       {/* Installment list */}
-      <div className="rpg-card" style={{ marginBottom: 16 }}>
-        <div className="rpg-card-title">
-          <ChainIcon broken={false} />
-          {t('coinify.installments', 'Cuotas')} ({rows.length})
-        </div>
-
+      <Section title={`${t('coinify.installments', 'Cuotas')} (${rows.length})`} rightSlot={<HelpBubble variant="inline" text={t('coinify.installmentsHelp', 'Cuotas activas del mes. Cada fila muestra el monto, la cuota actual y las restantes.')} />}>
         {loading ? (
           <div className="coin-skeleton coin-skeleton--card" />
         ) : rows.length === 0 ? (
-          <p className="coin-empty">{t('coinify.noInstallments', 'No hay cuotas este mes')}</p>
+          <p className="coin-empty-codex">{t('coinify.noInstallments', 'No hay cuotas este mes')}</p>
         ) : (
           <div className="coin-installment-list">
             {groups.map((group) => (
               <div key={group.groupId} className="coin-installment-group">
                 <div className="coin-installment-group__header">
                   <span className="coin-installment-group__title">
-                    <ChainIcon broken={false} />
-                    {' '}{group.description}
+                    {group.description}
                   </span>
+                  {(() => {
+                    const first = parseInstallmentNumber(group.rows[0]);
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                        <Gauge value={first.current} max={first.total} tone={first.current === first.total ? 'sage' : 'gold'} showPips={false} label={`${first.current}/${first.total}`} />
+                      </div>
+                    );
+                  })()}
                   <button
-                    className="rpg-button coin-installment-group__delete"
+                    className="rpg-button"
                     onClick={() => handleDeleteGroup(group.groupId)}
                     title={t('coinify.deleteInstallmentGroup', 'Eliminar grupo de cuotas')}
-                    style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)', opacity: 0.6 }}
+                    style={{ padding: '2px 6px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
                   >
-                    <TrashIcon />
+                    {'\u2715'}
                   </button>
                 </div>
                 {group.rows.map((row) => {
                   const { current, total } = parseInstallmentNumber(row);
                   const isComplete = current === total;
-                  const progressPct = (current / total) * 100;
 
                   return (
                     <div
                       key={row.id}
-                      className={`coin-installment ${isComplete ? 'coin-installment--complete' : ''}`}
+                      className={`coin-installment-row ${isComplete ? 'coin-installment-row--complete' : ''}`}
                     >
-                      <div className="coin-installment__desc">
-                        <ChainIcon broken={isComplete} />
-                        <span className="coin-installment__counter">
-                          {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
-                        </span>
-                      </div>
-                      <div className="coin-installment__right">
+                      <span className="qb-small-caps coin-installment-row__counter">
+                        {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
+                      </span>
+                      <div className="coin-installment-row__right">
                         {row.forThirdParty && (
-                          <span className="coin-tx__badge coin-tx__badge--third-party">
-                            {'\u2192'} {row.forThirdParty}
-                          </span>
+                          <Rune tone="gold">{'\u2192'} {row.forThirdParty}</Rune>
                         )}
-                        <div className="coin-installment__progress">
-                          <div
-                            className="coin-installment__progress-fill"
-                            style={{ width: `${progressPct}%` }}
-                          />
-                        </div>
+                        <Gauge value={current} max={total} tone={isComplete ? 'sage' : 'gold'} showPips={false} />
                         {editingId === row.id ? (
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <RpgNumberInput
-                              value={editAmount}
-                              onChange={setEditAmount}
-                              min={0}
-                              step={1}
-                              autoFocus
-                              style={{ width: 100 }}
-                              onBlur={() => {
+                          <div
+                            style={{ display: 'flex', gap: 4, alignItems: 'center' }}
+                            onBlur={(e) => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                                 const val = parseFloat(editAmount);
                                 if (val > 0) {
                                   window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
@@ -269,7 +235,16 @@ export default function Installments() {
                                 } else {
                                   setEditingId(null);
                                 }
-                              }}
+                              }
+                            }}
+                          >
+                            <RpgNumberInput
+                              value={editAmount}
+                              onChange={setEditAmount}
+                              min={0}
+                              step={1}
+                              autoFocus
+                              style={{ width: 100 }}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
@@ -289,7 +264,7 @@ export default function Installments() {
                           </div>
                         ) : (
                           <span
-                            className="coin-installment__amount"
+                            className="qb-numeral coin-installment-row__amount"
                             style={{ cursor: 'pointer' }}
                             title={t('coinify.clickToEdit', 'Click para editar')}
                             onClick={() => {
@@ -297,7 +272,7 @@ export default function Installments() {
                               setEditAmount(String(row.amount));
                             }}
                           >
-                            ${row.amount.toLocaleString('es-AR')}
+                            {formatCurrency(row.amount)}
                           </span>
                         )}
                       </div>
@@ -308,91 +283,25 @@ export default function Installments() {
             ))}
           </div>
         )}
-      </div>
+      </Section>
 
-      {/* Month summary stat cards */}
+      {/* Month summary */}
       {rows.length > 0 && (
         <div className="coin-installment-summary">
-          <CoinStatCard
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="m11 19-6-6" /><path d="m5 21-2-2" /><path d="m8 16-4 4" /><path d="M9.5 17.5 21 6V3h-3L6.5 14.5" />
-              </svg>
-            }
-            label={t('coinify.ownInstallments', 'Cuotas propias')}
-            value={totalOwn}
-            color="red"
-          />
-          <CoinStatCard
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-              </svg>
-            }
-            label={t('coinify.thirdPartyInstallments', 'Cuotas de terceros')}
-            value={totalThirdParty}
-            color="gold"
-          />
-          <CoinStatCard
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10" /><path d="M12 6v12M8 10h8" />
-              </svg>
-            }
-            label={t('coinify.netInstallments', 'Total neto')}
-            value={net}
-            color={net > 0 ? 'red' : 'gold'}
-          />
+          <HelpBubble text={t('coinify.installmentSummaryHelp', 'Resumen mensual de cuotas: propias, de terceros (cargadas a tu tarjeta) y el neto que pagás.')} />
+          <Cartouche label={t('coinify.ownInstallments', 'CUOTAS PROPIAS')} value={formatCurrency(totalOwn)} />
+          <Cartouche label={t('coinify.thirdPartyInstallments', 'DE TERCEROS')} value={formatCurrency(totalThirdParty)} />
+          <Cartouche label={t('coinify.netInstallments', 'TOTAL NETO')} value={formatCurrency(net)} />
         </div>
       )}
 
       {/* 12-month projection chart */}
       {projection.length > 0 && (
-        <div className="rpg-card coin-installment__chart">
-          <div className="rpg-card-title">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.3" strokeLinecap="round">
-              <path d="M2 13L5 9l3 2 3-5 3 3" />
-            </svg>
-            {t('coinify.installmentProjection', 'Proyeccion 12 meses')}
-          </div>
+        <Section title={t('coinify.installmentProjection', 'PROYECCION 12 MESES')} icon={<Compass width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.installmentProjectionHelp', 'Proyección de cuotas a 12 meses. Muestra cómo se distribuyen los compromisos futuros.')} />}>
           <div style={{ marginTop: 12 }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={projection.map((p) => ({
-                  name: projectionLabel(p.month),
-                  total: p.total,
-                  month: p.month,
-                }))}
-                margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--rpg-parchment-dark)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--rpg-ink-light)' }} axisLine={false} tickLine={false}
-                  width={60} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{
-                    background: 'var(--rpg-parchment)',
-                    border: '1px solid var(--rpg-gold-dark)',
-                    borderRadius: 6,
-                    fontSize: '0.85rem',
-                  }}
-                  formatter={(value) => [`$${(value as number).toLocaleString('es-AR')}`, t('coinify.netInstallments', 'Total')]}
-                  labelStyle={{ color: 'var(--rpg-gold)', marginBottom: 2 }}
-                />
-                <Bar dataKey="total" radius={[3, 3, 0, 0]}>
-                  {projection.map((p, i) => (
-                    <Cell
-                      key={i}
-                      fill={p.month === currentMonth ? GOLD_HIGHLIGHT : GOLD}
-                      stroke={p.month === currentMonth ? 'var(--rpg-gold)' : 'none'}
-                      strokeWidth={p.month === currentMonth ? 2 : 0}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <CastleBarChart data={barData} height={200} themed={false} />
           </div>
-        </div>
+        </Section>
       )}
     </div>
   );

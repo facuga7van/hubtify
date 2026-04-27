@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TaskTier, Task, Project } from '../types';
+import { XP_MAP, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
@@ -11,9 +11,10 @@ interface Props {
   projects: Project[];
   activeProjectId: string | null;
   onSaved: () => void;
+  onCancel?: () => void;
 }
 
-export default function TaskForm({ editingTask, categories, projects, activeProjectId, onSaved }: Props) {
+export default function TaskForm({ editingTask, categories, projects, activeProjectId, onSaved, onCancel }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -76,6 +77,12 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
           placeholder={t('questify.questName')}
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && onCancel) {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
           className="rpg-input"
           style={{ flex: 1 }}
           autoFocus
@@ -83,6 +90,16 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
         <button type="submit" className="rpg-button">
           {editingTask ? t('questify.update') : t('questify.addQuest')}
         </button>
+        {editingTask && onCancel && (
+          <button
+            type="button"
+            className="rpg-button"
+            onClick={onCancel}
+            style={{ opacity: 0.7, fontSize: 'var(--fs-label)' }}
+          >
+            {t('questify.cancel', 'Cancelar')}
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -94,15 +111,16 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
               type="button"
               onClick={() => setTier(tierVal)}
               style={{
-                padding: '4px 10px', border: '1px solid var(--rpg-wood)',
-                borderRadius: 'var(--rpg-radius)', cursor: 'pointer',
-                background: tier === tierVal ? 'var(--rpg-gold)' : 'var(--rpg-parchment)',
-                color: tier === tierVal ? 'var(--rpg-ink)' : 'var(--rpg-ink-light)',
+                padding: '4px 10px', border: '1px solid var(--leather)',
+                borderRadius: '6px', cursor: 'pointer',
+                background: tier === tierVal ? 'var(--gold)' : 'var(--parch-0)',
+                color: tier === tierVal ? 'var(--ink)' : 'var(--ink-soft)',
                 fontWeight: tier === tierVal ? 'bold' : 'normal',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
               }}
             >
               <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
+              <span style={{ opacity: 0.7, fontSize: '0.85em', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>
             </button>
           ))}
         </div>
@@ -160,7 +178,7 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
         </div>
 
         {/* Due date toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-label)', cursor: 'pointer' }}
           onClick={() => setUseDate(!useDate)}>
           <Checkbox checked={useDate} onChange={() => setUseDate(!useDate)} size={16} />
           <span>{t('questify.dueDate')}</span>

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CachedAccount } from '../shared/accountStore';
@@ -10,14 +11,28 @@ interface Props {
   onSwitch: (appName: string) => Promise<{ success: boolean; expired?: boolean } | undefined>;
   onLogout: () => void;
   onClose: () => void;
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
-export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, onLogout, onClose }: Props) {
+export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, onLogout, onClose, anchorRef }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
   const [expiredEmail, setExpiredEmail] = useState<string | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
+  const updatePos = useCallback(() => {
+    if (!anchorRef?.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.left });
+  }, [anchorRef]);
+
+  // Calculate position before paint — no jump
+  useLayoutEffect(() => {
+    updatePos();
+  }, [updatePos]);
+
+  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -40,11 +55,18 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
     }
   };
 
-  return (
-    <div ref={ref} className="account-dropdown">
+  // Don't render until position is known
+  if (!pos) return null;
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="account-dropdown"
+      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 10000 }}
+    >
       {/* Expired session toast */}
       {expiredEmail && (
-        <div className="account-dropdown__item" style={{ color: '#e74c3c', fontSize: '0.65rem' }}>
+        <div className="account-dropdown__item" style={{ color: '#e74c3c', fontSize: 'var(--fs-label)' }}>
           {t('auth.sessionExpired', { email: expiredEmail })}
         </div>
       )}
@@ -52,7 +74,12 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
       {/* Active account */}
       <div className="account-dropdown__item account-dropdown__item--active">
         <div className="account-dropdown__dot" />
-        <span className="account-dropdown__email">{activeUser.email}</span>
+        <div className="account-dropdown__info">
+          {activeUser.displayName && (
+            <span className="account-dropdown__username">{activeUser.displayName}</span>
+          )}
+          <span className="account-dropdown__email">{activeUser.email}</span>
+        </div>
       </div>
 
       {/* Cached accounts */}
@@ -63,9 +90,16 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
           onClick={() => handleSwitch(account)}
         >
           <div className="account-dropdown__avatar">
-            {account.email.charAt(0).toUpperCase()}
+            {(account.username || account.email).charAt(0).toUpperCase()}
           </div>
-          <span className="account-dropdown__email">{account.email}</span>
+          <div className="account-dropdown__info">
+            {account.username && (
+              <span className="account-dropdown__username">
+                {account.username}
+              </span>
+            )}
+            <span className="account-dropdown__email">{account.email}</span>
+          </div>
         </button>
       ))}
 
@@ -88,6 +122,7 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
         </svg>
         <span>{t('account.signOut')}</span>
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }

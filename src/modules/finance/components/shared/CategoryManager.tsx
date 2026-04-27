@@ -40,26 +40,26 @@ export default function CategoryManager({ categories, onClose, onSaved }: Props)
         {categories.map((cat) => (
           <div key={cat} style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
-            borderBottom: '1px solid var(--rpg-parchment-dark)',
+            borderBottom: '1px solid var(--parch-1)',
           }}>
             <span style={{ flex: 1, fontWeight: 'bold' }}>{cat}</span>
             {confirmingDelete === cat ? (
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>
+                <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
                   {t('coinify.confirmDelete')}
                 </span>
                 <button className="rpg-button" onClick={() => handleDelete(cat)}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--rpg-hp-red)' }}>
+                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
                   {t('coinify.yes')}
                 </button>
                 <button className="rpg-button" onClick={() => setConfirmingDelete(null)}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
+                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
                   {t('coinify.no')}
                 </button>
               </div>
             ) : (
               <button className="rpg-button" onClick={() => setConfirmingDelete(cat)}
-                style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
+                style={{ padding: '3px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
                 {t('coinify.delete')}
               </button>
             )}

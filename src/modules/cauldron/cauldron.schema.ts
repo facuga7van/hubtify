@@ -41,4 +41,15 @@ export const cauldronMigrations: Migration[] = [
         ('preset-quick-sprint', 'Quick Sprint', 15, 3, 10, 4, 1);
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 2,
+    up: `
+      INSERT OR IGNORE INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default)
+      VALUES
+        ('preset-classic', 'Classic', 25, 5, 15, 4, 1),
+        ('preset-long-focus', 'Long Focus', 50, 10, 30, 3, 1),
+        ('preset-quick-sprint', 'Quick Sprint', 15, 3, 10, 4, 1);
+    `,
+  },
 ];

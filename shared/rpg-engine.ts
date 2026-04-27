@@ -18,9 +18,18 @@ export function getLevel(totalXp: number): number {
   return level;
 }
 
+/** Returns the i18n key for the title at this level. */
+export function getTitleKey(level: number): string {
+  for (const [threshold, key] of TITLE_THRESHOLDS) {
+    if (level >= threshold) return key;
+  }
+  return 'rpg.titles.peasant';
+}
+
+/** Returns the fallback (untranslated) title name. */
 export function getTitle(level: number): string {
-  for (const [threshold, title] of TITLE_THRESHOLDS) {
-    if (level >= threshold) return title;
+  for (const [threshold, , fallback] of TITLE_THRESHOLDS) {
+    if (level >= threshold) return fallback;
   }
   return 'Campesino';
 }

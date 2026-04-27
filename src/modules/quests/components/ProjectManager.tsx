@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { Rune } from '../../../shared/components/codex/CodexPrimitives';
+import HelpBubble from '../../../shared/components/HelpBubble';
 import type { Project } from '../types';
 import { PROJECT_COLORS } from '../types';
 
@@ -52,43 +54,38 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.7)', zIndex: 9999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onClose}>
-      <div className="rpg-card" style={{ width: 420, maxHeight: '80vh', overflow: 'auto' }}
-        onClick={(e) => e.stopPropagation()}>
-        <div className="rpg-card-title">{t('questify.manageProjects')}</div>
+    <div className="quest-project-modal-overlay" onClick={onClose}>
+      <div className="quest-project-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="quest-project-modal-title">{t('questify.manageProjects')} <HelpBubble variant="inline" text={t('questify.projectsHelp', 'Proyectos agrupan misiones en campañas. Su progreso se muestra en la barra de Campañas.')} /></div>
 
         {projects.map((p) => (
-          <div key={p.id} style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
-            borderBottom: '1px solid var(--rpg-parchment-dark)',
-          }}>
+          <div key={p.id} className="quest-project-modal-row">
             {editingId === p.id ? (
               <>
                 <ColorPicker value={editColor} onChange={setEditColor} />
-                <input className="rpg-input" value={editName} onChange={(e) => setEditName(e.target.value)}
+                <input className="subtask-input" value={editName} onChange={(e) => setEditName(e.target.value)}
                   style={{ flex: 1 }} autoFocus onKeyDown={(e) => e.key === 'Enter' && handleUpdate(p.id)} />
-                <button className="rpg-button" onClick={() => handleUpdate(p.id)}
-                  style={{ padding: '3px 8px', fontSize: '0.8rem' }}>OK</button>
-                <button className="rpg-button" onClick={() => setEditingId(null)}
-                  style={{ padding: '3px 8px', fontSize: '0.8rem', opacity: 0.6 }}>{t('questify.cancel')}</button>
+                <Rune tone="sage">
+                  <span style={{ cursor: 'pointer' }} onClick={() => handleUpdate(p.id)}>OK</span>
+                </Rune>
+                <Rune>
+                  <span style={{ cursor: 'pointer' }} onClick={() => setEditingId(null)}>{t('questify.cancel')}</span>
+                </Rune>
               </>
             ) : (
               <>
                 <span style={{
                   width: 12, height: 12, borderRadius: '50%', background: p.color, flexShrink: 0,
                 }} />
-                <span style={{ flex: 1, fontWeight: 'bold' }}>{p.name}</span>
-                <button className="rpg-button" onClick={() => startEdit(p)}
-                  style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.6 }}>
-                  {t('questify.edit')}
-                </button>
-                <button className="rpg-button" onClick={() => handleDelete(p.id)}
-                  style={{ padding: '3px 8px', fontSize: '0.75rem', opacity: 0.4 }}>
-                  {t('questify.delete')}
-                </button>
+                <span style={{
+                  flex: 1, fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)', color: 'var(--ink)',
+                }}>{p.name}</span>
+                <Rune>
+                  <span style={{ cursor: 'pointer' }} onClick={() => startEdit(p)}>{t('questify.edit')}</span>
+                </Rune>
+                <Rune tone="rubric">
+                  <span style={{ cursor: 'pointer' }} onClick={() => handleDelete(p.id)}>{t('questify.delete')}</span>
+                </Rune>
               </>
             )}
           </div>
@@ -96,12 +93,12 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
           <ColorPicker value={newColor} onChange={setNewColor} />
-          <input className="rpg-input" placeholder={t('questify.projectName')} value={newName}
+          <input className="subtask-input" placeholder={t('questify.projectName')} value={newName}
             onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
-          <button className="rpg-button" onClick={handleCreate} disabled={!newName.trim()}>
-            + {t('questify.newProject')}
-          </button>
+          <Rune tone="sage">
+            <span style={{ cursor: 'pointer' }} onClick={handleCreate}>+ {t('questify.newProject')}</span>
+          </Rune>
         </div>
       </div>
     </div>
@@ -113,8 +110,8 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', width: 80 }}>
       {PROJECT_COLORS.map((c) => (
         <button key={c} type="button" onClick={() => onChange(c)} style={{
-          width: 16, height: 16, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
-          outline: c === value ? '2px solid var(--rpg-gold)' : '2px solid transparent',
+          width: 14, height: 14, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+          outline: c === value ? '2px solid var(--gold)' : '2px solid transparent',
           outlineOffset: 1,
         }} />
       ))}

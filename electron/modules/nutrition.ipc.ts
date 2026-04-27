@@ -2,6 +2,8 @@ import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 
 import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
+import { resolveMealType, DEFAULT_MEAL_SCHEDULE } from '../../shared/meal-utils';
+import type { MealSchedule } from '../../shared/meal-utils';
 
 export function registerNutritionIpcHandlers(): void {
   // ── Profile ────────────────────────────────────────
@@ -10,12 +12,17 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     const row = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
     if (!row) return null;
+    let mealSchedule: MealSchedule | null = null;
+    if (row.meal_schedule) {
+      try { mealSchedule = JSON.parse(row.meal_schedule as string); } catch { /* invalid JSON */ }
+    }
     return {
       dateOfBirth: row.date_of_birth, weightCheckDay: row.weight_check_day,
       weightPopupEnabled: row.weight_popup_enabled ?? 1,
       sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal,
+      mealSchedule,
     };
   });
 
@@ -23,6 +30,7 @@ export function registerNutritionIpcHandlers(): void {
     dateOfBirth: string; sex: string; heightCm: number; initialWeightKg: number;
     activityLevel: string; deficitTargetKcal?: number;
     weightCheckDay?: number; weightPopupEnabled?: boolean;
+    mealSchedule?: MealSchedule;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
     const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
@@ -33,35 +41,62 @@ export function registerNutritionIpcHandlers(): void {
     const age = getAgeFromDob(profile.dateOfBirth);
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const weightPopupEnabled = profile.weightPopupEnabled !== false ? 1 : 0;
+    const mealScheduleJson = profile.mealSchedule ? JSON.stringify(profile.mealSchedule) : null;
     const db = getDb();
+    // Read existing meal_schedule to preserve it when not provided
+    const existing = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
+    const finalMealSchedule = mealScheduleJson ?? existing?.meal_schedule ?? null;
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule);
 
     // Recalc today's summary with new profile
     const today = todayDateString();
     recalcSummary(db, today);
   });
 
+  ipcHandle('nutrition:getMealSchedule', () => {
+    const db = getDb();
+    const row = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
+    if (!row?.meal_schedule) return DEFAULT_MEAL_SCHEDULE;
+    try { return JSON.parse(row.meal_schedule); } catch { return DEFAULT_MEAL_SCHEDULE; }
+  });
+
   // ── Food Log ───────────────────────────────────────
 
   ipcHandle('nutrition:logFood', (_e, entry: {
     date?: string; description: string; calories: number; source: string;
-    frequentFoodId?: number;
+    frequentFoodId?: number; aiBreakdown?: string; meal?: string;
   }) => {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
     const db = getDb();
     const date = entry.date ?? todayDateString();
+    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
+    if (closed) throw new Error('Cannot modify a closed day');
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    // Resolve meal type if not provided
+    let meal = entry.meal ?? null;
+    if (!meal) {
+      const profileRow = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
+      let schedule: MealSchedule | null = null;
+      if (profileRow?.meal_schedule) {
+        try { schedule = JSON.parse(profileRow.meal_schedule); } catch { /* use default */ }
+      }
+      const resolved = resolveMealType(time, schedule);
+      if (resolved.ambiguous.length === 0) {
+        meal = resolved.meal;
+      }
+      // If ambiguous, leave meal null — frontend will handle picker
+    }
     db.transaction(() => {
       db.prepare(`
-        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(date, time, entry.description, entry.calories, entry.source,
-        entry.frequentFoodId ?? null);
+        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal);
       recalcSummary(db, date);
     })();
   });
@@ -70,33 +105,55 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, date, time, description, calories, source,
-             frequent_food_id AS frequentFoodId
+             frequent_food_id AS frequentFoodId,
+             ai_breakdown AS aiBreakdown,
+             meal
       FROM food_log WHERE date = ? ORDER BY time ASC
     `).all(date);
   });
 
   ipcHandle('nutrition:deleteFood', (_e, id: number) => {
     const db = getDb();
+    const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
+    if (entry) {
+      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
+      if (closed) throw new Error('Cannot modify a closed day');
+    }
     db.transaction(() => {
-      const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
       db.prepare('DELETE FROM food_log WHERE id = ?').run(id);
       if (entry) recalcSummary(db, entry.date);
     })();
   });
 
-  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number }) => {
+  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
+    const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
+    if (entry) {
+      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
+      if (closed) throw new Error('Cannot modify a closed day');
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
     if (fields.calories !== undefined) { sets.push('calories = ?'); vals.push(fields.calories); }
+    if (fields.meal !== undefined) { sets.push('meal = ?'); vals.push(fields.meal); }
+    if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (sets.length === 0) return;
     vals.push(id);
     db.transaction(() => {
       db.prepare(`UPDATE food_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
-      const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
       if (entry) recalcSummary(db, entry.date);
+    })();
+  });
+
+  ipcHandle('nutrition:deleteByDate', (_e, date: string) => {
+    const db = getDb();
+    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
+    if (closed) throw new Error('Cannot modify a closed day');
+    db.transaction(() => {
+      db.prepare('DELETE FROM food_log WHERE date = ?').run(date);
+      recalcSummary(db, date);
     })();
   });
 
@@ -225,11 +282,43 @@ export function registerNutritionIpcHandlers(): void {
     return streak;
   });
 
+  ipcHandle('nutrition:getWeekCalories', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const sevenAgo = daysAgoDateString(6);
+    const rows = db.prepare(`
+      SELECT date, COALESCE(SUM(calories), 0) AS total
+      FROM food_log
+      WHERE date BETWEEN ? AND ?
+      GROUP BY date
+      ORDER BY date ASC
+    `).all(sevenAgo, today) as Array<{ date: string; total: number }>;
+
+    // Build a map and fill in missing days with 0
+    const map = new Map(rows.map(r => [r.date, r.total]));
+    const result: number[] = [];
+    const d = new Date(sevenAgo + 'T12:00:00');
+    const end = new Date(today + 'T12:00:00');
+    while (d <= end) {
+      const key = formatDateString(d);
+      result.push(map.get(key) ?? 0);
+      d.setDate(d.getDate() + 1);
+    }
+    return result;
+  });
+
   ipcHandle('nutrition:getTodayCalories', () => {
     const db = getDb();
     const today = todayDateString();
     const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
     return row.total;
+  });
+
+  ipcHandle('nutrition:getTodayMealsCount', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const row = db.prepare('SELECT COUNT(*) AS c FROM food_log WHERE date = ?').get(today) as { c: number };
+    return row.c;
   });
 
   ipcHandle('nutrition:getTodayTarget', () => {
@@ -393,6 +482,18 @@ export function registerNutritionIpcHandlers(): void {
     }
   });
 
+  ipcHandle('nutrition:getRecentFoods', () => {
+    const db = getDb();
+    return db.prepare(`
+      SELECT description, calories, source
+      FROM food_log
+      WHERE description IS NOT NULL AND description != ''
+      GROUP BY description
+      ORDER BY MAX(id) DESC
+      LIMIT 10
+    `).all();
+  });
+
   ipcHandle('nutrition:getPendingDays', () => {
     const db = getDb();
     const today = todayDateString();
@@ -413,7 +514,7 @@ export function registerNutritionIpcHandlers(): void {
 
 // ── Helpers ────────────────────────────────────────
 
-function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
+export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
   if (!profile) return;
 

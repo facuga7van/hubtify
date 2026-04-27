@@ -212,6 +212,24 @@ export function registerQuestsIpcHandlers(): void {
     return result.c;
   });
 
+  ipcHandle('quests:getOverdueCount', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const result = db.prepare(
+      "SELECT COUNT(*) AS c FROM tasks WHERE status = 0 AND deleted_at IS NULL AND due_date IS NOT NULL AND due_date < ?"
+    ).get(today) as { c: number };
+    return result.c;
+  });
+
+  ipcHandle('quests:getDueTodayCount', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const result = db.prepare(
+      "SELECT COUNT(*) AS c FROM tasks WHERE status = 0 AND deleted_at IS NULL AND due_date = ?"
+    ).get(today) as { c: number };
+    return result.c;
+  });
+
   // ── Projects ─────────────────────────────────────
 
   ipcHandle('quests:getProjects', () => {
@@ -420,6 +438,138 @@ export function registerQuestsIpcHandlers(): void {
 
       return { ...h, streak, checkedToday, checksThisPeriod, targetThisPeriod };
     });
+  });
+
+  ipcHandle('quests:getHabitHeatmap', (_e, days: number = 91) => {
+    const db = getDb();
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - days + 1);
+    const startStr = formatDateString(startDate);
+
+    const rows = db.prepare(`
+      SELECT date, COUNT(DISTINCT habit_id) AS count
+      FROM habit_checks
+      WHERE deleted_at IS NULL AND date >= ?
+      GROUP BY date
+    `).all(startStr) as Array<{ date: string; count: number }>;
+
+    const totalHabits = (db.prepare(
+      'SELECT COUNT(*) AS c FROM habits WHERE deleted_at IS NULL'
+    ).get() as { c: number }).c;
+
+    const countMap = new Map<string, number>();
+    for (const row of rows) {
+      countMap.set(row.date, row.count);
+    }
+
+    const result: Array<{ date: string; count: number }> = [];
+    const d = new Date(startDate);
+    for (let i = 0; i < days; i++) {
+      const ds = formatDateString(d);
+      result.push({ date: ds, count: countMap.get(ds) ?? 0 });
+      d.setDate(d.getDate() + 1);
+    }
+
+    return { days: result, totalHabits };
+  });
+
+  ipcHandle('quests:getHabitStreaks', () => {
+    const db = getDb();
+    const today = new Date();
+    const todayStr = formatDateString(today);
+
+    const habits = db.prepare(`
+      SELECT id, name, frequency, times_per_week AS timesPerWeek
+      FROM habits WHERE deleted_at IS NULL
+    `).all() as Array<{ id: string; name: string; frequency: string; timesPerWeek: number }>;
+
+    if (habits.length === 0) return [];
+
+    const allChecks = db.prepare(
+      'SELECT habit_id, date FROM habit_checks WHERE deleted_at IS NULL ORDER BY date DESC'
+    ).all() as Array<{ habit_id: string; date: string }>;
+
+    const checksByHabit = new Map<string, Set<string>>();
+    for (const check of allChecks) {
+      let set = checksByHabit.get(check.habit_id);
+      if (!set) { set = new Set(); checksByHabit.set(check.habit_id, set); }
+      set.add(check.date);
+    }
+
+    const result: Array<{ name: string; streak: number }> = [];
+
+    for (const h of habits) {
+      const dates = checksByHabit.get(h.id) ?? new Set<string>();
+      const checkedToday = dates.has(todayStr);
+      let streak = 0;
+
+      if (h.frequency === 'daily') {
+        if (!checkedToday) {
+          const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+          if (!dates.has(formatDateString(yesterday))) continue;
+        }
+        const startDate = checkedToday ? todayStr : (() => {
+          const d = new Date(); d.setDate(d.getDate() - 1); return formatDateString(d);
+        })();
+        const d = new Date(startDate + 'T00:00:00');
+        while (dates.has(formatDateString(d))) {
+          streak++;
+          d.setDate(d.getDate() - 1);
+        }
+      } else if (h.frequency === 'weekly') {
+        const dayOfWeek = today.getDay() || 7;
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - dayOfWeek + 1);
+        const wStartStr = formatDateString(weekStart);
+        let checksThisWeek = 0;
+        for (const dt of dates) {
+          if (dt >= wStartStr && dt <= todayStr) checksThisWeek++;
+        }
+        const currentMet = checksThisWeek >= h.timesPerWeek;
+        const d = new Date(weekStart);
+        if (!currentMet) d.setDate(d.getDate() - 7);
+
+        while (true) {
+          const wStart = formatDateString(d);
+          const wEnd = new Date(d); wEnd.setDate(d.getDate() + 6);
+          const wEndStr = formatDateString(wEnd);
+          let count = 0;
+          for (const dt of dates) {
+            if (dt >= wStart && dt <= wEndStr) count++;
+          }
+          if (count < h.timesPerWeek) break;
+          streak++;
+          d.setDate(d.getDate() - 7);
+        }
+      } else if (h.frequency === 'monthly') {
+        const monthStart = todayStr.slice(0, 7) + '-01';
+        let checksThisMonth = 0;
+        for (const dt of dates) {
+          if (dt >= monthStart && dt <= todayStr) checksThisMonth++;
+        }
+        const currentMet = checksThisMonth >= 1;
+        let year = today.getFullYear();
+        let month = today.getMonth();
+        if (!currentMet) { month--; if (month < 0) { month = 11; year--; } }
+
+        while (true) {
+          const mStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+          const mEnd = `${year}-${String(month + 1).padStart(2, '0')}-31`;
+          let count = 0;
+          for (const d of dates) {
+            if (d >= mStart && d <= mEnd) count++;
+          }
+          if (count < 1) break;
+          streak++;
+          month--; if (month < 0) { month = 11; year--; }
+        }
+      }
+
+      if (streak > 0) result.push({ name: h.name, streak });
+    }
+
+    return result.sort((a, b) => b.streak - a.streak);
   });
 
   ipcHandle('quests:addHabit', (_e, habit: { name: string; frequency: string; timesPerWeek: number }) => {

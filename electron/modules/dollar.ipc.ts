@@ -1,5 +1,5 @@
-import { ipcMain, net } from 'electron';
 import { getDb } from '../ipc/db';
+import { ipcHandle } from '../ipc/ipc-handle';
 
 const DOLLAR_API = 'https://dolarapi.com/v1/dolares';
 
@@ -11,7 +11,7 @@ interface DollarRate {
 }
 
 export function registerDollarIpcHandlers(): void {
-  ipcMain.handle('dollar:getRates', async () => {
+  ipcHandle('dollar:getRates', async () => {
     try {
       // Try to fetch fresh rates
       const response = await fetch(DOLLAR_API);

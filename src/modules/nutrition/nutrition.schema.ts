@@ -103,4 +103,12 @@ export const nutritionMigrations: Migration[] = [
       ALTER TABLE nutrition_profile ADD COLUMN weight_popup_enabled INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 6,
+    up: `
+      ALTER TABLE food_log ADD COLUMN meal TEXT DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN meal_schedule TEXT DEFAULT NULL;
+    `,
+  },
 ];

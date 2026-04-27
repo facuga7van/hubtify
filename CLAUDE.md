@@ -114,3 +114,4 @@ Each module exports a `ModuleDefinition` with: id, name, routes, dashboardWidget
 - Don't skip the `account:switched` listener on new data components
 - Don't forget to add new tables to `USER_DATA_TABLES` and sync handlers
 - Don't use `window.confirm()` or `window.alert()` — use `useConfirm()` from `shared/components/ConfirmDialog` for in-app RPG-themed dialogs
+- Don't use emojis/Unicode emoji characters in the UI — use inline SVG icons from `src/shared/components/icons/` instead. Medieval RPG theme requires hand-crafted vector icons, not emojis

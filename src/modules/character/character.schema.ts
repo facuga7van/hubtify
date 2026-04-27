@@ -12,4 +12,11 @@ export const characterMigrations: Migration[] = [
       );
     `,
   },
+  {
+    namespace: 'character',
+    version: 2,
+    up: `
+      ALTER TABLE user_profile ADD COLUMN character_name TEXT;
+    `,
+  },
 ];

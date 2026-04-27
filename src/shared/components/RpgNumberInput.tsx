@@ -50,9 +50,10 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
 
   const arrowBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 16, height: '50%', border: 'none', cursor: 'pointer',
-    background: 'transparent', color: 'var(--rpg-wood, #2c1810)',
-    userSelect: 'none', padding: 0, opacity: 0.5,
+    width: 18, height: '50%', border: 'none', cursor: 'pointer',
+    background: 'linear-gradient(180deg, var(--leather-light), var(--leather))',
+    color: 'var(--gold)',
+    userSelect: 'none', padding: 0, borderRadius: 2,
   };
 
   return (
@@ -74,7 +75,9 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+          if (e.key === 'ArrowUp') { e.preventDefault(); adjust(1); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); adjust(-1); }
+          else if (e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
           onKeyDown?.(e);
         }}
         placeholder={placeholder}
@@ -90,7 +93,7 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
       {suffix && (
         <span style={{
           position: 'absolute', right: 34, top: '50%', transform: 'translateY(-50%)',
-          fontSize: '0.75rem', opacity: 0.5, pointerEvents: 'none',
+          fontSize: 'var(--fs-label)', opacity: 0.65, pointerEvents: 'none',
         }}>
           {suffix}
         </span>

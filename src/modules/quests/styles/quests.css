@@ -1,29 +1,596 @@
+/* ====== Questify — Codex / Medieval Codex Aesthetic ====== */
+
+/* ── Top stats strip ─────────────────────────────── */
+.quest-stats-strip {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* ── New quest input row ─────────────────────────── */
+.quest-input-row {
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.55);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quest-input-row input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: 'Cormorant Garamond', 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.quest-input-row input::placeholder {
+  color: var(--ink-faded);
+  opacity: 0.7;
+}
+
+/* ── Two-column layout ───────────────────────────── */
+.quest-columns {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 700px) {
+  .quest-columns {
+    grid-template-columns: 1fr;
+  }
+  .quest-stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Quest row card ──────────────────────────────── */
+.quest-row {
+  position: relative;
+  padding: 10px 12px 10px 16px;
+  margin-bottom: 8px;
+  background: rgba(245, 231, 192, 0.55);
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.quest-row:hover {
+  background: rgba(245, 231, 192, 0.6);
+}
+
+/* tier left-border colors */
+.quest-row--communis { border-left: 3px double var(--ink-soft); }
+.quest-row--rara     { border-left: 3px double var(--moss); }
+.quest-row--epica    { border-left: 3px double var(--gold-dark); }
+.quest-row--legendaria { border-left: 3px double var(--rubric); }
+.quest-row--delata   { border-left: 3px double var(--rubric); }
+
+/* completing animation state */
+.quest-row--completing {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* done state */
+.quest-row--done {
+  background: rgba(245, 231, 192, 0.35);
+}
+
+.quest-row--done .quest-row-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--rubric);
+  color: var(--ink-faded);
+}
+
+/* overdue state */
+.quest-row--overdue {
+  background: rgba(122, 30, 30, 0.1);
+}
+
+/* top-right ornament */
+.quest-row-ornament {
+  position: absolute;
+  top: -5px;
+  right: 6px;
+  font-size: var(--fs-label);
+}
+
+/* row inner flex layout */
+.quest-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* title + meta area */
+.quest-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.quest-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* tier label rune inside the row */
+.quest-tier-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  padding: 2px 6px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.quest-tier-label--communis {
+  color: var(--ink-soft);
+  border-color: rgba(74, 55, 32, 0.4);
+}
+
+.quest-tier-label--rara {
+  color: var(--moss);
+  border-color: rgba(85, 107, 60, 0.35);
+}
+
+.quest-tier-label--epica {
+  color: var(--gold-dark);
+  border-color: rgba(168, 138, 60, 0.35);
+}
+
+.quest-tier-label--legendaria {
+  color: var(--rubric);
+  border-color: rgba(122, 30, 30, 0.35);
+}
+
+.quest-tier-label--delata {
+  color: var(--rubric);
+  border-color: rgba(122, 30, 30, 0.35);
+  opacity: 0.8;
+}
+
+/* task title text */
+.quest-row-title {
+  font-family: 'IM Fell English', serif;
+  font-size: calc(14.5px * var(--font-scale));
+  color: var(--ink);
+}
+
+/* meta info row */
+.quest-row-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.quest-row-meta span {
+  font-family: 'Cormorant Garamond', 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* subtask nested list */
+.quest-row-subtasks {
+  margin-top: 8px;
+  padding-left: 4px;
+  border-left: 1px dotted rgba(74, 55, 32, 0.45);
+}
+
+.quest-row-subtask {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0 2px 8px;
+  font-size: var(--fs-quote);
+}
+
+.quest-row-subtask--done {
+  color: var(--ink-faded);
+}
+
+.quest-row-subtask--done .quest-row-subtask-text {
+  text-decoration: line-through;
+}
+
+.quest-row-subtask--pending {
+  color: var(--ink-soft);
+}
+
+/* XP reward display */
+.quest-row-xp {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.quest-row-xp-value {
+  font-family: 'UnifrakturCook', serif;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.quest-row-xp-value--reward { color: var(--moss); }
+.quest-row-xp-value--penalty { color: var(--rubric); }
+
+.quest-row-xp-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  color: var(--ink-faded);
+}
+
+/* ── Quest row actions (edit, notes, select, drag) ── */
+.quest-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.quest-row-actions svg {
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.quest-row-actions svg:hover {
+  opacity: 0.85;
+}
+
+/* ── Due Date Badges ──────────────────────────────── */
+.quest-due--overdue {
+  background: var(--rubric);
+  color: var(--parch-0);
+  padding: 1px 6px;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.08em;
+}
+
+.quest-due--today {
+  background: rgba(168, 138, 60, 0.8);
+  color: var(--parch-0);
+  padding: 1px 6px;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.08em;
+}
+
+.quest-due--this-week {
+  background: rgba(245, 231, 192, 0.7);
+  color: var(--ink-soft);
+  padding: 1px 6px;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+}
+
+.quest-due--later {
+  background: rgba(245, 231, 192, 0.5);
+  color: var(--ink-faded);
+  padding: 1px 6px;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  border: 1px solid rgba(74, 55, 32, 0.3);
+}
+
+/* ── Expanded detail area ────────────────────────── */
+.quest-row-expanded {
+  padding-left: 30px;
+  padding-top: 8px;
+  border-top: 1px dotted rgba(74, 55, 32, 0.35);
+  margin-top: 8px;
+}
+
+.quest-row-expanded p {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  opacity: 0.9;
+  margin-bottom: 6px;
+}
+
+/* ── Section project grouping ────────────────────── */
+.quest-project-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(74, 55, 32, 0.3);
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.quest-project-header:hover {
+  background: rgba(245, 231, 192, 0.4);
+}
+
+.quest-project-header-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  flex: 1;
+  color: var(--ink);
+}
+
+.quest-project-header-count {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  color: var(--ink-faded);
+}
+
+.quest-project-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Tabs & Filters bar ──────────────────────────── */
+.quest-tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.quest-tab-bar .qb-rune {
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.quest-tab-bar .qb-rune:hover {
+  background: rgba(245, 231, 192, 0.6);
+}
+
+.quest-tab-bar .qb-rune--active {
+  background: rgba(122, 30, 30, 0.18);
+  border-color: var(--rubric);
+  color: var(--rubric);
+}
+
+/* ── Category filter select ──────────────────────── */
+.quest-filter-select {
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.5);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  cursor: pointer;
+  outline: none;
+}
+
+/* ── Delete confirm strip ────────────────────────── */
+.quest-delete-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  background: rgba(122, 30, 30, 0.12);
+  border: 1px solid rgba(122, 30, 30, 0.4);
+}
+
+.quest-delete-bar span {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+}
+
+/* ── Habit grid (right column) ───────────────────── */
+.quest-habit-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.35);
+  gap: 8px;
+}
+
+.quest-habit-name {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.quest-habit-name--done {
+  opacity: 0.7;
+  text-decoration: line-through;
+  font-weight: normal;
+}
+
+.quest-habit-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quest-habit-freq {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  background: rgba(245, 231, 192, 0.4);
+  color: var(--ink-faded);
+}
+
+.quest-habit-progress {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+}
+
+.quest-habit-streak {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-faded);
+}
+
+.quest-habit-streak--hot {
+  color: var(--gold);
+}
+
+.quest-habit-check {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--ink-soft);
+  background: rgba(245, 231, 192, 0.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.quest-habit-check--done {
+  background: rgba(122, 30, 30, 0.22);
+  border-color: var(--rubric);
+}
+
+/* ── Campaign progress row ───────────────────────── */
+.quest-campaign-row {
+  padding: 6px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
+}
+
+.quest-campaign-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-quote);
+  margin-bottom: 3px;
+}
+
+.quest-campaign-name {
+  font-family: 'IM Fell English', serif;
+  color: var(--ink);
+}
+
+.quest-campaign-count {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+/* ── Scroll notes block (right column) ───────────── */
+.quest-scroll-note {
+  background: rgba(245, 231, 192, 0.6);
+  border: 1px dashed rgba(74, 55, 32, 0.5);
+  padding: 10px 12px;
+  font-family: 'Cormorant Garamond', 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-quote);
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+/* ── Skeleton Loading ────────────────────────────── */
+@keyframes questShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.quest-skeleton {
+  background: linear-gradient(90deg, rgba(245, 231, 192, 0.4) 25%, rgba(245, 231, 192, 0.6) 50%, rgba(245, 231, 192, 0.4) 75%);
+  background-size: 200% 100%;
+  animation: questShimmer 1.5s ease infinite;
+  height: 48px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(74, 55, 32, 0.25);
+}
+
+/* ── Empty state ─────────────────────────────────── */
+.quest-empty {
+  text-align: center;
+  padding: 24px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  color: var(--ink-faded);
+}
+
+/* ── Project select (header) ─────────────────────── */
+.quest-project-select {
+  padding: 4px 2px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--gold-dark);
+  border-radius: 0;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  cursor: pointer;
+  outline: none;
+}
+
+/* ── Note icon badge ─────────────────────────────── */
+.quest-note-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  background: var(--gold);
+  color: var(--ink);
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
 /* ── XP Toast ─────────────────────────────────────── */
 .xp-toast {
   position: fixed;
   bottom: 24px;
   right: 24px;
   padding: 12px 20px;
-  background: var(--rpg-wood);
-  color: var(--rpg-gold-light);
-  border: 2px solid var(--rpg-gold);
-  border-radius: var(--rpg-radius);
+  background: var(--leather);
+  color: var(--gold-light);
+  border: 2px solid var(--gold);
   box-shadow: 0 4px 20px rgba(44, 24, 16, 0.5);
   display: flex;
   flex-direction: column;
   gap: 4px;
-  z-index: 1000;
-  font-family: 'Cinzel', serif;
+  z-index: var(--z-toast);
+  font-family: 'UnifrakturCook', cursive;
 }
 
 .xp-toast__xp { font-size: 1.2rem; font-weight: bold; }
-.xp-toast__combo { font-size: 0.85rem; opacity: 0.8; }
-.xp-toast__bonus { font-size: 0.9rem; color: var(--rpg-gold); }
-.xp-toast__streak { font-size: 0.85rem; color: var(--rpg-xp-green-light); }
+.xp-toast__combo { font-size: var(--fs-label); opacity: 0.8; }
+.xp-toast__bonus { font-size: var(--fs-quote); color: var(--gold); }
+.xp-toast__streak { font-size: var(--fs-label); color: var(--moss-light); }
 
 .xp-toast--good {
-  border-color: #3498db;
-  box-shadow: 0 0 8px rgba(52, 152, 219, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+  border-color: var(--moss);
+  box-shadow: 0 0 8px rgba(85, 107, 60, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
 }
 
 .xp-toast--critical {
@@ -32,9 +599,9 @@
 }
 
 .xp-toast--legendary {
-  border-color: var(--rpg-gold);
-  background: linear-gradient(135deg, var(--rpg-leather) 0%, var(--rpg-wood) 100%);
-  box-shadow: 0 0 20px rgba(201, 168, 76, 0.5), 0 4px 20px rgba(44, 24, 16, 0.5);
+  border-color: var(--gold);
+  background: linear-gradient(135deg, var(--leather) 0%, var(--leather-light) 100%);
+  box-shadow: 0 0 20px rgba(168, 138, 60, 0.5), 0 4px 20px rgba(44, 24, 16, 0.5);
 }
 
 /* ── Subtask styles ───────────────────────────────── */
@@ -45,20 +612,21 @@
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 0.9rem;
+  font-size: var(--fs-quote);
+  font-family: 'IM Fell English', serif;
 }
 
-.subtask-item:hover { background: rgba(92, 58, 30, 0.05); }
+.subtask-item:hover { background: rgba(74, 55, 32, 0.08); }
 
-.subtask-item--completed { opacity: 0.5; }
+.subtask-item--completed { opacity: 0.65; }
 
 .subtask-toggle-completed {
   background: none;
   border: none;
-  color: var(--rpg-wood-light);
+  color: var(--ink-faded);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English', serif;
   padding: 4px 0;
   margin-top: 4px;
 }
@@ -71,95 +639,142 @@
   gap: 6px;
   padding: 8px;
   margin-top: 6px;
-  border: 1px dashed var(--rpg-wood);
-  border-radius: var(--rpg-radius);
-  background: rgba(244, 228, 193, 0.5);
+  border: 1px dashed rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.5);
 }
 
 .subtask-input {
   padding: 4px 8px;
-  border: 1px solid var(--rpg-wood);
-  border-radius: 3px;
-  background: var(--rpg-parchment);
-  font-family: inherit;
-  font-size: 0.85rem;
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.6);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  outline: none;
 }
 
 .subtask-tier-buttons { display: flex; gap: 4px; }
 
 .subtask-tier-btn {
   padding: 2px 8px;
-  border: 1px solid var(--rpg-wood);
-  border-radius: 3px;
-  background: var(--rpg-parchment);
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.5);
   cursor: pointer;
 }
 
 .subtask-tier-btn.tierActive {
-  background: var(--rpg-gold);
+  background: var(--gold);
   font-weight: bold;
 }
 
 .subtask-form-actions { display: flex; gap: 6px; }
 
-/* ── Task card enhancements ───────────────────────── */
-.rpg-card + .rpg-card {
-  margin-top: 8px;
-}
-
-
-/* ── Overdue Glow ─────────────────────────────────── */
-.quest-card--overdue {
-  border-left: 3px solid var(--rpg-hp-red) !important;
-  box-shadow: inset 3px 0 6px rgba(139, 32, 32, 0.15);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-/* ── Due Date Badges ──────────────────────────────── */
-.quest-due--overdue {
-  background: var(--rpg-hp-red);
-  color: var(--rpg-parchment);
-}
-
-.quest-due--today {
-  background: #c0792a;
-  color: var(--rpg-parchment);
-}
-
-.quest-due--this-week {
-  background: var(--rpg-gold);
-  color: var(--rpg-ink);
-  opacity: 0.8;
-}
-
-.quest-due--later {
-  background: var(--rpg-parchment-dark);
-  color: var(--rpg-ink-light);
-}
-
-/* ── Stats Strip ──────────────────────────────────── */
-.quest-stats-strip {
+/* ── Project Manager modal (codex) ───────────────── */
+.quest-project-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 29, 14, 0.75);
+  z-index: var(--z-modal);
   display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
+  align-items: center;
+  justify-content: center;
 }
 
-.quest-stats-strip .coin-stat {
-  flex: 1;
-  padding: 10px 8px;
+.quest-project-modal {
+  width: 420px;
+  max-height: 80vh;
+  overflow: auto;
+  background:
+    radial-gradient(ellipse at 50% 50%, var(--parch-0), var(--parch-1) 55%, var(--parch-2) 100%);
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 231, 192, 0.6),
+    0 20px 60px rgba(0, 0, 0, 0.4);
+  padding: 20px;
 }
 
-/* ── Skeleton Loading ─────────────────────────────── */
-@keyframes questShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+.quest-project-modal-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-quote);
+  letter-spacing: 0.18em;
+  color: var(--rubric);
+  border-bottom: 1px solid rgba(122, 30, 30, 0.35);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
 }
 
-.quest-skeleton {
-  background: linear-gradient(90deg, var(--rpg-parchment-dark) 25%, var(--rpg-parchment-light) 50%, var(--rpg-parchment-dark) 75%);
-  background-size: 200% 100%;
-  animation: questShimmer 1.5s ease infinite;
-  border-radius: var(--rpg-radius);
-  height: 48px;
-  margin-bottom: 8px;
+.quest-project-modal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.35);
+}
+
+/* ── Habit add/edit form (codex) ─────────────────── */
+.quest-habit-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.quest-habit-form input,
+.quest-habit-form select {
+  padding: 4px 8px;
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  background: rgba(245, 231, 192, 0.6);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  outline: none;
+}
+
+/* ── Drag handle ─────────────────────────────────── */
+.quest-drag-handle {
+  cursor: grab;
+  opacity: 0.3;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.quest-drag-handle:hover {
+  opacity: 0.6;
+}
+
+/* ── Cauldron link rune ──────────────────────────── */
+.quest-cauldron-link {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: calc(var(--fs-label) * var(--font-scale));
+  letter-spacing: 0.12em;
+  color: var(--parch-0);
+  padding: 5px 14px;
+  border: 1px solid rgba(85, 107, 60, 0.6);
+  border-radius: 4px;
+  background: linear-gradient(135deg, #556b3c 0%, #3c5028 100%);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  animation: cauldron-pulse 2.5s ease-in-out infinite;
+}
+
+.quest-cauldron-link:hover {
+  background: linear-gradient(135deg, #667d48 0%, #4a6230 100%);
+  border-color: var(--moss-light);
+  color: #fff;
+  box-shadow:
+    0 2px 8px rgba(85, 107, 60, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  animation: none;
+}
+
+@keyframes cauldron-pulse {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+  50% { box-shadow: 0 1px 8px rgba(85, 107, 60, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
 }

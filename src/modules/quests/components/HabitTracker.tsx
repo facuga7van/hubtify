@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { useToast } from '../../../shared/components/useToast';
+import { Tick } from '../../../shared/components/codex/CodexPrimitives';
+import { HeatmapCalendar, type CellLevel } from '../../../shared/components/charts/HeatmapCalendar';
 import type { HabitWithStreak, HabitFrequency } from '../types';
+import { bonusMultiplierToTier } from '../utils';
 import { playTaskComplete } from '../../../shared/audio';
 import { formatDateString } from '../../../../shared/date-utils';
+import HelpBubble from '../../../shared/components/HelpBubble';
 
 interface Props {
   onXpGained: () => void;
@@ -17,6 +22,7 @@ const FREQ_LABEL_KEYS: Record<HabitFrequency, string> = {
 
 export default function HabitTracker({ onXpGained }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const confirm = useConfirm();
   const [habits, setHabits] = useState<HabitWithStreak[]>([]);
   const [adding, setAdding] = useState(false);
@@ -27,38 +33,46 @@ export default function HabitTracker({ onXpGained }: Props) {
   const [editName, setEditName] = useState('');
   const [editFreq, setEditFreq] = useState<HabitFrequency>('daily');
   const [editTimes, setEditTimes] = useState(1);
-  const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem('questify_habits_collapsed') === 'true';
-  });
+  const [heatmapOpen, setHeatmapOpen] = useState(false);
+  const [heatmapData, setHeatmapData] = useState<CellLevel[]>([]);
+  const [heatmapStart, setHeatmapStart] = useState('');
 
   const loadHabits = useCallback(async () => {
     const result = await window.api.questsGetHabits();
     setHabits(result as HabitWithStreak[]);
   }, []);
 
-  useEffect(() => { loadHabits(); }, [loadHabits]);
+  const loadHeatmap = useCallback(async () => {
+    const { days, totalHabits } = await window.api.questsGetHabitHeatmap(30);
+    if (totalHabits === 0) { setHeatmapData([]); return; }
+    const todayStr = formatDateString(new Date());
+    if (days.length > 0) setHeatmapStart(days[0].date);
+    const cells: CellLevel[] = days.map(d => {
+      if (d.date === todayStr) return 'today';
+      if (d.count === 0) return 'l0';
+      const ratio = d.count / totalHabits;
+      if (ratio >= 1) return 'l4';
+      if (ratio >= 0.75) return 'l3';
+      if (ratio >= 0.5) return 'l2';
+      return 'l1';
+    });
+    setHeatmapData(cells);
+  }, []);
 
-  // Refresh when remote sync brings new data
+  useEffect(() => { loadHabits(); }, [loadHabits]);
+  useEffect(() => { if (heatmapOpen) loadHeatmap(); }, [heatmapOpen, loadHeatmap]);
+
   useEffect(() => {
-    const handler = () => loadHabits();
+    const handler = () => { loadHabits(); if (heatmapOpen) loadHeatmap(); };
     window.addEventListener('sync:questsUpdated', handler);
     return () => window.removeEventListener('sync:questsUpdated', handler);
-  }, [loadHabits]);
+  }, [loadHabits, loadHeatmap, heatmapOpen]);
 
-  // Reload data when account is switched
   useEffect(() => {
-    const handler = () => loadHabits();
+    const handler = () => { loadHabits(); if (heatmapOpen) loadHeatmap(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadHabits]);
-
-  const toggleCollapsed = () => {
-    setCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('questify_habits_collapsed', String(next));
-      return next;
-    });
-  };
+  }, [loadHabits, loadHeatmap, heatmapOpen]);
 
   const handleCheck = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId);
@@ -66,23 +80,22 @@ export default function HabitTracker({ onXpGained }: Props) {
     const result = await window.api.questsCheckHabit(habitId);
 
     if (result.checked) {
-      // XP only when this check completes the period target
       const justCompletedPeriod = habit.checksThisPeriod + 1 >= habit.targetThisPeriod
         && habit.checksThisPeriod < habit.targetThisPeriod;
       if (justCompletedPeriod) {
         const streak = habit.streak + 1;
         const xp = 5 + Math.min(streak, 10);
-        await window.api.processRpgEvent({
+        const rpgResult = await window.api.processRpgEvent({
           type: 'HABIT_CHECKED', moduleId: 'quests',
           payload: { xp, hp: 0, habitId },
           timestamp: Date.now(),
         });
+        toast({ type: 'xp', message: `+${rpgResult.xpGained} XP`, details: { xp: rpgResult.xpGained, bonusTier: bonusMultiplierToTier(rpgResult.bonusMultiplier), comboMultiplier: rpgResult.comboMultiplier, streakMilestone: rpgResult.milestoneXp || undefined } });
         onXpGained();
         window.dispatchEvent(new Event('rpg:statsChanged'));
       }
       playTaskComplete();
     } else {
-      // Remove XP only if unchecking drops below the target
       const droppedBelowTarget = habit.checksThisPeriod === habit.targetThisPeriod;
       if (droppedBelowTarget) {
         await window.api.processRpgEvent({
@@ -90,10 +103,12 @@ export default function HabitTracker({ onXpGained }: Props) {
           payload: { xp: -5, hp: 0, habitId },
           timestamp: Date.now(),
         });
+        toast({ type: 'warning', message: t('questify.habitUnchecked', 'Habit unchecked — XP deducted') });
         window.dispatchEvent(new Event('rpg:statsChanged'));
       }
     }
     await loadHabits();
+    if (heatmapOpen) loadHeatmap();
     window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
@@ -157,7 +172,6 @@ export default function HabitTracker({ onXpGained }: Props) {
       nextMonday.setDate(now.getDate() + (8 - dow));
       return formatDateString(nextMonday);
     }
-    // monthly
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     return formatDateString(nextMonth);
   };
@@ -174,49 +188,34 @@ export default function HabitTracker({ onXpGained }: Props) {
 
   if (habits.length === 0 && !adding) {
     return (
-      <div style={{ marginBottom: 16 }}>
-        <button className="rpg-button" onClick={() => setAdding(true)}
-          style={{ fontSize: '0.8rem', padding: '4px 10px', opacity: 0.6 }}>
+      <div>
+        <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setAdding(true)}>
           + {t('questify.addHabit')}
-        </button>
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="rpg-card" style={{ marginBottom: 16 }}>
-      {/* Header — collapsible */}
-      <div onClick={toggleCollapsed}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-          style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)', opacity: 0.4 }}>
-          <path d="M3 1l4 4-4 4"/>
-        </svg>
-        <div className="rpg-card-title" style={{ margin: 0, flex: 1 }}>
-          {t('questify.habits')}
-        </div>
-        <span style={{ fontSize: '0.75rem', opacity: 0.4, fontFamily: 'Fira Code, monospace' }}>
+    <div>
+      {/* Completion summary */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <span className="quest-habit-progress">
           {habits.filter(h => isPeriodComplete(h)).length}/{habits.length}
         </span>
-        <button className="rpg-button" onClick={(e) => { e.stopPropagation(); setAdding(!adding); }}
-          style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
-          +
-        </button>
+        <span className="qb-rune" style={{ cursor: 'pointer', fontSize: 'var(--fs-label)' }} onClick={() => setAdding(!adding)}>+</span>
       </div>
 
       {/* Habit list */}
-      {!collapsed && habits.map((h) => (
-        <div key={h.id} style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0',
-          borderBottom: '1px solid var(--rpg-parchment-dark)',
-        }}>
+      {habits.map((h) => (
+        <div key={h.id} className="quest-habit-row">
           {editingId === h.id ? (
-            <>
-              <input className="rpg-input" value={editName} onChange={(e) => setEditName(e.target.value)}
-                style={{ flex: 1, fontSize: '0.85rem' }} autoFocus
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input className="subtask-input" value={editName} onChange={(e) => setEditName(e.target.value)}
+                style={{ flex: 1, minWidth: 80 }} autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditingId(null); }} />
               <select value={editFreq} onChange={(e) => setEditFreq(e.target.value as HabitFrequency)}
-                className="rpg-select" style={{ fontSize: '0.75rem' }}>
+                className="subtask-input" style={{ fontSize: 'var(--fs-label)' }}>
                 {Object.entries(FREQ_LABEL_KEYS).map(([k, v]) => (
                   <option key={k} value={k}>{t(v)}</option>
                 ))}
@@ -224,102 +223,82 @@ export default function HabitTracker({ onXpGained }: Props) {
               {editFreq === 'weekly' && (
                 <input type="number" min={1} max={7} value={editTimes}
                   onChange={(e) => setEditTimes(Math.min(7, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="rpg-input" style={{ width: 36, textAlign: 'center', fontSize: '0.8rem' }} />
+                  className="subtask-input" style={{ width: 32, textAlign: 'center' }} />
               )}
-              <button className="rpg-button" onClick={handleEditSave}
-                disabled={!editName.trim() || isDuplicateName(editName.trim(), editingId)}
-                style={{ padding: '2px 8px', fontSize: '0.75rem' }}>OK</button>
-              <button className="rpg-button" onClick={() => setEditingId(null)}
-                style={{ padding: '2px 6px', fontSize: '0.75rem', opacity: 0.6 }}>
+              <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleEditSave}>OK</span>
+              <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setEditingId(null)}>
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <path d="M1 1l6 6M7 1l-6 6"/>
                 </svg>
-              </button>
-            </>
+              </span>
+            </div>
           ) : (
             <>
-              <span onClick={() => startEdit(h)} style={{
-                flex: 1, fontWeight: isPeriodComplete(h) ? 'normal' : 'bold',
-                opacity: isPeriodComplete(h) ? 0.6 : 1,
-                textDecoration: isPeriodComplete(h) ? 'line-through' : 'none',
-                cursor: 'pointer',
-              }} title={t('questify.edit')}>
+              <span
+                className={`quest-habit-name${isPeriodComplete(h) ? ' quest-habit-name--done' : ''}`}
+                onClick={() => startEdit(h)}
+                title={t('questify.edit')}
+              >
                 {h.name}
               </span>
 
-              {/* Frequency label */}
-              <span style={{
-                fontSize: '0.65rem', padding: '1px 5px', borderRadius: 3,
-                background: 'var(--rpg-parchment-dark)', color: 'var(--rpg-ink-light)',
-              }}>
-                {getFreqLabel(h)}
-              </span>
+              <div className="quest-habit-right">
+                {/* Frequency label */}
+                <span className="quest-habit-freq">{getFreqLabel(h)}</span>
 
-              {/* Progress for weekly/monthly */}
-              {getProgressLabel(h) && (
-                <span style={{ fontSize: '0.7rem', fontFamily: 'Fira Code, monospace', opacity: 0.6, cursor: 'default' }}
-                  title={getResetDate(h) ? t('questify.resetsOn', { date: getResetDate(h) }) : undefined}>
-                  {getProgressLabel(h)}
-                </span>
-              )}
-
-              {/* Streak */}
-              {h.streak > 0 && (
-                <span style={{
-                  fontSize: '0.7rem', fontFamily: 'Fira Code, monospace',
-                  color: h.streak >= 10 ? 'var(--rpg-gold)' : 'var(--rpg-ink-light)',
-                  opacity: 0.7, display: 'flex', alignItems: 'center', gap: 2,
-                }}>
-                  <svg width="10" height="10" viewBox="0 0 14 14" fill={h.streak >= 10 ? 'var(--rpg-gold)' : '#e67e22'} style={{ flexShrink: 0 }}>
-                    <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
-                  </svg>
-                  {h.streak}
-                </span>
-              )}
-
-              {/* Check button */}
-              <button onClick={() => handleCheck(h.id)}
-                style={{
-                  width: 24, height: 24, borderRadius: 4, cursor: 'pointer',
-                  border: `2px solid ${h.checkedToday ? 'var(--rpg-gold)' : 'var(--rpg-wood)'}`,
-                  background: h.checkedToday ? 'var(--rpg-gold)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.15s ease',
-                }}>
-                {h.checkedToday && (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--rpg-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7l3 3 5-6"/>
-                  </svg>
+                {/* Progress for weekly/monthly */}
+                {getProgressLabel(h) && (
+                  <span className="quest-habit-progress"
+                    title={getResetDate(h) ? t('questify.resetsOn', { date: getResetDate(h) }) : undefined}>
+                    {getProgressLabel(h)}
+                  </span>
                 )}
-              </button>
 
-              {/* Delete */}
-              <svg onClick={() => handleDelete(h.id)} width="12" height="12" viewBox="0 0 14 14"
-                style={{ cursor: 'pointer', opacity: 0.3, transition: 'opacity 0.2s', flexShrink: 0 }}
-                onMouseOver={(e) => (e.currentTarget.style.opacity = '0.7')}
-                onMouseOut={(e) => (e.currentTarget.style.opacity = '0.3')}
-                fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
-              </svg>
+                {/* Streak */}
+                {h.streak > 0 && (
+                  <span className={`quest-habit-streak${h.streak >= 10 ? ' quest-habit-streak--hot' : ''}`}>
+                    <svg width="10" height="10" viewBox="0 0 14 14" fill={h.streak >= 10 ? 'var(--gold)' : 'var(--rubric)'} style={{ flexShrink: 0 }}>
+                      <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
+                    </svg>
+                    {h.streak}
+                  </span>
+                )}
+
+                {/* Check button — using Tick component */}
+                <Tick
+                  checked={h.checkedToday}
+                  onChange={() => handleCheck(h.id)}
+                  label={h.name}
+                />
+
+                {/* Delete */}
+                <svg onClick={() => handleDelete(h.id)} width="10" height="10" viewBox="0 0 14 14"
+                  style={{ cursor: 'pointer', opacity: 0.25, transition: 'opacity 0.2s', flexShrink: 0 }}
+                  onMouseOver={(e) => (e.currentTarget.style.opacity = '0.6')}
+                  onMouseOut={(e) => (e.currentTarget.style.opacity = '0.25')}
+                  fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
+                  <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
+                </svg>
+              </div>
             </>
           )}
         </div>
       ))}
 
       {/* Add form */}
-      {!collapsed && adding && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+      {adding && (
+        <div className="quest-habit-form">
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder={t('questify.habitName')}
-            className="rpg-input"
-            style={{ flex: 1, minWidth: 120 }}
+            className="subtask-input"
+            style={{ flex: 1, minWidth: 100 }}
             autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           />
           <select value={newFreq} onChange={(e) => setNewFreq(e.target.value as HabitFrequency)}
-            className="rpg-select" style={{ fontSize: '0.85rem' }}>
+            className="subtask-input" style={{ fontSize: 'var(--fs-label)' }}>
             {Object.entries(FREQ_LABEL_KEYS).map(([k, v]) => (
               <option key={k} value={k}>{t(v)}</option>
             ))}
@@ -328,18 +307,39 @@ export default function HabitTracker({ onXpGained }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <input type="number" min={1} max={7} value={newTimes}
                 onChange={(e) => setNewTimes(Math.min(7, Math.max(1, parseInt(e.target.value) || 1)))}
-                className="rpg-input" style={{ width: 40, textAlign: 'center' }} />
-              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('questify.timesPerWeek')}</span>
+                className="subtask-input" style={{ width: 36, textAlign: 'center' }} />
+              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.timesPerWeek')}</span>
             </div>
           )}
-          <button className="rpg-button" onClick={handleAdd} disabled={!newName.trim()}
-            style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-            OK
-          </button>
-          <button className="rpg-button" onClick={() => setAdding(false)}
-            style={{ padding: '4px 8px', fontSize: '0.8rem', opacity: 0.6 }}>
+          <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleAdd}>OK</span>
+          <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setAdding(false)}>
             {t('questify.cancel')}
-          </button>
+          </span>
+        </div>
+      )}
+
+      {/* Heatmap calendar (collapsible) */}
+      {habits.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div
+            className="quest-project-header"
+            style={{ padding: '4px 6px', cursor: 'pointer' }}
+            onClick={() => setHeatmapOpen(!heatmapOpen)}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              style={{ transition: 'transform 0.2s', transform: heatmapOpen ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.5 }}>
+              <path d="M3 1l4 4-4 4"/>
+            </svg>
+            <span className="quest-project-header-name">
+              {t('questify.habitHeatmap', 'Activity Map')}
+            </span>
+            <HelpBubble variant="inline" text={t('questify.heatmapHelp', 'Mapa de actividad de los últimos 30 días. Los colores más intensos indican más hábitos completados ese día.')} />
+          </div>
+          {heatmapOpen && heatmapData.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <HeatmapCalendar data={heatmapData} startDate={heatmapStart} columns={7} legend />
+            </div>
+          )}
         </div>
       )}
     </div>

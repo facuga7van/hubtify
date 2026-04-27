@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { AnimatedNumber } from './AnimatedNumber';
+import { currencyPrefix } from '../../utils/format';
 
 interface DonutDatum {
   label: string;
@@ -52,7 +53,7 @@ export function DonutChart({ data, title }: DonutChartProps) {
     <div className="coin-donut-wrap">
       {title && (
         <div className="coin-donut-wrap__title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rpg-gold-dark)" strokeWidth="1.5" strokeLinecap="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="1.5" strokeLinecap="round">
             <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
             <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
           </svg>
@@ -69,7 +70,7 @@ export function DonutChart({ data, title }: DonutChartProps) {
               cy={CENTER}
               r={RADIUS}
               fill="none"
-              stroke="var(--rpg-parchment-dark)"
+              stroke="var(--parch-1)"
               strokeWidth={STROKE}
             />
             {/* Data segments */}
@@ -100,6 +101,7 @@ export function DonutChart({ data, title }: DonutChartProps) {
           >
             <AnimatedNumber
               value={total}
+              prefix={currencyPrefix()}
               className="coin-donut-center__total"
             />
             <span className="coin-donut-center__label">{t('coinify.total')}</span>

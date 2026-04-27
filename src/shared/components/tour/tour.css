@@ -1,0 +1,268 @@
+/* ══════════════════════════════════════════════════════
+   TOUR — Medieval guided tour overlay
+   ══════════════════════════════════════════════════════ */
+
+/* ── Overlay ─────────────────────────────────────── */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-tour);
+  pointer-events: none;
+}
+
+/* ── SVG Spotlight ───────────────────────────────── */
+.tour-spotlight__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The mask rect (dark area) captures clicks to prevent interaction outside spotlight */
+.tour-spotlight__mask-click {
+  pointer-events: auto;
+  cursor: default;
+}
+
+/* Golden glow around the spotlight cutout */
+.tour-spotlight__glow {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(168, 138, 60, 0.6)) drop-shadow(0 0 12px rgba(168, 138, 60, 0.3));
+  animation: tourGlowPulse 2s ease-in-out infinite;
+}
+
+@keyframes tourGlowPulse {
+  0%, 100% { stroke-opacity: 0.7; }
+  50% { stroke-opacity: 1; }
+}
+
+/* ── Tooltip ─────────────────────────────────────── */
+.tour-tooltip {
+  position: fixed;
+  z-index: calc(var(--z-tour) + 1);
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%);
+  border: 2px solid var(--gold-dark);
+  border-radius: 6px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(168, 138, 60, 0.1),
+    inset 0 1px 3px rgba(42, 29, 14, 0.1);
+  padding: 20px;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+/* Inner border ornament — matches rpg-card pattern */
+.tour-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  border: 1px solid rgba(168, 138, 60, 0.25);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.tour-tooltip--visible {
+  opacity: 1;
+}
+
+/* ── Tooltip Title ───────────────────────────────── */
+.tour-tooltip__title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: calc(var(--fs-nav) * var(--font-scale));
+  font-weight: 700;
+  color: var(--gold-dark);
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(168, 138, 60, 0.25);
+  padding-bottom: 8px;
+}
+
+/* ── Tooltip Description ─────────────────────────── */
+.tour-tooltip__desc {
+  font-family: 'IM Fell English', serif;
+  font-size: calc(var(--fs-body) * var(--font-scale));
+  color: var(--ink);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* ── Tooltip Navigation ──────────────────────────── */
+.tour-tooltip__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour-tooltip__nav-back {
+  padding: 6px 14px;
+  font-size: var(--fs-label);
+}
+
+.tour-tooltip__nav-back:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.tour-tooltip__nav-next {
+  padding: 6px 14px;
+  font-size: var(--fs-label);
+  flex: 1;
+}
+
+.tour-tooltip__nav-skip {
+  background: none;
+  border: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  font-style: italic;
+  padding: 4px 8px;
+  transition: color 0.2s;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.tour-tooltip__nav-skip:hover {
+  color: var(--ink);
+  opacity: 1;
+}
+
+/* ── Step Counter (Wax Seal Dots) ────────────────── */
+.tour-tooltip__steps {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(168, 138, 60, 0.15);
+}
+
+.tour-tooltip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--parch-2);
+  border: 1px solid var(--gold-dark);
+  transition: all 0.3s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.tour-tooltip__dot--active {
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  border-color: rgba(194, 58, 58, 0.6);
+  box-shadow: 0 0 6px rgba(194, 58, 58, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  transform: scale(1.2);
+}
+
+.tour-tooltip__dot--done {
+  background: var(--gold);
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 4px rgba(168, 138, 60, 0.3);
+}
+
+/* ── Step Counter Text ───────────────────────────── */
+.tour-tooltip__step-text {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  text-align: center;
+  margin-top: 6px;
+  letter-spacing: 0.06em;
+}
+
+/* ── Tooltip Arrow ───────────────────────────────── */
+.tour-tooltip__arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Arrow pointing up (tooltip is below target) */
+.tour-tooltip--bottom .tour-tooltip__arrow {
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--gold-dark);
+}
+
+.tour-tooltip--bottom .tour-tooltip__arrow::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: -7px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid var(--parch-0);
+}
+
+/* Arrow pointing down (tooltip is above target) */
+.tour-tooltip--top .tour-tooltip__arrow {
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--gold-dark);
+}
+
+.tour-tooltip--top .tour-tooltip__arrow::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: -7px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid var(--parch-2);
+}
+
+/* Arrow pointing left (tooltip is right of target) */
+.tour-tooltip--right .tour-tooltip__arrow {
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid var(--gold-dark);
+}
+
+.tour-tooltip--right .tour-tooltip__arrow::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: -7px;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-right: 7px solid var(--parch-0);
+}
+
+/* Arrow pointing right (tooltip is left of target) */
+.tour-tooltip--left .tour-tooltip__arrow {
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid var(--gold-dark);
+}
+
+.tour-tooltip--left .tour-tooltip__arrow::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: -7px;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 7px solid var(--parch-1);
+}

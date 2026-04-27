@@ -11,13 +11,16 @@ interface SyncSettings {
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const [stats, questData, charData, nutritionData, financeData, cauldronData] = await Promise.all([
+    const [stats, questData, charData, characterName, username, nutritionData, financeData, cauldronData, notificationData] = await Promise.all([
       window.api.getRpgStats(),
       window.api.syncGetAllQuestData(),
       window.api.characterLoad(),
+      window.api.characterGetName(),
+      window.api.characterGetUsername(),
       window.api.syncGetAllNutritionData(),
       window.api.syncGetAllFinanceData(),
       window.api.syncGetAllCauldronData(),
+      window.api.syncGetAllNotificationData(),
     ]);
 
     const db = getActiveFirestore();
@@ -27,8 +30,11 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
     await setDoc(userRef, {
       playerStats: stats,
       characterData: charData,
+      characterName: characterName ?? null,
+      username: username ?? null,
       questify: questData,
       nutrify: nutritionData,
+      notifications: notificationData,
       settings: {
         language: localStorage.getItem('hubtify_lang') || 'es',
         sound: localStorage.getItem('hubtify_sound') !== 'false',
@@ -41,11 +47,11 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
 
     // Finance subcollection document — avoids 1MB Firestore limit
     const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
-    await setDoc(financeRef, financeData);
+    await setDoc(financeRef, financeData, { merge: true });
 
     // Cauldron subcollection document
     const cauldronRef = doc(db, 'hubtify_users', uid, 'cauldron', 'data');
-    await setDoc(cauldronRef, cauldronData);
+    await setDoc(cauldronRef, cauldronData, { merge: true });
 
     return { success: true };
   } catch (err: unknown) {
@@ -73,6 +79,14 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
       await window.api.characterSave(data.characterData);
     }
 
+    if (data.characterName) {
+      await window.api.characterSetName(data.characterName as string);
+    }
+
+    if (data.username) {
+      await window.api.characterSetUsername(data.username as string);
+    }
+
     if (data.questify) {
       const result = await window.api.syncMergeQuestData(data.questify);
       if (result.changed) changed = true;
@@ -81,6 +95,11 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
     if (data.nutrify) {
       const nutritionResult = await window.api.syncMergeNutritionData(data.nutrify);
       if (nutritionResult.changed) changed = true;
+    }
+
+    if (data.notifications && Array.isArray(data.notifications)) {
+      const notifResult = await window.api.syncMergeNotificationData(data.notifications as Record<string, unknown>[]);
+      if (notifResult.changed) changed = true;
     }
 
     // Finance — read from subcollection

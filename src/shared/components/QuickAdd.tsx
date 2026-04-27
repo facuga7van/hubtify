@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Project } from '../../modules/quests/types';
 import { TierBadge, TIER_LABEL } from '../../modules/quests/utils';
@@ -16,10 +16,20 @@ export default function QuickAdd({ onClose }: Props) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  useEffect(() => {
+  const loadProjects = useCallback(() => {
     window.api.questsGetProjects().then((p) => setProjects(p as Project[]));
-    inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    loadProjects();
+    inputRef.current?.focus();
+  }, [loadProjects]);
+
+  useEffect(() => {
+    const handler = () => loadProjects();
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadProjects]);
 
   // Close on Escape
   useEffect(() => {
@@ -66,13 +76,13 @@ export default function QuickAdd({ onClose }: Props) {
         backgroundSize: '400px', backgroundRepeat: 'repeat',
         borderRadius: 8, padding: '16px 20px',
         boxShadow: '0 12px 40px rgba(44,24,16,0.6)',
-        border: '3px solid var(--rpg-gold-dark)',
+        border: '3px solid var(--gold-dark)',
         width: 440,
       }} onClick={(e) => e.stopPropagation()}>
 
         <div style={{
-          fontSize: '0.8rem', opacity: 0.5, marginBottom: 8,
-          fontFamily: 'Crimson Text, serif', textAlign: 'center',
+          fontSize: 'var(--fs-label)', opacity: 0.65, marginBottom: 8,
+          fontFamily: "'IM Fell English', serif", textAlign: 'center',
         }}>
           {t('questify.quickAdd')} — Ctrl+Q
         </div>
@@ -85,7 +95,7 @@ export default function QuickAdd({ onClose }: Props) {
             onChange={(e) => setName(e.target.value)}
             placeholder={t('questify.questName')}
             className="rpg-input"
-            style={{ width: '100%', fontSize: '1rem', padding: '8px 12px', marginBottom: 10 }}
+            style={{ width: '100%', fontSize: 'var(--fs-sub)', padding: '8px 12px', marginBottom: 10 }}
           />
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -94,12 +104,12 @@ export default function QuickAdd({ onClose }: Props) {
               {([1, 2, 3] as TaskTier[]).map((tierVal) => (
                 <button key={tierVal} type="button" onClick={() => setTier(tierVal)}
                   style={{
-                    padding: '3px 8px', border: '1px solid var(--rpg-wood)',
-                    borderRadius: 'var(--rpg-radius)', cursor: 'pointer',
-                    background: tier === tierVal ? 'var(--rpg-gold)' : 'var(--rpg-parchment)',
-                    color: tier === tierVal ? 'var(--rpg-ink)' : 'var(--rpg-ink-light)',
+                    padding: '3px 8px', border: '1px solid var(--leather)',
+                    borderRadius: '6px', cursor: 'pointer',
+                    background: tier === tierVal ? 'var(--gold)' : 'var(--parch-0)',
+                    color: tier === tierVal ? 'var(--ink)' : 'var(--ink-soft)',
                     fontWeight: tier === tierVal ? 'bold' : 'normal',
-                    display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8rem',
+                    display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--fs-label)',
                   }}>
                   <TierBadge tier={tierVal} size={12} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
                 </button>
@@ -109,7 +119,7 @@ export default function QuickAdd({ onClose }: Props) {
             {/* Project */}
             {projects.length > 0 && (
               <select value={projectId ?? ''} onChange={(e) => setProjectId(e.target.value || null)}
-                className="rpg-select" style={{ fontSize: '0.85rem' }}>
+                className="rpg-select" style={{ fontSize: 'var(--fs-label)' }}>
                 <option value="">{t('questify.noProject')}</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>

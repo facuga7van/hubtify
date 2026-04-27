@@ -4,120 +4,267 @@
   width: 100vw;
 }
 
-/* ── Sidebar ──────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   SIDEBAR — Medieval codex rail
+   ══════════════════════════════════════════════════════ */
 .sidebar {
-  width: 220px;
-  min-width: 220px;
-  background: linear-gradient(180deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%);
+  position: fixed;
+  top: 32px; bottom: 0; left: 0;
+  width: 260px;
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  border-right: 2px solid var(--gold);
+  box-shadow:
+    inset -1px 0 0 rgba(0,0,0,.5),
+    2px 0 20px rgba(0,0,0,.6);
+  z-index: 999;
+  transition: width .28s cubic-bezier(.4,.1,.2,1);
+  overflow: hidden;
+  font-family: 'IM Fell English', serif;
+  color: var(--parch-0);
   display: flex;
   flex-direction: column;
-  border-right: 3px solid var(--rpg-gold-dark);
-  color: var(--rpg-parchment);
-  box-shadow: 2px 0 12px rgba(44, 24, 16, 0.4);
-  transition: width 0.25s ease, min-width 0.25s ease;
-  overflow: hidden;
-  position: relative;
-  z-index: 2;
+}
+
+/* Decorative gold stripe on right edge */
+.sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 3px;
+  background:
+    repeating-linear-gradient(180deg,
+      var(--gold) 0 6px,
+      var(--gold-dark) 6px 12px);
+  opacity: .6;
+  pointer-events: none;
 }
 
 .sidebar--collapsed {
   width: 56px;
-  min-width: 56px;
 }
 
-/* ── Sidebar wrapper (holds sidebar + toggle) ────── */
+/* ── Sidebar wrapper (spacer for fixed sidebar) ───── */
 .sidebar-wrapper {
   position: relative;
   display: flex;
   flex-shrink: 0;
+  width: 260px;
+  transition: width .28s cubic-bezier(.4,.1,.2,1);
+}
+
+.sidebar-wrapper--collapsed {
+  width: 56px;
 }
 
 /* ── Toggle button ───────────────────────────────── */
 .sidebar-toggle {
-  position: absolute;
+  position: fixed;
   top: 50%;
-  right: 0;
-  transform: translateY(-50%) translateX(50%);
-  z-index: 1;
-  background: var(--rpg-wood, #2c1810);
-  border: 1px solid rgba(201, 168, 76, 0.25);
+  left: 260px;
+  transform: translateY(-50%);
+  z-index: 101;
+  background: var(--leather);
+  border: 1px solid rgba(168, 138, 60, 0.25);
   border-left: none;
-  color: var(--rpg-gold);
+  color: var(--gold);
   cursor: pointer;
-  opacity: 0.6;
-  width: 24px;
+  opacity: 0;
+  width: 20px;
   height: 40px;
   padding: 0;
   border-radius: 0 6px 6px 0;
-  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+  transition: left .28s cubic-bezier(.4,.1,.2,1), opacity 0.2s ease, background 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.sidebar-wrapper:hover .sidebar-toggle,
+.sidebar-toggle:hover,
+.sidebar-toggle--collapsed {
+  opacity: 0.7;
+}
+
 .sidebar-toggle:hover {
-  transform: translateY(-50%) translateX(100%);
   opacity: 1;
-  background: var(--rpg-leather, #3a2218);
+  background: var(--leather-light);
 }
 
 .sidebar-toggle--collapsed {
+  left: 56px;
 }
 
-/* ── PlayerCard ──────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   PLAYER CARD — Profile block
+   ══════════════════════════════════════════════════════ */
 .player-card {
-  padding: 12px 14px;
-  transition: padding 0.25s ease;
+  padding: 16px 12px 8px;
+  transition: padding .28s cubic-bezier(.4,.1,.2,1);
+  position: relative;
 }
 
 .player-card--collapsed {
-  padding: 8px 6px;
+  padding: 12px 6px 8px;
 }
 
+/* Profile row: avatar + identity side by side */
+.player-card__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(168,138,60,.35);
+  padding-bottom: 8px;
+}
+
+.player-card--collapsed .player-card__profile {
+  justify-content: center;
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+
+/* Avatar container */
 .player-card__avatar-wrap {
   position: relative;
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 8px;
-  transition: transform 0.25s ease;
-  transform-origin: top center;
+  width: 58px; height: 58px;
+  flex-shrink: 0;
+  transition: width .28s cubic-bezier(.4,.1,.2,1), height .28s cubic-bezier(.4,.1,.2,1);
 }
 
 .player-card--collapsed .player-card__avatar-wrap {
-  width: 36px;
-  height: 36px;
-  margin-bottom: 0;
+  width: 36px; height: 36px;
 }
 
-.player-card--collapsed .player-card__avatar-glow {
-  width: 36px;
-  height: 36px;
-}
-
-.player-card--collapsed .player-card__avatar-glow > * {
-  transform: scale(0.5);
-  transform-origin: top left;
-}
-
-.player-card__avatar-glow {
+/* Circular avatar ring with gold border */
+.player-card__avatar-ring {
+  width: 100%; height: 100%;
   border-radius: 50%;
-  width: 72px;
-  height: 72px;
+  border: 1.5px solid var(--gold);
+  overflow: hidden;
+  background: var(--parch-0);
+  box-shadow: 0 0 0 2px var(--leather-dark), 0 0 0 3px rgba(168,138,60,.35), 0 2px 8px rgba(0,0,0,.4);
 }
 
-.player-card__streak {
+.player-card__avatar-ring > * {
+  transform-origin: top left;
+  transition: transform .28s cubic-bezier(.4,.1,.2,1);
+}
+
+/* Scale down PixiJS character canvas inside smaller avatar */
+.player-card--collapsed .player-card__avatar-ring > * {
+  transform: scale(0.5);
+}
+
+/* Wax-red level badge on avatar */
+.player-card__level-badge {
   position: absolute;
-  bottom: -2px;
-  right: -8px;
+  bottom: -3px; right: -6px;
+  min-width: 22px;
+  padding: 1px 5px;
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  border: 1px solid var(--parch-0);
+  border-radius: 10px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--parch-0);
+  text-align: center;
+  line-height: 1.2;
+  box-shadow: 0 1px 3px rgba(0,0,0,.5);
+  transition: font-size .28s, bottom .28s, right .28s;
+}
+
+.sidebar:not(.sidebar--collapsed) .player-card__level-badge {
+  font-size: var(--fs-label);
+  bottom: -4px; right: -8px;
+}
+
+/* Identity text (fades in on expand) */
+.player-card__ident {
+  flex: 1;
+  min-width: 0;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity .2s .05s, transform .25s;
+  white-space: nowrap;
+}
+
+.sidebar:not(.sidebar--collapsed) .player-card__ident {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.player-card--collapsed .player-card__ident {
+  position: absolute;
+  pointer-events: none;
+  width: 0;
+  overflow: hidden;
+}
+
+/* Eyebrow text */
+.player-card__eyebrow {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: .22em;
+  color: var(--rubric-light);
+}
+
+/* Name row (contains bell + clickable name + dropdown) */
+.player-card__name-row {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.player-card__bell {
+  margin-right: 6px;
+}
+
+/* Fraktur name */
+.player-card__name {
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-nav);
+  line-height: 1;
+  margin-top: 2px;
+  color: var(--parch-0);
+}
+
+.player-card__name--clickable {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-nav);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+
+.player-card__name--clickable:hover {
+  opacity: 0.8;
+}
+
+/* Streak badge */
+.player-card__streak {
   display: flex;
   align-items: center;
-  gap: 1px;
-  font-size: 0.6rem;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 0 0;
+  font-size: var(--fs-label);
   color: #e67e22;
   font-family: 'Fira Code', monospace;
   line-height: 1;
   white-space: nowrap;
   transition: opacity 0.2s ease;
+}
+
+.player-card--collapsed .player-card__streak {
+  justify-content: center;
+  padding: 2px 0 0;
 }
 
 .player-card--collapsed .player-card__streak-text {
@@ -126,121 +273,168 @@
   overflow: hidden;
 }
 
-.player-card__info {
-  text-align: center;
-  margin-bottom: 12px;
-  transition: margin-bottom 0.25s ease;
-}
-
-.player-card--collapsed .player-card__info {
-  margin-bottom: 4px;
-}
-
-.player-card__level {
-  font-family: 'Cinzel', serif;
-  font-size: 0.9rem;
-  color: var(--rpg-gold-light);
-  transition: font-size 0.25s ease;
-}
-
-.player-card--collapsed .player-card__level {
-  font-size: 0.65rem;
-}
-
-.player-card__title {
-  font-size: 0.8rem;
-  color: var(--rpg-parchment);
-  opacity: 0.8;
-  max-height: 1.5em;
-  overflow: hidden;
-  transition: max-height 0.25s ease, opacity 0.25s ease;
-}
-
-.player-card--collapsed .player-card__title {
-  max-height: 0;
-  opacity: 0;
-}
-
-.player-card__bars {
+/* ══════════════════════════════════════════════════════
+   STAT BARS — VITA / XP / RACHA
+   ══════════════════════════════════════════════════════ */
+.sidebar-bars {
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 60px;
-  overflow: hidden;
-  opacity: 1;
-  transition: max-height 0.25s ease, opacity 0.2s ease;
-}
-
-.player-card--collapsed .player-card__bars {
-  max-height: 0;
+  gap: 8px;
   opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity .2s .05s, max-height .3s;
 }
 
-.player-card__combo {
-  margin-top: 6px;
-  text-align: center;
-  font-size: 0.75rem;
-  color: var(--rpg-gold-light);
+.sidebar:not(.sidebar--collapsed) .sidebar-bars {
+  opacity: 1;
+  max-height: 200px;
+}
+
+.sidebar-bar__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-label);
+  margin-bottom: 2px;
+}
+
+.sidebar-bar__label {
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: .18em;
+  color: rgba(245,231,192,.85);
+}
+
+.sidebar-bar__val {
   font-family: 'Fira Code', monospace;
-  max-height: 1.5em;
+  font-size: calc(12px * var(--font-scale));
+  color: var(--parch-0);
+}
+
+.sidebar-bar__track {
+  height: 9px;
+  border: 1px solid rgba(0,0,0,.5);
+  background: linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.2));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.6), 0 1px 0 rgba(168,138,60,.4);
+  position: relative;
   overflow: hidden;
-  opacity: 1;
-  transition: max-height 0.25s ease, opacity 0.2s ease;
 }
 
-.player-card--collapsed .player-card__combo {
-  max-height: 0;
-  opacity: 0;
-  margin-top: 0;
+.sidebar-bar__fill {
+  height: 100%;
+  position: relative;
+  transition: width .4s ease;
 }
 
+/* Hatch overlay on all bar fills */
+.sidebar-bar__fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.08) 4px 5px);
+}
+
+.sidebar-bar__fill--hp {
+  background: linear-gradient(180deg, var(--rubric-light) 0%, var(--rubric) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 0 6px rgba(194,58,58,.4);
+}
+
+.sidebar-bar__fill--xp {
+  background: linear-gradient(180deg, var(--moss-light) 0%, var(--moss) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 0 6px rgba(111,140,74,.4);
+}
+
+.sidebar-bar__fill--gold {
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 0 6px rgba(224,192,104,.4);
+}
+
+/* ══════════════════════════════════════════════════════
+   DIVIDER
+   ══════════════════════════════════════════════════════ */
+.sidebar-divider {
+  height: 1px;
+  margin: 6px 12px;
+  background: linear-gradient(90deg, transparent, rgba(168,138,60,.5), transparent);
+}
+
+/* ══════════════════════════════════════════════════════
+   NAV ITEMS
+   ══════════════════════════════════════════════════════ */
 .sidebar-nav {
   flex: 1;
+  padding: 4px 6px;
   display: flex;
   flex-direction: column;
-  padding: 8px 10px;
   gap: 2px;
 }
 
 .sidebar--collapsed .sidebar-nav {
-  padding: 8px 6px;
+  padding: 4px 4px;
 }
 
 .sidebar-nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 14px;
-  border-radius: var(--rpg-radius);
+  padding: 8px 10px;
+  border-radius: 4px;
+  color: rgba(245,231,192,.8);
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: 'Crimson Text', serif;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--rpg-parchment);
-  text-decoration: none;
-  letter-spacing: 0.02em;
+  transition: background .15s, color .15s, border-color .15s;
+  border: none;
+  border-left: 2px solid transparent;
+  background: none;
+  font-family: 'IM Fell English', serif;
+  font-size: calc(var(--fs-quote) * var(--font-scale));
   white-space: nowrap;
+  width: 100%;
+  text-align: left;
 }
 
 .sidebar--collapsed .sidebar-nav-item {
   justify-content: center;
-  padding: 10px;
+  padding: 8px;
   gap: 0;
 }
 
-.sidebar-nav-item span:first-child {
+.sidebar-nav-item__ico {
+  position: relative;
+  width: 20px;
   display: inline-flex;
-  align-items: center;
   justify-content: center;
-  width: 24px;
-  font-size: 1.05rem;
+  align-items: center;
   flex-shrink: 0;
+  color: var(--gold);
+}
+
+.sidebar-nav-item__label {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .2s .05s, transform .25s;
+}
+
+.sidebar:not(.sidebar--collapsed) .sidebar-nav-item__label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar--collapsed .sidebar-nav-item__label {
+  position: absolute;
+  pointer-events: none;
+  width: 0;
+  overflow: hidden;
 }
 
 .sidebar-nav-item:hover {
-  background: rgba(201, 168, 76, 0.15);
-  transform: translateX(2px);
+  background: rgba(168,138,60,.25);
+  color: var(--parch-0);
+}
+
+.sidebar-nav-item:hover .sidebar-nav-item__ico {
+  color: var(--gold-light);
 }
 
 .sidebar--collapsed .sidebar-nav-item:hover {
@@ -248,84 +442,215 @@
 }
 
 .sidebar-nav-item.active {
-  background: linear-gradient(90deg, rgba(201, 168, 76, 0.25) 0%, rgba(201, 168, 76, 0.1) 100%);
-  color: var(--rpg-gold-light);
-  font-weight: 700;
-  border-left: 3px solid var(--rpg-gold);
-  padding-left: 11px;
+  background: linear-gradient(90deg, rgba(122,30,30,.45), rgba(122,30,30,.15));
+  border-left-color: var(--rubric);
+  color: var(--parch-0);
+}
+
+.sidebar-nav-item.active .sidebar-nav-item__ico {
+  color: var(--rubric-light);
 }
 
 .sidebar--collapsed .sidebar-nav-item.active {
-  border-left: none;
-  padding-left: 10px;
-  background: rgba(201, 168, 76, 0.2);
+  border-left-color: transparent;
+  background: rgba(122, 30, 30, 0.35);
 }
 
-.sidebar-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent 5%, rgba(201, 168, 76, 0.3) 50%, transparent 95%);
-  margin: 6px 14px;
+.sidebar-nav-item--disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
 }
 
+/* ── Sidebar badges (H1) ──────────────────────────── */
+.sidebar-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sidebar-badge--count {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--rubric);
+  color: var(--parch-0);
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+
+.sidebar-badge--dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 4px rgba(224,192,104,.6), 0 1px 2px rgba(0,0,0,.4);
+}
+
+/* ── Next rank hint (H2) ──────────────────────────── */
+.sidebar-bar__next-rank {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: rgba(245,231,192,.75);
+  text-align: center;
+  padding: 2px 0 0;
+  line-height: 1.2;
+}
+
+.sidebar-bar__next-rank-title {
+  color: var(--gold-light);
+  font-weight: 600;
+  font-style: normal;
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: .08em;
+}
+
+/* ══════════════════════════════════════════════════════
+   SETTINGS AREA — pushed just above footer
+   ══════════════════════════════════════════════════════ */
+.sidebar-settings-area {
+  padding: 0 6px 4px;
+}
+
+.sidebar--collapsed .sidebar-settings-area {
+  padding: 0 4px 4px;
+}
+
+/* ══════════════════════════════════════════════════════
+   FOOTER — combo + version + language
+   ══════════════════════════════════════════════════════ */
 .sidebar-footer {
-  padding: 12px 14px;
-  border-top: 1px solid rgba(201, 168, 76, 0.2);
-  font-size: 0.85rem;
-  font-family: 'Crimson Text', serif;
-  color: var(--rpg-gold);
+  padding: 10px 12px 14px;
+  border-top: 1px solid rgba(168,138,60,.35);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity .2s .05s, max-height .3s;
+  font-family: 'IM Fell English', serif;
+  color: var(--gold);
 }
 
-.sidebar--collapsed .sidebar-footer {
-  padding: 8px 6px;
+.sidebar:not(.sidebar--collapsed) .sidebar-footer {
+  opacity: 1;
+  max-height: 160px;
 }
 
-/* ── Main Content ─────────────────────────────────── */
+.sidebar-footer__combo {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  border: 1px solid rgba(168,138,60,.4);
+  background: rgba(0,0,0,.2);
+}
+
+.sidebar-footer__combo-num {
+  font-family: 'UnifrakturCook', serif;
+  font-size: var(--fs-nav);
+  color: var(--rubric-light);
+  line-height: 1;
+}
+
+.sidebar-footer__combo-txt {
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: .18em;
+  font-size: var(--fs-label);
+  color: rgba(245,231,192,.75);
+  margin-top: 2px;
+}
+
+.sidebar-footer__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-footer__lang {
+  background: none;
+  border: none;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: .1em;
+  padding: 2px 4px;
+  transition: color .15s;
+}
+
+.sidebar-footer__lang:hover {
+  color: var(--gold-light);
+}
+
+/* ══════════════════════════════════════════════════════
+   MAIN CONTENT
+   ══════════════════════════════════════════════════════ */
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 28px;
-  background-image: url('../../assets/bg.jpg');
+  padding: 0;
+  background: var(--parch-0) url('../../assets/bg.jpg') repeat;
   background-size: 600px;
-  background-repeat: repeat;
-  background-color: var(--rpg-parchment);
 }
 
-/* ── Responsive ───────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
   .sidebar:not(.sidebar--collapsed) {
-    width: 180px;
-    min-width: 180px;
+    width: 220px;
+  }
+
+  .sidebar-wrapper:not(.sidebar-wrapper--collapsed) {
+    width: 220px;
+  }
+
+  .sidebar-toggle:not(.sidebar-toggle--collapsed) {
+    left: 220px;
   }
 
   .sidebar-nav-item {
-    padding: 8px 10px;
-    font-size: 0.85rem;
+    padding: 7px 8px;
+    font-size: var(--fs-label);
+  }
+
+  .sidebar-nav-item__label {
+    font-size: var(--fs-label);
   }
 
   .main-content {
-    padding: 16px 20px;
+    padding: 0;
   }
 }
 
 @media (max-width: 700px) {
   .main-content {
-    padding: 12px 16px;
+    padding: 0;
   }
 }
 
-/* Account dropdown */
+/* ══════════════════════════════════════════════════════
+   ACCOUNT DROPDOWN
+   ══════════════════════════════════════════════════════ */
 .account-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
   min-width: 200px;
-  background: var(--rpg-parchment);
-  border: 1.5px solid var(--rpg-gold-dark);
-  border-radius: var(--rpg-radius);
+  background: var(--parch-0);
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 6px;
   overflow: hidden;
-  z-index: 100;
-  box-shadow: 0 4px 16px rgba(44, 24, 16, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  font-family: 'Crimson Text', serif;
+  z-index: var(--z-dropdown-top);
+  box-shadow: 0 4px 16px rgba(42, 29, 14, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  font-family: 'IM Fell English', serif;
 }
 
 .account-dropdown__item {
@@ -337,11 +662,11 @@
   background: none;
   width: 100%;
   text-align: left;
-  font-size: 0.8rem;
-  font-family: 'Crimson Text', serif;
-  color: var(--rpg-ink);
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English', serif;
+  color: var(--ink);
   cursor: default;
-  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+  border-bottom: 1px solid rgba(168, 138, 60, 0.3);
 }
 
 .account-dropdown__item:last-child {
@@ -350,7 +675,7 @@
 
 .account-dropdown__item--active {
   font-weight: 600;
-  color: var(--rpg-ink);
+  color: var(--ink);
 }
 
 .account-dropdown__item--switch,
@@ -361,19 +686,19 @@
 
 .account-dropdown__item--switch:hover,
 .account-dropdown__item--add:hover {
-  background: rgba(201, 168, 76, 0.15);
+  background: rgba(168, 138, 60, 0.25);
 }
 
 .account-dropdown__item--logout {
-  color: var(--rpg-hp-red);
+  color: var(--rubric);
 }
 
 .account-dropdown__item--logout:hover {
-  background: rgba(139, 32, 32, 0.1);
+  background: rgba(122, 30, 30, 0.15);
 }
 
 .account-dropdown__item--add {
-  color: var(--rpg-gold-dark);
+  color: var(--gold-dark);
   font-weight: 600;
 }
 
@@ -381,7 +706,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--rpg-xp-green);
+  background: var(--moss);
   flex-shrink: 0;
 }
 
@@ -389,19 +714,19 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(201, 168, 76, 0.2);
-  border: 1px solid var(--rpg-gold-dark);
+  background: rgba(168, 138, 60, 0.3);
+  border: 1px solid var(--gold-dark);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: var(--fs-label);
   font-weight: 700;
-  color: var(--rpg-gold-dark);
+  color: var(--gold-dark);
   flex-shrink: 0;
 }
 
 .account-dropdown__plus {
-  font-size: 14px;
+  font-size: var(--fs-quote);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -412,19 +737,19 @@
   white-space: nowrap;
 }
 
-/* Clickable title in PlayerCard */
-.player-card__title--clickable {
-  background: none;
-  border: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  padding: 0;
-  transition: opacity 0.2s;
+/* Account dropdown username */
+.account-dropdown__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
 }
 
-.player-card__title--clickable:hover {
-  opacity: 0.8;
+.account-dropdown__username {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: var(--fs-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

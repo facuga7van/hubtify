@@ -69,7 +69,7 @@ export function DollarChip() {
       <button
         className="rpg-button"
         onClick={() => setOpen(!open)}
-        style={{ fontSize: '0.75rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
+        style={{ fontSize: 'var(--fs-label)', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
       >
         <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
           USD ${featured.venta.toLocaleString('es-AR')}
@@ -81,8 +81,8 @@ export function DollarChip() {
       {open && (
         <div style={{
           position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100,
-          background: 'var(--rpg-parchment)', border: '2px solid var(--rpg-gold-dark)',
-          borderRadius: 'var(--rpg-radius)', boxShadow: 'var(--rpg-shadow)', padding: 8,
+          background: 'var(--parch-0)', border: '2px solid var(--gold-dark)',
+          borderRadius: '6px', boxShadow: '0 2px 8px rgba(42, 29, 14, 0.35)', padding: 8,
           minWidth: 180,
         }}>
           {rates.map((rate) => {
@@ -90,10 +90,10 @@ export function DollarChip() {
             return (
               <div key={rate.nombre} style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
-                fontSize: '0.78rem', borderBottom: '1px solid var(--rpg-parchment-dark)',
+                fontSize: 'var(--fs-label)', borderBottom: '1px solid var(--parch-1)',
               }}>
                 {Icon && <Icon size={12} />}
-                <span style={{ flex: 1, opacity: 0.7 }}>{rate.nombre}</span>
+                <span style={{ flex: 1, opacity: 0.8 }}>{rate.nombre}</span>
                 <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
                   ${rate.venta.toLocaleString('es-AR')}
                 </span>

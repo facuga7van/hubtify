@@ -30,6 +30,8 @@ const api = {
   questsGetAllDrawingCounts: () => ipcRenderer.invoke('quests:getAllDrawingCounts'),
   questsSaveDrawing: (drawing: Record<string, unknown>) => ipcRenderer.invoke('quests:saveDrawing', drawing),
   questsDeleteDrawing: (id: string) => ipcRenderer.invoke('quests:deleteDrawing', id),
+  questsGetHabitHeatmap: (days?: number) => ipcRenderer.invoke('quests:getHabitHeatmap', days),
+  questsGetHabitStreaks: () => ipcRenderer.invoke('quests:getHabitStreaks'),
   questsGetHabits: () => ipcRenderer.invoke('quests:getHabits'),
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => ipcRenderer.invoke('quests:addHabit', habit),
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => ipcRenderer.invoke('quests:updateHabit', id, updates),
@@ -42,6 +44,8 @@ const api = {
   questsCountCompletedToday: () => ipcRenderer.invoke('quests:countCompletedToday'),
   questsGetPendingCount: () => ipcRenderer.invoke('quests:getPendingCount'),
   questsGetCompletedTodayCount: () => ipcRenderer.invoke('quests:getCompletedTodayCount'),
+  questsGetOverdueCount: () => ipcRenderer.invoke('quests:getOverdueCount'),
+  questsGetDueTodayCount: () => ipcRenderer.invoke('quests:getDueTodayCount'),
 
   // Nutrition
   nutritionGetProfile: () => ipcRenderer.invoke('nutrition:getProfile'),
@@ -49,6 +53,7 @@ const api = {
   nutritionLogFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:logFood', entry),
   nutritionGetFoodByDate: (date: string) => ipcRenderer.invoke('nutrition:getFoodByDate', date),
   nutritionDeleteFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFood', id),
+  nutritionDeleteByDate: (date: string) => ipcRenderer.invoke('nutrition:deleteByDate', date),
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => ipcRenderer.invoke('nutrition:updateFood', id, fields),
   nutritionGetFrequentFoods: () => ipcRenderer.invoke('nutrition:getFrequentFoods'),
   nutritionCreateFrequentFood: (food: Record<string, unknown>) => ipcRenderer.invoke('nutrition:createFrequentFood', food),
@@ -62,15 +67,23 @@ const api = {
   nutritionGetSummaryRange: (start: string, end: string) => ipcRenderer.invoke('nutrition:getSummaryRange', start, end),
   nutritionGetWeights: () => ipcRenderer.invoke('nutrition:getWeights'),
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
+  nutritionGetWeekCalories: () => ipcRenderer.invoke('nutrition:getWeekCalories'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
+  nutritionGetTodayMealsCount: () => ipcRenderer.invoke('nutrition:getTodayMealsCount'),
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
+  nutritionGetRecentFoods: () => ipcRenderer.invoke('nutrition:getRecentFoods'),
   nutritionGetPendingDays: () => ipcRenderer.invoke('nutrition:getPendingDays'),
+  nutritionGetMealSchedule: () => ipcRenderer.invoke('nutrition:getMealSchedule'),
   // Character
   characterSave: (data: Record<string, unknown>) => ipcRenderer.invoke('character:save', data),
   characterLoad: () => ipcRenderer.invoke('character:load'),
+  characterGetName: () => ipcRenderer.invoke('character:getName'),
+  characterSetName: (name: string) => ipcRenderer.invoke('character:setName', name),
+  characterGetUsername: () => ipcRenderer.invoke('character:getUsername'),
+  characterSetUsername: (username: string) => ipcRenderer.invoke('character:setUsername', username),
 
   // Sync
   syncRestoreStats: (stats: Record<string, unknown>) => ipcRenderer.invoke('sync:restoreStats', stats),
@@ -101,6 +114,7 @@ const api = {
   notificationsGetCount: () => ipcRenderer.invoke('notifications:getCount'),
   notificationsSetSystemEnabled: (enabled: boolean) => ipcRenderer.invoke('notifications:setSystemEnabled', enabled),
   notificationsSetLocale: (locale: string) => ipcRenderer.invoke('notifications:setLocale', locale),
+  notificationsSetModuleEnabled: (module: string, enabled: boolean) => ipcRenderer.invoke('notifications:setModuleEnabled', module, enabled),
   onNotificationsUpdated: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('notifications:updated', handler);
@@ -118,6 +132,8 @@ const api = {
   cauldronStop: () => ipcRenderer.invoke('cauldron:stop'),
   cauldronGetState: () => ipcRenderer.invoke('cauldron:getState'),
   cauldronGetStats: () => ipcRenderer.invoke('cauldron:getStats'),
+  cauldronGetSessions: (offset?: number, limit?: number) => ipcRenderer.invoke('cauldron:getSessions', offset, limit),
+  cauldronGetWeeklyFocusTime: () => ipcRenderer.invoke('cauldron:getWeeklyFocusTime'),
   onCauldronTick: (callback: (state: unknown) => void) => {
     const handler = (_e: unknown, state: unknown) => callback(state);
     ipcRenderer.on('cauldron:tick', handler);
@@ -179,9 +195,18 @@ const api = {
   financeGetCategoryBreakdownForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getCategoryBreakdownForRange', startMonth, endMonth),
   financeGetProjection: (months: number) => ipcRenderer.invoke('finance:getProjection', months),
 
+  // Finance - Export
+  financeExportCsv: (month?: string) => ipcRenderer.invoke('finance:exportCsv', month),
+
+  // Finance - Dashboard (new)
+  financeGetMonthlyExpenses: () => ipcRenderer.invoke('finance:getMonthlyExpenses'),
+  financeGetCategoryAverages: () => ipcRenderer.invoke('finance:getCategoryAverages'),
+  financeGetPreviousMonthSummary: () => ipcRenderer.invoke('finance:getPreviousMonthSummary'),
+
   // Finance - Backward compat
   financeGetMonthlyTotal: () => ipcRenderer.invoke('finance:getMonthlyTotal'),
   financeGetActiveLoansCount: () => ipcRenderer.invoke('finance:getActiveLoansCount'),
+  financeGetTodayTransactionsCount: () => ipcRenderer.invoke('finance:getTodayTransactionsCount'),
   financeGetCategories: () => ipcRenderer.invoke('finance:getCategories'),
   financeAddCategory: (name: string) => ipcRenderer.invoke('finance:addCategory', name),
   financeDeleteCategory: (name: string) => ipcRenderer.invoke('finance:deleteCategory', name),

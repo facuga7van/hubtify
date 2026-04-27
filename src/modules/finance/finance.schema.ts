@@ -225,4 +225,40 @@ export const financeMigrations: Migration[] = [
       ALTER TABLE finance_recurring_amount_history ADD COLUMN previous_amount REAL;
     `,
   },
+  {
+    namespace: 'finance',
+    version: 8,
+    up: `
+      -- Soft-delete support: add deleted_at to 6 tables with DELETE operations
+      ALTER TABLE finance_transactions ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_categories ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_credit_cards ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_installment_groups ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_recurring ADD COLUMN deleted_at TEXT DEFAULT NULL;
+
+      -- Add updated_at to tables missing it
+      ALTER TABLE finance_categories ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      ALTER TABLE finance_credit_cards ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      ALTER TABLE finance_credit_card_statements ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      ALTER TABLE finance_installment_groups ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      ALTER TABLE finance_recurring ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+
+      -- Backfill updated_at from created_at where available
+      UPDATE finance_credit_cards SET updated_at = created_at WHERE updated_at = '';
+      UPDATE finance_credit_card_statements SET updated_at = created_at WHERE updated_at = '';
+      UPDATE finance_installment_groups SET updated_at = created_at WHERE updated_at = '';
+      UPDATE finance_recurring SET updated_at = created_at WHERE updated_at = '';
+      -- finance_categories has no created_at — backfill with now
+      UPDATE finance_categories SET updated_at = datetime('now') WHERE updated_at = '';
+
+      -- Indexes for soft-delete filtering
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_deleted ON finance_transactions(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_cat_deleted ON finance_categories(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_cc_deleted ON finance_credit_cards(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_ccs_deleted ON finance_credit_card_statements(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_ig_deleted ON finance_installment_groups(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_rec_deleted ON finance_recurring(deleted_at);
+    `,
+  },
 ];

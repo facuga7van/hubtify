@@ -14,12 +14,14 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
+    if (!isLogin && mode !== 'addAccount' && !username.trim()) return;
     setError('');
     setLoading(true);
 
@@ -34,7 +36,7 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
       } else {
         const result = isLogin
           ? await login(email, password)
-          : await register(email, password);
+          : await register(email, password, username.trim() || undefined);
         if (result.success) {
           onAuth();
         } else {
@@ -49,45 +51,53 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
   };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: 'var(--rpg-parchment)',
-      backgroundImage: `url(${new URL('../assets/bg.jpg', import.meta.url).href})`,
-      backgroundSize: '600px', backgroundRepeat: 'repeat',
-    }}>
-      <div className="rpg-card" style={{ width: 360, padding: 32 }}>
-        <h2 style={{ textAlign: 'center', marginBottom: 4, fontSize: '1.6rem' }}>{t('app.title')}</h2>
-        <p style={{ textAlign: 'center', opacity: 0.6, marginBottom: 24, fontSize: '0.9rem' }}>
+    <div className="auth-page">
+      <div className="auth-card">
+        {/* Decorative top ornament */}
+        <div className="auth-card__ornament" />
+
+        <h1 className="auth-card__title">{t('app.title')}</h1>
+        <p className="auth-card__subtitle">
           {mode === 'addAccount'
             ? t('auth.addAccountDesc')
             : isLogin ? t('auth.welcomeBack') : t('auth.beginAdventure')}
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <form onSubmit={handleSubmit} className="auth-card__form">
+          {!isLogin && mode !== 'addAccount' && (
+            <input
+              type="text"
+              placeholder={t('auth.username', 'Nombre de usuario')}
+              value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+              className="rpg-input auth-card__input"
+              maxLength={20}
+              autoFocus
+            />
+          )}
           <input
-            type="email"
-            placeholder={t('auth.email')}
+            type={isLogin || mode === 'addAccount' ? 'text' : 'email'}
+            placeholder={isLogin || mode === 'addAccount'
+              ? t('auth.emailOrUsername', 'Email o nombre de usuario')
+              : t('auth.email')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rpg-input"
-            style={{ width: '100%' }}
-            autoFocus
+            className="rpg-input auth-card__input"
+            autoFocus={isLogin || mode === 'addAccount'}
           />
           <input
             type="password"
             placeholder={t('auth.password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rpg-input"
-            style={{ width: '100%' }}
+            className="rpg-input auth-card__input"
           />
 
           {error && (
-            <p style={{ color: 'var(--rpg-hp-red)', fontSize: '0.85rem', margin: 0 }}>{error}</p>
+            <p className="auth-card__error">{error}</p>
           )}
 
-          <button className="rpg-button" type="submit" disabled={loading}
-            style={{ width: '100%', padding: '10px', fontSize: '0.9rem', marginTop: 4 }}>
+          <button className="rpg-button auth-card__submit" type="submit" disabled={loading}>
             {loading
               ? t('common.loading')
               : mode === 'addAccount'
@@ -97,13 +107,10 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
         </form>
 
         {mode !== 'addAccount' && (
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <div className="auth-card__toggle-wrap">
             <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              style={{
-                background: 'none', border: 'none', color: 'var(--rpg-gold-dark)',
-                cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline',
-              }}
+              onClick={() => { setIsLogin(!isLogin); setError(''); setUsername(''); }}
+              className="auth-card__toggle"
             >
               {isLogin ? t('auth.noAccount') : t('auth.hasAccount')}
             </button>
@@ -111,18 +118,15 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
         )}
 
         {mode === 'addAccount' && onBack && (
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <button
-              onClick={onBack}
-              style={{
-                background: 'none', border: 'none', color: 'var(--rpg-ink-light)',
-                cursor: 'pointer', fontSize: '0.85rem',
-              }}
-            >
+          <div className="auth-card__toggle-wrap">
+            <button onClick={onBack} className="auth-card__back">
               {t('common.back')}
             </button>
           </div>
         )}
+
+        {/* Decorative bottom ornament */}
+        <div className="auth-card__ornament" />
       </div>
     </div>
   );

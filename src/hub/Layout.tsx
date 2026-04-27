@@ -8,13 +8,16 @@ import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull } from '../shared/sync';
 import './styles/layout.css';
 import './styles/components.css';
-import { playLevelUp } from '../shared/audio';
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts';
+import ShortcutModal from '../shared/components/ShortcutModal';
 import QuickAdd from '../shared/components/QuickAdd';
 import NotificationCenter from '../shared/components/NotificationCenter';
 import ToastProvider from '../shared/components/ToastProvider';
 import AnimatedOutlet, { AnimatedNavigateContext, type AnimatedOutletHandle } from '../shared/components/AnimatedOutlet';
 import CauldronFloatingTimer from '../modules/cauldron/components/CauldronFloatingTimer';
+import { TourProvider, TourOverlay } from '../shared/components/tour';
+import '../shared/components/tour/tour.css';
+import '../shared/styles/help-bubble.css';
 import { gsap } from 'gsap';
 import { levelUp as animateLevelUp } from '../shared/animations/epic';
 
@@ -31,7 +34,13 @@ export default function Layout() {
     outletHandleRef.current?.animatedNavigate(to)
   }, []);
 
-  useKeyboardShortcuts();
+  const { shortcutModalOpen, setShortcutModalOpen } = useKeyboardShortcuts();
+
+  // Apply font scale from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('hubtify_font_scale');
+    if (saved) document.documentElement.style.setProperty('--font-scale', saved);
+  }, []);
 
   useEffect(() => {
     window.api.notificationsSetLocale?.(i18n.language);
@@ -123,9 +132,14 @@ export default function Layout() {
     }, 30_000);
   }, [authUser]);
 
-  // Cleanup sync timeout on unmount
+  // Cancel pending debounced push on account switch (prevents stale uid push)
   useEffect(() => {
+    const handler = () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+    window.addEventListener('account:switched', handler);
     return () => {
+      window.removeEventListener('account:switched', handler);
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
   }, []);
@@ -136,11 +150,13 @@ export default function Layout() {
     window.addEventListener('rpg:statsChanged', handler);
     window.addEventListener('quests:dataChanged', handler);
     window.addEventListener('finance:dataChanged', handler);
+    window.addEventListener('nutrition:dataChanged', handler);
     window.addEventListener('cauldron:dataChanged', handler);
     return () => {
       window.removeEventListener('rpg:statsChanged', handler);
       window.removeEventListener('quests:dataChanged', handler);
       window.removeEventListener('finance:dataChanged', handler);
+      window.removeEventListener('nutrition:dataChanged', handler);
       window.removeEventListener('cauldron:dataChanged', handler);
     };
   }, [debouncedPush]);
@@ -179,6 +195,11 @@ export default function Layout() {
   useEffect(() => {
     const enabled = localStorage.getItem('hubtify_notifications_system') !== 'false';
     window.api.notificationsSetSystemEnabled?.(enabled);
+    for (const mod of ['quests', 'nutrition', 'finance']) {
+      const modEnabled = localStorage.getItem(`hubtify_notifications_module_${mod}`) !== 'false';
+      window.api.notificationsSetModuleEnabled?.(mod, modEnabled);
+    }
+    window.api.notificationsRunCheck?.();
   }, []);
 
   const retrySyncPull = useCallback(async () => {
@@ -211,8 +232,6 @@ export default function Layout() {
   }, [retrySyncPull]);
 
   const levelUpOverlayRef = useRef<HTMLDivElement>(null);
-  const levelUpBookRef = useRef<HTMLDivElement>(null);
-  const levelUpTextRef = useRef<HTMLDivElement>(null);
   const levelUpTimelineRef = useRef<gsap.core.Timeline | null>(null);
 
   useEffect(() => {
@@ -225,35 +244,29 @@ export default function Layout() {
   // Fire GSAP animation once the overlay is rendered (levelUp != null)
   useEffect(() => {
     if (!levelUp) return;
-    if (!levelUpOverlayRef.current || !levelUpBookRef.current || !levelUpTextRef.current) return;
+    if (!levelUpOverlayRef.current) return;
 
     // Kill any running timeline
     if (levelUpTimelineRef.current) {
+      levelUpTimelineRef.current.data?.particles?.stop();
       levelUpTimelineRef.current.kill();
       levelUpTimelineRef.current = null;
     }
 
-    // Play sound at phase 3 (text reveal at 0.6s)
-    const soundTimeout = setTimeout(() => playLevelUp(), 600);
+    const mainContent = document.querySelector('.main-content') as HTMLElement;
 
     levelUpTimelineRef.current = animateLevelUp(
       levelUpOverlayRef.current,
-      levelUpBookRef.current,
-      levelUpTextRef.current,
-      () => {
-        clearTimeout(soundTimeout);
-        setLevelUp(null);
-      },
+      mainContent,
+      levelUp,
+      () => setLevelUp(null),
     );
-
-    return () => {
-      clearTimeout(soundTimeout);
-    };
   }, [levelUp]);
 
   const handleDismissLevelUp = useCallback(() => {
     if (!levelUpOverlayRef.current) return;
     if (levelUpTimelineRef.current) {
+      levelUpTimelineRef.current.data?.particles?.stop();
       levelUpTimelineRef.current.kill();
       levelUpTimelineRef.current = null;
     }
@@ -270,10 +283,11 @@ export default function Layout() {
   return (
     <AnimatedNavigateContext.Provider value={animatedNavigate}>
     <ToastProvider>
+    <TourProvider>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
-        <div className="sidebar-wrapper">
+        <div className={`sidebar-wrapper ${sidebarCollapsed ? 'sidebar-wrapper--collapsed' : ''}`}>
           <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onBellClick={() => setShowNotifications(true)} />
           <button onClick={toggleSidebar} className={`sidebar-toggle ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
             title={sidebarCollapsed ? 'Expand' : 'Collapse'}>
@@ -288,12 +302,12 @@ export default function Layout() {
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
               padding: '10px 16px', background: 'rgba(248, 113, 113, 0.15)',
-              border: '1px solid rgba(248, 113, 113, 0.3)', borderRadius: 'var(--rpg-radius)',
-              margin: '8px 16px 0', color: '#f87171', fontSize: '0.85rem',
+              border: '1px solid rgba(248, 113, 113, 0.3)', borderRadius: '6px',
+              margin: '8px 16px 0', color: '#f87171', fontSize: 'var(--fs-label)',
             }}>
               <span>{t('auth.syncPullFailed')}</span>
               <button className="rpg-button" onClick={retrySyncPull}
-                style={{ padding: '4px 12px', fontSize: '0.8rem', flexShrink: 0 }}>
+                style={{ padding: '4px 12px', fontSize: 'var(--fs-label)', flexShrink: 0 }}>
                 {t('auth.syncRetry')}
               </button>
             </div>
@@ -314,84 +328,85 @@ export default function Layout() {
             zIndex: 9999, cursor: 'pointer',
           }}
         >
-          {/* Book container */}
+          {/* Flash layer */}
           <div
-            ref={levelUpBookRef}
+            data-levelup="flash"
             style={{
-              position: 'relative',
-              width: 240, height: 180,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'absolute', inset: 0,
+              background: 'radial-gradient(circle at center, rgba(255,245,212,0.9) 0%, rgba(212,160,23,0.6) 40%, transparent 70%)',
+              opacity: 0, pointerEvents: 'none',
+            }}
+          />
+          {/* God rays */}
+          <div
+            data-levelup="rays"
+            style={{
+              position: 'absolute',
+              width: '150vmax', height: '150vmax',
+              left: '50%', top: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'conic-gradient(from 0deg, transparent 0deg, rgba(212,160,23,0.15) 10deg, transparent 20deg, transparent 40deg, rgba(212,160,23,0.1) 50deg, transparent 60deg, transparent 80deg, rgba(212,160,23,0.15) 90deg, transparent 100deg, transparent 120deg, rgba(212,160,23,0.1) 130deg, transparent 140deg, transparent 160deg, rgba(212,160,23,0.15) 170deg, transparent 180deg, transparent 200deg, rgba(212,160,23,0.1) 210deg, transparent 220deg, transparent 240deg, rgba(212,160,23,0.15) 250deg, transparent 260deg, transparent 280deg, rgba(212,160,23,0.1) 290deg, transparent 300deg, transparent 320deg, rgba(212,160,23,0.15) 330deg, transparent 340deg, transparent 360deg)',
+              borderRadius: '50%',
+              opacity: 0, pointerEvents: 'none',
+            }}
+          />
+          {/* Shockwave */}
+          <div
+            data-levelup="shockwave"
+            style={{
+              position: 'absolute',
+              width: '120vmax', height: '120vmax',
+              left: '50%', top: '50%',
+              transform: 'translate(-50%, -50%) scale(0)',
+              borderRadius: '50%',
+              border: '3px solid rgba(212,160,23,0.5)',
+              opacity: 0, pointerEvents: 'none',
+            }}
+          />
+          {/* Text container */}
+          <div
+            data-levelup="text-container"
+            style={{
+              position: 'relative', zIndex: 2,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              opacity: 0, pointerEvents: 'none',
             }}
           >
-            {/* Left cover */}
-            <div
-              data-book="left"
-              style={{
-                position: 'absolute', left: 0, top: 0,
-                width: '50%', height: '100%',
-                background: 'linear-gradient(135deg, #c8a96e 0%, #a07840 50%, #7a5a28 100%)',
-                border: '2px solid rgba(212,160,23,0.6)',
-                borderRight: '1px solid rgba(212,160,23,0.3)',
-                borderRadius: '4px 0 0 4px',
-                transformOrigin: 'left center',
-              }}
-            />
-            {/* Right cover */}
-            <div
-              data-book="right"
-              style={{
-                position: 'absolute', right: 0, top: 0,
-                width: '50%', height: '100%',
-                background: 'linear-gradient(225deg, #c8a96e 0%, #a07840 50%, #7a5a28 100%)',
-                border: '2px solid rgba(212,160,23,0.6)',
-                borderLeft: '1px solid rgba(212,160,23,0.3)',
-                borderRadius: '0 4px 4px 0',
-                transformOrigin: 'right center',
-              }}
-            />
-
-            {/* Level text area */}
-            <div
-              ref={levelUpTextRef}
-              style={{
-                position: 'absolute', inset: 0,
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                opacity: 0, pointerEvents: 'none',
-                zIndex: 2,
-              }}
-            >
-              {/* SVG path for stroke draw-in effect */}
-              <svg width="200" height="60" viewBox="0 0 200 60" style={{ overflow: 'visible' }}>
-                <path
-                  d="M20 40 Q40 10 60 35 Q80 55 100 30 Q120 10 140 35 Q160 55 180 30"
-                  fill="none"
-                  stroke="rgba(212,160,23,0.6)"
-                  strokeWidth="1.5"
-                />
-              </svg>
-              <div style={{
-                fontFamily: 'Cinzel, serif', fontSize: '1.5rem', fontWeight: 'bold',
-                color: 'var(--rpg-gold-light)', textShadow: '0 2px 12px rgba(0,0,0,0.7)',
-                marginTop: 8,
-              }}>
-                {t('rpg.levelUp')}
-              </div>
-              <div style={{
-                fontFamily: 'Fira Code, monospace', fontSize: '1.1rem',
-                color: 'var(--rpg-gold)', marginTop: 4,
-              }}>
-                {t('rpg.level')} {levelUp}
-              </div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: 10, color: 'var(--rpg-parchment)' }}>
-                {t('rpg.clickDismiss')}
-              </div>
+            <div data-levelup="title" style={{
+              fontFamily: "'UnifrakturCook', cursive",
+              fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+              fontWeight: 'bold',
+              color: 'var(--gold-light)',
+              textShadow: '0 0 30px rgba(212,160,23,0.6), 0 2px 12px rgba(0,0,0,0.7)',
+              display: 'flex', gap: 2,
+            }}>
+              {t('rpg.levelUp').split('').map((char, i) => (
+                <span key={i} style={{ display: 'inline-block', whiteSpace: char === ' ' ? 'pre' : undefined }}>
+                  {char}
+                </span>
+              ))}
+            </div>
+            <div data-levelup="level" style={{
+              fontFamily: 'Fira Code, monospace',
+              fontSize: 'clamp(1.2rem, 3vw, 2rem)',
+              color: 'var(--gold)', marginTop: 8,
+              textShadow: '0 0 20px rgba(212,160,23,0.4)',
+            }}>
+              {t('rpg.level')} {levelUp}
+            </div>
+            <div data-levelup="dismiss" style={{
+              fontSize: 'var(--fs-label)', opacity: 0,
+              marginTop: 16, color: 'var(--parch-0)',
+            }}>
+              {t('rpg.clickDismiss')}
             </div>
           </div>
         </div>
       )}
 
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
+      <ShortcutModal open={shortcutModalOpen} onClose={() => setShortcutModalOpen(false)} />
 
       <CauldronFloatingTimer />
 
@@ -408,25 +423,25 @@ export default function Layout() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, var(--rpg-wood) 0%, var(--rpg-leather) 100%)',
-            border: '2px solid var(--rpg-gold-dark)',
-            borderRadius: 'var(--rpg-radius)', padding: '24px', maxWidth: 360,
-            textAlign: 'center', color: 'var(--rpg-parchment)',
+            background: 'linear-gradient(135deg, var(--leather) 0%, var(--leather) 100%)',
+            border: '2px solid var(--gold-dark)',
+            borderRadius: '6px', padding: '24px', maxWidth: 360,
+            textAlign: 'center', color: 'var(--parch-0)',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
           }}>
-            <h3 style={{ fontFamily: 'Cinzel, serif', marginBottom: 12, color: 'var(--rpg-gold-light)' }}>
+            <h3 style={{ fontFamily: "'UnifrakturCook', cursive", marginBottom: 12, color: 'var(--gold-light)' }}>
               {t('settings.updateAvailable', { version: updateAvailable.version })}
             </h3>
             {updateState === 'downloading' && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ height: '100%', background: 'var(--rpg-xp-green)', width: `${downloadPercent}%`, transition: 'width 0.3s ease' }} />
+                  <div style={{ height: '100%', background: 'var(--moss)', width: `${downloadPercent}%`, transition: 'width 0.3s ease' }} />
                 </div>
-                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{downloadPercent}%</span>
+                <span style={{ fontSize: 'var(--fs-label)', opacity: 0.75 }}>{downloadPercent}%</span>
               </div>
             )}
             {updateError && (
-              <p style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: 8 }}>{updateError}</p>
+              <p style={{ color: '#f87171', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{updateError}</p>
             )}
             {updateState === 'idle' && (
               <>
@@ -434,7 +449,7 @@ export default function Layout() {
                   {t('settings.downloadUpdate')}
                 </button>
                 <button onClick={() => setUpdateAvailable(null)} className="rpg-button"
-                  style={{ width: '100%', padding: '4px 8px', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--rpg-gold-dark)', color: 'var(--rpg-gold)' }}>
+                  style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
                   {t('nutrify.weightCheckin.later')}
                 </button>
               </>
@@ -444,6 +459,8 @@ export default function Layout() {
       )}
 
     </div>
+    <TourOverlay />
+    </TourProvider>
     </ToastProvider>
     </AnimatedNavigateContext.Provider>
   );
