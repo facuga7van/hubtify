@@ -8,6 +8,7 @@ import { useToast } from '../shared/components/useToast';
 import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/audio';
 import { useTour } from '../shared/components/tour';
 import FeedbackDialog from './FeedbackDialog';
+import ChangelogModal from '../shared/components/ChangelogModal';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -24,6 +25,7 @@ export default function SettingsPage() {
   const [notifNutrition, setNotifNutrition] = useState(() => localStorage.getItem('hubtify_notifications_module_nutrition') !== 'false');
   const [notifFinance, setNotifFinance] = useState(() => localStorage.getItem('hubtify_notifications_module_finance') !== 'false');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -84,6 +86,25 @@ export default function SettingsPage() {
   return (
     <div className="settings-page">
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
+
+      {/* About */}
+      <div className="rpg-card settings-section">
+        <div className="rpg-card-title">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--gold-dark)" strokeWidth="1.3" strokeLinecap="round">
+            <circle cx="8" cy="8" r="6"/><path d="M8 5v4M8 11h.01"/>
+          </svg>
+          {t('settings.about', 'Acerca de')}
+        </div>
+        <div className="settings-row">
+          <div>
+            <div className="settings-row__label">Hubtify v{APP_VERSION}</div>
+            <div className="settings-row__desc">{t('settings.aboutDesc', 'Tu hub de vida gamificado')}</div>
+          </div>
+          <button className="rpg-btn-sm" onClick={() => setChangelogOpen(true)}>
+            {t('settings.changelog', 'Changelog')}
+          </button>
+        </div>
+      </div>
 
       {/* Language */}
       <div className="rpg-card settings-section">
@@ -415,6 +436,7 @@ export default function SettingsPage() {
           toast({ message: t('settings.feedbackSent', '¡Feedback enviado!'), type: 'success' });
         }}
       />
+      <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
     </div>
   );
 }

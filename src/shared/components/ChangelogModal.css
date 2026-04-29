@@ -1,0 +1,99 @@
+.changelog-title {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: 1.2rem;
+  color: var(--ink);
+  margin: 0 0 16px;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+
+.changelog-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* Custom scrollbar for RPG theme */
+.changelog-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.changelog-scroll::-webkit-scrollbar-track {
+  background: rgba(74, 55, 32, 0.1);
+  border-radius: 3px;
+}
+.changelog-scroll::-webkit-scrollbar-thumb {
+  background: var(--gold-dark);
+  border-radius: 3px;
+}
+
+.changelog-version {
+  margin-bottom: 16px;
+}
+.changelog-version:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-version__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(168, 138, 60, 0.3);
+}
+
+.changelog-version__tag {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  color: var(--gold-dark);
+  font-weight: 700;
+}
+
+.changelog-version__date {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.changelog-changes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.changelog-change {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.changelog-badge {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.changelog-badge--feat { background: #4a7c3f; }
+.changelog-badge--fix { background: #8b3a3a; }
+.changelog-badge--refactor { background: #a88a3c; }
+.changelog-badge--chore { background: #6b5b4a; }
+
+.changelog-scope {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.changelog-text {
+  /* takes remaining space */
+}

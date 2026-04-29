@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
 
-const REPO = 'facuga7van/hubtify';
+const REPO = 'facuga7van/hubtify-releases';
 const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 let mainWindow: BrowserWindow | null = null;

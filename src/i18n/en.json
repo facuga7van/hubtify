@@ -1020,6 +1020,10 @@
     "restartTour": "Restart Tour",
     "restartTourDesc": "Replay the guided tour of all modules",
 
+    "about": "About",
+    "aboutDesc": "Your gamified life hub",
+    "changelog": "Changelog",
+
     "feedback": "Feedback",
     "feedbackDesc": "Send your opinion, report bugs or suggest features",
     "feedbackTitle": "Send Feedback",

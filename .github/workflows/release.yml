@@ -39,14 +39,50 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Extract changelog
+        id: changelog
+        shell: bash
+        run: |
+          node -e "
+            const { changelog } = require('./src/shared/changelog');
+            const version = '${{ steps.version.outputs.version }}';
+            const entry = changelog.find(e => e.version === version);
+            if (!entry) { console.log('No changelog entry for ' + version); process.exit(0); }
+            const cats = { feat: 'New Features', fix: 'Bug Fixes', refactor: 'Refactoring', chore: 'Maintenance' };
+            const grouped = {};
+            entry.changes.forEach(c => { (grouped[c.category] = grouped[c.category] || []).push(c); });
+            let md = '';
+            for (const [cat, items] of Object.entries(grouped)) {
+              md += '## ' + (cats[cat] || cat) + '\n';
+              items.forEach(c => { md += '- ' + (c.scope ? '**' + c.scope + ':** ' : '') + c.text + '\n'; });
+              md += '\n';
+            }
+            require('fs').writeFileSync('RELEASE_NOTES.md', md.trim());
+          " || true
+
+      - name: Check release notes
+        id: notes
+        shell: bash
+        run: |
+          if [ -f RELEASE_NOTES.md ]; then
+            echo "has_notes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_notes=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          repository: facuga7van/hubtify-releases
           name: Hubtify v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: ${{ steps.notes.outputs.has_notes != 'true' }}
+          body_path: ${{ steps.notes.outputs.has_notes == 'true' && 'RELEASE_NOTES.md' || '' }}
           files: |
             out/make/squirrel.windows/x64/*.exe
             out/make/squirrel.windows/x64/*.nupkg
             out/make/zip/win32/x64/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}

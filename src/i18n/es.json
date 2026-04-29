@@ -1021,6 +1021,10 @@
     "restartTour": "Reiniciar Tour",
     "restartTourDesc": "Reproducir el tour guiado de todos los módulos",
 
+    "about": "Acerca de",
+    "aboutDesc": "Tu hub de vida gamificado",
+    "changelog": "Changelog",
+
     "feedback": "Feedback",
     "feedbackDesc": "Envianos tu opinión, reportá bugs o sugerí features",
     "feedbackTitle": "Enviar Feedback",

@@ -3,6 +3,14 @@ import crypto from 'crypto';
 
 const genId = (): string => crypto.randomUUID();
 
+/** Local date string YYYY-MM-DD (avoids UTC offset from toISOString) */
+function localDate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** SQLite DATE('now') uses UTC — use 'localtime' modifier for local dates */
+const SQL_TODAY = "DATE('now', 'localtime')";
+
 let currentLocale: 'es' | 'en' = 'es';
 
 export function setEngineLocale(locale: string): void {
@@ -75,7 +83,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
   const dueSoon = db
     .prepare(
       `SELECT id, name FROM tasks
-       WHERE due_date = DATE('now', '+1 day')
+       WHERE due_date = DATE('now', 'localtime', '+1 day')
          AND status = 0
          AND deleted_at IS NULL`
     )
@@ -94,7 +102,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
   const overdue = db
     .prepare(
       `SELECT id, name FROM tasks
-       WHERE due_date < DATE('now')
+       WHERE due_date < ${SQL_TODAY}
          AND status = 0
          AND deleted_at IS NULL`
     )
@@ -137,15 +145,22 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
 
 export function evaluateNutritionNotifications(db: Database.Database): NotificationCandidate[] {
   const candidates: NotificationCandidate[] = [];
+  const hour = new Date().getHours();
 
+  // Before 10 AM: no nutrition notifications — day just started
+  if (hour < 10) return candidates;
+
+  // 10 AM+: unclosed days (only 2+ days old — yesterday gets grace period until evening)
+  // 20 PM+: unclosed days (including yesterday) + no meals logged today
+  const minAge = hour >= 20 ? 0 : 1; // 0 = include yesterday, 1 = skip yesterday
   const pendingDays = db
     .prepare(
       `SELECT DISTINCT f.date
        FROM food_log f
        LEFT JOIN nutrition_daily_closed c ON c.date = f.date
        WHERE c.date IS NULL
-         AND f.date >= DATE('now', '-7 days')
-         AND f.date < DATE('now')`
+         AND f.date >= DATE('now', 'localtime', '-7 days')
+         AND f.date < DATE('now', 'localtime', '-${minAge} days')`
     )
     .all() as { date: string }[];
 
@@ -159,9 +174,9 @@ export function evaluateNutritionNotifications(db: Database.Database): Notificat
     });
   }
 
-  const hour = new Date().getHours();
+  // Evening only: no meals logged today
   if (hour >= 20) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     const count = db
       .prepare(`SELECT COUNT(*) AS cnt FROM food_log WHERE date = ?`)
       .get(today) as { cnt: number };
@@ -192,8 +207,8 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
        FROM finance_transactions t
        JOIN finance_installment_groups ig ON ig.id = t.installment_group_id
        WHERE t.installment_group_id IS NOT NULL
-         AND t.date >= DATE('now')
-         AND t.date <= DATE('now', '+3 days')
+         AND t.date >= ${SQL_TODAY}
+         AND t.date <= DATE('now', 'localtime', '+3 days')
        GROUP BY t.installment_group_id`
     )
     .all() as { id: string; description: string; date: string }[];
@@ -364,7 +379,7 @@ export function autoResolve(db: Database.Database): number {
       }
 
       if (n.type === 'nutri_no_meals') {
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = localDate();
         const count = db
           .prepare(`SELECT COUNT(*) AS cnt FROM food_log WHERE date = ?`)
           .get(n.ref_id) as { cnt: number };
@@ -379,8 +394,8 @@ export function autoResolve(db: Database.Database): number {
       }
 
       if (n.type === 'finance_installment_due') {
-        const threeDaysFromNow = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const threeDaysFromNow = localDate(new Date(Date.now() + 3 * 86400000));
+        const todayStr = localDate();
         const upcoming = db
           .prepare(
             `SELECT 1 FROM finance_transactions
