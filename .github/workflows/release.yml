@@ -75,6 +75,7 @@ jobs:
         with:
           repository: facuga7van/hubtify-releases
           token: ${{ secrets.RELEASES_TOKEN }}
+          target_commitish: main
           name: Hubtify v${{ steps.version.outputs.version }}
           tag_name: v${{ steps.version.outputs.version }}
           draft: false
