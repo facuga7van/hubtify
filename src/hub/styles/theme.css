@@ -5,18 +5,18 @@
   /* ── Font scale (presets: 0.85 / 1 / 1.15 / 1.3) ── */
   --font-scale: 1;
 
-  /* ── Type Scale ────────────────────────────────────── */
-  --fs-timer:   64px;   /* Pomodoro timer face */
-  --fs-display: 34px;   /* Page titles (UnifrakturCook) */
-  --fs-hero:    28px;   /* Level number, big stat values */
-  --fs-stat:    24px;   /* Stat values, balance amounts */
-  --fs-accent:  22px;   /* Section titles, medium stats */
-  --fs-heading: 20px;   /* Subheadings, mid-size labels */
-  --fs-nav:     18px;   /* Nav items, card titles */
-  --fs-sub:     16px;   /* Subheaders, emphasis */
-  --fs-body:    15px;   /* Standard body text */
-  --fs-quote:   16px;   /* Epigraphs, quotes, secondary */
-  --fs-label:   13px;   /* Labels, hints, metadata — MINIMUM */
+  /* ── Type Scale (auto-scaled by --font-scale) ─────── */
+  --fs-timer:   calc(64px * var(--font-scale));   /* Pomodoro timer face */
+  --fs-display: calc(34px * var(--font-scale));   /* Page titles (UnifrakturCook) */
+  --fs-hero:    calc(28px * var(--font-scale));   /* Level number, big stat values */
+  --fs-stat:    calc(24px * var(--font-scale));   /* Stat values, balance amounts */
+  --fs-accent:  calc(22px * var(--font-scale));   /* Section titles, medium stats */
+  --fs-heading: calc(20px * var(--font-scale));   /* Subheadings, mid-size labels */
+  --fs-nav:     calc(18px * var(--font-scale));   /* Nav items, card titles */
+  --fs-sub:     calc(16px * var(--font-scale));   /* Subheaders, emphasis */
+  --fs-body:    calc(15px * var(--font-scale));   /* Standard body text */
+  --fs-quote:   calc(16px * var(--font-scale));   /* Epigraphs, quotes, secondary */
+  --fs-label:   calc(13px * var(--font-scale));   /* Labels, hints, metadata — MINIMUM */
 
   /* ── Codex palette ─────────────────────────────────── */
   --ink: #2a1d0e;
@@ -76,7 +76,7 @@ h4 {
 /* ── Typography utilities ────────────────────────── */
 .qb-eyebrow {
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--rubric);
@@ -91,7 +91,7 @@ h4 {
 .qb-subtitle {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: calc(var(--fs-quote) * var(--font-scale));
+  font-size: var(--fs-quote);
   color: var(--ink-faded);
 }
 

@@ -4,6 +4,7 @@ import { registerFood } from '../../../shared/animations/feedback';
 import { DawnSun, NoonSun, MoonCrescent, Herb, Platter } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
+import { estimateNutrition } from '../estimate-service';
 
 interface BreakdownItem {
   name: string;
@@ -19,7 +20,7 @@ interface FoodEntry {
 interface Props {
   entry: FoodEntry;
   onDelete: (id: number) => void;
-  onUpdate: (id: number, fields: { description?: string; calories?: number }) => void;
+  onUpdate: (id: number, fields: { description?: string; calories?: number; aiBreakdown?: string; source?: string }) => void;
   onMealChange?: (id: number, meal: string) => void;
   mealSchedule?: MealSchedule | null;
   readOnly?: boolean;
@@ -53,6 +54,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
   const [editCals, setEditCals] = useState(String(entry.calories));
   const [editDesc, setEditDesc] = useState(entry.description);
   const [expanded, setExpanded] = useState(false);
+  const [estimating, setEstimating] = useState(false);
   const [mealDropdown, setMealDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,27 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
     setEditing(false);
   };
 
+  const handleReEstimate = async () => {
+    const desc = editDesc.trim();
+    if (!desc) return;
+    setEstimating(true);
+    try {
+      const result = await estimateNutrition(desc);
+      setEditCals(String(result.calories));
+      onUpdate(entry.id, {
+        description: desc,
+        calories: result.calories,
+        aiBreakdown: JSON.stringify(result.items),
+        source: 'ai_estimate',
+      });
+      setEditing(false);
+    } catch {
+      // Estimation failed — stay in edit mode, user can save manually
+    } finally {
+      setEstimating(false);
+    }
+  };
+
   if (editing) {
     return (
       <div ref={rowRef} className={`nutri-meal-row nutri-pulse-gold ${className || ''}`}>
@@ -107,8 +130,21 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
         <input type="number" value={editCals} onChange={(e) => setEditCals(e.target.value)}
           className="nutri-text-input" style={{ width: 60, padding: '4px 6px', fontSize: 'var(--fs-label)' }}
           onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
-        <button className="nutri-btn" onClick={handleSave} style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>{t('common.ok', 'OK')}</button>
-        <button className="nutri-btn nutri-btn-ghost" onClick={() => setEditing(false)} style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>
+        <button className="nutri-btn" onClick={handleReEstimate} disabled={estimating || !editDesc.trim()} title={t('nutrify.reEstimate', 'Re-estimar con IA')}
+          style={{ padding: '4px 10px', fontSize: 'var(--fs-body)', opacity: estimating ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          {estimating ? (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+              <circle cx="7" cy="7" r="5.5" opacity="0.3"/><path d="M7 1.5a5.5 5.5 0 0 1 4.76 2.75" strokeWidth="1.5"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" stroke="none">
+              <path d="M7 0l.9 2.8h2.9l-2.4 1.7.9 2.8L7 5.6 4.7 7.3l.9-2.8L3.2 2.8h2.9z"/>
+              <path d="M11.5 5l.5 1.6h1.7l-1.4 1 .5 1.6-1.3-1-1.4 1 .5-1.6-1.3-1h1.7z" opacity="0.7"/>
+              <path d="M2.5 8l.4 1.2h1.3l-1 .8.4 1.2-1.1-.8-1 .8.4-1.2-1.1-.8h1.3z" opacity="0.5"/>
+            </svg>
+          )}
+        </button>
+        <button className="nutri-btn nutri-btn-ghost" onClick={() => setEditing(false)} disabled={estimating} style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>
           <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg>
         </button>
       </div>

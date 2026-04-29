@@ -80,7 +80,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   color: var(--gold);
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
   border: 1.5px solid var(--gold);
@@ -525,7 +525,7 @@
 
 .nutri-text-input {
   font-family: 'IM Fell English', serif;
-  font-size: calc(var(--fs-quote) * var(--font-scale));
+  font-size: var(--fs-quote);
   background: rgba(245, 231, 192, 0.7);
   border: 1.5px solid var(--ink-faded);
   border-radius: 3px;

@@ -750,7 +750,7 @@
   align-items: center;
   gap: 6px;
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.12em;
   color: var(--parch-0);
   padding: 5px 14px;

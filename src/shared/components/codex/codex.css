@@ -62,7 +62,7 @@
   align-items: center;
   gap: 8px;
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   color: var(--ink-soft);
 }
@@ -91,7 +91,7 @@
   border: 1px solid rgba(74, 55, 32, 0.45);
   border-radius: 3px;
   font-family: 'IM Fell English SC', 'UnifrakturCook', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.12em;
   color: var(--ink-soft);
   box-shadow: inset 0 0 0 1px rgba(244, 228, 193, 0.4);
@@ -128,7 +128,7 @@
 .qb-section-title {
   font-family: 'IM Fell English SC', serif;
   letter-spacing: 0.18em;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   color: var(--rubric);
   border-bottom: 1px solid rgba(122, 30, 30, 0.35);
   padding-bottom: 3px;
@@ -158,7 +158,7 @@
   border-radius: 2px;
   background: rgba(245, 231, 192, 0.5);
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.15em;
   color: var(--ink-soft);
 }
@@ -269,7 +269,7 @@
   align-items: center;
   justify-content: center;
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   color: var(--parch-0);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
@@ -423,7 +423,7 @@
 
 .qb-cartouche-label {
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.2em;
   color: var(--ink-faded);
 }
@@ -484,7 +484,7 @@
 
 .qb-stat-box-label {
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.2em;
   color: var(--ink-faded);
 }
@@ -527,7 +527,7 @@
 
 .qb-module-card-tome {
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.2em;
   color: var(--ink-faded);
 }
@@ -576,7 +576,7 @@
 
 .qb-ring-gauge-label {
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   color: var(--ink-faded);
   margin-top: 1px;
@@ -629,7 +629,7 @@
 
 .qb-small-count-label {
   font-family: 'IM Fell English SC', serif;
-  font-size: calc(var(--fs-label) * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.15em;
   color: var(--ink-faded);
   margin-top: 1px;

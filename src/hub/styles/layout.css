@@ -392,7 +392,7 @@
   border-left: 2px solid transparent;
   background: none;
   font-family: 'IM Fell English', serif;
-  font-size: calc(var(--fs-quote) * var(--font-scale));
+  font-size: var(--fs-quote);
   white-space: nowrap;
   width: 100%;
   text-align: left;

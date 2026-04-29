@@ -26,15 +26,10 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
     const db = getActiveFirestore();
     const userRef = doc(db, 'hubtify_users', uid);
 
-    // Main document — everything except finance
-    await setDoc(userRef, {
-      playerStats: stats,
-      characterData: charData,
+    // Build main doc payload conditionally — never overwrite Firestore with empty data
+    const mainPayload: Record<string, unknown> = {
       characterName: characterName ?? null,
       username: username ?? null,
-      questify: questData,
-      nutrify: nutritionData,
-      notifications: notificationData,
       settings: {
         language: localStorage.getItem('hubtify_lang') || 'es',
         sound: localStorage.getItem('hubtify_sound') !== 'false',
@@ -43,15 +38,56 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
         onboarded: localStorage.getItem('hubtify_onboarded') === 'true',
       },
       lastSyncAt: new Date().toISOString(),
-    }, { merge: true });
+    };
+
+    // Only include questify if it has real data
+    const questValues = Object.values(questData as Record<string, unknown[]>);
+    if (questValues.some(arr => Array.isArray(arr) && arr.length > 0)) {
+      mainPayload.questify = questData;
+    }
+
+    // Only include nutrify if profile exists or any array has data
+    const nd = nutritionData as Record<string, unknown>;
+    const hasNutritionData = nd.profile != null ||
+      Object.values(nd).some(v => Array.isArray(v) && v.length > 0);
+    if (hasNutritionData) {
+      mainPayload.nutrify = nutritionData;
+    }
+
+    // Only include notifications if non-empty
+    if (Array.isArray(notificationData) && notificationData.length > 0) {
+      mainPayload.notifications = notificationData;
+    }
+
+    // Only include playerStats if not default (level > 1 or xp > 0 or hp !== maxHp)
+    const s = stats as unknown as Record<string, number>;
+    if (s && (s.level > 1 || s.xp > 0 || s.hp !== s.maxHp)) {
+      mainPayload.playerStats = stats;
+    }
+
+    // Only include characterData if non-null/non-empty
+    if (charData != null && Object.keys(charData as Record<string, unknown>).length > 0) {
+      mainPayload.characterData = charData;
+    }
+
+    await setDoc(userRef, mainPayload, { merge: true });
 
     // Finance subcollection document — avoids 1MB Firestore limit
-    const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
-    await setDoc(financeRef, financeData, { merge: true });
+    // Guard: never overwrite Firestore with empty data (prevents data loss on cleared SQLite)
+    const hasFinanceData = Object.values(financeData as Record<string, unknown[]>)
+      .some(arr => Array.isArray(arr) && arr.length > 0);
+    if (hasFinanceData) {
+      const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
+      await setDoc(financeRef, financeData, { merge: true });
+    }
 
     // Cauldron subcollection document
-    const cauldronRef = doc(db, 'hubtify_users', uid, 'cauldron', 'data');
-    await setDoc(cauldronRef, cauldronData, { merge: true });
+    const hasCauldronData = Object.values(cauldronData as Record<string, unknown[]>)
+      .some(arr => Array.isArray(arr) && arr.length > 0);
+    if (hasCauldronData) {
+      const cauldronRef = doc(db, 'hubtify_users', uid, 'cauldron', 'data');
+      await setDoc(cauldronRef, cauldronData, { merge: true });
+    }
 
     return { success: true };
   } catch (err: unknown) {
@@ -71,11 +107,16 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
     const data = snap.data();
     let changed = false;
 
-    if (data.playerStats) {
+    // Only restore stats/character if remote is newer than last pull (Issue #5)
+    const localLastPull = localStorage.getItem('hubtify_last_pull_at');
+    const remoteLastSync = data.lastSyncAt as string | undefined;
+    const shouldRestoreScalars = !localLastPull || !remoteLastSync || remoteLastSync > localLastPull;
+
+    if (data.playerStats && shouldRestoreScalars) {
       await window.api.syncRestoreStats(data.playerStats);
     }
 
-    if (data.characterData) {
+    if (data.characterData && shouldRestoreScalars) {
       await window.api.characterSave(data.characterData);
     }
 
@@ -139,6 +180,9 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
       if (s.sidebarCollapsed !== undefined) localStorage.setItem('hubtify_sidebar_collapsed', String(s.sidebarCollapsed));
       if (s.onboarded) localStorage.setItem('hubtify_onboarded', 'true');
     }
+
+    // Track last successful pull time for overwrite guards
+    localStorage.setItem('hubtify_last_pull_at', new Date().toISOString());
 
     return { success: true, hasData: true, changed };
   } catch (err: unknown) {

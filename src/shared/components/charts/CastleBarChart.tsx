@@ -15,6 +15,7 @@ export interface CastleBarChartProps {
   height?: number;
   themed?: boolean;
   legend?: { ok?: string; under?: string; over?: string };
+  valueFormatter?: (value: number) => string;
 }
 
 const STATUS_COLORS = {
@@ -31,7 +32,9 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
   height = 200,
   themed = true,
   legend,
+  valueFormatter,
 }) => {
+  const formatValue = valueFormatter ?? ((v: number) => v.toLocaleString());
   const uid = useId();
 
   const computedMax = useMemo(
@@ -107,7 +110,7 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
           {/* Bars */}
           {data.map((d, i) => {
             const status = d.status ?? 'ok';
-            const barH = computedMax > 0 ? (d.value / computedMax) * chartHeight : 0;
+            const barH = computedMax > 0 ? Math.max(0, (d.value / computedMax) * chartHeight) : 0;
             const x = barSpacing * i + (barSpacing - barWidth) / 2;
             const y = chartBottom - barH;
 
@@ -133,7 +136,7 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                   fontWeight="700"
                   fill="#3B2314"
                 >
-                  {d.value.toLocaleString()}
+                  {formatValue(d.value)}
                 </text>
                 {/* X label */}
                 <text
@@ -218,7 +221,7 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
         {/* Castle towers */}
         {data.map((d, i) => {
           const status = d.status ?? 'ok';
-          const barH = computedMax > 0 ? (d.value / computedMax) * chartHeight : 0;
+          const barH = computedMax > 0 ? Math.max(0, (d.value / computedMax) * chartHeight) : 0;
           const tx = barSpacing * i + (barSpacing - barWidth) / 2;
           const ty = chartBottom - barH;
           const gradientRef = `url(#${uid}-stone${status === 'ok' ? 'Gold' : status === 'under' ? 'Green' : 'Red'})`;
@@ -345,24 +348,33 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
               )}
 
               {/* Value badge */}
-              <rect
-                x={tx - 2}
-                y={ty - 38}
-                width={barWidth + 4}
-                height="14"
-                fill="rgba(44,24,16,0.85)"
-                stroke="#C9A84C"
-                rx="1"
-              />
-              <text
-                className="castle-value-label"
-                x={tx + barWidth / 2}
-                y={ty - 28}
-                textAnchor="middle"
-                fontSize="9"
-              >
-                {d.value.toLocaleString()}
-              </text>
+              {(() => {
+                const label = formatValue(d.value);
+                const badgeW = Math.max(barWidth + 4, label.length * 6 + 8);
+                const badgeX = tx + barWidth / 2 - badgeW / 2;
+                return (
+                  <>
+                    <rect
+                      x={badgeX}
+                      y={ty - 38}
+                      width={badgeW}
+                      height="14"
+                      fill="rgba(44,24,16,0.85)"
+                      stroke="#C9A84C"
+                      rx="1"
+                    />
+                    <text
+                      className="castle-value-label"
+                      x={tx + barWidth / 2}
+                      y={ty - 28}
+                      textAnchor="middle"
+                      fontSize="9"
+                    >
+                      {label}
+                    </text>
+                  </>
+                );
+              })()}
 
               {/* X-axis label */}
               <text

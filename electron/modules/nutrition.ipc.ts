@@ -47,8 +47,8 @@ export function registerNutritionIpcHandlers(): void {
     const existing = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
     const finalMealSchedule = mealScheduleJson ?? existing?.meal_schedule ?? null;
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
       profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule);
 
@@ -125,7 +125,7 @@ export function registerNutritionIpcHandlers(): void {
     })();
   });
 
-  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string }) => {
+  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
@@ -139,6 +139,8 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.calories !== undefined) { sets.push('calories = ?'); vals.push(fields.calories); }
     if (fields.meal !== undefined) { sets.push('meal = ?'); vals.push(fields.meal); }
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
+    if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
+    if (fields.source !== undefined) { sets.push('source = ?'); vals.push(fields.source); }
     if (sets.length === 0) return;
     vals.push(id);
     db.transaction(() => {
@@ -173,8 +175,9 @@ export function registerNutritionIpcHandlers(): void {
     if (!trimmedName) throw new Error('Invalid name: must be a non-empty string');
     if (!Number.isFinite(food.calories) || food.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
-    db.prepare('INSERT INTO frequent_foods (name, calories, created_at) VALUES (?, ?, ?)')
-      .run(trimmedName, food.calories, new Date().toISOString());
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO frequent_foods (name, calories, created_at, updated_at) VALUES (?, ?, ?, ?)')
+      .run(trimmedName, food.calories, now, now);
   });
 
   ipcHandle('nutrition:deleteFrequentFood', (_e, id: number) => {
@@ -184,7 +187,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:incrementFrequentUsage', (_e, id: number) => {
     const db = getDb();
-    db.prepare('UPDATE frequent_foods SET times_used = times_used + 1 WHERE id = ?').run(id);
+    db.prepare("UPDATE frequent_foods SET times_used = times_used + 1, updated_at = datetime('now') WHERE id = ?").run(id);
   });
 
   // ── Metrics ────────────────────────────────────────
@@ -200,8 +203,8 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     const date = metrics.date ?? todayDateString();
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym)
-      VALUES (?, ?, ?)
+      INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
     `).run(date, metrics.steps ?? null, metrics.gym ? 1 : 0);
     recalcSummary(db, date);
   });
@@ -217,7 +220,7 @@ export function registerNutritionIpcHandlers(): void {
     if (metrics.waistCm != null && (!Number.isFinite(metrics.waistCm) || metrics.waistCm < 30 || metrics.waistCm > 250)) throw new Error('Invalid waist: must be between 30 and 250 cm');
     const db = getDb();
     const date = metrics.date ?? getMondayOfWeek();
-    db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm) VALUES (?, ?, ?)')
+    db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm, updated_at) VALUES (?, ?, ?, datetime(\'now\'))')
       .run(date, metrics.weightKg ?? null, metrics.waistCm ?? null);
     recalcSummary(db, todayDateString());
   });
@@ -535,8 +538,8 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
   const balance = tdee - totalCals.total;
 
   db.prepare(`
-    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
   `).run(date, totalCals.total, Math.round(bmr), tdee, balance);
 }
 

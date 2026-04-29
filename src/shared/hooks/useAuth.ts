@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -135,9 +136,12 @@ export function useAuth() {
         username: username ?? undefined,
       });
       await window.api.syncSetCurrentUser(cred.user.uid);
-      await syncPull(cred.user.uid);
+      // New account — syncPull may fail (no Firestore doc yet, or rules delay).
+      // Registration is already successful at this point; don't let sync break it.
+      try { await syncPull(cred.user.uid); } catch { /* best effort */ }
       return { success: true };
     } catch (err: unknown) {
+      console.error('[register] failed:', err);
       return { success: false, error: getErrorKey(err) };
     }
   }, []);
@@ -147,6 +151,7 @@ export function useAuth() {
 
     // Push local data to cloud BEFORE signing out — prevents data loss
     if (currentUser) {
+      window.dispatchEvent(new Event('sync:cancelPush'));
       try { await syncPush(currentUser.uid); } catch { /* best effort */ }
     }
 
@@ -160,6 +165,7 @@ export function useAuth() {
     localStorage.removeItem('questify_habits_collapsed');
     localStorage.removeItem('questify_collapsed_projects');
     localStorage.removeItem('hubtify_weight_dismiss_date');
+    localStorage.removeItem('hubtify_last_pull_at');
 
     // Switch to next cached account if available
     const remaining = getStoredAccounts();
@@ -172,7 +178,14 @@ export function useAuth() {
       if (nextUser) {
         touchAccount(next.uid);
         await window.api.syncSetCurrentUser(next.uid);
-        await syncPull(next.uid);
+        try {
+          await syncPull(next.uid);
+        } catch {
+          // Pull failed — go to logged out state instead of leaving empty DB
+          console.error('[logout] Pull for next account failed, going to logged out state');
+          setUser(null);
+          return;
+        }
         setUser({
           uid: nextUser.uid,
           email: nextUser.email,
@@ -210,6 +223,7 @@ export function useAuth() {
       }
 
       // Target is valid — now safe to push and clear current data
+      window.dispatchEvent(new Event('sync:cancelPush'));
       await syncPush(user.uid);
       await window.api.syncClearUserData();
 
@@ -217,10 +231,19 @@ export function useAuth() {
       setActiveAppName(appName);
       setActiveAppVersion(v => v + 1);
 
-      // Pull new account data
+      // Pull new account data — rollback on failure
       touchAccount(targetUser.uid);
       await window.api.syncSetCurrentUser(targetUser.uid);
-      await syncPull(targetUser.uid);
+      try {
+        await syncPull(targetUser.uid);
+      } catch {
+        // Rollback: restore original user's data
+        console.error('[switchAccount] Pull failed, rolling back to original user');
+        setActiveAppName(user.uid); // Won't match but we restore data below
+        await window.api.syncSetCurrentUser(user.uid);
+        await syncPull(user.uid);
+        return { success: false, error: 'auth.errors.switchFailed' };
+      }
 
       setUser({
         uid: targetUser.uid,
@@ -270,7 +293,10 @@ export function useAuth() {
       });
 
       // Switch to the new account
+      const previousUid = user?.uid;
+      const previousAppName = user ? getActiveAppName() : null;
       if (user) {
+        window.dispatchEvent(new Event('sync:cancelPush'));
         await syncPush(user.uid);
         await window.api.syncClearUserData();
       }
@@ -279,7 +305,20 @@ export function useAuth() {
       setActiveAppVersion(v => v + 1);
       touchAccount(cred.user.uid);
       await window.api.syncSetCurrentUser(cred.user.uid);
-      await syncPull(cred.user.uid);
+
+      try {
+        await syncPull(cred.user.uid);
+      } catch {
+        // Rollback: restore original user's data if we had one
+        if (previousUid && previousAppName) {
+          console.error('[addAccount] Pull failed, rolling back to original user');
+          setActiveAppName(previousAppName);
+          setActiveAppVersion(v => v + 1);
+          await window.api.syncSetCurrentUser(previousUid);
+          await syncPull(previousUid);
+        }
+        return { success: false, error: 'auth.errors.switchFailed' };
+      }
 
       setUser({
         uid: cred.user.uid,
@@ -299,9 +338,19 @@ export function useAuth() {
     }
   }, [user]);
 
+  const forgotPassword = useCallback(async (email: string) => {
+    try {
+      const auth = getActiveAuth();
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorKey(err) };
+    }
+  }, []);
+
   const getCachedAccounts = useCallback((): CachedAccount[] => {
     return getStoredAccounts();
   }, []);
 
-  return { user, loading, switching, login, register, logout, switchAccount, addAccount, getCachedAccounts };
+  return { user, loading, switching, login, register, logout, switchAccount, addAccount, forgotPassword, getCachedAccounts };
 }

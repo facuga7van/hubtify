@@ -11,6 +11,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   switchAccount: (appName: string) => Promise<{ success: boolean; expired?: boolean } | undefined>;
   addAccount: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   getCachedAccounts: () => CachedAccount[];
 }
 
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
   switchAccount: async () => ({ success: false }),
   addAccount: async () => ({ success: false }),
+  forgotPassword: async () => ({ success: false }),
   getCachedAccounts: () => [],
 });
 

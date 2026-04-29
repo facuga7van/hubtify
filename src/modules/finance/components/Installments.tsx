@@ -136,7 +136,7 @@ export default function Installments() {
       projection.map((p) => ({
         label: projectionLabel(p.month),
         value: p.total,
-        status: p.month === currentMonth ? ('ok' as const) : undefined,
+        status: p.month === currentMonth ? ('ok' as const) : ('under' as const),
       })),
     [projection, currentMonth]
   );
@@ -299,7 +299,11 @@ export default function Installments() {
       {projection.length > 0 && (
         <Section title={t('coinify.installmentProjection', 'PROYECCION 12 MESES')} icon={<Compass width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.installmentProjectionHelp', 'Proyección de cuotas a 12 meses. Muestra cómo se distribuyen los compromisos futuros.')} />}>
           <div style={{ marginTop: 12 }}>
-            <CastleBarChart data={barData} height={200} themed={false} />
+            <CastleBarChart data={barData} height={220} valueFormatter={(v) => {
+              if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+              if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+              return v.toLocaleString();
+            }} />
           </div>
         </Section>
       )}

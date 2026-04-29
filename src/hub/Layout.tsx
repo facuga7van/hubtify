@@ -132,14 +132,17 @@ export default function Layout() {
     }, 30_000);
   }, [authUser]);
 
-  // Cancel pending debounced push on account switch (prevents stale uid push)
+  // Cancel pending debounced push on account switch or explicit cancel
+  // sync:cancelPush fires BEFORE push+clear sequence to prevent stale uid race
   useEffect(() => {
     const handler = () => {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
     window.addEventListener('account:switched', handler);
+    window.addEventListener('sync:cancelPush', handler);
     return () => {
       window.removeEventListener('account:switched', handler);
+      window.removeEventListener('sync:cancelPush', handler);
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
   }, []);

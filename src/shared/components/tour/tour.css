@@ -76,7 +76,7 @@
 /* ── Tooltip Title ───────────────────────────────── */
 .tour-tooltip__title {
   font-family: 'UnifrakturCook', cursive;
-  font-size: calc(var(--fs-nav) * var(--font-scale));
+  font-size: var(--fs-nav);
   font-weight: 700;
   color: var(--gold-dark);
   letter-spacing: 0.03em;
@@ -88,7 +88,7 @@
 /* ── Tooltip Description ─────────────────────────── */
 .tour-tooltip__desc {
   font-family: 'IM Fell English', serif;
-  font-size: calc(var(--fs-body) * var(--font-scale));
+  font-size: var(--fs-body);
   color: var(--ink);
   line-height: 1.5;
   margin-bottom: 16px;

@@ -111,4 +111,15 @@ export const nutritionMigrations: Migration[] = [
       ALTER TABLE nutrition_profile ADD COLUMN meal_schedule TEXT DEFAULT NULL;
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 7,
+    up: `
+      ALTER TABLE nutrition_daily_metrics ADD COLUMN updated_at TEXT;
+      ALTER TABLE nutrition_daily_summary ADD COLUMN updated_at TEXT;
+      ALTER TABLE nutrition_weekly_metrics ADD COLUMN updated_at TEXT;
+      ALTER TABLE nutrition_profile ADD COLUMN updated_at TEXT;
+      ALTER TABLE frequent_foods ADD COLUMN updated_at TEXT;
+    `,
+  },
 ];

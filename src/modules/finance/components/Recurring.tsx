@@ -225,6 +225,7 @@ export default function Recurring() {
           onClick={() => setShowForm((v) => !v)}>
           {showForm ? t('coinify.cancel') : `+ ${t('coinify.addRecurring')}`}
         </button>
+        <HelpBubble variant="inline" text={t('coinify.recurringHelp', 'Gastos e ingresos que se repiten cada mes. Se suman automáticamente al balance mensual.')} />
       </div>
 
       {/* Add Form */}
@@ -291,8 +292,7 @@ export default function Recurring() {
       {items.length === 0 ? (
         <p className="coin-empty-codex">{t('coinify.noRecurring')}</p>
       ) : (
-        <div className="coin-recurring-list" style={{ position: 'relative' }}>
-          <HelpBubble text={t('coinify.recurringHelp', 'Gastos e ingresos que se repiten cada mes. Se suman automáticamente al balance mensual.')} />
+        <div className="coin-recurring-list">
           {items.map((item) => (
             <div
               key={item.id}
