@@ -94,6 +94,10 @@ export default function Loans() {
       toast({ message: t('coinify.validationAmount', 'Ingresá un monto válido'), type: 'warning' });
       return;
     }
+    if (parsed > 999_999_999) {
+      toast({ message: t('coinify.validationAmountTooLarge', 'El monto es demasiado grande'), type: 'warning' });
+      return;
+    }
 
     try {
       if (formType === 'installments') {

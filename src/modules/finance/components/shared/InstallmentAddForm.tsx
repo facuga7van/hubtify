@@ -41,6 +41,14 @@ export default function InstallmentAddForm({ onCreated }: Props) {
     const first = parseFloat(firstAmount);
     const last = lastAmount ? parseFloat(lastAmount) : first;
     if (!description || !count || !first) return;
+    if (count < 1 || count > 120) {
+      toast({ type: 'warning', message: t('coinify.validationInstallmentCount', 'Las cuotas deben ser entre 1 y 120') });
+      return;
+    }
+    if (first > 999_999_999) {
+      toast({ type: 'warning', message: t('coinify.validationAmountTooLarge', 'El monto es demasiado grande') });
+      return;
+    }
 
     setSubmitting(true);
     try {
