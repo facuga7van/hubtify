@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../../shared/components/ConfirmDialog';
+import { useToast } from '../../../../shared/components/useToast';
 import type { CreditCard } from '../../types';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 
@@ -14,6 +15,7 @@ interface Props {
 export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
   const { t } = useTranslation();
   const confirm = useConfirm();
+  const { toast } = useToast();
   const [newName, setNewName] = useState('');
   const [newClosingDay, setNewClosingDay] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -22,17 +24,27 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    await window.api.financeAddCreditCard({ name: newName.trim(), closingDay: newClosingDay });
-    setNewName('');
-    setNewClosingDay(1);
-    onSaved();
+    try {
+      await window.api.financeAddCreditCard({ name: newName.trim(), closingDay: newClosingDay });
+      setNewName('');
+      setNewClosingDay(1);
+      onSaved();
+    } catch (err) {
+      console.error('[CreditCardManager] financeAddCreditCard failed:', err);
+      toast({ type: 'warning', message: t('coinify.createError', 'Error al crear') });
+    }
   };
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({ message: t('coinify.confirmDelete'), danger: true, confirmText: t('coinify.delete') });
     if (!ok) return;
-    await window.api.financeDeleteCreditCard(id);
-    onSaved();
+    try {
+      await window.api.financeDeleteCreditCard(id);
+      onSaved();
+    } catch (err) {
+      console.error('[CreditCardManager] financeDeleteCreditCard failed:', err);
+      toast({ type: 'warning', message: t('coinify.deleteError', 'Error al eliminar') });
+    }
   };
 
   const startEdit = (card: CreditCard) => {
@@ -43,9 +55,14 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
 
   const handleUpdate = async () => {
     if (!editingId || !editName.trim()) return;
-    await window.api.financeUpdateCreditCard(editingId, { name: editName.trim(), closingDay: editClosingDay });
-    setEditingId(null);
-    onSaved();
+    try {
+      await window.api.financeUpdateCreditCard(editingId, { name: editName.trim(), closingDay: editClosingDay });
+      setEditingId(null);
+      onSaved();
+    } catch (err) {
+      console.error('[CreditCardManager] financeUpdateCreditCard failed:', err);
+      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+    }
   };
 
   return createPortal(

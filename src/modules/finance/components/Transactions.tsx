@@ -244,41 +244,46 @@ export default function Transactions() {
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
     creditCardId?: string;
   }) => {
-    let newId: string;
-    if (data.paymentMethod === 'credit_card' && data.installments > 1) {
-      newId = await window.api.financeCreateInstallmentGroup({
-        description: data.description || data.category,
-        totalAmount: data.amount * data.installments,
-        installmentCount: data.installments,
-        installmentAmount: data.amount,
-        currency: data.currency,
-        category: data.category,
-        startDate: data.date,
-        creditCardId: data.creditCardId,
+    try {
+      let newId: string;
+      if (data.paymentMethod === 'credit_card' && data.installments > 1) {
+        newId = await window.api.financeCreateInstallmentGroup({
+          description: data.description || data.category,
+          totalAmount: data.amount * data.installments,
+          installmentCount: data.installments,
+          installmentAmount: data.amount,
+          currency: data.currency,
+          category: data.category,
+          startDate: data.date,
+          creditCardId: data.creditCardId,
+        });
+      } else {
+        newId = await window.api.financeAddTransaction({
+          type: data.type,
+          amount: data.amount,
+          currency: data.currency,
+          category: data.category,
+          description: data.description,
+          date: data.date,
+          paymentMethod: data.paymentMethod,
+          creditCardId: data.creditCardId,
+        });
+      }
+      loadTransactions();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+      setEnteringId(newId);
+      setEnteringType(data.type);
+      setTimeout(() => { setEnteringId(null); setEnteringType(null); }, 600);
+      const formatted = formatCurrency(data.amount, { currency: data.currency });
+      toast({
+        type: 'coin',
+        message: `${formatted} ${t('coinify.in')} ${data.category}`,
+        details: { transactionType: data.type === 'income' ? 'income' : 'expense' },
       });
-    } else {
-      newId = await window.api.financeAddTransaction({
-        type: data.type,
-        amount: data.amount,
-        currency: data.currency,
-        category: data.category,
-        description: data.description,
-        date: data.date,
-        paymentMethod: data.paymentMethod,
-        creditCardId: data.creditCardId,
-      });
+    } catch (err) {
+      console.error('[Transactions] handleAdd failed:', err);
+      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
     }
-    loadTransactions();
-    window.dispatchEvent(new Event('finance:dataChanged'));
-    setEnteringId(newId);
-    setEnteringType(data.type);
-    setTimeout(() => { setEnteringId(null); setEnteringType(null); }, 600);
-    const formatted = formatCurrency(data.amount, { currency: data.currency });
-    toast({
-      type: 'coin',
-      message: `${formatted} ${t('coinify.in')} ${data.category}`,
-      details: { transactionType: data.type === 'income' ? 'income' : 'expense' },
-    });
   };
 
   const handleDelete = async (id: string) => {
@@ -286,10 +291,16 @@ export default function Transactions() {
     if (!ok) return;
     setExitingId(id);
     setTimeout(async () => {
-      await window.api.financeDeleteTransaction(id);
-      setExitingId(null);
-      loadTransactions();
-      window.dispatchEvent(new Event('finance:dataChanged'));
+      try {
+        await window.api.financeDeleteTransaction(id);
+        setExitingId(null);
+        loadTransactions();
+        window.dispatchEvent(new Event('finance:dataChanged'));
+      } catch (err) {
+        console.error('[Transactions] financeDeleteTransaction failed:', err);
+        setExitingId(null);
+        toast({ type: 'warning', message: t('coinify.deleteError', 'Error al eliminar') });
+      }
     }, 300);
   };
 
@@ -311,16 +322,21 @@ export default function Transactions() {
       toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
       return;
     }
-    await window.api.financeUpdateTransaction(editingId, {
-      amount,
-      description: editFields.description,
-      category: editFields.category,
-      date: editFields.date,
-      paymentMethod: editFields.paymentMethod,
-    });
-    setEditingId(null);
-    loadTransactions();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+    try {
+      await window.api.financeUpdateTransaction(editingId, {
+        amount,
+        description: editFields.description,
+        category: editFields.category,
+        date: editFields.date,
+        paymentMethod: editFields.paymentMethod,
+      });
+      setEditingId(null);
+      loadTransactions();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[Transactions] financeUpdateTransaction failed:', err);
+      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+    }
   };
 
   const paymentMethodLabel = (pm: string) => {

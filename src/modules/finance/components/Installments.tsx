@@ -71,8 +71,10 @@ export default function Installments() {
     try {
       const data = await window.api.financeGetInstallmentsForMonth(m);
       setRows(data as InstallmentRow[]);
-    } catch {
+    } catch (err) {
+      console.error('[Installments] financeGetInstallmentsForMonth failed:', err);
       setError(true);
+      toast({ type: 'warning', message: t('coinify.loadError', 'Error al cargar datos') });
     } finally {
       setLoading(false);
     }
@@ -113,11 +115,16 @@ export default function Installments() {
   const handleDeleteGroup = async (groupId: string) => {
     const ok = await confirm({ message: t('coinify.deleteInstallmentGroupConfirm', '¿Eliminar este grupo de cuotas? Se borrarán todas las transacciones asociadas.'), danger: true, confirmText: t('coinify.delete') });
     if (!ok) return;
-    await window.api.financeDeleteInstallmentGroup(groupId);
-    loadRows(month);
-    loadProjection();
-    window.dispatchEvent(new Event('finance:dataChanged'));
-    toast({ type: 'coin', message: t('coinify.installmentGroupDeleted', 'Grupo de cuotas eliminado') });
+    try {
+      await window.api.financeDeleteInstallmentGroup(groupId);
+      loadRows(month);
+      loadProjection();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+      toast({ type: 'coin', message: t('coinify.installmentGroupDeleted', 'Grupo de cuotas eliminado') });
+    } catch (err) {
+      console.error('[Installments] financeDeleteInstallmentGroup failed:', err);
+      toast({ type: 'warning', message: t('coinify.deleteError', 'Error al eliminar') });
+    }
   };
 
   const ownRows = rows.filter((r) => !r.forThirdParty);

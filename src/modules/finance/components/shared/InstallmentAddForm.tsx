@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '../../../../shared/components/useToast';
 import type { Currency, PaymentMethod } from '../../types';
 import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
@@ -19,6 +20,7 @@ function computeLinearAmounts(first: number, last: number, count: number): numbe
 
 export default function InstallmentAddForm({ onCreated }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const today = new Date().toISOString().slice(0, 10);
 
   const [description, setDescription] = useState('');
@@ -65,6 +67,9 @@ export default function InstallmentAddForm({ onCreated }: Props) {
       setFirstAmount('');
       setLastAmount('');
       onCreated();
+    } catch (err) {
+      console.error('[InstallmentAddForm] financeCreateInstallmentGroup failed:', err);
+      toast({ type: 'warning', message: t('coinify.createError', 'Error al crear') });
     } finally {
       setSubmitting(false);
     }

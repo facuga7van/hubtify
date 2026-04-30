@@ -365,7 +365,9 @@ export default function Dashboard() {
         }
 
         isFirstLoad.current = false;
-      } catch {
+      } catch (err) {
+        console.error('[Dashboard] loadDashboard failed:', err);
+        toast({ type: 'warning', message: t('coinify.loadError', 'Error al cargar datos') });
         setFadeState('in');
       } finally {
         setLoading(false);
@@ -378,15 +380,15 @@ export default function Dashboard() {
 
   // Fetch static data
   const loadStaticData = useCallback(() => {
-    window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[]));
-    window.api.financeGetActiveLoanSummary().then((data) => setLoans(data as LoanSummary));
-    window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length));
+    window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[])).catch((err) => console.error('[Dashboard] financeGetProjection failed:', err));
+    window.api.financeGetActiveLoanSummary().then((data) => setLoans(data as LoanSummary)).catch((err) => console.error('[Dashboard] financeGetActiveLoanSummary failed:', err));
+    window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length)).catch((err) => console.error('[Dashboard] financeGetInstallmentGroups failed:', err));
     window.api.financeGetCreditCardStatements({ status: 'pending' }).then((data) => {
       const total = (data as Array<{ calculatedAmount: number }>).reduce((sum, s) => sum + s.calculatedAmount, 0);
       setPendingCC(total);
-    });
-    window.api.financeGetMonthlyExpenses().then((data) => setMonthlyExpenses(data));
-    window.api.financeGetPreviousMonthSummary().then((data) => setPrevSummary(data));
+    }).catch((err) => console.error('[Dashboard] financeGetCreditCardStatements failed:', err));
+    window.api.financeGetMonthlyExpenses().then((data) => setMonthlyExpenses(data)).catch((err) => console.error('[Dashboard] financeGetMonthlyExpenses failed:', err));
+    window.api.financeGetPreviousMonthSummary().then((data) => setPrevSummary(data)).catch((err) => console.error('[Dashboard] financeGetPreviousMonthSummary failed:', err));
   }, []);
 
   useEffect(() => { loadStaticData(); }, [loadStaticData]);

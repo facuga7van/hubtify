@@ -110,6 +110,9 @@ export default function Recurring() {
       setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setShowForm(false);
       load();
       window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[Recurring] financeAddRecurring failed:', err);
+      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
     } finally {
       setFormSubmitting(false);
     }
@@ -129,9 +132,14 @@ export default function Recurring() {
   const saveEdit = async (id: string) => {
     const parsed = parseFloat(editingAmount);
     if (!isNaN(parsed) && parsed > 0) {
-      await window.api.financeUpdateRecurringAmount(id, parsed);
-      load();
-      window.dispatchEvent(new Event('finance:dataChanged'));
+      try {
+        await window.api.financeUpdateRecurringAmount(id, parsed);
+        load();
+        window.dispatchEvent(new Event('finance:dataChanged'));
+      } catch (err) {
+        console.error('[Recurring] financeUpdateRecurringAmount failed:', err);
+        toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+      }
     }
     setEditingId(null);
     setEditingAmount('');
@@ -179,9 +187,14 @@ export default function Recurring() {
   const handleDelete = async (id: string) => {
     const ok = await confirm({ message: t('coinify.confirmDelete'), danger: true, confirmText: t('coinify.delete') });
     if (!ok) return;
-    await window.api.financeDeleteRecurring(id);
-    load();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+    try {
+      await window.api.financeDeleteRecurring(id);
+      load();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[Recurring] financeDeleteRecurring failed:', err);
+      toast({ type: 'warning', message: t('coinify.deleteError', 'Error al eliminar') });
+    }
   };
 
   const toggleHistory = async (id: string) => {
@@ -204,8 +217,9 @@ export default function Recurring() {
       window.dispatchEvent(new Event('finance:dataChanged'));
       setShowCoinDrop(true);
       setTimeout(() => setShowCoinDrop(false), 600);
-    } catch {
-      // error handled silently
+    } catch (err) {
+      console.error('[Recurring] financeGenerateRecurringForMonth failed:', err);
+      toast({ type: 'warning', message: t('coinify.generateError', 'Error al generar') });
     } finally {
       setGenerating(false);
     }

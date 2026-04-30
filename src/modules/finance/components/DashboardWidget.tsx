@@ -11,8 +11,8 @@ export default function DashboardWidget() {
   const [balance, setBalance] = useState<{ income: number; expenses: number } | null>(null);
 
   const loadData = useCallback(() => {
-    window.api.financeGetMonthlyTotal().then(setTotal);
-    window.api.financeGetActiveLoansCount().then(setLoansCount);
+    window.api.financeGetMonthlyTotal().then(setTotal).catch((err) => console.warn('[DashboardWidget] financeGetMonthlyTotal failed:', err));
+    window.api.financeGetActiveLoansCount().then(setLoansCount).catch((err) => console.warn('[DashboardWidget] financeGetActiveLoansCount failed:', err));
     // Get monthly balance for income/expense breakdown
     window.api.financeGetMonthlyBalance().then((b) => {
       const data = b as { ARS?: { income: number; expenses: number }; USD?: { income: number; expenses: number } } | null;
@@ -22,7 +22,7 @@ export default function DashboardWidget() {
         const expenses = (data.ARS?.expenses ?? 0) + (data.USD?.expenses ?? 0);
         setBalance({ income, expenses });
       }
-    }).catch(() => { /* non-critical */ });
+    }).catch((err) => console.warn('[DashboardWidget] financeGetMonthlyBalance failed:', err));
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);

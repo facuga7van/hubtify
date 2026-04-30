@@ -115,8 +115,10 @@ export default function Import() {
       if (result.duplicateCount > 0) {
         toast({ type: 'warning', message: t('coinify.importDuplicatesSkipped', { count: result.duplicateCount }) });
       }
-    } catch {
+    } catch (err) {
+      console.error('[Import] financeImportConfirm failed:', err);
       setImportError(t('coinify.importErrorConfirm'));
+      toast({ type: 'warning', message: t('coinify.importErrorGeneric', 'Error al importar') });
     } finally {
       setImporting(false);
     }

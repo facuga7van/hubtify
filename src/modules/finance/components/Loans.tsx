@@ -94,53 +94,64 @@ export default function Loans() {
       return;
     }
 
-    if (formType === 'installments') {
-      await window.api.financeCreateThirdPartyPurchase({
-        description: formDescription || formCategory,
-        installmentCount: formInstallments,
-        installmentAmount: parsed,
-        currency: formCurrency,
-        category: formCategory,
-        startDate: formDate,
-        personName: formPerson.trim(),
-        direction: formDirection,
-      });
-    } else {
-      await window.api.financeAddLoan({
-        personName: formPerson.trim(),
-        direction: formDirection,
-        type: 'single',
-        amount: parsed,
-        currency: formCurrency,
-        date: formDate,
-        description: formDescription,
-      });
-    }
+    try {
+      if (formType === 'installments') {
+        await window.api.financeCreateThirdPartyPurchase({
+          description: formDescription || formCategory,
+          installmentCount: formInstallments,
+          installmentAmount: parsed,
+          currency: formCurrency,
+          category: formCategory,
+          startDate: formDate,
+          personName: formPerson.trim(),
+          direction: formDirection,
+        });
+      } else {
+        await window.api.financeAddLoan({
+          personName: formPerson.trim(),
+          direction: formDirection,
+          type: 'single',
+          amount: parsed,
+          currency: formCurrency,
+          date: formDate,
+          description: formDescription,
+        });
+      }
 
-    setFormPerson(''); setFormAmount(''); setFormDescription('');
-    setFormInstallments(1); setShowForm(false);
-    loadLoans();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+      setFormPerson(''); setFormAmount(''); setFormDescription('');
+      setFormInstallments(1); setShowForm(false);
+      loadLoans();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[Loans] handleAddLoan failed:', err);
+      toast({ message: t('coinify.saveError', 'Error al guardar'), type: 'warning' });
+    }
   };
 
   const handleSettle = async (id: string) => {
     const ok = await confirm({ message: t('coinify.settleConfirm'), confirmText: t('coinify.settle') });
     if (!ok) return;
     setSettlingId(id);
-    await window.api.financeSettleLoan(id);
-    toast({ type: 'coin', message: t('coinify.loanSettled'), details: { transactionType: 'settled' } });
+    try {
+      await window.api.financeSettleLoan(id);
+      toast({ type: 'coin', message: t('coinify.loanSettled'), details: { transactionType: 'settled' } });
 
-    const rowEl = loanRowRefs.current.get(id);
-    const animDuration = rowEl ? 1200 : 0;
-    if (rowEl) {
-      loanPaidOff(rowEl);
-    }
+      const rowEl = loanRowRefs.current.get(id);
+      const animDuration = rowEl ? 1200 : 0;
+      if (rowEl) {
+        loanPaidOff(rowEl);
+      }
 
-    setTimeout(() => {
+      setTimeout(() => {
+        setSettlingId(null);
+        loadLoans();
+        window.dispatchEvent(new Event('finance:dataChanged'));
+      }, animDuration + 100);
+    } catch (err) {
+      console.error('[Loans] handleSettle failed:', err);
       setSettlingId(null);
-      loadLoans();
-      window.dispatchEvent(new Event('finance:dataChanged'));
-    }, animDuration + 100);
+      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+    }
   };
 
   const openPayment = async (loanId: string) => {
@@ -156,12 +167,17 @@ export default function Loans() {
   const handleAddPayment = async (loanId: string) => {
     const parsed = parseFloat(paymentAmount);
     if (isNaN(parsed) || parsed <= 0) return;
-    await window.api.financeAddLoanPayment(loanId, { amount: parsed, date: paymentDate });
-    const rows = await window.api.financeGetLoanPayments(loanId);
-    setPayments((prev) => ({ ...prev, [loanId]: rows as LoanPaymentRow[] }));
-    setPayingLoanId(null);
-    loadLoans();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+    try {
+      await window.api.financeAddLoanPayment(loanId, { amount: parsed, date: paymentDate });
+      const rows = await window.api.financeGetLoanPayments(loanId);
+      setPayments((prev) => ({ ...prev, [loanId]: rows as LoanPaymentRow[] }));
+      setPayingLoanId(null);
+      loadLoans();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[Loans] handleAddPayment failed:', err);
+      toast({ type: 'warning', message: t('coinify.paymentError', 'Error al registrar pago') });
+    }
   };
 
   const isSettled = (loan: LoanRow) => loan.settled === true || loan.settled === 1;

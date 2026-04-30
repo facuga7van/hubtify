@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '../../../../shared/components/useToast';
 
 interface Props {
   categories: string[];
@@ -10,22 +11,33 @@ interface Props {
 
 export default function CategoryManager({ categories, onClose, onSaved }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [newName, setNewName] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    await window.api.financeAddCategory(newName.trim());
-    setNewName('');
-    onSaved();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+    try {
+      await window.api.financeAddCategory(newName.trim());
+      setNewName('');
+      onSaved();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[CategoryManager] financeAddCategory failed:', err);
+      toast({ type: 'warning', message: t('coinify.createError', 'Error al crear') });
+    }
   };
 
   const handleDelete = async (name: string) => {
-    await window.api.financeDeleteCategory(name);
-    setConfirmingDelete(null);
-    onSaved();
-    window.dispatchEvent(new Event('finance:dataChanged'));
+    try {
+      await window.api.financeDeleteCategory(name);
+      setConfirmingDelete(null);
+      onSaved();
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } catch (err) {
+      console.error('[CategoryManager] financeDeleteCategory failed:', err);
+      toast({ type: 'warning', message: t('coinify.deleteError', 'Error al eliminar') });
+    }
   };
 
   return createPortal(
