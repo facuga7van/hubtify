@@ -126,7 +126,7 @@ export default function NutritionSettings() {
   if (loadError) return (
     <div style={{ padding: 24, textAlign: 'center' }}>
       <p style={{ marginBottom: 12, color: 'var(--rubric)' }}>{t('common.somethingWentWrong')}</p>
-      <button className="nutri-btn" onClick={() => window.location.reload()}>{t('common.tryAgain')}</button>
+      <button className="nutri-btn" onClick={() => { setLoadError(false); setLoading(true); loadProfile(); }}>{t('common.tryAgain')}</button>
     </div>
   );
 
@@ -176,7 +176,7 @@ export default function NutritionSettings() {
 
           <div className="nutri-field">
             <label className="nutri-label">{t('nutrify.height', 'Altura')}</label>
-            <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={50} max={250} suffix="cm" />
+            <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={100} max={250} suffix="cm" />
           </div>
 
           <div className="nutri-field">

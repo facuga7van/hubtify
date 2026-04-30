@@ -673,7 +673,7 @@ export default function Today() {
                   {toleranceLow} – {toleranceHigh} kcal
                   {deficitTargetKcal !== 0 && (
                     <span className="nutri-cal-hint">
-                      {' '}{'\u00B7'} {deficitTargetKcal > 0 ? `deficit -${deficitTargetKcal}` : `surplus +${Math.abs(deficitTargetKcal)}`}
+                      {' '}{'\u00B7'} {deficitTargetKcal > 0 ? `${t('nutrify.goal_deficit', 'déficit').toLowerCase()} -${deficitTargetKcal}` : `${t('nutrify.goal_surplus', 'superávit').toLowerCase()} +${Math.abs(deficitTargetKcal)}`}
                     </span>
                   )}
                 </span>
@@ -959,8 +959,8 @@ export default function Today() {
 
       {/* ── Weight check-in popup ───────────────────── */}
       {weightPopup.show && (
-        <div className="nutri-popup-overlay">
-          <div className="nutri-popup">
+        <div className="nutri-popup-overlay" onClick={handleWeightDismiss} onKeyDown={(e) => e.key === 'Escape' && handleWeightDismiss()}>
+          <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
             <h3 className="nutri-popup-title">
               {t('nutrify.weightCheckin.title', 'Registro semanal de peso')}
             </h3>
@@ -994,8 +994,8 @@ export default function Today() {
 
       {/* ── Close day popup ─────────────────────────── */}
       {closeDayPopup && (
-        <div className="nutri-popup-overlay">
-          <div className="nutri-popup">
+        <div className="nutri-popup-overlay" onClick={() => setCloseDayPopup(false)} onKeyDown={(e) => e.key === 'Escape' && setCloseDayPopup(false)}>
+          <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
             <h3 className="nutri-popup-title">
               {isPending ? t('nutrify.confirmDaySummary', 'Resumen del día') : t('nutrify.closeDay', 'Cierre del Día')}
             </h3>

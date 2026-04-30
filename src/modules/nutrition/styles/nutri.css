@@ -133,17 +133,6 @@
   color: var(--ink);
 }
 
-.nutri-btn.ghost {
-  background: transparent;
-  color: var(--ink-faded);
-  border-color: var(--ink-faded);
-  box-shadow: none;
-}
-
-.nutri-btn.ghost:hover {
-  background: rgba(74, 55, 32, 0.08);
-  color: var(--ink);
-}
 
 .nutri-btn-danger {
   background: linear-gradient(180deg, var(--rubric-light), var(--rubric));
@@ -711,6 +700,9 @@
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-quote);
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nutri-meal-time {

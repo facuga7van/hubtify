@@ -314,6 +314,7 @@
     "aiPlaceholder": "Describe what you ate...",
     "estimate": "Estimate",
     "estimateFailed": "Estimation failed. Try manual entry.",
+    "estimationFailed": "Estimation failed — edit manually",
     "confirmLog": "Confirm & Log",
     "today": "Today",
     "foodInputPlaceholder": "What did you eat? e.g.: chicken with rice",

@@ -1,5 +1,6 @@
 import { useState, memo, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '../../../shared/components/useToast';
 import { registerFood } from '../../../shared/animations/feedback';
 import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
@@ -50,6 +51,7 @@ function getMealForEntry(entry: FoodEntry, schedule?: MealSchedule | null): Meal
 
 export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChange, onFavorite, mealSchedule, readOnly, className, isNew }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editCals, setEditCals] = useState(String(entry.calories));
@@ -116,7 +118,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
       });
       setEditing(false);
     } catch {
-      // Estimation failed — stay in edit mode, user can save manually
+      toast({ type: 'warning', message: t('nutrify.estimationFailed', 'Estimation failed — edit manually') });
     } finally {
       setEstimating(false);
     }

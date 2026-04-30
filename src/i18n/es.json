@@ -314,6 +314,7 @@
     "aiPlaceholder": "Describe lo que comiste...",
     "estimate": "Estimar",
     "estimateFailed": "Error al estimar. Probá modo manual.",
+    "estimationFailed": "Error al re-estimar — editá manualmente",
     "confirmLog": "Confirmar y registrar",
     "today": "Hoy",
     "foodInputPlaceholder": "¿Qué comiste? ej: milanesa con papas fritas",

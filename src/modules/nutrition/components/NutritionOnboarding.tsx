@@ -83,7 +83,7 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--fs-quote)' };
 
   return (
-    <div className="rpg-card" style={{ maxWidth: 450, margin: '40px auto', padding: 24 }}>
+    <div className="nutri-card" style={{ maxWidth: 450, margin: '40px auto', padding: 24 }}>
       <h3 style={{ marginBottom: 4, textAlign: 'center' }}>{t('nutrify.nutritionSetup')}</h3>
       <p style={{ textAlign: 'center', fontSize: 'var(--fs-label)', opacity: 0.75, marginBottom: 16 }}>
         {step === 0 ? t('nutrify.setupStep1') : step === 1 ? t('nutrify.setupStep2') : t('nutrify.onboardingStep3', 'Horario de comidas')}
