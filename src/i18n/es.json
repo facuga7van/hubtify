@@ -385,7 +385,8 @@
       "placeholder": "Tu peso actual (kg)",
       "save": "Guardar",
       "later": "Ahora no",
-      "invalid": "Ingresá un peso válido (30-300 kg)"
+      "invalid": "Ingresá un peso válido (30-300 kg)",
+      "saveFailed": "Error al guardar peso"
     },
     "weightCheckDay": "Día de pesaje semanal",
     "weightPopupEnabled": "Recordatorio de pesaje",
@@ -894,6 +895,7 @@
     "back": "Volver",
     "cancel": "Cancelar",
     "close": "Cerrar",
+    "delete": "Eliminar",
     "levelPrefix": "Nv.",
     "combo": "Combo x",
     "less": "Menos",

@@ -1,7 +1,7 @@
 import { useState, memo, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { registerFood } from '../../../shared/animations/feedback';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Platter } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
 import { estimateNutrition } from '../estimate-service';
@@ -22,6 +22,7 @@ interface Props {
   onDelete: (id: number) => void;
   onUpdate: (id: number, fields: { description?: string; calories?: number; aiBreakdown?: string; source?: string }) => void;
   onMealChange?: (id: number, meal: string) => void;
+  onFavorite?: () => void;
   mealSchedule?: MealSchedule | null;
   readOnly?: boolean;
   className?: string;
@@ -47,7 +48,7 @@ function getMealForEntry(entry: FoodEntry, schedule?: MealSchedule | null): Meal
   return resolveMealType(entry.time, schedule).meal;
 }
 
-export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChange, mealSchedule, readOnly, className, isNew }: Props) {
+export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChange, onFavorite, mealSchedule, readOnly, className, isNew }: Props) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -211,15 +212,26 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
               </span>
               <button className="nutri-btn" onClick={() => onDelete(entry.id)}
                 style={{ background: 'var(--rubric)', borderColor: 'var(--rubric)', padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-                {t('questify.delete', 'Delete')}
+                {t('common.delete', 'Eliminar')}
               </button>
               <button className="nutri-btn nutri-btn-ghost" onClick={() => setConfirmDelete(false)}
                 style={{ padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-                {t('questify.cancel', 'Cancel')}
+                {t('common.cancel', 'Cancelar')}
               </button>
             </div>
           ) : (
             <div className="nutri-meal-del" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {onFavorite && (
+                <span
+                  onClick={onFavorite}
+                  style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s', display: 'inline-flex' }}
+                  onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
+                  title={t('nutrify.saveToFavorites', 'Guardar en favoritos')}
+                >
+                  <Heart width={12} height={12} stroke="var(--rpg-hp-red)" />
+                </span>
+              )}
               <svg onClick={() => setEditing(true)} width="12" height="12" viewBox="0 0 12 12" fill="none"
                 stroke="var(--gold-dark)" strokeWidth="1.2" strokeLinecap="round"
                 style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}

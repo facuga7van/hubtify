@@ -385,7 +385,8 @@
       "placeholder": "Your current weight (kg)",
       "save": "Save",
       "later": "Not now",
-      "invalid": "Enter a valid weight (30-300 kg)"
+      "invalid": "Enter a valid weight (30-300 kg)",
+      "saveFailed": "Error saving weight"
     },
     "weightCheckDay": "Weekly weigh-in day",
     "weightPopupEnabled": "Weigh-in reminder",
@@ -894,6 +895,7 @@
     "back": "Back",
     "cancel": "Cancel",
     "close": "Close",
+    "delete": "Delete",
     "levelPrefix": "Lv.",
     "combo": "Combo x",
     "less": "Less",

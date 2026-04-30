@@ -204,7 +204,7 @@ export default function NutritionSettings() {
             </div>
             <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
               <span className="tdee-val">{tdee.toLocaleString()}</span>{' '}
-              <span className="tdee-unit">kcal/{t('nutrify.today', 'hoy').toLowerCase().charAt(0) === 'h' ? 'día' : 'day'}</span>
+              <span className="tdee-unit">kcal/{t('nutrify.perDay', 'día')}</span>
               <div className="nutri-field-hint">
                 BMR {bmr.toLocaleString()} {'\u00d7'}{multiplier} {t('nutrify.activityLevel', 'actividad').toLowerCase()}
               </div>
@@ -273,6 +273,10 @@ export default function NutritionSettings() {
         <div
           className={`nutri-check${weightPopupEnabled ? ' active' : ''}`}
           onClick={() => setWeightPopupEnabled(!weightPopupEnabled)}
+          role="checkbox"
+          aria-checked={weightPopupEnabled}
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWeightPopupEnabled(!weightPopupEnabled); } }}
         >
           <div className="nutri-check-box">{weightPopupEnabled ? '\u2713' : ''}</div>
           <div className="nutri-check-label">{t('nutrify.enableWeeklyReminder', 'Activar recordatorio semanal')}</div>

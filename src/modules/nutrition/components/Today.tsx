@@ -371,16 +371,25 @@ export default function Today() {
   };
 
   const handleMealChange = async (id: number, meal: string) => {
-    await window.api.nutritionUpdateFood(id, { meal });
-    loadData(date);
+    try {
+      await window.api.nutritionUpdateFood(id, { meal });
+      loadData(date);
+    } catch (err) {
+      console.error('[Nutrify] meal change failed', err);
+    }
   };
 
   const handleDelete = (id: number) => {
     setRemovingId(id);
     setTimeout(async () => {
-      await window.api.nutritionDeleteFood(id);
-      loadData(date);
-      setRemovingId(null);
+      try {
+        await window.api.nutritionDeleteFood(id);
+        loadData(date);
+      } catch (err) {
+        console.error('[Nutrify] delete failed', err);
+      } finally {
+        setRemovingId(null);
+      }
     }, 300);
   };
 
@@ -429,8 +438,13 @@ export default function Today() {
       return;
     }
     setWeightError('');
-    await window.api.nutritionSaveWeeklyMetrics({ weightKg: kg });
-    setWeightPopup({ show: false });
+    try {
+      await window.api.nutritionSaveWeeklyMetrics({ weightKg: kg });
+      setWeightPopup({ show: false });
+    } catch (err) {
+      console.error('[Nutrify] weight save failed', err);
+      setWeightError(t('nutrify.weightCheckin.saveFailed', 'Error saving weight'));
+    }
   };
 
   const handleWeightDismiss = () => {
@@ -797,7 +811,7 @@ export default function Today() {
                       <Heart width={14} height={14} /> {t('nutrify.saveToFavorites', 'Guardar en favoritos')}
                     </button>
                     <button className="nutri-btn nutri-btn-ghost" onClick={() => { setEstimation(null); setEditCalories(''); }}>
-                      {t('questify.cancel', 'Cancelar')}
+                      {t('common.cancel', 'Cancelar')}
                     </button>
                   </div>
                 </div>
@@ -1027,7 +1041,7 @@ export default function Today() {
             </button>
             <button onClick={() => setCloseDayPopup(false)} className="nutri-btn nutri-btn-ghost"
               style={{ width: '100%' }}>
-              {t('questify.cancel', 'Cancelar')}
+              {t('common.cancel', 'Cancelar')}
             </button>
           </div>
         </div>

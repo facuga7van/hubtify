@@ -76,6 +76,10 @@ export default function MealScheduleEditor({ schedule, onChange, showDefaults }:
             <div
               className={`nutri-meal-schedule-toggle${r.enabled ? ' active' : ''}`}
               onClick={() => updateMeal(meal, { enabled: !r.enabled })}
+              role="checkbox"
+              aria-checked={r.enabled}
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); updateMeal(meal, { enabled: !r.enabled }); } }}
             >
               <div className="nutri-check-box">{r.enabled ? '\u2713' : ''}</div>
             </div>
