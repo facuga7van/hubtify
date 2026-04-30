@@ -10,7 +10,7 @@ import {
 import type { BarDatum, PointDatum, CellLevel } from '../../../shared/components/charts';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { Flame, Book, Tower, Map as MapIcon, Scroll } from '../../../shared/components/icons';
+import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal } from '../../../shared/components/icons';
 import type { NutritionProfile, DailySummary } from '../types';
 
 interface WeightEntry {
@@ -288,7 +288,8 @@ export default function NutritionCharts() {
               className="nutri-btn nutri-btn-ghost"
               onClick={() => navigate('/nutrition')}
             >
-              {'\u2190'} {t('common.back', 'Back')}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M19 12H5M5 12l6-6M5 12l6 6"/></svg>{' '}
+              {t('common.back', 'Back')}
             </button>
           </div>
         </div>
@@ -319,7 +320,8 @@ export default function NutritionCharts() {
               className="nutri-btn nutri-btn-ghost"
               onClick={() => navigate('/nutrition')}
             >
-              {'\u2190'} {t('common.back', 'Back')}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M19 12H5M5 12l6-6M5 12l6 6"/></svg>{' '}
+              {t('common.back', 'Back')}
             </button>
           </div>
         </div>
@@ -356,7 +358,8 @@ export default function NutritionCharts() {
             className="nutri-btn nutri-btn-ghost"
             onClick={() => navigate('/nutrition')}
           >
-            {'\u2190'} {t('common.back', 'Back')}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M19 12H5M5 12l6-6M5 12l6 6"/></svg>{' '}
+            {t('common.back', 'Back')}
           </button>
         </div>
       </div>
@@ -365,7 +368,7 @@ export default function NutritionCharts() {
       <div className="nutri-kpi-strip">
         <HelpBubble text={t('nutrify.kpiHelp', 'Indicadores del período: precisión calórica, peso actual, racha de registro y días logueados.')} />
         <div className="nutri-kpi scroll-kpi">
-          <div className="nutri-kpi-icon seal-icon">{'\u2720'}</div>
+          <div className="nutri-kpi-icon seal-icon"><HelpSeal width={18} height={18} /></div>
           <div className="nutri-kpi-body">
             <div className="nutri-kpi-label">
               {t('nutrify.precision', 'Precision')}
@@ -375,7 +378,7 @@ export default function NutritionCharts() {
         </div>
 
         <div className="nutri-kpi scroll-kpi">
-          <div className="nutri-kpi-icon seal-icon">{'\u2696'}</div>
+          <div className="nutri-kpi-icon seal-icon"><Scale width={18} height={18} /></div>
           <div className="nutri-kpi-body">
             <div className="nutri-kpi-label">
               {t('nutrify.weight', 'Weight')}
@@ -406,7 +409,10 @@ export default function NutritionCharts() {
               const colorClass = isGood ? ' up' : isBad ? ' down' : '';
               return (
                 <div className={`nutri-kpi-delta${colorClass}`}>
-                  {kpis.weightDelta! > 0 ? '\u25B2' : '\u25BC'}{' '}
+                  {kpis.weightDelta! > 0
+                    ? <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 2l4 6H1z"/></svg>
+                    : <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 8L1 2h8z"/></svg>
+                  }{' '}
                   {Math.abs(kpis.weightDelta!)} kg
                 </div>
               );

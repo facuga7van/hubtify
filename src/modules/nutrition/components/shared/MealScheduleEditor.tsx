@@ -81,7 +81,7 @@ export default function MealScheduleEditor({ schedule, onChange, showDefaults }:
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); updateMeal(meal, { enabled: !r.enabled }); } }}
             >
-              <div className="nutri-check-box">{r.enabled ? '\u2713' : ''}</div>
+              <div className="nutri-check-box">{r.enabled ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M2 6l3 3 5-5"/></svg> : null}</div>
             </div>
             <span className="nutri-meal-schedule-icon">{MEAL_ICONS[meal]}</span>
             <span className="nutri-meal-schedule-name">{t(i18nKey, meal)}</span>

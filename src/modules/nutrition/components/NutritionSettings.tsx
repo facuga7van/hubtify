@@ -142,7 +142,8 @@ export default function NutritionSettings() {
         </div>
         <div className="nutri-head-actions">
           <button className="nutri-btn nutri-btn-ghost" onClick={() => navigate('/nutrition')}>
-            {'\u2190'} {t('common.back', 'Volver')}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M19 12H5M5 12l6-6M5 12l6 6"/></svg>{' '}
+            {t('common.back', 'Volver')}
           </button>
         </div>
       </div>
@@ -278,7 +279,7 @@ export default function NutritionSettings() {
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWeightPopupEnabled(!weightPopupEnabled); } }}
         >
-          <div className="nutri-check-box">{weightPopupEnabled ? '\u2713' : ''}</div>
+          <div className="nutri-check-box">{weightPopupEnabled ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M2 6l3 3 5-5"/></svg> : null}</div>
           <div className="nutri-check-label">{t('nutrify.enableWeeklyReminder', 'Activar recordatorio semanal')}</div>
         </div>
 
@@ -299,7 +300,7 @@ export default function NutritionSettings() {
         <p style={{ color: 'var(--rubric)', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{saveError}</p>
       )}
       <button className="nutri-action-bar" onClick={handleSave} disabled={saving}>
-        {saving ? t('common.loading') : saved ? '\u2713 ' + t('nutrify.saved') : t('nutrify.saveProfile')}
+        {saving ? t('common.loading') : saved ? <><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M2 6l3 3 5-5"/></svg>{' '}{t('nutrify.saved')}</> : t('nutrify.saveProfile')}
       </button>
     </div>
   );

@@ -12,7 +12,7 @@ import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Heart } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import type { TFunction } from 'i18next';
@@ -538,7 +538,7 @@ export default function Today() {
       <div className="nutri-page-head">
         <div>
           <h1 className="nutri-page-title">
-            <span className="nutri-title-ico">{'\u25C8'}</span> NUTRIFY
+            <span className="nutri-title-ico"><Herb width={16} height={16} /></span> NUTRIFY
           </h1>
         </div>
         <div className="nutri-head-actions">
@@ -584,7 +584,7 @@ export default function Today() {
       <div className="nutri-page-head">
         <div>
           <h1 className="nutri-page-title">
-            <span className="nutri-title-ico">{'\u25C8'}</span> NUTRIFY
+            <span className="nutri-title-ico"><Herb width={16} height={16} /></span> NUTRIFY
           </h1>
           <div className="nutri-page-sub">{t('nutrify.subtitle', 'Rastrea tu consumo diario')}</div>
         </div>
@@ -704,7 +704,7 @@ export default function Today() {
         <div className="nutri-card">
           <HelpBubble text={t('nutrify.logFoodHelp', 'Describí lo que comiste en lenguaje natural y la IA estimará las calorías. Podés editar antes de confirmar.')} />
           <h3 className="nutri-card-title">
-            <span className="nutri-t-ico">{'\u25C9'}</span>
+            <span className="nutri-t-ico"><Quill width={14} height={14} /></span>
             {t('nutrify.logFood', 'Registrar Comida')}
           </h3>
 
@@ -829,7 +829,7 @@ export default function Today() {
             style={{ cursor: 'pointer', userSelect: 'none' }}
             onClick={() => setShowFavorites(v => !v)}
           >
-            <span className="nutri-t-ico">{'\u25C6'}</span>
+            <span className="nutri-t-ico"><Heart width={14} height={14} /></span>
             {t('nutrify.favoriteFoods', 'Comidas Favoritas')}
             <HelpBubble variant="inline" text={t('nutrify.favoriteFoodsHelp', 'Tus comidas guardadas para loguear rápido')} />
             <span className="nutri-card-meta" style={{ fontSize: 'var(--fs-label)' }}>
@@ -861,7 +861,7 @@ export default function Today() {
       {/* ── Food log (grouped by meal) ────────────── */}
       <div className="nutri-card" data-tour="nutrition-log">
         <h3 className="nutri-card-title">
-          <span className="nutri-t-ico">{'\u2726'}</span>
+          <span className="nutri-t-ico"><Scroll width={14} height={14} /></span>
           {t('nutrify.foodLog', 'Registro de Comidas')}
           <HelpBubble variant="inline" text={t('nutrify.foodLogHelp', 'Comidas del día agrupadas por momento. Tocá el ícono para cambiar categoría. Podés editar o eliminar.')} />
           {foods.length > 0 && (
