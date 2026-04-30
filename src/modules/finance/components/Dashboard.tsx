@@ -5,7 +5,7 @@ import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
 import { SparklineChart } from '../../../shared/components/charts';
-import { Scale, Key, Compass } from '../../../shared/components/icons';
+import { Scale, Key, Compass, ArrowUp, ArrowDown, ChevronRight } from '../../../shared/components/icons';
 import { useToast } from '../../../shared/components/useToast';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency, currencyPrefix } from '../utils/format';
@@ -551,7 +551,10 @@ export default function Dashboard() {
                     <span>
                       saldo del mes {'\u2014'}{' '}
                       <span style={{ color: trendPct <= 0 ? 'var(--moss)' : 'var(--rubric)' }}>
-                        {trendPct <= 0 ? '\u2191' : '\u2193'} {Math.abs(trendPct)}%
+                        {trendPct <= 0
+                          ? <ArrowUp style={{ width: '0.75em', height: '0.75em' }} />
+                          : <ArrowDown style={{ width: '0.75em', height: '0.75em' }} />
+                        }{' '}{Math.abs(trendPct)}%
                       </span>{' '}
                       {trendPct <= 0 ? t('coinify.lessThanLastMonth') : t('coinify.moreThanLastMonth')}
                     </span>
@@ -591,7 +594,7 @@ export default function Dashboard() {
                 <AnimatedNumber value={balance.ARS.expenses} prefix={currencyPrefix()} />
               </div>
               <div className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>
-                {installmentCount} {t('coinify.activeInstallments').toLowerCase()} {'\u00B7'} TC {formatCurrency(pendingCC)}
+                {installmentCount} {t('coinify.activeInstallments').toLowerCase()} <span className="coin-separator">·</span> TC {formatCurrency(pendingCC)}
               </div>
               <Gauge value={balance.ARS.expenses} max={Math.max(balance.ARS.income, balance.ARS.expenses) * 1.2 || 1} tone="rubric" showPips={false} />
             </div>
@@ -678,7 +681,7 @@ export default function Dashboard() {
               className="coin-loan-mini__link"
               onClick={() => navigate('/finance/loans')}
             >
-              <span className="qb-small-caps">{t('coinify.loans')} {'\u25B7'}</span>
+              <span className="qb-small-caps">{t('coinify.loans')} <ChevronRight style={{ width: '0.7em', height: '0.7em' }} /></span>
             </div>
           </Section>
 

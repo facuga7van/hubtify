@@ -9,7 +9,7 @@ import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 import InstallmentAddForm from './shared/InstallmentAddForm';
 import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
-import { Compass } from '../../../shared/components/icons';
+import { Compass, CrossMark, ArrowRight } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
 
@@ -206,7 +206,7 @@ export default function Installments() {
                     title={t('coinify.deleteInstallmentGroup', 'Eliminar grupo de cuotas')}
                     style={{ padding: '2px 6px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
                   >
-                    {'\u2715'}
+                    <CrossMark style={{ width: '0.65em', height: '0.65em' }} />
                   </button>
                 </div>
                 {group.rows.map((row) => {
@@ -223,7 +223,7 @@ export default function Installments() {
                       </span>
                       <div className="coin-installment-row__right">
                         {row.forThirdParty && (
-                          <Rune tone="gold">{'\u2192'} {row.forThirdParty}</Rune>
+                          <Rune tone="gold"><ArrowRight style={{ width: '0.75em', height: '0.75em' }} /> {row.forThirdParty}</Rune>
                         )}
                         <Gauge value={current} max={total} tone={isComplete ? 'sage' : 'gold'} showPips={false} />
                         {editingId === row.id ? (

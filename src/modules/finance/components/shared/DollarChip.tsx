@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
 
 interface Rate {
   casa: string;
@@ -125,9 +126,7 @@ export function DollarChip() {
         <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
           USD ${featured.venta.toLocaleString('es-AR')}
         </span>
-        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d={open ? 'M2 7l3-3 3 3' : 'M2 3l3 3 3-3'} />
-        </svg>
+        {open ? <ChevronUp style={{ width: 8, height: 8 }} /> : <ChevronDown style={{ width: 8, height: 8 }} />}
       </button>
       {open && (
         <div style={{

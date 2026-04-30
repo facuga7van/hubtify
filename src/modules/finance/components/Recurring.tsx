@@ -7,6 +7,7 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { Currency, TransactionType } from '../types';
 import { Rune, Gauge } from '../../../shared/components/codex/CodexPrimitives';
+import { PlayIcon, PauseIcon, Pencil, CrossMark } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
 
@@ -319,7 +320,7 @@ export default function Recurring() {
                   onClick={() => handleToggle(item.id)}
                   title={isActive(item) ? t('coinify.pause') : t('coinify.activate')}
                 >
-                  {isActive(item) ? '\u25B6' : '\u23F8'}
+                  {isActive(item) ? <PlayIcon style={{ width: '0.7em', height: '0.7em' }} /> : <PauseIcon style={{ width: '0.7em', height: '0.7em' }} />}
                 </button>
 
                 {/* Name, Type, Category, Billing Day */}
@@ -401,7 +402,7 @@ export default function Recurring() {
                   <button className="rpg-button" onClick={() => startRecurringEdit(item)}
                     style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.5 }}
                     title={t('coinify.editRecurring', 'Editar recurrente')}>
-                    {'\u270E'}
+                    <Pencil style={{ width: '0.75em', height: '0.75em' }} />
                   </button>
                 )}
 
@@ -415,7 +416,7 @@ export default function Recurring() {
                 {/* Delete */}
                 <button className="rpg-button" onClick={() => handleDelete(item.id)}
                   style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
-                  title={t('coinify.delete')}>x</button>
+                  title={t('coinify.delete')}><CrossMark style={{ width: '0.65em', height: '0.65em' }} /></button>
               </div>
 
               {/* Amount History Timeline */}

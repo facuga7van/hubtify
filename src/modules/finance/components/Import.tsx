@@ -4,6 +4,7 @@ import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
 import type { ParsedRow } from '../../../../shared/types';
 import { CATEGORIES } from '../types';
+import { ChevronDown, ChevronRight } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 
 interface RowState extends ParsedRow {
@@ -242,7 +243,7 @@ export default function Import() {
                 onClick={() => setSkippedExpanded((v) => !v)}
               >
                 <span style={{ color: 'var(--gold)', fontSize: 'var(--fs-sub)' }}>
-                  {skippedExpanded ? '\u25BC' : '\u25B6'}
+                  {skippedExpanded ? <ChevronDown /> : <ChevronRight />}
                 </span>
                 <span style={{ color: 'var(--gold)', fontWeight: 600, fontSize: 'var(--fs-label)' }}>
                   {t('coinify.importSkippedLines', { count: skippedLines.length })}

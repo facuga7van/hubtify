@@ -8,6 +8,7 @@ import type { LoanDirection, LoanType, Currency } from '../types';
 import { loanPaidOff } from '../../../shared/animations/epic';
 import { CategorySelect } from './shared/CategorySelect';
 import { Section, Gauge, Rune } from '../../../shared/components/codex/CodexPrimitives';
+import { Checkmark, ChevronUp } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 
 interface LoanRow {
@@ -238,7 +239,7 @@ export default function Loans() {
                 </button>
               )}
               {isSettled(loan) && (
-                <span className="coin-loan-card__settled">{'\u2713'} {t('coinify.settled')}</span>
+                <span className="coin-loan-card__settled"><Checkmark style={{ width: '0.8em', height: '0.8em' }} /> {t('coinify.settled')}</span>
               )}
             </div>
           ))}
@@ -265,7 +266,7 @@ export default function Loans() {
                   </button>
                 )}
                 {allSettled && (
-                  <span className="coin-loan-card__settled">{'\u2713'} {t('coinify.settled')}</span>
+                  <span className="coin-loan-card__settled"><Checkmark style={{ width: '0.8em', height: '0.8em' }} /> {t('coinify.settled')}</span>
                 )}
               </div>
             );
@@ -296,7 +297,7 @@ export default function Loans() {
         </div>
         <button className="rpg-button" style={{ padding: '4px 12px', fontSize: 'var(--fs-label)' }}
           onClick={() => setShowForm(!showForm)}>
-          {showForm ? '\u25B2' : `+ ${t('coinify.addLoan')}`}
+          {showForm ? <ChevronUp style={{ width: '0.65em', height: '0.65em' }} /> : `+ ${t('coinify.addLoan')}`}
         </button>
       </div>
 

@@ -500,3 +500,51 @@ export function Dragon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function ChevronUp(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="18 15 12 9 6 15" /></svg>);
+}
+
+export function ChevronDown(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="6 9 12 15 18 9" /></svg>);
+}
+
+export function ChevronRight(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="9 18 15 12 9 6" /></svg>);
+}
+
+export function ArrowUp(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>);
+}
+
+export function ArrowDown(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>);
+}
+
+export function ArrowRight(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>);
+}
+
+export function Pencil(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>);
+}
+
+export function CrossMark(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>);
+}
+
+export function Checkmark(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="20 6 9 17 4 12" /></svg>);
+}
+
+export function WarningTriangle(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>);
+}
+
+export function PlayIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><polygon points="5 3 19 12 5 21 5 3" /></svg>);
+}
+
+export function PauseIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>);
+}

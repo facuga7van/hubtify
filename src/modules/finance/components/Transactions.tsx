@@ -14,6 +14,7 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { CategorySelect } from './shared/CategorySelect';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
+import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 
 interface TransactionRow {
@@ -349,7 +350,7 @@ export default function Transactions() {
 
   const sortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
-    return <span className="coin-sort-arrow">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>;
+    return <span className="coin-sort-arrow">{sortDir === 'asc' ? <ChevronUp style={{ width: '0.65em', height: '0.65em' }} /> : <ChevronDown style={{ width: '0.65em', height: '0.65em' }} />}</span>;
   };
 
   const renderTxRow = (tx: TransactionRow) => {
@@ -404,7 +405,7 @@ export default function Transactions() {
               {tx.description || tx.category}
               {!!tx.forThirdParty && (
                 <span className="coin-ledger-row__third-party">
-                  {' \u2192 '}{tx.forThirdParty}
+                  {' '}<ArrowRight style={{ width: '0.75em', height: '0.75em' }} />{' '}{tx.forThirdParty}
                 </span>
               )}
             </span>
@@ -412,7 +413,7 @@ export default function Transactions() {
               <Rune tone={tx.type === 'income' ? 'sage' : undefined}>{tx.category}</Rune>
               {anomalousCategories.has(tx.category) && tx.type === 'expense' && (
                 <Tooltip text={t('coinify.spendingAboveAverage', 'Gasto por encima del promedio')}>
-                  <Rune tone="rubric">{'\u26A0'}</Rune>
+                  <Rune tone="rubric"><WarningTriangle style={{ width: '0.8em', height: '0.8em', color: 'var(--rpg-hp-red)' }} /></Rune>
                 </Tooltip>
               )}
             </span>
@@ -431,9 +432,9 @@ export default function Transactions() {
             </span>
             <div className="coin-ledger-row__actions">
               <button className="rpg-button coin-ledger-row__action-btn"
-                onClick={() => startEdit(tx)}>{'\u270E'}</button>
+                onClick={() => startEdit(tx)}><Pencil style={{ width: '0.8em', height: '0.8em' }} /></button>
               <button className="rpg-button coin-ledger-row__action-btn"
-                onClick={() => handleDelete(tx.id)}>{'\u2715'}</button>
+                onClick={() => handleDelete(tx.id)}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
             </div>
           </>
         )}
@@ -471,7 +472,7 @@ export default function Transactions() {
           </button>
           <button className="rpg-button coin-month-nav__btn"
             onClick={() => setShowForm(!showForm)}>
-            {showForm ? '\u25B2' : `+ ${t('coinify.quickAdd')}`}
+            {showForm ? <ChevronUp style={{ width: '0.65em', height: '0.65em' }} /> : `+ ${t('coinify.quickAdd')}`}
           </button>
         </div>
       </div>
@@ -577,7 +578,7 @@ export default function Transactions() {
           <div className="coin-import-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span className="qb-small-caps" style={{ letterSpacing: '.14em', color: 'var(--rubric)' }}>{t('coinify.import')}</span>
-              <button className="rpg-button" onClick={() => setShowImport(false)} style={{ padding: '2px 8px' }}>{'\u2715'}</button>
+              <button className="rpg-button" onClick={() => setShowImport(false)} style={{ padding: '2px 8px' }}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
             </div>
             <Import />
           </div>

@@ -5,6 +5,7 @@ import { CreditCardSelect } from './CreditCardSelect';
 import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
+import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
 
 interface CategoryMapping {
   merchantPattern: string;
@@ -168,7 +169,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
         {showAdvanced
           ? t('coinify.lessOptions', 'Menos opciones')
           : t('coinify.moreOptions', 'Más opciones')}
-        <span style={{ marginLeft: 4, fontSize: '0.8em' }}>{showAdvanced ? '\u25B2' : '\u25BC'}</span>
+        <span style={{ marginLeft: 4, fontSize: '0.8em' }}>{showAdvanced ? <ChevronUp /> : <ChevronDown />}</span>
       </button>
 
       {/* Advanced fields */}
