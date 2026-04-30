@@ -35,9 +35,9 @@ const RANGE_LABELS: Record<Range, string> = {
 };
 
 /** Day abbreviation from date string (YYYY-MM-DD) */
-function dayAbbr(dateStr: string): string {
+function dayAbbr(dateStr: string, locale: string = 'es'): string {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('es', { weekday: 'short' }).slice(0, 3);
+  return d.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 3);
 }
 
 /** Short date label: DD/MM */
@@ -58,7 +58,7 @@ function dateRange(startStr: string, endStr: string): string[] {
 }
 
 export default function NutritionCharts() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   const [range, setRange] = useState<Range>('30d');
@@ -184,12 +184,12 @@ export default function NutritionCharts() {
         else if (ratio > 1.1) status = 'over';
       }
       return {
-        label: range === '7d' ? dayAbbr(s.date) : shortDate(s.date),
+        label: range === '7d' ? dayAbbr(s.date, i18n.language) : shortDate(s.date),
         value: s.totalCaloriesIn,
         status,
       };
     });
-  }, [summaries, dailyTarget, range]);
+  }, [summaries, dailyTarget, range, i18n.language]);
 
   // ── Line chart data (weight) ───────────────────────────────
 
@@ -246,13 +246,13 @@ export default function NutritionCharts() {
     return allDates.map((date) => {
       const s = summaryMap.get(date);
       const cal = s ? Math.round(s.totalCaloriesIn) : 0;
-      const label = date === today ? `${date} (hoy)` : date;
-      if (!cal) return `${label}\nSin registro`;
+      const label = date === today ? `${date} (${t('nutrify.today', 'hoy')})` : date;
+      if (!cal) return `${label}\n${t('nutrify.noRecord', 'Sin registro')}`;
       return target
         ? `${label}\n${cal.toLocaleString()} / ${target.toLocaleString()} kcal`
         : `${label}\n${cal.toLocaleString()} kcal`;
     });
-  }, [summaries, dailyTarget, heatmapStart, today]);
+  }, [summaries, dailyTarget, heatmapStart, today, t]);
 
   // ── Render ─────────────────────────────────────────────────
 
