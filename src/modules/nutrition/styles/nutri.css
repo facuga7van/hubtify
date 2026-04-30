@@ -1459,10 +1459,11 @@
 .nutri-kpi-delta {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--moss);
+  color: var(--ink-faded);
   margin-top: 2px;
 }
 
+.nutri-kpi-delta.up   { color: var(--moss); }
 .nutri-kpi-delta.down { color: var(--rubric); }
 
 

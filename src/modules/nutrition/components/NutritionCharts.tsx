@@ -398,14 +398,19 @@ export default function NutritionCharts() {
                 '\u2014'
               )}
             </div>
-            {kpis.weightDelta != null && (
-              <div
-                className={`nutri-kpi-delta${kpis.weightDelta > 0 ? ' down' : ''}`}
-              >
-                {kpis.weightDelta > 0 ? '\u25B2' : '\u25BC'}{' '}
-                {Math.abs(kpis.weightDelta)} kg
-              </div>
-            )}
+            {kpis.weightDelta != null && (() => {
+              const isDeficit = (profile?.deficitTargetKcal ?? 0) > 0;
+              const isSurplus = (profile?.deficitTargetKcal ?? 0) < 0;
+              const isGood = isDeficit ? kpis.weightDelta! < 0 : isSurplus ? kpis.weightDelta! > 0 : false;
+              const isBad = isDeficit ? kpis.weightDelta! > 0 : isSurplus ? kpis.weightDelta! < 0 : false;
+              const colorClass = isGood ? ' up' : isBad ? ' down' : '';
+              return (
+                <div className={`nutri-kpi-delta${colorClass}`}>
+                  {kpis.weightDelta! > 0 ? '\u25B2' : '\u25BC'}{' '}
+                  {Math.abs(kpis.weightDelta!)} kg
+                </div>
+              );
+            })()}
           </div>
         </div>
 
