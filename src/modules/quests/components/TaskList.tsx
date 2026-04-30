@@ -91,6 +91,7 @@ export default function TaskList() {
       setLoading(false);
     } catch (err) {
       console.error('[Quests]', err);
+      setLoading(false);
     }
   }, [activeProjectId]);
 
@@ -734,10 +735,10 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
 
         {/* XP reward */}
         <div className="quest-row-xp">
-          <div className={`quest-row-xp-value ${isOverdue ? 'quest-row-xp-value--penalty' : 'quest-row-xp-value--reward'}`}>
-            {isOverdue ? `-${XP_MAP[task.tier]}` : `+${XP_MAP[task.tier]}`}
+          <div className={`quest-row-xp-value quest-row-xp-value--reward${isOverdue ? ' quest-row-xp-value--overdue' : ''}`}>
+            +{XP_MAP[task.tier]}
           </div>
-          <div className="quest-row-xp-label">{isOverdue ? t('questify.penalty', 'CASTIGO') : 'XP'}</div>
+          <div className="quest-row-xp-label">XP</div>
         </div>
 
         {/* Action icons */}

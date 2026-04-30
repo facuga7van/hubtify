@@ -224,6 +224,7 @@
 
 .quest-row-xp-value--reward { color: var(--moss); }
 .quest-row-xp-value--penalty { color: var(--rubric); }
+.quest-row-xp-value--overdue { opacity: 0.5; }
 
 .quest-row-xp-label {
   font-family: 'IM Fell English SC', serif;

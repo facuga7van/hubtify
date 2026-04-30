@@ -222,7 +222,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.75)', zIndex: 9999,
+      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.75)', zIndex: 'var(--z-modal)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }} onClick={handleClose}>
       <div style={{
