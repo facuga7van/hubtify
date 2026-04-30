@@ -6,8 +6,6 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { ambientOrbs, brewComplete, statsShimmer } from '../../../shared/animations/cauldron';
 import {
   playCauldronStart,
-  playCauldronComplete,
-  playCauldronBreakEnd,
   playCauldronCycleEnd,
   playCauldronWarning,
   playCauldronPause,
@@ -634,7 +632,7 @@ export default function CauldronPage() {
         if (result.nextType === null) {
           playCauldronCycleEnd();
         } else {
-          playCauldronComplete();
+          playCauldronWarning();
         }
 
         window.api
@@ -652,7 +650,7 @@ export default function CauldronPage() {
         toast({ type: 'xp', message: t('cauldron.pomodoroComplete', 'Brew complete!') });
         setXpToast({ show: true, amount: 20, desc: t('cauldron.pomodoroComplete', 'Brew complete!') });
       } else if (result.sessionType !== 'work' && result.completed) {
-        playCauldronBreakEnd();
+        playCauldronWarning();
       }
       loadStats();
       loadSessions(0);

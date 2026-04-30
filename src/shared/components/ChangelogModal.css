@@ -1,99 +1,299 @@
-.changelog-title {
-  font-family: 'UnifrakturCook', cursive;
-  font-size: 1.2rem;
-  color: var(--ink);
-  margin: 0 0 16px;
+/* ChangelogModal — RPG parchment scroll design */
+
+.changelog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 12, 4, 0.7);
+  backdrop-filter: blur(2px);
+  animation: changelog-fadeIn 0.25s ease-out;
+  font-family: var(--ff-body);
+}
+
+@keyframes changelog-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Main card wrapper */
+.changelog-card {
+  width: 640px;
+  max-width: 95vw;
+  max-height: min(86vh, 720px);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.4s cubic-bezier(.2, .7, .3, 1), opacity 0.3s;
+}
+
+.changelog-card--entering {
+  transform: translateY(-30px) scale(0.96);
+  opacity: 0;
+}
+
+.changelog-card--open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+/* Scroll rollers (wooden bar at top/bottom) */
+.changelog-roller {
+  height: 22px;
+  align-self: stretch;
+  margin: 0 -8px;
+  border-radius: 11px;
+  border: 1px solid #2a1d0e;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.changelog-roller--top {
+  background: linear-gradient(180deg, #5c3a1e, #3a2513 60%, #2a1d0e);
+  box-shadow: inset 0 1px 0 rgba(196, 168, 78, 0.25), 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.changelog-roller--bottom {
+  background: linear-gradient(0deg, #5c3a1e, #3a2513 60%, #2a1d0e);
+  box-shadow: inset 0 -1px 0 rgba(196, 168, 78, 0.25), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.changelog-roller__knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #c4a84e, #8a7030);
+  border: 1px solid #5a3a1a;
+}
+
+/* Parchment body */
+.changelog-parchment {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--gold);
+  border-top: 1px solid var(--gold-dark);
+  border-bottom: 1px solid var(--gold-dark);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(168, 138, 60, 0.4);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Parchment texture */
+  background-color: #e8d5a3;
+  background-image:
+    radial-gradient(ellipse 380px 260px at 18% 22%, rgba(120, 80, 40, 0.12), transparent 70%),
+    radial-gradient(ellipse 220px 180px at 78% 12%, rgba(120, 70, 30, 0.10), transparent 70%),
+    radial-gradient(ellipse 320px 240px at 88% 82%, rgba(140, 90, 40, 0.14), transparent 70%),
+    radial-gradient(ellipse 200px 180px at 28% 88%, rgba(110, 70, 30, 0.10), transparent 70%),
+    radial-gradient(circle at 50% 50%, rgba(245, 231, 192, 0.5), rgba(212, 188, 130, 0.5)),
+    linear-gradient(180deg, #f0dca8 0%, #e0c890 50%, #cfb37a 100%);
+  background-blend-mode: multiply, multiply, multiply, multiply, normal, normal;
+}
+
+/* Close X button */
+.changelog-close-x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(58, 37, 19, 0.9);
+  color: #c4a84e;
+  border: 1px solid var(--gold-dark);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s;
+}
+
+.changelog-close-x:hover {
+  background: rgba(58, 37, 19, 1);
+  color: #f5e7c0;
+}
+
+/* Header */
+.changelog-header {
+  padding: 26px 36px 14px;
   text-align: center;
-  letter-spacing: 0.03em;
 }
 
-.changelog-scroll {
-  max-height: 60vh;
+.changelog-header__eyebrow {
+  font-family: var(--ff-accent);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rubric);
+}
+
+.changelog-header__title {
+  font-family: var(--ff-display);
+  font-size: 38px;
+  color: var(--ink);
+  margin: 8px 0 4px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.changelog-header__version {
+  font-family: var(--ff-accent);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: var(--gold-dark);
+}
+
+.changelog-header__flourish {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Scrollable body */
+.changelog-body {
+  flex: 1;
   overflow-y: auto;
-  padding-right: 8px;
+  padding: 16px 36px 12px;
+  scrollbar-width: none;
 }
 
-/* Custom scrollbar for RPG theme */
-.changelog-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.changelog-scroll::-webkit-scrollbar-track {
-  background: rgba(74, 55, 32, 0.1);
-  border-radius: 3px;
-}
-.changelog-scroll::-webkit-scrollbar-thumb {
-  background: var(--gold-dark);
-  border-radius: 3px;
+.changelog-body::-webkit-scrollbar {
+  display: none;
 }
 
-.changelog-version {
-  margin-bottom: 16px;
+/* Version section (for multi-version changelog) */
+.changelog-version-section {
+  margin-bottom: 24px;
 }
-.changelog-version:last-child {
+
+.changelog-version-section:last-child {
   margin-bottom: 0;
 }
 
-.changelog-version__header {
+.changelog-version-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+}
+
+.changelog-version-divider__tag {
+  font-family: var(--ff-accent);
+  font-size: 14px;
+  letter-spacing: 0.15em;
+  color: var(--gold-dark);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.changelog-version-divider__date {
+  font-family: var(--ff-quote);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-faded);
+  white-space: nowrap;
+}
+
+.changelog-version-divider__line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold-dark), transparent);
+}
+
+/* Category group */
+.changelog-group {
+  margin-bottom: 22px;
+}
+
+.changelog-group:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-group__header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(168, 138, 60, 0.3);
+  margin-bottom: 12px;
 }
 
-.changelog-version__tag {
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-body);
-  color: var(--gold-dark);
-  font-weight: 700;
-}
-
-.changelog-version__date {
-  font-family: 'IM Fell English', serif;
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
-}
-
-.changelog-changes {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.changelog-change {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 3px 0;
-  font-family: 'IM Fell English', serif;
-  font-size: var(--fs-body);
-  color: var(--ink);
-  line-height: 1.4;
-}
-
-.changelog-badge {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 0.7rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  color: #fff;
-  white-space: nowrap;
+.changelog-group__icon {
   flex-shrink: 0;
 }
 
-.changelog-badge--feat { background: #4a7c3f; }
-.changelog-badge--fix { background: #8b3a3a; }
-.changelog-badge--refactor { background: #a88a3c; }
-.changelog-badge--chore { background: #6b5b4a; }
-
-.changelog-scope {
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
+.changelog-group__label {
+  font-family: var(--ff-accent);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.changelog-text {
-  /* takes remaining space */
+.changelog-group__line {
+  flex: 1;
+  height: 1px;
+}
+
+.changelog-group__count {
+  font-family: var(--ff-accent);
+  font-size: 10px;
+  color: var(--ink-faded);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Individual change item */
+.changelog-items {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-left: 26px;
+}
+
+.changelog-item {
+  position: relative;
+}
+
+.changelog-item__diamond {
+  position: absolute;
+  left: -18px;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  opacity: 0.7;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.changelog-item__scope {
+  font-family: var(--ff-accent);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.changelog-item__text {
+  font-family: var(--ff-body);
+  font-size: 14.5px;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+/* Footer */
+.changelog-footer {
+  padding: 12px 36px;
+  border-top: 1px solid rgba(138, 112, 48, 0.4);
+  background: rgba(212, 188, 130, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import { useAuthContext } from '../shared/AuthContext';
@@ -9,6 +9,7 @@ import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/aud
 import { useTour } from '../shared/components/tour';
 import FeedbackDialog from './FeedbackDialog';
 import ChangelogModal from '../shared/components/ChangelogModal';
+import { changelog } from '../shared/changelog';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -26,6 +27,11 @@ export default function SettingsPage() {
   const [notifFinance, setNotifFinance] = useState(() => localStorage.getItem('hubtify_notifications_module_finance') !== 'false');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [patchNotesOpen, setPatchNotesOpen] = useState(false);
+  const currentVersionEntries = useMemo(() => {
+    const match = changelog.filter(e => e.version === APP_VERSION);
+    return match.length > 0 ? match : changelog.slice(0, 1);
+  }, []);
   const [syncStatus, setSyncStatus] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -100,9 +106,14 @@ export default function SettingsPage() {
             <div className="settings-row__label">Hubtify v{APP_VERSION}</div>
             <div className="settings-row__desc">{t('settings.aboutDesc', 'Tu hub de vida gamificado')}</div>
           </div>
-          <button className="rpg-btn-sm" onClick={() => setChangelogOpen(true)}>
-            {t('settings.changelog', 'Changelog')}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="rpg-btn-sm" onClick={() => setChangelogOpen(true)}>
+              {t('settings.changelog', 'Changelog')}
+            </button>
+            <button className="rpg-btn-sm" onClick={() => setPatchNotesOpen(true)}>
+              {t('settings.patchNotes', 'Notas del Parche')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -437,6 +448,12 @@ export default function SettingsPage() {
         }}
       />
       <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+      <ChangelogModal
+        open={patchNotesOpen}
+        onClose={() => setPatchNotesOpen(false)}
+        title={t('settings.patchNotes', 'Notas del Parche')}
+        entries={currentVersionEntries}
+      />
     </div>
   );
 }

@@ -84,14 +84,6 @@ export function playCauldronStart() {
   } catch { /* Sound not available */ }
 }
 
-export function playCauldronComplete() {
-  // TODO: needs replacement audio file (brew-complete.mp3 removed)
-}
-
-export function playCauldronBreakEnd() {
-  // TODO: needs replacement audio file (break-end.mp3 removed)
-}
-
 export function playCauldronCycleEnd() {
   if (!soundEnabled) return;
   try {

@@ -99,6 +99,11 @@ export function useAuth() {
       });
       await window.api.syncSetCurrentUser(cred.user.uid);
       await syncPull(cred.user.uid);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+      window.dispatchEvent(new Event('sync:questsUpdated'));
+      window.dispatchEvent(new Event('sync:nutritionUpdated'));
+      window.dispatchEvent(new Event('sync:cauldronUpdated'));
+      window.dispatchEvent(new Event('account:switched'));
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: getErrorKey(err) };

@@ -122,4 +122,37 @@ export const nutritionMigrations: Migration[] = [
       ALTER TABLE frequent_foods ADD COLUMN updated_at TEXT;
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 8,
+    up: `
+      CREATE TABLE IF NOT EXISTS favorite_foods (
+        id TEXT PRIMARY KEY,
+        description TEXT NOT NULL UNIQUE,
+        calories INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'manual',
+        ai_breakdown TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT
+      );
+
+      UPDATE food_log SET source = 'manual' WHERE source NOT IN ('ai_estimate', 'frequent', 'manual');
+
+      CREATE TABLE food_log_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        description TEXT NOT NULL,
+        calories INTEGER NOT NULL,
+        source TEXT NOT NULL CHECK(source IN ('ai_estimate', 'frequent', 'manual', 'favorite')),
+        frequent_food_id INTEGER,
+        ai_breakdown TEXT,
+        meal TEXT DEFAULT NULL
+      );
+      INSERT INTO food_log_new SELECT id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal FROM food_log;
+      DROP TABLE food_log;
+      ALTER TABLE food_log_new RENAME TO food_log;
+      CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log(date);
+    `,
+  },
 ];

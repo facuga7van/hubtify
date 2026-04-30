@@ -7,6 +7,7 @@ import { registerCharacterIpcHandlers } from '../modules/character.ipc';
 import { registerBackupIpcHandlers } from '../modules/backup.ipc';
 import { registerNotificationIpcHandlers } from '../modules/notifications.ipc';
 import { registerDollarIpcHandlers } from '../modules/dollar.ipc';
+import { registerCryptoIpcHandlers } from '../modules/crypto.ipc';
 import { registerSyncIpcHandlers } from '../modules/sync.ipc';
 import { registerCauldronIpcHandlers } from '../modules/cauldron.ipc';
 import { registerFeedbackIpcHandlers } from '../modules/feedback.ipc';
@@ -21,6 +22,7 @@ export function registerAllIpcHandlers(): void {
   registerBackupIpcHandlers();
   registerNotificationIpcHandlers();
   registerDollarIpcHandlers();
+  registerCryptoIpcHandlers();
   registerSyncIpcHandlers();
   registerCauldronIpcHandlers();
   registerFeedbackIpcHandlers();

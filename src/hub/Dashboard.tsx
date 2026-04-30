@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   BookPage,
@@ -11,19 +10,14 @@ import {
 import { Sword, Bread, Coin, Cauldron, Crown, Flame, Heart, Scroll, Quill } from '../shared/components/icons';
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
-import QuestsDashboardWidget from '../modules/quests/components/QuestsDashboardWidget';
+import TasksDashboardWidget from '../modules/quests/components/TasksDashboardWidget';
+import HabitsDashboardWidget from '../modules/quests/components/HabitsDashboardWidget';
 import NutritionDashboardWidget from '../modules/nutrition/components/NutritionDashboardWidget';
 import FinanceDashboardWidget from '../modules/finance/components/DashboardWidget';
 import CauldronDashboardWidget from '../modules/cauldron/components/CauldronDashboardWidget';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 import { playSealPress } from '../shared/audio';
 import './styles/components.css';
-
-interface QuickStats {
-  tasksDueToday: number;
-  mealsToday: number;
-  transactionsToday: number;
-}
 
 /* ── latin epigraphs ─────────────────────────────────────── */
 
@@ -125,7 +119,7 @@ function XpLedger({ data, t }: { data: Array<{ date: string; xp: number }>; t: (
 
 function SealButton({ level }: { level: number }) {
   const [pressed, setPressed] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleClick = () => {
     playSealPress();
@@ -162,7 +156,6 @@ export default function Dashboard() {
     eventsToday: number;
   } | null>(null);
   const [recentEvents, setRecentEvents] = useState<RpgEventRecord[]>([]);
-  const [quickStats, setQuickStats] = useState<QuickStats>({ tasksDueToday: 0, mealsToday: 0, transactionsToday: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const epigraph = useMemo(() => EPIGRAPHS[Math.floor(Math.random() * EPIGRAPHS.length)], []);
@@ -174,15 +167,11 @@ export default function Dashboard() {
       window.api.getRpgStats(),
       window.api.rpgGetDashboardStats(),
       window.api.getRpgHistory(8),
-      window.api.questsGetDueTodayCount(),
-      window.api.nutritionGetTodayMealsCount(),
-      window.api.financeGetTodayTransactionsCount(),
     ])
-      .then(([s, d, events, dueToday, meals, txToday]) => {
+      .then(([s, d, events]) => {
         setStats(s);
         setDashStats(d);
         setRecentEvents(events);
-        setQuickStats({ tasksDueToday: dueToday, mealsToday: meals, transactionsToday: txToday });
       })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
@@ -222,11 +211,12 @@ export default function Dashboard() {
             <div key={i} style={{ height: 64, background: 'rgba(74,55,32,.07)', borderRadius: 6 }} />
           ))}
         </div>
-        {/* Skeleton: module cards */}
+        {/* Skeleton: module cards (2+2+1 pattern) */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
           {[0, 1, 2, 3].map((i) => (
             <div key={i} style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6 }} />
           ))}
+          <div style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: '1 / -1' }} />
         </div>
       </div>
     );
@@ -310,65 +300,65 @@ export default function Dashboard() {
       {/* ── row 2: stat cartouches ────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
         <Tooltip text={t('dashboard.cartLevelTip', 'Nivel actual del héroe')}><Cartouche label={t('dashboard.cartLevel', 'NIVEL')} value={level} foot={stats?.title} icon={<Crown width={14} height={14} />} /></Tooltip>
-        <Tooltip text={t('dashboard.cartXpTip', 'Experiencia ganada hoy')}><Cartouche label={t('dashboard.cartXp', 'XP HODIE')} value={`+${xpToday}`} foot={t('dashboard.cartXpFoot', 'ganados al sol')} icon={<Sword width={14} height={14} />} tone="sage" /></Tooltip>
+        <Tooltip text={t('dashboard.cartXpTip', 'Experiencia ganada hoy')}><Cartouche label={t('dashboard.cartXp', 'XP HODIE')} value={xpToday >= 0 ? `+${xpToday}` : `${xpToday}`} foot={t('dashboard.cartXpFoot', 'ganados al sol')} icon={<Sword width={14} height={14} />} tone="sage" /></Tooltip>
         <Tooltip text={t('dashboard.cartStreakTip', 'Días consecutivos de actividad')}><Cartouche label={t('dashboard.cartStreak', 'RACHA')} value={streak} foot={t('dashboard.cartStreakFoot', 'días de gloria')} icon={<Flame width={14} height={14} />} /></Tooltip>
         <Tooltip text={t('dashboard.cartHpTip', 'Salud actual del héroe')}><Cartouche label={t('dashboard.cartHp', 'VITA')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" /></Tooltip>
       </div>
 
-      {/* ── row 2b: quick module stats (H3) ────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
-        <Tooltip text={t('dashboard.cartDueTodayTip', 'Misiones pendientes para hoy')}><Cartouche label={t('dashboard.cartDueToday', 'MISIONES HOY')} value={quickStats.tasksDueToday} foot={t('dashboard.cartDueTodayFoot', 'pendientes al sol')} icon={<Sword width={14} height={14} />} /></Tooltip>
-        <Tooltip text={t('dashboard.cartMealsTip', 'Comidas registradas hoy')}><Cartouche label={t('dashboard.cartMeals', 'PROVISIONES')} value={quickStats.mealsToday} foot={t('dashboard.cartMealsFoot', 'registradas hoy')} icon={<Bread width={14} height={14} />} tone="sage" /></Tooltip>
-        <Tooltip text={t('dashboard.cartTransactionsTip', 'Movimientos financieros del día')}><Cartouche label={t('dashboard.cartTransactions', 'TRANSACCIONES')} value={quickStats.transactionsToday} foot={t('dashboard.cartTransactionsFoot', 'movimientos del día')} icon={<Coin width={14} height={14} />} tone="gold" /></Tooltip>
-      </div>
-
       <QBDividerSection />
 
-      {/* ── row 3: four module folios ─────────────────── */}
+      {/* ── row 3: five module folios ─────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <Link to="/quests" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <ModuleCard
-            tome="Tomus I"
-            title={t('dashboard.moduleQuests', 'Libro de Misiones')}
-            latin="Acta Heroum"
-            icon={<Sword width={18} height={18} />}
-          >
-            <QuestsDashboardWidget />
-          </ModuleCard>
-        </Link>
+        <ModuleCard
+          tome="Tomus I"
+          title={t('dashboard.moduleTasks', 'Libro de Misiones')}
+          latin="Acta Heroum"
+          icon={<Sword width={18} height={18} />}
+          navTo="/quests"
+        >
+          <TasksDashboardWidget />
+        </ModuleCard>
 
-        <Link to="/nutrition" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <ModuleCard
-            tome="Tomus II"
-            title={t('dashboard.moduleNutrition', 'Diario de Provisiones')}
-            latin="De Cibo et Salute"
-            icon={<Bread width={18} height={18} />}
-          >
-            <NutritionDashboardWidget />
-          </ModuleCard>
-        </Link>
+        <ModuleCard
+          tome="Tomus I-B"
+          title={t('dashboard.moduleHabits', 'Rituales Diarios')}
+          latin="De Ritibus Quotidianis"
+          icon={<Flame width={18} height={18} />}
+          navTo="/quests"
+        >
+          <HabitsDashboardWidget />
+        </ModuleCard>
 
-        <Link to="/finance" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <ModuleCard
-            tome="Tomus III"
-            title={t('dashboard.moduleFinance', 'Libro del Tesorero')}
-            latin="De Rebus Aeris"
-            icon={<Coin width={18} height={18} />}
-          >
-            <FinanceDashboardWidget />
-          </ModuleCard>
-        </Link>
+        <ModuleCard
+          tome="Tomus II"
+          title={t('dashboard.moduleNutrition', 'Diario de Provisiones')}
+          latin="De Cibo et Salute"
+          icon={<Bread width={18} height={18} />}
+          navTo="/nutrition"
+        >
+          <NutritionDashboardWidget />
+        </ModuleCard>
 
-        <Link to="/cauldron" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <ModuleCard
-            tome="Tomus IV"
-            title={t('dashboard.moduleCauldron', 'Cámara del Caldero')}
-            latin="Decoctio Magna"
-            icon={<Cauldron width={18} height={18} />}
-          >
-            <CauldronDashboardWidget />
-          </ModuleCard>
-        </Link>
+        <ModuleCard
+          tome="Tomus III"
+          title={t('dashboard.moduleFinance', 'Libro del Tesorero')}
+          latin="De Rebus Aeris"
+          icon={<Coin width={18} height={18} />}
+          navTo="/finance"
+        >
+          <FinanceDashboardWidget />
+        </ModuleCard>
+
+        <ModuleCard
+          tome="Tomus IV"
+          title={t('dashboard.moduleCauldron', 'Cámara del Caldero')}
+          latin="Decoctio Magna"
+          icon={<Cauldron width={18} height={18} />}
+          navTo="/cauldron"
+          style={{ gridColumn: '1 / -1' }}
+        >
+          <CauldronDashboardWidget />
+        </ModuleCard>
       </div>
 
       {/* ── row 4: chronicle + xp ledger ──────────────── */}

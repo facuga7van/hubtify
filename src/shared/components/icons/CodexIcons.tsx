@@ -548,3 +548,11 @@ export function PlayIcon(props: React.SVGProps<SVGSVGElement>) {
 export function PauseIcon(props: React.SVGProps<SVGSVGElement>) {
   return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>);
 }
+
+export function Sparkle(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z" />
+    </svg>
+  );
+}

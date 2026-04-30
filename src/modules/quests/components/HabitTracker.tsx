@@ -9,6 +9,7 @@ import { bonusMultiplierToTier } from '../utils';
 import { playTaskComplete } from '../../../shared/audio';
 import { formatDateString } from '../../../../shared/date-utils';
 import HelpBubble from '../../../shared/components/HelpBubble';
+import RpgStepper from '../../../shared/components/RpgStepper';
 
 interface Props {
   onXpGained: () => void;
@@ -124,7 +125,11 @@ export default function HabitTracker({ onXpGained }: Props) {
   };
 
   const handleAdd = async () => {
-    if (!newName.trim() || isDuplicateName(newName.trim())) return;
+    if (!newName.trim()) return;
+    if (isDuplicateName(newName.trim())) {
+      toast({ type: 'warning', message: t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre') });
+      return;
+    }
     await window.api.questsAddHabit({
       name: newName.trim(),
       frequency: newFreq,
@@ -198,6 +203,9 @@ export default function HabitTracker({ onXpGained }: Props) {
   if (habits.length === 0 && !adding) {
     return (
       <div>
+        <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', marginBottom: 8 }}>
+          {t('questify.habitsEmptyHint', 'Rituales diarios o semanales que querés mantener.')}
+        </p>
         <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setAdding(true)}>
           + {t('questify.addHabit')}
         </span>
@@ -212,7 +220,7 @@ export default function HabitTracker({ onXpGained }: Props) {
         <span className="quest-habit-progress">
           {habits.filter(h => isPeriodComplete(h)).length}/{habits.length}
         </span>
-        <span className="qb-rune" style={{ cursor: 'pointer', fontSize: 'var(--fs-label)' }} onClick={() => setAdding(!adding)}>+</span>
+        <span className="qb-rune" style={{ cursor: 'pointer', fontSize: 'var(--fs-label)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, minWidth: 22, minHeight: 22 }} onClick={() => setAdding(!adding)}>+</span>
       </div>
 
       {/* Habit list */}
@@ -230,9 +238,7 @@ export default function HabitTracker({ onXpGained }: Props) {
                 ))}
               </select>
               {editFreq === 'weekly' && (
-                <input type="number" min={1} max={7} value={editTimes}
-                  onChange={(e) => setEditTimes(Math.min(7, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="subtask-input" style={{ width: 32, textAlign: 'center' }} />
+                <RpgStepper value={editTimes} onChange={setEditTimes} min={1} max={7} />
               )}
               <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleEditSave}>OK</span>
               <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setEditingId(null)}>
@@ -280,6 +286,16 @@ export default function HabitTracker({ onXpGained }: Props) {
                   label={h.name}
                 />
 
+                {/* Edit */}
+                <svg onClick={() => startEdit(h)} width="10" height="10" viewBox="0 0 16 16"
+                  className="quest-icon-hover"
+                  style={{ cursor: 'pointer', opacity: 0.25, flexShrink: 0 }}
+                  fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round"
+                  role="button" tabIndex={0} aria-label={t('questify.edit', 'Edit')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(h); } }}>
+                  <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
+                </svg>
+
                 {/* Delete */}
                 <svg onClick={() => handleDelete(h.id)} width="10" height="10" viewBox="0 0 14 14"
                   className="quest-icon-hover"
@@ -314,10 +330,8 @@ export default function HabitTracker({ onXpGained }: Props) {
             ))}
           </select>
           {newFreq === 'weekly' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="number" min={1} max={7} value={newTimes}
-                onChange={(e) => setNewTimes(Math.min(7, Math.max(1, parseInt(e.target.value) || 1)))}
-                className="subtask-input" style={{ width: 36, textAlign: 'center' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <RpgStepper value={newTimes} onChange={setNewTimes} min={1} max={7} />
               <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.timesPerWeek')}</span>
             </div>
           )}

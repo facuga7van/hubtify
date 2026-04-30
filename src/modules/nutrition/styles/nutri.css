@@ -535,6 +535,16 @@
   font-style: italic;
 }
 
+.nutri-text-input[type="number"]::-webkit-inner-spin-button,
+.nutri-text-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.nutri-text-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 
 /* ── Input mode toggle (AI / Manual) ── */
 
@@ -639,6 +649,16 @@
   text-align: right;
 }
 
+.nutri-total-input::-webkit-inner-spin-button,
+.nutri-total-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.nutri-total-input {
+  -moz-appearance: textfield;
+}
+
 .nutri-est-unit {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
@@ -646,10 +666,21 @@
 }
 
 .nutri-est-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 12px;
+}
+
+.nutri-est-actions .nutri-btn-primary {
+  width: 100%;
+  justify-content: center;
+}
+
+.nutri-est-actions .nutri-btn-ghost {
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
 }
 
 .nutri-estimate-error {
@@ -1660,6 +1691,109 @@
   font-size: var(--fs-label, 13px);
   font-style: italic;
   margin: 4px 0 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DASHBOARD WIDGET — QUICK ESTIMATE
+   ═══════════════════════════════════════════════════════════ */
+
+.nutri-dash-quick-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.nutri-dash-quick-btn {
+  font-size: var(--fs-label, 13px);
+  padding: 3px 12px;
+  min-width: 0;
+}
+
+.nutri-dash-quick-form {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(74, 55, 32, 0.25);
+}
+
+.nutri-dash-quick-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.nutri-dash-quick-input {
+  flex: 1;
+  font-size: var(--fs-label, 13px);
+  padding: 5px 8px;
+}
+
+.nutri-dash-quick-submit {
+  font-size: var(--fs-label, 13px);
+  padding: 5px 10px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.nutri-dash-quick-result {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(74, 55, 32, 0.06);
+  border: 1px solid rgba(74, 55, 32, 0.2);
+  border-radius: 4px;
+}
+
+.nutri-dash-quick-items {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+.nutri-dash-quick-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  font-size: var(--fs-label, 13px);
+  color: var(--ink, #2a1d0e);
+}
+
+.nutri-dash-quick-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid rgba(74, 55, 32, 0.25);
+  font-size: var(--fs-body, 15px);
+  font-weight: 600;
+  color: var(--ink, #2a1d0e);
+}
+
+.nutri-dash-quick-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.nutri-dash-quick-confirm {
+  font-size: var(--fs-label, 13px);
+  padding: 4px 14px;
+}
+
+.nutri-dash-quick-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Crimson Text', serif;
+  font-size: var(--fs-label, 13px);
+  color: var(--ink-faded, #7a6a55);
+  text-decoration: underline;
+  padding: 4px 6px;
+}
+
+.nutri-dash-quick-cancel:hover {
+  color: var(--ink, #2a1d0e);
 }
 
 /* ── Responsive breakpoints ─────────────────────── */

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { QBDivider } from '../icons';
 
 /* ── Section ──────────────────────────────────────── */
@@ -196,12 +197,21 @@ export interface ModuleCardProps {
   tome?: string;
   latin?: string;
   icon?: React.ReactNode;
+  navTo?: string;
+  style?: React.CSSProperties;
   children: React.ReactNode;
 }
 
-export function ModuleCard({ title, tome, latin, icon, children }: ModuleCardProps) {
+export function ModuleCard({ title, tome, latin, icon, navTo, style, children }: ModuleCardProps) {
   return (
-    <div className="qb-module-card">
+    <div className="qb-module-card" style={style}>
+      {navTo && (
+        <Link to={navTo} className="qb-module-card-nav" aria-label="Ir al módulo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 17L17 7M17 7H7M17 7v10" />
+          </svg>
+        </Link>
+      )}
       <div className="qb-module-card-header">
         {icon && <span className="qb-module-card-icon">{icon}</span>}
         <div style={{ flex: 1 }}>

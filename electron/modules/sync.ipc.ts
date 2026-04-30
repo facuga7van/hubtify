@@ -125,7 +125,9 @@ const USER_DATA_TABLES = [
   'nutrition_weekly_metrics',
   'nutrition_daily_summary',
   'nutrition_daily_closed',
+  'favorite_foods',
   'dollar_cache',
+  'crypto_cache',
   'finance_recurring',
   'finance_recurring_amount_history',
   'finance_installment_groups',
@@ -462,8 +464,9 @@ export function registerSyncIpcHandlers(): void {
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
+    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods ORDER BY created_at DESC').all();
 
-    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed };
+    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods };
   });
 
   // ── Nutrition bulk import (merge from Firestore) ──
@@ -608,6 +611,15 @@ export function registerSyncIpcHandlers(): void {
             );
             changed = true;
           }
+        }
+      }
+
+      // Favorite foods — dedup by description
+      if (Array.isArray(d.favoriteFoods)) {
+        const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        for (const f of d.favoriteFoods) {
+          insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual', f.aiBreakdown ?? null, f.createdAt, f.updatedAt ?? null);
+          changed = true;
         }
       }
     });

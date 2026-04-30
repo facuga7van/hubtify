@@ -209,7 +209,9 @@ export interface HubtifyApi {
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
-  nutritionGetRecentFoods: () => Promise<Array<{ description: string; calories: number; source: string }>>;
+  nutritionGetFavoriteFoods: () => Promise<FavoriteFood[]>;
+  nutritionAddFavoriteFood: (food: Record<string, unknown>) => Promise<{ id: string }>;
+  nutritionRemoveFavoriteFood: (id: string) => Promise<void>;
   nutritionGetPendingDays: () => Promise<string[]>;
   nutritionGetMealSchedule: () => Promise<import('./meal-utils').MealSchedule>;
 
@@ -255,6 +257,13 @@ export interface HubtifyApi {
 
   // Dollar
   dollarGetRates: () => Promise<{ success: boolean; rates: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
+  dollarGetVisibleTypes: () => Promise<string[]>;
+  dollarSetVisibleTypes: (types: string[]) => Promise<void>;
+
+  // Crypto
+  cryptoGetRates: () => Promise<{ success: boolean; rates: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
+  cryptoGetVisibleTypes: () => Promise<string[]>;
+  cryptoSetVisibleTypes: (types: string[]) => Promise<void>;
 
   // Finance - Transactions
   financeGetTransactions: (filters: Record<string, unknown>) => Promise<unknown[]>;
@@ -355,6 +364,18 @@ export interface HubtifyApi {
   onUpdateDownloaded: (callback: () => void) => () => void;
   onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;
   onUpdateError: (callback: (info: { message: string }) => void) => () => void;
+}
+
+// ── Nutrition Types ─────────────────────────────────────────
+
+export interface FavoriteFood {
+  id: string;
+  description: string;
+  calories: number;
+  source: string;
+  aiBreakdown?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 // ── Nutrition AI Types ──────────────────────────────────────

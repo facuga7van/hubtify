@@ -253,6 +253,17 @@
   border-color: var(--gold);
   box-shadow: 0 0 0 2px rgba(168, 138, 60, 0.3), inset 0 1px 3px rgba(42, 29, 14, 0.15);
 }
+
+/* Hide native number spinners globally */
+.rpg-input[type="number"]::-webkit-inner-spin-button,
+.rpg-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rpg-input[type="number"] {
+  -moz-appearance: textfield;
+}
 .rpg-select {
   padding: 6px 10px;
   border: 1px solid var(--gold-dark);
@@ -507,7 +518,7 @@
 }
 
 .onboarding-card {
-  max-width: 500px;
+  max-width: 560px;
   padding: 32px;
   width: 90%;
   overflow: hidden;
@@ -628,6 +639,220 @@
   background: var(--gold);
   border-color: var(--gold-dark);
   box-shadow: 0 0 4px rgba(168, 138, 60, 0.3);
+}
+
+/* ── Onboarding preferences ─────────────────── */
+.onboarding__section-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  color: var(--ink-faded);
+  margin-bottom: 8px;
+  margin-top: 16px;
+}
+
+.onboarding__pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.onboarding__pref-label {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+}
+
+/* Toggle switch */
+.onboarding__toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: rgba(74, 55, 32, 0.2);
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.onboarding__toggle--on {
+  background: rgba(85, 107, 60, 0.4);
+  border-color: var(--moss);
+}
+
+.onboarding__toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--parch-0);
+  border: 1px solid rgba(74, 55, 32, 0.3);
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.onboarding__toggle--on .onboarding__toggle-knob {
+  transform: translateX(16px);
+  background: var(--moss);
+  border-color: var(--moss);
+}
+
+/* Font scale selector */
+.onboarding__font-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.onboarding__font-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  border-radius: 3px;
+  background: rgba(245, 231, 192, 0.3);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.onboarding__font-btn:hover {
+  background: rgba(245, 231, 192, 0.5);
+}
+
+.onboarding__font-btn--active {
+  background: rgba(168, 138, 60, 0.2);
+  border-color: var(--gold-dark);
+  color: var(--ink);
+  font-weight: bold;
+}
+
+/* Hero name input */
+.onboarding__name-input {
+  width: 100%;
+  text-align: center;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 4px;
+  background: rgba(245, 231, 192, 0.5);
+  font-family: 'UnifrakturCook', cursive;
+  font-size: 1.3rem;
+  color: var(--ink);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.onboarding__name-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(168, 138, 60, 0.3);
+}
+
+.onboarding__name-input::placeholder {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-sub);
+  color: var(--ink-faded);
+  opacity: 0.6;
+}
+
+.onboarding__name-hint {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 8px;
+}
+
+/* Nutrify step — 2 col */
+.onboarding__nutri-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 500px) {
+  .onboarding__nutri-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.onboarding__nutri-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.onboarding__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-quote);
+}
+
+.onboarding__field-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+}
+
+.onboarding__field-error {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  font-style: italic;
+}
+
+.onboarding__goal-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.onboarding__goal-btn {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: var(--fs-label);
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.onboarding__goal-btn--active {
+  opacity: 1;
+}
+
+.onboarding__tdee-box {
+  padding: 10px;
+  border: 1px dashed var(--gold-dark);
+  border-radius: 3px;
+  background: rgba(168, 138, 60, 0.08);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+  text-align: center;
+}
+
+.onboarding__tdee-box strong {
+  color: var(--moss);
+  font-family: 'Fira Code', monospace;
+}
+
+/* Ready step */
+.onboarding__ready-icon {
+  margin-bottom: 12px;
+}
+
+.onboarding__ready-desc {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-sub);
+  color: var(--ink-faded);
+  margin-bottom: 24px;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -814,4 +1039,53 @@
   border-radius: 3px;
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(42, 29, 14, 0.15), inset 0 -1px 0 rgba(42, 29, 14, 0.1);
+}
+
+/* ── RPG Stepper (compact ±) ─────────────────────── */
+.rpg-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(74, 55, 32, 0.45);
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(245, 231, 192, 0.6);
+}
+
+.rpg-stepper-btn {
+  background: rgba(74, 55, 32, 0.08);
+  border: none;
+  color: var(--ink-soft);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  padding: 4px 10px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rpg-stepper-btn:hover:not(:disabled) {
+  background: rgba(74, 55, 32, 0.18);
+  color: var(--ink);
+}
+
+.rpg-stepper-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.rpg-stepper-value {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+  padding: 4px 10px;
+  min-width: 28px;
+  text-align: center;
+  line-height: 1;
+}
+
+.rpg-stepper-suffix {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-left: 3px;
 }

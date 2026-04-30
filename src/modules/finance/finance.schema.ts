@@ -261,4 +261,15 @@ export const financeMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_finance_rec_deleted ON finance_recurring(deleted_at);
     `,
   },
+  {
+    namespace: 'finance',
+    version: 9,
+    up: `
+      CREATE TABLE IF NOT EXISTS crypto_cache (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `,
+  },
 ];

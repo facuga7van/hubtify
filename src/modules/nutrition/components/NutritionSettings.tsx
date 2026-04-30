@@ -234,8 +234,7 @@ export default function NutritionSettings() {
           <div style={{ marginTop: 14 }}>
             <div className="nutri-field">
               <label className="nutri-label">{t('nutrify.goalAmount', 'Cantidad')} (kcal)</label>
-              <input type="number" value={goalAmount} onChange={(e) => setGoalAmount(+e.target.value)}
-                className="nutri-input-box" min={100} max={1500} step={50} />
+              <RpgNumberInput value={String(goalAmount)} onChange={(v) => setGoalAmount(+v || 0)} min={100} max={1500} step={50} suffix="kcal" />
               <span className="nutri-field-hint">
                 {goal === 'deficit' ? t('nutrify.goalAmountDeficitHint') : t('nutrify.goalAmountSurplusHint')}
               </span>

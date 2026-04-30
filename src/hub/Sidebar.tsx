@@ -165,10 +165,6 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
       <nav className="sidebar-nav" data-tour="sidebar">
         {navKeys.map((item) => {
           const IconComp = NAV_ICONS[item.icon];
-          const tooltipText = collapsed
-            ? item.comingSoon ? `${t(item.key)} (${t('common.comingSoon')})` : t(item.key)
-            : undefined;
-
           // H1: Badge logic per nav item
           let badgeCount = 0;
           let badgeDot = false;
@@ -179,7 +175,6 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
             <button
               key={item.path}
               className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''} ${item.comingSoon ? 'sidebar-nav-item--disabled' : ''}`}
-              title={tooltipText}
               aria-current={isActive(item.path) ? 'page' : undefined}
               onClick={item.comingSoon ? undefined : () => animatedNavigate(item.path)}
             >
@@ -196,7 +191,10 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
             </button>
           );
           if (item.comingSoon) {
-            return <Tooltip key={item.path} text={t('common.comingSoon')}>{navItem}</Tooltip>;
+            return <Tooltip key={item.path} text={`${t(item.key)} (${t('common.comingSoon')})`}>{navItem}</Tooltip>;
+          }
+          if (collapsed) {
+            return <Tooltip key={item.path} text={t(item.key)}>{navItem}</Tooltip>;
           }
           return navItem;
         })}
@@ -208,11 +206,10 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
       <nav className="sidebar-settings-area" aria-label="Secondary">
         {bottomNavKeys.map((item) => {
           const IconComp = NAV_ICONS[item.icon];
-          return (
+          const btn = (
             <button
               key={item.path}
               className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''}`}
-              title={collapsed ? t(item.key) : undefined}
               aria-current={isActive(item.path) ? 'page' : undefined}
               onClick={() => animatedNavigate(item.path)}
             >
@@ -222,19 +219,28 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
               <span className="sidebar-nav-item__label">{t(item.key)}</span>
             </button>
           );
+          return collapsed
+            ? <Tooltip key={item.path} text={t(item.key)}>{btn}</Tooltip>
+            : btn;
         })}
-        <button
-          className={`sidebar-nav-item ${isActive('/settings') ? 'active' : ''}`}
-          title={collapsed ? t('nav.settings') : undefined}
-          aria-current={isActive('/settings') ? 'page' : undefined}
-          onClick={() => animatedNavigate('/settings')}
-          data-tour="settings"
-        >
-          <span className="sidebar-nav-item__ico">
-            <SettingsIcon width={18} height={18} />
-          </span>
-          <span className="sidebar-nav-item__label">{t('nav.settings')}</span>
-        </button>
+        {(() => {
+          const settingsBtn = (
+            <button
+              className={`sidebar-nav-item ${isActive('/settings') ? 'active' : ''}`}
+              aria-current={isActive('/settings') ? 'page' : undefined}
+              onClick={() => animatedNavigate('/settings')}
+              data-tour="settings"
+            >
+              <span className="sidebar-nav-item__ico">
+                <SettingsIcon width={18} height={18} />
+              </span>
+              <span className="sidebar-nav-item__label">{t('nav.settings')}</span>
+            </button>
+          );
+          return collapsed
+            ? <Tooltip text={t('nav.settings')}>{settingsBtn}</Tooltip>
+            : settingsBtn;
+        })()}
       </nav>
 
       {/* Footer — combo + language toggle */}

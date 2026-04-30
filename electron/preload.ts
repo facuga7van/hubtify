@@ -74,7 +74,9 @@ const api = {
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
-  nutritionGetRecentFoods: () => ipcRenderer.invoke('nutrition:getRecentFoods'),
+  nutritionGetFavoriteFoods: () => ipcRenderer.invoke('nutrition:getFavoriteFoods'),
+  nutritionAddFavoriteFood: (food: Record<string, unknown>) => ipcRenderer.invoke('nutrition:addFavoriteFood', food),
+  nutritionRemoveFavoriteFood: (id: string) => ipcRenderer.invoke('nutrition:removeFavoriteFood', id),
   nutritionGetPendingDays: () => ipcRenderer.invoke('nutrition:getPendingDays'),
   nutritionGetMealSchedule: () => ipcRenderer.invoke('nutrition:getMealSchedule'),
   // Character
@@ -147,6 +149,13 @@ const api = {
 
   // Dollar
   dollarGetRates: () => ipcRenderer.invoke('dollar:getRates'),
+  dollarGetVisibleTypes: () => ipcRenderer.invoke('dollar:getVisibleTypes'),
+  dollarSetVisibleTypes: (types: string[]) => ipcRenderer.invoke('dollar:setVisibleTypes', types),
+
+  // Crypto
+  cryptoGetRates: () => ipcRenderer.invoke('crypto:getRates'),
+  cryptoGetVisibleTypes: () => ipcRenderer.invoke('crypto:getVisibleTypes'),
+  cryptoSetVisibleTypes: (types: string[]) => ipcRenderer.invoke('crypto:setVisibleTypes', types),
 
   // Finance - Transactions
   financeGetTransactions: (filters: Record<string, unknown>) => ipcRenderer.invoke('finance:getTransactions', filters),

@@ -2,14 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
+import { useToast } from '../../../shared/components/useToast';
+import { estimateNutrition } from '../estimate-service';
 
 export default function NutritionDashboardWidget() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [calories, setCalories] = useState(0);
   const [target, setTarget] = useState<number | null>(null);
   const [weekCalories, setWeekCalories] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+
+  // Quick-estimate states
+  const [showQuickLog, setShowQuickLog] = useState(false);
+  const [foodInput, setFoodInput] = useState('');
+  const [estimating, setEstimating] = useState(false);
+  const [estimation, setEstimation] = useState<{ totalCalories: number; items: Array<{ name: string; calories: number }> } | null>(null);
 
   const loadData = useCallback(() => {
     Promise.all([
@@ -32,6 +41,54 @@ export default function NutritionDashboardWidget() {
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
+
+  // ── Quick-estimate handlers ──────────────────────
+  const handleEstimate = async () => {
+    if (!foodInput.trim() || estimating) return;
+    setEstimating(true);
+    setEstimation(null);
+    try {
+      const result = await estimateNutrition(foodInput.trim());
+      setEstimation({ totalCalories: result.calories, items: result.items });
+    } catch {
+      toast({ type: 'warning', message: t('nutrify.estimateError', 'Error al estimar. Intenta en el modulo completo.') });
+    } finally {
+      setEstimating(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!estimation) return;
+    try {
+      await window.api.nutritionLogFood({
+        date: new Date().toISOString().slice(0, 10),
+        description: foodInput.trim(),
+        calories: estimation.totalCalories,
+        source: 'ai_estimate',
+        aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
+      });
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED',
+        moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 },
+        timestamp: Date.now(),
+      });
+      toast({ type: 'nutri', message: `+${estimation.totalCalories} kcal` });
+      setFoodInput('');
+      setEstimation(null);
+      setShowQuickLog(false);
+      loadData();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch {
+      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar') });
+    }
+  };
+
+  const handleDismiss = () => {
+    setEstimation(null);
+    setFoodInput('');
+    setShowQuickLog(false);
+  };
 
   if (loading)
     return (
@@ -116,6 +173,68 @@ export default function NutritionDashboardWidget() {
           </Rune>
         )}
       </div>
+
+      {/* Quick-estimate toggle */}
+      <div className="nutri-dash-quick-toggle">
+        <button
+          className="rpg-button nutri-dash-quick-btn"
+          onClick={() => { setShowQuickLog(prev => !prev); if (showQuickLog) { setEstimation(null); setFoodInput(''); } }}
+        >
+          {showQuickLog ? t('nutrify.closeEstimate', 'Cerrar') : t('nutrify.estimate', 'Estimar')}
+        </button>
+      </div>
+
+      {/* Quick-estimate form */}
+      {showQuickLog && (
+        <div className="nutri-dash-quick-form">
+          <div className="nutri-dash-quick-input-row">
+            <input
+              className="rpg-input nutri-dash-quick-input"
+              type="text"
+              placeholder={t('nutrify.estimatePlaceholder', 'milanesa con pure...')}
+              value={foodInput}
+              onChange={e => setFoodInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleEstimate(); }}
+              disabled={estimating}
+            />
+            <button
+              className="rpg-button nutri-dash-quick-submit"
+              onClick={handleEstimate}
+              disabled={estimating || !foodInput.trim()}
+            >
+              {estimating ? t('nutrify.estimating', 'Estimando...') : t('nutrify.estimate', 'Estimar')}
+            </button>
+          </div>
+
+          {/* Estimation result */}
+          {estimation && (
+            <div className="nutri-dash-quick-result">
+              {estimation.items.length > 1 && (
+                <ul className="nutri-dash-quick-items">
+                  {estimation.items.map((item, i) => (
+                    <li key={i} className="nutri-dash-quick-item">
+                      <span className="qb-hand">{item.name}</span>
+                      <span className="qb-numeral">{item.calories} kcal</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="nutri-dash-quick-total">
+                <span className="qb-hand">{t('nutrify.total', 'Total')}</span>
+                <span className="qb-numeral">{estimation.totalCalories} kcal</span>
+              </div>
+              <div className="nutri-dash-quick-actions">
+                <button className="rpg-button nutri-dash-quick-confirm" onClick={handleConfirm}>
+                  {t('nutrify.confirm', 'Confirmar')}
+                </button>
+                <button className="nutri-dash-quick-cancel" onClick={handleDismiss}>
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

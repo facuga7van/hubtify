@@ -1,7 +1,7 @@
 import type { ModuleDefinition } from '../../core/module-registry';
 import { questsMigrations } from './quests.schema';
 import TaskList from './components/TaskList';
-import QuestsDashboardWidget from './components/QuestsDashboardWidget';
+import TasksDashboardWidget from './components/TasksDashboardWidget';
 
 export const questsModule: ModuleDefinition = {
   id: 'quests',
@@ -10,7 +10,7 @@ export const questsModule: ModuleDefinition = {
   routes: [
     { path: '/quests', component: TaskList },
   ],
-  dashboardWidget: QuestsDashboardWidget,
+  dashboardWidget: TasksDashboardWidget,
   migrations: questsMigrations,
   rpgEventHandlers: {
     TASK_COMPLETED: (payload: unknown) => {

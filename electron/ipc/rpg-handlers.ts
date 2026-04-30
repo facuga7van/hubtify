@@ -128,10 +128,13 @@ export function registerRpgHandlers(): void {
       const oldLevel = stats.level as number;
 
       const now = localTimestamp();
+      // Undo events: store 0 xp_gained in the log (the original event is already deleted,
+      // so storing negative XP here would double-count the reversal in SUM queries)
+      const loggedXp = isUndo ? 0 : totalXpGained;
       db.prepare(`
         INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(event.moduleId, event.type, totalXpGained, hpChange, comboMultiplier, bonusMultiplier, JSON.stringify(event.payload), now);
+      `).run(event.moduleId, event.type, loggedXp, hpChange, comboMultiplier, bonusMultiplier, JSON.stringify(event.payload), now);
 
       if (isUndo) {
         db.prepare(`

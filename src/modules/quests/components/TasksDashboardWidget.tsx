@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tick } from '../../../shared/components/codex';
-import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import Loading from '../../../shared/components/Loading';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
 import { type Task, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier } from '../utils';
 
-export default function QuestsDashboardWidget() {
+export default function TasksDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [pendingCount, setPendingCount] = useState(0);
@@ -18,22 +17,19 @@ export default function QuestsDashboardWidget() {
   const [loadError, setLoadError] = useState(false);
   const completingRef = useRef(false);
   const [allPendingTasks, setAllPendingTasks] = useState<Task[]>([]);
-  const [habitStreaks, setHabitStreaks] = useState<Array<{ name: string; streak: number }>>([]);
 
   const loadData = useCallback(() => {
     Promise.all([
       window.api.questsGetPendingCount(),
       window.api.questsGetCompletedTodayCount(),
       window.api.questsGetTasks().catch(() => []),
-      window.api.questsGetHabitStreaks().catch(() => []),
-    ]).then(([p, c, tasks, streaks]) => {
+    ]).then(([p, c, tasks]) => {
       setPendingCount(p);
       setCompletedToday(c);
       const all = tasks as Task[];
       const pending = all.filter((t) => !t.status);
       setPreviewTasks(pending.slice(0, 4));
       setAllPendingTasks(pending);
-      setHabitStreaks(streaks);
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
@@ -148,31 +144,6 @@ export default function QuestsDashboardWidget() {
           </span>
         )}
       </div>
-
-      {/* Habit streaks */}
-      {habitStreaks.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 6,
-            flexWrap: 'wrap',
-            marginTop: 6,
-            paddingTop: 6,
-            borderTop: '1px solid rgba(74,55,32,.15)',
-          }}
-        >
-          {habitStreaks.slice(0, 3).map((s) => (
-            <Rune key={s.name} tone="gold">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <svg width="10" height="10" viewBox="0 0 14 14" fill="var(--rubric)" style={{ flexShrink: 0 }}>
-                  <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
-                </svg>
-                {s.name}: {t('questify.streakDays', '{{count}} days', { count: s.streak })}
-              </span>
-            </Rune>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

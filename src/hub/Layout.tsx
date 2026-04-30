@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
@@ -20,6 +20,18 @@ import '../shared/components/tour/tour.css';
 import '../shared/styles/help-bubble.css';
 import { gsap } from 'gsap';
 import { levelUp as animateLevelUp } from '../shared/animations/epic';
+import ChangelogModal from '../shared/components/ChangelogModal';
+import { changelog } from '../shared/changelog';
+
+function isNewerVersion(a: string, b: string): boolean {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true;
+    if ((pa[i] || 0) < (pb[i] || 0)) return false;
+  }
+  return false;
+}
 
 export default function Layout() {
   const { t, i18n } = useTranslation();
@@ -93,6 +105,29 @@ export default function Layout() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // Patch notes — show on first launch after version update
+  const [showPatchNotes, setShowPatchNotes] = useState(false);
+  const [lastSeenVersion, setLastSeenVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('hubtify_last_seen_version');
+    if (!stored || isNewerVersion(APP_VERSION, stored)) {
+      setLastSeenVersion(stored);
+      setShowPatchNotes(true);
+      localStorage.setItem('hubtify_last_seen_version', APP_VERSION);
+    }
+  }, []);
+
+  const patchEntries = useMemo(() => {
+    let entries: typeof changelog;
+    if (!lastSeenVersion) {
+      entries = changelog.filter(e => e.version === APP_VERSION);
+    } else {
+      entries = changelog.filter(e => isNewerVersion(e.version, lastSeenVersion) && !isNewerVersion(e.version, APP_VERSION));
+    }
+    return entries.length > 0 ? entries : changelog.slice(0, 1);
+  }, [lastSeenVersion]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('hubtify_sidebar_collapsed') === 'true';
@@ -418,6 +453,14 @@ export default function Layout() {
           onClose={() => setShowNotifications(false)}
           onNavigate={animatedNavigate}
         />
+
+      {/* Patch notes — shown once after version update */}
+      <ChangelogModal
+        open={showPatchNotes && patchEntries.length > 0}
+        onClose={() => setShowPatchNotes(false)}
+        title={t('settings.patchNotes', 'Patch Notes')}
+        entries={patchEntries}
+      />
 
       {/* Update popup */}
       {updateAvailable && (

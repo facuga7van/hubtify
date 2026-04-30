@@ -40,4 +40,17 @@ export function registerDollarIpcHandlers(): void {
 
     return { success: false, error: 'No rates available' };
   });
+
+  const DEFAULT_VISIBLE = ['oficial', 'blue', 'bolsa', 'cripto', 'tarjeta'];
+
+  ipcHandle('dollar:getVisibleTypes', () => {
+    const db = getDb();
+    const row = db.prepare("SELECT value FROM app_state WHERE key = 'dollar_visible_types'").get() as { value: string } | undefined;
+    return row ? JSON.parse(row.value) as string[] : DEFAULT_VISIBLE;
+  });
+
+  ipcHandle('dollar:setVisibleTypes', (_e, types: string[]) => {
+    const db = getDb();
+    db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('dollar_visible_types', ?)").run(JSON.stringify(types));
+  });
 }

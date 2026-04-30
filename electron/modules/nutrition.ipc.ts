@@ -5,6 +5,10 @@ import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, days
 import { resolveMealType, DEFAULT_MEAL_SCHEDULE } from '../../shared/meal-utils';
 import type { MealSchedule } from '../../shared/meal-utils';
 
+function genId(): string {
+  return crypto.randomUUID();
+}
+
 export function registerNutritionIpcHandlers(): void {
   // ── Profile ────────────────────────────────────────
 
@@ -404,19 +408,37 @@ export function registerNutritionIpcHandlers(): void {
       const xpWeight = weightLogged ? 5 : 0;
       const xpTotal = xpPrecision + xpBonus + xpSteps + xpGym + xpWeight;
 
-      // Calculate HP change
+      // Calculate HP change based on nutritional goal
+      const deficitTarget = profile.deficit_target_kcal as number;
       let hpChange = 0;
-      if (target > 0) {
-        const excess = consumed - target;
-        if (excess > 0) {
-          const excessPct = excess / target;
-          if (excessPct <= 0.10) hpChange = -5;
-          else if (excessPct <= 0.20) hpChange = -10;
-          else hpChange = -20;
+      if (target > 0 && consumed > 0) {
+        if (deficitTarget > 0) {
+          // Deficit goal: eating at/below target = healing, above = damage
+          if (consumed <= target) {
+            hpChange = 10;
+          } else {
+            const overPct = (consumed - target) / target;
+            if (overPct <= 0.10) hpChange = -5;
+            else if (overPct <= 0.20) hpChange = -10;
+            else hpChange = -20;
+          }
+        } else if (deficitTarget < 0) {
+          // Surplus goal: eating at/above target = healing, below = damage
+          if (consumed >= target) {
+            hpChange = 10;
+          } else {
+            const underPct = (target - consumed) / target;
+            if (underPct <= 0.10) hpChange = -5;
+            else if (underPct <= 0.20) hpChange = -10;
+            else hpChange = -20;
+          }
         } else {
-          const pct = Math.abs(consumed - target) / target;
-          if (pct <= 0.10) hpChange = 10;
-          else hpChange = 0;
+          // Maintenance: staying close = healing, deviating = damage
+          const deviationPct = Math.abs(consumed - target) / target;
+          if (deviationPct <= 0.10) hpChange = 10;
+          else if (deviationPct <= 0.20) hpChange = -5;
+          else if (deviationPct <= 0.30) hpChange = -10;
+          else hpChange = -20;
         }
       }
 
@@ -485,16 +507,25 @@ export function registerNutritionIpcHandlers(): void {
     }
   });
 
-  ipcHandle('nutrition:getRecentFoods', () => {
+  // ── Favorite Foods ─────────────────────────────────
+
+  ipcHandle('nutrition:getFavoriteFoods', () => {
     const db = getDb();
-    return db.prepare(`
-      SELECT description, calories, source
-      FROM food_log
-      WHERE description IS NOT NULL AND description != ''
-      GROUP BY description
-      ORDER BY MAX(id) DESC
-      LIMIT 10
-    `).all();
+    return db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods ORDER BY created_at DESC').all();
+  });
+
+  ipcHandle('nutrition:addFavoriteFood', (_e, food: { description: string; calories: number; source?: string; aiBreakdown?: string }) => {
+    const db = getDb();
+    const id = genId();
+    db.prepare(
+      'INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null);
+    return { id };
+  });
+
+  ipcHandle('nutrition:removeFavoriteFood', (_e, id: string) => {
+    const db = getDb();
+    db.prepare('DELETE FROM favorite_foods WHERE id = ?').run(id);
   });
 
   ipcHandle('nutrition:getPendingDays', () => {

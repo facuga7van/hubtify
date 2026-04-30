@@ -13,6 +13,7 @@ import { Quill, Sword, Compass, Map as MapIcon } from '../../../shared/component
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import { useToast } from '../../../shared/components/useToast';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { XpToastData } from '../types';
 import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
@@ -44,6 +45,7 @@ function getTierInfo(task: Task) {
 export default function TaskList() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { user } = useAuthContext();
   const animatedNavigate = useAnimatedNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -57,7 +59,6 @@ export default function TaskList() {
   const [activeProjectId, setActiveProjectId] = useState<string | null | undefined>(undefined);
   const [filter, setFilter] = useState('');
   const [todayCount, setTodayCount] = useState(0);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [notesTaskId, setNotesTaskId] = useState<string | null>(null);
   const [drawingCounts, setDrawingCounts] = useState<Record<string, number>>({});
@@ -270,14 +271,15 @@ export default function TaskList() {
 
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDelete = async () => {
+    const ok = await confirm({
+      message: t('questify.deleteConfirm', { count: selectedIds.size }),
+      danger: true,
+      confirmText: t('questify.delete'),
+    });
+    if (!ok) return;
     playDelete();
     await window.api.questsDeleteTasks(Array.from(selectedIds));
     setSelectedIds(new Set());
-    setShowDeleteConfirm(false);
     await loadTasks();
     window.dispatchEvent(new Event('quests:dataChanged'));
   };
@@ -435,7 +437,7 @@ export default function TaskList() {
           </select>
         )}
 
-        {selectedIds.size > 0 && !showDeleteConfirm && (
+        {selectedIds.size > 0 && (
           <>
             <Rune tone="sage">
               <span style={{ cursor: 'pointer' }} onClick={handleBatchComplete}>
@@ -448,18 +450,6 @@ export default function TaskList() {
               </span>
             </Rune>
           </>
-        )}
-
-        {showDeleteConfirm && (
-          <div className="quest-delete-bar">
-            <span>{t('questify.deleteConfirm', { count: selectedIds.size })}</span>
-            <Rune tone="rubric">
-              <span style={{ cursor: 'pointer' }} onClick={confirmDelete}>{t('questify.delete')}</span>
-            </Rune>
-            <Rune>
-              <span style={{ cursor: 'pointer' }} onClick={() => setShowDeleteConfirm(false)}>{t('questify.cancel')}</span>
-            </Rune>
-          </div>
         )}
       </div>
 

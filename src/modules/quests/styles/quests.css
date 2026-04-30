@@ -247,7 +247,7 @@
 
 .quest-row-actions svg {
   cursor: pointer;
-  opacity: 0.35;
+  opacity: 0.5;
   transition: opacity 0.2s;
   flex-shrink: 0;
 }
@@ -268,7 +268,7 @@
 }
 
 .quest-due--today {
-  background: rgba(168, 138, 60, 0.8);
+  background: var(--gold-dark);
   color: var(--parch-0);
   padding: 1px 6px;
   font-size: var(--fs-label);
@@ -287,8 +287,8 @@
 }
 
 .quest-due--later {
-  background: rgba(245, 231, 192, 0.5);
-  color: var(--ink-faded);
+  background: var(--leather-light);
+  color: var(--parch-0);
   padding: 1px 6px;
   font-size: var(--fs-label);
   font-family: 'IM Fell English SC', serif;
@@ -606,8 +606,8 @@
 }
 
 .xp-toast--critical {
-  border-color: #9b59b6;
-  box-shadow: 0 0 12px rgba(155, 89, 182, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 12px rgba(168, 138, 60, 0.3), 0 4px 20px rgba(44, 24, 16, 0.5);
 }
 
 .xp-toast--legendary {
@@ -726,7 +726,7 @@
 /* ── Habit add/edit form (codex) ─────────────────── */
 .quest-habit-form {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   margin-top: 8px;
   flex-wrap: wrap;
@@ -734,14 +734,37 @@
 
 .quest-habit-form input,
 .quest-habit-form select {
-  padding: 4px 8px;
+  padding: 6px 10px;
   border: 1px solid rgba(74, 55, 32, 0.45);
   background: rgba(245, 231, 192, 0.6);
   font-family: 'IM Fell English', serif;
-  font-size: var(--fs-label);
+  font-size: var(--fs-quote);
   color: var(--ink);
   outline: none;
 }
+
+.quest-habit-form select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%234a3720' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+
+/* Hide native number spinner */
+.quest-habit-form input[type="number"]::-webkit-inner-spin-button,
+.quest-habit-form input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.quest-habit-form input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 
 /* ── Drag handle ─────────────────────────────────── */
 .quest-drag-handle {
@@ -768,7 +791,7 @@
   padding: 5px 14px;
   border: 1px solid rgba(85, 107, 60, 0.6);
   border-radius: 4px;
-  background: linear-gradient(135deg, #556b3c 0%, #3c5028 100%);
+  background: linear-gradient(135deg, var(--moss) 0%, var(--moss-dark, #3c5028) 100%);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -777,7 +800,7 @@
 }
 
 .quest-cauldron-link:hover {
-  background: linear-gradient(135deg, #667d48 0%, #4a6230 100%);
+  background: linear-gradient(135deg, var(--moss-light) 0%, var(--moss) 100%);
   border-color: var(--moss-light);
   color: #fff;
   box-shadow:

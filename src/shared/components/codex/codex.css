@@ -547,6 +547,21 @@
   margin-top: 1px;
 }
 
+.qb-module-card-nav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  color: var(--ink-faded);
+  opacity: 0.35;
+  transition: opacity 0.2s, color 0.2s;
+  line-height: 1;
+}
+.qb-module-card-nav:hover {
+  opacity: 1;
+  color: var(--rubric);
+}
+
 .qb-module-card-body {
   border-top: 1px dotted rgba(74, 55, 32, 0.45);
   padding-top: 8px;
