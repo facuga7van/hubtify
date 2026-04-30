@@ -782,3 +782,7 @@
   0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
   50% { box-shadow: 0 1px 8px rgba(85, 107, 60, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
 }
+
+/* ── Icon hover utility ─────────────────────── */
+.quest-icon-hover { transition: opacity 0.2s; }
+.quest-icon-hover:hover, .quest-icon-hover:focus-visible { opacity: 0.8 !important; }

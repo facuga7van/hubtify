@@ -221,7 +221,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   const bgUrl = new URL('../../../assets/bg.jpg', import.meta.url).href;
 
   return (
-    <div style={{
+    <div onKeyDown={(e) => e.key === 'Escape' && handleClose()} role="dialog" aria-modal="true" tabIndex={-1} ref={(el) => el?.focus()} style={{
       position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.75)', zIndex: 'var(--z-modal)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }} onClick={handleClose}>

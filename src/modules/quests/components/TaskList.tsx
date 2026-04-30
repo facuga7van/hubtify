@@ -414,7 +414,7 @@ export default function TaskList() {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
           <option value="__none__">{t('questify.noProject')}</option>
-          <option disabled>--------</option>
+          <option disabled aria-hidden="true">--------</option>
           <option value="__manage__">{t('questify.manageProjects')}</option>
         </select>
 
@@ -698,8 +698,8 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
       <span className="quest-row-ornament" style={{ color: tier.color }}>&#10022;</span>
       <div className="quest-row-inner">
         {/* Drag handle */}
-        <div className="quest-drag-handle" {...listeners}>
-          <svg width="10" height="14" viewBox="0 0 10 14" fill="var(--ink-faded)">
+        <div className="quest-drag-handle" {...listeners} aria-label={t('questify.dragHandle', 'Reorder')} role="button">
+          <svg width="10" height="14" viewBox="0 0 10 14" fill="var(--ink-faded)" aria-hidden="true">
             <circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/>
             <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
             <circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/>
@@ -759,7 +759,8 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
           <span onClick={onOpenNotes} style={{ position: 'relative', cursor: 'pointer', display: 'inline-flex' }}>
             <svg width="14" height="14" viewBox="0 0 16 16"
               style={{ opacity: drawingCount > 0 ? 0.6 : 0.35 }}
-              fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"
+              role="img" aria-label={t('questify.notes', 'Notes')}>
               <path d="M4 1h8l2 2v10a1 1 0 01-1 1H3a1 1 0 01-1-1V2a1 1 0 011-1z"/>
               <path d="M10 1v3h3"/>
               <path d="M5 8h6M5 11h4"/>
@@ -769,13 +770,15 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
 
           {/* Edit icon */}
           <svg onClick={onEdit} width="14" height="14" viewBox="0 0 16 16"
-            fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
+            fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round"
+            role="button" tabIndex={0} aria-label={t('questify.edit', 'Edit')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEdit(); } }}>
             <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
           </svg>
 
           {/* Select checkbox */}
           <svg onClick={onToggleSelect} width="12" height="12" viewBox="0 0 14 14"
-            fill="none" stroke={selected ? 'var(--rubric)' : 'var(--ink-faded)'} strokeWidth="1.3">
+            fill="none" stroke={selected ? 'var(--rubric)' : 'var(--ink-faded)'} strokeWidth="1.3"
+            role="checkbox" tabIndex={0} aria-checked={selected} aria-label={t('questify.selectTask', 'Select task')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSelect(); } }}>
             <rect x="1" y="1" width="12" height="12" rx="1"/>
             {selected && <path d="M3.5 7l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round"/>}
           </svg>

@@ -199,10 +199,11 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
         </div>
       ) : (
         <svg onClick={() => setConfirmDelete(true)} width="12" height="12" viewBox="0 0 12 12"
-          style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
-          onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
-          onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
-          stroke="var(--rubric)" strokeWidth="1.8" strokeLinecap="round">
+          className="quest-icon-hover"
+          style={{ cursor: 'pointer', opacity: 0.4 }}
+          stroke="var(--rubric)" strokeWidth="1.8" strokeLinecap="round"
+          role="button" tabIndex={0} aria-label={t('questify.delete', 'Delete')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDelete(true); } }}>
           <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
         </svg>
       )}

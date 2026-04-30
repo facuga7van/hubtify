@@ -273,10 +273,11 @@ export default function HabitTracker({ onXpGained }: Props) {
 
                 {/* Delete */}
                 <svg onClick={() => handleDelete(h.id)} width="10" height="10" viewBox="0 0 14 14"
-                  style={{ cursor: 'pointer', opacity: 0.25, transition: 'opacity 0.2s', flexShrink: 0 }}
-                  onMouseOver={(e) => (e.currentTarget.style.opacity = '0.6')}
-                  onMouseOut={(e) => (e.currentTarget.style.opacity = '0.25')}
-                  fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
+                  className="quest-icon-hover"
+                  style={{ cursor: 'pointer', opacity: 0.25, flexShrink: 0 }}
+                  fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round"
+                  role="button" tabIndex={0} aria-label={t('questify.deleteHabit', 'Delete habit')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDelete(h.id); } }}>
                   <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
                 </svg>
               </div>

@@ -54,7 +54,7 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
   };
 
   return (
-    <div className="quest-project-modal-overlay" onClick={onClose}>
+    <div className="quest-project-modal-overlay" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()} role="dialog" aria-modal="true" aria-label={t('questify.manageProjects')}>
       <div className="quest-project-modal" onClick={(e) => e.stopPropagation()}>
         <div className="quest-project-modal-title">{t('questify.manageProjects')} <HelpBubble variant="inline" text={t('questify.projectsHelp', 'Proyectos agrupan misiones en campañas. Su progreso se muestra en la barra de Campañas.')} /></div>
 
