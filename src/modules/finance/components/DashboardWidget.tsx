@@ -49,7 +49,7 @@ export default function DashboardWidget() {
       <div style={{ margin: '6px 0 10px' }}>
         {/* Income row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginBottom: 4 }}>
-          <span className="qb-hand">{t('coinify.income', 'Income')}</span>
+          <span className="qb-hand">{t('coinify.income', 'Ingreso')}</span>
           <span className="qb-numeral" style={{ fontSize: 'var(--fs-body)', color: 'var(--moss)' }}>
             {total !== null ? (
               <AnimatedNumber value={income} prefix={currencyPrefix()} />
@@ -61,7 +61,7 @@ export default function DashboardWidget() {
 
         {/* Expense row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginBottom: 4 }}>
-          <span className="qb-hand">{t('coinify.expense', 'Expense')}</span>
+          <span className="qb-hand">{t('coinify.expense', 'Gasto')}</span>
           <span className="qb-numeral" style={{ fontSize: 'var(--fs-body)', color: 'var(--rubric)' }}>
             {total !== null ? (
               <AnimatedNumber value={expenses} prefix={currencyPrefix()} />
@@ -76,12 +76,12 @@ export default function DashboardWidget() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginTop: 4, color: 'var(--ink-faded)' }}>
           <span>
-            {t('coinify.thisMonth', 'this month')} &middot;{' '}
+            {t('coinify.thisMonth', 'este mes')} &middot;{' '}
             {total !== null ? (
               <AnimatedNumber value={balanceNet} prefix={currencyPrefix()} />
             ) : '---'}
           </span>
-          <span>{monthPct}% del mes</span>
+          <span>{monthPct}% {t('coinify.ofTheMonth', 'del mes')}</span>
         </div>
       </div>
 
@@ -99,8 +99,8 @@ export default function DashboardWidget() {
       >
         <span className="qb-hand">
           {loansCount > 0
-            ? `${loansCount} ${t('coinify.activeLoans', 'active loans')}`
-            : t('coinify.thisMonth', 'this month')}
+            ? `${loansCount} ${t('coinify.activeLoans', 'préstamos activos')}`
+            : t('coinify.thisMonth', 'este mes')}
         </span>
         <Rune>{monthPct}%</Rune>
       </div>

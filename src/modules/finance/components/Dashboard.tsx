@@ -507,6 +507,7 @@ export default function Dashboard() {
         <button
           className="rpg-button coin-export-btn"
           onClick={handleExportCsv}
+          aria-label={t('coinify.exportCsv', 'Exportar CSV')}
           title={t('coinify.exportCsv', 'Exportar CSV')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

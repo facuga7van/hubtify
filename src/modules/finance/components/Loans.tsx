@@ -234,6 +234,8 @@ export default function Loans() {
               <span className="qb-numeral coin-loan-card__amount">{formatCurrency(loan.amount, { currency: loan.currency })}</span>
               {!isSettled(loan) && (
                 <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
+                  aria-label={t('coinify.settleLoan', 'Liquidar préstamo')}
+                  title={t('coinify.settleLoan', 'Liquidar préstamo')}
                   onClick={() => handleSettle(loan.id)}>
                   {t('coinify.settle')}
                 </button>
@@ -261,6 +263,8 @@ export default function Loans() {
                 <span className="qb-numeral coin-loan-card__amount">{formatCurrency(totalAmount, { currency: firstLoan.currency })}</span>
                 {!allSettled && (
                   <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
+                    aria-label={t('coinify.markPayment')}
+                    title={t('coinify.markPayment')}
                     onClick={() => openPayment(firstLoan.id)}>
                     {t('coinify.markPayment')}
                   </button>

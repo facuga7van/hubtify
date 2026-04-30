@@ -318,7 +318,8 @@ export default function Recurring() {
                 <button
                   className={`rpg-button coin-recurring-card__toggle ${isActive(item) ? 'coin-recurring-card__toggle--active' : 'coin-recurring-card__toggle--paused'}`}
                   onClick={() => handleToggle(item.id)}
-                  title={isActive(item) ? t('coinify.pause') : t('coinify.activate')}
+                  aria-label={isActive(item) ? t('coinify.pause', 'Pausar') : t('coinify.resume', 'Reanudar')}
+                  title={isActive(item) ? t('coinify.pause', 'Pausar') : t('coinify.resume', 'Reanudar')}
                 >
                   {isActive(item) ? <PlayIcon style={{ width: '0.7em', height: '0.7em' }} /> : <PauseIcon style={{ width: '0.7em', height: '0.7em' }} />}
                 </button>
@@ -401,7 +402,8 @@ export default function Recurring() {
                 {editingRecurringId !== item.id && (
                   <button className="rpg-button" onClick={() => startRecurringEdit(item)}
                     style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.5 }}
-                    title={t('coinify.editRecurring', 'Editar recurrente')}>
+                    aria-label={t('coinify.edit', 'Editar')}
+                    title={t('coinify.edit', 'Editar')}>
                     <Pencil style={{ width: '0.75em', height: '0.75em' }} />
                   </button>
                 )}
@@ -416,7 +418,8 @@ export default function Recurring() {
                 {/* Delete */}
                 <button className="rpg-button" onClick={() => handleDelete(item.id)}
                   style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
-                  title={t('coinify.delete')}><CrossMark style={{ width: '0.65em', height: '0.65em' }} /></button>
+                  aria-label={t('coinify.delete', 'Eliminar')}
+                  title={t('coinify.delete', 'Eliminar')}><CrossMark style={{ width: '0.65em', height: '0.65em' }} /></button>
               </div>
 
               {/* Amount History Timeline */}

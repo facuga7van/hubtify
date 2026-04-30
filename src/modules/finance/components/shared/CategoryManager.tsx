@@ -62,7 +62,7 @@ export default function CategoryManager({ categories, onClose, onSaved }: Props)
                 </span>
                 <button className="rpg-button" onClick={() => handleDelete(cat)}
                   style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
-                  {t('coinify.yes')}
+                  {t('common.yes', 'Sí')}
                 </button>
                 <button className="rpg-button" onClick={() => setConfirmingDelete(null)}
                   style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>

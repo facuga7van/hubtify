@@ -53,15 +53,19 @@ export function CreditCardSelect({ value, onChange, className }: CreditCardSelec
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           className={`rpg-select ${className ?? ''}`}
+          aria-label={t('coinify.selectCard', 'Seleccionar tarjeta')}
         >
           <option value="">{t('coinify.selectCard')}</option>
-          {cards.map((card) => (
-            <option key={card.id} value={card.id}>
-              {card.name} ({t('coinify.closingDay')}: {card.closingDay})
-            </option>
-          ))}
-          <option disabled>───────────</option>
-          <option value="__manage__">{t('coinify.manageCreditCards')}</option>
+          <optgroup label={t('coinify.creditCards', 'Tarjetas')}>
+            {cards.map((card) => (
+              <option key={card.id} value={card.id}>
+                {card.name} ({t('coinify.closingDay')}: {card.closingDay})
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="">
+            <option value="__manage__">{t('coinify.manageCreditCards')}</option>
+          </optgroup>
         </select>
       </div>
 

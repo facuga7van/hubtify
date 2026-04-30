@@ -89,7 +89,7 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
                   style={{ width: 70 }} min={1} max={31} step={1} />
                 <button className="rpg-button" onClick={handleUpdate}
                   style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}>
-                  OK
+                  {t('common.ok', 'OK')}
                 </button>
                 <button className="rpg-button" onClick={() => setEditingId(null)}
                   style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>

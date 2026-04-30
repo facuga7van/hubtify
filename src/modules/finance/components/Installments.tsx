@@ -52,7 +52,7 @@ interface InstallmentGroup {
 }
 
 export default function Installments() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const confirm = useConfirm();
   const currentMonth = todayMonth();
@@ -135,7 +135,8 @@ export default function Installments() {
 
   const projectionLabel = (m: string) => {
     const [y, mo] = m.split('-').map(Number);
-    return new Date(y, mo - 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+    const locale = i18n.language === 'en' ? 'en-US' : 'es-AR';
+    return new Date(y, mo - 1).toLocaleDateString(locale, { month: 'short', year: '2-digit' });
   };
 
   const barData = useMemo<BarDatum[]>(
@@ -203,6 +204,7 @@ export default function Installments() {
                   <button
                     className="rpg-button"
                     onClick={() => handleDeleteGroup(group.groupId)}
+                    aria-label={t('coinify.deleteGroup', 'Eliminar grupo')}
                     title={t('coinify.deleteInstallmentGroup', 'Eliminar grupo de cuotas')}
                     style={{ padding: '2px 6px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
                   >

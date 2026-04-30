@@ -394,8 +394,12 @@ export default function Transactions() {
               <option value="credit_card">{t('coinify.creditCard')}</option>
             </select>
             <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '4px 8px' }}
+              aria-label={t('coinify.save', 'Guardar')}
+              title={t('coinify.save', 'Guardar')}
               onClick={saveEdit}>{t('coinify.saveTransaction')}</button>
             <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '4px 8px' }}
+              aria-label={t('coinify.cancel', 'Cancelar')}
+              title={t('coinify.cancel', 'Cancelar')}
               onClick={() => setEditingId(null)}>{t('coinify.cancelEdit')}</button>
           </div>
         ) : (
@@ -432,8 +436,12 @@ export default function Transactions() {
             </span>
             <div className="coin-ledger-row__actions">
               <button className="rpg-button coin-ledger-row__action-btn"
+                aria-label={t('coinify.editTransaction', 'Editar transacción')}
+                title={t('coinify.editTransaction', 'Editar transacción')}
                 onClick={() => startEdit(tx)}><Pencil style={{ width: '0.8em', height: '0.8em' }} /></button>
               <button className="rpg-button coin-ledger-row__action-btn"
+                aria-label={t('coinify.deleteTransaction', 'Eliminar transacción')}
+                title={t('coinify.deleteTransaction', 'Eliminar transacción')}
                 onClick={() => handleDelete(tx.id)}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
             </div>
           </>
@@ -495,16 +503,16 @@ export default function Transactions() {
 
       {/* Ledger header */}
       <div className="coin-ledger-header">
-        <span className="coin-sort-header" onClick={() => toggleSort('date')}>
+        <span className="coin-sort-header" role="button" aria-label={t('coinify.colDate', 'DÍA')} onClick={() => toggleSort('date')}>
           {t('coinify.colDate', 'DÍA')} {sortIndicator('date')}
         </span>
-        <span className="coin-sort-header" onClick={() => toggleSort('description')}>
+        <span className="coin-sort-header" role="button" aria-label={t('coinify.colDescription', 'CONCEPTO')} onClick={() => toggleSort('description')}>
           {t('coinify.colDescription', 'CONCEPTO')} {sortIndicator('description')}
         </span>
-        <span className="coin-sort-header" onClick={() => toggleSort('category')}>
+        <span className="coin-sort-header" role="button" aria-label={t('coinify.colCategory', 'CATEGORÍA')} onClick={() => toggleSort('category')}>
           {t('coinify.colCategory', 'CATEGORÍA')} {sortIndicator('category')}
         </span>
-        <span className="coin-sort-header" onClick={() => toggleSort('amount')} style={{ textAlign: 'right' }}>
+        <span className="coin-sort-header" role="button" aria-label={t('coinify.colAmount', 'MONEDAS')} onClick={() => toggleSort('amount')} style={{ textAlign: 'right' }}>
           {t('coinify.colAmount', 'MONEDAS')} {sortIndicator('amount')}
         </span>
       </div>

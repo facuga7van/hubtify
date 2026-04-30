@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BookPage } from '../../../shared/components/codex/BookPage';
 import { DollarChip } from './shared/DollarChip';
+import { CryptoChip } from './shared/CryptoChip';
 
 const tabs = [
   { path: '/finance', label: 'coinify.dashboard', end: true },
@@ -20,23 +21,30 @@ export default function FinanceLayout() {
       eyebrow="† TOMO IV †  —  DE REBUS AERIS"
       title="Libro del Tesorero"
       subtitle="Registro de dádivas, tributos, préstamos y del estado del cofre real"
-      headerExtra={<DollarChip />}
+      headerExtra={<div style={{ display: 'flex', gap: 6 }}><DollarChip /><CryptoChip /></div>}
       className="coin-book"
     >
       {/* Tab navigation (hidden visually, using NavLinks for routing) */}
-      <nav className="coin-tab-nav">
-        {tabs.map((tab) => (
-          <NavLink
-            key={tab.path}
-            to={tab.path}
-            end={'end' in tab ? tab.end : undefined}
-            className={({ isActive }) =>
-              `coin-tab-link ${isActive ? 'coin-tab-link--active' : ''}`
-            }
-          >
-            {t(tab.label)}
-          </NavLink>
-        ))}
+      <nav className="coin-tab-nav" role="tablist">
+        {tabs.map((tab) => {
+          const isActive = 'end' in tab && tab.end
+            ? location.pathname === tab.path
+            : location.pathname === tab.path || location.pathname.startsWith(tab.path + '/');
+          return (
+            <NavLink
+              key={tab.path}
+              to={tab.path}
+              end={'end' in tab ? tab.end : undefined}
+              role="tab"
+              aria-selected={isActive}
+              className={({ isActive: active }) =>
+                `coin-tab-link ${active ? 'coin-tab-link--active' : ''}`
+              }
+            >
+              {t(tab.label)}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="coin-layout__content">
