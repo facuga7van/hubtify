@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuthContext } from '../../../shared/AuthContext';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -43,6 +44,7 @@ function getTierInfo(task: Task) {
 export default function TaskList() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuthContext();
   const animatedNavigate = useAnimatedNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [subtasksMap, setSubtasksMap] = useState<Record<string, Subtask[]>>({});
@@ -61,12 +63,17 @@ export default function TaskList() {
   const [drawingCounts, setDrawingCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const completingRef = useRef(false);
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => {
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const collapsedStorageKey = user?.uid
+    ? `questify_collapsed_projects_${user.uid}`
+    : 'questify_collapsed_projects';
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('questify_collapsed_projects');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch { return new Set(); }
-  });
+      const saved = localStorage.getItem(collapsedStorageKey);
+      setCollapsedProjects(saved ? new Set(JSON.parse(saved)) : new Set());
+    } catch { setCollapsedProjects(new Set()); }
+  }, [collapsedStorageKey]);
   const formRef = useRef<HTMLDivElement>(null);
 
   /* ── Data loading ───────────────────────────────── */
@@ -319,7 +326,7 @@ export default function TaskList() {
     setCollapsedProjects((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
-      localStorage.setItem('questify_collapsed_projects', JSON.stringify([...next]));
+      localStorage.setItem(collapsedStorageKey, JSON.stringify([...next]));
       return next;
     });
   };

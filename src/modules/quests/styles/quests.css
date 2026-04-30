@@ -419,6 +419,12 @@
   cursor: pointer;
 }
 
+.quest-habit-name:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
 .quest-habit-name--done {
   opacity: 0.7;
   text-decoration: line-through;
