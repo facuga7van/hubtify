@@ -164,6 +164,9 @@
   font-family: 'IM Fell English', serif;
   font-size: calc(14.5px * var(--font-scale));
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* meta info row */

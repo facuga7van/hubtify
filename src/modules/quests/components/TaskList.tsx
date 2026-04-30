@@ -155,8 +155,14 @@ export default function TaskList() {
   );
 
   const completed = useMemo(() =>
-    filteredByProject.filter((t) => t.status),
-    [filteredByProject]
+    filteredByProject
+      .filter((t) => t.status)
+      .filter((t) => !filter || t.category === filter)
+      .sort((a, b) => {
+        if (!a.completedAt || !b.completedAt) return 0;
+        return new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime();
+      }),
+    [filteredByProject, filter]
   );
 
   type DueDateGroup = 'overdue' | 'today' | 'thisWeek' | 'later' | 'noDate';

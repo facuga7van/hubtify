@@ -182,7 +182,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     await window.api.questsSaveDrawing({ taskId, data });
     await loadDrawings();
     onCountChanged?.();
-    setCurrentIdx(drawings.length);
+    setCurrentIdx(Number.MAX_SAFE_INTEGER);
   };
 
   useEffect(() => {
