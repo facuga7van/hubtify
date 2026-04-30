@@ -112,7 +112,10 @@ export default function Layout() {
 
   useEffect(() => {
     const stored = localStorage.getItem('hubtify_last_seen_version');
-    if (!stored || isNewerVersion(APP_VERSION, stored)) {
+    if (!stored) {
+      // First time user — just save current version, no patch notes
+      localStorage.setItem('hubtify_last_seen_version', APP_VERSION);
+    } else if (isNewerVersion(APP_VERSION, stored)) {
       setLastSeenVersion(stored);
       setShowPatchNotes(true);
       localStorage.setItem('hubtify_last_seen_version', APP_VERSION);

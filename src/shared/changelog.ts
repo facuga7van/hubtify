@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.6.6',
+    date: '2026-04-30',
+    changes: [
+      {
+        category: 'fix',
+        text: {
+          es: 'Las notas del parche ya no aparecen la primera vez que abrís la app — solo se muestran cuando actualizás a una versión nueva',
+          en: 'Patch notes no longer pop up the first time you open the app — they only show when you update to a new version',
+        },
+      },
+    ],
+  },
+  {
     version: '0.6.5',
     date: '2026-04-30',
     changes: [
