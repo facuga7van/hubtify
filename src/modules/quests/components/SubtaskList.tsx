@@ -119,7 +119,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
           onCancel={() => { setShowForm(false); setEditingSubtask(null); }}
         />
       ) : (
-        <button className="rpg-button" disabled={atLimit} title={atLimit ? 'Max 30 subtasks reached' : undefined} onClick={() => setShowForm(true)}
+        <button className="rpg-button" disabled={atLimit} title={atLimit ? t('questify.subtaskLimit', 'Max 30 subtasks reached') : undefined} onClick={() => setShowForm(true)}
           style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', marginTop: 6 }}>
           {t('questify.addSubtask')}
         </button>

@@ -25,6 +25,7 @@ export default function HabitTracker({ onXpGained }: Props) {
   const { toast } = useToast();
   const confirm = useConfirm();
   const [habits, setHabits] = useState<HabitWithStreak[]>([]);
+  const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newFreq, setNewFreq] = useState<HabitFrequency>('daily');
@@ -38,8 +39,14 @@ export default function HabitTracker({ onXpGained }: Props) {
   const [heatmapStart, setHeatmapStart] = useState('');
 
   const loadHabits = useCallback(async () => {
-    const result = await window.api.questsGetHabits();
-    setHabits(result as HabitWithStreak[]);
+    try {
+      const result = await window.api.questsGetHabits();
+      setHabits(result as HabitWithStreak[]);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const loadHeatmap = useCallback(async () => {
@@ -186,6 +193,8 @@ export default function HabitTracker({ onXpGained }: Props) {
     return h.checksThisPeriod >= h.targetThisPeriod;
   };
 
+  if (loading) return null;
+
   if (habits.length === 0 && !adding) {
     return (
       <div>
@@ -296,7 +305,7 @@ export default function HabitTracker({ onXpGained }: Props) {
             className="subtask-input"
             style={{ flex: 1, minWidth: 100 }}
             autoFocus
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAdding(false); }}
           />
           <select value={newFreq} onChange={(e) => setNewFreq(e.target.value as HabitFrequency)}
             className="subtask-input" style={{ fontSize: 'var(--fs-label)' }}>

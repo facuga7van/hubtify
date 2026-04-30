@@ -364,12 +364,14 @@ export default function TaskList() {
       subtitle={t('questify.subtitle')}
     >
       {/* ── Stats strip ──────────────────────────── */}
-      <div className="quest-stats-strip">
-        <HelpBubble text={t('questify.statsHelp', 'Resumen de misiones: en progreso, vencidas, para hoy y completadas este mes.')} />
-        <SmallCount label={t('questify.inProgress', 'EN CURSO')} value={inProgressCount} />
-        <SmallCount label={t('questify.overdue', 'VENCIDAS')} value={overdueCount} tone="rubric" />
-        <SmallCount label={t('questify.todayDue', 'HODIE')} value={todayDueCount} />
-        <SmallCount label={t('questify.completedCount', 'CUMPLIDAS')} value={completed.length} />
+      <div style={{ position: 'relative' }}>
+        <HelpBubble text={t('questify.statsHelp', 'Resumen de misiones: en progreso, vencidas, para hoy y completadas.')} />
+        <div className="quest-stats-strip">
+          <SmallCount label={t('questify.inProgress', 'EN CURSO')} value={inProgressCount} />
+          <SmallCount label={t('questify.overdue', 'VENCIDAS')} value={overdueCount} tone="rubric" />
+          <SmallCount label={t('questify.todayDue', 'HODIE')} value={todayDueCount} />
+          <SmallCount label={t('questify.completedCount', 'CUMPLIDAS')} value={completed.length} />
+        </div>
       </div>
 
       {/* ── Task form ────────────────────────────── */}
@@ -589,7 +591,7 @@ export default function TaskList() {
                   <div key={c.project.id} className="quest-campaign-row">
                     <div className="quest-campaign-header">
                       <span className="quest-campaign-name">
-                        <span style={{ color: c.project.color }}>&#9670;</span> {c.project.name}
+                        <span style={{ color: c.project.color }} aria-hidden="true">&#9670;</span> {c.project.name}
                       </span>
                       <span className="quest-campaign-count">{c.done}/{c.total}</span>
                     </div>
@@ -695,7 +697,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
       {...attributes}
       className={`quest-row quest-row--${tier.cls}${isOverdue ? ' quest-row--overdue' : ''}${animatingComplete ? ' quest-row--completing' : ''}`}
     >
-      <span className="quest-row-ornament" style={{ color: tier.color }}>&#10022;</span>
+      <span className="quest-row-ornament" style={{ color: tier.color }} aria-hidden="true">&#10022;</span>
       <div className="quest-row-inner">
         {/* Drag handle */}
         <div className="quest-drag-handle" {...listeners} aria-label={t('questify.dragHandle', 'Reorder')} role="button">

@@ -218,7 +218,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     onClose();
   };
 
-  const bgUrl = new URL('../../../assets/bg.jpg', import.meta.url).href;
+  const bgUrl = parchmentBg;
 
   return (
     <div onKeyDown={(e) => e.key === 'Escape' && handleClose()} role="dialog" aria-modal="true" tabIndex={-1} ref={(el) => el?.focus()} style={{
@@ -279,10 +279,10 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
           ref={canvasRef}
           width={CANVAS_W}
           height={CANVAS_H}
-          onMouseDown={onPointerDown}
-          onMouseMove={onPointerMove}
-          onMouseUp={onPointerUp}
-          onMouseLeave={onPointerUp}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
           style={{
             cursor: tool === 'eraser' ? 'cell' : 'crosshair',
             borderRadius: 4,
@@ -312,7 +312,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
                 padding: '4px 8px', opacity: tool === 'pen' ? 1 : 0.5,
                 background: tool === 'pen' ? 'var(--gold)' : undefined,
               }}
-              title="Lapiz">
+              title={t('questify.penTool', 'Pen')}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
                 <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
               </svg>
@@ -324,7 +324,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
                 padding: '4px 8px', opacity: tool === 'eraser' ? 1 : 0.5,
                 background: tool === 'eraser' ? 'var(--gold)' : undefined,
               }}
-              title="Goma">
+              title={t('questify.eraserTool', 'Eraser')}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12.5 5.5l-5 5-3-3 5-5z"/>
                 <path d="M4.5 10.5l-2 2h5l2-2"/>

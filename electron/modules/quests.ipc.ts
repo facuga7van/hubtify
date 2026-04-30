@@ -298,7 +298,7 @@ export function registerQuestsIpcHandlers(): void {
     const now = new Date().toISOString();
 
     if (drawing.id) {
-      db.prepare('UPDATE task_drawings SET data = ? WHERE id = ?').run(drawing.data, drawing.id);
+      db.prepare('UPDATE task_drawings SET data = ?, updated_at = ? WHERE id = ?').run(drawing.data, new Date().toISOString(), drawing.id);
       return drawing.id;
     } else {
       const id = genId();
@@ -596,6 +596,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const now = new Date().toISOString();
     db.prepare('UPDATE habits SET deleted_at = ? WHERE id = ?').run(now, id);
+    db.prepare('UPDATE habit_checks SET deleted_at = ? WHERE habit_id = ?').run(now, id);
   });
 
   ipcHandle('quests:checkHabit', (_e, habitId: string) => {

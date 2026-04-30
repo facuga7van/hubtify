@@ -221,7 +221,7 @@
 
 .quest-row-xp-value {
   font-family: 'UnifrakturCook', serif;
-  font-size: 17px;
+  font-size: calc(17px * var(--font-scale));
   line-height: 1;
 }
 
@@ -264,6 +264,7 @@
   font-size: var(--fs-label);
   font-family: 'IM Fell English SC', serif;
   letter-spacing: 0.08em;
+  border-radius: 2px;
 }
 
 .quest-due--today {
@@ -273,6 +274,7 @@
   font-size: var(--fs-label);
   font-family: 'IM Fell English SC', serif;
   letter-spacing: 0.08em;
+  border-radius: 2px;
 }
 
 .quest-due--this-week {

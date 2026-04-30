@@ -138,7 +138,7 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tasks_project_deleted ON tasks(project_id, deleted_at);
       CREATE INDEX IF NOT EXISTS idx_subtasks_task_deleted ON subtasks(task_id, deleted_at, subtask_order);
       CREATE INDEX IF NOT EXISTS idx_categories_name_project ON task_categories(name, project_id);
-      CREATE INDEX IF NOT EXISTS idx_drawings_task ON task_drawings(task_id, draw_order);
+      CREATE INDEX IF NOT EXISTS idx_drawings_task_order ON task_drawings(task_id, draw_order);
     `,
   },
   {
