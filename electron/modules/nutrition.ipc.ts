@@ -259,6 +259,10 @@ export function registerNutritionIpcHandlers(): void {
   });
 
   ipcHandle('nutrition:getStreak', () => {
+    // Streak tolerance: ±10% of daily target
+    // This matches the HP system's "on target" threshold (±10% → +10 HP).
+    // XP precision uses finer gradations (5%/15%/30%) for reward scaling,
+    // but streak is binary (on/off) so the ±10% HP band is the right match.
     const db = getDb();
     const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
     if (!profile) return 0;
