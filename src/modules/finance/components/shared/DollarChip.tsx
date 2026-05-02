@@ -129,27 +129,15 @@ export function DollarChip() {
         {open ? <ChevronUp style={{ width: 8, height: 8 }} /> : <ChevronDown style={{ width: 8, height: 8 }} />}
       </button>
       {open && (
-        <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100,
-          background: 'var(--parch-0)', border: '2px solid var(--gold-dark)',
-          borderRadius: '6px', boxShadow: '0 2px 8px rgba(42, 29, 14, 0.35)', padding: 8,
-          minWidth: 200,
-        }}>
+        <div className="coin-dollar-menu">
           {/* Header with gear toggle */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 4, paddingBottom: 4, borderBottom: '1px solid var(--gold-dark)',
-          }}>
-            <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, opacity: 0.7 }}>
+          <div className="coin-dollar-menu__header">
+            <span className="coin-dollar-menu__title">
               {configMode ? t('coinify.dollarConfigTitle', 'Configurar tipos') : t('coinify.dollarRatesTitle', 'Cotizaciones')}
             </span>
             <button
               onClick={() => setConfigMode(!configMode)}
-              style={{
-                background: configMode ? 'var(--gold-dark)' : 'none', border: 'none', cursor: 'pointer',
-                color: configMode ? 'var(--parch-0)' : 'currentColor', opacity: configMode ? 1 : 0.5,
-                borderRadius: 4, padding: 2, display: 'flex', alignItems: 'center',
-              }}
+              className={`coin-dollar-menu__config-btn${configMode ? ' coin-dollar-menu__config-btn--active' : ''}`}
               title={t('coinify.dollarConfigTitle', 'Configurar tipos')}
             >
               <GearIcon />
@@ -165,11 +153,7 @@ export function DollarChip() {
               return (
                 <label
                   key={rate.casa}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
-                    fontSize: 'var(--fs-label)', cursor: isLast ? 'not-allowed' : 'pointer',
-                    borderBottom: '1px solid var(--parch-1)', opacity: isLast ? 0.5 : 1,
-                  }}
+                  className={`coin-dollar-menu__row coin-dollar-menu__row--checkbox${isLast ? ' coin-dollar-menu__row--disabled' : ''}`}
                 >
                   <input
                     type="checkbox"
@@ -188,13 +172,10 @@ export function DollarChip() {
             visibleRates.map((rate) => {
               const Icon = RATE_ICONS[rate.casa];
               return (
-                <div key={rate.casa} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
-                  fontSize: 'var(--fs-label)', borderBottom: '1px solid var(--parch-1)',
-                }}>
+                <div key={rate.casa} className="coin-dollar-menu__row">
                   {Icon && <Icon size={12} />}
-                  <span style={{ flex: 1, opacity: 0.8 }}>{rate.nombre}</span>
-                  <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
+                  <span className="coin-dollar-menu__rate-label">{rate.nombre}</span>
+                  <span className="coin-dollar-menu__rate-value">
                     ${rate.venta.toLocaleString('es-AR')}
                   </span>
                 </div>
