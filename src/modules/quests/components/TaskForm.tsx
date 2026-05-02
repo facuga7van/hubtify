@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XP_MAP, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
@@ -7,14 +7,14 @@ import Checkbox from '../../../shared/components/Checkbox';
 
 interface Props {
   editingTask: Task | null;
-  categories: string[];
   projects: Project[];
   activeProjectId: string | null;
   onSaved: () => void;
   onCancel?: () => void;
+  shouldFocus?: boolean;
 }
 
-export default function TaskForm({ editingTask, categories, projects, activeProjectId, onSaved, onCancel }: Props) {
+export default function TaskForm({ editingTask, projects, activeProjectId, onSaved, onCancel, shouldFocus }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -24,6 +24,16 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
   const [dueDate, setDueDate] = useState('');
   const [useDate, setUseDate] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+
+  const loadCategories = useCallback(async (pid: string | null | undefined) => {
+    try {
+      const cats = await window.api.questsGetCategories(pid === undefined ? undefined : pid);
+      setCategories(cats);
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadCategories(projectId); }, [projectId, loadCategories]);
 
   useEffect(() => {
     if (editingTask) {
@@ -85,7 +95,7 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
           }}
           className="rpg-input"
           style={{ flex: 1 }}
-          autoFocus
+          autoFocus={shouldFocus}
         />
         <button type="submit" className="rpg-button">
           {editingTask ? t('questify.update') : t('questify.addQuest')}
@@ -110,14 +120,7 @@ export default function TaskForm({ editingTask, categories, projects, activeProj
               key={tierVal}
               type="button"
               onClick={() => setTier(tierVal)}
-              style={{
-                padding: '4px 10px', border: '1px solid var(--leather)',
-                borderRadius: '6px', cursor: 'pointer',
-                background: tier === tierVal ? 'var(--gold)' : 'var(--parch-0)',
-                color: tier === tierVal ? 'var(--ink)' : 'var(--ink-soft)',
-                fontWeight: tier === tierVal ? 'bold' : 'normal',
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-              }}
+              className={`quest-tier-btn${tier === tierVal ? ' quest-tier-btn--active' : ''}`}
             >
               <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
               <span style={{ opacity: 0.7, fontSize: '0.85em', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>

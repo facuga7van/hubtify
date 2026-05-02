@@ -64,6 +64,20 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
     [filteredTasks]
   );
 
+  const MAX_WIDGET_TASKS = 8;
+  const displayTasks = useMemo(() => {
+    const urgencyOrder = (task: Task) => {
+      if (!task.dueDate) return 3;
+      const status = getDueDateStatus(task.dueDate);
+      if (status === 'overdue') return 0;
+      if (status === 'today') return 1;
+      return 2;
+    };
+    return [...filteredTasks]
+      .sort((a, b) => urgencyOrder(a) - urgencyOrder(b))
+      .slice(0, MAX_WIDGET_TASKS);
+  }, [filteredTasks]);
+
   const handleComplete = useCallback(async (task: Task) => {
     if (completingRef.current) return;
     completingRef.current = true;
@@ -117,9 +131,9 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
       )}
 
       {/* Task checklist */}
-      {filteredTasks.length > 0 ? (
+      {displayTasks.length > 0 ? (
         <div className="widget-list-flow">
-          {filteredTasks.map((task) => (
+          {displayTasks.map((task) => (
             <div
               key={task.id}
               style={{
@@ -143,6 +157,11 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
               </span>
             </div>
           ))}
+          {filteredTasks.length > MAX_WIDGET_TASKS && (
+            <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', padding: '2px 0' }}>
+              +{filteredTasks.length - MAX_WIDGET_TASKS} {t('questify.showMore', 'más')}
+            </span>
+          )}
         </div>
       ) : (
         <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', margin: '4px 0' }}>

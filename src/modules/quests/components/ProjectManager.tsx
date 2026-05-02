@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
@@ -53,9 +53,36 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
     setEditColor(p.color);
   };
 
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Auto-focus first input on mount
+    const firstInput = modalRef.current?.querySelector('input') as HTMLInputElement | null;
+    firstInput?.focus();
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'Tab' && modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+        'input, button, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
   return (
-    <div className="quest-project-modal-overlay" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()} role="dialog" aria-modal="true" aria-label={t('questify.manageProjects')}>
-      <div className="quest-project-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="quest-project-modal-overlay" onClick={onClose} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label={t('questify.manageProjects')}>
+      <div ref={modalRef} className="quest-project-modal" onClick={(e) => e.stopPropagation()}>
         <div className="quest-project-modal-title">{t('questify.manageProjects')} <HelpBubble variant="inline" text={t('questify.projectsHelp', 'Proyectos agrupan misiones en campañas. Su progreso se muestra en la barra de Campañas.')} /></div>
 
         {projects.map((p) => (

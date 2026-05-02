@@ -63,6 +63,8 @@ export default function TaskList() {
   const [notesTaskId, setNotesTaskId] = useState<string | null>(null);
   const [drawingCounts, setDrawingCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const completingRef = useRef(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const collapsedStorageKey = user?.uid
@@ -118,20 +120,24 @@ export default function TaskList() {
   }, [loadTasks]);
 
   useEffect(() => {
-    if (editingTask && formRef.current) {
-      const card = formRef.current.querySelector('.rpg-card') as HTMLElement;
-      if (!card) return;
-      const tl = gsap.timeline();
-      tl.fromTo(card, {
-        boxShadow: '0 0 12px 4px rgba(168, 138, 60, 0.6), inset 0 0 8px rgba(168, 138, 60, 0.2)',
-        borderColor: 'var(--gold)',
-      }, {
-        boxShadow: '0 0 0 0 transparent, inset 0 0 0 transparent',
-        borderColor: 'rgba(74, 55, 32, 0.45)',
-        duration: 1.8,
-        ease: 'power2.out',
-      });
-      tl.fromTo(card, { scale: 1.015 }, { scale: 1, duration: 0.5, ease: 'power2.out' }, 0);
+    if (editingTask) {
+      setShowForm(true);
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const card = formRef.current.querySelector('.rpg-card') as HTMLElement;
+        if (!card) return;
+        const tl = gsap.timeline();
+        tl.fromTo(card, {
+          boxShadow: '0 0 12px 4px rgba(168, 138, 60, 0.6), inset 0 0 8px rgba(168, 138, 60, 0.2)',
+          borderColor: 'var(--gold)',
+        }, {
+          boxShadow: '0 0 0 0 transparent, inset 0 0 0 transparent',
+          borderColor: 'rgba(74, 55, 32, 0.45)',
+          duration: 1.8,
+          ease: 'power2.out',
+        });
+        tl.fromTo(card, { scale: 1.015 }, { scale: 1, duration: 0.5, ease: 'power2.out' }, 0);
+      }
     }
   }, [editingTask]);
 
@@ -155,22 +161,30 @@ export default function TaskList() {
     return tasks.filter((t) => (activeProjectId === null ? t.projectId === null : t.projectId === activeProjectId));
   }, [tasks, activeProjectId]);
 
+  const matchesSearch = useCallback((task: Task) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return task.name.toLowerCase().includes(q) || (task.description?.toLowerCase().includes(q) ?? false);
+  }, [searchQuery]);
+
   const pending = useMemo(() =>
     filteredByProject.filter((t) => !t.status)
       .sort((a, b) => a.order - b.order)
-      .filter((t) => !filter || t.category === filter),
-    [filteredByProject, filter]
+      .filter((t) => !filter || t.category === filter)
+      .filter(matchesSearch),
+    [filteredByProject, filter, matchesSearch]
   );
 
   const completed = useMemo(() =>
     filteredByProject
       .filter((t) => t.status)
       .filter((t) => !filter || t.category === filter)
+      .filter(matchesSearch)
       .sort((a, b) => {
         if (!a.completedAt || !b.completedAt) return 0;
         return new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime();
       }),
-    [filteredByProject, filter]
+    [filteredByProject, filter, matchesSearch]
   );
 
   type DueDateGroup = 'overdue' | 'today' | 'thisWeek' | 'later' | 'noDate';
@@ -246,18 +260,15 @@ export default function TaskList() {
 
   const handleBatchComplete = async () => {
     const ids = Array.from(selectedIds);
-    let totalXp = 0;
-    for (const id of ids) {
-      const task = pending.find(t => t.id === id);
-      if (!task) continue;
-      await window.api.questsSetTaskStatus(id, true);
-      const result = await window.api.processRpgEvent({
+    const tasksToComplete = ids.map(id => pending.find(t => t.id === id)).filter(Boolean) as Task[];
+    await Promise.all(tasksToComplete.map(async (task) => {
+      await window.api.questsSetTaskStatus(task.id, true);
+      await window.api.processRpgEvent({
         type: 'TASK_COMPLETED', moduleId: 'quests',
-        payload: { xp: XP_MAP[task.tier], hp: 0, taskId: id, tier: task.tier },
+        payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
         timestamp: Date.now(),
       });
-      totalXp += result.xpGained;
-    }
+    }));
     playTaskComplete();
     toast({
       type: 'xp',
@@ -354,6 +365,7 @@ export default function TaskList() {
     onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); },
     drawingCount: drawingCounts[task.id] ?? 0,
     onOpenNotes: () => setNotesTaskId(task.id),
+    isEditing: editingTask?.id === task.id,
   });
 
   const SkeletonCards = () => (
@@ -368,7 +380,7 @@ export default function TaskList() {
   return (
     <BookPage
       data-tour="quests"
-      eyebrow={t('questify.eyebrow', 'TOMO II  —  ACTA HEROUM')}
+      eyebrow={t('questify.eyebrow', 'QUESTIFY — LIBER MISSIONUM')}
       title={t('questify.title')}
       subtitle={t('questify.subtitle')}
     >
@@ -383,16 +395,31 @@ export default function TaskList() {
         </div>
       </div>
 
-      {/* ── Task form ────────────────────────────── */}
-      <div ref={formRef} data-tour="quests-add">
+      {/* ── Task form (collapsible) ─────────────── */}
+      <div ref={formRef} data-tour="quests-add" className={`quest-form-wrapper${showForm || editingTask ? ' quest-form-wrapper--open' : ''}`}>
         <TaskForm
           editingTask={editingTask}
-          categories={categories}
           projects={projects}
           activeProjectId={activeProjectId === undefined ? null : activeProjectId}
-          onSaved={() => { setEditingTask(null); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
-          onCancel={() => setEditingTask(null)}
+          onSaved={() => { setEditingTask(null); setShowForm(false); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
+          onCancel={() => { setEditingTask(null); setShowForm(false); }}
+          shouldFocus={showForm || !!editingTask}
         />
+      </div>
+
+      {/* ── Add quest toggle button ────────────── */}
+      <div className="quest-add-toggle-wrapper">
+        <button
+          type="button"
+          className={`quest-add-toggle${showForm || editingTask ? ' quest-add-toggle--active' : ''}`}
+          onClick={() => { setShowForm(prev => !prev); if (editingTask) setEditingTask(null); }}
+          title={t('questify.addQuest')}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            {showForm || editingTask ? <path d="M4 8h8" /> : <><path d="M8 3v10" /><path d="M3 8h10" /></>}
+          </svg>
+          {showForm || editingTask ? t('questify.cancel', 'Cancelar') : t('questify.addQuest')}
+        </button>
       </div>
 
       {/* ── Tabs + filters bar ───────────────────── */}
@@ -415,7 +442,6 @@ export default function TaskList() {
           value={activeProjectId === undefined ? '__all__' : (activeProjectId ?? '__none__')}
           onChange={(e) => {
             const val = e.target.value;
-            if (val === '__manage__') { setShowProjectManager(true); return; }
             setActiveProjectId(val === '__all__' ? undefined : val === '__none__' ? null : val);
             setFilter('');
           }}
@@ -425,9 +451,19 @@ export default function TaskList() {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
           <option value="__none__">{t('questify.noProject')}</option>
-          <option disabled aria-hidden="true">--------</option>
-          <option value="__manage__">{t('questify.manageProjects')}</option>
         </select>
+
+        <span
+          className="qb-rune"
+          onClick={() => setShowProjectManager(true)}
+          title={t('questify.manageProjects')}
+          style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 4h5l2 2h5v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4z"/>
+            <path d="M2 4V3a1 1 0 011-1h4l2 2"/>
+          </svg>
+        </span>
 
         {uniqueCategories.length > 0 && (
           <select value={filter} onChange={(e) => setFilter(e.target.value)}
@@ -436,6 +472,14 @@ export default function TaskList() {
             {uniqueCategories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
+
+        <input
+          type="text"
+          className="rpg-input quest-search-input"
+          placeholder={t('questify.searchPlaceholder', 'Buscar...')}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
 
         {selectedIds.size > 0 && (
           <>
@@ -521,6 +565,10 @@ export default function TaskList() {
               </>
             )}
 
+            {activeTab === 'completed' && completed.length === 0 && (
+              <p className="quest-empty">{t('questify.noCompletedQuests', 'Aún no has completado ninguna misión. ¡Adelante, héroe!')}</p>
+            )}
+
             {activeTab === 'completed' && completed.map((task) => {
               const isExpanded = expandedIds.has(task.id);
               const subs = subtasksMap[task.id] ?? [];
@@ -588,7 +636,7 @@ export default function TaskList() {
                   <div key={c.project.id} className="quest-campaign-row">
                     <div className="quest-campaign-header">
                       <span className="quest-campaign-name">
-                        <span style={{ color: c.project.color }} aria-hidden="true">&#9670;</span> {c.project.name}
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.project.color, display: 'inline-block', flexShrink: 0 }} aria-hidden="true" /> {c.project.name}
                       </span>
                       <span className="quest-campaign-count">{c.done}/{c.total}</span>
                     </div>
@@ -637,13 +685,14 @@ export default function TaskList() {
 
 function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
   onToggleExpand, onComplete, onEdit, onToggleSelect, onShowToast, onSubtaskChanged,
-  drawingCount, onOpenNotes }: {
+  drawingCount, onOpenNotes, isEditing }: {
   task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
   todayCount: number;
   onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
   onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
   onSubtaskChanged: () => void;
   drawingCount: number; onOpenNotes: () => void;
+  isEditing?: boolean;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
@@ -675,12 +724,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
   // Build meta info
   const meta: string[] = [];
   if (task.category) meta.push(task.category);
-  if (task.dueDate) {
-    const status = getDueDateStatus(task.dueDate);
-    if (status === 'overdue') meta.push(t('questify.overdueLabel', 'vencida'));
-    else if (status === 'today') meta.push(t('questify.dueToday'));
-    else meta.push(new Date(task.dueDate).toLocaleDateString());
-  }
+  // Due date shown only as colored badge in actions area (avoid duplication)
   const subCount = subtasks.length;
   const doneCount = subtasks.filter(s => s.status).length;
   if (subCount > 0) {
@@ -692,9 +736,11 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
       ref={(el) => { setNodeRef(el); rowRef.current = el; }}
       style={style}
       {...attributes}
-      className={`quest-row quest-row--${tier.cls}${isOverdue ? ' quest-row--overdue' : ''}${animatingComplete ? ' quest-row--completing' : ''}`}
+      className={`quest-row quest-row--${tier.cls}${isOverdue ? ' quest-row--overdue' : ''}${animatingComplete ? ' quest-row--completing' : ''}${isEditing ? ' quest-row--editing' : ''}`}
     >
-      <span className="quest-row-ornament" style={{ color: tier.color }} aria-hidden="true">&#10022;</span>
+      <span className="quest-row-ornament" style={{ color: tier.color }} aria-hidden="true">
+        <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l2.5 5.5L16 8l-5.5 2.5L8 16l-2.5-5.5L0 8l5.5-2.5z"/></svg>
+      </span>
       <div className="quest-row-inner">
         {/* Drag handle */}
         <div className="quest-drag-handle" {...listeners} aria-label={t('questify.dragHandle', 'Reorder')} role="button">
