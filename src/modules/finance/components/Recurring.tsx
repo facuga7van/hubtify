@@ -339,13 +339,11 @@ export default function Recurring() {
                       }}
                     />
                     <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'expense' }))}
-                      className={`rpg-button ${editRecurringFields.type === 'expense' ? 'rpg-btn-active' : ''}`}
-                      style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}>
+                      className={`rpg-button coin-action-btn ${editRecurringFields.type === 'expense' ? 'rpg-btn-active' : ''}`}>
                       {t('coinify.expense')}
                     </button>
                     <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'income' }))}
-                      className={`rpg-button ${editRecurringFields.type === 'income' ? 'rpg-btn-active' : ''}`}
-                      style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}>
+                      className={`rpg-button coin-action-btn ${editRecurringFields.type === 'income' ? 'rpg-btn-active' : ''}`}>
                       {t('coinify.income')}
                     </button>
                     <CategorySelect value={editRecurringFields.category}
@@ -353,10 +351,8 @@ export default function Recurring() {
                     <RpgNumberInput value={String(editRecurringFields.billingDay)}
                       onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
                       style={{ width: 55 }} fontSize="0.8rem" min={1} max={31} step={1} />
-                    <button className="rpg-button" onClick={() => saveRecurringEdit(item.id)}
-                      style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--moss)' }}>ok</button>
-                    <button className="rpg-button" onClick={cancelRecurringEdit}
-                      style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>x</button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--confirm" onClick={() => saveRecurringEdit(item.id)}>ok</button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--cancel" onClick={cancelRecurringEdit}>x</button>
                   </>
                 ) : (
                   <>
@@ -388,10 +384,8 @@ export default function Recurring() {
                         if (e.key === 'Escape') cancelEdit();
                       }}
                     />
-                    <button className="rpg-button" onClick={() => saveEdit(item.id)}
-                      style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--moss)' }}>ok</button>
-                    <button className="rpg-button" onClick={cancelEdit}
-                      style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>x</button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--confirm" onClick={() => saveEdit(item.id)}>ok</button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--cancel" onClick={cancelEdit}>x</button>
                   </div>
                 ) : (
                   <button className="coin-recurring-card__amount-btn qb-numeral" onClick={() => startEdit(item)}
@@ -403,8 +397,7 @@ export default function Recurring() {
 
                 {/* Edit fields */}
                 {editingRecurringId !== item.id && (
-                  <button className="rpg-button" onClick={() => startRecurringEdit(item)}
-                    style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.5 }}
+                  <button className="rpg-button coin-action-btn coin-action-btn--muted" onClick={() => startRecurringEdit(item)}
                     aria-label={t('coinify.edit', 'Editar')}
                     title={t('coinify.edit', 'Editar')}>
                     <Pencil style={{ width: '0.75em', height: '0.75em' }} />
@@ -412,15 +405,13 @@ export default function Recurring() {
                 )}
 
                 {/* History Toggle */}
-                <button className="rpg-button" onClick={() => toggleHistory(item.id)}
-                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.5 }}
+                <button className="rpg-button coin-action-btn coin-action-btn--muted" onClick={() => toggleHistory(item.id)}
                   title={t('coinify.amountHistory')}>
                   hist
                 </button>
 
                 {/* Delete */}
-                <button className="rpg-button" onClick={() => handleDelete(item.id)}
-                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
+                <button className="rpg-button coin-action-btn coin-action-btn--danger" onClick={() => handleDelete(item.id)}
                   aria-label={t('coinify.delete', 'Eliminar')}
                   title={t('coinify.delete', 'Eliminar')}><CrossMark style={{ width: '0.65em', height: '0.65em' }} /></button>
               </div>
