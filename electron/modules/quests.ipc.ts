@@ -339,6 +339,8 @@ export function registerQuestsIpcHandlers(): void {
     return habits.map((h) => {
       const dates = checksByHabit.get(h.id) ?? new Set<string>();
       const checkedToday = dates.has(todayStr);
+      const yesterdayStr = yesterdayDateString();
+      const checkedYesterday = dates.has(yesterdayStr);
 
       // Checks this period
       let checksThisPeriod = 0;
@@ -377,7 +379,7 @@ export function registerQuestsIpcHandlers(): void {
         if (!checkedToday) {
           const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
           if (!dates.has(formatDateString(yesterday))) {
-            return { ...h, streak: 0, checkedToday, checksThisPeriod, targetThisPeriod };
+            return { ...h, streak: 0, checkedToday, checkedYesterday, checksThisPeriod, targetThisPeriod };
           }
         }
         const d = new Date(startDate + 'T00:00:00');
@@ -427,7 +429,7 @@ export function registerQuestsIpcHandlers(): void {
         }
       }
 
-      return { ...h, streak, checkedToday, checksThisPeriod, targetThisPeriod };
+      return { ...h, streak, checkedToday, checkedYesterday, checksThisPeriod, targetThisPeriod };
     });
   });
 

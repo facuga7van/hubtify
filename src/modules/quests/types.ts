@@ -30,6 +30,7 @@ export interface Habit {
 export interface HabitWithStreak extends Habit {
   streak: number;
   checkedToday: boolean;
+  checkedYesterday: boolean;
   checksThisPeriod: number;
   targetThisPeriod: number;
 }
