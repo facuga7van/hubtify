@@ -25,6 +25,14 @@ export default function SettingsPage() {
   const [notifQuests, setNotifQuests] = useState(() => localStorage.getItem('hubtify_notifications_module_quests') !== 'false');
   const [notifNutrition, setNotifNutrition] = useState(() => localStorage.getItem('hubtify_notifications_module_nutrition') !== 'false');
   const [notifFinance, setNotifFinance] = useState(() => localStorage.getItem('hubtify_notifications_module_finance') !== 'false');
+  const [habitReminderEnabled, setHabitReminderEnabled] = useState(
+    () => localStorage.getItem('hubtify_habit_reminder_enabled') !== 'false'
+  );
+  const [habitReminderTime, setHabitReminderTime] = useState(
+    () => localStorage.getItem('hubtify_habit_reminder_time') || '21:00'
+  );
+  const habitReminderEnabledRef = useRef(habitReminderEnabled);
+  const habitReminderTimeRef = useRef(habitReminderTime);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [patchNotesOpen, setPatchNotesOpen] = useState(false);
@@ -36,6 +44,9 @@ export default function SettingsPage() {
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  }, []);
+  useEffect(() => {
+    window.api.notificationsSetHabitReminder?.(habitReminderEnabledRef.current, habitReminderTimeRef.current);
   }, []);
 
   const applyFontScale = (value: string) => {
@@ -277,6 +288,48 @@ export default function SettingsPage() {
             </button>
           </div>
         ))}
+        {/* Habit reminder */}
+        <div className="settings-row__separator" style={{ borderTop: '1px solid rgba(212,160,23,0.15)', margin: '8px 0', paddingTop: 8 }}>
+          <div className="settings-row__label" style={{ fontSize: 'var(--fs-label)', opacity: 0.75, marginBottom: 6 }}>
+            {t('settings.habitReminder', 'Recordatorio de hábitos')}
+          </div>
+        </div>
+        <div className="settings-row">
+          <div>
+            <div className="settings-row__label">{t('settings.habitReminderLabel', 'Recordatorio diario')}</div>
+            <div className="settings-row__desc">{t('settings.habitReminderDesc', 'Notificación si quedan hábitos sin marcar')}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {habitReminderEnabled && (
+              <input
+                type="time"
+                value={habitReminderTime}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setHabitReminderTime(next);
+                  localStorage.setItem('hubtify_habit_reminder_time', next);
+                  window.api.notificationsSetHabitReminder?.(habitReminderEnabled, next);
+                }}
+                className="rpg-input"
+                style={{ width: 100, fontSize: 'var(--fs-label)' }}
+              />
+            )}
+            <button
+              className={`settings-toggle${habitReminderEnabled ? ' settings-toggle--on' : ''}`}
+              onClick={() => {
+                const next = !habitReminderEnabled;
+                setHabitReminderEnabled(next);
+                localStorage.setItem('hubtify_habit_reminder_enabled', next ? 'true' : 'false');
+                window.api.notificationsSetHabitReminder?.(next, habitReminderTime);
+              }}
+            >
+              <span className="settings-toggle__thumb" />
+              <span className="settings-toggle__text">
+                {habitReminderEnabled ? t('settings.toggleOn') : t('settings.toggleOff')}
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Cloud Sync */}
