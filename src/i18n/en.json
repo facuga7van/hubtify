@@ -584,6 +584,8 @@
     "quickAdd": "Quick add",
     "quickAddError": "Failed to add transaction",
     "quickAddSubmit": "Submit",
+    "quickExpense": "Quick expense",
+    "quickIncome": "Quick income",
     "range_all": "All",
     "range_month": "Month",
     "range_quarter": "Quarter",

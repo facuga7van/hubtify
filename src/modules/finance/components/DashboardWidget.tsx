@@ -61,7 +61,7 @@ export default function DashboardWidget() {
       await window.api.financeAddTransaction({
         type: quickType,
         amount,
-        description: quickDesc.trim() || (quickType === 'expense' ? 'Gasto rapido' : 'Ingreso rapido'),
+        description: quickDesc.trim() || (quickType === 'expense' ? t('coinify.quickExpense', 'Gasto rápido') : t('coinify.quickIncome', 'Ingreso rápido')),
         date: new Date().toISOString().slice(0, 10),
         category: 'Otros',
         currency: 'ARS',

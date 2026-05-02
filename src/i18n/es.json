@@ -584,6 +584,8 @@
     "quickAdd": "Carga rápida",
     "quickAddError": "Error al registrar",
     "quickAddSubmit": "Registrar",
+    "quickExpense": "Gasto rápido",
+    "quickIncome": "Ingreso rápido",
     "range_all": "Todo",
     "range_month": "Mes",
     "range_quarter": "Trimestre",
