@@ -1063,6 +1063,18 @@ export default function Today() {
           </div>
         </div>
       )}
+
+      {!dayClosed && !closeResult && foods.length > 0 && (
+        <div className="nutri-sticky-footer">
+          <button className="rpg-button nutri-close-day-btn" onClick={() => {
+            setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
+            setPopupGym(!!metrics.gym);
+            setCloseDayPopup(true);
+          }}>
+            {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
