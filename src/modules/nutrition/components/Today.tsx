@@ -618,10 +618,15 @@ export default function Today() {
               )}
             </button>
             <button
-              className="nutri-date-pill"
+              className={`nutri-date-pill${dayClosed ? ' nutri-date-pill--closed' : ''}`}
               onClick={() => !isToday && setDate(todayDateString())}
               disabled={isToday}
             >
+              {dayClosed && (
+                <svg className="nutri-closed-ico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="8" width="10" height="7" rx="1"/><path d="M5 8V5a3 3 0 0 1 6 0v3"/>
+                </svg>
+              )}
               {isToday ? t('nutrify.today', 'Hoy') : `${date} \u00B7 ${dateDayName}`}
             </button>
             <button className="nutri-day-btn" onClick={() => goDay(1)}
