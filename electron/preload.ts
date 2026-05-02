@@ -116,6 +116,7 @@ const api = {
   notificationsSetSystemEnabled: (enabled: boolean) => ipcRenderer.invoke('notifications:setSystemEnabled', enabled),
   notificationsSetLocale: (locale: string) => ipcRenderer.invoke('notifications:setLocale', locale),
   notificationsSetModuleEnabled: (module: string, enabled: boolean) => ipcRenderer.invoke('notifications:setModuleEnabled', module, enabled),
+  notificationsSetHabitReminder: (enabled: boolean, time: string) => ipcRenderer.invoke('notifications:setHabitReminder', enabled, time),
   onNotificationsUpdated: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('notifications:updated', handler);

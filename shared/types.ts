@@ -255,6 +255,7 @@ export interface HubtifyApi {
   notificationsSetSystemEnabled: (enabled: boolean) => Promise<void>;
   notificationsSetLocale: (locale: string) => Promise<void>;
   notificationsSetModuleEnabled: (module: string, enabled: boolean) => Promise<void>;
+  notificationsSetHabitReminder: (enabled: boolean, time: string) => Promise<void>;
   onNotificationsUpdated: (callback: () => void) => () => void;
 
   // Dollar
