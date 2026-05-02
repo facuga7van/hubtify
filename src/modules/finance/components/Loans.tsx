@@ -69,6 +69,7 @@ export default function Loans() {
   const [formInstallments, setFormInstallments] = useState(1);
   const [formCategory, setFormCategory] = useState('Otros');
   const [formDate, setFormDate] = useState(today);
+  const [submitting, setSubmitting] = useState(false);
 
   const loadLoans = useCallback(() => {
     window.api.financeGetLoans({ direction, settled: false }).then((rows) => setActiveLoans(rows as LoanRow[]));
@@ -85,6 +86,7 @@ export default function Loans() {
 
   const handleAddLoan = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     const parsed = parseFloat(formAmount);
     if (!formPerson.trim()) {
       toast({ message: t('coinify.validationPerson', 'Ingresá el nombre de la persona'), type: 'warning' });
@@ -99,6 +101,7 @@ export default function Loans() {
       return;
     }
 
+    setSubmitting(true);
     try {
       if (formType === 'installments') {
         await window.api.financeCreateThirdPartyPurchase({
@@ -130,6 +133,8 @@ export default function Loans() {
     } catch (err) {
       console.error('[Loans] handleAddLoan failed:', err);
       toast({ message: t('coinify.saveError', 'Error al guardar'), type: 'warning' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -370,8 +375,8 @@ export default function Loans() {
                 <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="rpg-input" />
               </div>
 
-              <button type="submit" className="rpg-button" style={{ width: '100%' }}>
-                {t('coinify.add')}
+              <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={submitting}>
+                {submitting ? '...' : t('coinify.add')}
               </button>
             </div>
           </div>
