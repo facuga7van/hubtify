@@ -539,7 +539,12 @@ export default function Transactions() {
 
           <div className="coin-ledger">
             {sortedTx.length === 0 ? (
-              <p className="coin-empty-codex">{t('coinify.noTransactions')}</p>
+              <div className="coin-empty-codex">
+                <p>{t('coinify.noTransactions', 'Sin transacciones este mes')}</p>
+                {(filterCategory || filterType || filterPayment) && (
+                  <p style={{ fontSize: 'var(--fs-label)', marginTop: 4 }}>{t('coinify.filterActive', 'Hay filtros activos — probá limpiarlos')}</p>
+                )}
+              </div>
             ) : (
               sortedTx.slice(0, visibleCount).map((tx) => renderTxRow(tx))
             )}

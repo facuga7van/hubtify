@@ -191,8 +191,8 @@ export default function Loans() {
     const groups = groupByPerson(loans);
     if (Object.keys(groups).length === 0) {
       return (
-        <div className="coin-empty-codex" style={{ padding: '40px 16px' }}>
-          <div className="qb-hand" style={{ fontStyle: 'italic' }}>{t('coinify.noLoans')}</div>
+        <div className="coin-empty-codex">
+          <p>{t('coinify.noLoans', 'Sin préstamos activos')}</p>
         </div>
       );
     }

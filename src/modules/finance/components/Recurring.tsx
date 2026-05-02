@@ -305,7 +305,10 @@ export default function Recurring() {
 
       {/* List */}
       {items.length === 0 ? (
-        <p className="coin-empty-codex">{t('coinify.noRecurring')}</p>
+        <div className="coin-empty-codex">
+          <p>{t('coinify.noRecurring', 'No hay recurrentes configurados')}</p>
+          <p style={{ fontSize: 'var(--fs-label)', marginTop: 4 }}>{t('coinify.noRecurringHint', 'Agregá gastos fijos como alquiler, servicios o suscripciones')}</p>
+        </div>
       ) : (
         <div className="coin-recurring-list">
           {items.map((item) => (
