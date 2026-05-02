@@ -272,4 +272,17 @@ export const financeMigrations: Migration[] = [
       );
     `,
   },
+  {
+    namespace: 'finance',
+    version: 10,
+    up: `
+      ALTER TABLE finance_loans ADD COLUMN updated_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_loan_payments ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE finance_loan_payments ADD COLUMN updated_at TEXT DEFAULT NULL;
+      UPDATE finance_loans SET updated_at = created_at WHERE updated_at IS NULL;
+      UPDATE finance_loan_payments SET updated_at = created_at WHERE updated_at IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_finance_statements_status ON finance_credit_card_statements(status);
+      CREATE INDEX IF NOT EXISTS idx_finance_loans_settled ON finance_loans(settled);
+    `,
+  },
 ];
