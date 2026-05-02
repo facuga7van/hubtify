@@ -124,7 +124,7 @@ export function registerNutritionIpcHandlers(): void {
       if (closed) throw new Error('Cannot modify a closed day');
     }
     db.transaction(() => {
-      db.prepare('DELETE FROM food_log WHERE id = ?').run(id);
+      db.prepare("UPDATE food_log SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
       if (entry) recalcSummary(db, entry.date);
     })();
   });
@@ -158,7 +158,7 @@ export function registerNutritionIpcHandlers(): void {
     const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
     if (closed) throw new Error('Cannot modify a closed day');
     db.transaction(() => {
-      db.prepare('DELETE FROM food_log WHERE date = ?').run(date);
+      db.prepare("UPDATE food_log SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND deleted_at IS NULL").run(date);
       recalcSummary(db, date);
     })();
   });
@@ -186,7 +186,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:deleteFrequentFood', (_e, id: number) => {
     const db = getDb();
-    db.prepare('DELETE FROM frequent_foods WHERE id = ?').run(id);
+    db.prepare("UPDATE frequent_foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
   });
 
   ipcHandle('nutrition:incrementFrequentUsage', (_e, id: number) => {
@@ -525,7 +525,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:removeFavoriteFood', (_e, id: string) => {
     const db = getDb();
-    db.prepare('DELETE FROM favorite_foods WHERE id = ?').run(id);
+    db.prepare("UPDATE favorite_foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
   });
 
   ipcHandle('nutrition:getPendingDays', () => {
