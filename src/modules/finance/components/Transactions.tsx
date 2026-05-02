@@ -503,18 +503,18 @@ export default function Transactions() {
 
       {/* Ledger header */}
       <div className="coin-ledger-header">
-        <span className="coin-sort-header" role="button" aria-label={t('coinify.colDate', 'DÍA')} onClick={() => toggleSort('date')}>
+        <button className="coin-sort-header" onClick={() => toggleSort('date')}>
           {t('coinify.colDate', 'DÍA')} {sortIndicator('date')}
-        </span>
-        <span className="coin-sort-header" role="button" aria-label={t('coinify.colDescription', 'CONCEPTO')} onClick={() => toggleSort('description')}>
+        </button>
+        <button className="coin-sort-header" onClick={() => toggleSort('description')}>
           {t('coinify.colDescription', 'CONCEPTO')} {sortIndicator('description')}
-        </span>
-        <span className="coin-sort-header" role="button" aria-label={t('coinify.colCategory', 'CATEGORÍA')} onClick={() => toggleSort('category')}>
+        </button>
+        <button className="coin-sort-header" onClick={() => toggleSort('category')}>
           {t('coinify.colCategory', 'CATEGORÍA')} {sortIndicator('category')}
-        </span>
-        <span className="coin-sort-header" role="button" aria-label={t('coinify.colAmount', 'MONEDAS')} onClick={() => toggleSort('amount')} style={{ textAlign: 'right' }}>
+        </button>
+        <button className="coin-sort-header" onClick={() => toggleSort('amount')} style={{ textAlign: 'right' }}>
           {t('coinify.colAmount', 'MONEDAS')} {sortIndicator('amount')}
-        </span>
+        </button>
       </div>
 
       {/* Transactions Section */}
