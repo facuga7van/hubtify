@@ -15,8 +15,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "lint": "eslint --ext .ts,.tsx .",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run",
+    "test:watch": "cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs",
     "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "author": {
@@ -42,6 +42,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
+    "cross-env": "^10.1.0",
     "electron": "41.0.2",
     "eslint": "^8.57.1",
     "postcss": "^8.5.8",
