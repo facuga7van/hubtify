@@ -145,6 +145,81 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
   return candidates;
 }
 
+// ── Habit Evaluator ─────────────────────────────────────────
+
+export function evaluateHabitNotifications(
+  db: Database.Database,
+  reminderTime: string,
+): NotificationCandidate[] {
+  // Gate: only run if current time >= configured reminder time
+  const now = new Date();
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  if (currentTime < reminderTime) return [];
+
+  const todayStr = localDate();
+
+  // Get all active habits
+  const habits = db.prepare(`
+    SELECT id, name, frequency, times_per_week AS timesPerWeek
+    FROM habits WHERE deleted_at IS NULL
+  `).all() as Array<{ id: string; name: string; frequency: string; timesPerWeek: number }>;
+
+  if (habits.length === 0) return [];
+
+  // Get all checks for period calculation
+  const allChecks = db.prepare(
+    'SELECT habit_id, date FROM habit_checks WHERE deleted_at IS NULL'
+  ).all() as Array<{ habit_id: string; date: string }>;
+
+  const checksByHabit = new Map<string, Set<string>>();
+  for (const c of allChecks) {
+    let set = checksByHabit.get(c.habit_id);
+    if (!set) { set = new Set(); checksByHabit.set(c.habit_id, set); }
+    set.add(c.date);
+  }
+
+  let uncheckedCount = 0;
+
+  for (const h of habits) {
+    const dates = checksByHabit.get(h.id) ?? new Set<string>();
+
+    if (h.frequency === 'daily') {
+      if (!dates.has(todayStr)) uncheckedCount++;
+    } else if (h.frequency === 'weekly') {
+      const today = new Date();
+      const dayOfWeek = today.getDay() || 7;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - dayOfWeek + 1);
+      const mondayStr = localDate(monday);
+      let count = 0;
+      for (const d of dates) {
+        if (d >= mondayStr && d <= todayStr) count++;
+      }
+      if (count < h.timesPerWeek) uncheckedCount++;
+    } else if (h.frequency === 'monthly') {
+      const today = new Date();
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      if (today.getDate() < lastDay - 2) continue;
+      const monthStart = todayStr.slice(0, 7) + '-01';
+      let count = 0;
+      for (const d of dates) {
+        if (d >= monthStart && d <= todayStr) count++;
+      }
+      if (count < 1) uncheckedCount++;
+    }
+  }
+
+  if (uncheckedCount === 0) return [];
+
+  return [{
+    type: 'habit_reminder',
+    module: 'quests',
+    ...msg('habit_reminder'),
+    actionRoute: '/quests',
+    refId: todayStr,
+  }];
+}
+
 // ── Nutrition Evaluator ─────────────────────────────────────
 
 export function evaluateNutritionNotifications(db: Database.Database): NotificationCandidate[] {
