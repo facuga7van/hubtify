@@ -213,6 +213,9 @@ export default function Layout() {
     };
     const onFocus = async () => {
       try {
+        // Push local changes FIRST so cloud has latest data before pulling
+        if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+        await syncPush(authUser.uid);
         const result = await syncPull(authUser.uid);
         // Update stats without triggering level-up (sync restore, not user action)
         const freshStats = await window.api.getRpgStats();

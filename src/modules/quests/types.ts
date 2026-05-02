@@ -55,6 +55,7 @@ export interface Task {
   projectId: string | null;
   dueDate: string | null;
   order: number;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

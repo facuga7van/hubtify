@@ -35,6 +35,8 @@ export default function HabitTracker({ onXpGained }: Props) {
   const [editName, setEditName] = useState('');
   const [editFreq, setEditFreq] = useState<HabitFrequency>('daily');
   const [editTimes, setEditTimes] = useState(1);
+  const HABITS_PER_PAGE = 10;
+  const [page, setPage] = useState(0);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [heatmapData, setHeatmapData] = useState<CellLevel[]>([]);
   const [heatmapStart, setHeatmapStart] = useState('');
@@ -224,7 +226,7 @@ export default function HabitTracker({ onXpGained }: Props) {
       </div>
 
       {/* Habit list */}
-      {habits.map((h) => (
+      {habits.slice(page * HABITS_PER_PAGE, (page + 1) * HABITS_PER_PAGE).map((h) => (
         <div key={h.id} className="quest-habit-row">
           {editingId === h.id ? (
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -310,6 +312,32 @@ export default function HabitTracker({ onXpGained }: Props) {
           )}
         </div>
       ))}
+
+      {/* Pagination */}
+      {habits.length > HABITS_PER_PAGE && (() => {
+        const totalPages = Math.ceil(habits.length / HABITS_PER_PAGE);
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 'var(--fs-label)' }}>
+            <span
+              className="qb-rune"
+              style={{ cursor: page > 0 ? 'pointer' : 'default', opacity: page > 0 ? 1 : 0.3 }}
+              onClick={() => page > 0 && setPage(page - 1)}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5 1L2 4l3 3"/></svg>
+            </span>
+            <span className="qb-hand" style={{ color: 'var(--ink-faded)' }}>
+              {page + 1}/{totalPages}
+            </span>
+            <span
+              className="qb-rune"
+              style={{ cursor: page < totalPages - 1 ? 'pointer' : 'default', opacity: page < totalPages - 1 ? 1 : 0.3 }}
+              onClick={() => page < totalPages - 1 && setPage(page + 1)}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 1l3 3-3 3"/></svg>
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Add form */}
       {adding && (

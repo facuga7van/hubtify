@@ -4,32 +4,33 @@ import { Tick } from '../../../shared/components/codex';
 import Loading from '../../../shared/components/Loading';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
-import { type Task, XP_MAP } from '../types';
+import { type Task, type Project, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier } from '../utils';
 
-export default function TasksDashboardWidget() {
+export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: number; rowSpan?: number }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
-  const [previewTasks, setPreviewTasks] = useState<Task[]>([]);
+  const [allPendingTasks, setAllPendingTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const completingRef = useRef(false);
-  const [allPendingTasks, setAllPendingTasks] = useState<Task[]>([]);
 
   const loadData = useCallback(() => {
     Promise.all([
       window.api.questsGetPendingCount(),
       window.api.questsGetCompletedTodayCount(),
       window.api.questsGetTasks().catch(() => []),
-    ]).then(([p, c, tasks]) => {
+      window.api.questsGetProjects().catch(() => []),
+    ]).then(([p, c, tasks, projs]) => {
       setPendingCount(p);
       setCompletedToday(c);
       const all = tasks as Task[];
-      const pending = all.filter((t) => !t.status);
-      setPreviewTasks(pending.slice(0, 4));
-      setAllPendingTasks(pending);
+      setAllPendingTasks(all.filter((t) => !t.status));
+      setProjects(projs as Project[]);
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
@@ -52,12 +53,17 @@ export default function TasksDashboardWidget() {
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
 
+  const filteredTasks = useMemo(() => {
+    if (selectedProjectId === null) return allPendingTasks;
+    if (selectedProjectId === '__none__') return allPendingTasks.filter(t => !t.projectId);
+    return allPendingTasks.filter(t => t.projectId === selectedProjectId);
+  }, [allPendingTasks, selectedProjectId]);
+
   const actualOverdueCount = useMemo(() =>
-    allPendingTasks.filter(t => t.dueDate && getDueDateStatus(t.dueDate) === 'overdue').length,
-    [allPendingTasks]
+    filteredTasks.filter(t => t.dueDate && getDueDateStatus(t.dueDate) === 'overdue').length,
+    [filteredTasks]
   );
 
-  /* ── Task completion handler ─────────────────────── */
   const handleComplete = useCallback(async (task: Task) => {
     if (completingRef.current) return;
     completingRef.current = true;
@@ -90,32 +96,54 @@ export default function TasksDashboardWidget() {
 
   return (
     <div>
-      {/* Mini checklist of pending tasks */}
-      {previewTasks.length > 0 ? (
-        previewTasks.map((task) => (
-          <div
-            key={task.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '3px 0',
-              fontSize: 'var(--fs-label)',
-              color: task.status ? 'var(--ink-faded)' : 'var(--ink)',
-            }}
+      {/* Project filter */}
+      {projects.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <select
+            className="rpg-select"
+            value={selectedProjectId ?? ''}
+            onChange={(e) => setSelectedProjectId(e.target.value === '' ? null : e.target.value)}
+            style={{ fontSize: 'var(--fs-label)', padding: '2px 6px', width: '100%' }}
           >
-            <Tick checked={false} onChange={() => handleComplete(task)} />
-            <span
+            <option value="">{t('questify.allProjects', 'Todas las misiones')}</option>
+            <option value="__none__">{t('questify.noProject', 'Sin proyecto')}</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Task checklist */}
+      {filteredTasks.length > 0 ? (
+        <div className="widget-list-flow">
+          {filteredTasks.map((task) => (
+            <div
+              key={task.id}
               style={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '3px 0',
+                fontSize: 'var(--fs-label)',
+                color: task.status ? 'var(--ink-faded)' : 'var(--ink)',
               }}
             >
-              {task.name}
-            </span>
-          </div>
-        ))
+              <Tick checked={false} onChange={() => handleComplete(task)} />
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {task.name}
+              </span>
+            </div>
+          ))}
+        </div>
       ) : (
         <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', margin: '4px 0' }}>
           {t('questify.noQuests', 'No quests yet')}

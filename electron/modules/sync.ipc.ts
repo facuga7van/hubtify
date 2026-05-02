@@ -153,11 +153,11 @@ export function registerSyncIpcHandlers(): void {
         db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
         // Re-seed default cauldron presets after clearing
         db.prepare(
-          `INSERT OR IGNORE INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default)
+          `INSERT OR IGNORE INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, is_default)
            VALUES
-             ('preset-classic', 'Classic', 25, 5, 15, 4, 1),
-             ('preset-long-focus', 'Long Focus', 50, 10, 30, 3, 1),
-             ('preset-quick-sprint', 'Quick Sprint', 15, 3, 10, 4, 1)`,
+             ('preset-classic', 'Classic', 25, 5, 15, 4, 5, 1),
+             ('preset-long-focus', 'Long Focus', 50, 10, 30, 3, 5, 1),
+             ('preset-quick-sprint', 'Quick Sprint', 15, 3, 10, 4, 5, 1)`,
         ).run();
       });
       tx();
@@ -1027,15 +1027,15 @@ export function registerSyncIpcHandlers(): void {
     const presets = data.cauldron_presets as Array<Record<string, unknown>> | undefined;
     if (presets?.length) {
       const getPreset = db.prepare('SELECT id, updated_at FROM cauldron_presets WHERE id = ?');
-      const insertPreset = db.prepare(`INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      const updatePreset = db.prepare(`UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?, long_break_minutes = ?, cycles_before_long = ?, is_default = ?, updated_at = ?, deleted_at = ? WHERE id = ?`);
+      const insertPreset = db.prepare(`INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const updatePreset = db.prepare(`UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?, long_break_minutes = ?, cycles_before_long = ?, extension_minutes = ?, is_default = ?, updated_at = ?, deleted_at = ? WHERE id = ?`);
       for (const p of presets) {
         const local = getPreset.get(p.id) as { id: string; updated_at: string } | undefined;
         if (!local) {
-          insertPreset.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.is_default, p.created_at, p.updated_at, p.deleted_at);
+          insertPreset.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.extension_minutes ?? 5, p.is_default, p.created_at, p.updated_at, p.deleted_at);
           changed = true;
         } else if (p.updated_at && (!local.updated_at || p.updated_at > local.updated_at)) {
-          updatePreset.run(p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.is_default, p.updated_at, p.deleted_at, p.id);
+          updatePreset.run(p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.extension_minutes ?? 5, p.is_default, p.updated_at, p.deleted_at, p.id);
           changed = true;
         }
       }

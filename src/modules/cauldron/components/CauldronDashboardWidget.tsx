@@ -7,13 +7,7 @@ import type {
   CauldronPreset,
 } from '../../../../shared/types';
 import { statsShimmer } from '../../../shared/animations/cauldron';
-
-function formatTime(ms: number): string {
-  const totalSeconds = Math.ceil(ms / 1000);
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
+import { formatTime } from '../utils';
 
 function getSessionLabel(sessionType: string, t: (key: string, fallback: string) => string): string {
   switch (sessionType) {
@@ -60,7 +54,7 @@ function CauldronGlyph() {
 
 export default function CauldronDashboardWidget() {
   const { t } = useTranslation();
-  const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0 });
+  const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
   const countRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
@@ -96,13 +90,14 @@ export default function CauldronDashboardWidget() {
     return cleanup;
   }, []);
 
-  // Subscribe to session end events
+  // Subscribe to session end events — reload both stats and timer state
   useEffect(() => {
     const cleanup = window.api.onCauldronSessionEnd(() => {
       loadStats();
+      loadState();
     });
     return cleanup;
-  }, [loadStats]);
+  }, [loadStats, loadState]);
 
   // Trigger shimmer when today's count increases
   useEffect(() => {
@@ -119,9 +114,11 @@ export default function CauldronDashboardWidget() {
       const presets = (await window.api.cauldronGetPresets()) as CauldronPreset[];
       if (presets.length > 0) {
         await window.api.cauldronStart(presets[0].id);
+        window.api.cauldronOpenWindow();
       }
     } catch {
-      /* already active */
+      // Timer already active — just open the window
+      window.api.cauldronOpenWindow();
     }
   };
 

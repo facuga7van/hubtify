@@ -4,20 +4,18 @@ import {
   BookPage,
   Cartouche,
   QBDividerSection,
-  ModuleCard,
   Section,
 } from '../shared/components/codex';
-import { Sword, Bread, Coin, Cauldron, Crown, Flame, Heart, Scroll, Quill } from '../shared/components/icons';
+import { Sword, Crown, Flame, Heart, Scroll, Quill } from '../shared/components/icons';
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
-import TasksDashboardWidget from '../modules/quests/components/TasksDashboardWidget';
-import HabitsDashboardWidget from '../modules/quests/components/HabitsDashboardWidget';
-import NutritionDashboardWidget from '../modules/nutrition/components/NutritionDashboardWidget';
-import FinanceDashboardWidget from '../modules/finance/components/DashboardWidget';
-import CauldronDashboardWidget from '../modules/cauldron/components/CauldronDashboardWidget';
+import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
+import { useDashboardLayout } from './layouts/useDashboardLayout';
+import { useDashboardDrag } from './layouts/useDashboardDrag';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 import { playSealPress } from '../shared/audio';
 import './styles/components.css';
+import './styles/dashboard-layouts.css';
 
 /* ── latin epigraphs ─────────────────────────────────────── */
 
@@ -149,6 +147,8 @@ function SealButton({ level }: { level: number }) {
 
 export default function Dashboard() {
   const { t } = useTranslation();
+  const { layout, cycleColSpan, cycleRowSpan, reorder } = useDashboardLayout();
+  const { dragIndex, dropTargetIndex, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd } = useDashboardDrag(reorder);
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [dashStats, setDashStats] = useState<{
     xpToday: number;
@@ -211,10 +211,10 @@ export default function Dashboard() {
             <div key={i} style={{ height: 64, background: 'rgba(74,55,32,.07)', borderRadius: 6 }} />
           ))}
         </div>
-        {/* Skeleton: module cards (2+2+1 pattern) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        {/* Skeleton: module cards (4-column grid) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6 }} />
+            <div key={i} style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: 'span 2' }} />
           ))}
           <div style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: '1 / -1' }} />
         </div>
@@ -307,58 +307,40 @@ export default function Dashboard() {
 
       <QBDividerSection />
 
-      {/* ── row 3: five module folios ─────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <ModuleCard
-          tome="Tomus I"
-          title={t('dashboard.moduleTasks', 'Libro de Misiones')}
-          latin="Acta Heroum"
-          icon={<Sword width={18} height={18} />}
-          navTo="/quests"
-        >
-          <TasksDashboardWidget />
-        </ModuleCard>
-
-        <ModuleCard
-          tome="Tomus I-B"
-          title={t('dashboard.moduleHabits', 'Rituales Diarios')}
-          latin="De Ritibus Quotidianis"
-          icon={<Flame width={18} height={18} />}
-          navTo="/quests"
-        >
-          <HabitsDashboardWidget />
-        </ModuleCard>
-
-        <ModuleCard
-          tome="Tomus II"
-          title={t('dashboard.moduleNutrition', 'Diario de Provisiones')}
-          latin="De Cibo et Salute"
-          icon={<Bread width={18} height={18} />}
-          navTo="/nutrition"
-        >
-          <NutritionDashboardWidget />
-        </ModuleCard>
-
-        <ModuleCard
-          tome="Tomus III"
-          title={t('dashboard.moduleFinance', 'Libro del Tesorero')}
-          latin="De Rebus Aeris"
-          icon={<Coin width={18} height={18} />}
-          navTo="/finance"
-        >
-          <FinanceDashboardWidget />
-        </ModuleCard>
-
-        <ModuleCard
-          tome="Tomus IV"
-          title={t('dashboard.moduleCauldron', 'Cámara del Caldero')}
-          latin="Decoctio Magna"
-          icon={<Cauldron width={18} height={18} />}
-          navTo="/cauldron"
-          style={{ gridColumn: '1 / -1' }}
-        >
-          <CauldronDashboardWidget />
-        </ModuleCard>
+      {/* ── row 3: customizable module grid ────────────── */}
+      <div className="dashboard-grid-4">
+        {layout.widgets.map((w, index) => {
+          const def = WIDGET_DEFINITIONS[w.id];
+          if (!def) return null;
+          const Widget = def.component;
+          return (
+            <DashboardWidgetWrapper
+              key={w.id}
+              widgetId={w.id}
+              colSpan={w.colSpan}
+              rowSpan={w.rowSpan ?? 1}
+              index={index}
+              isDragging={dragIndex === index}
+              isDropTarget={dropTargetIndex === index}
+              onCycleColSpan={cycleColSpan}
+              onCycleRowSpan={cycleRowSpan}
+              dragHandlers={{
+                onDragStart: onDragStart(index),
+                onDragOver: onDragOver(index),
+                onDragLeave,
+                onDrop: onDrop(index),
+                onDragEnd,
+              }}
+              title={t(def.titleKey, def.titleFallback)}
+              tome={def.tome}
+              latin={def.latin}
+              icon={<def.IconComponent width={18} height={18} />}
+              navTo={def.navTo}
+            >
+              <Widget />
+            </DashboardWidgetWrapper>
+          );
+        })}
       </div>
 
       {/* ── row 4: chronicle + xp ledger ──────────────── */}

@@ -6,9 +6,7 @@ import { playTaskComplete } from '../../../shared/audio';
 import type { HabitWithStreak } from '../types';
 import { bonusMultiplierToTier } from '../utils';
 
-const MAX_HABITS = 5;
-
-export default function HabitsDashboardWidget() {
+export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: number; rowSpan?: number }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [habits, setHabits] = useState<HabitWithStreak[]>([]);
@@ -111,60 +109,61 @@ export default function HabitsDashboardWidget() {
   }
 
   const checkedCount = habits.filter(h => isPeriodComplete(h)).length;
-  const displayed = habits.slice(0, MAX_HABITS);
 
   return (
     <div>
-      {displayed.map((h) => (
-        <div
-          key={h.id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '3px 0',
-            fontSize: 'var(--fs-label)',
-            color: isPeriodComplete(h) ? 'var(--ink-faded)' : 'var(--ink)',
-          }}
-        >
-          <Tick
-            checked={isPeriodComplete(h)}
-            onChange={() => handleCheck(h.id)}
-            label={h.name}
-          />
-          <span
+      <div className="widget-list-flow">
+        {habits.map((h) => (
+          <div
+            key={h.id}
             style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flex: 1,
-              textDecoration: isPeriodComplete(h) ? 'line-through' : undefined,
-              opacity: isPeriodComplete(h) ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '3px 0',
+              fontSize: 'var(--fs-label)',
+              color: isPeriodComplete(h) ? 'var(--ink-faded)' : 'var(--ink)',
             }}
           >
-            {h.name}
-          </span>
-          {h.streak > 0 && (
+            <Tick
+              checked={isPeriodComplete(h)}
+              onChange={() => handleCheck(h.id)}
+              label={h.name}
+            />
             <span
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-                fontSize: 'var(--fs-label)',
-                color: h.streak >= 10 ? 'var(--gold)' : 'var(--ink-faded)',
-                fontFamily: "'Cinzel', serif",
-                fontWeight: 600,
-                flexShrink: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+                textDecoration: isPeriodComplete(h) ? 'line-through' : undefined,
+                opacity: isPeriodComplete(h) ? 0.6 : 1,
               }}
             >
-              <svg width="10" height="10" viewBox="0 0 14 14" fill={h.streak >= 10 ? 'var(--gold)' : 'var(--rubric)'} style={{ flexShrink: 0 }}>
-                <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
-              </svg>
-              {h.streak}d
+              {h.name}
             </span>
-          )}
-        </div>
-      ))}
+            {h.streak > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  fontSize: 'var(--fs-label)',
+                  color: h.streak >= 10 ? 'var(--gold)' : 'var(--ink-faded)',
+                  fontFamily: "'Cinzel', serif",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 14 14" fill={h.streak >= 10 ? 'var(--gold)' : 'var(--rubric)'} style={{ flexShrink: 0 }}>
+                  <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
+                </svg>
+                {h.streak}d
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Footer */}
       <div
