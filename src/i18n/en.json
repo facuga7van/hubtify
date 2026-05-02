@@ -146,6 +146,7 @@
     "streakDays": "{{count}} days",
     "deleteHabitConfirm": "Delete this habit and all its history?",
     "quickAdd": "Quick add",
+    "retroCheckTitle": "Check yesterday's habit",
     "reward": "REWARD",
     "edit": "Edit",
     "eraserTool": "Eraser",
@@ -205,7 +206,8 @@
     "batchCompleted": "{{count}} quests completed!",
     "noCompletedQuests": "No completed quests yet. Onward, hero!",
     "searchPlaceholder": "Search...",
-    "widgetHelp": "Quick view of your nearest pending quests."
+    "widgetHelp": "Quick view of your nearest pending quests.",
+    "yesterday": "Yesterday"
   },
   "nutrify": {
     "title": "Provision Journal",

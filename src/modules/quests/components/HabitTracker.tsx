@@ -5,9 +5,8 @@ import { useToast } from '../../../shared/components/useToast';
 import { Tick } from '../../../shared/components/codex/CodexPrimitives';
 import { HeatmapCalendar, type CellLevel } from '../../../shared/components/charts/HeatmapCalendar';
 import type { HabitWithStreak, HabitFrequency } from '../types';
-import { bonusMultiplierToTier } from '../utils';
-import { playTaskComplete } from '../../../shared/audio';
-import { formatDateString } from '../../../../shared/date-utils';
+import { processHabitCheck } from '../utils';
+import { formatDateString, daysAgoDateString } from '../../../../shared/date-utils';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import RpgStepper from '../../../shared/components/RpgStepper';
 
@@ -85,41 +84,31 @@ export default function HabitTracker({ onXpGained }: Props) {
   }, [loadHabits, loadHeatmap, heatmapOpen]);
 
   const handleCheck = async (habitId: string) => {
-    const habit = habits.find(h => h.id === habitId);
-    if (!habit) return;
-    const result = await window.api.questsCheckHabit(habitId);
-
-    if (result.checked) {
-      const justCompletedPeriod = habit.checksThisPeriod + 1 >= habit.targetThisPeriod
-        && habit.checksThisPeriod < habit.targetThisPeriod;
-      if (justCompletedPeriod) {
-        const streak = habit.streak + 1;
-        const xp = 5 + Math.min(streak, 10);
-        const rpgResult = await window.api.processRpgEvent({
-          type: 'HABIT_CHECKED', moduleId: 'quests',
-          payload: { xp, hp: 0, habitId },
-          timestamp: Date.now(),
-        });
-        toast({ type: 'xp', message: `+${rpgResult.xpGained} XP`, details: { xp: rpgResult.xpGained, bonusTier: bonusMultiplierToTier(rpgResult.bonusMultiplier), comboMultiplier: rpgResult.comboMultiplier, streakMilestone: rpgResult.milestoneXp || undefined } });
-        onXpGained();
-        window.dispatchEvent(new Event('rpg:statsChanged'));
-      }
-      playTaskComplete();
-    } else {
-      const droppedBelowTarget = habit.checksThisPeriod === habit.targetThisPeriod;
-      if (droppedBelowTarget) {
-        await window.api.processRpgEvent({
-          type: 'HABIT_UNCHECKED', moduleId: 'quests',
-          payload: { xp: -5, hp: 0, habitId },
-          timestamp: Date.now(),
-        });
-        toast({ type: 'warning', message: t('questify.habitUnchecked', 'Habit unchecked — XP deducted') });
-        window.dispatchEvent(new Event('rpg:statsChanged'));
-      }
-    }
+    await processHabitCheck(habitId, habits, { toast, t, onXpGained });
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
-    window.dispatchEvent(new Event('quests:dataChanged'));
+  };
+
+  const canRetroCheck = useCallback((h: HabitWithStreak): boolean => {
+    // Only show badge if yesterday was NOT checked (checkedToday is irrelevant)
+    if (h.checkedYesterday) return false;
+    if (h.frequency === 'daily') return true;
+    if (h.frequency === 'weekly') {
+      // Yesterday must be in current week (today is NOT Monday)
+      return new Date().getDay() !== 1;
+    }
+    if (h.frequency === 'monthly') {
+      // Yesterday must be in current month (today is NOT the 1st)
+      return new Date().getDate() !== 1;
+    }
+    return false;
+  }, []);
+
+  const handleRetroCheck = async (habitId: string) => {
+    const yesterday = daysAgoDateString(1);
+    await processHabitCheck(habitId, habits, { toast, t, onXpGained }, yesterday);
+    await loadHabits();
+    if (heatmapOpen) loadHeatmap();
   };
 
   const isDuplicateName = (name: string, excludeId?: string) => {
@@ -153,7 +142,11 @@ export default function HabitTracker({ onXpGained }: Props) {
   };
 
   const handleEditSave = async () => {
-    if (!editingId || !editName.trim() || isDuplicateName(editName.trim(), editingId)) return;
+    if (!editingId || !editName.trim()) return;
+    if (isDuplicateName(editName.trim(), editingId)) {
+      toast({ type: 'warning', message: t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre') });
+      return;
+    }
     await window.api.questsUpdateHabit(editingId, {
       name: editName.trim(),
       frequency: editFreq,
@@ -200,7 +193,13 @@ export default function HabitTracker({ onXpGained }: Props) {
     return h.checksThisPeriod >= h.targetThisPeriod;
   };
 
-  if (loading) return null;
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {[1, 2, 3].map(i => (
+        <div key={i} className="quest-skeleton" style={{ height: 28, animationDelay: `${i * 80}ms` }} />
+      ))}
+    </div>
+  );
 
   if (habits.length === 0 && !adding) {
     return (
@@ -230,11 +229,11 @@ export default function HabitTracker({ onXpGained }: Props) {
         <div key={h.id} className="quest-habit-row">
           {editingId === h.id ? (
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input className="subtask-input" value={editName} onChange={(e) => setEditName(e.target.value)}
+              <input className="rpg-input" value={editName} onChange={(e) => setEditName(e.target.value)}
                 style={{ flex: 1, minWidth: 80 }} autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditingId(null); }} />
               <select value={editFreq} onChange={(e) => setEditFreq(e.target.value as HabitFrequency)}
-                className="subtask-input" style={{ fontSize: 'var(--fs-label)' }}>
+                className="rpg-input" style={{ fontSize: 'var(--fs-label)' }}>
                 {Object.entries(FREQ_LABEL_KEYS).map(([k, v]) => (
                   <option key={k} value={k}>{t(v)}</option>
                 ))}
@@ -279,6 +278,18 @@ export default function HabitTracker({ onXpGained }: Props) {
                     </svg>
                     {h.streak}
                   </span>
+                )}
+
+                {/* Retroactive check badge for yesterday */}
+                {canRetroCheck(h) && (
+                  <button
+                    type="button"
+                    className="quest-retro-badge"
+                    onClick={(e) => { e.stopPropagation(); handleRetroCheck(h.id); }}
+                    title={t('questify.retroCheckTitle', 'Marcar hábito de ayer')}
+                  >
+                    {t('questify.yesterday', 'Ayer')}
+                  </button>
                 )}
 
                 {/* Check button — using Tick component */}
@@ -346,13 +357,13 @@ export default function HabitTracker({ onXpGained }: Props) {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder={t('questify.habitName')}
-            className="subtask-input"
+            className="rpg-input"
             style={{ flex: 1, minWidth: 100 }}
             autoFocus
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAdding(false); }}
           />
           <select value={newFreq} onChange={(e) => setNewFreq(e.target.value as HabitFrequency)}
-            className="subtask-input" style={{ fontSize: 'var(--fs-label)' }}>
+            className="rpg-input" style={{ fontSize: 'var(--fs-label)' }}>
             {Object.entries(FREQ_LABEL_KEYS).map(([k, v]) => (
               <option key={k} value={k}>{t(v)}</option>
             ))}

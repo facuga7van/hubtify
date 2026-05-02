@@ -146,6 +146,7 @@
     "streakDays": "{{count}} días",
     "deleteHabitConfirm": "¿Eliminar este hábito y todo su historial?",
     "quickAdd": "Agregar rápido",
+    "retroCheckTitle": "Marcar hábito de ayer",
     "reward": "RECOMPENSA",
     "edit": "Editar",
     "eraserTool": "Goma",
@@ -205,7 +206,8 @@
     "batchCompleted": "{{count}} misiones completadas!",
     "noCompletedQuests": "Aún no has completado ninguna misión. ¡Adelante, héroe!",
     "searchPlaceholder": "Buscar...",
-    "widgetHelp": "Vista rápida de tus misiones pendientes más próximas."
+    "widgetHelp": "Vista rápida de tus misiones pendientes más próximas.",
+    "yesterday": "Ayer"
   },
   "nutrify": {
     "title": "Diario de Provisiones",

@@ -9,30 +9,78 @@
   margin-bottom: 14px;
 }
 
-/* ── New quest input row ─────────────────────────── */
-.quest-input-row {
-  border: 1px solid rgba(74, 55, 32, 0.5);
-  background: rgba(245, 231, 192, 0.55);
-  padding: 6px 10px;
+/* ── Add quest toggle button ───────────────────── */
+.quest-add-toggle-wrapper {
   display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.quest-add-toggle {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.quest-input-row input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-family: 'Cormorant Garamond', 'IM Fell English', serif;
-  font-style: italic;
+  gap: 6px;
+  padding: 6px 18px;
+  background: rgba(245, 231, 192, 0.55);
+  border: 1px dashed rgba(74, 55, 32, 0.45);
+  color: var(--ink-soft);
+  font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
-.quest-input-row input::placeholder {
-  color: var(--ink-faded);
-  opacity: 0.7;
+.quest-add-toggle:hover {
+  background: rgba(245, 231, 192, 0.75);
+  border-color: var(--gold-dark);
+  color: var(--ink);
+}
+
+.quest-add-toggle--active {
+  background: rgba(122, 30, 30, 0.08);
+  border-color: var(--rubric);
+  border-style: solid;
+  color: var(--rubric);
+}
+
+/* ── Collapsible form wrapper ───────────────────── */
+.quest-form-wrapper {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.35s ease, opacity 0.25s ease;
+}
+.quest-form-wrapper--open {
+  max-height: 500px;
+  opacity: 1;
+}
+
+/* ── Editing row highlight ─────────────────────── */
+.quest-row--editing {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 8px rgba(196, 164, 76, 0.3), inset 0 0 4px rgba(196, 164, 76, 0.1);
+}
+
+/* ── Tier buttons ──────────────────────────────── */
+.quest-tier-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--leather);
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--parch-0);
+  color: var(--ink-soft);
+  font-weight: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.quest-tier-btn--active {
+  background: var(--gold);
+  color: var(--ink);
+  font-weight: bold;
 }
 
 /* ── Two-column layout ───────────────────────────── */
@@ -184,27 +232,7 @@
   color: var(--ink-faded);
 }
 
-/* subtask nested list */
-.quest-row-subtasks {
-  margin-top: 8px;
-  padding-left: 4px;
-  border-left: 1px dotted rgba(74, 55, 32, 0.45);
-}
-
-.quest-row-subtask {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 2px 0 2px 8px;
-  font-size: var(--fs-quote);
-}
-
-.quest-row-subtask--done {
-  color: var(--ink-faded);
-}
-
-.quest-row-subtask--done .quest-row-subtask-text {
-  text-decoration: line-through;
+/* (dead CSS removed: .quest-row-subtasks, .quest-row-subtask*)
 }
 
 .quest-row-subtask--pending {
@@ -373,6 +401,15 @@
   color: var(--rubric);
 }
 
+/* ── Search input in tab bar ────────────────────── */
+.quest-search-input {
+  flex: 1;
+  min-width: 100px;
+  max-width: 180px;
+  padding: 3px 8px;
+  font-size: var(--fs-label);
+}
+
 /* ── Category filter select ──────────────────────── */
 .quest-filter-select {
   margin-left: auto;
@@ -467,24 +504,6 @@
   color: var(--gold);
 }
 
-.quest-habit-check {
-  width: 18px;
-  height: 18px;
-  border: 1.5px solid var(--ink-soft);
-  background: rgba(245, 231, 192, 0.5);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.quest-habit-check--done {
-  background: rgba(122, 30, 30, 0.22);
-  border-color: var(--rubric);
-}
-
 /* ── Campaign progress row ───────────────────────── */
 .quest-campaign-row {
   padding: 6px 0;
@@ -507,18 +526,6 @@
   font-family: 'UnifrakturCook', cursive;
   font-size: var(--fs-label);
   color: var(--ink-soft);
-}
-
-/* ── Scroll notes block (right column) ───────────── */
-.quest-scroll-note {
-  background: rgba(245, 231, 192, 0.6);
-  border: 1px dashed rgba(74, 55, 32, 0.5);
-  padding: 10px 12px;
-  font-family: 'Cormorant Garamond', 'IM Fell English', serif;
-  font-style: italic;
-  font-size: var(--fs-quote);
-  color: var(--ink-soft);
-  line-height: 1.5;
 }
 
 /* ── Skeleton Loading ────────────────────────────── */
@@ -557,6 +564,12 @@
   letter-spacing: 0.1em;
   color: var(--ink);
   cursor: pointer;
+  outline: none;
+}
+
+.quest-project-select:focus-visible {
+  border-bottom-color: var(--gold);
+  box-shadow: 0 2px 0 0 var(--gold);
   outline: none;
 }
 
@@ -817,3 +830,24 @@
 /* ── Icon hover utility ─────────────────────── */
 .quest-icon-hover { transition: opacity 0.2s; }
 .quest-icon-hover:hover, .quest-icon-hover:focus-visible { opacity: 0.8 !important; }
+
+/* ── Retroactive check badge ──────────────────────── */
+.quest-retro-badge {
+  background: rgba(196, 164, 76, 0.15);
+  border: 1px dashed var(--rpg-gold);
+  border-radius: 4px;
+  color: var(--rpg-gold);
+  cursor: pointer;
+  font-family: 'Crimson Text', serif;
+  font-size: var(--fs-label);
+  line-height: 1;
+  padding: 2px 6px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.quest-retro-badge:hover {
+  background: rgba(196, 164, 76, 0.3);
+  border-color: var(--rpg-gold);
+}
+.quest-retro-badge:active {
+  background: rgba(196, 164, 76, 0.45);
+}
