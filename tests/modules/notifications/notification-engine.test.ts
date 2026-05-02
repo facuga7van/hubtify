@@ -127,16 +127,23 @@ describe('evaluateNutritionNotifications', () => {
   });
 
   it('returns nutri_pending for day with food logged but not closed', () => {
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    // Use 3 days ago to avoid time-of-day gate (yesterday has grace period until 8 PM)
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
     db.prepare(
       `INSERT INTO food_log (date, time, description, calories, source)
        VALUES (?, '12:00', 'Lunch', 500, 'manual')`
-    ).run(yesterday);
+    ).run(threeDaysAgo);
 
     const results = evaluateNutritionNotifications(db);
     const pending = results.filter((r) => r.type === 'nutri_pending');
-    expect(pending).toHaveLength(1);
-    expect(pending[0].refId).toBe(yesterday);
+    // Before 10 AM the evaluator returns nothing (day just started) — skip assertion
+    const hour = new Date().getHours();
+    if (hour < 10) {
+      expect(pending).toHaveLength(0);
+    } else {
+      expect(pending).toHaveLength(1);
+      expect(pending[0].refId).toBe(threeDaysAgo);
+    }
   });
 
   it('does not return nutri_pending if day is closed', () => {

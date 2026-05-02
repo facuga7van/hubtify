@@ -4,7 +4,9 @@ import { Howl } from 'howler';
 const sounds: Record<string, Howl> = {};
 
 // Cache sound preference to avoid hitting localStorage on every play
-let soundEnabled = localStorage.getItem('hubtify_sound') !== 'false';
+let soundEnabled = typeof localStorage !== 'undefined'
+  ? localStorage.getItem('hubtify_sound') !== 'false'
+  : false;
 
 export function setSoundEnabled(enabled: boolean) {
   soundEnabled = enabled;

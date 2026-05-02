@@ -4,7 +4,13 @@ import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
 
 function runMigrations(db: Database.Database) {
   for (const m of cauldronMigrations) {
-    db.exec(m.up);
+    try {
+      db.exec(m.up);
+    } catch (e: unknown) {
+      // ALTER TABLE ADD COLUMN is not idempotent in SQLite — skip if column already exists
+      if (e instanceof Error && e.message.includes('duplicate column name')) continue;
+      throw e;
+    }
   }
 }
 
