@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tick } from '../../../shared/components/codex';
 import { useToast } from '../../../shared/components/useToast';
-import { playTaskComplete } from '../../../shared/audio';
 import type { HabitWithStreak } from '../types';
-import { bonusMultiplierToTier } from '../utils';
+import { processHabitCheck } from '../utils';
 
 export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: number; rowSpan?: number }) {
   const { t } = useTranslation();
@@ -51,48 +50,8 @@ export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: 
     if (checkingRef.current) return;
     checkingRef.current = true;
     try {
-      const habit = habits.find(h => h.id === habitId);
-      if (!habit) return;
-      const result = await window.api.questsCheckHabit(habitId);
-
-      if (result.checked) {
-        const justCompletedPeriod = habit.checksThisPeriod + 1 >= habit.targetThisPeriod
-          && habit.checksThisPeriod < habit.targetThisPeriod;
-        if (justCompletedPeriod) {
-          const streak = habit.streak + 1;
-          const xp = 5 + Math.min(streak, 10);
-          const rpgResult = await window.api.processRpgEvent({
-            type: 'HABIT_CHECKED', moduleId: 'quests',
-            payload: { xp, hp: 0, habitId },
-            timestamp: Date.now(),
-          });
-          toast({
-            type: 'xp',
-            message: `+${rpgResult.xpGained} XP`,
-            details: {
-              xp: rpgResult.xpGained,
-              bonusTier: bonusMultiplierToTier(rpgResult.bonusMultiplier),
-              comboMultiplier: rpgResult.comboMultiplier,
-              streakMilestone: rpgResult.milestoneXp || undefined,
-            },
-          });
-          window.dispatchEvent(new Event('rpg:statsChanged'));
-        }
-        playTaskComplete();
-      } else {
-        const droppedBelowTarget = habit.checksThisPeriod === habit.targetThisPeriod;
-        if (droppedBelowTarget) {
-          await window.api.processRpgEvent({
-            type: 'HABIT_UNCHECKED', moduleId: 'quests',
-            payload: { xp: -5, hp: 0, habitId },
-            timestamp: Date.now(),
-          });
-          toast({ type: 'warning', message: t('questify.habitUnchecked', 'Habit unchecked — XP deducted') });
-          window.dispatchEvent(new Event('rpg:statsChanged'));
-        }
-      }
+      await processHabitCheck(habitId, habits, { toast, t });
       await loadData();
-      window.dispatchEvent(new Event('quests:dataChanged'));
     } finally {
       checkingRef.current = false;
     }
