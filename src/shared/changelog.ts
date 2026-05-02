@@ -13,6 +13,75 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.7.0',
+    date: '2026-05-01',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'cauldron',
+        text: {
+          es: 'El Caldero ahora tiene ventana flotante — un mini-timer que flota encima de todas tus apps para que puedas ver el tiempo sin volver a Hubtify. Se abre automáticamente al iniciar una poción y podés moverlo a donde quieras',
+          en: 'The Cauldron now has a floating window — a mini-timer that stays on top of all your apps so you can track time without switching back to Hubtify. Opens automatically when you start a brew and you can drag it wherever you want',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'cauldron',
+        text: {
+          es: 'Cuando termina un segmento ya no avanza solo — ahora te pregunta si querés continuar, extender el tiempo (+N min configurable por receta), o parar. Se acabó perder descansos porque no estabas mirando',
+          en: 'When a segment ends it no longer auto-advances — now it asks if you want to continue, extend the time (+N min configurable per recipe), or stop. No more missing breaks because you weren\'t looking',
+        },
+      },
+      {
+        category: 'feat',
+        text: {
+          es: 'Los widgets del dashboard ahora se pueden reordenar arrastrándolos — organizá tu pantalla principal como más te guste',
+          en: 'Dashboard widgets are now drag-and-drop reorderable — organize your main screen however you like',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'cauldron',
+        text: {
+          es: 'La racha del Caldero ahora cuenta días consecutivos de verdad, no solo las pociones de hoy. ¡Mantené el fuego encendido!',
+          en: 'The Cauldron streak now counts real consecutive days, not just today\'s brews. Keep the fire burning!',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'sync',
+        text: {
+          es: 'Se corrigió un problema donde subir de nivel y volver a la app podía revertir tu XP — ahora los datos locales se sincronizan antes de traer los de la nube',
+          en: 'Fixed an issue where leveling up and returning to the app could revert your XP — local data now syncs before pulling from the cloud',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'cauldron',
+        text: {
+          es: 'La XP del Caldero se otorga correctamente sin importar en qué pantalla estés — ya no necesitás estar mirando la página del Caldero para ganar experiencia',
+          en: 'Cauldron XP is now granted correctly regardless of which screen you\'re on — you no longer need to be looking at the Cauldron page to earn experience',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'cauldron',
+        text: {
+          es: 'Las notificaciones del sistema ahora aparecen en español con info del ciclo, la próxima fase y el nombre de la receta',
+          en: 'System notifications now show in Spanish with cycle info, next phase, and recipe name',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'Si tenés muchos hábitos, ahora se paginan para que la lista no se haga interminable',
+          en: 'If you have lots of habits, they\'re now paginated so the list doesn\'t go on forever',
+        },
+      },
+    ],
+  },
+  {
     version: '0.6.6',
     date: '2026-04-30',
     changes: [
