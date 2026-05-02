@@ -58,6 +58,10 @@ const MESSAGES: Record<string, Record<'es' | 'en', { title: (name: string) => st
     es: { title: (name) => `Gasto recurrente "${name}" no registrado`, body: 'No se generó la transacción recurrente para este mes.' },
     en: { title: (name) => `Recurring expense "${name}" not registered`, body: 'The recurring transaction for this month was not generated.' },
   },
+  habit_reminder: {
+    es: { title: () => 'Hábitos pendientes', body: 'Tenés hábitos sin marcar hoy.' },
+    en: { title: () => 'Habits pending', body: 'You have unchecked habits today.' },
+  },
 };
 
 function msg(type: string, name: string = ''): { title: string; body: string } {
