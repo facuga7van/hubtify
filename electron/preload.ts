@@ -131,6 +131,8 @@ const api = {
   cauldronPause: () => ipcRenderer.invoke('cauldron:pause'),
   cauldronResume: () => ipcRenderer.invoke('cauldron:resume'),
   cauldronSkip: () => ipcRenderer.invoke('cauldron:skip'),
+  cauldronConfirmNext: () => ipcRenderer.invoke('cauldron:confirmNext'),
+  cauldronExtend: (minutes?: number) => ipcRenderer.invoke('cauldron:extend', minutes),
   cauldronStop: () => ipcRenderer.invoke('cauldron:stop'),
   cauldronGetState: () => ipcRenderer.invoke('cauldron:getState'),
   cauldronGetStats: () => ipcRenderer.invoke('cauldron:getStats'),
@@ -145,6 +147,18 @@ const api = {
     const handler = (_e: unknown, result: unknown) => callback(result);
     ipcRenderer.on('cauldron:sessionEnd', handler);
     return () => { ipcRenderer.removeListener('cauldron:sessionEnd', handler); };
+  },
+  cauldronOpenWindow: () => ipcRenderer.invoke('cauldron:openWindow'),
+  cauldronCloseWindow: () => ipcRenderer.invoke('cauldron:closeWindow'),
+  onCauldronWindowOpened: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('cauldron:windowOpened', handler);
+    return () => { ipcRenderer.removeListener('cauldron:windowOpened', handler); };
+  },
+  onCauldronWindowClosed: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('cauldron:windowClosed', handler);
+    return () => { ipcRenderer.removeListener('cauldron:windowClosed', handler); };
   },
 
   // Dollar

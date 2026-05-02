@@ -549,10 +549,42 @@ export function PauseIcon(props: React.SVGProps<SVGSVGElement>) {
   return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>);
 }
 
+export function StopIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><rect x="5" y="5" width="14" height="14" rx="2" /></svg>);
+}
+
+export function SkipForwardIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><polygon points="5 4 15 12 5 20 5 4" /><rect x="17" y="4" width="3" height="16" /></svg>);
+}
+
+export function PopOutIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5" /></svg>);
+}
+
 export function Sparkle(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...defaults} {...props}>
       <path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z" />
+    </svg>
+  );
+}
+
+export function ResizeHorizontal(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M2 12h20" />
+      <path d="M2 12l3-3M2 12l3 3" />
+      <path d="M22 12l-3-3M22 12l-3 3" />
+    </svg>
+  );
+}
+
+export function ResizeVertical(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M12 2v20" />
+      <path d="M12 2l-3 3M12 2l3 3" />
+      <path d="M12 22l-3-3M12 22l3-3" />
     </svg>
   );
 }

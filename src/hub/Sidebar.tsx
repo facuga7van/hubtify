@@ -69,6 +69,17 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
   const location = useLocation();
   const animatedNavigate = useAnimatedNavigate();
   const [badges, setBadges] = useState<SidebarBadges>({ questsOverdue: 0, nutritionNoMeals: false });
+  const [cauldronHidden, setCauldronHidden] = useState(false);
+
+  // Listen for floating timer visibility changes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { hidden, active } = (e as CustomEvent).detail;
+      setCauldronHidden(hidden && active);
+    };
+    window.addEventListener('cauldron:floating-visibility', handler);
+    return () => window.removeEventListener('cauldron:floating-visibility', handler);
+  }, []);
 
   const loadBadges = useCallback(() => {
     Promise.all([
@@ -240,6 +251,23 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
           return collapsed
             ? <Tooltip text={t('nav.settings')}>{settingsBtn}</Tooltip>
             : settingsBtn;
+        })()}
+        {cauldronHidden && (() => {
+          const showTimerBtn = (
+            <button
+              className="sidebar-nav-item sidebar-nav-item--cauldron-toggle"
+              onClick={() => window.dispatchEvent(new Event('cauldron:show-floating'))}
+            >
+              <span className="sidebar-nav-item__ico">
+                <Cauldron width={18} height={18} />
+                <span className="sidebar-badge sidebar-badge--dot" />
+              </span>
+              <span className="sidebar-nav-item__label">{t('cauldron.showTimer', 'Show timer')}</span>
+            </button>
+          );
+          return collapsed
+            ? <Tooltip text={t('cauldron.showTimer', 'Show timer')}>{showTimerBtn}</Tooltip>
+            : showTimerBtn;
         })()}
       </nav>
 

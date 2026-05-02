@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { registerAllIpcHandlers } from './ipc/registry';
 import { closeDb, getDb, runModuleMigrations } from './ipc/db';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
@@ -18,6 +19,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 let mainWindow: BrowserWindow | null = null;
+let cauldronWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let minimizeToTray = true;
@@ -127,9 +129,102 @@ function createWindow(): void {
   }
 }
 
+// ─── Cauldron Window Position Memory ────────────────────────
+const CAULDRON_BOUNDS_FILE = 'cauldron-window-bounds.json';
+
+function getCauldronBoundsPath(): string {
+  return path.join(app.getPath('userData'), CAULDRON_BOUNDS_FILE);
+}
+
+function saveCauldronBounds(bounds: Electron.Rectangle): void {
+  try {
+    fs.writeFileSync(getCauldronBoundsPath(), JSON.stringify(bounds));
+  } catch {
+    // Silently fail — non-critical
+  }
+}
+
+function loadCauldronBounds(): Electron.Rectangle | null {
+  try {
+    const data = fs.readFileSync(getCauldronBoundsPath(), 'utf-8');
+    const bounds = JSON.parse(data) as Electron.Rectangle;
+    // Validate bounds are on a visible display
+    const displays = screen.getAllDisplays();
+    const visible = displays.some((d) => {
+      const { x, y, width, height } = d.workArea;
+      return (
+        bounds.x >= x - 50 &&
+        bounds.y >= y - 50 &&
+        bounds.x < x + width - 50 &&
+        bounds.y < y + height - 50
+      );
+    });
+    return visible ? bounds : null;
+  } catch {
+    return null;
+  }
+}
+
+function createCauldronWindow(): void {
+  if (cauldronWindow && !cauldronWindow.isDestroyed()) {
+    cauldronWindow.focus();
+    return;
+  }
+
+  const saved = loadCauldronBounds();
+
+  cauldronWindow = new BrowserWindow({
+    width: 320,
+    height: 56,
+    ...(saved ? { x: saved.x, y: saved.y } : {}),
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    backgroundColor: '#2a1d0e',
+    icon: getIconPath(),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Save position when moved
+  cauldronWindow.on('moved', () => {
+    if (cauldronWindow && !cauldronWindow.isDestroyed()) {
+      saveCauldronBounds(cauldronWindow.getBounds());
+    }
+  });
+
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    cauldronWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL + '?view=floating-timer');
+  } else {
+    cauldronWindow.loadFile(
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+      { search: 'view=floating-timer' },
+    );
+  }
+
+  // Notify main window that floating was opened
+  mainWindow?.webContents.send('cauldron:windowOpened');
+
+  cauldronWindow.on('closed', () => {
+    cauldronWindow = null;
+    mainWindow?.webContents.send('cauldron:windowClosed');
+  });
+}
+
 app.whenReady().then(() => {
   registerAllIpcHandlers();
   registerUpdaterIpcHandlers();
+
+  ipcMain.handle('cauldron:openWindow', () => createCauldronWindow());
+  ipcMain.handle('cauldron:closeWindow', () => {
+    if (cauldronWindow && !cauldronWindow.isDestroyed()) {
+      cauldronWindow.close();
+    }
+  });
 
   // Run module migrations
   getDb();
