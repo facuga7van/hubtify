@@ -506,21 +506,11 @@ export default function NutritionCharts() {
                   todayIndex={lineData.length - 1}
                 />
               ) : (
-                <p
-                  style={{
-                    opacity: 0.65,
-                    fontStyle: 'italic',
-                    textAlign: 'center',
-                    padding: 24,
-                    fontFamily: "'IM Fell English', serif",
-                    color: 'var(--ink-faded)',
-                  }}
-                >
-                  {t(
-                    'nutrify.needMoreWeights',
-                    'Log at least 2 weight entries to see the trend',
-                  )}
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                  <p style={{ opacity: 0.65, fontStyle: 'italic', textAlign: 'center', fontFamily: "'IM Fell English', serif", color: 'var(--ink-faded)' }}>
+                    {t('nutrify.needMoreWeights', 'Registrá al menos 2 pesos para ver la tendencia')}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -532,26 +522,18 @@ export default function NutritionCharts() {
               <span className="t-ico"><Scroll width={18} height={18} /></span>{' '}
               {t('nutrify.consistencyCalendar', 'Consistency Calendar')}
             </h3>
+            {/* TODO: Add onCellClick to HeatmapCalendar for touch tooltip support */}
             <HeatmapCalendar data={heatmapData} startDate={heatmapStart} tooltips={heatmapTooltips} themed legend />
           </div>
         </>
       ) : (
-        <div className="nutri-card medieval">
-          <p
-            style={{
-              opacity: 0.65,
-              fontStyle: 'italic',
-              textAlign: 'center',
-              padding: 24,
-              fontFamily: "'IM Fell English', serif",
-              color: 'var(--ink-faded)',
-            }}
-          >
-            {t(
-              'nutrify.startLogging',
-              'Start logging food to see charts here',
-            )}
+        <div className="nutri-card medieval" style={{ textAlign: 'center', padding: '32px 24px' }}>
+          <p style={{ color: 'var(--ink-faded)', fontStyle: 'italic', marginBottom: 16 }}>
+            {t('nutrify.noChartData', 'Logueá tu primer día para ver los gráficos')}
           </p>
+          <button className="rpg-button" onClick={() => navigate('/nutrition')}>
+            {t('nutrify.goToToday', 'Ir a hoy')}
+          </button>
         </div>
       )}
     </div>
