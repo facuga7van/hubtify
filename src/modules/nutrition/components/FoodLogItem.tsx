@@ -37,12 +37,13 @@ const MEAL_ICON_MAP: Record<MealType, React.ReactNode> = {
   snack: <Herb width={16} height={16} />,
 };
 
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Desayuno',
-  lunch: 'Almuerzo',
-  dinner: 'Cena',
-  snack: 'Snack',
-};
+function getMealLabel(meal: MealType, t: ReturnType<typeof useTranslation>['t']): string {
+  const key = `nutrify.meal${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+  const fallback: Record<MealType, string> = {
+    breakfast: 'Desayuno', lunch: 'Almuerzo', dinner: 'Cena', snack: 'Snack',
+  };
+  return t(key, fallback[meal]);
+}
 
 function getMealForEntry(entry: FoodEntry, schedule?: MealSchedule | null): MealType {
   if (entry.meal) return entry.meal as MealType;
@@ -161,7 +162,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
           <span
             onClick={() => { if (!readOnly && onMealChange) setMealDropdown(v => !v); }}
             style={{ cursor: readOnly ? 'default' : 'pointer' }}
-            title={t(`nutrify.meal${currentMeal.charAt(0).toUpperCase() + currentMeal.slice(1)}`, MEAL_LABELS[currentMeal])}
+            title={getMealLabel(currentMeal, t)}
           >
             {MEAL_ICON_MAP[currentMeal] ?? <Platter width={16} height={16} />}
           </span>
@@ -184,7 +185,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
                   }}
                 >
                   {MEAL_ICON_MAP[m]}
-                  <span>{t(`nutrify.meal${m.charAt(0).toUpperCase() + m.slice(1)}`, MEAL_LABELS[m])}</span>
+                  <span>{getMealLabel(m, t)}</span>
                 </button>
               ))}
             </div>
