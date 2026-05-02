@@ -507,6 +507,52 @@ export function autoResolve(db: Database.Database): number {
         if (tx) shouldResolve = true;
       }
 
+      if (n.type === 'habit_reminder') {
+        // Re-check if all habits are complete for the ref date
+        const refDate = n.ref_id;
+        const habits = db.prepare(`
+          SELECT id, frequency, times_per_week AS timesPerWeek
+          FROM habits WHERE deleted_at IS NULL
+        `).all() as Array<{ id: string; frequency: string; timesPerWeek: number }>;
+
+        const allChecks = db.prepare(
+          'SELECT habit_id, date FROM habit_checks WHERE deleted_at IS NULL'
+        ).all() as Array<{ habit_id: string; date: string }>;
+
+        const checksByHabit = new Map<string, Set<string>>();
+        for (const c of allChecks) {
+          let set = checksByHabit.get(c.habit_id);
+          if (!set) { set = new Set(); checksByHabit.set(c.habit_id, set); }
+          set.add(c.date);
+        }
+
+        let allComplete = true;
+        for (const h of habits) {
+          const dates = checksByHabit.get(h.id) ?? new Set<string>();
+          if (h.frequency === 'daily') {
+            if (!dates.has(refDate)) { allComplete = false; break; }
+          } else if (h.frequency === 'weekly') {
+            const ref = new Date(refDate + 'T00:00:00');
+            const dayOfWeek = ref.getDay() || 7;
+            const monday = new Date(ref);
+            monday.setDate(ref.getDate() - dayOfWeek + 1);
+            const mondayStr = localDate(monday);
+            let count = 0;
+            for (const d of dates) { if (d >= mondayStr && d <= refDate) count++; }
+            if (count < h.timesPerWeek) { allComplete = false; break; }
+          } else if (h.frequency === 'monthly') {
+            const monthStart = refDate.slice(0, 7) + '-01';
+            let count = 0;
+            for (const d of dates) { if (d >= monthStart && d <= refDate) count++; }
+            if (count < 1) { allComplete = false; break; }
+          }
+        }
+        if (allComplete) shouldResolve = true;
+
+        // Also resolve if the notification is from a previous day (stale)
+        if (refDate !== localDate()) shouldResolve = true;
+      }
+
       if (shouldResolve) {
         resolveStmt.run(n.id);
         resolved++;
