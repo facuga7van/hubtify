@@ -659,13 +659,13 @@ export function registerSyncIpcHandlers(): void {
     const loans = db.prepare(`
       SELECT id, person_name AS personName, direction, type, amount, currency,
              date, description, settled, installment_group_id AS installmentGroupId,
-             settled_date AS settledDate, created_at AS createdAt
+             settled_date AS settledDate, created_at AS createdAt, updated_at AS updatedAt
       FROM finance_loans ORDER BY date DESC
     `).all();
 
     const loanPayments = db.prepare(`
       SELECT id, loan_id AS loanId, amount, currency, date, note,
-             created_at AS createdAt
+             created_at AS createdAt, deleted_at AS deletedAt, updated_at AS updatedAt
       FROM finance_loan_payments ORDER BY date ASC
     `).all();
 
@@ -860,8 +860,8 @@ export function registerSyncIpcHandlers(): void {
         const insertLoan = db.prepare(`
           INSERT OR IGNORE INTO finance_loans
             (id, person_name, direction, type, amount, currency, date, description,
-             settled, installment_group_id, settled_date, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             settled, installment_group_id, settled_date, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const settleLoan = db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?`);
         for (const l of data.loans as Array<Record<string, unknown>>) {
@@ -870,7 +870,7 @@ export function registerSyncIpcHandlers(): void {
             const result = insertLoan.run(
               l.id, l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
               l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
-              l.settledDate ?? null, l.createdAt ?? now,
+              l.settledDate ?? null, l.createdAt ?? now, l.updatedAt ?? null,
             );
             if (result.changes > 0) changed = true;
           } else if (l.settled === 1 && local.settled === 0) {
@@ -884,11 +884,23 @@ export function registerSyncIpcHandlers(): void {
       if (data.loanPayments && Array.isArray(data.loanPayments)) {
         const stmt = db.prepare(`
           INSERT OR IGNORE INTO finance_loan_payments
-            (id, loan_id, amount, currency, date, note, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+            (id, loan_id, amount, currency, date, note, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
+        const lww = db.prepare(
+          "UPDATE finance_loan_payments SET deleted_at = ?, updated_at = ? WHERE id = ? AND (updated_at IS NULL OR updated_at < ?)"
+        );
         for (const p of data.loanPayments as Array<Record<string, unknown>>) {
-          stmt.run(p.id, p.loanId, p.amount, p.currency ?? 'ARS', p.date, p.note ?? '', p.createdAt ?? now);
+          const result = stmt.run(
+            p.id, p.loanId, p.amount, p.currency ?? 'ARS', p.date, p.note ?? '',
+            p.createdAt ?? now, p.updatedAt ?? null, p.deletedAt ?? null
+          );
+          if (result.changes > 0) changed = true;
+          // LWW for soft-delete propagation
+          if (p.deletedAt || p.updatedAt) {
+            const u = lww.run(p.deletedAt ?? null, p.updatedAt ?? null, p.id, p.updatedAt);
+            if (u.changes > 0) changed = true;
+          }
         }
       }
 
