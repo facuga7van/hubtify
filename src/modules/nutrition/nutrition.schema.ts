@@ -155,4 +155,18 @@ export const nutritionMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log(date);
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 9,
+    up: `
+      ALTER TABLE food_log ADD COLUMN updated_at TEXT DEFAULT NULL;
+      ALTER TABLE food_log ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE favorite_foods ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      ALTER TABLE frequent_foods ADD COLUMN deleted_at TEXT DEFAULT NULL;
+      DELETE FROM frequent_foods WHERE rowid NOT IN (
+        SELECT MIN(rowid) FROM frequent_foods GROUP BY name COLLATE NOCASE
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_frequent_foods_name ON frequent_foods(name COLLATE NOCASE);
+    `,
+  },
 ];
