@@ -192,6 +192,7 @@ const api = {
   financeSettleLoan: (id: string) => ipcRenderer.invoke('finance:settleLoan', id),
   financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => ipcRenderer.invoke('finance:addLoanPayment', loanId, payment),
   financeGetLoanPayments: (loanId: string) => ipcRenderer.invoke('finance:getLoanPayments', loanId),
+  financeDeleteLoanPayment: (id: string) => ipcRenderer.invoke('finance:deleteLoanPayment', id),
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => ipcRenderer.invoke('finance:createThirdPartyPurchase', data),
   financeGetActiveLoanSummary: () => ipcRenderer.invoke('finance:getActiveLoanSummary'),
 

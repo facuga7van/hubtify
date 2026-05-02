@@ -289,6 +289,7 @@ export interface HubtifyApi {
   financeSettleLoan: (id: string) => Promise<void>;
   financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => Promise<string>;
   financeGetLoanPayments: (loanId: string) => Promise<unknown[]>;
+  financeDeleteLoanPayment: (id: string) => Promise<void>;
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => Promise<string>;
   financeGetActiveLoanSummary: () => Promise<unknown>;
 

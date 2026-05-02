@@ -736,8 +736,8 @@ export function registerFinanceIpcHandlers(): void {
     const now = new Date().toISOString();
     db.prepare(`
       INSERT INTO finance_loans
-        (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+        (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `).run(
       id,
       loan.personName,
@@ -749,6 +749,7 @@ export function registerFinanceIpcHandlers(): void {
       loan.description ?? '',
       loan.installmentGroupId ?? null,
       now,
+      now,
     );
     return id;
   });
@@ -756,7 +757,7 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:settleLoan', (_e, id: string) => {
     const db = getDb();
     const today = new Date().toISOString().slice(0, 10);
-    db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?`).run(today, id);
+    db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ?, updated_at = datetime('now') WHERE id = ?`).run(today, id);
   });
 
   ipcHandle('finance:addLoanPayment', (_e, loanId: string, payment: {
@@ -769,8 +770,8 @@ export function registerFinanceIpcHandlers(): void {
     const id = genId();
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, note, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, note, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       loanId,
@@ -778,6 +779,7 @@ export function registerFinanceIpcHandlers(): void {
       payment.currency ?? 'ARS',
       payment.date,
       payment.note ?? '',
+      now,
       now,
     );
     return id;
@@ -788,9 +790,14 @@ export function registerFinanceIpcHandlers(): void {
     return db.prepare(`
       SELECT id, loan_id AS loanId, amount, currency, date, note, created_at AS createdAt
       FROM finance_loan_payments
-      WHERE loan_id = ?
+      WHERE loan_id = ? AND deleted_at IS NULL
       ORDER BY date ASC
     `).all(loanId);
+  });
+
+  ipcHandle('finance:deleteLoanPayment', (_e, id: string) => {
+    const db = getDb();
+    db.prepare("UPDATE finance_loan_payments SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
   });
 
   ipcHandle('finance:createThirdPartyPurchase', (_e, data: {
