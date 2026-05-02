@@ -158,6 +158,7 @@
   line-height: 1;
   color: var(--ink);
   letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
   margin: 8px 0 6px;
   text-shadow: 0 1px 0 rgba(245, 231, 192, 0.6);
 }
@@ -747,15 +748,51 @@
 .cauldron-floating-timer.break { border-color: var(--moss-light); }
 .cauldron-floating-timer.long-break { border-color: var(--gold); }
 
+/* Paused state — slow opacity pulse */
+.cauldron-floating-timer.paused {
+  animation: cauldron-ft-paused 2s ease-in-out infinite;
+}
+
+@keyframes cauldron-ft-paused {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Awaiting next — attention pulse */
+.cauldron-floating-timer.awaiting {
+  animation: cauldron-ft-awaiting 1.2s ease-in-out infinite;
+}
+
+@keyframes cauldron-ft-awaiting {
+  0%, 100% { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 8px rgba(168, 138, 60, 0.3); }
+  50% { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 18px rgba(168, 138, 60, 0.6); }
+}
+
+.cauldron-ft-btn--confirm {
+  background: rgba(107, 138, 76, 0.3) !important;
+  border-color: rgba(107, 138, 76, 0.6) !important;
+}
+
+.cauldron-ft-btn--confirm:hover {
+  background: rgba(107, 138, 76, 0.5) !important;
+}
+
 /* Time — Fraktur display */
 .cauldron-ft-time {
   font-family: 'UnifrakturCook', cursive;
   font-size: var(--fs-heading);
   color: var(--parch-0);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Single pause/resume button */
+/* Button group */
+.cauldron-ft-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .cauldron-ft-btn {
   width: 24px;
   height: 24px;
@@ -766,12 +803,21 @@
   display: grid;
   place-items: center;
   font-size: var(--fs-label);
-  transition: background 150ms ease;
+  transition: background 150ms ease, border-color 150ms ease;
   flex-shrink: 0;
 }
 
 .cauldron-ft-btn:hover {
   background: rgba(168, 138, 60, 0.3);
+}
+
+.cauldron-ft-btn--stop:hover {
+  background: rgba(122, 30, 30, 0.4);
+  border-color: rgba(122, 30, 30, 0.6);
+}
+
+.cauldron-ft-btn--hide:hover {
+  background: rgba(168, 138, 60, 0.2);
 }
 
 /* Progress bar — bottom accent */
@@ -1039,6 +1085,8 @@
   .cauldron-steam,
   .cauldron-ember,
   .cauldron-floating-timer.active,
+  .cauldron-floating-timer.paused,
+  .cauldron-floating-timer.awaiting,
   .cauldron-cycle-dot.current,
   .cauldron-mini-dot {
     animation: none !important;

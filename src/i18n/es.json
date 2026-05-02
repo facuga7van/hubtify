@@ -48,6 +48,8 @@
     "noChronicle": "Ninguna crónica registrada aún.",
     "noXpData": "Sin datos de XP registrados.",
     "quote": "\u00ab Non est ad astra mollis e terris via. \u00bb",
+    "resizeHeight": "Cambiar alto",
+    "resizeWidget": "Cambiar ancho",
     "quoteAuthor": "\u2014 Séneca, transcripto de viejo volumen",
     "royalSeal": "sigilo real",
     "salutation1": "Salve, noble",
@@ -121,6 +123,7 @@
     "manageProjects": "Gestionar proyectos",
     "deleteProjectConfirm": "Las tasks de este proyecto pasarán a 'Sin proyecto'. ¿Continuar?",
     "pendingCount": "{{count}} pendientes",
+    "showMore": "Ver más",
     "scrollNotes": "Notas",
     "noteOf": "Nota {{current}} de {{total}}",
     "newNote": "Nueva",
@@ -723,6 +726,7 @@
   "cauldron": {
     "break": "Descanso",
     "brewing": "Preparando…",
+    "closeWindow": "Cerrar ventana",
     "cycle": "Ciclo {{current}} de {{total}}",
     "editPresetHelp": "Ciclos antes del descanso largo: tras N ciclos seguidos, se activa el descanso largo.",
     "flavor": {
@@ -787,7 +791,11 @@
     "brewsMade": "{{count}} pócima{{s}} hoy",
     "pause": "Pausar",
     "paused": "Pausado",
+    "confirmNext": "Continuar",
+    "extend": "+{{min}} min",
     "pomodoroComplete": "¡Poción completada!",
+    "segmentDone": "¡Tiempo!",
+    "popOut": "Ventana flotante",
     "presetsHelp": "Recetas definen tiempos de trabajo, descanso y ciclos. Podés crear recetas personalizadas.",
     "presets": {
       "breakMin": "Descanso (min)",
@@ -797,6 +805,7 @@
       "delete": "Descartar Receta",
       "deleteConfirm": "¿Estás seguro de eliminar esta receta?",
       "editRecipe": "Editar Receta",
+      "extensionMin": "Prórroga (min)",
       "longBreakMin": "Descanso largo (min)",
       "longFocus": "Enfoque Largo",
       "name": "Nombre",
@@ -824,6 +833,7 @@
       "week": "Esta Semana",
       "weekSub": "sesiones esta semana"
     },
+    "hideTimer": "Ocultar temporizador",
     "history": {
       "title": "Historial de Sesiones",
       "loadMore": "Cargar más",
@@ -832,7 +842,9 @@
       "unknownPreset": "Receta desconocida"
     },
     "inForge": "En fragua",
+    "showTimer": "Mostrar temporizador",
     "stop": "Detener",
+    "stopConfirm": "¿Detener la sesión? Se perderá el progreso actual.",
     "subtitle": "Prepará pociones de enfoque. Descansá con intención. Ganá experiencia por cada poción completada.",
     "ticker": {
       "brewing": "Preparando poción de enfoque...",

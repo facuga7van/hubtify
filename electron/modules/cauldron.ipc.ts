@@ -29,6 +29,7 @@ let timerState: CauldronTimerState = {
   sessionType: 'work',
   presetId: null,
   presetName: null,
+  extensionMinutes: 5,
 };
 
 let timerInterval: NodeJS.Timeout | null = null;
@@ -38,8 +39,10 @@ let activePreset: {
   breakMinutes: number;
   longBreakMinutes: number;
   cyclesBeforeLong: number;
+  extensionMinutes: number;
 } | null = null;
 let currentSessionDbId: string | null = null;
+let pendingNextSegment: NextSegment | null = null;
 
 function clearTimer(): void {
   if (timerInterval) {
@@ -91,23 +94,32 @@ function onTimeUp(): void {
 
   // OS Notification
   if (Notification.isSupported()) {
+    const presetLabel = timerState.presetName ? ` (${timerState.presetName})` : '';
+    const cycleInfo = `Ciclo ${timerState.currentCycle}/${timerState.totalCycles}`;
     if (nextSegment === null) {
       new Notification({
-        title: 'Cauldron Cycle Complete!',
-        body: 'Full brewing cycle finished.',
+        title: 'Caldero — ¡Ciclo completo!',
+        body: `Ciclo de pociones terminado.${presetLabel}`,
       }).show();
     } else {
-      const title = wasWork ? 'Brew Complete!' : 'Break Over!';
-      const body = wasWork ? 'Time for a break.' : 'Ready for another brew?';
+      const nextLabel = nextSegment.type === 'work' ? 'Enfoque' : nextSegment.type === 'long_break' ? 'Descanso largo' : 'Descanso';
+      const nextMin = Math.round(nextSegment.durationMs / 60000);
+      const title = wasWork ? '¡Poción completada!' : '¡Descanso terminado!';
+      const body = `${cycleInfo} — Siguiente: ${nextLabel} (${nextMin} min)${presetLabel}`;
       new Notification({ title, body }).show();
     }
   }
 
+  clearTimer();
+
   if (nextSegment) {
-    startSegment(nextSegment.type, nextSegment.durationMs);
+    // Wait for user confirmation before advancing
+    pendingNextSegment = nextSegment;
+    timerState = { ...timerState, status: 'awaiting_next', remainingMs: 0 };
+    broadcast('cauldron:tick', getSnapshotState());
   } else {
     // Full cycle complete
-    clearTimer();
+    pendingNextSegment = null;
     timerState = { ...timerState, status: 'idle', remainingMs: 0 };
     broadcast('cauldron:tick', getSnapshotState());
   }
@@ -204,9 +216,27 @@ function startSegment(
   }
 }
 
+// ─── Startup Cleanup ────────────────────────────────────────
+
+/** Mark orphaned sessions (started but never completed) as abandoned on startup */
+function cleanupOrphanedSessions(): void {
+  try {
+    const db = getDb();
+    const now = new Date().toISOString();
+    db.prepare(
+      `UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?
+       WHERE completed = 0 AND deleted_at IS NULL`,
+    ).run(now, now);
+  } catch {
+    // Non-critical — silently ignore
+  }
+}
+
 // ─── IPC Handlers ──────────────────────────────────────────
 
 export function registerCauldronIpcHandlers(): void {
+  cleanupOrphanedSessions();
+
   // ─── Preset CRUD ───
 
   ipcHandle('cauldron:getPresets', () => {
@@ -215,6 +245,7 @@ export function registerCauldronIpcHandlers(): void {
       .prepare(
         `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
               long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
+              extension_minutes AS extensionMinutes,
               is_default AS isDefault, created_at AS createdAt, updated_at AS updatedAt
        FROM cauldron_presets WHERE deleted_at IS NULL
        ORDER BY is_default DESC, name ASC`,
@@ -238,7 +269,7 @@ export function registerCauldronIpcHandlers(): void {
         }
         db.prepare(
           `UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?,
-          long_break_minutes = ?, cycles_before_long = ?, updated_at = ?
+          long_break_minutes = ?, cycles_before_long = ?, extension_minutes = ?, updated_at = ?
           WHERE id = ? AND deleted_at IS NULL`,
         ).run(
           preset.name,
@@ -246,13 +277,14 @@ export function registerCauldronIpcHandlers(): void {
           preset.breakMinutes,
           preset.longBreakMinutes,
           preset.cyclesBeforeLong,
+          preset.extensionMinutes ?? 5,
           now,
           id,
         );
       } else {
         db.prepare(
-          `INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, is_default, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+          `INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, is_default, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
         ).run(
           id,
           preset.name,
@@ -260,6 +292,7 @@ export function registerCauldronIpcHandlers(): void {
           preset.breakMinutes,
           preset.longBreakMinutes,
           preset.cyclesBeforeLong,
+          preset.extensionMinutes ?? 5,
           now,
           now,
         );
@@ -293,7 +326,8 @@ export function registerCauldronIpcHandlers(): void {
     const preset = db
       .prepare(
         `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
-              long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong
+              long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
+              extension_minutes AS extensionMinutes
        FROM cauldron_presets WHERE id = ? AND deleted_at IS NULL`,
       )
       .get(presetId) as CauldronPreset | undefined;
@@ -305,6 +339,7 @@ export function registerCauldronIpcHandlers(): void {
       breakMinutes: preset.breakMinutes,
       longBreakMinutes: preset.longBreakMinutes,
       cyclesBeforeLong: preset.cyclesBeforeLong,
+      extensionMinutes: preset.extensionMinutes ?? 5,
     };
 
     timerState = {
@@ -316,6 +351,7 @@ export function registerCauldronIpcHandlers(): void {
       sessionType: 'work',
       presetId: preset.id,
       presetName: preset.name,
+      extensionMinutes: preset.extensionMinutes ?? 5,
     };
 
     startSegment('work', preset.workMinutes * 60 * 1000);
@@ -363,6 +399,16 @@ export function registerCauldronIpcHandlers(): void {
     }
 
     clearTimer();
+    pendingNextSegment = null;
+
+    // Broadcast sessionEnd so stats refresh in all UIs
+    const sessionEndResult: CauldronSessionEndResult = {
+      sessionType: timerState.sessionType,
+      completed: false,
+      nextType: null,
+    };
+    broadcast('cauldron:sessionEnd', sessionEndResult);
+
     const nextSegment = getNextSegment();
 
     if (nextSegment) {
@@ -372,6 +418,49 @@ export function registerCauldronIpcHandlers(): void {
       activePreset = null;
     }
 
+    broadcast('cauldron:tick', getSnapshotState());
+    return getSnapshotState();
+  });
+
+  ipcHandle('cauldron:confirmNext', () => {
+    if (timerState.status !== 'awaiting_next' || !pendingNextSegment) {
+      throw new Error('No segment awaiting confirmation');
+    }
+    const next = pendingNextSegment;
+    pendingNextSegment = null;
+    startSegment(next.type, next.durationMs);
+    broadcast('cauldron:tick', getSnapshotState());
+    return getSnapshotState();
+  });
+
+  ipcHandle('cauldron:extend', (_e, minutes?: number) => {
+    if (timerState.status !== 'awaiting_next') {
+      throw new Error('Can only extend at segment end');
+    }
+    // Resume same segment with extra time, track in DB
+    const extMin = minutes ?? activePreset?.extensionMinutes ?? 5;
+    const durationMs = extMin * 60 * 1000;
+
+    // Create a DB row for the extension so it's tracked
+    const db = getDb();
+    const now = new Date().toISOString();
+    const sessionId = genId();
+    db.prepare(
+      `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
+    ).run(sessionId, timerState.presetId, timerState.sessionType, extMin, now, now, now);
+    currentSessionDbId = sessionId;
+
+    targetEndTime = Date.now() + durationMs;
+    timerState = {
+      ...timerState,
+      status: timerState.sessionType === 'work' ? 'work' : 'on_break',
+      remainingMs: durationMs,
+      totalMs: durationMs,
+    };
+    if (!timerInterval) {
+      timerInterval = setInterval(tick, 1000);
+    }
     broadcast('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -390,6 +479,7 @@ export function registerCauldronIpcHandlers(): void {
     }
 
     clearTimer();
+    pendingNextSegment = null;
     timerState = {
       status: 'idle',
       remainingMs: 0,
@@ -399,6 +489,7 @@ export function registerCauldronIpcHandlers(): void {
       sessionType: 'work',
       presetId: null,
       presetName: null,
+      extensionMinutes: 5,
     };
     activePreset = null;
     broadcast('cauldron:tick', getSnapshotState());
@@ -466,7 +557,7 @@ export function registerCauldronIpcHandlers(): void {
       )
       .all() as Array<{ day: string; totalMinutes: number }>;
 
-    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     return rows.map((r) => {
       const dt = new Date(r.day + 'T12:00:00');
       return {
@@ -502,6 +593,31 @@ export function registerCauldronIpcHandlers(): void {
       )
       .get() as { count: number };
 
-    return { today: today.count, week: week.count, total: total.count };
+    // Streak: consecutive days (including today) with at least one completed work session
+    const streakRows = db
+      .prepare(
+        `SELECT DISTINCT date(started_at) AS d FROM cauldron_sessions
+         WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL
+         ORDER BY d DESC`,
+      )
+      .all() as Array<{ d: string }>;
+
+    let streak = 0;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let expectedDate = todayStr;
+    for (const row of streakRows) {
+      if (row.d === expectedDate) {
+        streak++;
+        // Move to previous day
+        const prev = new Date(expectedDate + 'T12:00:00');
+        prev.setDate(prev.getDate() - 1);
+        expectedDate = prev.toISOString().slice(0, 10);
+      } else if (row.d < expectedDate) {
+        // Gap found — streak broken
+        break;
+      }
+    }
+
+    return { today: today.count, week: week.count, total: total.count, streak };
   });
 }

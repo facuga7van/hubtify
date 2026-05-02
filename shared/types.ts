@@ -77,7 +77,7 @@ export interface ParsedRow {
 
 // ── Cauldron Types ────────────────────────────────────────
 
-export type CauldronTimerStatus = 'idle' | 'work' | 'work_paused' | 'on_break' | 'break_paused';
+export type CauldronTimerStatus = 'idle' | 'work' | 'work_paused' | 'on_break' | 'break_paused' | 'awaiting_next';
 
 export interface CauldronTimerState {
   status: CauldronTimerStatus;
@@ -88,6 +88,7 @@ export interface CauldronTimerState {
   sessionType: 'work' | 'break' | 'long_break';
   presetId: string | null;
   presetName: string | null;
+  extensionMinutes: number;
 }
 
 export interface CauldronPreset {
@@ -97,6 +98,7 @@ export interface CauldronPreset {
   breakMinutes: number;
   longBreakMinutes: number;
   cyclesBeforeLong: number;
+  extensionMinutes: number;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -116,6 +118,7 @@ export interface CauldronStats {
   today: number;
   week: number;
   total: number;
+  streak: number;
 }
 
 export interface CauldronSessionEndResult {
@@ -346,6 +349,8 @@ export interface HubtifyApi {
   cauldronPause: () => Promise<CauldronTimerState>;
   cauldronResume: () => Promise<CauldronTimerState>;
   cauldronSkip: () => Promise<CauldronTimerState>;
+  cauldronConfirmNext: () => Promise<CauldronTimerState>;
+  cauldronExtend: (minutes?: number) => Promise<CauldronTimerState>;
   cauldronStop: () => Promise<void>;
   cauldronGetState: () => Promise<CauldronTimerState>;
   cauldronGetStats: () => Promise<CauldronStats>;
@@ -353,6 +358,10 @@ export interface HubtifyApi {
   cauldronGetWeeklyFocusTime: () => Promise<CauldronWeeklyFocusDay[]>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
   onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
+  cauldronOpenWindow: () => Promise<void>;
+  cauldronCloseWindow: () => Promise<void>;
+  onCauldronWindowOpened: (callback: () => void) => () => void;
+  onCauldronWindowClosed: (callback: () => void) => () => void;
 
   // Feedback
   feedbackSend: (data: { type: string; description: string; email?: string }) => Promise<{ success: boolean }>;

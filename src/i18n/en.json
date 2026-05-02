@@ -48,6 +48,8 @@
     "noChronicle": "No chronicle recorded yet.",
     "noXpData": "No XP data recorded.",
     "quote": "\u00ab Non est ad astra mollis e terris via. \u00bb",
+    "resizeHeight": "Change height",
+    "resizeWidget": "Change width",
     "quoteAuthor": "\u2014 Seneca, transcribed from an old volume",
     "royalSeal": "royal seal",
     "salutation1": "Hail, noble",
@@ -121,6 +123,7 @@
     "manageProjects": "Manage projects",
     "deleteProjectConfirm": "Tasks from this project will move to 'No project'. Continue?",
     "pendingCount": "{{count}} pending",
+    "showMore": "Show more",
     "scrollNotes": "Notes",
     "noteOf": "Note {{current}} of {{total}}",
     "newNote": "New",
@@ -724,6 +727,7 @@
   "cauldron": {
     "break": "Break",
     "brewing": "Brewing…",
+    "closeWindow": "Close window",
     "cycle": "Cycle {{current}} of {{total}}",
     "editPresetHelp": "Cycles before long break: after N consecutive cycles, the long break activates.",
     "flavor": {
@@ -788,7 +792,11 @@
     "brewsMade": "{{count}} brew{{s}} today",
     "pause": "Pause",
     "paused": "Paused",
+    "confirmNext": "Continue",
+    "extend": "+{{min}} min",
     "pomodoroComplete": "Brew complete!",
+    "segmentDone": "Time's up!",
+    "popOut": "Floating window",
     "presetsHelp": "Recipes define work, break and cycle times. You can create custom recipes.",
     "presets": {
       "breakMin": "Break (min)",
@@ -798,6 +806,7 @@
       "delete": "Discard Recipe",
       "deleteConfirm": "Are you sure you want to delete this recipe?",
       "editRecipe": "Edit Recipe",
+      "extensionMin": "Extension (min)",
       "longBreakMin": "Long Break (min)",
       "longFocus": "Long Focus",
       "name": "Name",
@@ -825,6 +834,7 @@
       "week": "This Week",
       "weekSub": "sessions this week"
     },
+    "hideTimer": "Hide timer",
     "history": {
       "title": "Session History",
       "loadMore": "Load more",
@@ -833,7 +843,9 @@
       "unknownPreset": "Unknown recipe"
     },
     "inForge": "Brewing",
+    "showTimer": "Show timer",
     "stop": "Stop",
+    "stopConfirm": "Stop session? Current progress will be lost.",
     "subtitle": "Brew focus. Rest deliberately. Earn experience for every potion completed.",
     "ticker": {
       "brewing": "Brewing focus potion...",

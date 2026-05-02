@@ -20,7 +20,7 @@ import {
   Gauge,
   Cartouche,
 } from '../../../shared/components/codex/CodexPrimitives';
-import { Cauldron as CauldronIcon, Flame, Potion } from '../../../shared/components/icons/CodexIcons';
+import { Cauldron as CauldronIcon, Flame, Potion, ChevronUp, ChevronDown } from '../../../shared/components/icons/CodexIcons';
 import { CastleBarChart } from '../../../shared/components/charts/CastleBarChart';
 import type {
   CauldronTimerState,
@@ -527,7 +527,8 @@ export default function CauldronPage() {
   const [presets, setPresets] = useState<CauldronPreset[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
-  const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0 });
+  const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
+  const [actionPending, setActionPending] = useState(false);
   const [editingPreset, setEditingPreset] = useState<Partial<CauldronPreset> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [flavorIdx, setFlavorIdx] = useState(0);
@@ -548,6 +549,18 @@ export default function CauldronPage() {
   const prevTodayRef = useRef(0);
   const statsRef = useRef<HTMLDivElement>(null);
   const warningFiredRef = useRef(false);
+  const externalWindowOpenRef = useRef(false);
+
+  // Track external floating window state — mute auto-sounds when open
+  useEffect(() => {
+    const onOpened = window.api.onCauldronWindowOpened(() => {
+      externalWindowOpenRef.current = true;
+    });
+    const onClosed = window.api.onCauldronWindowClosed(() => {
+      externalWindowOpenRef.current = false;
+    });
+    return () => { onOpened(); onClosed(); };
+  }, []);
 
   /* -- Data loaders -- */
   const loadPresets = useCallback(() => {
@@ -615,7 +628,7 @@ export default function CauldronPage() {
       setTimerState(state);
       if (state.remainingMs <= 10000 && !warningFiredRef.current) {
         warningFiredRef.current = true;
-        playCauldronWarning();
+        if (!externalWindowOpenRef.current) playCauldronWarning();
       }
     });
     return cleanup;
@@ -625,32 +638,24 @@ export default function CauldronPage() {
   useEffect(() => {
     const cleanup = window.api.onCauldronSessionEnd((result: CauldronSessionEndResult) => {
       warningFiredRef.current = false;
+      const muted = externalWindowOpenRef.current;
 
       if (result.sessionType === 'work' && result.completed) {
         if (timerContainerRef.current) brewComplete(timerContainerRef.current);
 
-        if (result.nextType === null) {
-          playCauldronCycleEnd();
-        } else {
-          playCauldronWarning();
+        if (!muted) {
+          if (result.nextType === null) {
+            playCauldronCycleEnd();
+          } else {
+            playCauldronWarning();
+          }
         }
 
-        window.api
-          .processRpgEvent({
-            type: 'POMODORO_COMPLETED',
-            moduleId: 'cauldron',
-            payload: { xp: 20, hp: 0 },
-            timestamp: Date.now(),
-          })
-          .then(() => {
-            window.dispatchEvent(new Event('rpg:statsChanged'));
-            window.dispatchEvent(new Event('cauldron:dataChanged'));
-          });
-
+        // XP is granted by CauldronFloatingTimer (always mounted in Layout)
         toast({ type: 'xp', message: t('cauldron.pomodoroComplete', 'Brew complete!') });
-        setXpToast({ show: true, amount: 20, desc: t('cauldron.pomodoroComplete', 'Brew complete!') });
+        setXpToast({ show: true, amount: 8, desc: t('cauldron.pomodoroComplete', 'Brew complete!') });
       } else if (result.sessionType !== 'work' && result.completed) {
-        playCauldronWarning();
+        if (!muted) playCauldronWarning();
       }
       loadStats();
       loadSessions(0);
@@ -670,6 +675,7 @@ export default function CauldronPage() {
   const isIdle = !timerState || timerState.status === 'idle';
   const isRunning = timerState?.status === 'work' || timerState?.status === 'on_break';
   const isPaused = timerState?.status === 'work_paused' || timerState?.status === 'break_paused';
+  const isAwaiting = timerState?.status === 'awaiting_next';
 
   /* -- Timer display calculations -- */
   const remainingSeconds = timerState ? Math.ceil(timerState.remainingMs / 1000) : 0;
@@ -740,7 +746,16 @@ export default function CauldronPage() {
   }, [isIdle, isPaused, sessionType, flavorIdx, t]);
 
   /* -- Timer control handlers -- */
-  const handleStart = async () => {
+  /** Guard wrapper — prevents double-clicks during async IPC calls */
+  const guarded = <T,>(fn: () => Promise<T>): (() => Promise<void>) => {
+    return async () => {
+      if (actionPending) return;
+      setActionPending(true);
+      try { await fn(); } finally { setActionPending(false); }
+    };
+  };
+
+  const handleStart = guarded(async () => {
     if (!selectedPresetId) return;
     setEditingPreset(null);
     try {
@@ -748,32 +763,56 @@ export default function CauldronPage() {
       setTimerState(state);
       playCauldronStart();
       setFlavorIdx(0);
+      window.api.cauldronOpenWindow();
     } catch (err) {
       toast({ type: 'warning', message: String(err) });
     }
-  };
+  });
 
-  const handlePause = async () => {
+  const handlePause = guarded(async () => {
     const state = await window.api.cauldronPause();
     setTimerState(state);
     playCauldronPause();
-  };
+  });
 
-  const handleResume = async () => {
+  const handleResume = guarded(async () => {
     const state = await window.api.cauldronResume();
     setTimerState(state);
     playCauldronResume();
-  };
+  });
 
-  const handleSkip = async () => {
+  const handleSkip = guarded(async () => {
     const state = await window.api.cauldronSkip();
     setTimerState(state);
-  };
+  });
+
+  const handleConfirmNext = guarded(async () => {
+    const state = await window.api.cauldronConfirmNext();
+    setTimerState(state);
+  });
+
+  const extMin = timerState?.extensionMinutes ?? 5;
+
+  const handleExtend = guarded(async () => {
+    const state = await window.api.cauldronExtend(extMin);
+    setTimerState(state);
+  });
 
   const handleStop = async () => {
-    await window.api.cauldronStop();
-    setTimerState(null);
-    playCauldronPause();
+    const confirmed = await confirm({
+      message: t('cauldron.stopConfirm', '¿Detener la sesión? Se perderá el progreso actual.'),
+      danger: true,
+    });
+    if (!confirmed) return;
+    if (actionPending) return;
+    setActionPending(true);
+    try {
+      await window.api.cauldronStop();
+      setTimerState(null);
+      playCauldronPause();
+    } finally {
+      setActionPending(false);
+    }
   };
 
   /* -- Preset handlers -- */
@@ -783,6 +822,7 @@ export default function CauldronPage() {
       breakMinutes: 5,
       longBreakMinutes: 15,
       cyclesBeforeLong: 4,
+      extensionMinutes: 5,
       name: '',
     });
     setIsCreating(true);
@@ -813,6 +853,7 @@ export default function CauldronPage() {
       breakMinutes: editingPreset.breakMinutes,
       longBreakMinutes: editingPreset.longBreakMinutes,
       cyclesBeforeLong: editingPreset.cyclesBeforeLong,
+      extensionMinutes: editingPreset.extensionMinutes ?? 5,
     };
     if (editingPreset.id) payload.id = editingPreset.id;
     try {
@@ -1017,7 +1058,7 @@ export default function CauldronPage() {
                 </div>
                 <div className="cauldron-kv-row">
                   <span className="cauldron-kv-key">{t('cauldron.reward', 'Reward')}</span>
-                  <span className="cauldron-kv-value gold">+20 XP</span>
+                  <span className="cauldron-kv-value gold">+8 XP</span>
                 </div>
 
                 {/* Phase Progress Gauge */}
@@ -1055,6 +1096,19 @@ export default function CauldronPage() {
                     <>
                       <button className="cauldron-btn cauldron-btn--primary" onClick={handleResume}>
                         {t('cauldron.resume', 'Resume')}
+                      </button>
+                      <button className="cauldron-btn cauldron-btn--danger" onClick={handleStop}>
+                        {t('cauldron.stop', 'Stop')}
+                      </button>
+                    </>
+                  )}
+                  {isAwaiting && (
+                    <>
+                      <button className="cauldron-btn cauldron-btn--primary" onClick={handleConfirmNext}>
+                        {t('cauldron.confirmNext', 'Continuar')}
+                      </button>
+                      <button className="cauldron-btn" onClick={handleExtend}>
+                        {t('cauldron.extend', '+{{min}} min', { min: extMin })}
                       </button>
                       <button className="cauldron-btn cauldron-btn--danger" onClick={handleStop}>
                         {t('cauldron.stop', 'Stop')}
@@ -1109,8 +1163,8 @@ export default function CauldronPage() {
           />
           <Cartouche
             label={t('cauldron.stats.streak', 'Streak')}
-            value={stats.today > 0 ? `${stats.today}` : '0'}
-            icon={stats.today > 0 ? <Flame width={14} height={14} /> : undefined}
+            value={`${stats.streak}`}
+            icon={stats.streak > 0 ? <Flame width={14} height={14} /> : undefined}
           />
         </div>
       </Section>
@@ -1150,7 +1204,7 @@ export default function CauldronPage() {
               onClick={() => setHistoryOpen((prev) => !prev)}
               aria-expanded={historyOpen}
             >
-              {historyOpen ? '\u25B2' : '\u25BC'}
+              {historyOpen ? <ChevronUp width={12} height={12} /> : <ChevronDown width={12} height={12} />}
             </button>
           </>
         }
@@ -1211,9 +1265,15 @@ export default function CauldronPage() {
 
       {/* === Preset Editor Modal === */}
       {editingPreset && createPortal(
-        <div className="cauldron-modal-overlay" onClick={() => setEditingPreset(null)}>
+        <div
+          className="cauldron-modal-overlay"
+          onClick={() => setEditingPreset(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditingPreset(null); }}
+        >
           <div
             className="cauldron-modal"
+            role="dialog"
+            aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="cauldron-modal-head">
@@ -1319,6 +1379,24 @@ export default function CauldronPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="cauldron-kv-key">
+                  {t('cauldron.presets.extensionMin', 'Prórroga (min)')}
+                </label>
+                <input
+                  className="cauldron-input cauldron-mono"
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={editingPreset.extensionMinutes || 5}
+                  onChange={(e) =>
+                    setEditingPreset({
+                      ...editingPreset,
+                      extensionMinutes: Math.max(1, parseInt(e.target.value, 10) || 1),
+                    })
+                  }
+                />
               </div>
             </div>
             <CyclePreviewBar preset={editingPreset as CauldronPreset} />

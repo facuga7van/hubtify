@@ -15,7 +15,7 @@ export const cauldronModule: ModuleDefinition = {
   rpgEventHandlers: {
     POMODORO_COMPLETED: (payload: unknown) => {
       const p = payload as { xp?: number };
-      return { xp: p.xp ?? 20, hp: 0 };
+      return { xp: p.xp ?? 8, hp: 0 };
     },
   },
 };

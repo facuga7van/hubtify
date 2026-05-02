@@ -52,4 +52,11 @@ export const cauldronMigrations: Migration[] = [
         ('preset-quick-sprint', 'Quick Sprint', 15, 3, 10, 4, 1);
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 3,
+    up: `
+      ALTER TABLE cauldron_presets ADD COLUMN extension_minutes INTEGER NOT NULL DEFAULT 5;
+    `,
+  },
 ];
