@@ -164,12 +164,12 @@ export interface HubtifyApi {
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
   questsGetHabitHeatmap: (days?: number) => Promise<{ days: Array<{ date: string; count: number }>; totalHabits: number }>;
-  questsGetHabitStreaks: () => Promise<Array<{ name: string; streak: number }>>;
   questsGetHabits: () => Promise<unknown[]>;
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => Promise<string>;
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => Promise<void>;
   questsDeleteHabit: (id: string) => Promise<void>;
   questsCheckHabit: (habitId: string) => Promise<{ checked: boolean }>;
+  questsCheckHabitForDate: (habitId: string, date: string) => Promise<{ checked: boolean }>;
   questsGetDrawings: (taskId: string) => Promise<unknown[]>;
   questsGetDrawingCount: (taskId: string) => Promise<number>;
   questsGetAllDrawingCounts: () => Promise<Array<{ task_id: string; count: number }>>;
@@ -183,7 +183,6 @@ export interface HubtifyApi {
   questsGetPendingCount: () => Promise<number>;
   questsGetCompletedTodayCount: () => Promise<number>;
   questsGetOverdueCount: () => Promise<number>;
-  questsGetDueTodayCount: () => Promise<number>;
 
   // Nutrition
   nutritionGetProfile: () => Promise<unknown>;

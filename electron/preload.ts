@@ -31,12 +31,12 @@ const api = {
   questsSaveDrawing: (drawing: Record<string, unknown>) => ipcRenderer.invoke('quests:saveDrawing', drawing),
   questsDeleteDrawing: (id: string) => ipcRenderer.invoke('quests:deleteDrawing', id),
   questsGetHabitHeatmap: (days?: number) => ipcRenderer.invoke('quests:getHabitHeatmap', days),
-  questsGetHabitStreaks: () => ipcRenderer.invoke('quests:getHabitStreaks'),
   questsGetHabits: () => ipcRenderer.invoke('quests:getHabits'),
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => ipcRenderer.invoke('quests:addHabit', habit),
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => ipcRenderer.invoke('quests:updateHabit', id, updates),
   questsDeleteHabit: (id: string) => ipcRenderer.invoke('quests:deleteHabit', id),
   questsCheckHabit: (habitId: string) => ipcRenderer.invoke('quests:checkHabit', habitId),
+  questsCheckHabitForDate: (habitId: string, date: string) => ipcRenderer.invoke('quests:checkHabitForDate', habitId, date),
   questsGetProjects: () => ipcRenderer.invoke('quests:getProjects'),
   questsUpsertProject: (project: Record<string, unknown>) => ipcRenderer.invoke('quests:upsertProject', project),
   questsDeleteProject: (id: string) => ipcRenderer.invoke('quests:deleteProject', id),
@@ -45,7 +45,6 @@ const api = {
   questsGetPendingCount: () => ipcRenderer.invoke('quests:getPendingCount'),
   questsGetCompletedTodayCount: () => ipcRenderer.invoke('quests:getCompletedTodayCount'),
   questsGetOverdueCount: () => ipcRenderer.invoke('quests:getOverdueCount'),
-  questsGetDueTodayCount: () => ipcRenderer.invoke('quests:getDueTodayCount'),
 
   // Nutrition
   nutritionGetProfile: () => ipcRenderer.invoke('nutrition:getProfile'),
