@@ -245,6 +245,7 @@
     "confirmTargetLabel": "Calorie target",
     "consumed": "consumed",
     "target": "Target",
+    "targetHelp": "Your target adjusts based on your base activity level and your recent activity (gym, steps) from the last 14 days.",
     "remaining": "remaining",
     "overTarget": "over target",
     "overTdee": "Over your TDEE — be careful!",

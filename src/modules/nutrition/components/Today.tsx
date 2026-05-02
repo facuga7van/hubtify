@@ -673,7 +673,7 @@ export default function Today() {
                 </span>
               </div>
               <div className="nutri-cal-row">
-                <span className="nutri-cal-label">{t('nutrify.target', 'Objetivo')}</span>
+                <span className="nutri-cal-label">{t('nutrify.target', 'Objetivo')}<HelpBubble text={t('nutrify.targetHelp', 'Tu objetivo se ajusta según tu nivel de actividad base y tu actividad reciente (gym, pasos) de los últimos 14 días.')} /></span>
                 <span className="nutri-cal-val">
                   {toleranceLow} – {toleranceHigh} kcal
                   {deficitTargetKcal !== 0 && (

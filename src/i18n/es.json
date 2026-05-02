@@ -251,6 +251,7 @@
     "confirmTargetLabel": "Objetivo calórico",
     "consumed": "consumidas",
     "target": "Objetivo",
+    "targetHelp": "Tu objetivo se ajusta según tu nivel de actividad base y tu actividad reciente (gym, pasos) de los últimos 14 días.",
     "remaining": "restantes",
     "overTarget": "sobre objetivo",
     "overTdee": "Superaste tu TDEE — ¡cuidado!",
