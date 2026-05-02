@@ -17,6 +17,11 @@ export function daysAgoDateString(n: number): string {
   return d.toLocaleDateString('en-CA');
 }
 
+/** Returns yesterday's date as YYYY-MM-DD string */
+export function yesterdayDateString(): string {
+  return daysAgoDateString(1);
+}
+
 /** Returns a Date object formatted as YYYY-MM-DD string */
 export function formatDateString(date: Date): string {
   return date.toLocaleDateString('en-CA');
