@@ -458,13 +458,13 @@ export function registerSyncIpcHandlers(): void {
     const db = getDb();
 
     const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() || null;
-    const foodLog = db.prepare('SELECT id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal FROM food_log ORDER BY date DESC, time DESC').all();
-    const frequentFoods = db.prepare('SELECT id, name, calories, ai_breakdown, times_used, created_at, updated_at FROM frequent_foods ORDER BY times_used DESC').all();
+    const foodLog = db.prepare('SELECT id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at FROM food_log ORDER BY date DESC, time DESC').all();
+    const frequentFoods = db.prepare('SELECT id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
     const dailyMetrics = db.prepare('SELECT date, steps, gym, updated_at FROM nutrition_daily_metrics ORDER BY date DESC').all();
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
-    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods ORDER BY created_at DESC').all();
+    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
 
     return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods };
   });
@@ -496,21 +496,26 @@ export function registerSyncIpcHandlers(): void {
       const affectedDates = new Set<string>();
       if (Array.isArray(d.foodLog)) {
         const getFoodById = db.prepare('SELECT id FROM food_log WHERE id = ?');
-        const insertFood = db.prepare('INSERT OR IGNORE INTO food_log (id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const insertFood = db.prepare('INSERT OR IGNORE INTO food_log (id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         for (const f of d.foodLog) {
           if (f.id != null) {
             const exists = getFoodById.get(f.id);
             if (!exists) {
-              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null);
+              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null);
               affectedDates.add(f.date);
               changed = true;
+            }
+            if (f.deleted_at || f.updated_at) {
+              db.prepare(
+                "UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ? AND (updated_at IS NULL OR updated_at < ?)"
+              ).run(f.deleted_at ?? null, f.updated_at ?? null, f.id, f.updated_at);
             }
           } else {
             // Legacy entries without id — fallback to composite key
             const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?').get(f.date, f.time, f.description, f.calories);
             if (!exists) {
-              db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-                f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null
+              db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+                f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null
               );
               affectedDates.add(f.date);
               changed = true;
@@ -527,23 +532,23 @@ export function registerSyncIpcHandlers(): void {
       if (Array.isArray(d.frequentFoods)) {
         const getFreq = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE id = ?');
         const getFreqByName = db.prepare('SELECT id FROM frequent_foods WHERE name = ?');
-        const insertFreq = db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
-        const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, times_used = ?, updated_at = ? WHERE id = ?');
+        const insertFreq = db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
         for (const f of d.frequentFoods) {
           if (f.id != null) {
             const local = getFreq.get(f.id) as { id: number; updated_at: string | null } | undefined;
             if (!local) {
-              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null);
+              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
               changed = true;
             } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
-              updateFreq.run(f.calories, f.ai_breakdown ?? null, f.times_used, f.updated_at, f.id);
+              updateFreq.run(f.calories, f.ai_breakdown ?? null, f.times_used, f.updated_at, f.deleted_at ?? null, f.id);
               changed = true;
             }
           } else {
             // Legacy entries without id — fallback to name check
             const exists = getFreqByName.get(f.name);
             if (!exists) {
-              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null);
+              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
               changed = true;
             }
           }
@@ -616,10 +621,14 @@ export function registerSyncIpcHandlers(): void {
 
       // Favorite foods — dedup by description
       if (Array.isArray(d.favoriteFoods)) {
-        const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         for (const f of d.favoriteFoods) {
-          insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual', f.aiBreakdown ?? null, f.createdAt, f.updatedAt ?? null);
+          insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual', f.aiBreakdown ?? null, f.createdAt, f.updatedAt ?? null, f.deletedAt ?? f.deleted_at ?? null);
           changed = true;
+          // LWW update for existing entries
+          db.prepare(
+            "UPDATE favorite_foods SET deleted_at = ?, updated_at = ? WHERE id = ? AND (updated_at IS NULL OR updated_at < ?)"
+          ).run(f.deletedAt ?? f.deleted_at ?? null, f.updatedAt ?? f.updated_at ?? null, f.id, f.updatedAt ?? f.updated_at);
         }
       }
     });
