@@ -19,6 +19,8 @@ export default function NutritionDashboardWidget() {
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
   const [estimation, setEstimation] = useState<{ totalCalories: number; items: Array<{ name: string; calories: number }> } | null>(null);
+  const [showManualFallback, setShowManualFallback] = useState(false);
+  const [manualCalories, setManualCalories] = useState('');
 
   const loadData = useCallback(() => {
     Promise.all([
@@ -51,7 +53,8 @@ export default function NutritionDashboardWidget() {
       const result = await estimateNutrition(foodInput.trim());
       setEstimation({ totalCalories: result.calories, items: result.items });
     } catch {
-      toast({ type: 'warning', message: t('nutrify.estimateError', 'Error al estimar. Intenta en el modulo completo.') });
+      setEstimation(null);
+      setShowManualFallback(true);
     } finally {
       setEstimating(false);
     }
@@ -133,9 +136,11 @@ export default function NutritionDashboardWidget() {
               </div>
             </>
           ) : (
-            <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', fontStyle: 'italic', margin: 0 }}>
-              {t('nutrify.setupRequired', 'Setup required')}
-            </p>
+            <div className="nutri-empty" style={{ textAlign: 'center', padding: 16 }}>
+              <p style={{ color: 'var(--ink-faded)', fontStyle: 'italic', margin: 0 }}>
+                {t('nutrify.setupRequired', 'Configurá tu perfil nutricional')}
+              </p>
+            </div>
           )}
         </div>
         {weekCalories.length >= 2 && (
@@ -231,6 +236,47 @@ export default function NutritionDashboardWidget() {
                   {t('common.cancel', 'Cancelar')}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Manual fallback on AI error */}
+          {showManualFallback && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <input
+                className="rpg-input"
+                type="number"
+                placeholder="kcal"
+                value={manualCalories}
+                onChange={(e) => setManualCalories(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button
+                className="rpg-button"
+                disabled={!manualCalories || Number(manualCalories) <= 0}
+                onClick={async () => {
+                  const cal = Number(manualCalories);
+                  await window.api.nutritionLogFood({
+                    date: new Date().toISOString().slice(0, 10),
+                    description: foodInput.trim() || t('nutrify.manualEntry', 'Entrada manual'),
+                    calories: cal,
+                    source: 'manual',
+                  });
+                  const rpgResult = await window.api.processRpgEvent({
+                    type: 'MEAL_LOGGED',
+                    moduleId: 'nutrition',
+                    payload: { xp: 5, hp: 0, calories: cal },
+                    timestamp: Date.now(),
+                  });
+                  toast({ type: 'xp', message: `+${rpgResult.xpGained} XP` });
+                  window.dispatchEvent(new Event('rpg:statsChanged'));
+                  setShowManualFallback(false);
+                  setManualCalories('');
+                  setFoodInput('');
+                  loadData();
+                }}
+              >
+                {t('nutrify.confirm', 'Confirmar')}
+              </button>
             </div>
           )}
         </div>

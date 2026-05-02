@@ -353,6 +353,7 @@
     "hpExplanation": "HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP",
     "invalidCalories": "Las calorías deben ser mayores a 0",
     "logError": "Error al registrar comida",
+    "manualEntry": "Entrada manual",
     "manualMode": "Manual",
     "meals": "comidas",
     "nextDay": "Día siguiente",

@@ -353,6 +353,7 @@
     "hpExplanation": "HP based on target accuracy: within range = +HP, outside range = -HP",
     "invalidCalories": "Calories must be greater than 0",
     "logError": "Error logging food",
+    "manualEntry": "Manual entry",
     "manualMode": "Manual",
     "meals": "meals",
     "nextDay": "Next day",
