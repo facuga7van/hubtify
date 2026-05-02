@@ -3,6 +3,7 @@ import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import {
   evaluateQuestNotifications,
+  evaluateHabitNotifications,
   evaluateNutritionNotifications,
   evaluateFinanceNotifications,
   deduplicateAndInsert,
@@ -21,6 +22,9 @@ const enabledModules: Record<string, boolean> = { quests: true, nutrition: true,
 const POLLING_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const NATIVE_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
 
+let habitReminderEnabled = true;
+let habitReminderTime = '21:00';
+
 function runNotificationCheck(): number {
   const db = getDb();
 
@@ -28,6 +32,7 @@ function runNotificationCheck(): number {
 
   const candidates = [
     ...(enabledModules.quests ? evaluateQuestNotifications(db) : []),
+    ...(enabledModules.quests && habitReminderEnabled ? evaluateHabitNotifications(db, habitReminderTime) : []),
     ...(enabledModules.nutrition ? evaluateNutritionNotifications(db) : []),
     ...(enabledModules.finance ? evaluateFinanceNotifications(db) : []),
   ];
@@ -162,5 +167,10 @@ export function registerNotificationIpcHandlers(): void {
     if (module in enabledModules) {
       enabledModules[module] = enabled;
     }
+  });
+
+  ipcHandle('notifications:setHabitReminder', (_e, enabled: boolean, time: string) => {
+    habitReminderEnabled = enabled;
+    if (time) habitReminderTime = time;
   });
 }
