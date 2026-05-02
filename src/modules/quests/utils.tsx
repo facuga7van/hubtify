@@ -1,5 +1,6 @@
-import type { TaskTier } from './types';
+import type { TaskTier, HabitWithStreak } from './types';
 import { XP_MAP } from './types';
+import { playTaskComplete } from '../../shared/audio';
 import { getComboMultiplier } from '../../../shared/rpg-engine';
 import { GemRough, GemCut, GemBrilliant } from '../../shared/components/icons/CodexIcons';
 
@@ -47,6 +48,92 @@ export function bonusMultiplierToTier(multiplier: number): 'normal' | 'good' | '
   if (multiplier >= 2.0) return 'critical';
   if (multiplier >= 1.5) return 'good';
   return 'normal';
+}
+
+/* ── Shared habit check logic ──────────────────── */
+
+export interface HabitCheckCallbacks {
+  toast: (opts: { type: string; message: string; details?: Record<string, unknown> }) => void;
+  t: (key: string, fallback?: string) => string;
+  onXpGained?: () => void;
+}
+
+export async function processHabitCheck(
+  habitId: string,
+  habits: HabitWithStreak[],
+  callbacks: HabitCheckCallbacks,
+  date?: string,
+): Promise<void> {
+  const habit = habits.find(h => h.id === habitId);
+  if (!habit) return;
+
+  const result = date
+    ? await window.api.questsCheckHabitForDate(habitId, date)
+    : await window.api.questsCheckHabit(habitId);
+
+  if (result.checked) {
+    if (date) {
+      // Retroactive check: flat 5 XP (period-completion gate doesn't apply to past dates)
+      const rpgResult = await window.api.processRpgEvent({
+        type: 'HABIT_CHECKED', moduleId: 'quests',
+        payload: { xp: 5, hp: 0, habitId },
+        timestamp: Date.now(),
+      });
+      callbacks.toast({
+        type: 'xp',
+        message: `+${rpgResult.xpGained} XP`,
+        details: {
+          xp: rpgResult.xpGained,
+          bonusTier: bonusMultiplierToTier(rpgResult.bonusMultiplier),
+          comboMultiplier: rpgResult.comboMultiplier,
+          streakMilestone: rpgResult.milestoneXp || undefined,
+        },
+      });
+      callbacks.onXpGained?.();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } else {
+      // Normal check: XP only when period just completed
+      const justCompletedPeriod = habit.checksThisPeriod + 1 >= habit.targetThisPeriod
+        && habit.checksThisPeriod < habit.targetThisPeriod;
+      if (justCompletedPeriod) {
+        const streak = habit.streak + 1;
+        const xp = 5 + Math.min(streak, 10);
+        const rpgResult = await window.api.processRpgEvent({
+          type: 'HABIT_CHECKED', moduleId: 'quests',
+          payload: { xp, hp: 0, habitId },
+          timestamp: Date.now(),
+        });
+        callbacks.toast({
+          type: 'xp',
+          message: `+${rpgResult.xpGained} XP`,
+          details: {
+            xp: rpgResult.xpGained,
+            bonusTier: bonusMultiplierToTier(rpgResult.bonusMultiplier),
+            comboMultiplier: rpgResult.comboMultiplier,
+            streakMilestone: rpgResult.milestoneXp || undefined,
+          },
+        });
+        callbacks.onXpGained?.();
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+      }
+    }
+    playTaskComplete();
+  } else {
+    // Uncheck logic (only for normal checks, not retroactive)
+    if (!date) {
+      const droppedBelowTarget = habit.checksThisPeriod === habit.targetThisPeriod;
+      if (droppedBelowTarget) {
+        await window.api.processRpgEvent({
+          type: 'HABIT_UNCHECKED', moduleId: 'quests',
+          payload: { xp: -5, hp: 0, habitId },
+          timestamp: Date.now(),
+        });
+        callbacks.toast({ type: 'warning', message: callbacks.t('questify.habitUnchecked', 'Habit unchecked — XP deducted') });
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+      }
+    }
+  }
+  window.dispatchEvent(new Event('quests:dataChanged'));
 }
 
 export function getDueDateStatus(dueDate: string): 'overdue' | 'today' | 'this-week' | 'later' {
