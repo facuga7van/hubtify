@@ -761,16 +761,35 @@
 }
 
 .nutri-meal-del {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   background: transparent;
   border: none;
   color: var(--rubric);
-  cursor: pointer;
   font-size: var(--fs-quote);
-  opacity: 0.4;
-  transition: opacity 150ms ease;
 }
 
-.nutri-meal-del:hover { opacity: 1; }
+.nutri-food-action {
+  min-height: 32px;
+  min-width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.nutri-food-action svg {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.nutri-food-action:hover svg {
+  opacity: 1;
+}
+.nutri-food-action:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
 
 .nutri-empty {
   font-family: 'IM Fell English', serif;

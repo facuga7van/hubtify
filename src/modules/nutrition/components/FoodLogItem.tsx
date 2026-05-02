@@ -222,32 +222,25 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
               </button>
             </div>
           ) : (
-            <div className="nutri-meal-del" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div className="nutri-meal-del">
               {onFavorite && (
-                <span
-                  onClick={onFavorite}
-                  style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s', display: 'inline-flex' }}
-                  onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-                  onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}
-                  title={t('nutrify.saveToFavorites', 'Guardar en favoritos')}
-                >
-                  <Heart width={12} height={12} stroke="var(--rpg-hp-red)" />
+                <span className="nutri-food-action" onClick={onFavorite}
+                  title={t('nutrify.saveToFavorites', 'Guardar en favoritos')}>
+                  <Heart width={14} height={14} stroke="var(--rpg-hp-red)" />
                 </span>
               )}
-              <svg onClick={() => setEditing(true)} width="12" height="12" viewBox="0 0 12 12" fill="none"
-                stroke="var(--gold-dark)" strokeWidth="1.2" strokeLinecap="round"
-                style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
-                onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-                onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}>
-                <path d="M8.5 1.5l2 2M3 7l5.5-5.5 2 2L5 9H3V7z"/>
-              </svg>
-              <svg onClick={() => setConfirmDelete(true)} width="12" height="12" viewBox="0 0 12 12" fill="none"
-                stroke="var(--rubric)" strokeWidth="1.5" strokeLinecap="round"
-                style={{ cursor: 'pointer', opacity: 0.4, transition: 'opacity 0.2s' }}
-                onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
-                onMouseOut={(e) => (e.currentTarget.style.opacity = '0.4')}>
-                <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
-              </svg>
+              <span className="nutri-food-action" onClick={() => setEditing(true)}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                  stroke="var(--gold-dark)" strokeWidth="1.2" strokeLinecap="round">
+                  <path d="M8.5 1.5l2 2M3 7l5.5-5.5 2 2L5 9H3V7z"/>
+                </svg>
+              </span>
+              <span className="nutri-food-action" onClick={() => setConfirmDelete(true)}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                  stroke="var(--rubric)" strokeWidth="1.5" strokeLinecap="round">
+                  <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+                </svg>
+              </span>
             </div>
           )
         ) : <div />}
