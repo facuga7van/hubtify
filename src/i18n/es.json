@@ -234,6 +234,7 @@
     "logFoodHelp": "Describí lo que comiste en lenguaje natural y la IA estimará las calorías. Podés editar antes de confirmar.",
     "logWeight": "Registrar peso",
     "noFood": "No hay comidas registradas",
+    "noFoodToday": "No hay comidas registradas. Describí lo que comiste arriba o usá un favorito.",
     "noRecord": "Sin registro",
     "ofDailyTarget": "del objetivo diario",
     "ofTarget": "de",

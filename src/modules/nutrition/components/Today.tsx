@@ -12,7 +12,7 @@ import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import type { TFunction } from 'i18next';
@@ -880,7 +880,12 @@ export default function Today() {
             </button>
           )}
         </h3>
-        {foods.length === 0 && <p className="nutri-empty">{t('nutrify.noFood', 'No hay comidas registradas')}</p>}
+        {foods.length === 0 && !dayClosed && (
+          <div className="nutri-empty">
+            <Platter width={32} height={32} />
+            <p>{t('nutrify.noFoodToday', 'No hay comidas registradas. Describí lo que comiste arriba o usá un favorito.')}</p>
+          </div>
+        )}
         {mealGroups.map((group) => (
           <div key={group.type} className="nutri-meal-group">
             <div className="nutri-meal-group-header">
