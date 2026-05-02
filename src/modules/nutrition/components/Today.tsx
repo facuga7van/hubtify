@@ -948,6 +948,13 @@ export default function Today() {
           <div className="nutri-close-day">
             <CloseDayStats consumed={consumed} target={target} />
             <div className="nutri-reward-card">
+              <button
+                className="nutri-btn nutri-btn-ghost"
+                style={{ width: '100%', marginBottom: 8 }}
+                onClick={() => setWeightPopup({ show: true, lastWeight: weightPopup.lastWeight })}
+              >
+                {t('nutrify.logWeight', 'Registrar peso')}
+              </button>
               <button className="nutri-btn nutri-btn-primary" onClick={() => {
                 setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
                 setPopupGym(!!metrics.gym);

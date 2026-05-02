@@ -226,6 +226,7 @@
     "kcalUnit": "kcal",
     "logFood": "Log Food",
     "logFoodHelp": "Describe what you ate in natural language and AI will estimate calories. You can edit before confirming.",
+    "logWeight": "Log weight",
     "noFood": "No food logged yet",
     "noRecord": "No record",
     "ofDailyTarget": "of daily target",

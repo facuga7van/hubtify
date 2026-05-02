@@ -232,6 +232,7 @@
     "kcalUnit": "kcal",
     "logFood": "Registrar Comida",
     "logFoodHelp": "Describí lo que comiste en lenguaje natural y la IA estimará las calorías. Podés editar antes de confirmar.",
+    "logWeight": "Registrar peso",
     "noFood": "No hay comidas registradas",
     "noRecord": "Sin registro",
     "ofDailyTarget": "del objetivo diario",
