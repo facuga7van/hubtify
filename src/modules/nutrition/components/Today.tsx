@@ -1140,9 +1140,12 @@ function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: numbe
         <span className="nutri-reward-xp-total">
           <span className="nutri-green">+{data.xpTotal} XP</span>
           {data.hpChange !== 0 && (
-            <span className={data.hpChange > 0 ? 'nutri-green' : 'nutri-red'} style={{ marginLeft: 8 }}>
-              {data.hpChange > 0 ? '+' : ''}{data.hpChange} HP
-            </span>
+            <>
+              <span className={data.hpChange >= 0 ? 'nutri-green' : 'nutri-red'} style={{ marginLeft: 8 }}>
+                {data.hpChange >= 0 ? '+' : ''}{data.hpChange} HP
+              </span>
+              <HelpBubble text={t('nutrify.hpExplanation', 'HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP')} />
+            </>
           )}
         </span>
       </div>
