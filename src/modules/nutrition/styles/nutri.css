@@ -738,6 +738,24 @@
   font-size: var(--fs-quote);
 }
 
+.nutri-meal-unresolved {
+  background: var(--rpg-gold);
+  color: var(--ink);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
 .nutri-meal-name {
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-quote);

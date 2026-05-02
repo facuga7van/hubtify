@@ -165,6 +165,13 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
           >
             {MEAL_ICON_MAP[currentMeal] ?? <Platter width={16} height={16} />}
           </span>
+          {!entry.meal && !readOnly && onMealChange && (
+            <span
+              className="nutri-meal-unresolved"
+              title={t('nutrify.pickMeal', 'Elegí la comida')}
+              onClick={() => setMealDropdown(v => !v)}
+            >?</span>
+          )}
           {mealDropdown && (
             <div className="nutri-meal-picker">
               {MEAL_ORDER.map(m => (
