@@ -112,13 +112,13 @@ export function registerNutritionIpcHandlers(): void {
              frequent_food_id AS frequentFoodId,
              ai_breakdown AS aiBreakdown,
              meal
-      FROM food_log WHERE date = ? ORDER BY time ASC
+      FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC
     `).all(date);
   });
 
   ipcHandle('nutrition:deleteFood', (_e, id: number) => {
     const db = getDb();
-    const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
+    const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
     if (entry) {
       const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
       if (closed) throw new Error('Cannot modify a closed day');
@@ -132,7 +132,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
-    const entry = db.prepare('SELECT date FROM food_log WHERE id = ?').get(id) as { date: string } | undefined;
+    const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
     if (entry) {
       const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
       if (closed) throw new Error('Cannot modify a closed day');
@@ -148,7 +148,7 @@ export function registerNutritionIpcHandlers(): void {
     if (sets.length === 0) return;
     vals.push(id);
     db.transaction(() => {
-      db.prepare(`UPDATE food_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+      db.prepare(`UPDATE food_log SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL`).run(...vals);
       if (entry) recalcSummary(db, entry.date);
     })();
   });
@@ -170,7 +170,7 @@ export function registerNutritionIpcHandlers(): void {
     return db.prepare(`
       SELECT id, name, calories,
              times_used AS timesUsed, created_at AS createdAt
-      FROM frequent_foods ORDER BY times_used DESC
+      FROM frequent_foods WHERE deleted_at IS NULL ORDER BY times_used DESC
     `).all();
   });
 
@@ -191,7 +191,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:incrementFrequentUsage', (_e, id: number) => {
     const db = getDb();
-    db.prepare("UPDATE frequent_foods SET times_used = times_used + 1, updated_at = datetime('now') WHERE id = ?").run(id);
+    db.prepare("UPDATE frequent_foods SET times_used = times_used + 1, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
   });
 
   // ── Metrics ────────────────────────────────────────
@@ -296,7 +296,7 @@ export function registerNutritionIpcHandlers(): void {
     const rows = db.prepare(`
       SELECT date, COALESCE(SUM(calories), 0) AS total
       FROM food_log
-      WHERE date BETWEEN ? AND ?
+      WHERE date BETWEEN ? AND ? AND deleted_at IS NULL
       GROUP BY date
       ORDER BY date ASC
     `).all(sevenAgo, today) as Array<{ date: string; total: number }>;
@@ -317,14 +317,14 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:getTodayCalories', () => {
     const db = getDb();
     const today = todayDateString();
-    const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(today) as { total: number };
+    const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ? AND deleted_at IS NULL').get(today) as { total: number };
     return row.total;
   });
 
   ipcHandle('nutrition:getTodayMealsCount', () => {
     const db = getDb();
     const today = todayDateString();
-    const row = db.prepare('SELECT COUNT(*) AS c FROM food_log WHERE date = ?').get(today) as { c: number };
+    const row = db.prepare('SELECT COUNT(*) AS c FROM food_log WHERE date = ? AND deleted_at IS NULL').get(today) as { c: number };
     return row.c;
   });
 
@@ -511,7 +511,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:getFavoriteFoods', () => {
     const db = getDb();
-    return db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods ORDER BY created_at DESC').all();
+    return db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods WHERE deleted_at IS NULL ORDER BY created_at DESC').all();
   });
 
   ipcHandle('nutrition:addFavoriteFood', (_e, food: { description: string; calories: number; source?: string; aiBreakdown?: string }) => {
@@ -539,6 +539,7 @@ export function registerNutritionIpcHandlers(): void {
       LEFT JOIN nutrition_daily_closed c ON c.date = f.date
       WHERE c.date IS NULL
         AND f.date >= ? AND f.date < ?
+        AND f.deleted_at IS NULL
       ORDER BY f.date ASC
     `).all(sevenAgo, today) as { date: string }[];
 
@@ -552,7 +553,7 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
   const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
   if (!profile) return;
 
-  const totalCals = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ?').get(date) as { total: number };
+  const totalCals = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ? AND deleted_at IS NULL').get(date) as { total: number };
   const metrics = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
 
   const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
