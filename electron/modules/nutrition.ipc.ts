@@ -145,7 +145,8 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
     if (fields.source !== undefined) { sets.push('source = ?'); vals.push(fields.source); }
-    if (sets.length === 0) return;
+    sets.push("updated_at = datetime('now')");
+    if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
     db.transaction(() => {
       db.prepare(`UPDATE food_log SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL`).run(...vals);
@@ -180,7 +181,7 @@ export function registerNutritionIpcHandlers(): void {
     if (!Number.isFinite(food.calories) || food.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO frequent_foods (name, calories, created_at, updated_at) VALUES (?, ?, ?, ?)')
+    db.prepare('INSERT OR IGNORE INTO frequent_foods (name, calories, times_used, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
       .run(trimmedName, food.calories, now, now);
   });
 
