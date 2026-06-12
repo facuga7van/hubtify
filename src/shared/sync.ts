@@ -1,5 +1,6 @@
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getActiveFirestore } from './firebase';
+import { mergeQuestData } from './sync-merge';
 
 interface SyncSettings {
   language?: string;
@@ -43,7 +44,14 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
     // Only include questify if it has real data
     const questValues = Object.values(questData as Record<string, unknown[]>);
     if (questValues.some(arr => Array.isArray(arr) && arr.length > 0)) {
-      mainPayload.questify = questData;
+      // setDoc(merge:true) replaces each questify array wholesale, so merge
+      // per-record against the remote doc first — a record the local SQLite
+      // doesn't know yet (external writer, other device) must survive the push
+      const remoteSnap = await getDoc(userRef);
+      const remoteQuestify = remoteSnap.exists()
+        ? (remoteSnap.data().questify as Record<string, unknown> | undefined)
+        : undefined;
+      mainPayload.questify = mergeQuestData(questData as Record<string, unknown>, remoteQuestify);
     }
 
     // Only include nutrify if profile exists or any array has data

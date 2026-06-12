@@ -144,7 +144,7 @@ export default function Layout() {
   }, []);
 
   const refreshStats = useCallback(() => {
-    window.api.getRpgStats().then(setStats).catch(console.error);
+    window.api.getRpgStats().then(setStats).catch(() => { /* Stats refresh is non-critical */ });
   }, []);
 
   useEffect(() => {
@@ -160,10 +160,13 @@ export default function Layout() {
 
   // Debounced push sync — triggers 30s after last data change
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncGenRef = useRef(0);
   const debouncedPush = useCallback(() => {
     if (!authUser) return;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    const gen = syncGenRef.current;
     syncTimeoutRef.current = setTimeout(async () => {
+      if (syncGenRef.current !== gen) return;
       try {
         await syncPush(authUser.uid);
       } catch { /* Silent fail */ }
@@ -175,6 +178,7 @@ export default function Layout() {
   useEffect(() => {
     const handler = () => {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncGenRef.current += 1;
     };
     window.addEventListener('account:switched', handler);
     window.addEventListener('sync:cancelPush', handler);
@@ -206,18 +210,24 @@ export default function Layout() {
   useEffect(() => {
     if (!authUser) return;
     const onBlur = async () => {
+      const gen = syncGenRef.current;
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
       try {
+        if (syncGenRef.current !== gen) return;
         await syncPush(authUser.uid);
       } catch { /* Silent fail */ }
     };
     const onFocus = async () => {
+      const gen = syncGenRef.current;
       try {
-        // Push local changes FIRST so cloud has latest data before pulling
         if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-        await syncPush(authUser.uid);
+        if (syncGenRef.current !== gen) return;
+        // Pull BEFORE push: external writes land locally first, then the
+        // (per-record merged) push uploads the combined state
         const result = await syncPull(authUser.uid);
-        // Update stats without triggering level-up (sync restore, not user action)
+        if (syncGenRef.current !== gen) return;
+        await syncPush(authUser.uid);
+        if (syncGenRef.current !== gen) return;
         const freshStats = await window.api.getRpgStats();
         if (freshStats) prevLevelRef.current = freshStats.level;
         setStats(freshStats);
@@ -248,16 +258,18 @@ export default function Layout() {
 
   const retrySyncPull = useCallback(async () => {
     if (!authUser) return;
+    const gen = syncGenRef.current;
     setSyncError(false);
     try {
       const lastUid = await window.api.syncGetCurrentUser();
+      if (syncGenRef.current !== gen) return;
       if (lastUid && lastUid !== authUser.uid) {
         await window.api.syncClearUserData();
       }
+      if (syncGenRef.current !== gen) return;
       await window.api.syncSetCurrentUser(authUser.uid);
       const result = await syncPull(authUser.uid);
-      // Refresh stats after sync but skip level-up detection
-      // (sync restores cloud data, not a real level-up action)
+      if (syncGenRef.current !== gen) return;
       const freshStats = await window.api.getRpgStats();
       if (freshStats) prevLevelRef.current = freshStats.level;
       setStats(freshStats);
@@ -267,6 +279,7 @@ export default function Layout() {
         window.dispatchEvent(new Event('sync:cauldronUpdated'));
       }
     } catch {
+      if (syncGenRef.current !== gen) return;
       setSyncError(true);
     }
   }, [authUser]);
@@ -334,7 +347,10 @@ export default function Layout() {
         <div className={`sidebar-wrapper ${sidebarCollapsed ? 'sidebar-wrapper--collapsed' : ''}`}>
           <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onBellClick={() => setShowNotifications(true)} />
           <button onClick={toggleSidebar} className={`sidebar-toggle ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
-            title={sidebarCollapsed ? 'Expand' : 'Collapse'}>
+            title={sidebarCollapsed ? t('hub.expand', 'Expandir') : t('hub.collapse', 'Colapsar')}
+            aria-expanded={!sidebarCollapsed}
+            aria-controls="main-sidebar"
+            aria-label={t('hub.toggleSidebar', 'Alternar barra lateral')}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
               style={{ transition: 'transform 0.25s ease', transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
               <path d="M9 2L4 7l5 5"/>
@@ -343,7 +359,7 @@ export default function Layout() {
         </div>
         <main className="main-content">
           {syncError && (
-            <div style={{
+            <div role="alert" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
               padding: '10px 16px', background: 'rgba(248, 113, 113, 0.15)',
               border: '1px solid rgba(248, 113, 113, 0.3)', borderRadius: '6px',
@@ -369,7 +385,7 @@ export default function Layout() {
             position: 'fixed', inset: 0, display: 'none',
             alignItems: 'center', justifyContent: 'center',
             background: 'rgba(58, 35, 18, 0.88)',
-            zIndex: 9999, cursor: 'pointer',
+            zIndex: 5000, cursor: 'pointer',
           }}
         >
           {/* Flash layer */}
