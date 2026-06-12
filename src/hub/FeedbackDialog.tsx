@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '../shared/components/useToast';
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -9,6 +10,7 @@ interface FeedbackDialogProps {
 
 export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialogProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [type, setType] = useState<'bug' | 'feature' | 'other'>('bug');
   const [description, setDescription] = useState('');
   const [email, setEmail] = useState('');
@@ -40,6 +42,7 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
       setType('bug');
       onSent();
     } catch {
+      toast({ message: t('settings.feedbackError', 'No se pudo enviar el feedback. Intentá de nuevo más tarde.'), type: 'warning' });
       onClose();
     } finally {
       setSending(false);
@@ -50,13 +53,13 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(42, 29, 14, 0.7)', zIndex: 99999,
+      position: 'fixed', inset: 0, background: 'rgba(42, 29, 14, 0.7)', zIndex: 5000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={t('settings.feedback', 'Feedback')}
+        aria-labelledby="feedback-dialog-title"
         style={{
           background: 'linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%)',
           borderRadius: 6, padding: '24px 28px',
@@ -77,7 +80,7 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
           borderRadius: 3, pointerEvents: 'none',
         }} />
 
-        <h3 style={{
+        <h3 id="feedback-dialog-title" style={{
           fontFamily: "'UnifrakturCook', cursive", fontSize: 'var(--fs-heading)',
           color: 'var(--ink)', textAlign: 'center', marginBottom: 16,
         }}>
@@ -111,7 +114,7 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
               fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)',
               color: 'var(--ink-soft)', display: 'block', marginBottom: 4,
             }}>
-              {t('settings.feedbackDesc', 'Descripcion')}
+              {t('settings.feedbackDescLabel', 'Descripción')}
             </label>
             <textarea
               ref={descRef}

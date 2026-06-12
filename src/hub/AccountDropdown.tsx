@@ -32,6 +32,11 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
     updatePos();
   }, [updatePos]);
 
+  // Return focus to trigger on close
+  useEffect(() => {
+    return () => { anchorRef?.current?.focus(); };
+  }, [anchorRef]);
+
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -62,7 +67,8 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
     <div
       ref={ref}
       className="account-dropdown"
-      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 10000 }}
+      role="menu"
+      style={{ top: pos.top, left: pos.left }}
     >
       {/* Expired session toast */}
       {expiredEmail && (
@@ -87,10 +93,11 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
         <button
           key={account.uid}
           className="account-dropdown__item account-dropdown__item--switch"
+          role="menuitem"
           onClick={() => handleSwitch(account)}
         >
           <div className="account-dropdown__avatar">
-            {(account.username || account.email).charAt(0).toUpperCase()}
+            {(account.username || account.email || '?').charAt(0).toUpperCase()}
           </div>
           <div className="account-dropdown__info">
             {account.username && (
@@ -106,6 +113,7 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
       {/* Add account */}
       <button
         className="account-dropdown__item account-dropdown__item--add"
+        role="menuitem"
         onClick={() => { navigate('/login/add'); onClose(); }}
       >
         <span className="account-dropdown__plus">+</span>
@@ -115,6 +123,7 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
       {/* Sign out */}
       <button
         className="account-dropdown__item account-dropdown__item--logout"
+        role="menuitem"
         onClick={() => { onLogout(); onClose(); }}
       >
         <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">

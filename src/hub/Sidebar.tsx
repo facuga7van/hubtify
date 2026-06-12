@@ -10,6 +10,8 @@ import { Scroll, Shield, Sword, Bread, Coin, Crown, Tower, Cauldron } from '../s
 import Tooltip from '../shared/components/Tooltip';
 import './styles/layout.css';
 
+const STREAK_BAR_SCALE = 3.3; // 30 days = ~100% width
+
 interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; onBellClick?: () => void; }
 
 /** Badge counts for sidebar nav items */
@@ -115,7 +117,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
   const nextRank = stats ? getNextRank(stats.level) : null;
 
   return (
-    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+    <aside id="main-sidebar" className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div data-tour="player-card">
         <PlayerCard stats={stats} collapsed={collapsed} onBellClick={() => onBellClick?.()} />
 
@@ -161,7 +163,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
                   <span className="sidebar-bar__val">{stats.streak} {t('rpg.days', 'días')}</span>
                 </div>
                 <div className="sidebar-bar__track">
-                  <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * 3.3, 100)}%` }} />
+                  <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * STREAK_BAR_SCALE, 100)}%` }} />
                 </div>
               </div>
             )}
@@ -173,7 +175,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
       <div className="sidebar-divider" />
 
       {/* Nav */}
-      <nav className="sidebar-nav" data-tour="sidebar">
+      <nav className="sidebar-nav" data-tour="sidebar" aria-label={t('hub.mainNavigation', 'Navegación principal')}>
         {navKeys.map((item) => {
           const IconComp = NAV_ICONS[item.icon];
           // H1: Badge logic per nav item
@@ -214,7 +216,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
       <div className="sidebar-divider" />
 
       {/* Bottom nav: Character + Settings */}
-      <nav className="sidebar-settings-area" aria-label="Secondary">
+      <nav className="sidebar-settings-area" aria-label={t('hub.settingsNavigation', 'Configuración')}>
         {bottomNavKeys.map((item) => {
           const IconComp = NAV_ICONS[item.icon];
           const btn = (
@@ -262,11 +264,11 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
                 <Cauldron width={18} height={18} />
                 <span className="sidebar-badge sidebar-badge--dot" />
               </span>
-              <span className="sidebar-nav-item__label">{t('cauldron.showTimer', 'Show timer')}</span>
+              <span className="sidebar-nav-item__label">{t('cauldron.showTimer', 'Mostrar temporizador')}</span>
             </button>
           );
           return collapsed
-            ? <Tooltip text={t('cauldron.showTimer', 'Show timer')}>{showTimerBtn}</Tooltip>
+            ? <Tooltip text={t('cauldron.showTimer', 'Mostrar temporizador')}>{showTimerBtn}</Tooltip>
             : showTimerBtn;
         })()}
       </nav>
@@ -278,7 +280,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
             <span className="sidebar-footer__combo-num">
               ×{[1.0, 1.25, 1.5, 1.75, 2.0][Math.min(Math.max(stats.dailyCombo - 1, 0), 4)]}
             </span>
-            <span className="sidebar-footer__combo-txt">{t('rpg.todayCombo', "Today's Combo")}</span>
+            <span className="sidebar-footer__combo-txt">{t('rpg.todayCombo', 'Combo de Hoy')}</span>
           </div>
         )}
         <div className="sidebar-footer__bottom">
@@ -291,7 +293,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
             const newLang = i18n.language === 'es' ? 'en' : 'es';
             i18n.changeLanguage(newLang);
             localStorage.setItem('hubtify_lang', newLang);
-          }} className="sidebar-footer__lang" aria-label={t('nav.switchLanguage', 'Switch language')}>
+          }} className="sidebar-footer__lang" aria-label={t('nav.switchLanguage', 'Cambiar idioma')}>
             {i18n.language === 'es' ? 'ES' : 'EN'}
           </button>
         </div>

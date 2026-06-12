@@ -252,31 +252,6 @@
   opacity: 0.8;
 }
 
-/* Streak badge */
-.player-card__streak {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 4px 0 0;
-  font-size: var(--fs-label);
-  color: #e67e22;
-  font-family: 'Fira Code', monospace;
-  line-height: 1;
-  white-space: nowrap;
-  transition: opacity 0.2s ease;
-}
-
-.player-card--collapsed .player-card__streak {
-  justify-content: center;
-  padding: 2px 0 0;
-}
-
-.player-card--collapsed .player-card__streak-text {
-  opacity: 0;
-  width: 0;
-  overflow: hidden;
-}
 
 /* ══════════════════════════════════════════════════════
    STAT BARS — VITA / XP / RACHA

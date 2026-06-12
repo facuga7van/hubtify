@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { BookPage } from '../shared/components/codex';
 import {
   Section,
@@ -19,6 +20,12 @@ import {
   Scroll,
   Quill,
   Compass,
+  Sparkle,
+  Dagger,
+  CrossPlus,
+  Pencil,
+  ArrowUpRight,
+  Cauldron,
 } from '../shared/components/icons';
 import Tooltip from '../shared/components/Tooltip';
 import HelpBubble from '../shared/components/HelpBubble';
@@ -47,27 +54,27 @@ function toRoman(n: number): string {
   return result;
 }
 
-function formatNumber(n: number): string {
-  return n.toLocaleString('es-ES');
+function formatNumber(n: number, locale = 'es-ES'): string {
+  return n.toLocaleString(locale);
 }
 
-const EVENT_ICON_MAP: Record<string, string> = {
-  TASK_COMPLETED: '\u2694',
-  TASK_UNCOMPLETED: '\u2694',
-  SUBTASK_COMPLETED: '\u2694',
-  SUBTASK_UNCOMPLETED: '\u2694',
-  HABIT_CHECKED: '\u2726',
-  HABIT_UNCHECKED: '\u2726',
-  MEAL_LOGGED: '\u2020',
-  DAY_SUMMARY: '\u2020',
-  EXPENSE_LOGGED: '\u2020',
-  EXPENSE_TRACKED: '\u2020',
-  INCOME_LOGGED: '\u2020',
-  LOAN_SETTLED: '\u2020',
-  STATEMENT_IMPORTED: '\u2020',
-  RECURRING_UPDATED: '\u2020',
-  POMODORO_COMPLETED: '\u271A',
-  LEVEL_UP: '\u271A',
+const EVENT_ICON_COMPONENTS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
+  TASK_COMPLETED: Sword,
+  TASK_UNCOMPLETED: Sword,
+  SUBTASK_COMPLETED: Sword,
+  SUBTASK_UNCOMPLETED: Sword,
+  HABIT_CHECKED: Sparkle,
+  HABIT_UNCHECKED: Sparkle,
+  MEAL_LOGGED: Scale,
+  DAY_SUMMARY: Scale,
+  EXPENSE_LOGGED: Coin,
+  EXPENSE_TRACKED: Coin,
+  INCOME_LOGGED: Coin,
+  LOAN_SETTLED: Coin,
+  STATEMENT_IMPORTED: Coin,
+  RECURRING_UPDATED: Coin,
+  POMODORO_COMPLETED: Cauldron,
+  LEVEL_UP: CrossPlus,
 };
 
 /** Build the title trail from TITLE_THRESHOLDS. */
@@ -85,8 +92,7 @@ function buildTitleTrail(currentLevel: number, t: (key: string, fallback: string
 
 /** Derive "virtue" stats from player data. These are synthetic
  *  gauges derived from the real stats. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deriveVirtues(stats: PlayerStats, t: (...args: any[]) => any) {
+function deriveVirtues(stats: PlayerStats, t: TFunction) {
   // Each virtue maps a real metric to a 0-100 pct scale
   const cap = (v: number, max: number) => Math.min(100, Math.round((v / max) * 100));
   return [
@@ -102,7 +108,8 @@ function deriveVirtues(stats: PlayerStats, t: (...args: any[]) => any) {
 /* ── main component ──────────────────────────────── */
 
 export default function CharacterPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'en' ? 'en-US' : 'es-ES';
   const { user: authUser } = useAuthContext();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
@@ -114,10 +121,12 @@ export default function CharacterPage() {
   const load = useCallback(() => {
     setLoadError(false);
     Promise.all([
-      window.api.getRpgStats().then(setStats),
-      window.api.getRpgHistory(20).then(setHistory),
-      window.api.characterGetName().then(name => setCharacterName(name || '')),
-    ]).catch(() => setLoadError(true));
+      window.api.getRpgStats().then(setStats).catch(() => null),
+      window.api.getRpgHistory(20).then(setHistory).catch(() => null),
+      window.api.characterGetName().then(name => setCharacterName(name || '')).catch(() => null),
+    ]).then(results => {
+      if (results[0] === null && results[1] === null) setLoadError(true);
+    });
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -141,20 +150,20 @@ export default function CharacterPage() {
   const translatedTitle = t(getTitleKey(stats.level), stats.title);
   const playerName = characterName || authUser?.displayName || translatedTitle;
   const levelDisplay = stats.level;
-  const titleTrail = buildTitleTrail(stats.level, t);
-  const virtues = deriveVirtues(stats, t);
+  const titleTrail = useMemo(() => buildTitleTrail(stats.level, t), [stats.level, t]);
+  const virtues = useMemo(() => deriveVirtues(stats, t), [stats, t]);
   const xpNeeded = stats.xpToNextLevel;
   const xpTotal = stats.xp;
-  const xpForNext = xpThreshold(stats.level + 1);
+  const xpForNext = useMemo(() => xpThreshold(stats.level + 1), [stats.level]);
   const xpPct = xpForNext > 0 ? Math.round((xpTotal / xpForNext) * 100) : 0;
 
   // Find next title info
-  const nextTitle = titleTrail.find((t) => !t.done);
+  const nextTitle = useMemo(() => titleTrail.find((t) => !t.done), [titleTrail]);
 
   return (
     <BookPage
       data-tour="character"
-      eyebrow={t('character.eyebrow', '\u2726 TOMO V \u2726  \u2014  EFFIGIES HEROIS')}
+      eyebrow={<><Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {t('character.eyebrowText', 'TOMO V')} <Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {'\u2014'} {t('character.eyebrowSub', 'EFFIGIES HEROIS')}</>}
       title={t('character.title', 'Ficha del Héroe')}
       subtitle={t('character.pageSubtitle', 'Dó se conservan el retrato, los hechos y las virtudes del aventurero')}
     >
@@ -172,35 +181,40 @@ export default function CharacterPage() {
           {/* Editable character name */}
           <div className="hero-name-edit">
             {isEditingName ? (
-              <input
-                className="hero-name-input"
-                type="text"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+              <>
+                <input
+                  className="hero-name-input"
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const trimmed = nameInput.trim();
+                      window.api.characterSetName(trimmed).then(() => {
+                        setCharacterName(trimmed);
+                        setIsEditingName(false);
+                        window.dispatchEvent(new Event('character:nameChanged'));
+                      });
+                    } else if (e.key === 'Escape') {
+                      setIsEditingName(false);
+                    }
+                  }}
+                  onBlur={() => {
                     const trimmed = nameInput.trim();
                     window.api.characterSetName(trimmed).then(() => {
                       setCharacterName(trimmed);
                       setIsEditingName(false);
                       window.dispatchEvent(new Event('character:nameChanged'));
                     });
-                  } else if (e.key === 'Escape') {
-                    setIsEditingName(false);
-                  }
-                }}
-                onBlur={() => {
-                  const trimmed = nameInput.trim();
-                  window.api.characterSetName(trimmed).then(() => {
-                    setCharacterName(trimmed);
-                    setIsEditingName(false);
-                    window.dispatchEvent(new Event('character:nameChanged'));
-                  });
-                }}
-                autoFocus
-                maxLength={30}
-                placeholder={t('character.setName', 'Nombre del personaje...')}
-              />
+                  }}
+                  autoFocus
+                  maxLength={30}
+                  placeholder={t('character.setName', 'Nombre del personaje...')}
+                />
+                <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', display: 'block', marginTop: 2 }}>
+                  {nameInput.length}/30
+                </span>
+              </>
             ) : (
               <button
                 className="hero-name-button"
@@ -217,7 +231,7 @@ export default function CharacterPage() {
                     {t('character.editName', 'Click para cambiar el nombre del personaje')}
                   </span>
                 )}
-                <span>{' \u270E'}</span>
+                <Pencil width={12} height={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
               </button>
             )}
           </div>
@@ -245,12 +259,12 @@ export default function CharacterPage() {
               <div className="hero-bar-header">
                 <span className="qb-small-caps" style={{ color: 'var(--moss)' }}>EXPERIENTIA</span>
                 <span className="qb-numeral" style={{ fontSize: 'var(--fs-label)' }}>
-                  {formatNumber(xpTotal)} / {formatNumber(xpForNext)}
+                  {formatNumber(xpTotal, locale)} / {formatNumber(xpForNext, locale)}
                 </span>
               </div>
               <Gauge value={xpPct} max={100} tone="sage" />
               <div className="qb-hand hero-bar-hint">
-                {formatNumber(xpNeeded)} {t('character.xpToNextLevel', 'xp para el próximo ascenso')}
+                {formatNumber(xpNeeded, locale)} {t('character.xpToNextLevel', 'xp para el próximo ascenso')}
                 {nextTitle ? ` \u2014 ${nextTitle.name} ${t('character.atLevel', 'al nivel')} ${nextTitle.level}` : ''}
               </div>
             </div>
@@ -259,9 +273,9 @@ export default function CharacterPage() {
           {/* Wax seals */}
           <div className="hero-seals">
             {[
-              { label: String(stats.totalTasks), rotation: -4 },
-              { label: String(stats.streak), rotation: 0 },
-              { label: '\u2020', rotation: 4 },
+              { label: String(stats.totalTasks) as ReactNode, rotation: -4 },
+              { label: String(stats.streak) as ReactNode, rotation: 0 },
+              { label: <Dagger width={14} height={14} /> as ReactNode, rotation: 4 },
             ].map((seal, i) => (
               <div
                 key={i}
@@ -314,13 +328,13 @@ export default function CharacterPage() {
             rightSlot={<HelpBubble variant="inline" text={t('character.deedBookHelp', 'Estadísticas acumuladas: misiones, comidas, transacciones, racha y combo. El combo sube con acciones variadas en un día.')} />}
           >
             <div className="hero-stats-grid">
-              <Tooltip text={t('character.statQuestsTip', 'Misiones completadas en total')}><StatBox label={t('character.statQuests', 'MISIONES')} value={formatNumber(stats.totalTasks)} /></Tooltip>
-              <Tooltip text={t('character.statMealsTip', 'Comidas registradas en total')}><StatBox label={t('character.statMeals', 'VIANDAS')} value={formatNumber(stats.totalMeals)} /></Tooltip>
-              <Tooltip text={t('character.statExpensesTip', 'Transacciones registradas en total')}><StatBox label={t('character.statExpenses', 'MONEDAS')} value={formatNumber(stats.totalExpenses)} /></Tooltip>
+              <Tooltip text={t('character.statQuestsTip', 'Misiones completadas en total')}><StatBox label={t('character.statQuests', 'MISIONES')} value={formatNumber(stats.totalTasks, locale)} /></Tooltip>
+              <Tooltip text={t('character.statMealsTip', 'Comidas registradas en total')}><StatBox label={t('character.statMeals', 'VIANDAS')} value={formatNumber(stats.totalMeals, locale)} /></Tooltip>
+              <Tooltip text={t('character.statExpensesTip', 'Transacciones registradas en total')}><StatBox label={t('character.statExpenses', 'MONEDAS')} value={formatNumber(stats.totalExpenses, locale)} /></Tooltip>
               <Tooltip text={t('character.statComboTip', 'Multiplicador diario por acciones variadas')}><StatBox label={t('character.statCombo', 'COMBO')} value={String(stats.dailyCombo)} /></Tooltip>
               <Tooltip text={t('character.statStreakTip', 'Días consecutivos de actividad')}><StatBox label={t('character.statStreak', 'RACHA')} value={`${stats.streak}d`} /></Tooltip>
               <Tooltip text={t('character.statLevelTip', 'Nivel actual del héroe')}><StatBox label={t('character.statLevel', 'NIVEL')} value={levelDisplay} /></Tooltip>
-              <Tooltip text={t('character.statTotalXpTip', 'Experiencia acumulada en total')}><StatBox label={t('character.statTotalXp', 'XP TOTAL')} value={formatNumber(xpTotal)} /></Tooltip>
+              <Tooltip text={t('character.statTotalXpTip', 'Experiencia acumulada en total')}><StatBox label={t('character.statTotalXp', 'XP TOTAL')} value={formatNumber(xpTotal, locale)} /></Tooltip>
               <Tooltip text={t('character.statMaxHpTip', 'Salud máxima del héroe')}><StatBox label={t('character.statMaxHp', 'SALUD MAX')} value={String(stats.maxHp)} /></Tooltip>
             </div>
           </Section>
@@ -340,7 +354,7 @@ export default function CharacterPage() {
             ) : (
               <div className="hero-chronicle-grid">
                 {history.slice(0, 12).map((event) => {
-                  const icon = EVENT_ICON_MAP[event.eventType] ?? '\u2726';
+                  const IconComp = EVENT_ICON_COMPONENTS[event.eventType] ?? Sparkle;
                   const label = t(`events.${event.eventType}`);
                   const displayLabel = label !== `events.${event.eventType}` ? label : event.eventType;
                   const xpText = event.xpGained > 0
@@ -348,7 +362,7 @@ export default function CharacterPage() {
                     : `${Math.round(event.xpGained)} XP`;
                   return (
                     <div key={event.id} className="hero-chronicle-row">
-                      <span className="hero-chronicle-icon">{icon}</span>
+                      <span className="hero-chronicle-icon"><IconComp width={12} height={12} /></span>
                       <span className="hero-chronicle-text">{displayLabel}</span>
                       <span className="qb-numeral hero-chronicle-xp">{xpText}</span>
                     </div>
@@ -373,7 +387,7 @@ export default function CharacterPage() {
 
       {/* Marginalia */}
       <div className="hero-marginalia">
-        {t('character.marginalia', 'nota del escriba \u2014 el retrato fue pintado en la feria de Midsummer')} {'\u2197'}
+        {t('character.marginalia', 'nota del escriba \u2014 el retrato fue pintado en la feria de Midsummer')} <ArrowUpRight width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} />
       </div>
     </BookPage>
   );

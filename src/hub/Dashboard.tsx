@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   BookPage,
   Cartouche,
   QBDividerSection,
   Section,
 } from '../shared/components/codex';
-import { Sword, Crown, Flame, Heart, Scroll, Quill } from '../shared/components/icons';
+import { Sword, Crown, Flame, Heart, Scroll, Quill, Cauldron, Sparkle, Dagger, FloralHeart, ArrowUpRight } from '../shared/components/icons';
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
 import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
@@ -37,13 +38,14 @@ const EPIGRAPHS: { quote: string; author: string }[] = [
 /* ── helpers ──────────────────────────────────────────────── */
 
 
-function eventIcon(moduleId: string): string {
+function eventIcon(moduleId: string): ReactNode {
+  const size = 14;
   switch (moduleId) {
-    case 'quests': return '\u2694'; // swords
-    case 'nutrition': return '\u2766'; // floral heart
-    case 'finance': return '\u2020'; // dagger
-    case 'cauldron': return '\u2697'; // alembic
-    default: return '\u2726'; // star
+    case 'quests': return <Sword width={size} height={size} />;
+    case 'nutrition': return <FloralHeart width={size} height={size} />;
+    case 'finance': return <Dagger width={size} height={size} />;
+    case 'cauldron': return <Cauldron width={size} height={size} />;
+    default: return <Sparkle width={size} height={size} />;
   }
 }
 
@@ -62,7 +64,7 @@ function formatEventTime(createdAt: string): string {
 
 /* ── XP Ledger mini chart ─────────────────────────────────── */
 
-function XpLedger({ data, t }: { data: Array<{ date: string; xp: number }>; t: (...args: any[]) => any }) {
+function XpLedger({ data, t }: { data: Array<{ date: string; xp: number }>; t: TFunction }) {
   if (data.length === 0) return null;
   const maxXp = Math.max(...data.map((d) => d.xp), 1);
   const daysShort = t('dashboard.daysShort', { returnObjects: true, defaultValue: ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'] }) as string[];
@@ -240,7 +242,7 @@ export default function Dashboard() {
   return (
     <BookPage
       data-tour="welcome"
-      eyebrow={t('dashboard.eyebrow', '\u2723 HUBTIFY \u2723  \u2014  CÓDICE DEL AVENTURERO')}
+      eyebrow={<><Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {t('dashboard.eyebrowText', 'HUBTIFY')} <Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {'\u2014'} {t('dashboard.eyebrowSub', 'CÓDICE DEL AVENTURERO')}</>}
       title={t('dashboard.title', 'Tabla del Aventurero')}
       subtitle={t('dashboard.subtitle', 'Primer folio · do se escriben las nuevas del día y se registran los hechos del campeón')}
     >
@@ -292,7 +294,7 @@ export default function Dashboard() {
               transform: 'rotate(4deg)',
             }}
           >
-            {t('dashboard.royalSeal', 'sigilo real')} {'\u2198'}
+            {t('dashboard.royalSeal', 'sigilo real')} <ArrowUpRight width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle', transform: 'rotate(90deg)' }} />
           </div>
         </div>
       </div>
@@ -423,7 +425,7 @@ export default function Dashboard() {
         transform: 'rotate(-2deg)',
         textAlign: 'right',
       }}>
-        {t('dashboard.marginNote', 'nota al margen')} {'\u2014'} {dashStats?.eventsToday ?? 0} {t('dashboard.eventsToday', 'hechos registrados hoy')} {'\u2197'}
+        {t('dashboard.marginNote', 'nota al margen')} {'\u2014'} {dashStats?.eventsToday ?? 0} {t('dashboard.eventsToday', 'hechos registrados hoy')} <ArrowUpRight width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} />
       </div>
     </BookPage>
   );

@@ -8,7 +8,12 @@
   "hub": {
     "character": "Hero's Sheet",
     "codex": "Adventurer's Codex",
-    "dashboard": "Adventurer's Codex"
+    "collapse": "Collapse",
+    "dashboard": "Adventurer's Codex",
+    "expand": "Expand",
+    "mainNavigation": "Main navigation",
+    "settingsNavigation": "Settings",
+    "toggleSidebar": "Toggle sidebar"
   },
   "dashboard": {
     "cartDueToday": "QUESTS TODAY",
@@ -695,6 +700,7 @@
     "pageSubtitle": "Wherein the portrait, deeds, and virtues of the adventurer are preserved",
     "questifyCompleted": "Questify Completed",
     "radiant": "Radiant",
+    "saveFailed": "Could not save character",
     "recentActivity": "Recent Activity",
     "recentChronicleHelp": "Last 12 events that gave XP. Negative values occur from low caloric accuracy when closing the day.",
     "sealsHint": "seals of valor \u2014 quests, streak, royal favor",
@@ -890,6 +896,7 @@
     "email": "Email",
     "emailOrUsername": "Email or username",
     "password": "Password",
+    "passwordTooShort": "Password must be at least 6 characters",
     "enterRealm": "Enter the Realm",
     "createAccount": "Create Account",
     "noAccount": "Don't have an account? Register",
@@ -1041,6 +1048,7 @@
     "ready": "Your codex is ready!",
     "readyDesc": "Explore the modules with the guided tour",
     "startExploring": "Explore Hubtify",
+    "stepProgress": "Step {{current}} of {{total}}",
     "yourModules": "Your Modules",
     "questifyDesc": "Tasks and productivity",
     "nutriftyDesc": "Nutrition and calories",

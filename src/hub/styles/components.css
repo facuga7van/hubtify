@@ -137,10 +137,10 @@
 }
 
 /* ── Button Active State ─────────────────────────── */
-.rpg-btn-active {
-  background: linear-gradient(to bottom, var(--gold-dark), var(--gold)) !important;
-  color: var(--leather) !important;
-  border-color: var(--gold-light) !important;
+.rpg-button.rpg-btn-active {
+  background: linear-gradient(to bottom, var(--gold-dark), var(--gold));
+  color: var(--leather);
+  border-color: var(--gold-light);
 }
 
 /* ── Card Small ───────────────────────────────────── */
@@ -213,28 +213,6 @@
   gap: 16px;
 }
 
-.dashboard-widget {
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.dashboard-widget .rpg-card-title {
-  flex-shrink: 0;
-}
-
-.dashboard-widget > *:last-child:not(.rpg-card-title) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.dashboard-widget:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(42, 29, 14, 0.35), 0 0 0 1px var(--gold);
-}
 
 /* ── Utility Styles ───────────────────────────────── */
 .rpg-input {
@@ -443,7 +421,7 @@
 }
 
 .auth-card__success {
-  color: var(--rpg-xp-green);
+  color: var(--moss);
   font-size: var(--fs-label);
   font-family: 'IM Fell English', serif;
   font-style: italic;
@@ -870,9 +848,9 @@
   border-color: rgba(122, 30, 30, 0.22);
 }
 
-.settings-danger-title {
-  color: var(--rubric) !important;
-  border-bottom-color: rgba(122, 30, 30, 0.35) !important;
+.rpg-card-title.settings-danger-title {
+  color: var(--rubric);
+  border-bottom-color: rgba(122, 30, 30, 0.35);
 }
 
 .settings-row {
@@ -911,15 +889,15 @@
   opacity: 0.45;
 }
 
-.settings-btn--danger {
-  background: linear-gradient(to bottom, var(--rubric-light), var(--rubric)) !important;
-  color: var(--parch-0) !important;
-  border-color: rgba(122, 30, 30, 0.6) !important;
+.rpg-btn-sm.settings-btn--danger {
+  background: linear-gradient(to bottom, var(--rubric-light), var(--rubric));
+  color: var(--parch-0);
+  border-color: rgba(122, 30, 30, 0.6);
 }
 
-.settings-btn--danger:hover {
-  background: linear-gradient(to bottom, var(--rubric), #5a0e0e) !important;
-  color: var(--parch-0) !important;
+.rpg-btn-sm.settings-btn--danger:hover {
+  background: linear-gradient(to bottom, var(--rubric), #5a0e0e);
+  color: var(--parch-0);
 }
 
 /* ── Codex Toggle Switch ─────────────────────────── */

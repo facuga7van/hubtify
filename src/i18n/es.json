@@ -8,7 +8,12 @@
   "hub": {
     "character": "Ficha del Héroe",
     "codex": "Códice del Aventurero",
-    "dashboard": "Tabla del Aventurero"
+    "collapse": "Colapsar",
+    "dashboard": "Tabla del Aventurero",
+    "expand": "Expandir",
+    "mainNavigation": "Navegación principal",
+    "settingsNavigation": "Configuración",
+    "toggleSidebar": "Alternar barra lateral"
   },
   "dashboard": {
     "cartDueToday": "MISIONES HOY",
@@ -694,6 +699,7 @@
     "pageSubtitle": "Dó se conservan el retrato, los hechos y las virtudes del aventurero",
     "questifyCompleted": "Questify Completadas",
     "radiant": "Radiante",
+    "saveFailed": "No se pudo guardar el personaje",
     "recentActivity": "Actividad Reciente",
     "recentChronicleHelp": "Últimos 12 eventos que dieron XP. Valores negativos ocurren por baja precisión calórica al cerrar el día.",
     "sealsHint": "sellos de hazañas \u2014 misiones, racha, favor real",
@@ -889,6 +895,7 @@
     "email": "Correo electrónico",
     "emailOrUsername": "Email o nombre de usuario",
     "password": "Contraseña",
+    "passwordTooShort": "La contraseña debe tener al menos 6 caracteres",
     "enterRealm": "Entrar al Reino",
     "createAccount": "Crear Cuenta",
     "noAccount": "¿No tenés cuenta? Registrate",
@@ -1040,6 +1047,7 @@
     "ready": "¡Tu códice está listo!",
     "readyDesc": "Explorá los módulos con el tour guiado",
     "startExploring": "Explorar Hubtify",
+    "stepProgress": "Paso {{current}} de {{total}}",
     "yourModules": "Tus Módulos",
     "questifyDesc": "Tareas y productividad",
     "nutriftyDesc": "Nutrición y calorías",

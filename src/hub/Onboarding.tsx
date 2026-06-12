@@ -374,11 +374,11 @@ export default function Onboarding({ onComplete }: Props) {
           {stepContent()}
 
           {/* Step indicators — wax seal dots */}
-          <div className="onboarding__steps">
+          <div className="onboarding__steps" role="group" aria-label={t('onboarding.stepProgress', { current: step + 1, total: TOTAL_STEPS })}>
             {Array.from({ length: TOTAL_STEPS }, (_, i) => (
               <div key={i} className={
                 `onboarding__dot${i === step ? ' onboarding__dot--active' : ''}${i < step ? ' onboarding__dot--done' : ''}`
-              } />
+              } aria-current={i === step ? 'step' : undefined} />
             ))}
           </div>
         </div>

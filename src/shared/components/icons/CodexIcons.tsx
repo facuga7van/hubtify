@@ -588,3 +588,24 @@ export function ResizeVertical(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function ArrowUpRight(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>);
+}
+
+export function CrossPlus(props: React.SVGProps<SVGSVGElement>) {
+  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>);
+}
+
+export function FloralHeart(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      {/* Heart body */}
+      <path d="M12 21 C 5 16 3 12 3 8 A 4 4 0 0 1 12 6 A 4 4 0 0 1 21 8 C 21 12 19 16 12 21Z" />
+      {/* Floral tendrils */}
+      <path d="M6 6 Q 4 3 6 2 M18 6 Q 20 3 18 2" strokeWidth=".8" />
+      {/* Center petal */}
+      <path d="M12 6 V3" strokeWidth=".8" />
+    </svg>
+  );
+}

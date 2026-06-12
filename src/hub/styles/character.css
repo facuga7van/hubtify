@@ -329,74 +329,17 @@
   transform: rotate(1deg);
 }
 
-/* ── character customizer within codex ────────── */
-.hero-customizer {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 1px solid rgba(74, 55, 32, 0.45);
-  background: rgba(245, 231, 192, 0.45);
-}
 
-.hero-customizer-title {
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-label);
-  letter-spacing: 0.12em;
-  color: var(--rubric);
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+/* ── responsive: stack hero layout on small screens ── */
+@media (max-width: 768px) {
+  .hero-layout {
+    grid-template-columns: 1fr;
+  }
 
-.hero-customizer-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.hero-customizer-label {
-  font-family: 'IM Fell English', serif;
-  font-style: italic;
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
-}
-
-.hero-customizer-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.hero-customizer-value {
-  font-family: 'UnifrakturCook', cursive;
-  font-size: var(--fs-quote);
-  min-width: 24px;
-  text-align: center;
-  color: var(--ink);
-}
-
-.hero-customizer-btn {
-  width: 24px;
-  height: 24px;
-  border: 1px solid rgba(74, 55, 32, 0.5);
-  background: rgba(245, 231, 192, 0.6);
-  color: var(--ink);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  transition: background 0.15s;
-}
-
-.hero-customizer-btn:hover {
-  background: rgba(245, 231, 192, 0.8);
-}
-
-.hero-customizer-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  .hero-portrait-frame {
+    max-width: 260px;
+    margin: 0 auto;
+  }
 }
 
 

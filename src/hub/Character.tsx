@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Application, Assets, Sprite, type Renderer } from 'pixi.js';
 import HelpBubble from '../shared/components/HelpBubble';
+import { useToast } from '../shared/components/useToast';
 
 import faceImg from '../assets/pixi/face.png';
 import neckImg from '../assets/pixi/neck.png';
@@ -42,6 +43,7 @@ interface Props {
 
 export default function Character({ size = 100, canCustomize = false }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const pixiContainerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application<Renderer> | null>(null);
   const rearHairBackRef = useRef<Sprite | null>(null);
@@ -52,6 +54,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
 
   const [charData, setCharData] = useState<CharacterData>(DEFAULT_CHAR);
   const [loadingHair, setLoadingHair] = useState(true);
+  const [pixiError, setPixiError] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [dbLoaded, setDbLoaded] = useState(false);
 
@@ -62,7 +65,8 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
   const loadCharacter = useCallback(() => {
     setDbLoaded(false);
     window.api.characterLoad().then((data) => {
-      if (data && typeof data === 'object') {
+      if (data && typeof data === 'object' &&
+          'backHairIndex' in data && 'frontHairIndex' in data) {
         const d = data as CharacterData;
         const loaded = {
           backHairIndex: d.backHairIndex ?? 1,
@@ -73,7 +77,9 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
         setCharData(loaded);
         charDataRef.current = loaded;
       }
-    }).catch(console.error).finally(() => setDbLoaded(true));
+    }).catch(() => {
+      toast({ message: t('common.somethingWentWrong', 'Algo salió mal'), type: 'warning' });
+    }).finally(() => setDbLoaded(true));
   }, []);
 
   useEffect(() => { loadCharacter(); }, [loadCharacter]);
@@ -173,7 +179,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       if (frontHairRef.current) app.stage.setChildIndex(frontHairRef.current, app.stage.children.length - 1);
 
     } catch (e) {
-      console.error('[Character]', e);
+      // Hair loading is non-critical — character renders without it
     } finally {
       isLoadingRef.current = false;
       setLoadingHair(false);
@@ -187,38 +193,43 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     const app = new Application();
 
     (async () => {
-      const canvas = document.createElement('canvas');
+      try {
+        const canvas = document.createElement('canvas');
 
-      const dpr = window.devicePixelRatio || 1;
-      const res = (size / 100) * dpr;
-      await app.init({ canvas, background: '#c0a080', width: 100, height: 100, resolution: res });
+        const dpr = window.devicePixelRatio || 1;
+        const res = (size / 100) * dpr;
+        await app.init({ canvas, background: '#c0a080', width: 100, height: 100, resolution: res });
 
-      // Set CSS size after init — canvas has 100*res physical pixels, displayed at size CSS px
-      canvas.style.width = `${size}px`;
-      canvas.style.height = `${size}px`;
-      canvas.style.borderRadius = '50%';
+        // Set CSS size after init — canvas has 100*res physical pixels, displayed at size CSS px
+        canvas.style.width = `${size}px`;
+        canvas.style.height = `${size}px`;
+        canvas.style.borderRadius = '50%';
 
-      appRef.current = app;
-      pixiContainerRef.current?.appendChild(canvas);
+        appRef.current = app;
+        pixiContainerRef.current?.appendChild(canvas);
 
-      const cx = app.screen.width / 2;
-      const cy = app.screen.height / 2;
+        const cx = app.screen.width / 2;
+        const cy = app.screen.height / 2;
 
-      const textures = await Promise.all([
-        Assets.load(neckImg), Assets.load(faceImg), Assets.load(eyesImg),
-        Assets.load(eyeBrImg), Assets.load(mouthImg), Assets.load(noseImg),
-      ]);
+        const textures = await Promise.all([
+          Assets.load(neckImg), Assets.load(faceImg), Assets.load(eyesImg),
+          Assets.load(eyeBrImg), Assets.load(mouthImg), Assets.load(noseImg),
+        ]);
 
-      textures.forEach((tex) => {
-        const sp = new Sprite(tex);
-        sp.anchor.set(0.5, 0.5);
-        sp.x = cx; sp.y = cy;
-        app.stage.addChild(sp);
-      });
+        textures.forEach((tex) => {
+          const sp = new Sprite(tex);
+          sp.anchor.set(0.5, 0.5);
+          sp.x = cx; sp.y = cy;
+          app.stage.addChild(sp);
+        });
 
-      // Use ref to get the latest data (not stale closure)
-      const d = charDataRef.current;
-      loadAllHair(d.backHairIndex, d.backColorIndex, d.frontHairIndex, d.frontColorIndex);
+        // Use ref to get the latest data (not stale closure)
+        const d = charDataRef.current;
+        loadAllHair(d.backHairIndex, d.backColorIndex, d.frontHairIndex, d.frontColorIndex);
+      } catch {
+        setPixiError(true);
+        setLoadingHair(false);
+      }
     })();
 
     return () => { app.destroy(true); appRef.current = null; };
@@ -241,7 +252,9 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       const raw = prev[field] + delta;
       const wrapped = raw < 1 ? max : raw > max ? 1 : raw;
       const next = { ...prev, [field]: wrapped };
-      window.api.characterSave(next).catch(console.error);
+      window.api.characterSave(next).catch(() => {
+        toast({ message: t('character.saveFailed', 'No se pudo guardar el personaje'), type: 'warning' });
+      });
       window.dispatchEvent(new CustomEvent('character:updated', { detail: next }));
       charChannel.postMessage({ type: 'char-updated', charData: next });
       return next;
@@ -252,18 +265,33 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     <div>
       {/* Character canvas */}
       <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
-        {loadingHair && (
+        {pixiError ? (
           <div style={{
-            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: '#c0a080', borderRadius: '50%', zIndex: 10,
+            width: size, height: size, borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--parch-1), var(--parch-2))',
+            border: '2px solid var(--gold-dark)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <div style={{
-              width: 20, height: 20, border: '2px solid var(--gold-dark)',
-              borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-            }} />
+            <svg width={size * 0.4} height={size * 0.4} viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L3 7v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V7l-9-5z"/>
+            </svg>
           </div>
+        ) : (
+          <>
+            {loadingHair && (
+              <div role="status" aria-label={t('common.loading', 'Loading...')} style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#c0a080', borderRadius: '50%', zIndex: 10,
+              }}>
+                <div style={{
+                  width: 20, height: 20, border: '2px solid var(--gold-dark)',
+                  borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+                }} />
+              </div>
+            )}
+            <div ref={pixiContainerRef} style={{ visibility: loadingHair ? 'hidden' : 'visible' }} />
+          </>
         )}
-        <div ref={pixiContainerRef} style={{ visibility: loadingHair ? 'hidden' : 'visible' }} />
       </div>
 
       {/* Customize button */}

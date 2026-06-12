@@ -84,6 +84,8 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
               ref={nameRef}
               className="player-card__name player-card__name--clickable"
               onClick={() => setDropdownOpen(!dropdownOpen)}
+              aria-expanded={dropdownOpen}
+              aria-haspopup="true"
             >
               {characterName || authUser?.displayName || authUser?.email?.split('@')[0] || translatedTitle}
               <svg

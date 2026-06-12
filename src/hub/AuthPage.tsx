@@ -19,6 +19,7 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [passwordTooShort, setPasswordTooShort] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +93,7 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
         {/* Decorative top ornament */}
         <div className="auth-card__ornament" />
 
-        <h1 className="auth-card__title">{t('app.title')}</h1>
+        <h1 id="auth-card-title" className="auth-card__title">{t('app.title')}</h1>
         <p className="auth-card__subtitle">
           {isForgot
             ? t('auth.forgotPasswordTitle', 'Recuperá tu cuenta')
@@ -109,11 +110,12 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="auth-card__form">
+          <form onSubmit={handleSubmit} className="auth-card__form" role="form" aria-labelledby="auth-card-title">
             {!isLogin && !isForgot && mode !== 'addAccount' && (
               <input
                 type="text"
                 placeholder={t('auth.username', 'Nombre de usuario')}
+                aria-label={t('auth.username', 'Nombre de usuario')}
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
                 className="rpg-input auth-card__input"
@@ -128,19 +130,32 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
                 : isLogin || mode === 'addAccount'
                   ? t('auth.emailOrUsername', 'Email o nombre de usuario')
                   : t('auth.email')}
+              aria-label={isForgot
+                ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
+                : isLogin || mode === 'addAccount'
+                  ? t('auth.emailOrUsername', 'Email o nombre de usuario')
+                  : t('auth.email')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="rpg-input auth-card__input"
               autoFocus={isForgot || isLogin || mode === 'addAccount'}
             />
             {!isForgot && (
-              <input
-                type="password"
-                placeholder={t('auth.password')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="rpg-input auth-card__input"
-              />
+              <>
+                <input
+                  type="password"
+                  placeholder={t('auth.password')}
+                  aria-label={t('auth.password')}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setPasswordTooShort(false); }}
+                  onBlur={() => { if (password.length > 0 && password.length < 6) setPasswordTooShort(true); }}
+                  className="rpg-input auth-card__input"
+                  minLength={6}
+                />
+                {passwordTooShort && (
+                  <p className="auth-card__error">{t('auth.passwordTooShort', 'La contraseña debe tener al menos 6 caracteres')}</p>
+                )}
+              </>
             )}
 
             {error && (

@@ -10,7 +10,7 @@ export interface BookPageTab {
 }
 
 export interface BookPageProps extends React.HTMLAttributes<HTMLDivElement> {
-  eyebrow?: string;
+  eyebrow?: React.ReactNode;
   title: string;
   subtitle?: string;
   headerExtra?: React.ReactNode;
