@@ -13,6 +13,84 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.7.1',
+    date: '2026-06-11',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'quests',
+        text: {
+          es: 'Tus hábitos ahora te avisan — recordatorios configurables cuando todavía no marcaste el día. Y si ayer cumpliste pero te olvidaste de marcarlo, ahora podés marcarlo retroactivamente con un toque',
+          en: 'Your habits now remind you — configurable notifications when you haven\'t checked in yet. And if you did the thing yesterday but forgot to log it, you can now check it retroactively with one tap',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'quests',
+        text: {
+          es: 'Questify más cómodo: buscá tareas al instante y el formulario de crear se colapsa para dejarte más espacio en pantalla',
+          en: 'Questify got comfier: search your tasks instantly and the create form now collapses to give you more screen space',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'La IA ahora estima calorías pensando en gramos primero, con porciones argentinas de referencia — se acabaron las estimaciones infladas en porciones chicas',
+          en: 'The AI now estimates calories thinking in grams first, with reference portions — no more inflated estimates on small servings',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'Nutrify pulido de punta a punta: botón de cerrar día siempre a mano, registro de peso accesible cuando quieras, ayuda sobre tu TDEE, y avisos claros cuando un día ya está cerrado o una comida quedó sin resolver',
+          en: 'Nutrify polished end to end: close-day button always within reach, weight check-in whenever you want, TDEE help bubble, and clear badges when a day is closed or a meal is unresolved',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'El cofre de Coinify se ordenó: encabezados para ordenar tus movimientos, estados vacíos que te guían, y botones más fáciles de tocar',
+          en: 'The Coinify chest got organized: sortable headers for your transactions, empty states that guide you, and easier-to-tap buttons',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'ui',
+        text: {
+          es: 'El hub es más accesible y honesto: validación de contraseña con aviso claro, errores que se muestran en vez de fallar en silencio, y mejor soporte de lectores de pantalla',
+          en: 'The hub is more accessible and honest: password validation with clear feedback, errors that show up instead of failing silently, and better screen reader support',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'sync',
+        text: {
+          es: 'Arreglamos una pérdida de datos grave: lo que creabas desde otro dispositivo o integración podía ser pisado al sincronizar. Ahora cada registro se compara individualmente y siempre gana la versión más nueva — nada se pierde',
+          en: 'Fixed a serious data loss bug: things created from another device or integration could get overwritten on sync. Now every record is compared individually and the newest version always wins — nothing gets lost',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Los préstamos borrados ya no resucitan al sincronizar, y el formulario de préstamos ya no crea duplicados si tocás dos veces',
+          en: 'Deleted loans no longer come back from the dead when syncing, and the loan form no longer creates duplicates on double-tap',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Las comidas y datos que borrabas podían volver después de sincronizar — ya no. Y si la IA falla, ahora podés cargar la comida a mano sin perder lo que escribiste',
+          en: 'Deleted foods and entries could reappear after syncing — not anymore. And if the AI fails, you can now log the meal manually without losing what you typed',
+        },
+      },
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-05-01',
     changes: [
