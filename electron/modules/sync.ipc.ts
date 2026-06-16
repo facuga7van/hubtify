@@ -1,3 +1,4 @@
+import type Database from 'better-sqlite3';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import { recalcSummary } from './nutrition.ipc';
@@ -139,6 +140,32 @@ const USER_DATA_TABLES = [
   'cauldron_presets',
   'cauldron_sessions',
 ];
+
+// Merges remote habit checks into local with last-write-wins.
+// The natural key is (habit_id, date) — enforced by UNIQUE in the schema — NOT the
+// surrogate `id`. The same logical check can arrive under a different id from another
+// device/account; a plain INSERT would then violate UNIQUE(habit_id, date), throw, and
+// roll back the ENTIRE questify merge transaction.
+// Defense-in-depth: an UPSERT makes that conflict structurally harmless — instead of
+// throwing, it reconciles in place. The WHERE on DO UPDATE preserves last-write-wins so
+// a stale remote never clobbers a newer local row.
+export function mergeHabitChecks(db: Database.Database, checks: SyncHabitCheck[]): boolean {
+  let changed = false;
+  const upsert = db.prepare(`
+    INSERT INTO habit_checks (id, habit_id, date, created_at, updated_at, deleted_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(habit_id, date) DO UPDATE SET
+      deleted_at = excluded.deleted_at,
+      updated_at = excluded.updated_at
+    WHERE excluded.updated_at > habit_checks.updated_at
+  `);
+
+  for (const rc of checks) {
+    const info = upsert.run(rc.id, rc.habitId, rc.date, rc.createdAt, rc.updatedAt, rc.deletedAt);
+    if (info.changes > 0) changed = true;
+  }
+  return changed;
+}
 
 export function registerSyncIpcHandlers(): void {
   ipcHandle('sync:clearUserData', () => {
@@ -406,28 +433,9 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
-      // ── Merge habit checks ──
+      // ── Merge habit checks (keyed by natural key habit_id+date, see mergeHabitChecks) ──
       if (remote.habitChecks?.length) {
-        const getCheck = db.prepare('SELECT id, updated_at FROM habit_checks WHERE id = ?');
-        const insertCheck = db.prepare(`
-          INSERT INTO habit_checks (id, habit_id, date, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        const updateCheck = db.prepare(`
-          UPDATE habit_checks SET deleted_at = ?, updated_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rc of remote.habitChecks) {
-          const local = getCheck.get(rc.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertCheck.run(rc.id, rc.habitId, rc.date, rc.createdAt, rc.updatedAt, rc.deletedAt);
-            changed = true;
-          } else if (rc.updatedAt > local.updated_at) {
-            updateCheck.run(rc.deletedAt, rc.updatedAt, rc.id);
-            changed = true;
-          }
-        }
+        if (mergeHabitChecks(db, remote.habitChecks)) changed = true;
       }
 
       // ── Merge RPG events (insert if not exists by id) ──
