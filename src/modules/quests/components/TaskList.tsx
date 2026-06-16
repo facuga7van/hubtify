@@ -574,7 +574,7 @@ export default function TaskList() {
               const subs = subtasksMap[task.id] ?? [];
               const tier = getTierInfo(task);
               return (
-                <div key={task.id} className={`quest-row quest-row--${tier.cls} quest-row--done`}>
+                <div key={task.id} className={`quest-row quest-row--${tier.cls} quest-row--done${isExpanded ? ' quest-row--expanded' : ''}`}>
                   <div className="quest-row-inner">
                     <Tick
                       checked
@@ -736,7 +736,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
       ref={(el) => { setNodeRef(el); rowRef.current = el; }}
       style={style}
       {...attributes}
-      className={`quest-row quest-row--${tier.cls}${isOverdue ? ' quest-row--overdue' : ''}${animatingComplete ? ' quest-row--completing' : ''}${isEditing ? ' quest-row--editing' : ''}`}
+      className={`quest-row quest-row--${tier.cls}${isOverdue ? ' quest-row--overdue' : ''}${animatingComplete ? ' quest-row--completing' : ''}${isEditing ? ' quest-row--editing' : ''}${expanded ? ' quest-row--expanded' : ''}`}
     >
       <span className="quest-row-ornament" style={{ color: tier.color }} aria-hidden="true">
         <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l2.5 5.5L16 8l-5.5 2.5L8 16l-2.5-5.5L0 8l5.5-2.5z"/></svg>

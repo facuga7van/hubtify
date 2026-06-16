@@ -90,6 +90,12 @@
   gap: 18px;
 }
 
+/* prevent a long task title from blowing out the grid track and pushing
+   the habits column off screen (grid items default to min-width: auto) */
+.quest-columns > * {
+  min-width: 0;
+}
+
 @media (max-width: 700px) {
   .quest-columns {
     grid-template-columns: 1fr;
@@ -212,9 +218,18 @@
   font-family: 'IM Fell English', serif;
   font-size: calc(14.5px * var(--font-scale));
   color: var(--ink);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* when the card is expanded, reveal the full title (wrap, no ellipsis) */
+.quest-row--expanded .quest-row-title {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* meta info row */
