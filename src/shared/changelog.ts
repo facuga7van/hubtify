@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.7.2',
+    date: '2026-06-15',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'sync',
+        text: {
+          es: '¿Creaste tareas en otro dispositivo y no aparecían? Resuelto. Un hábito marcado el mismo día desde dos lados podía trabar la sincronización de TODAS tus tareas, proyectos y hábitos — existían en la nube pero nunca llegaban a la app. Ahora entra todo, sin frenarse',
+          en: 'Made tasks on another device and they never showed up? Sorted. A habit checked on the same day from two places could jam the sync of ALL your tasks, projects, and habits — they lived in the cloud but never reached the app. Now everything lands, no stalling',
+        },
+      },
+    ],
+  },
+  {
     version: '0.7.1',
     date: '2026-06-11',
     changes: [
