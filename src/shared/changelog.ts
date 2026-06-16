@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.7.3',
+    date: '2026-06-16',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: '¿Una tarea con título largo te empujaba los hábitos fuera de pantalla? Solucionado. Ahora los títulos largos se recortan prolijos en la lista y el panel de hábitos siempre queda en su lugar — y si querés leer el título completo, desplegá la tarea y aparece entero',
+          en: 'A task with a long title shoving your habits off the screen? Fixed. Long titles now trim neatly in the list and the habits panel stays put — and when you want the full title, expand the task and it shows in full',
+        },
+      },
+    ],
+  },
+  {
     version: '0.7.2',
     date: '2026-06-15',
     changes: [
