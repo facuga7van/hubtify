@@ -8,6 +8,7 @@ import { useToast } from '../shared/components/useToast';
 import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/audio';
 import { useTour } from '../shared/components/tour';
 import FeedbackDialog from './FeedbackDialog';
+import UpdateSettings from './UpdateSettings';
 import ChangelogModal from '../shared/components/ChangelogModal';
 import { changelog } from '../shared/changelog';
 
@@ -33,6 +34,7 @@ export default function SettingsPage() {
   );
   const habitReminderEnabledRef = useRef(habitReminderEnabled);
   const habitReminderTimeRef = useRef(habitReminderTime);
+  const [updateMode, setUpdateMode] = useState(() => localStorage.getItem('hubtify_update_mode') || 'notify');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [patchNotesOpen, setPatchNotesOpen] = useState(false);
@@ -331,6 +333,16 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Updates */}
+      <UpdateSettings
+        mode={updateMode}
+        onChange={(m) => {
+          setUpdateMode(m);
+          localStorage.setItem('hubtify_update_mode', m);
+          window.dispatchEvent(new Event('updateMode:changed'));
+        }}
+      />
 
       {/* Cloud Sync */}
       <div className="rpg-card settings-section">
