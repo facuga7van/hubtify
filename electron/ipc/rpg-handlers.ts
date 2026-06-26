@@ -53,7 +53,7 @@ export function registerRpgHandlers(): void {
 
   ipcHandle('rpg:processEvent', (_e, event: RpgEvent) => {
     const db = getDb();
-    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED';
+    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED' || event.type === 'DAY_REOPENED';
 
     const processTransaction = db.transaction(() => {
       const stats = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
@@ -77,9 +77,11 @@ export function registerRpgHandlers(): void {
           'TASK_UNCOMPLETED': 'TASK_COMPLETED',
           'SUBTASK_UNCOMPLETED': 'SUBTASK_COMPLETED',
           'HABIT_UNCHECKED': 'HABIT_CHECKED',
+          'DAY_REOPENED': 'DAY_SUMMARY',
         };
         const originalType = undoMap[event.type];
-        const itemId = (payload?.taskId ?? payload?.habitId ?? payload?.subtaskId) as string | undefined;
+        // DAY_REOPENED matches its original DAY_SUMMARY close by the day's date.
+        const itemId = (payload?.taskId ?? payload?.habitId ?? payload?.subtaskId ?? payload?.date) as string | undefined;
 
         let originalEvent: { id: number; xp_gained: number; created_at: string } | undefined;
         if (itemId && originalType) {

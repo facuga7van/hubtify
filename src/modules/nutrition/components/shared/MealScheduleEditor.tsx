@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { DawnSun, NoonSun, MoonCrescent, Herb } from '../../../../shared/components/icons';
-import { MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../../shared/meal-utils';
+import { MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, findScheduleOverlaps, minutesToTime } from '../../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../../shared/meal-utils';
 
 interface Props {
@@ -29,28 +29,14 @@ function fromTimeStr(str: string): { hour: number; minute: number } {
   return { hour: h || 0, minute: m || 0 };
 }
 
-/** Check if two enabled meals overlap */
-function hasOverlap(schedule: MealSchedule): boolean {
-  const ranges = MEAL_ORDER
-    .filter(m => m !== 'snack' && schedule[m].enabled)
-    .map(m => {
-      const r = schedule[m];
-      return { start: r.startHour * 60 + r.startMinute, end: r.endHour * 60 + r.endMinute };
-    });
-
-  for (let i = 0; i < ranges.length; i++) {
-    for (let j = i + 1; j < ranges.length; j++) {
-      if (ranges[i].start < ranges[j].end && ranges[j].start < ranges[i].end) {
-        return true;
-      }
-    }
-  }
-  return false;
+function mealName(meal: MealType, t: ReturnType<typeof useTranslation>['t']): string {
+  const i18nKey = `nutrify.meal${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+  return t(i18nKey, meal);
 }
 
 export default function MealScheduleEditor({ schedule, onChange, showDefaults }: Props) {
   const { t } = useTranslation();
-  const overlap = hasOverlap(schedule);
+  const overlaps = findScheduleOverlaps(schedule);
 
   const updateMeal = (meal: MealType, patch: Partial<typeof schedule.breakfast>) => {
     onChange({ ...schedule, [meal]: { ...schedule[meal], ...patch } });
@@ -107,8 +93,26 @@ export default function MealScheduleEditor({ schedule, onChange, showDefaults }:
           </div>
         );
       })}
-      {overlap && (
-        <p className="nutri-meal-overlap-warn">{t('nutrify.mealOverlap', 'Los horarios se superponen')}</p>
+      {overlaps.length > 0 && (
+        <div className="nutri-meal-overlap-warn" role="status">
+          <p className="nutri-meal-overlap-title">{t('nutrify.mealOverlap', 'Los horarios se superponen')}</p>
+          <ul className="nutri-meal-overlap-list">
+            {overlaps.map((o) => (
+              <li key={`${o.meals[0]}-${o.meals[1]}`}>
+                {t('nutrify.mealOverlapDetail', {
+                  mealA: mealName(o.meals[0], t),
+                  mealB: mealName(o.meals[1], t),
+                  start: minutesToTime(o.startMinutes),
+                  end: minutesToTime(o.endMinutes),
+                  defaultValue: '{{mealA}} y {{mealB}} se pisan de {{start}} a {{end}}',
+                })}
+              </li>
+            ))}
+          </ul>
+          <p className="nutri-meal-overlap-hint">
+            {t('nutrify.mealOverlapHint', 'Una comida registrada en esa franja queda sin asignar para que vos elijas cuál es.')}
+          </p>
+        </div>
       )}
       {showDefaults && (
         <button

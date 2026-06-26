@@ -4,10 +4,12 @@ const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 const SYSTEM_PROMPT = `Sos un nutricionista que estima calorías de comida argentina con precisión. Pensá en GRAMOS primero, después calculá calorías.
 
-MÉTODO: Para cada ingrediente → estimá gramos → aplicá kcal/100g → resultado.
+MÉTODO: Para cada ingrediente → estimá gramos → aplicá kcal/100g → resultado. Estimá también los MACROS (proteína, carbohidratos, grasa) en gramos por ingrediente.
 
 Reglas:
-- Cada ingrediente SEPARADO con su peso en gramos y calorías
+- Cada ingrediente SEPARADO con su peso en gramos, calorías y macros (protein_g, carbs_g, fat_g)
+- Los macros van en GRAMOS del ingrediente (no por 100g). Aproximadamente: proteína 4 kcal/g, carbohidratos 4 kcal/g, grasa 9 kcal/g
+- Si no podés estimar un macro con confianza, devolvé 0 para ese macro
 - Si hay cantidad (ej: "2 milanesas"), reflejar TODAS las unidades
 - Sé CONSERVADOR: ante duda, estimá porciones normales, NO exageres
 - Si no reconocés la comida, estimá lo más cercano
@@ -58,19 +60,19 @@ Límites de sanidad (si tu estimación excede esto, REVISÁ):
 
 Ejemplos:
 Input: "milanesa con puré"
-→ {"items": [{"name": "milanesa", "grams": 150, "calories": 330}, {"name": "puré de papas", "grams": 200, "calories": 200}]}
+→ {"items": [{"name": "milanesa", "grams": 150, "calories": 330, "protein_g": 24, "carbs_g": 18, "fat_g": 17}, {"name": "puré de papas", "grams": 200, "calories": 200, "protein_g": 4, "carbs_g": 30, "fat_g": 6}]}
 
 Input: "3 empanadas de carne"
-→ {"items": [{"name": "empanada de carne x3", "grams": 360, "calories": 900}]}
+→ {"items": [{"name": "empanada de carne x3", "grams": 360, "calories": 900, "protein_g": 33, "carbs_g": 75, "fat_g": 48}]}
 
 Input: "sanguche chico de queso y tomate"
-→ {"items": [{"name": "pan de molde x2 rebanadas (chico)", "grams": 40, "calories": 106}, {"name": "queso cremoso (1 feta)", "grams": 20, "calories": 60}, {"name": "tomate (2 rodajas)", "grams": 40, "calories": 7}]}
+→ {"items": [{"name": "pan de molde x2 rebanadas (chico)", "grams": 40, "calories": 106, "protein_g": 4, "carbs_g": 20, "fat_g": 1}, {"name": "queso cremoso (1 feta)", "grams": 20, "calories": 60, "protein_g": 4, "carbs_g": 1, "fat_g": 5}, {"name": "tomate (2 rodajas)", "grams": 40, "calories": 7, "protein_g": 0, "carbs_g": 2, "fat_g": 0}]}
 
 Input: "café con leche y 2 medialunas"
-→ {"items": [{"name": "café con leche", "grams": 200, "calories": 75}, {"name": "medialuna x2", "grams": 100, "calories": 350}]}
+→ {"items": [{"name": "café con leche", "grams": 200, "calories": 75, "protein_g": 6, "carbs_g": 9, "fat_g": 3}, {"name": "medialuna x2", "grams": 100, "calories": 350, "protein_g": 6, "carbs_g": 40, "fat_g": 18}]}
 
 Input: "ensalada de lechuga, tomate y huevo"
-→ {"items": [{"name": "lechuga", "grams": 60, "calories": 9}, {"name": "tomate", "grams": 100, "calories": 18}, {"name": "huevo duro", "grams": 50, "calories": 78}, {"name": "aceite (aderezo)", "grams": 10, "calories": 90}]}`;
+→ {"items": [{"name": "lechuga", "grams": 60, "calories": 9, "protein_g": 1, "carbs_g": 2, "fat_g": 0}, {"name": "tomate", "grams": 100, "calories": 18, "protein_g": 1, "carbs_g": 4, "fat_g": 0}, {"name": "huevo duro", "grams": 50, "calories": 78, "protein_g": 6, "carbs_g": 1, "fat_g": 5}, {"name": "aceite (aderezo)", "grams": 10, "calories": 90, "protein_g": 0, "carbs_g": 0, "fat_g": 10}]}`;
 
 export const estimateNutrition = functions
   .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 60, memory: '256MB' })
@@ -111,6 +113,9 @@ export const estimateNutrition = functions
                       name: { type: 'STRING', description: 'Ingredient name with portion context' },
                       grams: { type: 'INTEGER', description: 'Estimated weight in grams' },
                       calories: { type: 'INTEGER', description: 'Calories calculated from grams × kcal/100g' },
+                      protein_g: { type: 'NUMBER', description: 'Protein in grams for this item (0 if unknown)' },
+                      carbs_g: { type: 'NUMBER', description: 'Carbohydrates in grams for this item (0 if unknown)' },
+                      fat_g: { type: 'NUMBER', description: 'Fat in grams for this item (0 if unknown)' },
                     },
                     required: ['name', 'grams', 'calories'],
                   },
@@ -138,14 +143,26 @@ export const estimateNutrition = functions
         throw new functions.https.HttpsError('internal', 'No response from AI');
       }
 
-      const parsed = JSON.parse(text) as { items?: Array<{ name: string; calories: number }> };
+      const parsed = JSON.parse(text) as {
+        items?: Array<{ name: string; calories: number; protein_g?: unknown; carbs_g?: unknown; fat_g?: unknown }>;
+      };
       if (!parsed.items || !Array.isArray(parsed.items) || parsed.items.length === 0) {
         throw new functions.https.HttpsError('internal', 'Could not parse AI response');
       }
 
+      // Coerce a macro value: keep null when absent/invalid so it never fakes a 0.
+      const macro = (v: unknown): number | null =>
+        typeof v === 'number' && isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
+
       const items = parsed.items
         .filter(it => typeof it.name === 'string' && typeof it.calories === 'number' && it.calories > 0)
-        .map(it => ({ name: it.name.trim(), calories: Math.round(it.calories) }));
+        .map(it => ({
+          name: it.name.trim(),
+          calories: Math.round(it.calories),
+          proteinG: macro(it.protein_g),
+          carbsG: macro(it.carbs_g),
+          fatG: macro(it.fat_g),
+        }));
 
       if (items.length === 0) {
         throw new functions.https.HttpsError('internal', 'No valid items in AI response');
@@ -153,7 +170,19 @@ export const estimateNutrition = functions
 
       const calories = items.reduce((sum, it) => sum + it.calories, 0);
 
-      return { calories, items };
+      // Sum only the items that reported a given macro; null if none did (backward compatible).
+      const sumMacro = (key: 'proteinG' | 'carbsG' | 'fatG'): number | null => {
+        const present = items.map(it => it[key]).filter((v): v is number => v != null);
+        return present.length > 0 ? Math.round(present.reduce((a, b) => a + b, 0) * 10) / 10 : null;
+      };
+
+      return {
+        calories,
+        proteinG: sumMacro('proteinG'),
+        carbsG: sumMacro('carbsG'),
+        fatG: sumMacro('fatG'),
+        items,
+      };
     } catch (err) {
       if (err instanceof functions.https.HttpsError) throw err;
       if ((err as Error).name === 'AbortError') {

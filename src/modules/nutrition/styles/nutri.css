@@ -431,6 +431,124 @@
 .nutri-status--muted { color: var(--ink-faded); }
 
 
+/* ── Macro attribute bars ── */
+
+.nutri-macros {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(168, 138, 60, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nutri-macros-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nutri-macros-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-macros-auto {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  opacity: 0.7;
+}
+
+.nutri-macro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nutri-macro-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nutri-macro-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-macro-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nutri-macro-pct {
+  color: var(--ink-faded);
+  font-weight: 400;
+}
+
+.nutri-macro-bar {
+  position: relative;
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(42, 29, 14, 0.12);
+  border: 1px solid rgba(168, 138, 60, 0.3);
+  overflow: hidden;
+}
+
+.nutri-macro-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  background: var(--gold);
+}
+
+/* Per-macro colors — informative, non-punitive */
+.nutri-macro-bar--protein .nutri-macro-fill {
+  background: linear-gradient(90deg, var(--rubric-light), var(--gold-light));
+}
+.nutri-macro-bar--carbs .nutri-macro-fill {
+  background: linear-gradient(90deg, var(--moss-light), var(--moss));
+}
+.nutri-macro-bar--fat .nutri-macro-fill {
+  background: linear-gradient(90deg, var(--gold-light), var(--gold-dark));
+}
+
+/* Going over target is fine — gild the bar (treasure, not alarm) so the
+   over-state reads at a glance: golden halo + brighter fill + golden percent.
+   No warning color anywhere; gold means "you crossed the mark", not "you failed". */
+.nutri-macro-bar.is-over {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 5px rgba(168, 138, 60, 0.4), 0 0 7px rgba(193, 154, 58, 0.55);
+}
+.nutri-macro.is-over .nutri-macro-fill {
+  filter: saturate(1.15) brightness(1.07);
+}
+.nutri-macro.is-over .nutri-macro-pct {
+  color: var(--gold-dark);
+  font-weight: 700;
+}
+
+.nutri-macro-targets-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+
 /* ═══════════════════════════════════════════════════════════
    4. CARDS
    ═══════════════════════════════════════════════════════════ */
@@ -694,6 +812,130 @@
   min-width: 0;
 }
 
+/* ── Editable ingredient breakdown ── */
+
+.nutri-est-hint {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin: 0 0 8px;
+}
+
+.nutri-est-item--edit {
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.25);
+}
+
+.nutri-est-item--edit:last-child { border-bottom: none; }
+
+.nutri-est-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.nutri-est-item-main .nutri-food-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nutri-est-item-macros {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(var(--fs-label) * 0.85);
+  color: var(--ink-faded);
+  letter-spacing: 0.02em;
+}
+
+.nutri-est-item-cal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.nutri-est-cal-input {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  padding: 3px 6px;
+  width: 62px;
+  border: 1.5px solid var(--ink-faded);
+  border-radius: 3px;
+  background: rgba(245, 231, 192, 0.7);
+  color: var(--ink);
+  text-align: right;
+  outline: none;
+}
+
+.nutri-est-cal-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(168, 138, 60, 0.25);
+}
+
+.nutri-est-cal-input::-webkit-inner-spin-button,
+.nutri-est-cal-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.nutri-est-cal-input {
+  -moz-appearance: textfield;
+}
+
+.nutri-est-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--rubric);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.nutri-est-remove:hover {
+  opacity: 1;
+  background: rgba(122, 30, 30, 0.1);
+}
+
+.nutri-est-total-recalc {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nutri-est-total-macros {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(var(--fs-label) * 0.85);
+  color: var(--ink-faded);
+}
+
+.nutri-est-total-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-quote);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.nutri-est-empty {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
 .nutri-estimate-error {
   margin-top: 8px;
   padding: 6px 10px;
@@ -703,6 +945,19 @@
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
   color: var(--rubric);
+  font-style: italic;
+}
+
+/* Calm, informative notice (e.g. AI unavailable → use manual entry). */
+.nutri-estimate-notice {
+  margin: 8px 0;
+  padding: 6px 10px;
+  background: rgba(122, 92, 30, 0.1);
+  border: 1px solid rgba(122, 92, 30, 0.28);
+  border-radius: 3px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
   font-style: italic;
 }
 
@@ -939,6 +1194,98 @@
   font-size: var(--fs-label) !important;
   padding: 4px 10px !important;
   letter-spacing: 0.04em !important;
+}
+
+/* Pill + portion-adjust button grouped together */
+.nutri-pill-wrap {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.nutri-pill-wrap .nutri-pill {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.nutri-pill-portion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border: 1px solid var(--gold);
+  border-left: none;
+  border-radius: 0 3px 3px 0;
+  background: rgba(138, 106, 61, 0.12);
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nutri-pill-portion:hover {
+  background: var(--gold);
+  color: var(--parch-0);
+}
+
+/* Repeat-day picker list */
+.nutri-repeat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.nutri-repeat-day {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--ink-faded);
+  border-radius: 4px;
+  background: rgba(245, 231, 192, 0.4);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.nutri-repeat-day:hover {
+  background: rgba(138, 106, 61, 0.18);
+  border-color: var(--gold);
+}
+
+.nutri-repeat-day-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+.nutri-repeat-day-meta {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* Portion multiplier presets */
+.nutri-portion-presets {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.nutri-portion-preset {
+  flex: 1;
+  justify-content: center;
+  font-size: var(--fs-label) !important;
+}
+
+.nutri-portion-preset.active {
+  background: var(--gold) !important;
+  color: var(--parch-0) !important;
+  border-color: var(--gold) !important;
 }
 
 
@@ -1350,6 +1697,129 @@
 }
 
 
+/* ── Adaptive TDEE insight (settings) ── */
+
+.nutri-adaptive-insight {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(168, 138, 60, 0.12), rgba(168, 138, 60, 0.04));
+  border: 1px solid rgba(168, 138, 60, 0.45);
+  border-radius: 4px;
+}
+
+.nutri-adaptive-insight.is-pending {
+  border-style: dashed;
+  background: rgba(74, 53, 32, 0.05);
+}
+
+.nutri-adaptive-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-adaptive-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.nutri-confidence-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-confidence-badge .conf-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(74, 53, 32, 0.25);
+  display: inline-block;
+}
+
+.nutri-confidence-badge .conf-pip.on {
+  background: var(--gold);
+}
+
+.nutri-confidence-badge.conf-high .conf-pip.on {
+  background: var(--gold-light);
+}
+
+.nutri-adaptive-figures {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
+.nutri-adaptive-real {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.nutri-adaptive-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  color: var(--gold-dark);
+}
+
+.nutri-adaptive-unit {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-adaptive-vs {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-adaptive-diff {
+  margin-left: 6px;
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+}
+
+.nutri-adaptive-diff.pos { color: var(--gold-dark); }
+.nutri-adaptive-diff.neg { color: var(--rubric); }
+
+.nutri-adaptive-explain {
+  margin: 8px 0 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+}
+
+.nutri-adaptive-pending {
+  margin: 8px 0 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-body);
+  color: var(--ink-faded);
+}
+
+.nutri-adaptive-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.nutri-adaptive-apply-target {
+  opacity: 0.85;
+  font-weight: 400;
+}
+
+
 /* ── Goal toggle ── */
 
 .nutri-goal-toggle {
@@ -1751,10 +2221,37 @@
 }
 
 .nutri-meal-overlap-warn {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rubric);
+  border-radius: 4px;
+  background: rgba(122, 30, 30, 0.06);
+}
+
+.nutri-meal-overlap-title {
+  margin: 0;
+  color: var(--rubric);
+  font-size: var(--fs-label, 13px);
+  font-weight: 600;
+}
+
+.nutri-meal-overlap-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
   color: var(--rubric);
   font-size: var(--fs-label, 13px);
   font-style: italic;
-  margin: 4px 0 0;
+}
+
+.nutri-meal-overlap-list li {
+  margin: 1px 0;
+}
+
+.nutri-meal-overlap-hint {
+  margin: 6px 0 0;
+  color: var(--ink-faded);
+  font-size: var(--fs-label, 13px);
+  font-style: italic;
 }
 
 /* ═══════════════════════════════════════════════════════════

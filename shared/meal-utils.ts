@@ -34,6 +34,14 @@ function parseTime(time: string): { hour: number; minute: number } {
   return { hour: parseInt(match[1], 10), minute: parseInt(match[2], 10) };
 }
 
+/** Format minutes-since-midnight back to a "HH:MM" string */
+export function minutesToTime(minutes: number): string {
+  const clamped = ((minutes % 1440) + 1440) % 1440;
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export interface MealResolution {
   meal: MealType;
   ambiguous: MealType[];
@@ -71,4 +79,50 @@ export function resolveMealType(time: string, schedule?: MealSchedule | null): M
     return { meal: candidates[0], ambiguous: [] };
   }
   return { meal: candidates[0], ambiguous: candidates };
+}
+
+/** A detected overlap between two enabled meal ranges. */
+export interface ScheduleOverlap {
+  /** The two meals whose ranges intersect, in MEAL_ORDER order. */
+  meals: [MealType, MealType];
+  /** Overlap window start, in minutes since midnight. */
+  startMinutes: number;
+  /** Overlap window end, in minutes since midnight (exclusive). */
+  endMinutes: number;
+}
+
+/**
+ * Find every pair of enabled meals whose time ranges overlap.
+ * Snack is excluded — it has no range (catch-all).
+ * Returned pairs preserve MEAL_ORDER, so the result is deterministic and
+ * the UI can warn the user precisely which meals collide and in what window.
+ */
+export function findScheduleOverlaps(schedule?: MealSchedule | null): ScheduleOverlap[] {
+  const s = schedule ?? DEFAULT_MEAL_SCHEDULE;
+
+  const ranges = MEAL_ORDER
+    .filter((meal) => meal !== 'snack' && s[meal].enabled)
+    .map((meal) => ({
+      meal,
+      start: timeToMinutes(s[meal].startHour, s[meal].startMinute),
+      end: timeToMinutes(s[meal].endHour, s[meal].endMinute),
+    }))
+    // A zero/negative-length range can't overlap anything.
+    .filter((r) => r.end > r.start);
+
+  const overlaps: ScheduleOverlap[] = [];
+  for (let i = 0; i < ranges.length; i++) {
+    for (let j = i + 1; j < ranges.length; j++) {
+      const start = Math.max(ranges[i].start, ranges[j].start);
+      const end = Math.min(ranges[i].end, ranges[j].end);
+      if (start < end) {
+        overlaps.push({
+          meals: [ranges[i].meal, ranges[j].meal],
+          startMinutes: start,
+          endMinutes: end,
+        });
+      }
+    }
+  }
+  return overlaps;
 }

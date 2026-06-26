@@ -466,13 +466,13 @@ export function registerSyncIpcHandlers(): void {
     const db = getDb();
 
     const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() || null;
-    const foodLog = db.prepare('SELECT id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at FROM food_log ORDER BY date DESC, time DESC').all();
-    const frequentFoods = db.prepare('SELECT id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
+    const foodLog = db.prepare('SELECT id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g, updated_at, deleted_at FROM food_log ORDER BY date DESC, time DESC').all();
+    const frequentFoods = db.prepare('SELECT id, name, calories, ai_breakdown, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
     const dailyMetrics = db.prepare('SELECT date, steps, gym, updated_at FROM nutrition_daily_metrics ORDER BY date DESC').all();
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
-    const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
+    const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, protein_g, carbs_g, fat_g, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
-    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
+    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
 
     return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods };
   });
@@ -490,40 +490,50 @@ export function registerSyncIpcHandlers(): void {
         const local = db.prepare('SELECT updated_at FROM nutrition_profile WHERE id = 1').get() as { updated_at: string | null } | undefined;
         const remoteUpdatedAt = p.updated_at ?? '';
         if (!local || remoteUpdatedAt > (local.updated_at || '')) {
-          db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, protein_target_g, carbs_target_g, fat_target_g, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
             p.age, p.sex, p.height_cm, p.initial_weight_kg, p.activity_level,
             p.deficit_target_kcal ?? 500, p.gym_calories ?? 300, p.step_calories_factor ?? 0.04,
             p.date_of_birth ?? null, p.weight_check_day ?? 1, p.weight_popup_enabled ?? 1,
-            p.meal_schedule ?? null, remoteUpdatedAt || null
+            p.meal_schedule ?? null, p.protein_target_g ?? null, p.carbs_target_g ?? null, p.fat_target_g ?? null,
+            remoteUpdatedAt || null
           );
           changed = true;
         }
       }
 
-      // Food log — merge by id instead of composite key (Issue #11)
+      // Food log — merge by id with full LWW (Issue #11 + Phase 3.4).
+      // A remote row that is strictly newer (by updated_at) replaces ALL editable
+      // fields, not just deleted_at/updated_at. This is what propagates EDITS
+      // (calories, macros, meal, description, time, date, ai_breakdown, frequent_food_id)
+      // across accounts, mirroring the LWW pattern used by daily_closed/profile.
+      // Strictly-greater comparison preserves: local-newer never gets clobbered,
+      // equal timestamps are a no-op, and a soft-deleted row never revives unless a
+      // newer remote re-creates it.
       const affectedDates = new Set<string>();
       if (Array.isArray(d.foodLog)) {
-        const getFoodById = db.prepare('SELECT id FROM food_log WHERE id = ?');
-        const insertFood = db.prepare('INSERT OR IGNORE INTO food_log (id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const getFoodById = db.prepare('SELECT id, date, updated_at FROM food_log WHERE id = ?');
+        const insertFood = db.prepare('INSERT OR IGNORE INTO food_log (id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const updateFood = db.prepare('UPDATE food_log SET date = ?, time = ?, description = ?, calories = ?, source = ?, frequent_food_id = ?, ai_breakdown = ?, meal = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
         for (const f of d.foodLog) {
           if (f.id != null) {
-            const exists = getFoodById.get(f.id);
-            if (!exists) {
-              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null);
+            const local = getFoodById.get(f.id) as { id: number; date: string; updated_at: string | null } | undefined;
+            if (!local) {
+              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id ?? null, f.ai_breakdown ?? null, f.meal ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.updated_at ?? null, f.deleted_at ?? null);
               affectedDates.add(f.date);
               changed = true;
-            }
-            if (f.deleted_at || f.updated_at) {
-              db.prepare(
-                "UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ? AND (updated_at IS NULL OR updated_at < ?)"
-              ).run(f.deleted_at ?? null, f.updated_at ?? null, f.id, f.updated_at);
+            } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
+              // Remote strictly newer → adopt the full remote row (edit, delete, or both).
+              updateFood.run(f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id ?? null, f.ai_breakdown ?? null, f.meal ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.updated_at ?? null, f.deleted_at ?? null, f.id);
+              affectedDates.add(f.date);
+              if (local.date !== f.date) affectedDates.add(local.date); // moved date → recalc the old one too
+              changed = true;
             }
           } else {
             // Legacy entries without id — fallback to composite key
             const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?').get(f.date, f.time, f.description, f.calories);
             if (!exists) {
-              db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-                f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null
+              db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+                f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.updated_at ?? null, f.deleted_at ?? null
               );
               affectedDates.add(f.date);
               changed = true;
@@ -540,23 +550,23 @@ export function registerSyncIpcHandlers(): void {
       if (Array.isArray(d.frequentFoods)) {
         const getFreq = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE id = ?');
         const getFreqByName = db.prepare('SELECT id FROM frequent_foods WHERE name = ?');
-        const insertFreq = db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
+        const insertFreq = db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, protein_g = ?, carbs_g = ?, fat_g = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
         for (const f of d.frequentFoods) {
           if (f.id != null) {
             const local = getFreq.get(f.id) as { id: number; updated_at: string | null } | undefined;
             if (!local) {
-              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
+              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
               changed = true;
             } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
-              updateFreq.run(f.calories, f.ai_breakdown ?? null, f.times_used, f.updated_at, f.deleted_at ?? null, f.id);
+              updateFreq.run(f.calories, f.ai_breakdown ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.times_used, f.updated_at, f.deleted_at ?? null, f.id);
               changed = true;
             }
           } else {
             // Legacy entries without id — fallback to name check
             const exists = getFreqByName.get(f.name);
             if (!exists) {
-              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
+              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
               changed = true;
             }
           }
@@ -600,27 +610,34 @@ export function registerSyncIpcHandlers(): void {
       // Daily summary — check timestamp before replacing
       if (Array.isArray(d.dailySummary)) {
         const getDS = db.prepare('SELECT date, updated_at FROM nutrition_daily_summary WHERE date = ?');
-        const insertDS = db.prepare('INSERT INTO nutrition_daily_summary (date, bmr, tdee, total_calories_in, balance, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
-        const updateDS = db.prepare('UPDATE nutrition_daily_summary SET bmr = ?, tdee = ?, total_calories_in = ?, balance = ?, updated_at = ? WHERE date = ?');
+        const insertDS = db.prepare('INSERT INTO nutrition_daily_summary (date, bmr, tdee, total_calories_in, balance, protein_g, carbs_g, fat_g, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const updateDS = db.prepare('UPDATE nutrition_daily_summary SET bmr = ?, tdee = ?, total_calories_in = ?, balance = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ? WHERE date = ?');
         for (const s of d.dailySummary) {
           const local = getDS.get(s.date) as { date: string; updated_at: string | null } | undefined;
           if (!local) {
-            insertDS.run(s.date, s.bmr, s.tdee, s.total_calories_in, s.balance, s.updated_at ?? null);
+            insertDS.run(s.date, s.bmr, s.tdee, s.total_calories_in, s.balance, s.protein_g ?? null, s.carbs_g ?? null, s.fat_g ?? null, s.updated_at ?? null);
             changed = true;
           } else if ((s.updated_at ?? '') > (local.updated_at || '')) {
-            updateDS.run(s.bmr, s.tdee, s.total_calories_in, s.balance, s.updated_at, s.date);
+            updateDS.run(s.bmr, s.tdee, s.total_calories_in, s.balance, s.protein_g ?? null, s.carbs_g ?? null, s.fat_g ?? null, s.updated_at, s.date);
             changed = true;
           }
         }
       }
 
-      // Daily closed - merge by date
+      // Daily closed - merge by date. Carries updated_at/deleted_at so a
+      // "reopen day" (soft-delete) replicates across accounts via LWW.
       if (Array.isArray(d.dailyClosed)) {
         for (const c of d.dailyClosed) {
-          const exists = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(c.date);
-          if (!exists) {
-            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0
+          const local = db.prepare('SELECT updated_at FROM nutrition_daily_closed WHERE date = ?').get(c.date) as { updated_at: string | null } | undefined;
+          if (!local) {
+            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0, c.updated_at ?? null, c.deleted_at ?? null
+            );
+            changed = true;
+          } else if ((c.updated_at ?? '') > (local.updated_at || '')) {
+            // Remote is newer → adopt its state (covers reopen via deleted_at).
+            db.prepare('UPDATE nutrition_daily_closed SET xp_precision = ?, xp_steps = ?, xp_gym = ?, xp_weight = ?, xp_bonus = ?, xp_total = ?, hp_change = ?, consumed = ?, target = ?, updated_at = ?, deleted_at = ? WHERE date = ?').run(
+              c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0, c.updated_at ?? null, c.deleted_at ?? null, c.date
             );
             changed = true;
           }
@@ -629,9 +646,9 @@ export function registerSyncIpcHandlers(): void {
 
       // Favorite foods — dedup by description
       if (Array.isArray(d.favoriteFoods)) {
-        const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, protein_g, carbs_g, fat_g, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         for (const f of d.favoriteFoods) {
-          insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual', f.aiBreakdown ?? null, f.createdAt, f.updatedAt ?? null, f.deletedAt ?? f.deleted_at ?? null);
+          insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual', f.aiBreakdown ?? null, f.proteinG ?? f.protein_g ?? null, f.carbsG ?? f.carbs_g ?? null, f.fatG ?? f.fat_g ?? null, f.createdAt, f.updatedAt ?? null, f.deletedAt ?? f.deleted_at ?? null);
           changed = true;
           // LWW update for existing entries
           db.prepare(

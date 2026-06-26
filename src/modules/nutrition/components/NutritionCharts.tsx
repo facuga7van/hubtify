@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
+import { smoothWeightSeries, weightTrendSummary } from '../../../../shared/weight-trend';
 import {
   CastleBarChart,
   TreasureLineChart,
@@ -10,8 +11,9 @@ import {
 import type { BarDatum, PointDatum, CellLevel } from '../../../shared/components/charts';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal } from '../../../shared/components/icons';
-import type { NutritionProfile, DailySummary } from '../types';
+import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal, Cauldron } from '../../../shared/components/icons';
+import type { NutritionProfile, DailySummary, MacroTargets } from '../types';
+import { MacroHistory } from './MacroHistory';
 
 interface WeightEntry {
   date: string;
@@ -66,6 +68,7 @@ export default function NutritionCharts() {
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [streak, setStreak] = useState(0);
   const [profile, setProfile] = useState<NutritionProfile | null>(null);
+  const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -82,12 +85,14 @@ export default function NutritionCharts() {
       window.api.nutritionGetWeights(),
       window.api.nutritionGetStreak(),
       window.api.nutritionGetProfile(),
+      window.api.nutritionGetMacroTargets(),
     ])
-      .then(([sums, wts, str, prof]) => {
+      .then(([sums, wts, str, prof, macros]) => {
         setSummaries(sums as DailySummary[]);
         setWeights(wts as WeightEntry[]);
         setStreak(str);
         setProfile(prof as NutritionProfile | null);
+        setMacroTargets(macros as MacroTargets | null);
         setLoading(false);
       })
       .catch(() => {
@@ -145,31 +150,25 @@ export default function NutritionCharts() {
       filteredWeights.length > 0
         ? filteredWeights[filteredWeights.length - 1].weightKg
         : null;
-    const firstWeight =
-      filteredWeights.length > 1 ? filteredWeights[0].weightKg : null;
-    const weightDelta =
-      latestWeight != null && firstWeight != null
-        ? +(latestWeight - firstWeight).toFixed(1)
-        : null;
 
     const daysLogged = daysWithData.length;
 
-    // Weight velocity: delta kg per week from filtered weights
-    let weightVelocity: number | null = null;
-    if (filteredWeights.length >= 2) {
-      const first = filteredWeights[0];
-      const last = filteredWeights[filteredWeights.length - 1];
-      const daysBetween = Math.max(1,
-        (new Date(last.date + 'T12:00:00').getTime() - new Date(first.date + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24)
-      );
-      const weeks = daysBetween / 7;
-      if (weeks > 0) {
-        weightVelocity = +((last.weightKg - first.weightKg) / weeks).toFixed(2);
-      }
-    }
-
-    return { precision, latestWeight, weightDelta, streak, daysLogged, weightVelocity };
+    return { precision, latestWeight, streak, daysLogged };
   }, [summaries, filteredWeights, dailyTarget, streak]);
+
+  // ── Smoothed weight trend ──────────────────────────────────
+  // Raw weigh-ins are noisy (water/sodium/glycogen). We surface an EMA-smoothed
+  // trend line + direction instead of reacting to the last raw point.
+
+  const smoothedWeights = useMemo(
+    () => smoothWeightSeries(filteredWeights),
+    [filteredWeights],
+  );
+
+  const trendSummary = useMemo(
+    () => weightTrendSummary(filteredWeights),
+    [filteredWeights],
+  );
 
   // ── Bar chart data ─────────────────────────────────────────
 
@@ -201,6 +200,17 @@ export default function NutritionCharts() {
         label: `${w.weightKg} kg`,
       })),
     [filteredWeights],
+  );
+
+  // Smoothed trend overlay — same x-indices as the raw points so they align.
+  const trendLineData: PointDatum[] = useMemo(
+    () =>
+      smoothedWeights.map((w, i) => ({
+        x: i,
+        y: w.trend,
+        label: `${Math.round(w.trend * 10) / 10} kg`,
+      })),
+    [smoothedWeights],
   );
 
   const weightXLabels = useMemo(
@@ -401,19 +411,34 @@ export default function NutritionCharts() {
                 '\u2014'
               )}
             </div>
-            {kpis.weightDelta != null && (() => {
+            {trendSummary != null && (() => {
+              const delta = trendSummary.deltaKg;
+              const dir = trendSummary.direction;
               const isDeficit = (profile?.deficitTargetKcal ?? 0) > 0;
               const isSurplus = (profile?.deficitTargetKcal ?? 0) < 0;
-              const isGood = isDeficit ? kpis.weightDelta! < 0 : isSurplus ? kpis.weightDelta! > 0 : false;
-              const isBad = isDeficit ? kpis.weightDelta! > 0 : isSurplus ? kpis.weightDelta! < 0 : false;
+              // Tone is goal-aware but never punitive: weight change is informative.
+              const isGood = isDeficit ? dir === 'falling' : isSurplus ? dir === 'rising' : false;
+              const isBad = isDeficit ? dir === 'rising' : isSurplus ? dir === 'falling' : false;
               const colorClass = isGood ? ' up' : isBad ? ' down' : '';
+              const dirWord =
+                dir === 'rising'
+                  ? t('nutrify.trendRising', 'subiendo')
+                  : dir === 'falling'
+                    ? t('nutrify.trendFalling', 'bajando')
+                    : t('nutrify.trendStable', 'estable');
               return (
                 <div className={`nutri-kpi-delta${colorClass}`}>
-                  {kpis.weightDelta! > 0
-                    ? <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 2l4 6H1z"/></svg>
-                    : <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 8L1 2h8z"/></svg>
-                  }{' '}
-                  {Math.abs(kpis.weightDelta!)} kg
+                  {dir === 'rising' ? (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 2l4 6H1z"/></svg>
+                  ) : dir === 'falling' ? (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 8L1 2h8z"/></svg>
+                  ) : (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><rect x="1" y="4" width="8" height="2"/></svg>
+                  )}{' '}
+                  {Math.abs(delta)} kg
+                  <span style={{ marginLeft: 4, fontStyle: 'italic', color: 'var(--ink-faded)' }}>
+                    {dirWord}
+                  </span>
                 </div>
               );
             })()}
@@ -490,15 +515,16 @@ export default function NutritionCharts() {
               <h3 className="nutri-card-title">
                 <span className="t-ico"><MapIcon width={18} height={18} /></span>{' '}
                 {t('nutrify.weightJourney', 'Weight Journey')}
-                {kpis.weightVelocity != null && (
-                  <Rune tone={kpis.weightVelocity <= 0 ? 'sage' : 'rubric'}>
-                    {kpis.weightVelocity > 0 ? '+' : ''}{kpis.weightVelocity} {t('nutrify.kgPerWeek', 'kg/sem')}
+                {trendSummary != null && (
+                  <Rune tone={trendSummary.direction === 'rising' ? 'rubric' : 'sage'}>
+                    {trendSummary.kgPerWeek > 0 ? '+' : ''}{trendSummary.kgPerWeek} {t('nutrify.kgPerWeek', 'kg/sem')}
                   </Rune>
                 )}
               </h3>
               {lineData.length >= 2 ? (
                 <TreasureLineChart
                   data={lineData}
+                  trendData={trendLineData}
                   themed
                   showArea
                   height={200}
@@ -524,6 +550,16 @@ export default function NutritionCharts() {
             </h3>
             {/* TODO: Add onCellClick to HeatmapCalendar for touch tooltip support */}
             <HeatmapCalendar data={heatmapData} startDate={heatmapStart} tooltips={heatmapTooltips} themed legend />
+          </div>
+
+          {/* Macro balance -- average daily macros over the range vs target */}
+          <div className="nutri-card medieval nutri-chart-card">
+            <HelpBubble text={t('nutrify.macroBalanceHelp', 'Promedio diario de proteína, carbohidratos y grasa del período comparado con tus objetivos. Solo cuenta los días con macros registrados.')} />
+            <h3 className="nutri-card-title">
+              <span className="t-ico"><Cauldron width={18} height={18} /></span>{' '}
+              {t('nutrify.macroBalance', 'Balance of Nutrients')}
+            </h3>
+            <MacroHistory summaries={summaries} targets={macroTargets} t={t} />
           </div>
         </>
       ) : (

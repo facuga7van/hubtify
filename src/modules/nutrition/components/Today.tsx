@@ -10,13 +10,15 @@ import { todayDateString, formatDateString } from '../../../../shared/date-utils
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
+import { rescaleItem, sumBreakdown, scalePortion } from '../breakdown-utils';
+import type { BreakdownItem, BreakdownTotals } from '../breakdown-utils';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import type { TFunction } from 'i18next';
-import type { NutritionProfile } from '../types';
+import type { NutritionProfile, MacroTargets } from '../types';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -69,9 +71,22 @@ interface FoodEntry {
   meal?: string | null;
 }
 
-interface FavoriteFood { id: string; description: string; calories: number; source: string; aiBreakdown?: string; createdAt: string; updatedAt?: string; }
-interface FrequentFood { id: number; name: string; calories: number; timesUsed: number; }
-interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; }
+interface FavoriteFood { id: string; description: string; calories: number; source: string; aiBreakdown?: string; proteinG?: number | null; carbsG?: number | null; fatG?: number | null; createdAt: string; updatedAt?: string; }
+interface FrequentFood { id: number; name: string; calories: number; timesUsed: number; proteinG?: number | null; carbsG?: number | null; fatG?: number | null; }
+interface RecentLoggedDay { date: string; meals: number; calories: number; }
+
+// Food selected for portion adjustment (favorite or frequent), normalized.
+interface PortionTarget {
+  kind: 'favorite' | 'frequent';
+  name: string;
+  calories: number;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  source: string;
+  frequentFoodId?: number;
+}
+interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; proteinG?: number | null; carbsG?: number | null; fatG?: number | null; }
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 const MEAL_ICON: Record<MealType, React.ReactNode> = {
@@ -83,7 +98,10 @@ const MEAL_ICON: Record<MealType, React.ReactNode> = {
 
 interface EstimationResult {
   totalCalories: number;
-  items: Array<{ name: string; calories: number }>;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  items: BreakdownItem[];
   aiError?: string;
 }
 
@@ -93,6 +111,7 @@ export default function Today() {
   const [date, setDate] = useState(() => todayDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
+  const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -118,9 +137,13 @@ export default function Today() {
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
-  const [estimateError, setEstimateError] = useState('');
+  const [retrying, setRetrying] = useState(false);
+  const [estimateNotice, setEstimateNotice] = useState('');
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
+  // Editable ingredient breakdown — calorie input string + removed flag per original item index.
+  const [itemCals, setItemCals] = useState<string[]>([]);
+  const [removedItems, setRemovedItems] = useState<boolean[]>([]);
   const [favoriteFoods, setFavoriteFoods] = useState<FavoriteFood[]>([]);
   const [showFavorites, setShowFavorites] = useState(false);
   const [frequentSearch, setFrequentSearch] = useState('');
@@ -129,11 +152,17 @@ export default function Today() {
   const [manualMode, setManualMode] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>(DEFAULT_MEAL_SCHEDULE);
+  // Repeat-day picker
+  const [repeatPickerOpen, setRepeatPickerOpen] = useState(false);
+  const [recentDays, setRecentDays] = useState<RecentLoggedDay[]>([]);
+  // Portion multiplier picker
+  const [portionFood, setPortionFood] = useState<PortionTarget | null>(null);
+  const [portionFactor, setPortionFactor] = useState(1);
   const { toast } = useToast();
   const confirm = useConfirm();
 
   const loadData = useCallback(async (d: string) => {
-    const [foodList, sum, met, freq, prof, tgt, closedDay, favorites, schedule] = await Promise.all([
+    const [foodList, sum, met, freq, prof, tgt, closedDay, favorites, schedule, macros] = await Promise.all([
       window.api.nutritionGetFoodByDate(d),
       window.api.nutritionGetSummary(d),
       window.api.nutritionGetDailyMetrics(d),
@@ -143,9 +172,11 @@ export default function Today() {
       window.api.nutritionIsDayClosed(d),
       window.api.nutritionGetFavoriteFoods(),
       window.api.nutritionGetMealSchedule(),
+      window.api.nutritionGetMacroTargets(d),
     ]);
     setFoods(foodList as FoodEntry[]);
     setSummary(sum as DailySummary | null);
+    setMacroTargets(macros as MacroTargets | null);
     setMetrics(met as DailyMetrics);
     setFrequentFoods(freq as FrequentFood[]);
     setFavoriteFoods(favorites as FavoriteFood[]);
@@ -211,30 +242,98 @@ export default function Today() {
   const handleEstimate = async () => {
     if (!foodInput.trim() || estimating) return;
     setEstimating(true);
+    setRetrying(false);
     setEstimation(null);
-    setEstimateError('');
+    setEstimateNotice('');
     try {
-      const result = await estimateNutrition(foodInput.trim());
-      setEstimation({ totalCalories: result.calories, items: result.items });
+      const result = await estimateNutrition(foodInput.trim(), { onRetry: () => setRetrying(true) });
+      setEstimation({
+        totalCalories: result.calories,
+        proteinG: result.proteinG,
+        carbsG: result.carbsG,
+        fatG: result.fatG,
+        items: result.items,
+      });
+      setItemCals(result.items.map((it) => String(it.calories)));
+      setRemovedItems(result.items.map(() => false));
       setEditCalories(String(result.calories));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'AI estimation failed';
-      setEstimateError(msg);
+      // Degrade gracefully: keep the typed food, switch to manual entry and show a
+      // calm, informative notice instead of an alarming red error.
       console.error('[Nutrition]', err);
-      toast({ type: 'warning', message: t('nutrify.estimateFailed', 'Estimation failed. Try manual entry.') });
       setManualMode(true);
+      setEstimateNotice(t('nutrify.aiUnavailable', 'No pudimos estimar las calorías ahora (sin conexión o servicio ocupado). Ingresá las calorías manualmente.'));
+      toast({ type: 'info', message: t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual') });
     } finally {
       setEstimating(false);
+      setRetrying(false);
     }
+  };
+
+  // ── Editable breakdown: recompute live items + totals from edits ──
+  const liveBreakdown = useMemo(() => {
+    const empty = {
+      entries: [] as Array<{ orig: BreakdownItem; index: number; calorieInput: string }>,
+      items: [] as BreakdownItem[],
+      totals: { calories: 0, proteinG: null, carbsG: null, fatG: null } as BreakdownTotals,
+    };
+    if (!estimation) return empty;
+    const entries: Array<{ orig: BreakdownItem; index: number; calorieInput: string }> = [];
+    const items: BreakdownItem[] = [];
+    estimation.items.forEach((orig, i) => {
+      if (removedItems[i]) return;
+      const input = itemCals[i] ?? '';
+      const parsed = parseInt(input);
+      const cal = Number.isFinite(parsed) ? parsed : 0;
+      entries.push({ orig, index: i, calorieInput: input });
+      items.push(rescaleItem(orig, cal));
+    });
+    return { entries, items, totals: sumBreakdown(items) };
+  }, [estimation, itemCals, removedItems]);
+
+  const handleEditItemCalories = (localIndex: number, value: string) => {
+    const origIndex = liveBreakdown.entries[localIndex]?.index;
+    if (origIndex == null) return;
+    setItemCals((prev) => {
+      const next = [...prev];
+      next[origIndex] = value;
+      return next;
+    });
+  };
+
+  const handleRemoveItem = (localIndex: number) => {
+    const origIndex = liveBreakdown.entries[localIndex]?.index;
+    if (origIndex == null) return;
+    setRemovedItems((prev) => {
+      const next = [...prev];
+      next[origIndex] = true;
+      return next;
+    });
+  };
+
+  const resetEstimation = () => {
+    setEstimation(null);
+    setEditCalories('');
+    setItemCals([]);
+    setRemovedItems([]);
   };
 
   const handleConfirmEstimation = async () => {
     if (!estimation) return;
-    const calories = parseInt(editCalories) || estimation.totalCalories;
+    const hasItems = estimation.items.length > 0;
+    const liveItems = liveBreakdown.items;
+    // Principal path: total recalculated from the (edited) ingredients.
+    // Fallback: AI returned no breakdown — keep the direct editable total.
+    const calories = hasItems
+      ? liveBreakdown.totals.calories
+      : (parseInt(editCalories) || estimation.totalCalories);
     if (calories <= 0) {
       toast({ type: 'warning', message: t('nutrify.invalidCalories', 'Las calorías deben ser mayores a 0') });
       return;
     }
+    const macros: BreakdownTotals = hasItems
+      ? liveBreakdown.totals
+      : { calories, proteinG: estimation.proteinG, carbsG: estimation.carbsG, fatG: estimation.fatG };
 
     try {
       const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
@@ -243,7 +342,10 @@ export default function Today() {
         description: foodInput.trim(),
         calories,
         source: 'ai_estimate',
-        aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
+        aiBreakdown: liveItems.length > 1 ? JSON.stringify(liveItems) : undefined,
+        proteinG: macros.proteinG,
+        carbsG: macros.carbsG,
+        fatG: macros.fatG,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
 
@@ -254,8 +356,7 @@ export default function Today() {
 
       toast({ type: 'nutri', message: `+${calories} kcal` });
       setFoodInput('');
-      setEstimation(null);
-      setEditCalories('');
+      resetEstimation();
       const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
@@ -305,6 +406,7 @@ export default function Today() {
       await window.api.nutritionLogFood({
         date, description: food.name, calories: food.calories, source: 'frequent',
         frequentFoodId: food.id,
+        proteinG: food.proteinG ?? null, carbsG: food.carbsG ?? null, fatG: food.fatG ?? null,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
       await window.api.nutritionIncrementFrequentUsage(food.id);
@@ -329,6 +431,7 @@ export default function Today() {
       await window.api.nutritionLogFood({
         date, description: food.description, calories: food.calories, source: 'favorite',
         aiBreakdown: food.aiBreakdown || undefined,
+        proteinG: food.proteinG ?? null, carbsG: food.carbsG ?? null, fatG: food.fatG ?? null,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
       await window.api.processRpgEvent({
@@ -346,9 +449,125 @@ export default function Today() {
     }
   };
 
-  const handleAddFavorite = async (description: string, calories: number, source?: string, aiBreakdown?: string) => {
+  // ── Repeat a previous day ────────────────────────
+  const openRepeatPicker = async () => {
     try {
-      await window.api.nutritionAddFavoriteFood({ description, calories, source, aiBreakdown });
+      const days = await window.api.nutritionGetRecentLoggedDays(date, 14);
+      setRecentDays(days as RecentLoggedDay[]);
+      setRepeatPickerOpen(true);
+    } catch (err) {
+      console.error('[Nutrition] openRepeatPicker error:', err);
+      toast({ type: 'warning', message: t('nutrify.repeatDayError', 'Error al repetir el día') });
+    }
+  };
+
+  const handleRepeatDay = async (fromDate: string) => {
+    // If the day already has meals, confirm before stacking another day on top.
+    if (foods.length > 0) {
+      const ok = await confirm({
+        message: t('nutrify.repeatDayConfirm', 'Este día ya tiene comidas. ¿Sumar las del día elegido igual?'),
+        confirmText: t('nutrify.repeatDayButton', 'Repetir día'),
+      });
+      if (!ok) return;
+    }
+    try {
+      const { copied } = await window.api.nutritionRepeatDay(fromDate, date);
+      setRepeatPickerOpen(false);
+      if (copied > 0) {
+        // Emit one meal event per copied dish, mirroring logging them one by one.
+        for (let i = 0; i < copied; i++) {
+          await window.api.processRpgEvent({
+            type: 'MEAL_LOGGED', moduleId: 'nutrition',
+            payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+          });
+        }
+        toast({ type: 'nutri', message: t('nutrify.repeatDaySuccess', { count: copied, defaultValue: 'Se repitieron {{count}} comidas' }) });
+        const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+        if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
+        loadData(date);
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+      } else {
+        toast({ type: 'info', message: t('nutrify.repeatDayEmpty', 'Ese día no tiene comidas para repetir') });
+      }
+    } catch (err) {
+      console.error('[Nutrition] repeatDay error:', err);
+      toast({ type: 'warning', message: t('nutrify.repeatDayError', 'Error al repetir el día') });
+    }
+  };
+
+  // ── Portion multiplier (favorites / frequent) ────
+  const openPortionFavorite = (f: FavoriteFood) => {
+    setPortionFood({
+      kind: 'favorite', name: f.description, calories: f.calories,
+      proteinG: f.proteinG ?? null, carbsG: f.carbsG ?? null, fatG: f.fatG ?? null,
+      source: f.source || 'favorite',
+    });
+    setPortionFactor(1);
+  };
+
+  const openPortionFrequent = (f: FrequentFood) => {
+    setPortionFood({
+      kind: 'frequent', name: f.name, calories: f.calories,
+      proteinG: f.proteinG ?? null, carbsG: f.carbsG ?? null, fatG: f.fatG ?? null,
+      source: 'frequent', frequentFoodId: f.id,
+    });
+    setPortionFactor(1);
+  };
+
+  const handleConfirmPortion = async () => {
+    if (!portionFood) return;
+    const scaled = scalePortion(
+      { calories: portionFood.calories, proteinG: portionFood.proteinG, carbsG: portionFood.carbsG, fatG: portionFood.fatG },
+      portionFactor,
+    );
+    if (scaled.calories <= 0) {
+      toast({ type: 'warning', message: t('nutrify.invalidCalories', 'Las calorías deben ser mayores a 0') });
+      return;
+    }
+    const label = portionFactor !== 1
+      ? `${portionFood.name} (x${Number(portionFactor.toFixed(2))})`
+      : portionFood.name;
+    try {
+      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
+      await window.api.nutritionLogFood({
+        date, description: label, calories: scaled.calories, source: portionFood.source,
+        frequentFoodId: portionFood.kind === 'frequent' ? portionFood.frequentFoodId : undefined,
+        proteinG: scaled.proteinG, carbsG: scaled.carbsG, fatG: scaled.fatG,
+        meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
+      });
+      if (portionFood.kind === 'frequent' && portionFood.frequentFoodId != null) {
+        await window.api.nutritionIncrementFrequentUsage(portionFood.frequentFoodId);
+      }
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+      });
+      toast({ type: 'nutri', message: `+${scaled.calories} kcal` });
+      setPortionFood(null);
+      const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+      if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
+      loadData(date);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch (err) {
+      console.error('[Nutrition] confirmPortion error:', err);
+      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+    }
+  };
+
+  const handleAddFavorite = async (
+    description: string,
+    calories: number,
+    source?: string,
+    aiBreakdown?: string,
+    macros?: { proteinG: number | null; carbsG: number | null; fatG: number | null },
+  ) => {
+    try {
+      await window.api.nutritionAddFavoriteFood({
+        description, calories, source, aiBreakdown,
+        proteinG: macros?.proteinG ?? null,
+        carbsG: macros?.carbsG ?? null,
+        fatG: macros?.fatG ?? null,
+      });
       toast({ type: 'nutri', message: t('nutrify.favoriteSaved', 'Guardado en favoritos') });
       const favorites = await window.api.nutritionGetFavoriteFoods();
       setFavoriteFoods(favorites as FavoriteFood[]);
@@ -473,7 +692,8 @@ export default function Today() {
       const hp = b?.hpChange ?? 0;
       await window.api.processRpgEvent({
         type: 'DAY_SUMMARY', moduleId: 'nutrition',
-        payload: { xp, hp },
+        // `date` lets a later DAY_REOPENED find and revert this exact close.
+        payload: { xp, hp, date },
         timestamp: Date.now(),
       });
       toast({ type: 'info', message: `+${xp} XP` });
@@ -481,6 +701,33 @@ export default function Today() {
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
       setDayClosed(closed as typeof dayClosed);
+    }
+  };
+
+  const handleReopenDay = async () => {
+    const ok = await confirm({
+      message: t('nutrify.reopenDayWarning', 'Reabrir la jornada revertirá el XP y HP que ganaste al cerrarla. Vas a poder editar las comidas y volver a cerrarla.'),
+      confirmText: t('nutrify.reopenDay', 'Reabrir la jornada'),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const result = await window.api.nutritionReopenDay(date);
+      if (result.success) {
+        // Revert the granted XP/HP through the RPG engine's undo path
+        // (mirrors Questify's TASK_UNCOMPLETED — reverses the exact close event).
+        await window.api.processRpgEvent({
+          type: 'DAY_REOPENED', moduleId: 'nutrition',
+          payload: { xp: -(result.xpTotal ?? 0), hp: -(result.hpChange ?? 0), date },
+          timestamp: Date.now(),
+        });
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+        toast({ type: 'info', message: t('nutrify.dayReopened', 'Jornada reabierta') });
+      }
+      await loadData(date);
+      loadPendingDays();
+    } catch {
+      toast({ type: 'warning', message: t('nutrify.reopenDayError', 'Error al reabrir la jornada') });
     }
   };
 
@@ -701,6 +948,9 @@ export default function Today() {
               </p>
             );
           })()}
+
+          {/* Macro attribute bars */}
+          <MacroBars summary={summary} targets={macroTargets} t={t} />
         </div>
       </div>
 
@@ -717,18 +967,22 @@ export default function Today() {
             <button
               type="button"
               className={`nutri-mode-btn ${!manualMode ? 'active' : ''}`}
-              onClick={() => setManualMode(false)}
+              onClick={() => { setManualMode(false); setEstimateNotice(''); }}
             >
               {t('nutrify.aiMode', 'Estimación IA')}
             </button>
             <button
               type="button"
               className={`nutri-mode-btn ${manualMode ? 'active' : ''}`}
-              onClick={() => setManualMode(true)}
+              onClick={() => { setManualMode(true); setEstimateNotice(''); }}
             >
               {t('nutrify.manualMode', 'Manual')}
             </button>
           </div>
+
+          {estimateNotice && (
+            <div className="nutri-estimate-notice">{estimateNotice}</div>
+          )}
 
           {manualMode ? (
             <div className="nutri-manual-inputs">
@@ -769,53 +1023,68 @@ export default function Today() {
                 />
                 <button className="nutri-btn" onClick={handleEstimate}
                   disabled={estimating || !foodInput.trim()}>
-                  {estimating ? t('common.loading', 'Cargando...') : t('nutrify.estimate', 'Estimar')}
+                  {retrying
+                    ? t('nutrify.retrying', 'Reintentando...')
+                    : estimating
+                      ? t('common.loading', 'Cargando...')
+                      : t('nutrify.estimate', 'Estimar')}
                 </button>
               </div>
-
-              {/* Error message */}
-              {estimateError && (
-                <div className="nutri-estimate-error">{estimateError}</div>
-              )}
 
               {/* Estimation result */}
               {estimation && (
                 <div className="nutri-estimation">
-                  {estimation.items.length > 0 && (
-                    <div className="nutri-est-items">
-                      {estimation.items.map((item, i) => (
-                        <div key={i} className="nutri-est-item">
-                          <span className="nutri-food-name">{item.name}</span>
-                          <span className="nutri-food-kcal"><AnimatedNumber value={item.calories} prefix="" locale={i18n.language === 'en' ? 'en-US' : 'es-AR'} duration={400} /> kcal</span>
-                        </div>
-                      ))}
+                  {estimation.items.length > 0 ? (
+                    <EstimationBreakdown
+                      items={liveBreakdown.items.map((it, li) => ({
+                        ...it,
+                        calorieInput: liveBreakdown.entries[li].calorieInput,
+                      }))}
+                      totals={liveBreakdown.totals}
+                      onEditCalories={handleEditItemCalories}
+                      onRemove={handleRemoveItem}
+                      t={t}
+                      locale={i18n.language === 'en' ? 'en-US' : 'es-AR'}
+                    />
+                  ) : (
+                    <div className="nutri-est-total">
+                      <span className="nutri-est-total-label">{t('nutrify.totalCalories', 'Total')}:</span>
+                      <div className="nutri-est-total-input">
+                        <input
+                          type="number"
+                          value={editCalories}
+                          onChange={(e) => setEditCalories(e.target.value)}
+                          className="nutri-total-input"
+                        />
+                        <span className="nutri-est-unit">kcal</span>
+                      </div>
                     </div>
                   )}
-                  <div className="nutri-est-total">
-                    <span className="nutri-est-total-label">{t('nutrify.totalCalories', 'Total')}:</span>
-                    <div className="nutri-est-total-input">
-                      <input
-                        type="number"
-                        value={editCalories}
-                        onChange={(e) => setEditCalories(e.target.value)}
-                        className="nutri-total-input"
-                      />
-                      <span className="nutri-est-unit">kcal</span>
-                    </div>
-                  </div>
                   <div className="nutri-est-actions">
-                    <button className="nutri-btn nutri-btn-primary" onClick={handleConfirmEstimation}>
+                    <button
+                      className="nutri-btn nutri-btn-primary"
+                      onClick={handleConfirmEstimation}
+                      disabled={estimation.items.length > 0 && liveBreakdown.items.length === 0}
+                    >
                       {t('nutrify.confirmLog', 'Confirmar y registrar')}
                     </button>
-                    <button className="nutri-btn nutri-btn-ghost" onClick={() => handleAddFavorite(
-                      foodInput.trim(),
-                      parseInt(editCalories) || estimation.totalCalories,
-                      'ai_estimate',
-                      estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
-                    )}>
+                    <button className="nutri-btn nutri-btn-ghost" onClick={() => {
+                      const hasItems = estimation.items.length > 0;
+                      const cal = hasItems ? liveBreakdown.totals.calories : (parseInt(editCalories) || estimation.totalCalories);
+                      const macros = hasItems
+                        ? { proteinG: liveBreakdown.totals.proteinG, carbsG: liveBreakdown.totals.carbsG, fatG: liveBreakdown.totals.fatG }
+                        : { proteinG: estimation.proteinG, carbsG: estimation.carbsG, fatG: estimation.fatG };
+                      handleAddFavorite(
+                        foodInput.trim(),
+                        cal,
+                        'ai_estimate',
+                        liveBreakdown.items.length > 1 ? JSON.stringify(liveBreakdown.items) : undefined,
+                        macros,
+                      );
+                    }}>
                       <Heart width={14} height={14} /> {t('nutrify.saveToFavorites', 'Guardar en favoritos')}
                     </button>
-                    <button className="nutri-btn nutri-btn-ghost" onClick={() => { setEstimation(null); setEditCalories(''); }}>
+                    <button className="nutri-btn nutri-btn-ghost" onClick={resetEstimation}>
                       {t('common.cancel', 'Cancelar')}
                     </button>
                   </div>
@@ -845,14 +1114,24 @@ export default function Today() {
             <>
               <div className="nutri-frequent-pills">
                 {favoriteFoods.map((f) => (
-                  <button
-                    key={f.id}
-                    className="nutri-btn nutri-pill"
-                    onClick={() => handleLogFavorite(f)}
-                    onContextMenu={(e) => { e.preventDefault(); handleRemoveFavorite(f.id); }}
-                  >
-                    {f.description} ({f.calories})
-                  </button>
+                  <span key={f.id} className="nutri-pill-wrap">
+                    <button
+                      className="nutri-btn nutri-pill"
+                      onClick={() => handleLogFavorite(f)}
+                      onContextMenu={(e) => { e.preventDefault(); handleRemoveFavorite(f.id); }}
+                    >
+                      {f.description} ({f.calories})
+                    </button>
+                    <button
+                      type="button"
+                      className="nutri-pill-portion"
+                      onClick={() => openPortionFavorite(f)}
+                      title={t('nutrify.adjustPortion', 'Ajustar porción')}
+                      aria-label={t('nutrify.adjustPortion', 'Ajustar porción')}
+                    >
+                      <PortionGlyph />
+                    </button>
+                  </span>
                 ))}
               </div>
               <p className="nutri-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.5, marginTop: 4 }}>
@@ -875,6 +1154,15 @@ export default function Today() {
             </span>
           )}
           {foods.length > 0 && !dayClosed && (
+            <button className="nutri-btn nutri-btn-ghost nutri-btn-sm" onClick={openRepeatPicker}>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 8a6 6 0 0 1 10-4.5L14 5" /><path d="M14 2v3h-3" />
+                <path d="M14 8a6 6 0 0 1-10 4.5L2 11" /><path d="M2 14v-3h3" />
+              </svg>
+              {' '}{t('nutrify.repeatDayShort', 'Repetir día')}
+            </button>
+          )}
+          {foods.length > 0 && !dayClosed && (
             <button className="nutri-btn nutri-btn-danger nutri-btn-sm" onClick={handleDeleteDay}>
               {t('nutrify.deleteDayButton', 'Eliminar día')}
             </button>
@@ -884,6 +1172,13 @@ export default function Today() {
           <div className="nutri-empty">
             <Platter width={32} height={32} />
             <p>{t('nutrify.noFoodToday', 'No hay comidas registradas. Describí lo que comiste arriba o usá un favorito.')}</p>
+            <button className="nutri-btn nutri-btn-ghost" onClick={openRepeatPicker} style={{ marginTop: 4 }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 8a6 6 0 0 1 10-4.5L14 5" /><path d="M14 2v3h-3" />
+                <path d="M14 8a6 6 0 0 1-10 4.5L2 11" /><path d="M2 14v-3h3" />
+              </svg>
+              {' '}{t('nutrify.repeatPreviousDay', 'Repetir día anterior')}
+            </button>
           </div>
         )}
         {mealGroups.map((group) => (
@@ -914,9 +1209,20 @@ export default function Today() {
             onChange={(e) => setFrequentSearch(e.target.value)} className="nutri-text-input" style={{ width: '100%', marginBottom: 8 }} />
           <div className="nutri-frequent-pills">
             {filteredFrequent.slice(0, 12).map((f) => (
-              <button key={f.id} className="nutri-btn nutri-pill" onClick={() => handleLogFrequent(f)}>
-                {f.name} ({f.calories})
-              </button>
+              <span key={f.id} className="nutri-pill-wrap">
+                <button className="nutri-btn nutri-pill" onClick={() => handleLogFrequent(f)}>
+                  {f.name} ({f.calories})
+                </button>
+                <button
+                  type="button"
+                  className="nutri-pill-portion"
+                  onClick={() => openPortionFrequent(f)}
+                  title={t('nutrify.adjustPortion', 'Ajustar porción')}
+                  aria-label={t('nutrify.adjustPortion', 'Ajustar porción')}
+                >
+                  <PortionGlyph />
+                </button>
+              </span>
             ))}
           </div>
         </div>
@@ -940,6 +1246,13 @@ export default function Today() {
               <CloseDayStats consumed={dayClosed.consumed} target={dayClosed.target} />
               <DayBreakdown data={dayClosed} t={t} />
             </div>
+            <button
+              className="nutri-btn nutri-btn-ghost"
+              style={{ width: '100%', marginTop: 12 }}
+              onClick={handleReopenDay}
+            >
+              {t('nutrify.reopenDay', 'Reabrir la jornada')}
+            </button>
           </div>
         ) : closeResult ? (
           <div>
@@ -1064,6 +1377,33 @@ export default function Today() {
         </div>
       )}
 
+      {/* ── Repeat a day picker ─────────────────────── */}
+      {repeatPickerOpen && (
+        <RepeatDayPicker
+          days={recentDays}
+          onPick={handleRepeatDay}
+          onClose={() => setRepeatPickerOpen(false)}
+          locale={i18n.language === 'en' ? 'en-US' : 'es-AR'}
+          t={t}
+        />
+      )}
+
+      {/* ── Portion multiplier picker ───────────────── */}
+      {portionFood && (
+        <PortionPicker
+          name={portionFood.name}
+          baseCalories={portionFood.calories}
+          baseProteinG={portionFood.proteinG}
+          baseCarbsG={portionFood.carbsG}
+          baseFatG={portionFood.fatG}
+          factor={portionFactor}
+          onFactor={setPortionFactor}
+          onConfirm={handleConfirmPortion}
+          onClose={() => setPortionFood(null)}
+          t={t}
+        />
+      )}
+
       {!dayClosed && !closeResult && foods.length > 0 && (
         <div className="nutri-sticky-footer">
           <button className="rpg-button nutri-close-day-btn" onClick={() => {
@@ -1073,6 +1413,286 @@ export default function Today() {
           }}>
             {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Small "multiply" glyph for the portion-adjust pill button (no emoji).
+function PortionGlyph() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <line x1="2.5" y1="2.5" x2="9.5" y2="9.5" /><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" />
+    </svg>
+  );
+}
+
+// Presentational picker listing recent logged days to repeat. Fully prop-driven
+// so it can be visual-tested in isolation (same pattern as MacroBars).
+export function RepeatDayPicker({
+  days,
+  onPick,
+  onClose,
+  locale,
+  t,
+}: {
+  days: Array<{ date: string; meals: number; calories: number }>;
+  onPick: (date: string) => void;
+  onClose: () => void;
+  locale: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: TFunction<any, any>;
+}) {
+  const dayLabel = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const obj = new Date(y, m - 1, d);
+    return obj.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' });
+  };
+  return (
+    <div className="nutri-popup-overlay" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
+        <h3 className="nutri-popup-title">{t('nutrify.repeatDayTitle', 'Repetir el festín de…')}</h3>
+        {days.length === 0 ? (
+          <p className="nutri-popup-hint">{t('nutrify.repeatDayNoneRecent', 'No hay días recientes con comidas para repetir.')}</p>
+        ) : (
+          <>
+            <p className="nutri-popup-hint">{t('nutrify.repeatDayHint', 'Elegí un día y sumamos sus comidas a hoy.')}</p>
+            <div className="nutri-repeat-list">
+              {days.map((day) => (
+                <button key={day.date} type="button" className="nutri-repeat-day" onClick={() => onPick(day.date)}>
+                  <span className="nutri-repeat-day-name">{dayLabel(day.date)}</span>
+                  <span className="nutri-repeat-day-meta">
+                    {day.meals} {t('nutrify.meals', 'comidas')} {'·'} {day.calories.toLocaleString(locale)} kcal
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <button onClick={onClose} className="nutri-btn nutri-btn-ghost" style={{ width: '100%', marginTop: 8 }}>
+          {t('common.cancel', 'Cancelar')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const PORTION_PRESETS = [0.5, 1, 1.5, 2];
+
+// Presentational portion-multiplier picker. Pure preview math via scalePortion,
+// prop-driven so it can be visual-tested in isolation.
+export function PortionPicker({
+  name,
+  baseCalories,
+  baseProteinG,
+  baseCarbsG,
+  baseFatG,
+  factor,
+  onFactor,
+  onConfirm,
+  onClose,
+  t,
+}: {
+  name: string;
+  baseCalories: number;
+  baseProteinG: number | null;
+  baseCarbsG: number | null;
+  baseFatG: number | null;
+  factor: number;
+  onFactor: (f: number) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: TFunction<any, any>;
+}) {
+  const scaled = scalePortion(
+    { calories: baseCalories, proteinG: baseProteinG, carbsG: baseCarbsG, fatG: baseFatG },
+    factor,
+  );
+  const hasMacros = scaled.proteinG != null || scaled.carbsG != null || scaled.fatG != null;
+  return (
+    <div className="nutri-popup-overlay" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
+        <h3 className="nutri-popup-title">{t('nutrify.portionTitle', 'Ajustar porción')}</h3>
+        <p className="nutri-popup-hint">{name}</p>
+
+        <div className="nutri-portion-presets">
+          {PORTION_PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={`nutri-btn nutri-portion-preset${factor === p ? ' active' : ''}`}
+              onClick={() => onFactor(p)}
+            >
+              x{p}
+            </button>
+          ))}
+        </div>
+
+        <label className="nutri-popup-field">
+          <span>{t('nutrify.portionFactor', 'Porciones')}</span>
+          <RpgNumberInput
+            value={String(factor)}
+            onChange={(v) => onFactor(parseFloat(v) || 0)}
+            step={0.5} min={0} max={20}
+            style={{ width: 120 }}
+          />
+        </label>
+
+        <div className="nutri-popup-summary">
+          <div className="nutri-popup-row">
+            <span className="nutri-popup-label">{t('nutrify.calories', 'Calorías')}</span>
+            <span className="nutri-popup-val">{scaled.calories} kcal</span>
+          </div>
+          {hasMacros && (
+            <div className="nutri-popup-row nutri-popup-row--border">
+              <span className="nutri-popup-label">{t('nutrify.macros', 'Macros')}</span>
+              <span className="nutri-popup-val">
+                {t('nutrify.protein', 'Proteína').charAt(0)} {scaled.proteinG ?? '–'}g {'·'}{' '}
+                {t('nutrify.carbs', 'Carbohidratos').charAt(0)} {scaled.carbsG ?? '–'}g {'·'}{' '}
+                {t('nutrify.fat', 'Grasa').charAt(0)} {scaled.fatG ?? '–'}g
+              </span>
+            </div>
+          )}
+        </div>
+
+        <button className="nutri-btn nutri-btn-primary" onClick={onConfirm} disabled={scaled.calories <= 0}
+          style={{ width: '100%', marginBottom: 8 }}>
+          {t('nutrify.portionConfirm', 'Registrar porción')}
+        </button>
+        <button onClick={onClose} className="nutri-btn nutri-btn-ghost" style={{ width: '100%' }}>
+          {t('common.cancel', 'Cancelar')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function MacroBars({ summary, targets, t }: { summary: DailySummary | null; targets: MacroTargets | null; t: TFunction<any, any> }) {
+  if (!targets) return null;
+
+  const rows: Array<{ key: string; label: string; consumed: number; target: number }> = [
+    { key: 'protein', label: t('nutrify.protein', 'Proteína'), consumed: Math.round(summary?.proteinG ?? 0), target: targets.proteinG },
+    { key: 'carbs', label: t('nutrify.carbs', 'Carbohidratos'), consumed: Math.round(summary?.carbsG ?? 0), target: targets.carbsG },
+    { key: 'fat', label: t('nutrify.fat', 'Grasa'), consumed: Math.round(summary?.fatG ?? 0), target: targets.fatG },
+  ];
+
+  return (
+    <div className="nutri-macros">
+      <div className="nutri-macros-head">
+        <span className="nutri-macros-title">{t('nutrify.macros', 'Macros')}</span>
+        {targets.auto && (
+          <span className="nutri-macros-auto">{t('nutrify.autoSuggested', 'Sugerido automáticamente')}</span>
+        )}
+      </div>
+      {rows.map((row) => {
+        const pct = row.target > 0 ? Math.round((row.consumed / row.target) * 100) : 0;
+        const fill = Math.min(100, pct);
+        const over = pct > 100;
+        return (
+          <div key={row.key} className={`nutri-macro${over ? ' is-over' : ''}`}>
+            <div className="nutri-macro-info">
+              <span className="nutri-macro-label">{row.label}</span>
+              <span className="nutri-macro-val">
+                {row.consumed} / {row.target} g
+                <span className="nutri-macro-pct">{' '}{'·'} {pct}%</span>
+              </span>
+            </div>
+            <div className={`nutri-macro-bar nutri-macro-bar--${row.key}${over ? ' is-over' : ''}`}>
+              <div className="nutri-macro-fill" style={{ width: `${fill}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Editable AI ingredient breakdown — presentational, fully driven by props so it
+// can be unit/visual-tested in isolation (same pattern as MacroBars).
+export function EstimationBreakdown({
+  items,
+  totals,
+  onEditCalories,
+  onRemove,
+  t,
+  locale,
+}: {
+  items: Array<BreakdownItem & { calorieInput: string }>;
+  totals: BreakdownTotals;
+  onEditCalories: (index: number, value: string) => void;
+  onRemove: (index: number) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: TFunction<any, any>;
+  locale: string;
+}) {
+  const initials = {
+    p: t('nutrify.protein', 'Proteína').charAt(0).toUpperCase(),
+    c: t('nutrify.carbs', 'Carbohidratos').charAt(0).toUpperCase(),
+    f: t('nutrify.fat', 'Grasa').charAt(0).toUpperCase(),
+  };
+  const macroLine = (p: number | null, c: number | null, f: number | null): string | null => {
+    const parts = [
+      p != null ? `${initials.p} ${p}g` : null,
+      c != null ? `${initials.c} ${c}g` : null,
+      f != null ? `${initials.f} ${f}g` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join('  ·  ') : null;
+  };
+  const totalMacros = macroLine(totals.proteinG, totals.carbsG, totals.fatG);
+
+  return (
+    <div className="nutri-est-breakdown">
+      <p className="nutri-est-hint">
+        {t('nutrify.breakdownHint', 'Ajustá las calorías de cada ingrediente o quitá lo que no comiste.')}
+      </p>
+      <div className="nutri-est-items">
+        {items.map((it, i) => {
+          const macros = macroLine(it.proteinG, it.carbsG, it.fatG);
+          return (
+            <div key={i} className="nutri-est-item nutri-est-item--edit">
+              <div className="nutri-est-item-main">
+                <span className="nutri-food-name">{it.name}</span>
+                {macros && <span className="nutri-est-item-macros">{macros}</span>}
+              </div>
+              <div className="nutri-est-item-cal">
+                <input
+                  type="number"
+                  className="nutri-est-cal-input"
+                  value={it.calorieInput}
+                  onChange={(e) => onEditCalories(i, e.target.value)}
+                  aria-label={t('nutrify.itemCaloriesLabel', { name: it.name, defaultValue: 'Calorías de {{name}}' })}
+                />
+                <span className="nutri-est-unit">{t('nutrify.kcalUnit', 'kcal')}</span>
+                <button
+                  type="button"
+                  className="nutri-est-remove"
+                  onClick={() => onRemove(i)}
+                  title={t('nutrify.removeIngredient', 'Quitar ingrediente')}
+                  aria-label={t('nutrify.removeIngredient', 'Quitar ingrediente')}
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {items.length === 0 ? (
+        <p className="nutri-est-empty">
+          {t('nutrify.breakdownEmpty', 'Quitaste todos los ingredientes. Volvé a estimar o agregá uno manualmente.')}
+        </p>
+      ) : (
+        <div className="nutri-est-total">
+          <span className="nutri-est-total-label">{t('nutrify.totalCalories', 'Total')}:</span>
+          <div className="nutri-est-total-recalc">
+            {totalMacros && <span className="nutri-est-total-macros">{totalMacros}</span>}
+            <span className="nutri-est-total-val">{totals.calories.toLocaleString(locale)} {t('nutrify.kcalUnit', 'kcal')}</span>
+          </div>
         </div>
       )}
     </div>

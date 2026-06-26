@@ -6,8 +6,11 @@ import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import MealScheduleEditor from './shared/MealScheduleEditor';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { Gear, Shield, Compass, Chalice, Scale } from '../../../shared/components/icons';
+import { Gear, Shield, Compass, Chalice, Scale, Meat } from '../../../shared/components/icons';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
+import { calcAutoMacroTargets } from '../../../../shared/macro-utils';
+import { AdaptiveTdeeInsight } from './AdaptiveTdeeInsight';
+import type { AdaptiveTdeeEstimate } from '../../../../shared/adaptive-tdee';
 import type { MealSchedule } from '../../../../shared/meal-utils';
 import type { NutritionProfile } from '../types';
 
@@ -45,10 +48,19 @@ export default function NutritionSettings() {
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
+  // Macro target overrides (empty string = use auto calculation)
+  const [proteinTarget, setProteinTarget] = useState('');
+  const [carbsTarget, setCarbsTarget] = useState('');
+  const [fatTarget, setFatTarget] = useState('');
+  const [macroError, setMacroError] = useState('');
+  const [adaptive, setAdaptive] = useState<AdaptiveTdeeEstimate | null>(null);
 
   const loadProfile = useCallback(() => {
     setLoading(true);
     setLoadError(false);
+    window.api.nutritionGetAdaptiveTdee()
+      .then((est) => setAdaptive(est as AdaptiveTdeeEstimate))
+      .catch(() => setAdaptive(null));
     Promise.all([
       window.api.nutritionGetProfile(),
       window.api.nutritionGetWeights(),
@@ -74,6 +86,17 @@ export default function NutritionSettings() {
         else { setGoal('maintain'); setGoalAmount(0); }
 
         if (p.mealSchedule) setMealSchedule(p.mealSchedule);
+
+        // Macro overrides: only treated as set when all three are present (todo-o-nada)
+        if (p.proteinTargetG != null && p.carbsTargetG != null && p.fatTargetG != null) {
+          setProteinTarget(String(p.proteinTargetG));
+          setCarbsTarget(String(p.carbsTargetG));
+          setFatTarget(String(p.fatTargetG));
+        } else {
+          setProteinTarget('');
+          setCarbsTarget('');
+          setFatTarget('');
+        }
       }
     }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
@@ -89,6 +112,27 @@ export default function NutritionSettings() {
 
   const handleSave = async () => {
     if (saving) return;
+
+    // Resolve macro overrides: all-or-nothing. Empty all three = use auto.
+    const macroStrings = [proteinTarget, carbsTarget, fatTarget];
+    const filled = macroStrings.filter((v) => v.trim() !== '');
+    let proteinTargetG: number | null = null;
+    let carbsTargetG: number | null = null;
+    let fatTargetG: number | null = null;
+    if (filled.length > 0) {
+      if (filled.length < 3) {
+        setMacroError(t('nutrify.macroTargetsPartial', 'Completá los tres macros o dejá los tres vacíos para usar el cálculo automático.'));
+        return;
+      }
+      const parsed = macroStrings.map((v) => parseFloat(v));
+      if (parsed.some((n) => !Number.isFinite(n) || n < 0 || n > 2000)) {
+        setMacroError(t('nutrify.macroTargetsRange', 'Cada macro debe estar entre 0 y 2000 g.'));
+        return;
+      }
+      [proteinTargetG, carbsTargetG, fatTargetG] = parsed;
+    }
+    setMacroError('');
+
     setSaving(true);
     setSaveError('');
     try {
@@ -99,6 +143,7 @@ export default function NutritionSettings() {
       await window.api.nutritionSaveProfile({
         dateOfBirth, weightCheckDay, weightPopupEnabled, sex, heightCm: height, initialWeightKg: weight,
         activityLevel: activity, deficitTargetKcal, mealSchedule,
+        proteinTargetG, carbsTargetG, fatTargetG,
       });
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
@@ -120,6 +165,37 @@ export default function NutritionSettings() {
     const mult = ACTIVITY_MULTIPLIERS[activity] ?? 1.55;
     return { bmr: Math.round(rawBmr), tdee: Math.round(rawBmr * mult), multiplier: mult };
   }, [age, weight, height, sex, activity]);
+
+  // Auto macro targets (shown as placeholders / suggestions when no override is set)
+  const autoMacros = useMemo(() => {
+    const deficit = goal === 'deficit' ? goalAmount : goal === 'surplus' ? -goalAmount : 0;
+    return calcAutoMacroTargets(tdee - deficit, weight, deficit);
+  }, [tdee, weight, goal, goalAmount]);
+
+  const hasMacroOverride = [proteinTarget, carbsTarget, fatTarget].some((v) => v.trim() !== '');
+
+  const signedDeficit = goal === 'deficit' ? goalAmount : goal === 'surplus' ? -goalAmount : 0;
+
+  // Manual, explicit application of the adaptive estimate. We can't (and won't)
+  // touch the day-close math, which derives the daily target from the STATIC tdee.
+  // The only honest lever is the user's own deficit: we solve for the deficit that
+  // makes `staticTdee - deficit` land on `realTdee - intendedDeficit`, i.e. shift
+  // it by (staticTdee - realTdee). Then we PRE-FILL the goal fields — the user
+  // still has to hit Save, so nothing changes automatically.
+  const applyAdaptive = () => {
+    if (!adaptive || adaptive.tdee == null) return;
+    const newSigned = Math.round(tdee - adaptive.tdee + signedDeficit);
+    if (newSigned > 0) { setGoal('deficit'); setGoalAmount(Math.min(1500, newSigned)); }
+    else if (newSigned < 0) { setGoal('surplus'); setGoalAmount(Math.min(1500, Math.abs(newSigned))); }
+    else { setGoal('maintain'); setGoalAmount(0); }
+  };
+
+  const handleResetMacros = () => {
+    setProteinTarget('');
+    setCarbsTarget('');
+    setFatTarget('');
+    setMacroError('');
+  };
 
   if (loading) return <div style={{ padding: 24, fontFamily: "'IM Fell English', serif", color: 'var(--ink-faded)' }}>{t('common.loading')}</div>;
 
@@ -251,6 +327,60 @@ export default function NutritionSettings() {
             </span>
           </div>
         )}
+
+        {tdee > 0 && adaptive && (
+          <AdaptiveTdeeInsight
+            result={adaptive}
+            staticTdee={tdee}
+            signedDeficit={signedDeficit}
+            onApply={adaptive.tdee != null ? applyAdaptive : undefined}
+            t={t}
+          />
+        )}
+      </div>
+
+      {/* ── Macro Targets ── */}
+      <div className="nutri-card">
+        <HelpBubble text={t('nutrify.macroTargetsHelp', 'Objetivos de gramos de proteína, carbohidratos y grasa. Por defecto se calculan automáticamente según tu objetivo; podés sobrescribir los tres a la vez.')} />
+        <h3 className="nutri-card-title">
+          <span className="nutri-t-ico"><Meat width={14} height={14} /></span> {t('nutrify.macroTargets', 'Objetivos de macros')}
+          <span className="nutri-card-subtitle">{t('nutrify.macroTargetsSub', 'Dejá vacío para usar el cálculo automático')}</span>
+        </h3>
+
+        <div className="nutri-config-grid">
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.protein', 'Proteína')}</label>
+            <RpgNumberInput value={proteinTarget} onChange={setProteinTarget} step={5} min={0} max={2000}
+              suffix="g" placeholder={String(autoMacros.proteinG)} />
+          </div>
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.carbs', 'Carbohidratos')}</label>
+            <RpgNumberInput value={carbsTarget} onChange={setCarbsTarget} step={5} min={0} max={2000}
+              suffix="g" placeholder={String(autoMacros.carbsG)} />
+          </div>
+          <div className="nutri-field">
+            <label className="nutri-label">{t('nutrify.fat', 'Grasa')}</label>
+            <RpgNumberInput value={fatTarget} onChange={setFatTarget} step={5} min={0} max={2000}
+              suffix="g" placeholder={String(autoMacros.fatG)} />
+          </div>
+        </div>
+
+        {macroError && (
+          <p className="nutri-field-hint" style={{ color: 'var(--rubric)', marginTop: 8 }}>{macroError}</p>
+        )}
+
+        <div className="nutri-macro-targets-foot">
+          <span className="nutri-field-hint">
+            {hasMacroOverride
+              ? t('nutrify.macroTargetsOverride', 'Usando objetivos personalizados')
+              : t('nutrify.macroTargetsAuto', 'Usando cálculo automático según tu objetivo')}
+          </span>
+          {hasMacroOverride && (
+            <button type="button" className="nutri-btn nutri-btn-ghost nutri-btn-sm" onClick={handleResetMacros}>
+              {t('nutrify.resetToAuto', 'Volver a automático')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Meal Schedule ── */}

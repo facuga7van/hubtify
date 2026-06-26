@@ -15,6 +15,13 @@ export interface TreasureLineChartProps {
   themed?: boolean;
   showArea?: boolean;
   todayIndex?: number;
+  /**
+   * Optional smoothed overlay (e.g. a weight trend line). When provided it is
+   * drawn as the prominent headline line and `data` is rendered as faint raw
+   * markers underneath. Both series share the same scale. Omit for the original
+   * single-series behaviour.
+   */
+  trendData?: PointDatum[];
 }
 
 export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
@@ -25,6 +32,7 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
   themed = true,
   showArea = true,
   todayIndex,
+  trendData,
 }) => {
   const uid = useId();
   const stippleId = `${uid}-stipple`;
@@ -35,12 +43,14 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
   const chartW = viewBoxWidth - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
-  // Auto-scale: compute domain from data + goalLine
-  const { minY, maxY, scaledPoints } = useMemo(() => {
+  // Auto-scale: compute a shared domain from data + trendData + goalLine so both
+  // series line up on the same axes.
+  const { minY, maxY, scaledPoints, scaledTrend } = useMemo(() => {
     if (data.length === 0)
-      return { minY: 0, maxY: 100, scaledPoints: [] };
+      return { minY: 0, maxY: 100, scaledPoints: [], scaledTrend: [] };
 
     const yVals = data.map((d) => d.y);
+    if (trendData) for (const d of trendData) yVals.push(d.y);
     if (goalLine != null) yVals.push(goalLine);
 
     let mn = Math.min(...yVals);
@@ -50,18 +60,26 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
     mx += range * 0.1;
 
     const xVals = data.map((d) => d.x);
+    if (trendData) for (const d of trendData) xVals.push(d.x);
     const xMin = Math.min(...xVals);
     const xMax = Math.max(...xVals);
     const xRange = xMax - xMin || 1;
 
-    const pts = data.map((d) => ({
+    const scale = (d: PointDatum) => ({
       sx: padding.left + ((d.x - xMin) / xRange) * chartW,
       sy: padding.top + ((mx - d.y) / (mx - mn)) * chartH,
       orig: d,
-    }));
+    });
 
-    return { minY: mn, maxY: mx, scaledPoints: pts };
-  }, [data, goalLine, chartW, chartH, padding.left, padding.top]);
+    return {
+      minY: mn,
+      maxY: mx,
+      scaledPoints: data.map(scale),
+      scaledTrend: trendData ? trendData.map(scale) : [],
+    };
+  }, [data, trendData, goalLine, chartW, chartH, padding.left, padding.top]);
+
+  const hasTrend = scaledTrend.length >= 2;
 
   const linePath = useMemo(
     () =>
@@ -71,13 +89,24 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
     [scaledPoints]
   );
 
+  const trendPath = useMemo(
+    () =>
+      scaledTrend
+        .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.sx},${p.sy}`)
+        .join(' '),
+    [scaledTrend]
+  );
+
+  // Fill the area under the trend line when present, otherwise under the raw line.
   const areaPath = useMemo(() => {
-    if (scaledPoints.length < 2) return '';
-    const last = scaledPoints[scaledPoints.length - 1];
-    const first = scaledPoints[0];
+    const src = hasTrend ? scaledTrend : scaledPoints;
+    if (src.length < 2) return '';
+    const d = src.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.sx},${p.sy}`).join(' ');
+    const last = src[src.length - 1];
+    const first = src[0];
     const bottom = padding.top + chartH;
-    return `${linePath} L${last.sx},${bottom} L${first.sx},${bottom} Z`;
-  }, [linePath, scaledPoints, padding.top, chartH]);
+    return `${d} L${last.sx},${bottom} L${first.sx},${bottom} Z`;
+  }, [hasTrend, scaledTrend, scaledPoints, padding.top, chartH]);
 
   const goalY = useMemo(() => {
     if (goalLine == null) return null;
@@ -124,21 +153,27 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
             </>
           )}
 
-          {/* Line */}
-          {linePath && (
+          {/* Raw line — hidden when a trend overlay takes the headline role */}
+          {linePath && !hasTrend && (
             <path d={linePath} className="treasure-line" />
           )}
 
-          {/* Data points */}
+          {/* Smoothed trend line — the headline series */}
+          {hasTrend && trendPath && (
+            <path d={trendPath} className="treasure-trend-line" />
+          )}
+
+          {/* Data points (faint when a trend overlay is present) */}
           {scaledPoints.map((p, i) => (
             <circle
               key={i}
               cx={p.sx}
               cy={p.sy}
-              r="3"
+              r={hasTrend ? 2 : 3}
               fill="#E0C068"
               stroke="#3B2314"
               strokeWidth="1"
+              opacity={hasTrend ? 0.45 : 1}
             />
           ))}
 
@@ -287,16 +322,22 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
             <path d={areaPath} fill={`url(#${areaGradientId})`} />
           )}
 
-          {/* Line path — dashed trail */}
-          {linePath && (
+          {/* Raw dashed trail — hidden when a trend overlay takes over */}
+          {linePath && !hasTrend && (
             <path d={linePath} className="treasure-line" />
           )}
 
-          {/* Data points — X marks */}
+          {/* Smoothed trend line — solid gold headline */}
+          {hasTrend && trendPath && (
+            <path d={trendPath} className="treasure-trend-line" />
+          )}
+
+          {/* Data points — X marks (faded to the background when a trend leads) */}
           {scaledPoints.map((p, i) => {
             const isToday = todayIndex != null && i === todayIndex;
+            const faded = hasTrend && !isToday;
             return (
-              <g key={i} className="treasure-marker">
+              <g key={i} className="treasure-marker" opacity={faded ? 0.4 : 1}>
                 {/* X cross */}
                 <g transform={`translate(${p.sx},${p.sy})`}>
                   <line x1="-4" y1="-4" x2="4" y2="4" stroke="#3B2314" strokeWidth="1.5" />
