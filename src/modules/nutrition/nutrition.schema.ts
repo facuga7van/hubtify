@@ -169,4 +169,29 @@ export const nutritionMigrations: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_frequent_foods_name ON frequent_foods(name COLLATE NOCASE);
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 10,
+    up: `
+      ALTER TABLE food_log ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE food_log ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE food_log ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE favorite_foods ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE favorite_foods ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE favorite_foods ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE frequent_foods ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE frequent_foods ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE frequent_foods ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE nutrition_daily_summary ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_daily_summary ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_daily_summary ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE nutrition_profile ADD COLUMN protein_target_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN carbs_target_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN fat_target_g REAL DEFAULT NULL;
+    `,
+  },
 ];
