@@ -76,7 +76,7 @@ export function MacroHistory({
         const fill = Math.min(100, pct);
         const over = pct > 100;
         return (
-          <div key={row.key} className="nutri-macro">
+          <div key={row.key} className={`nutri-macro${over ? ' is-over' : ''}`}>
             <div className="nutri-macro-info">
               <span className="nutri-macro-label">{row.label}</span>
               <span className="nutri-macro-val">
