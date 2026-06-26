@@ -65,6 +65,7 @@ const api = {
   nutritionSaveWeeklyMetrics: (metrics: Record<string, unknown>) => ipcRenderer.invoke('nutrition:saveWeeklyMetrics', metrics),
   nutritionGetSummary: (date: string) => ipcRenderer.invoke('nutrition:getSummary', date),
   nutritionGetSummaryRange: (start: string, end: string) => ipcRenderer.invoke('nutrition:getSummaryRange', start, end),
+  nutritionGetMacroTargets: (date?: string) => ipcRenderer.invoke('nutrition:getMacroTargets', date),
   nutritionGetWeights: () => ipcRenderer.invoke('nutrition:getWeights'),
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetWeekCalories: () => ipcRenderer.invoke('nutrition:getWeekCalories'),

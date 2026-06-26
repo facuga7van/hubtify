@@ -203,6 +203,7 @@ export interface HubtifyApi {
   nutritionSaveWeeklyMetrics: (metrics: Record<string, unknown>) => Promise<void>;
   nutritionGetSummary: (date: string) => Promise<unknown>;
   nutritionGetSummaryRange: (start: string, end: string) => Promise<unknown[]>;
+  nutritionGetMacroTargets: (date?: string) => Promise<{ proteinG: number; carbsG: number; fatG: number; auto: boolean } | null>;
   nutritionGetWeights: () => Promise<unknown[]>;
   nutritionGetStreak: () => Promise<number>;
   nutritionGetWeekCalories: () => Promise<number[]>;

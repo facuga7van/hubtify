@@ -9,12 +9,19 @@ export interface NutritionProfile {
   weightCheckDay: number;
   weightPopupEnabled: number;
   mealSchedule?: import('../../../shared/meal-utils').MealSchedule | null;
+  /** Macro target overrides in grams; null means "use the auto calculation". */
+  proteinTargetG?: number | null;
+  carbsTargetG?: number | null;
+  fatTargetG?: number | null;
 }
 
 export interface FrequentFood {
   id: number;
   name: string;
   calories: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   timesUsed: number;
   createdAt: string;
 }
