@@ -4,9 +4,15 @@ import { getDb } from '../ipc/db';
 import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
 import { resolveMealType, DEFAULT_MEAL_SCHEDULE } from '../../shared/meal-utils';
 import type { MealSchedule } from '../../shared/meal-utils';
+import { calcAutoMacroTargets } from '../../shared/macro-utils';
 
 function genId(): string {
   return crypto.randomUUID();
+}
+
+/** Normalize a macro gram value to a finite, non-negative number rounded to 0.1, or null. */
+function normMacro(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
 }
 
 export function registerNutritionIpcHandlers(): void {
@@ -26,6 +32,9 @@ export function registerNutritionIpcHandlers(): void {
       sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal,
+      proteinTargetG: row.protein_target_g ?? null,
+      carbsTargetG: row.carbs_target_g ?? null,
+      fatTargetG: row.fat_target_g ?? null,
       mealSchedule,
     };
   });
@@ -35,6 +44,7 @@ export function registerNutritionIpcHandlers(): void {
     activityLevel: string; deficitTargetKcal?: number;
     weightCheckDay?: number; weightPopupEnabled?: boolean;
     mealSchedule?: MealSchedule;
+    proteinTargetG?: number | null; carbsTargetG?: number | null; fatTargetG?: number | null;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
     const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
@@ -46,15 +56,30 @@ export function registerNutritionIpcHandlers(): void {
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const weightPopupEnabled = profile.weightPopupEnabled !== false ? 1 : 0;
     const mealScheduleJson = profile.mealSchedule ? JSON.stringify(profile.mealSchedule) : null;
+    // Validate macro target overrides (nullable; undefined = leave existing untouched)
+    const validMacro = (v: number | null | undefined, label: string): number | null | undefined => {
+      if (v === undefined) return undefined;
+      if (v === null) return null;
+      if (!Number.isFinite(v) || v < 0 || v > 2000) throw new Error(`Invalid ${label} target: must be between 0 and 2000 g`);
+      return Math.round(v * 10) / 10;
+    };
+    const proteinTargetG = validMacro(profile.proteinTargetG, 'protein');
+    const carbsTargetG = validMacro(profile.carbsTargetG, 'carbs');
+    const fatTargetG = validMacro(profile.fatTargetG, 'fat');
     const db = getDb();
-    // Read existing meal_schedule to preserve it when not provided
-    const existing = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
+    // Read existing values to preserve them when not provided
+    const existing = db.prepare('SELECT meal_schedule, protein_target_g, carbs_target_g, fat_target_g FROM nutrition_profile WHERE id = 1').get() as
+      { meal_schedule: string | null; protein_target_g: number | null; carbs_target_g: number | null; fat_target_g: number | null } | undefined;
     const finalMealSchedule = mealScheduleJson ?? existing?.meal_schedule ?? null;
+    const finalProteinTarget = proteinTargetG !== undefined ? proteinTargetG : (existing?.protein_target_g ?? null);
+    const finalCarbsTarget = carbsTargetG !== undefined ? carbsTargetG : (existing?.carbs_target_g ?? null);
+    const finalFatTarget = fatTargetG !== undefined ? fatTargetG : (existing?.fat_target_g ?? null);
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, protein_target_g, carbs_target_g, fat_target_g, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule,
+      finalProteinTarget, finalCarbsTarget, finalFatTarget);
 
     // Recalc today's summary with new profile
     const today = todayDateString();
@@ -73,6 +98,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:logFood', (_e, entry: {
     date?: string; description: string; calories: number; source: string;
     frequentFoodId?: number; aiBreakdown?: string; meal?: string;
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
   }) => {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
@@ -97,10 +123,11 @@ export function registerNutritionIpcHandlers(): void {
     }
     db.transaction(() => {
       db.prepare(`
-        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(date, time, entry.description, entry.calories, entry.source,
-        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal);
+        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal,
+        normMacro(entry.proteinG), normMacro(entry.carbsG), normMacro(entry.fatG));
       recalcSummary(db, date);
     })();
   });
@@ -111,7 +138,8 @@ export function registerNutritionIpcHandlers(): void {
       SELECT id, date, time, description, calories, source,
              frequent_food_id AS frequentFoodId,
              ai_breakdown AS aiBreakdown,
-             meal
+             meal,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG
       FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC
     `).all(date);
   });
@@ -129,7 +157,7 @@ export function registerNutritionIpcHandlers(): void {
     })();
   });
 
-  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string }) => {
+  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string; proteinG?: number | null; carbsG?: number | null; fatG?: number | null }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
@@ -145,6 +173,9 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
     if (fields.source !== undefined) { sets.push('source = ?'); vals.push(fields.source); }
+    if (fields.proteinG !== undefined) { sets.push('protein_g = ?'); vals.push(normMacro(fields.proteinG)); }
+    if (fields.carbsG !== undefined) { sets.push('carbs_g = ?'); vals.push(normMacro(fields.carbsG)); }
+    if (fields.fatG !== undefined) { sets.push('fat_g = ?'); vals.push(normMacro(fields.fatG)); }
     sets.push("updated_at = datetime('now')");
     if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
@@ -170,19 +201,20 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, name, calories,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
              times_used AS timesUsed, created_at AS createdAt
       FROM frequent_foods WHERE deleted_at IS NULL ORDER BY times_used DESC
     `).all();
   });
 
-  ipcHandle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number }) => {
+  ipcHandle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number; proteinG?: number | null; carbsG?: number | null; fatG?: number | null }) => {
     const trimmedName = typeof food.name === 'string' ? food.name.trim() : '';
     if (!trimmedName) throw new Error('Invalid name: must be a non-empty string');
     if (!Number.isFinite(food.calories) || food.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
     const now = new Date().toISOString();
-    db.prepare('INSERT OR IGNORE INTO frequent_foods (name, calories, times_used, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
-      .run(trimmedName, food.calories, now, now);
+    db.prepare('INSERT OR IGNORE INTO frequent_foods (name, calories, protein_g, carbs_g, fat_g, times_used, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+      .run(trimmedName, food.calories, normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG), now, now);
   });
 
   ipcHandle('nutrition:deleteFrequentFood', (_e, id: number) => {
@@ -238,15 +270,48 @@ export function registerNutritionIpcHandlers(): void {
     return row ? {
       date: row.date, totalCaloriesIn: row.total_calories_in,
       bmr: row.bmr, tdee: row.tdee, balance: row.balance,
+      proteinG: row.protein_g ?? null, carbsG: row.carbs_g ?? null, fatG: row.fat_g ?? null,
     } : null;
   });
 
   ipcHandle('nutrition:getSummaryRange', (_e, start: string, end: string) => {
     const db = getDb();
     return db.prepare(`
-      SELECT date, total_calories_in AS totalCaloriesIn, bmr, tdee, balance
+      SELECT date, total_calories_in AS totalCaloriesIn, bmr, tdee, balance,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG
       FROM nutrition_daily_summary WHERE date BETWEEN ? AND ? ORDER BY date ASC
     `).all(start, end);
+  });
+
+  // Macro targets: profile override when all three set, otherwise auto from the helper.
+  ipcHandle('nutrition:getMacroTargets', (_e, date?: string) => {
+    const db = getDb();
+    const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
+    if (!profile) return null;
+
+    const p = profile.protein_target_g as number | null;
+    const c = profile.carbs_target_g as number | null;
+    const f = profile.fat_target_g as number | null;
+    if (p != null && c != null && f != null) {
+      return { proteinG: p, carbsG: c, fatG: f, auto: false };
+    }
+
+    const targetDate = date ?? todayDateString();
+    // Ensure a summary (and thus a fresh tdee) exists for the target date.
+    let summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(targetDate) as { tdee: number } | undefined;
+    if (!summary) {
+      recalcSummary(db, targetDate);
+      summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(targetDate) as { tdee: number } | undefined;
+    }
+    const tdee = summary?.tdee ?? 0;
+    const deficit = (profile.deficit_target_kcal as number) ?? 0;
+    const targetCalories = tdee - deficit;
+
+    const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
+    const weight = latestWeight?.weight_kg ?? (profile.initial_weight_kg as number);
+
+    const auto = calcAutoMacroTargets(targetCalories, weight, deficit);
+    return { ...auto, auto: true };
   });
 
   // ── Dashboard ──────────────────────────────────────
@@ -516,15 +581,16 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:getFavoriteFoods', () => {
     const db = getDb();
-    return db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods WHERE deleted_at IS NULL ORDER BY created_at DESC').all();
+    return db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods WHERE deleted_at IS NULL ORDER BY created_at DESC').all();
   });
 
-  ipcHandle('nutrition:addFavoriteFood', (_e, food: { description: string; calories: number; source?: string; aiBreakdown?: string }) => {
+  ipcHandle('nutrition:addFavoriteFood', (_e, food: { description: string; calories: number; source?: string; aiBreakdown?: string; proteinG?: number | null; carbsG?: number | null; fatG?: number | null }) => {
     const db = getDb();
     const id = genId();
     db.prepare(
-      'INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null);
+      'INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, protein_g, carbs_g, fat_g) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null,
+      normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG));
     return { id };
   });
 
@@ -559,6 +625,11 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
   if (!profile) return;
 
   const totalCals = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ? AND deleted_at IS NULL').get(date) as { total: number };
+  // Sum macros for the day. NULL when no food entry reported that macro (avoids faking 0g totals).
+  const macroTotals = db.prepare(`
+    SELECT SUM(protein_g) AS protein, SUM(carbs_g) AS carbs, SUM(fat_g) AS fat
+    FROM food_log WHERE date = ? AND deleted_at IS NULL
+  `).get(date) as { protein: number | null; carbs: number | null; fat: number | null };
   const metrics = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
 
   const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
@@ -574,10 +645,14 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
   const tdee = calculateTDEEWithFactor(bmr, dynamicFactor);
   const balance = tdee - totalCals.total;
 
+  const roundMacro = (v: number | null): number | null =>
+    v != null && Number.isFinite(v) ? Math.round(v * 10) / 10 : null;
+
   db.prepare(`
-    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance, updated_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `).run(date, totalCals.total, Math.round(bmr), tdee, balance);
+    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance, protein_g, carbs_g, fat_g, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(date, totalCals.total, Math.round(bmr), tdee, balance,
+    roundMacro(macroTotals.protein), roundMacro(macroTotals.carbs), roundMacro(macroTotals.fat));
 }
 
 /**
