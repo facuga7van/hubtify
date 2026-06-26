@@ -431,6 +431,115 @@
 .nutri-status--muted { color: var(--ink-faded); }
 
 
+/* ── Macro attribute bars ── */
+
+.nutri-macros {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(168, 138, 60, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nutri-macros-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nutri-macros-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-macros-auto {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  opacity: 0.7;
+}
+
+.nutri-macro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nutri-macro-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nutri-macro-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-macro-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nutri-macro-pct {
+  color: var(--ink-faded);
+  font-weight: 400;
+}
+
+.nutri-macro-bar {
+  position: relative;
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(42, 29, 14, 0.12);
+  border: 1px solid rgba(168, 138, 60, 0.3);
+  overflow: hidden;
+}
+
+.nutri-macro-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  background: var(--gold);
+}
+
+/* Per-macro colors — informative, non-punitive */
+.nutri-macro-bar--protein .nutri-macro-fill {
+  background: linear-gradient(90deg, var(--rubric-light), var(--gold-light));
+}
+.nutri-macro-bar--carbs .nutri-macro-fill {
+  background: linear-gradient(90deg, var(--moss-light), var(--moss));
+}
+.nutri-macro-bar--fat .nutri-macro-fill {
+  background: linear-gradient(90deg, var(--gold-light), var(--gold-dark));
+}
+
+/* Going over target is fine: keep the bar full with a soft gilded sheen, no alarm color */
+.nutri-macro-bar.is-over {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 6px rgba(168, 138, 60, 0.35);
+}
+
+.nutri-macro-targets-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+
 /* ═══════════════════════════════════════════════════════════
    4. CARDS
    ═══════════════════════════════════════════════════════════ */

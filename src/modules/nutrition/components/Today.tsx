@@ -16,7 +16,7 @@ import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter } f
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import type { TFunction } from 'i18next';
-import type { NutritionProfile } from '../types';
+import type { NutritionProfile, MacroTargets } from '../types';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
@@ -71,7 +71,7 @@ interface FoodEntry {
 
 interface FavoriteFood { id: string; description: string; calories: number; source: string; aiBreakdown?: string; createdAt: string; updatedAt?: string; }
 interface FrequentFood { id: number; name: string; calories: number; timesUsed: number; }
-interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; }
+interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; proteinG?: number | null; carbsG?: number | null; fatG?: number | null; }
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 const MEAL_ICON: Record<MealType, React.ReactNode> = {
@@ -93,6 +93,7 @@ export default function Today() {
   const [date, setDate] = useState(() => todayDateString());
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
+  const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -133,7 +134,7 @@ export default function Today() {
   const confirm = useConfirm();
 
   const loadData = useCallback(async (d: string) => {
-    const [foodList, sum, met, freq, prof, tgt, closedDay, favorites, schedule] = await Promise.all([
+    const [foodList, sum, met, freq, prof, tgt, closedDay, favorites, schedule, macros] = await Promise.all([
       window.api.nutritionGetFoodByDate(d),
       window.api.nutritionGetSummary(d),
       window.api.nutritionGetDailyMetrics(d),
@@ -143,9 +144,11 @@ export default function Today() {
       window.api.nutritionIsDayClosed(d),
       window.api.nutritionGetFavoriteFoods(),
       window.api.nutritionGetMealSchedule(),
+      window.api.nutritionGetMacroTargets(d),
     ]);
     setFoods(foodList as FoodEntry[]);
     setSummary(sum as DailySummary | null);
+    setMacroTargets(macros as MacroTargets | null);
     setMetrics(met as DailyMetrics);
     setFrequentFoods(freq as FrequentFood[]);
     setFavoriteFoods(favorites as FavoriteFood[]);
@@ -701,6 +704,9 @@ export default function Today() {
               </p>
             );
           })()}
+
+          {/* Macro attribute bars */}
+          <MacroBars summary={summary} targets={macroTargets} t={t} />
         </div>
       </div>
 
@@ -1075,6 +1081,47 @@ export default function Today() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function MacroBars({ summary, targets, t }: { summary: DailySummary | null; targets: MacroTargets | null; t: TFunction<any, any> }) {
+  if (!targets) return null;
+
+  const rows: Array<{ key: string; label: string; consumed: number; target: number }> = [
+    { key: 'protein', label: t('nutrify.protein', 'Proteína'), consumed: Math.round(summary?.proteinG ?? 0), target: targets.proteinG },
+    { key: 'carbs', label: t('nutrify.carbs', 'Carbohidratos'), consumed: Math.round(summary?.carbsG ?? 0), target: targets.carbsG },
+    { key: 'fat', label: t('nutrify.fat', 'Grasa'), consumed: Math.round(summary?.fatG ?? 0), target: targets.fatG },
+  ];
+
+  return (
+    <div className="nutri-macros">
+      <div className="nutri-macros-head">
+        <span className="nutri-macros-title">{t('nutrify.macros', 'Macros')}</span>
+        {targets.auto && (
+          <span className="nutri-macros-auto">{t('nutrify.autoSuggested', 'Sugerido automáticamente')}</span>
+        )}
+      </div>
+      {rows.map((row) => {
+        const pct = row.target > 0 ? Math.round((row.consumed / row.target) * 100) : 0;
+        const fill = Math.min(100, pct);
+        const over = pct > 100;
+        return (
+          <div key={row.key} className="nutri-macro">
+            <div className="nutri-macro-info">
+              <span className="nutri-macro-label">{row.label}</span>
+              <span className="nutri-macro-val">
+                {row.consumed} / {row.target} g
+                <span className="nutri-macro-pct">{' '}{'·'} {pct}%</span>
+              </span>
+            </div>
+            <div className={`nutri-macro-bar nutri-macro-bar--${row.key}${over ? ' is-over' : ''}`}>
+              <div className="nutri-macro-fill" style={{ width: `${fill}%` }} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
