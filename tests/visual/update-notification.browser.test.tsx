@@ -18,7 +18,7 @@ beforeAll(() => {
 describe('UpdateNotification — visual states', () => {
   test('idle — with changelog', async () => {
     render(
-      <UpdateNotification version="0.7.4" state="idle" percent={0} error={null} onDownload={noop} onDismiss={noop} />,
+      <UpdateNotification version="0.7.4" state="idle" percent={0} error={null} onDownload={noop} onRestart={noop} onDismiss={noop} />,
     );
     await expect.element(page.getByText(/Qué hay de nuevo/i)).toBeVisible();
     await page.screenshot({ path: `${SCREENS}/update-01-idle.png` });
@@ -26,7 +26,7 @@ describe('UpdateNotification — visual states', () => {
 
   test('downloading', async () => {
     render(
-      <UpdateNotification version="0.7.4" state="downloading" percent={45} error={null} onDownload={noop} onDismiss={noop} />,
+      <UpdateNotification version="0.7.4" state="downloading" percent={45} error={null} onDownload={noop} onRestart={noop} onDismiss={noop} />,
     );
     await expect.element(page.getByText('45%')).toBeVisible();
     await page.screenshot({ path: `${SCREENS}/update-02-downloading.png` });
@@ -34,9 +34,17 @@ describe('UpdateNotification — visual states', () => {
 
   test('error', async () => {
     render(
-      <UpdateNotification version="0.7.4" state="idle" percent={0} error="Update failed: network error" onDownload={noop} onDismiss={noop} />,
+      <UpdateNotification version="0.7.4" state="idle" percent={0} error="Update failed: network error" onDownload={noop} onRestart={noop} onDismiss={noop} />,
     );
     await expect.element(page.getByText(/network error/i)).toBeVisible();
     await page.screenshot({ path: `${SCREENS}/update-03-error.png` });
+  });
+
+  test('ready — restart prompt', async () => {
+    render(
+      <UpdateNotification version="0.7.4" state="ready" percent={100} error={null} onDownload={noop} onRestart={noop} onDismiss={noop} />,
+    );
+    await expect.element(page.getByText(/Reiniciar ahora/i)).toBeVisible();
+    await page.screenshot({ path: `${SCREENS}/update-04-ready.png` });
   });
 });

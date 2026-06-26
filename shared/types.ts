@@ -371,6 +371,7 @@ export interface HubtifyApi {
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
   updaterDownload: () => Promise<string>;
+  updaterRestart: () => Promise<void>;
   onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
   onUpdateDownloaded: (callback: () => void) => () => void;
   onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;

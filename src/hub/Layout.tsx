@@ -67,7 +67,7 @@ export default function Layout() {
   const [syncError, setSyncError] = useState(false);
 
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null);
-  const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
+  const [updateState, setUpdateState] = useState<'idle' | 'downloading' | 'ready'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showUpdateDetails, setShowUpdateDetails] = useState(false);
@@ -76,6 +76,7 @@ export default function Layout() {
     const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
     const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
     const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
+    const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
 
     // Also actively check on mount — the passive listener may have missed
     // the message if it was sent before React mounted
@@ -85,7 +86,7 @@ export default function Layout() {
       }
     }).catch(() => { /* not available in dev */ });
 
-    return () => { c1(); c2(); c3(); };
+    return () => { c1(); c2(); c3(); c4(); };
   }, []);
 
   const handleUpdate = async () => {
@@ -93,8 +94,12 @@ export default function Layout() {
     setUpdateError(null);
     try {
       await window.api.updaterDownload();
-      // App will auto-quit and installer runs
+      setUpdateState('ready'); // staged — user chooses when to restart
     } catch { setUpdateState('idle'); }
+  };
+
+  const handleRestart = () => {
+    window.api.updaterRestart?.();
   };
 
   // Ctrl+Q to open quick add
@@ -495,6 +500,7 @@ export default function Layout() {
           percent={downloadPercent}
           error={updateError}
           onViewDetails={() => setShowUpdateDetails(true)}
+          onRestart={handleRestart}
           onDismiss={() => setUpdateAvailable(null)}
         />
       )}
@@ -506,6 +512,7 @@ export default function Layout() {
           percent={downloadPercent}
           error={updateError}
           onDownload={() => { handleUpdate(); setShowUpdateDetails(false); }}
+          onRestart={handleRestart}
           onDismiss={() => setShowUpdateDetails(false)}
         />
       )}

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { changelog } from '../shared/changelog';
 
-export type UpdateState = 'idle' | 'downloading';
+export type UpdateState = 'idle' | 'downloading' | 'ready';
 
 interface Props {
   version: string;
@@ -9,6 +9,7 @@ interface Props {
   percent: number;
   error: string | null;
   onDownload: () => void;
+  onRestart: () => void;
   onDismiss: () => void;
 }
 
@@ -17,10 +18,13 @@ interface Props {
  * Layout owns the updater state and IPC; this only renders it. Pulls the
  * matching changelog entry so the user sees WHAT'S new, not just a number.
  */
-export default function UpdateNotification({ version, state, percent, error, onDownload, onDismiss }: Props) {
+export default function UpdateNotification({ version, state, percent, error, onDownload, onRestart, onDismiss }: Props) {
   const { t, i18n } = useTranslation();
   const lang: 'es' | 'en' = i18n.language === 'en' ? 'en' : 'es';
   const whatsNew = lang === 'en' ? "What's new" : 'Qué hay de nuevo';
+  const readyLabel = lang === 'en' ? 'Update ready to install' : 'Actualización lista para instalar';
+  const restartNow = lang === 'en' ? 'Restart now' : 'Reiniciar ahora';
+  const restartLater = lang === 'en' ? 'Later' : 'Después';
 
   const entry = changelog.find((e) => e.version === version);
 
@@ -87,6 +91,19 @@ export default function UpdateNotification({ version, state, percent, error, onD
             <button onClick={onDismiss} className="rpg-button"
               style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
               {t('nutrify.weightCheckin.later')}
+            </button>
+          </>
+        )}
+
+        {state === 'ready' && (
+          <>
+            <p style={{ fontSize: 'var(--fs-label)', color: 'var(--moss)', marginBottom: 10 }}>{readyLabel}</p>
+            <button className="rpg-button" onClick={onRestart} style={{ width: '100%', marginBottom: 8 }}>
+              {restartNow}
+            </button>
+            <button onClick={onDismiss} className="rpg-button"
+              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
+              {restartLater}
             </button>
           </>
         )}

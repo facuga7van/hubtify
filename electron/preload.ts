@@ -252,6 +252,7 @@ const api = {
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),
   updaterDownload: () => ipcRenderer.invoke('updater:download') as Promise<string>,
+  updaterRestart: () => ipcRenderer.invoke('updater:restart') as Promise<void>,
   onUpdateAvailable: (callback: (info: { version: string }) => void) => {
     const handler = (_e: unknown, info: { version: string }) => callback(info);
     ipcRenderer.on('updater:update-available', handler);

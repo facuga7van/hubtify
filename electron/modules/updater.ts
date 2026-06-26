@@ -131,8 +131,15 @@ export function registerUpdaterIpcHandlers(): void {
       throw new Error(msg);
     }
 
+    // Update staged into a new app-x.y.z folder. Tell the renderer it's ready
+    // and let the user choose when to restart (updater:restart) — otherwise the
+    // new version simply takes effect on the next manual launch.
     mainWindow?.webContents.send('updater:update-downloaded');
+    return 'downloaded';
+  });
 
+  ipcHandle('updater:restart', async () => {
+    if (!canUpdate()) return;
     // Relaunch the freshly-staged version. --processStartAndWait makes Update.exe
     // WAIT for this (old) instance to exit — and release the single-instance lock —
     // before starting the new one, so the new instance isn't killed by the lock.
@@ -143,6 +150,5 @@ export function registerUpdaterIpcHandlers(): void {
       // Relaunch failed — the update is applied; user can reopen manually.
     }
     setTimeout(() => app.quit(), 500);
-    return 'updated';
   });
 }

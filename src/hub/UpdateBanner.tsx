@@ -7,6 +7,7 @@ interface Props {
   percent: number;
   error: string | null;
   onViewDetails: () => void;
+  onRestart: () => void;
   onDismiss: () => void;
 }
 
@@ -15,12 +16,14 @@ interface Props {
  * "View what's new" opens the full changelog modal (UpdateNotification).
  * While downloading it shows compact progress in place.
  */
-export default function UpdateBanner({ version, state, percent, error, onViewDetails, onDismiss }: Props) {
+export default function UpdateBanner({ version, state, percent, error, onViewDetails, onRestart, onDismiss }: Props) {
   const { t, i18n } = useTranslation();
   const lang: 'es' | 'en' = i18n.language === 'en' ? 'en' : 'es';
   const viewLabel = lang === 'en' ? 'View what\'s new' : 'Ver novedades';
   const retryLabel = lang === 'en' ? 'Retry' : 'Reintentar';
+  const restartLabel = lang === 'en' ? 'Restart now' : 'Reiniciar ahora';
   const downloadingLabel = lang === 'en' ? 'Downloading' : 'Descargando';
+  const readyLabel = lang === 'en' ? 'Update ready' : 'Actualización lista';
   const failedLabel = lang === 'en' ? 'Update failed' : 'Error al actualizar';
 
   return (
@@ -51,6 +54,8 @@ export default function UpdateBanner({ version, state, percent, error, onViewDet
               <div style={{ height: '100%', width: `${percent}%`, background: 'var(--moss)', transition: 'width 0.3s ease' }} />
             </div>
           </>
+        ) : state === 'ready' ? (
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--moss)' }}>{readyLabel} · v{version}</span>
         ) : (
           <span style={{ fontSize: 'var(--fs-label)', color: 'var(--gold-light)' }}>
             {t('settings.updateAvailable', { version })}
@@ -58,11 +63,11 @@ export default function UpdateBanner({ version, state, percent, error, onViewDet
         )}
       </div>
 
-      {state === 'idle' && (
+      {(state === 'idle' || state === 'ready') && (
         <>
-          <button onClick={onViewDetails} className="rpg-button"
+          <button onClick={state === 'ready' ? onRestart : onViewDetails} className="rpg-button"
             style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-            {error ? retryLabel : viewLabel}
+            {state === 'ready' ? restartLabel : error ? retryLabel : viewLabel}
           </button>
           <button onClick={onDismiss} aria-label={t('nutrify.weightCheckin.later', 'Más tarde')}
             style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', flexShrink: 0, padding: 2, display: 'flex' }}>
