@@ -1697,6 +1697,129 @@
 }
 
 
+/* ── Adaptive TDEE insight (settings) ── */
+
+.nutri-adaptive-insight {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(168, 138, 60, 0.12), rgba(168, 138, 60, 0.04));
+  border: 1px solid rgba(168, 138, 60, 0.45);
+  border-radius: 4px;
+}
+
+.nutri-adaptive-insight.is-pending {
+  border-style: dashed;
+  background: rgba(74, 53, 32, 0.05);
+}
+
+.nutri-adaptive-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-adaptive-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.nutri-confidence-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-confidence-badge .conf-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(74, 53, 32, 0.25);
+  display: inline-block;
+}
+
+.nutri-confidence-badge .conf-pip.on {
+  background: var(--gold);
+}
+
+.nutri-confidence-badge.conf-high .conf-pip.on {
+  background: var(--gold-light);
+}
+
+.nutri-adaptive-figures {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
+.nutri-adaptive-real {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.nutri-adaptive-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  color: var(--gold-dark);
+}
+
+.nutri-adaptive-unit {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-adaptive-vs {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-adaptive-diff {
+  margin-left: 6px;
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+}
+
+.nutri-adaptive-diff.pos { color: var(--gold-dark); }
+.nutri-adaptive-diff.neg { color: var(--rubric); }
+
+.nutri-adaptive-explain {
+  margin: 8px 0 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+}
+
+.nutri-adaptive-pending {
+  margin: 8px 0 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-body);
+  color: var(--ink-faded);
+}
+
+.nutri-adaptive-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.nutri-adaptive-apply-target {
+  opacity: 0.85;
+  font-weight: 400;
+}
+
+
 /* ── Goal toggle ── */
 
 .nutri-goal-toggle {

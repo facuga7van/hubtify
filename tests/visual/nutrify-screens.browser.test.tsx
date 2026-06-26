@@ -152,6 +152,10 @@ function installApi() {
     processRpgEvent: async () => ({}),
     // NutritionSettings
     nutritionGetWeights: async () => WEIGHTS,
+    nutritionGetAdaptiveTdee: async () => ({
+      tdee: 2280, confidence: 'high', windowDays: 28, sampleDays: 25,
+      weightSamples: 4, intakeAvg: 2000, deltaKg: -1,
+    }),
     nutritionSaveProfile: async () => {},
     // NutritionCharts
     nutritionGetSummaryRange: async () => SUMMARY_RANGE,

@@ -9,6 +9,8 @@ import HelpBubble from '../../../shared/components/HelpBubble';
 import { Gear, Shield, Compass, Chalice, Scale, Meat } from '../../../shared/components/icons';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import { calcAutoMacroTargets } from '../../../../shared/macro-utils';
+import { AdaptiveTdeeInsight } from './AdaptiveTdeeInsight';
+import type { AdaptiveTdeeEstimate } from '../../../../shared/adaptive-tdee';
 import type { MealSchedule } from '../../../../shared/meal-utils';
 import type { NutritionProfile } from '../types';
 
@@ -51,10 +53,14 @@ export default function NutritionSettings() {
   const [carbsTarget, setCarbsTarget] = useState('');
   const [fatTarget, setFatTarget] = useState('');
   const [macroError, setMacroError] = useState('');
+  const [adaptive, setAdaptive] = useState<AdaptiveTdeeEstimate | null>(null);
 
   const loadProfile = useCallback(() => {
     setLoading(true);
     setLoadError(false);
+    window.api.nutritionGetAdaptiveTdee()
+      .then((est) => setAdaptive(est as AdaptiveTdeeEstimate))
+      .catch(() => setAdaptive(null));
     Promise.all([
       window.api.nutritionGetProfile(),
       window.api.nutritionGetWeights(),
@@ -167,6 +173,22 @@ export default function NutritionSettings() {
   }, [tdee, weight, goal, goalAmount]);
 
   const hasMacroOverride = [proteinTarget, carbsTarget, fatTarget].some((v) => v.trim() !== '');
+
+  const signedDeficit = goal === 'deficit' ? goalAmount : goal === 'surplus' ? -goalAmount : 0;
+
+  // Manual, explicit application of the adaptive estimate. We can't (and won't)
+  // touch the day-close math, which derives the daily target from the STATIC tdee.
+  // The only honest lever is the user's own deficit: we solve for the deficit that
+  // makes `staticTdee - deficit` land on `realTdee - intendedDeficit`, i.e. shift
+  // it by (staticTdee - realTdee). Then we PRE-FILL the goal fields — the user
+  // still has to hit Save, so nothing changes automatically.
+  const applyAdaptive = () => {
+    if (!adaptive || adaptive.tdee == null) return;
+    const newSigned = Math.round(tdee - adaptive.tdee + signedDeficit);
+    if (newSigned > 0) { setGoal('deficit'); setGoalAmount(Math.min(1500, newSigned)); }
+    else if (newSigned < 0) { setGoal('surplus'); setGoalAmount(Math.min(1500, Math.abs(newSigned))); }
+    else { setGoal('maintain'); setGoalAmount(0); }
+  };
 
   const handleResetMacros = () => {
     setProteinTarget('');
@@ -304,6 +326,16 @@ export default function NutritionSettings() {
               (TDEE {tdee} {goal === 'deficit' ? '-' : goal === 'surplus' ? '+' : '\u00b1'} {goal === 'maintain' ? 0 : goalAmount})
             </span>
           </div>
+        )}
+
+        {tdee > 0 && adaptive && (
+          <AdaptiveTdeeInsight
+            result={adaptive}
+            staticTdee={tdee}
+            signedDeficit={signedDeficit}
+            onApply={adaptive.tdee != null ? applyAdaptive : undefined}
+            t={t}
+          />
         )}
       </div>
 
