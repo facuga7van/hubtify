@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.7.4',
+    date: '2026-06-26',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'updater',
+        text: {
+          es: '¿Cada actualización te borraba el acceso directo o te rompía el ícono fijado en la barra de tareas? Se terminó. Ahora las actualizaciones respetan tus accesos directos, y de paso bajan mucho más livianas y rápidas — solo lo que cambió, no toda la app de nuevo',
+          en: 'Every update wiping your shortcut or breaking the icon you pinned to the taskbar? Done with that. Updates now leave your shortcuts alone, and they download much lighter and faster too — only what changed, not the whole app again',
+        },
+      },
+    ],
+  },
+  {
     version: '0.7.3',
     date: '2026-06-16',
     changes: [
