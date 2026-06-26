@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
 import { existsSync, readdirSync, statSync, mkdtempSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // Smoke test for the REAL packaged Electron app, focused on the Nutrify schema.
@@ -30,12 +30,13 @@ test.describe('Nutrify schema — real Electron boot', () => {
   test.skip(!appPath, 'Run `npm run package` first to build the Electron app.');
 
   let app: ElectronApplication;
+  let userDataDir: string;
   const stderr: string[] = [];
 
   test.beforeAll(async () => {
     // Fresh userData dir → migrations run against a brand-new on-disk DB and
     // the real user's profile/data is never touched.
-    const userDataDir = mkdtempSync(join(tmpdir(), 'hubtify-nutri-e2e-'));
+    userDataDir = mkdtempSync(join(tmpdir(), 'hubtify-nutri-e2e-'));
     app = await electron.launch({
       args: [appPath!, `--user-data-dir=${userDataDir}`],
     });
@@ -64,19 +65,29 @@ test.describe('Nutrify schema — real Electron boot', () => {
   });
 
   test('macro columns exist in the real on-disk schema', async () => {
-    // Ask the main process to introspect the actual SQLite file it migrated.
+    // Introspect the actual on-disk SQLite file the app migrated at boot.
     // Proves V10 (macros) and V11 (reopen-day soft-delete) physically landed.
-    const cols = await app.evaluate(async ({ app: electronApp }) => {
-      // Lazy-require so this runs inside the packaged main process.
-      const path = require('node:path');
-      const Database = require('better-sqlite3');
-      const dbPath = path.join(electronApp.getPath('userData'), 'hubtify.db');
-      const db = new Database(dbPath, { readonly: true });
-      const foodLog = db.prepare("PRAGMA table_info(food_log)").all().map((c: { name: string }) => c.name);
-      const closed = db.prepare("PRAGMA table_info(nutrition_daily_closed)").all().map((c: { name: string }) => c.name);
+    // Runs INSIDE the packaged main process: better-sqlite3 is built for
+    // Electron's ABI, so it cannot be required from Playwright's plain-node side.
+    const dbPath = join(userDataDir, 'hubtify.db');
+    // Native module is unpacked outside the asar; require it by absolute path so
+    // resolution doesn't depend on the eval scope's module paths.
+    const bsqPath = join(dirname(appPath!), 'app.asar.unpacked', 'node_modules', 'better-sqlite3');
+    const cols = await app.evaluate(async (_electron, args) => {
+      // Playwright's evaluate runs in a bare eval scope with no lexical `require`;
+      // reach the bundle's require through the main module instead.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const req = (typeof require === 'function' ? require : (globalThis as any).process.mainModule.require);
+      const Database = req(args.bsqPath);
+      const db = new Database(args.dbFile, { readonly: true });
+      const names = (tbl: string) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        db.prepare(`PRAGMA table_info(${tbl})`).all().map((c: any) => c.name as string);
+      const foodLog = names('food_log');
+      const closed = names('nutrition_daily_closed');
       db.close();
       return { foodLog, closed };
-    });
+    }, { dbFile: dbPath, bsqPath });
     expect(cols.foodLog).toEqual(expect.arrayContaining(['protein_g', 'carbs_g', 'fat_g', 'deleted_at']));
     expect(cols.closed).toEqual(expect.arrayContaining(['deleted_at', 'updated_at']));
   });
