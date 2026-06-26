@@ -192,6 +192,8 @@ export interface HubtifyApi {
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
   nutritionDeleteFood: (id: number) => Promise<void>;
   nutritionDeleteByDate: (date: string) => Promise<void>;
+  nutritionRepeatDay: (fromDate: string, toDate: string) => Promise<{ copied: number }>;
+  nutritionGetRecentLoggedDays: (beforeDate?: string, limit?: number) => Promise<Array<{ date: string; meals: number; calories: number }>>;
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => Promise<void>;
   nutritionGetFrequentFoods: () => Promise<unknown[]>;
   nutritionCreateFrequentFood: (food: Record<string, unknown>) => Promise<void>;

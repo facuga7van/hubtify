@@ -195,6 +195,42 @@ export function registerNutritionIpcHandlers(): void {
     })();
   });
 
+  // Copy every non-deleted meal from a source day to a destination day.
+  // Adds on top of whatever the destination already has (never replaces),
+  // preserving each meal's original time/meal/macros so the day keeps its shape.
+  ipcHandle('nutrition:repeatDay', (_e, fromDate: string, toDate: string) => {
+    if (!fromDate || !toDate || !/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+      throw new Error('Invalid date format');
+    }
+    const db = getDb();
+    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(toDate);
+    if (closed) throw new Error('Cannot modify a closed day');
+    let copied = 0;
+    db.transaction(() => { copied = repeatDayMeals(db, fromDate, toDate); })();
+    return { copied };
+  });
+
+  // Recent days (last 30) that have at least one logged meal, before `beforeDate`.
+  // Used by the "repeat a day" picker so the user can choose a source day.
+  ipcHandle('nutrition:getRecentLoggedDays', (_e, beforeDate?: string, limit?: number) => {
+    const db = getDb();
+    const date = beforeDate ?? todayDateString();
+    const lowerBound = (() => {
+      const d = new Date(date + 'T12:00:00');
+      d.setDate(d.getDate() - 30);
+      return formatDateString(d);
+    })();
+    const max = Number.isFinite(limit) && (limit as number) > 0 ? Math.min(Math.floor(limit as number), 60) : 14;
+    return db.prepare(`
+      SELECT date, COUNT(*) AS meals, COALESCE(SUM(calories), 0) AS calories
+      FROM food_log
+      WHERE deleted_at IS NULL AND date < ? AND date >= ?
+      GROUP BY date
+      ORDER BY date DESC
+      LIMIT ?
+    `).all(date, lowerBound, max);
+  });
+
   // ── Frequent Foods ─────────────────────────────────
 
   ipcHandle('nutrition:getFrequentFoods', () => {
@@ -619,6 +655,35 @@ export function registerNutritionIpcHandlers(): void {
 }
 
 // ── Helpers ────────────────────────────────────────
+
+/**
+ * Copy all non-deleted meals from `fromDate` to `toDate`, returning the count
+ * copied. New rows get fresh autoincrement IDs; description/calories/source/
+ * meal/macros/ai_breakdown and the ORIGINAL time are preserved so the repeated
+ * day keeps its meal grouping. Adds on top of existing entries (never replaces).
+ * Recalculates the destination summary afterwards.
+ */
+export function repeatDayMeals(db: ReturnType<typeof getDb>, fromDate: string, toDate: string): number {
+  const rows = db.prepare(`
+    SELECT time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g
+    FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC
+  `).all(fromDate) as Array<{
+    time: string; description: string; calories: number; source: string;
+    frequent_food_id: number | null; ai_breakdown: string | null; meal: string | null;
+    protein_g: number | null; carbs_g: number | null; fat_g: number | null;
+  }>;
+  if (rows.length === 0) return 0;
+  const insert = db.prepare(`
+    INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const r of rows) {
+    insert.run(toDate, r.time, r.description, r.calories, r.source,
+      r.frequent_food_id, r.ai_breakdown, r.meal, r.protein_g, r.carbs_g, r.fat_g);
+  }
+  recalcSummary(db, toDate);
+  return rows.length;
+}
 
 export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
