@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XP_MAP, PROJECT_COLORS, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
+import { parseQuickTask } from '../parseQuickTask';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
 
@@ -26,6 +27,14 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   const [newCategory, setNewCategory] = useState('');
   const [newProject, setNewProject] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
+  const [dismissedQuickDate, setDismissedQuickDate] = useState(false);
+
+  // Natural-language quick-add: parse a date from the tail of the name as you type.
+  const quick = useMemo(() => parseQuickTask(name), [name]);
+  const quickActive = !!quick.dueDate && !dismissedQuickDate;
+  const quickDateLabel = quick.dueDate
+    ? new Date(quick.dueDate + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
+    : '';
 
   const loadCategories = useCallback(async (pid: string | null | undefined) => {
     try {
@@ -40,6 +49,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   }, [projectId, loadCategories]);
 
   useEffect(() => {
+    setDismissedQuickDate(false);
     if (editingTask) {
       setName(editingTask.name);
       setDescription(editingTask.description);
@@ -60,6 +70,12 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     const resolvedCategory = category === '__new__' ? newCategory.trim() : category;
 
+    // Quick-add: when a date was recognized in the name, use the cleaned name and that date;
+    // otherwise fall back to the manual name + date-picker value.
+    const resolvedName = quickActive ? quick.cleanName : name.trim();
+    const resolvedDueDate = quickActive ? quick.dueDate : (useDate && dueDate ? dueDate : null);
+    if (!resolvedName) return;
+
     // Resolve the project: if the user chose "new project", create it first and use its id.
     let resolvedProjectId: string | null = projectId === '__new__' ? null : projectId;
     if (projectId === '__new__' && newProject.trim()) {
@@ -69,12 +85,12 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     const task = {
       id: editingTask?.id,
-      name: name.trim(),
+      name: resolvedName,
       description: description.trim(),
       tier,
       category: resolvedCategory,
       projectId: resolvedProjectId,
-      dueDate: useDate && dueDate ? dueDate : null,
+      dueDate: resolvedDueDate,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
     };
@@ -82,6 +98,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     await window.api.questsUpsertTask(task as Record<string, unknown>);
 
     setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setDismissedQuickDate(false);
     setProjectId(activeProjectId);
     onSaved();
   };
@@ -118,6 +135,28 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
           </button>
         )}
       </div>
+
+      {/* Quick-add: live hint when a date is recognized in the name */}
+      {quickActive && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 'var(--fs-label)', color: 'var(--gold-dark)' }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ flexShrink: 0 }}>
+            <rect x="2" y="3" width="12" height="11" rx="1.5" />
+            <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
+          </svg>
+          <span>
+            {t('questify.quickDateHint', 'Se agenda para')} <strong>{quickDateLabel}</strong>
+            <span style={{ opacity: 0.6 }}>{` · "${quick.cleanName}"`}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setDismissedQuickDate(true)}
+            title={t('questify.cancel', 'Descartar')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faded)', padding: 0, display: 'inline-flex', alignItems: 'center' }}
+          >
+            <svg width="10" height="10" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 1l6 6M7 1l-6 6" /></svg>
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Tier buttons */}
