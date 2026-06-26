@@ -190,4 +190,14 @@ export const questsMigrations: Migration[] = [
       UPDATE habits SET updated_at = created_at WHERE updated_at = '';
     `,
   },
+  {
+    namespace: 'quests',
+    version: 11,
+    up: `
+      ALTER TABLE tasks ADD COLUMN recurrence_rule TEXT DEFAULT NULL;
+      ALTER TABLE tasks ADD COLUMN recurrence_parent_id TEXT DEFAULT NULL;
+      ALTER TABLE tasks ADD COLUMN recurrence_anchor TEXT DEFAULT NULL;
+      CREATE INDEX IF NOT EXISTS idx_tasks_recurrence_parent ON tasks(recurrence_parent_id);
+    `,
+  },
 ];

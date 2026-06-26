@@ -57,6 +57,9 @@ export interface Task {
   dueDate: string | null;
   order: number;
   completedAt: string | null;
+  recurrenceRule: string | null;
+  recurrenceParentId: string | null;
+  recurrenceAnchor: string | null;
   createdAt: string;
   updatedAt: string;
 }
