@@ -125,8 +125,15 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
         <button className="rpg-button" disabled={atLimit} title={atLimit ? t('questify.subtaskLimit', 'Max 30 subtasks reached') : undefined} onClick={() => setShowForm(true)}
           style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', marginTop: 6 }}>
           {t('questify.addSubtask')}
-          {subtasks.length >= 20 && (
-            <span style={{ marginLeft: 6, opacity: 0.7 }}>({subtasks.length}/{MAX_SUBTASKS})</span>
+          {subtasks.length > 0 && (
+            <span style={{
+              marginLeft: 6,
+              opacity: subtasks.length >= 25 ? 1 : 0.55,
+              color: subtasks.length >= 25 ? 'var(--rubric)' : 'inherit',
+              fontWeight: subtasks.length >= 25 ? 600 : 'normal',
+            }}>
+              ({subtasks.length}/{MAX_SUBTASKS})
+            </span>
           )}
         </button>
       )}
