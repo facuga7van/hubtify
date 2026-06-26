@@ -1086,7 +1086,7 @@ export default function Today() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function MacroBars({ summary, targets, t }: { summary: DailySummary | null; targets: MacroTargets | null; t: TFunction<any, any> }) {
+export function MacroBars({ summary, targets, t }: { summary: DailySummary | null; targets: MacroTargets | null; t: TFunction<any, any> }) {
   if (!targets) return null;
 
   const rows: Array<{ key: string; label: string; consumed: number; target: number }> = [
