@@ -803,6 +803,130 @@
   min-width: 0;
 }
 
+/* ── Editable ingredient breakdown ── */
+
+.nutri-est-hint {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin: 0 0 8px;
+}
+
+.nutri-est-item--edit {
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.25);
+}
+
+.nutri-est-item--edit:last-child { border-bottom: none; }
+
+.nutri-est-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.nutri-est-item-main .nutri-food-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nutri-est-item-macros {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(var(--fs-label) * 0.85);
+  color: var(--ink-faded);
+  letter-spacing: 0.02em;
+}
+
+.nutri-est-item-cal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.nutri-est-cal-input {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  padding: 3px 6px;
+  width: 62px;
+  border: 1.5px solid var(--ink-faded);
+  border-radius: 3px;
+  background: rgba(245, 231, 192, 0.7);
+  color: var(--ink);
+  text-align: right;
+  outline: none;
+}
+
+.nutri-est-cal-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(168, 138, 60, 0.25);
+}
+
+.nutri-est-cal-input::-webkit-inner-spin-button,
+.nutri-est-cal-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.nutri-est-cal-input {
+  -moz-appearance: textfield;
+}
+
+.nutri-est-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--rubric);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.nutri-est-remove:hover {
+  opacity: 1;
+  background: rgba(122, 30, 30, 0.1);
+}
+
+.nutri-est-total-recalc {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nutri-est-total-macros {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(var(--fs-label) * 0.85);
+  color: var(--ink-faded);
+}
+
+.nutri-est-total-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-quote);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.nutri-est-empty {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
 .nutri-estimate-error {
   margin-top: 8px;
   padding: 6px 10px;

@@ -10,6 +10,8 @@ import { todayDateString, formatDateString } from '../../../../shared/date-utils
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
+import { rescaleItem, sumBreakdown } from '../breakdown-utils';
+import type { BreakdownItem, BreakdownTotals } from '../breakdown-utils';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter } from '../../../shared/components/icons';
@@ -83,7 +85,10 @@ const MEAL_ICON: Record<MealType, React.ReactNode> = {
 
 interface EstimationResult {
   totalCalories: number;
-  items: Array<{ name: string; calories: number }>;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  items: BreakdownItem[];
   aiError?: string;
 }
 
@@ -123,6 +128,9 @@ export default function Today() {
   const [estimateNotice, setEstimateNotice] = useState('');
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
+  // Editable ingredient breakdown — calorie input string + removed flag per original item index.
+  const [itemCals, setItemCals] = useState<string[]>([]);
+  const [removedItems, setRemovedItems] = useState<boolean[]>([]);
   const [favoriteFoods, setFavoriteFoods] = useState<FavoriteFood[]>([]);
   const [showFavorites, setShowFavorites] = useState(false);
   const [frequentSearch, setFrequentSearch] = useState('');
@@ -220,7 +228,15 @@ export default function Today() {
     setEstimateNotice('');
     try {
       const result = await estimateNutrition(foodInput.trim(), { onRetry: () => setRetrying(true) });
-      setEstimation({ totalCalories: result.calories, items: result.items });
+      setEstimation({
+        totalCalories: result.calories,
+        proteinG: result.proteinG,
+        carbsG: result.carbsG,
+        fatG: result.fatG,
+        items: result.items,
+      });
+      setItemCals(result.items.map((it) => String(it.calories)));
+      setRemovedItems(result.items.map(() => false));
       setEditCalories(String(result.calories));
     } catch (err) {
       // Degrade gracefully: keep the typed food, switch to manual entry and show a
@@ -235,13 +251,70 @@ export default function Today() {
     }
   };
 
+  // ── Editable breakdown: recompute live items + totals from edits ──
+  const liveBreakdown = useMemo(() => {
+    const empty = {
+      entries: [] as Array<{ orig: BreakdownItem; index: number; calorieInput: string }>,
+      items: [] as BreakdownItem[],
+      totals: { calories: 0, proteinG: null, carbsG: null, fatG: null } as BreakdownTotals,
+    };
+    if (!estimation) return empty;
+    const entries: Array<{ orig: BreakdownItem; index: number; calorieInput: string }> = [];
+    const items: BreakdownItem[] = [];
+    estimation.items.forEach((orig, i) => {
+      if (removedItems[i]) return;
+      const input = itemCals[i] ?? '';
+      const parsed = parseInt(input);
+      const cal = Number.isFinite(parsed) ? parsed : 0;
+      entries.push({ orig, index: i, calorieInput: input });
+      items.push(rescaleItem(orig, cal));
+    });
+    return { entries, items, totals: sumBreakdown(items) };
+  }, [estimation, itemCals, removedItems]);
+
+  const handleEditItemCalories = (localIndex: number, value: string) => {
+    const origIndex = liveBreakdown.entries[localIndex]?.index;
+    if (origIndex == null) return;
+    setItemCals((prev) => {
+      const next = [...prev];
+      next[origIndex] = value;
+      return next;
+    });
+  };
+
+  const handleRemoveItem = (localIndex: number) => {
+    const origIndex = liveBreakdown.entries[localIndex]?.index;
+    if (origIndex == null) return;
+    setRemovedItems((prev) => {
+      const next = [...prev];
+      next[origIndex] = true;
+      return next;
+    });
+  };
+
+  const resetEstimation = () => {
+    setEstimation(null);
+    setEditCalories('');
+    setItemCals([]);
+    setRemovedItems([]);
+  };
+
   const handleConfirmEstimation = async () => {
     if (!estimation) return;
-    const calories = parseInt(editCalories) || estimation.totalCalories;
+    const hasItems = estimation.items.length > 0;
+    const liveItems = liveBreakdown.items;
+    // Principal path: total recalculated from the (edited) ingredients.
+    // Fallback: AI returned no breakdown — keep the direct editable total.
+    const calories = hasItems
+      ? liveBreakdown.totals.calories
+      : (parseInt(editCalories) || estimation.totalCalories);
     if (calories <= 0) {
       toast({ type: 'warning', message: t('nutrify.invalidCalories', 'Las calorías deben ser mayores a 0') });
       return;
     }
+    const macros: BreakdownTotals = hasItems
+      ? liveBreakdown.totals
+      : { calories, proteinG: estimation.proteinG, carbsG: estimation.carbsG, fatG: estimation.fatG };
 
     try {
       const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
@@ -250,7 +323,10 @@ export default function Today() {
         description: foodInput.trim(),
         calories,
         source: 'ai_estimate',
-        aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
+        aiBreakdown: liveItems.length > 1 ? JSON.stringify(liveItems) : undefined,
+        proteinG: macros.proteinG,
+        carbsG: macros.carbsG,
+        fatG: macros.fatG,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
 
@@ -261,8 +337,7 @@ export default function Today() {
 
       toast({ type: 'nutri', message: `+${calories} kcal` });
       setFoodInput('');
-      setEstimation(null);
-      setEditCalories('');
+      resetEstimation();
       const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
@@ -353,9 +428,20 @@ export default function Today() {
     }
   };
 
-  const handleAddFavorite = async (description: string, calories: number, source?: string, aiBreakdown?: string) => {
+  const handleAddFavorite = async (
+    description: string,
+    calories: number,
+    source?: string,
+    aiBreakdown?: string,
+    macros?: { proteinG: number | null; carbsG: number | null; fatG: number | null },
+  ) => {
     try {
-      await window.api.nutritionAddFavoriteFood({ description, calories, source, aiBreakdown });
+      await window.api.nutritionAddFavoriteFood({
+        description, calories, source, aiBreakdown,
+        proteinG: macros?.proteinG ?? null,
+        carbsG: macros?.carbsG ?? null,
+        fatG: macros?.fatG ?? null,
+      });
       toast({ type: 'nutri', message: t('nutrify.favoriteSaved', 'Guardado en favoritos') });
       const favorites = await window.api.nutritionGetFavoriteFoods();
       setFavoriteFoods(favorites as FavoriteFood[]);
@@ -794,41 +880,57 @@ export default function Today() {
               {/* Estimation result */}
               {estimation && (
                 <div className="nutri-estimation">
-                  {estimation.items.length > 0 && (
-                    <div className="nutri-est-items">
-                      {estimation.items.map((item, i) => (
-                        <div key={i} className="nutri-est-item">
-                          <span className="nutri-food-name">{item.name}</span>
-                          <span className="nutri-food-kcal"><AnimatedNumber value={item.calories} prefix="" locale={i18n.language === 'en' ? 'en-US' : 'es-AR'} duration={400} /> kcal</span>
-                        </div>
-                      ))}
+                  {estimation.items.length > 0 ? (
+                    <EstimationBreakdown
+                      items={liveBreakdown.items.map((it, li) => ({
+                        ...it,
+                        calorieInput: liveBreakdown.entries[li].calorieInput,
+                      }))}
+                      totals={liveBreakdown.totals}
+                      onEditCalories={handleEditItemCalories}
+                      onRemove={handleRemoveItem}
+                      t={t}
+                      locale={i18n.language === 'en' ? 'en-US' : 'es-AR'}
+                    />
+                  ) : (
+                    <div className="nutri-est-total">
+                      <span className="nutri-est-total-label">{t('nutrify.totalCalories', 'Total')}:</span>
+                      <div className="nutri-est-total-input">
+                        <input
+                          type="number"
+                          value={editCalories}
+                          onChange={(e) => setEditCalories(e.target.value)}
+                          className="nutri-total-input"
+                        />
+                        <span className="nutri-est-unit">kcal</span>
+                      </div>
                     </div>
                   )}
-                  <div className="nutri-est-total">
-                    <span className="nutri-est-total-label">{t('nutrify.totalCalories', 'Total')}:</span>
-                    <div className="nutri-est-total-input">
-                      <input
-                        type="number"
-                        value={editCalories}
-                        onChange={(e) => setEditCalories(e.target.value)}
-                        className="nutri-total-input"
-                      />
-                      <span className="nutri-est-unit">kcal</span>
-                    </div>
-                  </div>
                   <div className="nutri-est-actions">
-                    <button className="nutri-btn nutri-btn-primary" onClick={handleConfirmEstimation}>
+                    <button
+                      className="nutri-btn nutri-btn-primary"
+                      onClick={handleConfirmEstimation}
+                      disabled={estimation.items.length > 0 && liveBreakdown.items.length === 0}
+                    >
                       {t('nutrify.confirmLog', 'Confirmar y registrar')}
                     </button>
-                    <button className="nutri-btn nutri-btn-ghost" onClick={() => handleAddFavorite(
-                      foodInput.trim(),
-                      parseInt(editCalories) || estimation.totalCalories,
-                      'ai_estimate',
-                      estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
-                    )}>
+                    <button className="nutri-btn nutri-btn-ghost" onClick={() => {
+                      const hasItems = estimation.items.length > 0;
+                      const cal = hasItems ? liveBreakdown.totals.calories : (parseInt(editCalories) || estimation.totalCalories);
+                      const macros = hasItems
+                        ? { proteinG: liveBreakdown.totals.proteinG, carbsG: liveBreakdown.totals.carbsG, fatG: liveBreakdown.totals.fatG }
+                        : { proteinG: estimation.proteinG, carbsG: estimation.carbsG, fatG: estimation.fatG };
+                      handleAddFavorite(
+                        foodInput.trim(),
+                        cal,
+                        'ai_estimate',
+                        liveBreakdown.items.length > 1 ? JSON.stringify(liveBreakdown.items) : undefined,
+                        macros,
+                      );
+                    }}>
                       <Heart width={14} height={14} /> {t('nutrify.saveToFavorites', 'Guardar en favoritos')}
                     </button>
-                    <button className="nutri-btn nutri-btn-ghost" onClick={() => { setEstimation(null); setEditCalories(''); }}>
+                    <button className="nutri-btn nutri-btn-ghost" onClick={resetEstimation}>
                       {t('common.cancel', 'Cancelar')}
                     </button>
                   </div>
@@ -1129,6 +1231,95 @@ export function MacroBars({ summary, targets, t }: { summary: DailySummary | nul
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Editable AI ingredient breakdown — presentational, fully driven by props so it
+// can be unit/visual-tested in isolation (same pattern as MacroBars).
+export function EstimationBreakdown({
+  items,
+  totals,
+  onEditCalories,
+  onRemove,
+  t,
+  locale,
+}: {
+  items: Array<BreakdownItem & { calorieInput: string }>;
+  totals: BreakdownTotals;
+  onEditCalories: (index: number, value: string) => void;
+  onRemove: (index: number) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: TFunction<any, any>;
+  locale: string;
+}) {
+  const initials = {
+    p: t('nutrify.protein', 'Proteína').charAt(0).toUpperCase(),
+    c: t('nutrify.carbs', 'Carbohidratos').charAt(0).toUpperCase(),
+    f: t('nutrify.fat', 'Grasa').charAt(0).toUpperCase(),
+  };
+  const macroLine = (p: number | null, c: number | null, f: number | null): string | null => {
+    const parts = [
+      p != null ? `${initials.p} ${p}g` : null,
+      c != null ? `${initials.c} ${c}g` : null,
+      f != null ? `${initials.f} ${f}g` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join('  ·  ') : null;
+  };
+  const totalMacros = macroLine(totals.proteinG, totals.carbsG, totals.fatG);
+
+  return (
+    <div className="nutri-est-breakdown">
+      <p className="nutri-est-hint">
+        {t('nutrify.breakdownHint', 'Ajustá las calorías de cada ingrediente o quitá lo que no comiste.')}
+      </p>
+      <div className="nutri-est-items">
+        {items.map((it, i) => {
+          const macros = macroLine(it.proteinG, it.carbsG, it.fatG);
+          return (
+            <div key={i} className="nutri-est-item nutri-est-item--edit">
+              <div className="nutri-est-item-main">
+                <span className="nutri-food-name">{it.name}</span>
+                {macros && <span className="nutri-est-item-macros">{macros}</span>}
+              </div>
+              <div className="nutri-est-item-cal">
+                <input
+                  type="number"
+                  className="nutri-est-cal-input"
+                  value={it.calorieInput}
+                  onChange={(e) => onEditCalories(i, e.target.value)}
+                  aria-label={t('nutrify.itemCaloriesLabel', { name: it.name, defaultValue: 'Calorías de {{name}}' })}
+                />
+                <span className="nutri-est-unit">{t('nutrify.kcalUnit', 'kcal')}</span>
+                <button
+                  type="button"
+                  className="nutri-est-remove"
+                  onClick={() => onRemove(i)}
+                  title={t('nutrify.removeIngredient', 'Quitar ingrediente')}
+                  aria-label={t('nutrify.removeIngredient', 'Quitar ingrediente')}
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {items.length === 0 ? (
+        <p className="nutri-est-empty">
+          {t('nutrify.breakdownEmpty', 'Quitaste todos los ingredientes. Volvé a estimar o agregá uno manualmente.')}
+        </p>
+      ) : (
+        <div className="nutri-est-total">
+          <span className="nutri-est-total-label">{t('nutrify.totalCalories', 'Total')}:</span>
+          <div className="nutri-est-total-recalc">
+            {totalMacros && <span className="nutri-est-total-macros">{totalMacros}</span>}
+            <span className="nutri-est-total-val">{totals.calories.toLocaleString(locale)} {t('nutrify.kcalUnit', 'kcal')}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
