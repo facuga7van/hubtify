@@ -207,6 +207,15 @@ export interface HubtifyApi {
   nutritionGetSummaryRange: (start: string, end: string) => Promise<unknown[]>;
   nutritionGetMacroTargets: (date?: string) => Promise<{ proteinG: number; carbsG: number; fatG: number; auto: boolean } | null>;
   nutritionGetWeights: () => Promise<unknown[]>;
+  nutritionGetAdaptiveTdee: () => Promise<{
+    tdee: number | null;
+    confidence: 'insufficient' | 'low' | 'medium' | 'high';
+    windowDays: number;
+    sampleDays: number;
+    weightSamples: number;
+    intakeAvg: number | null;
+    deltaKg: number | null;
+  }>;
   nutritionGetStreak: () => Promise<number>;
   nutritionGetWeekCalories: () => Promise<number[]>;
   nutritionGetTodayCalories: () => Promise<number>;

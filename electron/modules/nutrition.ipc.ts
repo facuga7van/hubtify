@@ -5,6 +5,7 @@ import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, days
 import { resolveMealType, DEFAULT_MEAL_SCHEDULE } from '../../shared/meal-utils';
 import type { MealSchedule } from '../../shared/meal-utils';
 import { calcAutoMacroTargets } from '../../shared/macro-utils';
+import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adaptive-tdee';
 
 function genId(): string {
   return crypto.randomUUID();
@@ -348,6 +349,35 @@ export function registerNutritionIpcHandlers(): void {
 
     const auto = calcAutoMacroTargets(targetCalories, weight, deficit);
     return { ...auto, auto: true };
+  });
+
+  // Adaptive (data-derived) TDEE INSIGHT. Reads logged intake + the weight series
+  // over the lookback window and infers the user's REAL expenditure via the pure
+  // energy-balance helper. Read-only: never recalibrates the goal or touches the
+  // day-close math. Returns the estimate with a confidence level and the sample
+  // counts so the renderer can either show the number or say what's still missing.
+  ipcHandle('nutrition:getAdaptiveTdee', () => {
+    const db = getDb();
+    const today = todayDateString();
+    const start = daysAgoDateString(ADAPTIVE_LOOKBACK_DAYS - 1);
+
+    const intake = db.prepare(`
+      SELECT date, COALESCE(SUM(calories), 0) AS calories
+      FROM food_log
+      WHERE date BETWEEN ? AND ? AND deleted_at IS NULL
+      GROUP BY date
+      HAVING calories > 0
+      ORDER BY date ASC
+    `).all(start, today) as Array<{ date: string; calories: number }>;
+
+    const weights = db.prepare(`
+      SELECT date, weight_kg AS weightKg
+      FROM nutrition_weekly_metrics
+      WHERE weight_kg IS NOT NULL AND date BETWEEN ? AND ?
+      ORDER BY date ASC
+    `).all(start, today) as Array<{ date: string; weightKg: number }>;
+
+    return estimateAdaptiveTdee(intake, weights);
   });
 
   // ── Dashboard ──────────────────────────────────────

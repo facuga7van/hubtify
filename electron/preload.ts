@@ -69,6 +69,7 @@ const api = {
   nutritionGetSummaryRange: (start: string, end: string) => ipcRenderer.invoke('nutrition:getSummaryRange', start, end),
   nutritionGetMacroTargets: (date?: string) => ipcRenderer.invoke('nutrition:getMacroTargets', date),
   nutritionGetWeights: () => ipcRenderer.invoke('nutrition:getWeights'),
+  nutritionGetAdaptiveTdee: () => ipcRenderer.invoke('nutrition:getAdaptiveTdee'),
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetWeekCalories: () => ipcRenderer.invoke('nutrition:getWeekCalories'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
