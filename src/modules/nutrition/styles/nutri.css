@@ -1187,6 +1187,98 @@
   letter-spacing: 0.04em !important;
 }
 
+/* Pill + portion-adjust button grouped together */
+.nutri-pill-wrap {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.nutri-pill-wrap .nutri-pill {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.nutri-pill-portion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border: 1px solid var(--gold);
+  border-left: none;
+  border-radius: 0 3px 3px 0;
+  background: rgba(138, 106, 61, 0.12);
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nutri-pill-portion:hover {
+  background: var(--gold);
+  color: var(--parch-0);
+}
+
+/* Repeat-day picker list */
+.nutri-repeat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.nutri-repeat-day {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--ink-faded);
+  border-radius: 4px;
+  background: rgba(245, 231, 192, 0.4);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.nutri-repeat-day:hover {
+  background: rgba(138, 106, 61, 0.18);
+  border-color: var(--gold);
+}
+
+.nutri-repeat-day-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+.nutri-repeat-day-meta {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* Portion multiplier presets */
+.nutri-portion-presets {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.nutri-portion-preset {
+  flex: 1;
+  justify-content: center;
+  font-size: var(--fs-label) !important;
+}
+
+.nutri-portion-preset.active {
+  background: var(--gold) !important;
+  color: var(--parch-0) !important;
+  border-color: var(--gold) !important;
+}
+
 
 /* ═══════════════════════════════════════════════════════════
    8. CLOSE DAY

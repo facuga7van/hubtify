@@ -58,6 +58,33 @@ export function rescaleItem(original: BreakdownItem, newCalories: number): Break
   };
 }
 
+export interface PortionNutrition {
+  calories: number;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+}
+
+/**
+ * Scale a food's calories and macros by a portion factor (e.g. 0.5, 1, 2).
+ * Used by the quick-log portion picker so a favorite/frequent can be logged at
+ * a fraction or multiple of its stored serving.
+ *
+ * - Calories are scaled and rounded to a non-negative integer.
+ * - Each macro scales proportionally; a null macro (unknown) stays null.
+ * - A non-finite or non-positive factor falls back to 1 (a no-op), so the
+ *   common one-tap case is never corrupted by a bad input.
+ */
+export function scalePortion(food: PortionNutrition, factor: number): PortionNutrition {
+  const f = Number.isFinite(factor) && factor > 0 ? factor : 1;
+  return {
+    calories: Math.max(0, Math.round((Number.isFinite(food.calories) ? food.calories : 0) * f)),
+    proteinG: scaleMacro(food.proteinG, f),
+    carbsG: scaleMacro(food.carbsG, f),
+    fatG: scaleMacro(food.fatG, f),
+  };
+}
+
 /**
  * Sum the calories and macros of the given items.
  * A macro total stays null until at least one item reports that macro, so a
