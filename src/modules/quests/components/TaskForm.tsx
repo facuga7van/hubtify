@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { XP_MAP, type TaskTier, type Task, type Project } from '../types';
+import { XP_MAP, PROJECT_COLORS, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
@@ -24,6 +24,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   const [dueDate, setDueDate] = useState('');
   const [useDate, setUseDate] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  const [newProject, setNewProject] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
 
   const loadCategories = useCallback(async (pid: string | null | undefined) => {
@@ -33,7 +34,10 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { loadCategories(projectId); }, [projectId, loadCategories]);
+  useEffect(() => {
+    if (projectId === '__new__') { setCategories([]); return; }
+    loadCategories(projectId);
+  }, [projectId, loadCategories]);
 
   useEffect(() => {
     if (editingTask) {
@@ -56,13 +60,20 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     const resolvedCategory = category === '__new__' ? newCategory.trim() : category;
 
+    // Resolve the project: if the user chose "new project", create it first and use its id.
+    let resolvedProjectId: string | null = projectId === '__new__' ? null : projectId;
+    if (projectId === '__new__' && newProject.trim()) {
+      const color = PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
+      resolvedProjectId = await window.api.questsUpsertProject({ name: newProject.trim(), color });
+    }
+
     const task = {
       id: editingTask?.id,
       name: name.trim(),
       description: description.trim(),
       tier,
       category: resolvedCategory,
-      projectId,
+      projectId: resolvedProjectId,
       dueDate: useDate && dueDate ? dueDate : null,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
@@ -70,7 +81,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     await window.api.questsUpsertTask(task as Record<string, unknown>);
 
-    setName(''); setDescription(''); setTier(2); setNewCategory(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(''); setUseDate(false);
     setProjectId(activeProjectId);
     onSaved();
   };
@@ -135,12 +146,12 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
         />
 
         {/* Project */}
-        {projects.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <select
-            value={projectId ?? ''}
+            value={projectId === '__new__' ? '__new__' : (projectId ?? '')}
             onChange={(e) => {
               const val = e.target.value;
-              setProjectId(val || null);
+              setProjectId(val === '' ? null : val);
               setCategory('');
             }}
             className="rpg-select"
@@ -149,8 +160,20 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
             {projects.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
+            <option value="__new__">+ {t('questify.newProject', 'Nuevo proyecto')}</option>
           </select>
-        )}
+          {projectId === '__new__' && (
+            <input
+              type="text"
+              placeholder={t('questify.projectName', 'Nombre del proyecto')}
+              value={newProject}
+              onChange={(e) => setNewProject(e.target.value)}
+              className="rpg-input"
+              style={{ width: 120 }}
+              autoFocus
+            />
+          )}
+        </div>
 
         {/* Category */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
