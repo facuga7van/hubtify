@@ -501,23 +501,32 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
-      // Food log — merge by id instead of composite key (Issue #11)
+      // Food log — merge by id with full LWW (Issue #11 + Phase 3.4).
+      // A remote row that is strictly newer (by updated_at) replaces ALL editable
+      // fields, not just deleted_at/updated_at. This is what propagates EDITS
+      // (calories, macros, meal, description, time, date, ai_breakdown, frequent_food_id)
+      // across accounts, mirroring the LWW pattern used by daily_closed/profile.
+      // Strictly-greater comparison preserves: local-newer never gets clobbered,
+      // equal timestamps are a no-op, and a soft-deleted row never revives unless a
+      // newer remote re-creates it.
       const affectedDates = new Set<string>();
       if (Array.isArray(d.foodLog)) {
-        const getFoodById = db.prepare('SELECT id FROM food_log WHERE id = ?');
+        const getFoodById = db.prepare('SELECT id, date, updated_at FROM food_log WHERE id = ?');
         const insertFood = db.prepare('INSERT OR IGNORE INTO food_log (id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, carbs_g, fat_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const updateFood = db.prepare('UPDATE food_log SET date = ?, time = ?, description = ?, calories = ?, source = ?, frequent_food_id = ?, ai_breakdown = ?, meal = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
         for (const f of d.foodLog) {
           if (f.id != null) {
-            const exists = getFoodById.get(f.id);
-            if (!exists) {
-              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.updated_at ?? null, f.deleted_at ?? null);
+            const local = getFoodById.get(f.id) as { id: number; date: string; updated_at: string | null } | undefined;
+            if (!local) {
+              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id ?? null, f.ai_breakdown ?? null, f.meal ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.updated_at ?? null, f.deleted_at ?? null);
               affectedDates.add(f.date);
               changed = true;
-            }
-            if (f.deleted_at || f.updated_at) {
-              db.prepare(
-                "UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ? AND (updated_at IS NULL OR updated_at < ?)"
-              ).run(f.deleted_at ?? null, f.updated_at ?? null, f.id, f.updated_at);
+            } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
+              // Remote strictly newer → adopt the full remote row (edit, delete, or both).
+              updateFood.run(f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id ?? null, f.ai_breakdown ?? null, f.meal ?? null, f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null, f.updated_at ?? null, f.deleted_at ?? null, f.id);
+              affectedDates.add(f.date);
+              if (local.date !== f.date) affectedDates.add(local.date); // moved date → recalc the old one too
+              changed = true;
             }
           } else {
             // Legacy entries without id — fallback to composite key
