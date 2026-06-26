@@ -67,6 +67,7 @@ const EVENT_ICON_COMPONENTS: Record<string, React.ComponentType<React.SVGProps<S
   HABIT_UNCHECKED: Sparkle,
   MEAL_LOGGED: Scale,
   DAY_SUMMARY: Scale,
+  DAY_REOPENED: Scale,
   EXPENSE_LOGGED: Coin,
   EXPENSE_TRACKED: Coin,
   INCOME_LOGGED: Coin,

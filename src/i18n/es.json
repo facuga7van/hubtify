@@ -376,6 +376,7 @@
     "closeDayError": "Error al confirmar el día",
     "dayClosed": "Día cerrado",
     "dayClosedSuccess": "¡Día cerrado exitosamente!",
+    "dayReopened": "Jornada reabierta",
     "xpPrecision": "Precisión (cercanía al objetivo)",
     "xpSteps": "Actividad (pasos)",
     "xpGym": "Entrenamiento (gym)",
@@ -433,6 +434,9 @@
     "portionConfirm": "Registrar porción",
     "portionFactor": "Porciones",
     "portionTitle": "Ajustar porción",
+    "reopenDay": "Reabrir la jornada",
+    "reopenDayError": "Error al reabrir la jornada",
+    "reopenDayWarning": "Reabrir la jornada revertirá el XP y HP que ganaste al cerrarla. Vas a poder editar las comidas y volver a cerrarla.",
     "repeatDayButton": "Repetir día",
     "repeatDayConfirm": "Este día ya tiene comidas. ¿Sumar las del día elegido igual?",
     "repeatDayEmpty": "Ese día no tiene comidas para repetir",
@@ -1038,6 +1042,7 @@
     }
   },
   "events": {
+    "DAY_REOPENED": "Jornada reabierta",
     "DAY_SUMMARY": "Resumen del día",
     "EXPENSE_LOGGED": "Gasto registrado",
     "EXPENSE_TRACKED": "Gasto registrado",

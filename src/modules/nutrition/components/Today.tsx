@@ -692,7 +692,8 @@ export default function Today() {
       const hp = b?.hpChange ?? 0;
       await window.api.processRpgEvent({
         type: 'DAY_SUMMARY', moduleId: 'nutrition',
-        payload: { xp, hp },
+        // `date` lets a later DAY_REOPENED find and revert this exact close.
+        payload: { xp, hp, date },
         timestamp: Date.now(),
       });
       toast({ type: 'info', message: `+${xp} XP` });
@@ -700,6 +701,33 @@ export default function Today() {
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
       setDayClosed(closed as typeof dayClosed);
+    }
+  };
+
+  const handleReopenDay = async () => {
+    const ok = await confirm({
+      message: t('nutrify.reopenDayWarning', 'Reabrir la jornada revertirá el XP y HP que ganaste al cerrarla. Vas a poder editar las comidas y volver a cerrarla.'),
+      confirmText: t('nutrify.reopenDay', 'Reabrir la jornada'),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const result = await window.api.nutritionReopenDay(date);
+      if (result.success) {
+        // Revert the granted XP/HP through the RPG engine's undo path
+        // (mirrors Questify's TASK_UNCOMPLETED — reverses the exact close event).
+        await window.api.processRpgEvent({
+          type: 'DAY_REOPENED', moduleId: 'nutrition',
+          payload: { xp: -(result.xpTotal ?? 0), hp: -(result.hpChange ?? 0), date },
+          timestamp: Date.now(),
+        });
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+        toast({ type: 'info', message: t('nutrify.dayReopened', 'Jornada reabierta') });
+      }
+      await loadData(date);
+      loadPendingDays();
+    } catch {
+      toast({ type: 'warning', message: t('nutrify.reopenDayError', 'Error al reabrir la jornada') });
     }
   };
 
@@ -1218,6 +1246,13 @@ export default function Today() {
               <CloseDayStats consumed={dayClosed.consumed} target={dayClosed.target} />
               <DayBreakdown data={dayClosed} t={t} />
             </div>
+            <button
+              className="nutri-btn nutri-btn-ghost"
+              style={{ width: '100%', marginTop: 12 }}
+              onClick={handleReopenDay}
+            >
+              {t('nutrify.reopenDay', 'Reabrir la jornada')}
+            </button>
           </div>
         ) : closeResult ? (
           <div>

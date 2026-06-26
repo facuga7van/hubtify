@@ -376,6 +376,7 @@
     "closeDayError": "Error closing the day",
     "dayClosed": "Day closed",
     "dayClosedSuccess": "Day closed successfully!",
+    "dayReopened": "Day reopened",
     "xpPrecision": "Precision (closeness to target)",
     "xpSteps": "Activity (steps)",
     "xpGym": "Training (gym)",
@@ -433,6 +434,9 @@
     "portionConfirm": "Log portion",
     "portionFactor": "Servings",
     "portionTitle": "Adjust portion",
+    "reopenDay": "Reopen the day",
+    "reopenDayError": "Error reopening the day",
+    "reopenDayWarning": "Reopening the day will revert the XP and HP you earned by closing it. You'll be able to edit meals and close it again.",
     "repeatDayButton": "Repeat day",
     "repeatDayConfirm": "This day already has meals. Add the chosen day's meals anyway?",
     "repeatDayEmpty": "That day has no meals to repeat",
@@ -1039,6 +1043,7 @@
     }
   },
   "events": {
+    "DAY_REOPENED": "Day reopened",
     "DAY_SUMMARY": "Daily summary",
     "EXPENSE_LOGGED": "Expense logged",
     "EXPENSE_TRACKED": "Expense tracked",
