@@ -159,29 +159,25 @@ export function registerQuestsIpcHandlers(): void {
 
   // ── Categories ─────────────────────────────────────
 
+  // Categories are derived directly from the tasks themselves — tasks.category is the
+  // single source of truth. The old task_categories catalog table is no longer read or
+  // written (it remains in the sync payload as inert legacy data until a future cleanup,
+  // to stay forward-compatible with older clients per the expand-contract pattern).
   ipcHandle('quests:getCategories', (_e, projectId?: string | null) => {
     const db = getDb();
     if (projectId === undefined) {
-      return (db.prepare('SELECT id, name FROM task_categories WHERE deleted_at IS NULL ORDER BY created_at ASC').all() as { id: string; name: string }[])
-        .map((r) => r.name);
-    } else {
-      return (db.prepare('SELECT id, name FROM task_categories WHERE deleted_at IS NULL AND project_id IS ? ORDER BY created_at ASC').all(projectId) as { id: string; name: string }[])
-        .map((r) => r.name);
+      return (db.prepare(
+        "SELECT DISTINCT category FROM tasks WHERE deleted_at IS NULL AND category != '' ORDER BY category COLLATE NOCASE ASC"
+      ).all() as { category: string }[]).map((r) => r.category);
     }
+    return (db.prepare(
+      "SELECT DISTINCT category FROM tasks WHERE deleted_at IS NULL AND category != '' AND project_id IS ? ORDER BY category COLLATE NOCASE ASC"
+    ).all(projectId) as { category: string }[]).map((r) => r.category);
   });
 
-  ipcHandle('quests:ensureCategory', (_e, name: string, projectId?: string | null) => {
-    const db = getDb();
-    const pid = projectId ?? null;
-    const existing = db.prepare(
-      'SELECT id FROM task_categories WHERE name = ? AND project_id IS ? AND deleted_at IS NULL'
-    ).get(name, pid);
-    if (existing) return;
-    const id = genId();
-    const now = new Date().toISOString();
-    db.prepare('INSERT INTO task_categories (id, name, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, name, pid, now, now);
-  });
+  // Deprecated: kept as a no-op so the preload bridge and any older renderer that still
+  // calls it don't break. Creating a task with a category now implicitly "registers" it.
+  ipcHandle('quests:ensureCategory', () => { /* no-op — categories derive from tasks.category */ });
 
   // ── Stats helpers ──────────────────────────────────
 

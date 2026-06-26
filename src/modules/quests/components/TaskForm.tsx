@@ -70,10 +70,6 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     await window.api.questsUpsertTask(task as Record<string, unknown>);
 
-    if (resolvedCategory && resolvedCategory.trim()) {
-      await window.api.questsEnsureCategory(resolvedCategory.trim(), projectId);
-    }
-
     setName(''); setDescription(''); setTier(2); setNewCategory(''); setCategory(''); setDueDate(''); setUseDate(false);
     setProjectId(activeProjectId);
     onSaved();
