@@ -1,7 +1,9 @@
+import type { TFunction } from 'i18next';
 import type { TaskTier, HabitWithStreak } from './types';
 import { XP_MAP } from './types';
 import { playTaskComplete } from '../../shared/audio';
 import { getComboMultiplier } from '../../../shared/rpg-engine';
+import type { ToastData } from '../../shared/components/useToast';
 import { GemRough, GemCut, GemBrilliant } from '../../shared/components/icons/CodexIcons';
 
 export const TIER_LABEL: Record<TaskTier, string> = {
@@ -53,8 +55,8 @@ export function bonusMultiplierToTier(multiplier: number): 'normal' | 'good' | '
 /* ── Shared habit check logic ──────────────────── */
 
 export interface HabitCheckCallbacks {
-  toast: (opts: { type: string; message: string; details?: Record<string, unknown> }) => void;
-  t: (key: string, fallback?: string) => string;
+  toast: (data: Omit<ToastData, 'id'>) => void;
+  t: TFunction;
   onXpGained?: () => void;
 }
 
