@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
+import UpdateNotification from './UpdateNotification';
+import UpdateBanner from './UpdateBanner';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull } from '../shared/sync';
@@ -68,6 +70,7 @@ export default function Layout() {
   const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
   useEffect(() => {
     const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
@@ -484,46 +487,27 @@ export default function Layout() {
         entries={patchEntries}
       />
 
-      {/* Update popup */}
+      {/* Discreet banner — always shown while an update is available */}
       {updateAvailable && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, var(--leather) 0%, var(--leather) 100%)',
-            border: '2px solid var(--gold-dark)',
-            borderRadius: '6px', padding: '24px', maxWidth: 360,
-            textAlign: 'center', color: 'var(--parch-0)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-          }}>
-            <h3 style={{ fontFamily: "'UnifrakturCook', cursive", marginBottom: 12, color: 'var(--gold-light)' }}>
-              {t('settings.updateAvailable', { version: updateAvailable.version })}
-            </h3>
-            {updateState === 'downloading' && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ height: '100%', background: 'var(--moss)', width: `${downloadPercent}%`, transition: 'width 0.3s ease' }} />
-                </div>
-                <span style={{ fontSize: 'var(--fs-label)', opacity: 0.75 }}>{downloadPercent}%</span>
-              </div>
-            )}
-            {updateError && (
-              <p style={{ color: '#f87171', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{updateError}</p>
-            )}
-            {updateState === 'idle' && (
-              <>
-                <button className="rpg-button" onClick={handleUpdate} style={{ width: '100%', marginBottom: 8 }}>
-                  {t('settings.downloadUpdate')}
-                </button>
-                <button onClick={() => setUpdateAvailable(null)} className="rpg-button"
-                  style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
-                  {t('nutrify.weightCheckin.later')}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        <UpdateBanner
+          version={updateAvailable.version}
+          state={updateState}
+          percent={downloadPercent}
+          error={updateError}
+          onViewDetails={() => setShowUpdateDetails(true)}
+          onDismiss={() => setUpdateAvailable(null)}
+        />
+      )}
+      {/* Full changelog modal — opened from the banner's "View what's new" */}
+      {updateAvailable && showUpdateDetails && (
+        <UpdateNotification
+          version={updateAvailable.version}
+          state={updateState}
+          percent={downloadPercent}
+          error={updateError}
+          onDownload={() => { handleUpdate(); setShowUpdateDetails(false); }}
+          onDismiss={() => setShowUpdateDetails(false)}
+        />
       )}
 
     </div>
