@@ -194,4 +194,14 @@ export const nutritionMigrations: Migration[] = [
       ALTER TABLE nutrition_profile ADD COLUMN fat_target_g REAL DEFAULT NULL;
     `,
   },
+  {
+    // Soft-delete support for closed days so "reopen day" replicates across accounts.
+    // A row with deleted_at set is treated as reopened (no longer a closed day).
+    namespace: 'nutrition',
+    version: 11,
+    up: `
+      ALTER TABLE nutrition_daily_closed ADD COLUMN updated_at TEXT DEFAULT NULL;
+      ALTER TABLE nutrition_daily_closed ADD COLUMN deleted_at TEXT DEFAULT NULL;
+    `,
+  },
 ];

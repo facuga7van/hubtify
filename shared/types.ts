@@ -214,6 +214,7 @@ export interface HubtifyApi {
   nutritionGetTodayTarget: () => Promise<number | null>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
+  nutritionReopenDay: (date: string) => Promise<{ success: boolean; notClosed?: boolean; xpTotal?: number; hpChange?: number }>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
   nutritionGetFavoriteFoods: () => Promise<FavoriteFood[]>;
   nutritionAddFavoriteFood: (food: Record<string, unknown>) => Promise<{ id: string }>;

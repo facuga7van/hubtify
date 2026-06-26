@@ -615,13 +615,20 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
-      // Daily closed - merge by date
+      // Daily closed - merge by date. Carries updated_at/deleted_at so a
+      // "reopen day" (soft-delete) replicates across accounts via LWW.
       if (Array.isArray(d.dailyClosed)) {
         for (const c of d.dailyClosed) {
-          const exists = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(c.date);
-          if (!exists) {
-            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0
+          const local = db.prepare('SELECT updated_at FROM nutrition_daily_closed WHERE date = ?').get(c.date) as { updated_at: string | null } | undefined;
+          if (!local) {
+            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0, c.updated_at ?? null, c.deleted_at ?? null
+            );
+            changed = true;
+          } else if ((c.updated_at ?? '') > (local.updated_at || '')) {
+            // Remote is newer → adopt its state (covers reopen via deleted_at).
+            db.prepare('UPDATE nutrition_daily_closed SET xp_precision = ?, xp_steps = ?, xp_gym = ?, xp_weight = ?, xp_bonus = ?, xp_total = ?, hp_change = ?, consumed = ?, target = ?, updated_at = ?, deleted_at = ? WHERE date = ?').run(
+              c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0, c.updated_at ?? null, c.deleted_at ?? null, c.date
             );
             changed = true;
           }

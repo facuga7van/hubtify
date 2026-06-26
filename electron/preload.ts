@@ -76,6 +76,7 @@ const api = {
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
+  nutritionReopenDay: (date: string) => ipcRenderer.invoke('nutrition:reopenDay', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
   nutritionGetFavoriteFoods: () => ipcRenderer.invoke('nutrition:getFavoriteFoods'),
   nutritionAddFavoriteFood: (food: Record<string, unknown>) => ipcRenderer.invoke('nutrition:addFavoriteFood', food),

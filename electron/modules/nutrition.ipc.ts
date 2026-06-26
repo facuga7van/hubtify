@@ -104,7 +104,7 @@ export function registerNutritionIpcHandlers(): void {
     if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
     const db = getDb();
     const date = entry.date ?? todayDateString();
-    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
+    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date);
     if (closed) throw new Error('Cannot modify a closed day');
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     // Resolve meal type if not provided
@@ -148,7 +148,7 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
     if (entry) {
-      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
+      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(entry.date);
       if (closed) throw new Error('Cannot modify a closed day');
     }
     db.transaction(() => {
@@ -162,7 +162,7 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
     if (entry) {
-      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
+      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(entry.date);
       if (closed) throw new Error('Cannot modify a closed day');
     }
     const sets: string[] = [];
@@ -187,7 +187,7 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:deleteByDate', (_e, date: string) => {
     const db = getDb();
-    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
+    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date);
     if (closed) throw new Error('Cannot modify a closed day');
     db.transaction(() => {
       db.prepare("UPDATE food_log SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND deleted_at IS NULL").run(date);
@@ -203,7 +203,7 @@ export function registerNutritionIpcHandlers(): void {
       throw new Error('Invalid date format');
     }
     const db = getDb();
-    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(toDate);
+    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(toDate);
     if (closed) throw new Error('Cannot modify a closed day');
     let copied = 0;
     db.transaction(() => { copied = repeatDayMeals(db, fromDate, toDate); })();
@@ -449,8 +449,8 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
 
     return db.transaction(() => {
-      // Check if day already closed
-      const existing = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
+      // Check if day already closed (a soft-deleted row counts as reopened → re-closable)
+      const existing = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date);
       if (existing) return { success: false, alreadyClosed: true };
 
       // Get summary
@@ -548,10 +548,17 @@ export function registerNutritionIpcHandlers(): void {
         }
       }
 
-      // Save close record
+      // Save close record. UPSERT so a previously reopened (soft-deleted) day can be
+      // re-closed: clear deleted_at and refresh updated_at for sync.
       db.prepare(`
-        INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), NULL)
+        ON CONFLICT(date) DO UPDATE SET
+          xp_precision = excluded.xp_precision, xp_steps = excluded.xp_steps,
+          xp_gym = excluded.xp_gym, xp_weight = excluded.xp_weight,
+          xp_bonus = excluded.xp_bonus, xp_total = excluded.xp_total,
+          hp_change = excluded.hp_change, consumed = excluded.consumed,
+          target = excluded.target, updated_at = datetime('now'), deleted_at = NULL
       `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange, consumed, Math.round(target));
 
       return {
@@ -597,7 +604,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:isDayClosed', (_e, date: string) => {
     try {
       const db = getDb();
-      const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+      const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date) as Record<string, unknown> | undefined;
       if (!row) return null;
       return {
         xpPrecision: row.xp_precision, xpSteps: row.xp_steps,
@@ -611,6 +618,19 @@ export function registerNutritionIpcHandlers(): void {
       console.error('[nutrition:isDayClosed]', err);
       return null;
     }
+  });
+
+  // Reopen a closed day so its meals become editable again. Soft-deletes the
+  // nutrition_daily_closed record (so the reopen replicates across accounts via
+  // LWW sync) and returns the granted XP/HP so the renderer can emit a
+  // DAY_REOPENED event to revert them through the RPG engine's undo path.
+  ipcHandle('nutrition:reopenDay', (_e, date: string) => {
+    const db = getDb();
+    return db.transaction(() => {
+      const result = reopenDayRecord(db, date);
+      if (!result) return { success: false, notClosed: true };
+      return { success: true, xpTotal: result.xpTotal, hpChange: result.hpChange };
+    })();
   });
 
   // ── Favorite Foods ─────────────────────────────────
@@ -643,7 +663,7 @@ export function registerNutritionIpcHandlers(): void {
     const rows = db.prepare(`
       SELECT DISTINCT f.date
       FROM food_log f
-      LEFT JOIN nutrition_daily_closed c ON c.date = f.date
+      LEFT JOIN nutrition_daily_closed c ON c.date = f.date AND c.deleted_at IS NULL
       WHERE c.date IS NULL
         AND f.date >= ? AND f.date < ?
         AND f.deleted_at IS NULL
@@ -683,6 +703,25 @@ export function repeatDayMeals(db: ReturnType<typeof getDb>, fromDate: string, t
   }
   recalcSummary(db, toDate);
   return rows.length;
+}
+
+/**
+ * Reopen a closed day by soft-deleting its nutrition_daily_closed record.
+ * Returns the granted XP/HP for the caller to revert, or null if the day was
+ * not closed (idempotent / safe no-op for non-closed or already-reopened days).
+ */
+export function reopenDayRecord(
+  db: ReturnType<typeof getDb>,
+  date: string,
+): { xpTotal: number; hpChange: number } | null {
+  const row = db.prepare(
+    'SELECT xp_total AS xpTotal, hp_change AS hpChange FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL'
+  ).get(date) as { xpTotal: number; hpChange: number } | undefined;
+  if (!row) return null;
+  db.prepare(
+    "UPDATE nutrition_daily_closed SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND deleted_at IS NULL"
+  ).run(date);
+  return { xpTotal: row.xpTotal, hpChange: row.hpChange };
 }
 
 export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
