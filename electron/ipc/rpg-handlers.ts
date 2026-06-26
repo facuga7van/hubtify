@@ -10,7 +10,7 @@ import {
   clampHp,
   getStreakMilestoneBonus,
   getLocalDateString,
-  daysDiff,
+  nextStreak,
 } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEvent, RpgEventRecord } from '../../shared/types';
 import { todayDateString, localTimestamp, daysAgoDateString } from '../../shared/date-utils';
@@ -69,6 +69,7 @@ export function registerRpgHandlers(): void {
       let streak = stats.streak as number;
       let combo = (stats.daily_combo as number) || 0;
       let milestoneXp = 0;
+      let streakSaved = false;
 
       if (isUndo) {
         // Find the original completion event and reverse its exact XP
@@ -108,16 +109,13 @@ export function registerRpgHandlers(): void {
         bonusMultiplier = rollRandomBonus();
         xpGained = Math.round(calculateXpGain(baseXp, comboMultiplier, bonusMultiplier, stats.hp as number) * 100) / 100;
 
-        const lastDate = stats.streak_last_date as string | null;
-        if (lastDate !== today) {
-          if (lastDate) {
-            const diff = daysDiff(lastDate, today);
-            streak = diff === 1 ? streak + 1 : 1;
-          } else {
-            streak = 1;
-          }
-        }
-        milestoneXp = getStreakMilestoneBonus(streak);
+        const prevStreak = streak;
+        const streakResult = nextStreak(streak, stats.streak_last_date as string | null, today);
+        streak = streakResult.streak;
+        streakSaved = streakResult.saved;
+        // Milestone bonus only when the streak actually ADVANCES to a new value —
+        // never on a same-day second action nor on a grace-saved day (prevents re-collecting).
+        milestoneXp = streak > prevStreak ? getStreakMilestoneBonus(streak) : 0;
       }
 
       const totalXpGained = xpGained + milestoneXp;
@@ -168,6 +166,7 @@ export function registerRpgHandlers(): void {
         milestoneXp,
         comboMultiplier,
         bonusMultiplier,
+        streakSaved,
       };
     });
 
@@ -181,7 +180,7 @@ export function registerRpgHandlers(): void {
           VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?)
         `).run(event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp());
       } catch { /* best effort logging */ }
-      return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0, comboMultiplier: 1.0, bonusMultiplier: 1.0 };
+      return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0, comboMultiplier: 1.0, bonusMultiplier: 1.0, streakSaved: false };
     }
   });
 

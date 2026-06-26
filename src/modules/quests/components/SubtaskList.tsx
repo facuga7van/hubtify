@@ -5,9 +5,10 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
 import Checkbox from '../../../shared/components/Checkbox';
+import { useToast } from '../../../shared/components/useToast';
 import type { XpToastData } from '../types';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
-import { TierBadge, tierXp, bonusMultiplierToTier } from '../utils';
+import { TierBadge, tierXp, bonusMultiplierToTier, notifyStreakSaved } from '../utils';
 import { todayDateString } from '../../../../shared/date-utils';
 import { completeTask } from '../../../shared/animations/feedback';
 import { playTaskComplete } from '../../../shared/audio';
@@ -22,6 +23,7 @@ interface Props {
 
 export default function SubtaskList({ taskId, subtasks, countCompletedToday, onShowToast, onSubtaskChanged }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingSubtask, setEditingSubtask] = useState<Subtask | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -66,6 +68,7 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
       } else {
         onShowToast(toastData);
       }
+      notifyStreakSaved(result, { toast, t });
     } else {
       await window.api.questsSetSubtaskStatus(subtask.id, false);
       await window.api.processRpgEvent({

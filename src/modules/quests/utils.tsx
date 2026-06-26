@@ -58,6 +58,21 @@ export interface HabitCheckCallbacks {
   onXpGained?: () => void;
 }
 
+/**
+ * Shows an empathetic toast when the one-day grace period kept the streak alive.
+ * Call right after processing any RPG event whose result may carry `streakSaved`.
+ */
+export function notifyStreakSaved(
+  result: { streakSaved?: boolean },
+  callbacks: { toast: HabitCheckCallbacks['toast']; t: HabitCheckCallbacks['t'] },
+): void {
+  if (!result.streakSaved) return;
+  callbacks.toast({
+    type: 'info',
+    message: callbacks.t('questify.streakSaved', 'Tu racha sobrevivió — un día no te define, aventurero'),
+  });
+}
+
 export async function processHabitCheck(
   habitId: string,
   habits: HabitWithStreak[],
@@ -89,6 +104,7 @@ export async function processHabitCheck(
           streakMilestone: rpgResult.milestoneXp || undefined,
         },
       });
+      notifyStreakSaved(rpgResult, callbacks);
       callbacks.onXpGained?.();
       window.dispatchEvent(new Event('rpg:statsChanged'));
     } else {
@@ -113,6 +129,7 @@ export async function processHabitCheck(
             streakMilestone: rpgResult.milestoneXp || undefined,
           },
         });
+        notifyStreakSaved(rpgResult, callbacks);
         callbacks.onXpGained?.();
         window.dispatchEvent(new Event('rpg:statsChanged'));
       }

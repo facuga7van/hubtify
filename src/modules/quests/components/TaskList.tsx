@@ -19,7 +19,7 @@ import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
 import HabitTracker from './HabitTracker';
 import { type Task, type Subtask, type Project, XP_MAP } from '../types';
-import { getDueDateStatus, bonusMultiplierToTier, TierBadge } from '../utils';
+import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved, TierBadge } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
 import { useAnimatedNavigate } from '../../../shared/components/AnimatedOutlet';
 import QuillCheckbox from '../../../shared/components/QuillCheckbox';
@@ -245,6 +245,7 @@ export default function TaskList() {
         }),
       ]);
       toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+      notifyStreakSaved(result, { toast, t });
     } else {
       await window.api.questsSetTaskStatus(task.id, false);
       await window.api.processRpgEvent({

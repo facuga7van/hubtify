@@ -5,7 +5,7 @@ import Loading from '../../../shared/components/Loading';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
 import { type Task, type Project, XP_MAP } from '../types';
-import { getDueDateStatus, bonusMultiplierToTier } from '../utils';
+import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved } from '../utils';
 
 export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: number; rowSpan?: number }) {
   const { t } = useTranslation();
@@ -90,6 +90,7 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
       });
       playTaskComplete();
       toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+      notifyStreakSaved(result, { toast, t });
       loadData();
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('quests:dataChanged'));
