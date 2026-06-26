@@ -36,9 +36,19 @@ export default function HabitTracker({ onXpGained }: Props) {
   const [editTimes, setEditTimes] = useState(1);
   const HABITS_PER_PAGE = 10;
   const [page, setPage] = useState(0);
-  const [heatmapOpen, setHeatmapOpen] = useState(false);
+  const [heatmapOpen, setHeatmapOpen] = useState(() => {
+    try { return localStorage.getItem('quests:heatmapOpen') !== '0'; } catch { return true; }
+  });
   const [heatmapData, setHeatmapData] = useState<CellLevel[]>([]);
   const [heatmapStart, setHeatmapStart] = useState('');
+
+  const toggleHeatmap = useCallback(() => {
+    setHeatmapOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem('quests:heatmapOpen', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   const loadHabits = useCallback(async () => {
     try {
@@ -114,6 +124,9 @@ export default function HabitTracker({ onXpGained }: Props) {
   const isDuplicateName = (name: string, excludeId?: string) => {
     return habits.some(h => h.name.toLowerCase() === name.toLowerCase() && h.id !== excludeId);
   };
+
+  const newNameTaken = newName.trim().length > 0 && isDuplicateName(newName.trim());
+  const editNameTaken = editName.trim().length > 0 && isDuplicateName(editName.trim(), editingId ?? undefined);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -241,12 +254,21 @@ export default function HabitTracker({ onXpGained }: Props) {
               {editFreq === 'weekly' && (
                 <RpgStepper value={editTimes} onChange={setEditTimes} min={1} max={7} />
               )}
-              <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleEditSave}>OK</span>
+              <span
+                className="qb-rune qb-rune--sage"
+                style={{ cursor: editNameTaken ? 'not-allowed' : 'pointer', opacity: editNameTaken ? 0.4 : 1 }}
+                onClick={() => { if (!editNameTaken) handleEditSave(); }}
+              >OK</span>
               <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setEditingId(null)}>
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <path d="M1 1l6 6M7 1l-6 6"/>
                 </svg>
               </span>
+              {editNameTaken && (
+                <span style={{ flexBasis: '100%', fontSize: 'var(--fs-label)', color: 'var(--rubric)', fontStyle: 'italic' }}>
+                  {t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre')}
+                </span>
+              )}
             </div>
           ) : (
             <>
@@ -374,10 +396,19 @@ export default function HabitTracker({ onXpGained }: Props) {
               <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.timesPerWeek')}</span>
             </div>
           )}
-          <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleAdd}>OK</span>
+          <span
+            className="qb-rune qb-rune--sage"
+            style={{ cursor: newNameTaken ? 'not-allowed' : 'pointer', opacity: newNameTaken ? 0.4 : 1 }}
+            onClick={() => { if (!newNameTaken) handleAdd(); }}
+          >OK</span>
           <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setAdding(false)}>
             {t('questify.cancel')}
           </span>
+          {newNameTaken && (
+            <span style={{ flexBasis: '100%', fontSize: 'var(--fs-label)', color: 'var(--rubric)', fontStyle: 'italic' }}>
+              {t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre')}
+            </span>
+          )}
         </div>
       )}
 
@@ -387,7 +418,7 @@ export default function HabitTracker({ onXpGained }: Props) {
           <div
             className="quest-project-header"
             style={{ padding: '4px 6px', cursor: 'pointer' }}
-            onClick={() => setHeatmapOpen(!heatmapOpen)}
+            onClick={toggleHeatmap}
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
               style={{ transition: 'transform 0.2s', transform: heatmapOpen ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.5 }}>
