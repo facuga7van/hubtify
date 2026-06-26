@@ -155,27 +155,72 @@ describe('mergeNutritionData — weekly_metrics LWW', () => {
   });
 });
 
-// ── food_log (INSERT OR IGNORE by id + soft-delete LWW) ────────────────────
+// ── food_log (INSERT OR IGNORE by id + full LWW for edits/soft-delete) ──────
 
 describe('mergeNutritionData — food_log merge by id', () => {
-  function insertLocalFood(id: number, calories: number, updatedAt: string | null = null, deletedAt: string | null = null) {
+  function insertLocalFood(
+    id: number,
+    calories: number,
+    updatedAt: string | null = null,
+    deletedAt: string | null = null,
+    extra: { description?: string; meal?: string | null; proteinG?: number | null; carbsG?: number | null; fatG?: number | null; time?: string; date?: string } = {},
+  ) {
     testDb.prepare(`
-      INSERT INTO food_log (id, date, time, description, calories, source, updated_at, deleted_at)
-      VALUES (?, '2026-05-01', '12:00', 'Lunch', ?, 'manual', ?, ?)
-    `).run(id, calories, updatedAt, deletedAt);
+      INSERT INTO food_log (id, date, time, description, calories, source, meal, protein_g, carbs_g, fat_g, updated_at, deleted_at)
+      VALUES (?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, extra.date ?? '2026-05-01', extra.time ?? '12:00', extra.description ?? 'Lunch', calories,
+      extra.meal ?? null, extra.proteinG ?? null, extra.carbsG ?? null, extra.fatG ?? null, updatedAt, deletedAt,
+    );
   }
   const readFood = (id: number) =>
-    testDb.prepare('SELECT calories, deleted_at AS deletedAt FROM food_log WHERE id = ?').get(id) as { calories: number; deletedAt: string | null };
+    testDb.prepare(
+      'SELECT calories, description, meal, time, date, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, deleted_at AS deletedAt FROM food_log WHERE id = ?',
+    ).get(id) as {
+      calories: number; description: string; meal: string | null; time: string; date: string;
+      proteinG: number | null; carbsG: number | null; fatG: number | null; deletedAt: string | null;
+    };
 
   it('inserts a new remote food row by id', async () => {
     await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '12:00', description: 'Lunch', calories: 600, source: 'manual', updated_at: NEW }] });
     expect(readFood(100).calories).toBe(600);
   });
 
-  it('INSERT OR IGNORE: existing id keeps its local calories (no overwrite on insert path)', async () => {
+  it('replicates a remote-newer edit: calories/meal/description', async () => {
+    insertLocalFood(100, 500, OLD);
+    await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '13:30', description: 'Big lunch', calories: 999, source: 'manual', meal: 'lunch', updated_at: NEW }] });
+    const row = readFood(100);
+    expect(row.calories).toBe(999);
+    expect(row.description).toBe('Big lunch');
+    expect(row.meal).toBe('lunch');
+    expect(row.time).toBe('13:30');
+  });
+
+  it('replicates a remote-newer edit of macros (protein/carbs/fat)', async () => {
+    insertLocalFood(100, 500, OLD, null, { proteinG: 10, carbsG: 20, fatG: 5 });
+    await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '12:00', description: 'Lunch', calories: 500, source: 'manual', protein_g: 40, carbs_g: 60, fat_g: 15, updated_at: NEW }] });
+    const row = readFood(100);
+    expect(row.proteinG).toBe(40);
+    expect(row.carbsG).toBe(60);
+    expect(row.fatG).toBe(15);
+  });
+
+  it('does NOT overwrite when the local row is newer than the remote edit', async () => {
+    insertLocalFood(100, 500, NEW);
+    await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '12:00', description: 'Lunch', calories: 999, source: 'manual', updated_at: OLD }] });
+    expect(readFood(100).calories).toBe(500); // local edit wins over older remote
+  });
+
+  it('does NOT overwrite on equal updated_at (strictly-greater LWW)', async () => {
+    insertLocalFood(100, 500, NEW);
+    await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '12:00', description: 'Lunch', calories: 999, source: 'manual', updated_at: NEW }] });
+    expect(readFood(100).calories).toBe(500);
+  });
+
+  it('INSERT OR IGNORE: a remote row missing updated_at never clobbers a local row', async () => {
     insertLocalFood(100, 500);
     await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '12:00', description: 'Lunch', calories: 999, source: 'manual' }] });
-    // No updated_at/deleted_at on the remote → only the IGNORE insert runs, which is a no-op.
+    // remote has no updated_at → '' is not strictly greater than local '' → no-op.
     expect(readFood(100).calories).toBe(500);
   });
 
@@ -191,7 +236,7 @@ describe('mergeNutritionData — food_log merge by id', () => {
     expect(readFood(100).deletedAt).toBeNull(); // local edit wins over older remote delete
   });
 
-  it('does not resurrect a locally-deleted row (id exists → INSERT OR IGNORE is a no-op)', async () => {
+  it('does not resurrect a locally-deleted row from an older remote (LWW)', async () => {
     insertLocalFood(100, 500, NEW, NEW); // locally deleted, recent
     await merge({ foodLog: [{ id: 100, date: '2026-05-01', time: '12:00', description: 'Lunch', calories: 500, source: 'manual', updated_at: OLD }] });
     expect(readFood(100).deletedAt).toBe(NEW); // stays deleted
