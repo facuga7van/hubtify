@@ -28,12 +28,6 @@ jobs:
       - name: Build installers
         run: npm run make
 
-      - name: Deploy Cloud Functions
-        shell: bash
-        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --force --token "$FIREBASE_TOKEN"
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-
       - name: Get version from tag
         id: version
         shell: bash
@@ -87,3 +81,13 @@ jobs:
             out/make/squirrel.windows/x64/*.nupkg
             out/make/squirrel.windows/x64/RELEASES
             out/make/zip/win32/x64/*.zip
+
+      # Best-effort: deploying Functions must NOT block the app release. Runs
+      # after the release is published and won't fail the workflow if the
+      # FIREBASE_TOKEN is stale (regenerate with `firebase login:ci`).
+      - name: Deploy Cloud Functions
+        continue-on-error: true
+        shell: bash
+        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --force --token "$FIREBASE_TOKEN"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
