@@ -67,7 +67,6 @@
     "@gsap/react": "^2.1.2",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.8.0",
-    "electron-squirrel-startup": "^1.0.1",
     "firebase": "^12.11.0",
     "gsap": "^3.14.2",
     "howler": "^2.2.4",
