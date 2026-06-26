@@ -13,6 +13,28 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.7.5',
+    date: '2026-06-26',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'updater',
+        text: {
+          es: 'El aviso de nueva versión se renovó: ahora aparece como un cartelito discreto que no te interrumpe, te muestra QUÉ hay de nuevo antes de actualizar, y vos elegís cuándo reiniciar. Y en Ajustes podés decidir si querés que se actualice solo, que solo te avise, o que no moleste',
+          en: 'The update prompt got a makeover: it now shows up as a discreet little banner that stays out of your way, tells you WHAT\'s new before you update, and lets you choose when to restart. And in Settings you decide whether it updates on its own, just notifies you, or stays quiet',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'auth',
+        text: {
+          es: '¿Escribiste mal la contraseña y no sabés dónde? Ahora podés mostrarla u ocultarla con un toque al iniciar sesión',
+          en: 'Typed your password wrong and can\'t tell where? You can now show or hide it with one tap when logging in',
+        },
+      },
+    ],
+  },
+  {
     version: '0.7.4',
     date: '2026-06-26',
     changes: [
