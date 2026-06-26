@@ -18,6 +18,7 @@ export default function NutritionDashboardWidget() {
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [estimation, setEstimation] = useState<{ totalCalories: number; items: Array<{ name: string; calories: number }> } | null>(null);
   const [showManualFallback, setShowManualFallback] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
@@ -48,15 +49,18 @@ export default function NutritionDashboardWidget() {
   const handleEstimate = async () => {
     if (!foodInput.trim() || estimating) return;
     setEstimating(true);
+    setRetrying(false);
     setEstimation(null);
+    setShowManualFallback(false);
     try {
-      const result = await estimateNutrition(foodInput.trim());
+      const result = await estimateNutrition(foodInput.trim(), { onRetry: () => setRetrying(true) });
       setEstimation({ totalCalories: result.calories, items: result.items });
     } catch {
       setEstimation(null);
       setShowManualFallback(true);
     } finally {
       setEstimating(false);
+      setRetrying(false);
     }
   };
 
@@ -207,7 +211,11 @@ export default function NutritionDashboardWidget() {
               onClick={handleEstimate}
               disabled={estimating || !foodInput.trim()}
             >
-              {estimating ? t('nutrify.estimating', 'Estimando...') : t('nutrify.estimate', 'Estimar')}
+              {retrying
+                ? t('nutrify.retrying', 'Reintentando...')
+                : estimating
+                  ? t('nutrify.estimating', 'Estimando...')
+                  : t('nutrify.estimate', 'Estimar')}
             </button>
           </div>
 
@@ -241,6 +249,10 @@ export default function NutritionDashboardWidget() {
 
           {/* Manual fallback on AI error */}
           {showManualFallback && (
+            <>
+            <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', fontStyle: 'italic', margin: '8px 0 0' }}>
+              {t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual')}
+            </p>
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <input
                 className="rpg-input"
@@ -278,6 +290,7 @@ export default function NutritionDashboardWidget() {
                 {t('nutrify.confirm', 'Confirmar')}
               </button>
             </div>
+            </>
           )}
         </div>
       )}

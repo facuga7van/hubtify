@@ -815,6 +815,19 @@
   font-style: italic;
 }
 
+/* Calm, informative notice (e.g. AI unavailable → use manual entry). */
+.nutri-estimate-notice {
+  margin: 8px 0;
+  padding: 6px 10px;
+  background: rgba(122, 92, 30, 0.1);
+  border: 1px solid rgba(122, 92, 30, 0.28);
+  border-radius: 3px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  font-style: italic;
+}
+
 
 /* ═══════════════════════════════════════════════════════════
    6. MEAL LOG

@@ -119,7 +119,8 @@ export default function Today() {
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
-  const [estimateError, setEstimateError] = useState('');
+  const [retrying, setRetrying] = useState(false);
+  const [estimateNotice, setEstimateNotice] = useState('');
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
   const [favoriteFoods, setFavoriteFoods] = useState<FavoriteFood[]>([]);
@@ -214,20 +215,23 @@ export default function Today() {
   const handleEstimate = async () => {
     if (!foodInput.trim() || estimating) return;
     setEstimating(true);
+    setRetrying(false);
     setEstimation(null);
-    setEstimateError('');
+    setEstimateNotice('');
     try {
-      const result = await estimateNutrition(foodInput.trim());
+      const result = await estimateNutrition(foodInput.trim(), { onRetry: () => setRetrying(true) });
       setEstimation({ totalCalories: result.calories, items: result.items });
       setEditCalories(String(result.calories));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'AI estimation failed';
-      setEstimateError(msg);
+      // Degrade gracefully: keep the typed food, switch to manual entry and show a
+      // calm, informative notice instead of an alarming red error.
       console.error('[Nutrition]', err);
-      toast({ type: 'warning', message: t('nutrify.estimateFailed', 'Estimation failed. Try manual entry.') });
       setManualMode(true);
+      setEstimateNotice(t('nutrify.aiUnavailable', 'No pudimos estimar las calorías ahora (sin conexión o servicio ocupado). Ingresá las calorías manualmente.'));
+      toast({ type: 'info', message: t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual') });
     } finally {
       setEstimating(false);
+      setRetrying(false);
     }
   };
 
@@ -723,18 +727,22 @@ export default function Today() {
             <button
               type="button"
               className={`nutri-mode-btn ${!manualMode ? 'active' : ''}`}
-              onClick={() => setManualMode(false)}
+              onClick={() => { setManualMode(false); setEstimateNotice(''); }}
             >
               {t('nutrify.aiMode', 'Estimación IA')}
             </button>
             <button
               type="button"
               className={`nutri-mode-btn ${manualMode ? 'active' : ''}`}
-              onClick={() => setManualMode(true)}
+              onClick={() => { setManualMode(true); setEstimateNotice(''); }}
             >
               {t('nutrify.manualMode', 'Manual')}
             </button>
           </div>
+
+          {estimateNotice && (
+            <div className="nutri-estimate-notice">{estimateNotice}</div>
+          )}
 
           {manualMode ? (
             <div className="nutri-manual-inputs">
@@ -775,14 +783,13 @@ export default function Today() {
                 />
                 <button className="nutri-btn" onClick={handleEstimate}
                   disabled={estimating || !foodInput.trim()}>
-                  {estimating ? t('common.loading', 'Cargando...') : t('nutrify.estimate', 'Estimar')}
+                  {retrying
+                    ? t('nutrify.retrying', 'Reintentando...')
+                    : estimating
+                      ? t('common.loading', 'Cargando...')
+                      : t('nutrify.estimate', 'Estimar')}
                 </button>
               </div>
-
-              {/* Error message */}
-              {estimateError && (
-                <div className="nutri-estimate-error">{estimateError}</div>
-              )}
 
               {/* Estimation result */}
               {estimation && (
