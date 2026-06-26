@@ -2098,10 +2098,37 @@
 }
 
 .nutri-meal-overlap-warn {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rubric);
+  border-radius: 4px;
+  background: rgba(122, 30, 30, 0.06);
+}
+
+.nutri-meal-overlap-title {
+  margin: 0;
+  color: var(--rubric);
+  font-size: var(--fs-label, 13px);
+  font-weight: 600;
+}
+
+.nutri-meal-overlap-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
   color: var(--rubric);
   font-size: var(--fs-label, 13px);
   font-style: italic;
-  margin: 4px 0 0;
+}
+
+.nutri-meal-overlap-list li {
+  margin: 1px 0;
+}
+
+.nutri-meal-overlap-hint {
+  margin: 6px 0 0;
+  color: var(--ink-faded);
+  font-size: var(--fs-label, 13px);
+  font-style: italic;
 }
 
 /* ═══════════════════════════════════════════════════════════

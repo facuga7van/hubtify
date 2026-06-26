@@ -467,6 +467,8 @@
     "mealFrom": "From",
     "mealLunch": "Lunch",
     "mealOverlap": "Time ranges overlap",
+    "mealOverlapDetail": "{{mealA}} and {{mealB}} overlap from {{start}} to {{end}}",
+    "mealOverlapHint": "A meal logged in that window stays unassigned so you can choose which one it is.",
     "mealPickerTitle": "Which meal?",
     "mealSchedule": "Meal schedule",
     "mealScheduleHelp": "Meal times for each meal. When logging food, the system assigns the meal based on current time.",

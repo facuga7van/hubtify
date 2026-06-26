@@ -467,6 +467,8 @@
     "mealFrom": "Desde",
     "mealLunch": "Almuerzo",
     "mealOverlap": "Los horarios se superponen",
+    "mealOverlapDetail": "{{mealA}} y {{mealB}} se pisan de {{start}} a {{end}}",
+    "mealOverlapHint": "Una comida registrada en esa franja queda sin asignar para que vos elijas cuál es.",
     "mealPickerTitle": "¿Qué comida es?",
     "mealSchedule": "Horario de comidas",
     "mealScheduleHelp": "Horarios de cada comida. Al registrar un alimento, el sistema asigna el momento según la hora actual.",
