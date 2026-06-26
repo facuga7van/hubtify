@@ -10,8 +10,9 @@ import {
 import type { BarDatum, PointDatum, CellLevel } from '../../../shared/components/charts';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal } from '../../../shared/components/icons';
-import type { NutritionProfile, DailySummary } from '../types';
+import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal, Cauldron } from '../../../shared/components/icons';
+import type { NutritionProfile, DailySummary, MacroTargets } from '../types';
+import { MacroHistory } from './MacroHistory';
 
 interface WeightEntry {
   date: string;
@@ -66,6 +67,7 @@ export default function NutritionCharts() {
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [streak, setStreak] = useState(0);
   const [profile, setProfile] = useState<NutritionProfile | null>(null);
+  const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -82,12 +84,14 @@ export default function NutritionCharts() {
       window.api.nutritionGetWeights(),
       window.api.nutritionGetStreak(),
       window.api.nutritionGetProfile(),
+      window.api.nutritionGetMacroTargets(),
     ])
-      .then(([sums, wts, str, prof]) => {
+      .then(([sums, wts, str, prof, macros]) => {
         setSummaries(sums as DailySummary[]);
         setWeights(wts as WeightEntry[]);
         setStreak(str);
         setProfile(prof as NutritionProfile | null);
+        setMacroTargets(macros as MacroTargets | null);
         setLoading(false);
       })
       .catch(() => {
@@ -524,6 +528,16 @@ export default function NutritionCharts() {
             </h3>
             {/* TODO: Add onCellClick to HeatmapCalendar for touch tooltip support */}
             <HeatmapCalendar data={heatmapData} startDate={heatmapStart} tooltips={heatmapTooltips} themed legend />
+          </div>
+
+          {/* Macro balance -- average daily macros over the range vs target */}
+          <div className="nutri-card medieval nutri-chart-card">
+            <HelpBubble text={t('nutrify.macroBalanceHelp', 'Promedio diario de proteína, carbohidratos y grasa del período comparado con tus objetivos. Solo cuenta los días con macros registrados.')} />
+            <h3 className="nutri-card-title">
+              <span className="t-ico"><Cauldron width={18} height={18} /></span>{' '}
+              {t('nutrify.macroBalance', 'Balance of Nutrients')}
+            </h3>
+            <MacroHistory summaries={summaries} targets={macroTargets} t={t} />
           </div>
         </>
       ) : (
