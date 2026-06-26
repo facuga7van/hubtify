@@ -1,48 +1,54 @@
 import { httpsCallable } from 'firebase/functions';
 import { getActiveFunctions, getActiveAuth } from '../../shared/firebase';
+import { readEstimateCache, writeEstimateCache, normalizeDescription } from './estimate-cache';
+import {
+  type AiResult,
+  type AiEstimationItem,
+  TIMEOUT_MS,
+  RETRY_DELAYS_MS,
+  isTransientError,
+  withRetry,
+  normalizeResult,
+} from './estimate-core';
 
-export type AiEstimationItem = {
-  name: string;
-  calories: number;
-  /** Macros in grams for this item; null when the model could not estimate it. */
-  proteinG: number | null;
-  carbsG: number | null;
-  fatG: number | null;
+export { normalizeDescription, isTransientError, withRetry, normalizeResult };
+export type { AiResult, AiEstimationItem };
+
+export type EstimateOptions = {
+  /** Called before each retry with the upcoming attempt number (2-based). */
+  onRetry?: (attempt: number) => void;
+  /** Bypass the local cache and force a fresh network estimate. */
+  forceFresh?: boolean;
 };
 
-export type AiResult = {
-  calories: number;
-  /** Day/item-level macro totals in grams; null when no item reported the macro. */
-  proteinG: number | null;
-  carbsG: number | null;
-  fatG: number | null;
-  items: AiEstimationItem[];
-};
-
-/** Clamp an incoming macro to a finite, non-negative number or null. */
-function macro(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
-}
-
-export async function estimateNutrition(description: string): Promise<AiResult> {
+export async function estimateNutrition(
+  description: string,
+  options: EstimateOptions = {},
+): Promise<AiResult> {
   if (!getActiveAuth().currentUser) {
     throw new Error('Login required to estimate nutrition');
   }
-  const fn = httpsCallable<{ description: string }, AiResult>(getActiveFunctions(), 'estimateNutrition');
-  const result = await fn({ description });
-  const data = result.data;
-  // Validate/normalize macros defensively — older function deployments omit them.
-  return {
-    calories: data.calories,
-    proteinG: macro(data.proteinG),
-    carbsG: macro(data.carbsG),
-    fatG: macro(data.fatG),
-    items: (data.items ?? []).map(it => ({
-      name: it.name,
-      calories: it.calories,
-      proteinG: macro(it.proteinG),
-      carbsG: macro(it.carbsG),
-      fatG: macro(it.fatG),
-    })),
-  };
+
+  // Serve from cache before touching the network (normalized key).
+  if (!options.forceFresh) {
+    const cached = readEstimateCache(description);
+    if (cached) return cached;
+  }
+
+  // Firebase callable honours its own `timeout` option (an external AbortController
+  // is not wired into httpsCallable) — a timeout surfaces as `deadline-exceeded`,
+  // which the retry policy treats as transient.
+  const fn = httpsCallable<{ description: string }, AiResult>(
+    getActiveFunctions(),
+    'estimateNutrition',
+    { timeout: TIMEOUT_MS },
+  );
+
+  const result = await withRetry(
+    async () => normalizeResult((await fn({ description })).data),
+    { delays: RETRY_DELAYS_MS, isTransient: isTransientError, onRetry: options.onRetry },
+  );
+
+  writeEstimateCache(description, result);
+  return result;
 }
