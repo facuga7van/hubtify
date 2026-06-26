@@ -764,7 +764,7 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
  * Blends the user's chosen base level with actual gym/steps history.
  * More gym days + more steps → higher factor, fewer → lower factor.
  */
-function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: string): number {
+export function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: string): number {
   const baseFactor: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
   const base = baseFactor[baseLevel] ?? 1.2;
 
@@ -802,12 +802,12 @@ function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: strin
   return Math.round((base * 0.4 + dynamicFactor * 0.6) * 1000) / 1000;
 }
 
-function calculateBMR(weight: number, height: number, age: number, sex: string): number {
+export function calculateBMR(weight: number, height: number, age: number, sex: string): number {
   const base = 10 * weight + 6.25 * height - 5 * age;
   return Math.max(800, Math.min(3500, sex === 'M' ? base + 5 : base - 161));
 }
 
-function calculateTDEEWithFactor(bmr: number, factor: number): number {
+export function calculateTDEEWithFactor(bmr: number, factor: number): number {
   return Math.round(bmr * factor);
 }
 
