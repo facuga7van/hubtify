@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rescaleItem, sumBreakdown } from '@modules/nutrition/breakdown-utils';
+import { rescaleItem, sumBreakdown, scalePortion } from '@modules/nutrition/breakdown-utils';
 import type { BreakdownItem } from '@modules/nutrition/breakdown-utils';
 
 const item = (over: Partial<BreakdownItem> = {}): BreakdownItem => ({
@@ -133,5 +133,51 @@ describe('sumBreakdown — total + macro aggregation', () => {
     expect(totals.proteinG).toBe(17);  // 15 + 2
     expect(totals.carbsG).toBe(18);    // 10 + 8
     expect(totals.fatG).toBe(16);      // 9 + 7
+  });
+});
+
+describe('scalePortion — portion multiplier for quick-log', () => {
+  const food = { calories: 400, proteinG: 30, carbsG: 20, fatG: 18 };
+
+  it('is an identity at factor 1 (one tap stays one tap)', () => {
+    const r = scalePortion(food, 1);
+    expect(r).toEqual({ calories: 400, proteinG: 30, carbsG: 20, fatG: 18 });
+  });
+
+  it('doubles calories and macros at factor 2', () => {
+    const r = scalePortion(food, 2);
+    expect(r.calories).toBe(800);
+    expect(r.proteinG).toBe(60);
+    expect(r.carbsG).toBe(40);
+    expect(r.fatG).toBe(36);
+  });
+
+  it('halves calories and macros at factor 0.5', () => {
+    const r = scalePortion(food, 0.5);
+    expect(r.calories).toBe(200);
+    expect(r.proteinG).toBe(15);
+    expect(r.carbsG).toBe(10);
+    expect(r.fatG).toBe(9);
+  });
+
+  it('keeps a null macro null while still scaling the others', () => {
+    const r = scalePortion({ calories: 200, proteinG: null, carbsG: 20, fatG: null }, 1.5);
+    expect(r.calories).toBe(300);
+    expect(r.proteinG).toBeNull();
+    expect(r.carbsG).toBe(30);
+    expect(r.fatG).toBeNull();
+  });
+
+  it('rounds calories to an integer and macros to one decimal', () => {
+    const r = scalePortion({ calories: 333, proteinG: 10, carbsG: 5, fatG: 3 }, 1.5);
+    expect(r.calories).toBe(500); // 333 * 1.5 = 499.5 → 500
+    expect(r.proteinG).toBe(15);
+    expect(r.fatG).toBe(4.5);
+  });
+
+  it('falls back to factor 1 for invalid factors (0, negative, NaN)', () => {
+    expect(scalePortion(food, 0)).toEqual(food);
+    expect(scalePortion(food, -2)).toEqual(food);
+    expect(scalePortion(food, NaN)).toEqual(food);
   });
 });
