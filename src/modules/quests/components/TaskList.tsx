@@ -20,6 +20,7 @@ import ScrollNotes from './ScrollNotes';
 import HabitTracker from './HabitTracker';
 import { type Task, type Subtask, type Project, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved, TierBadge } from '../utils';
+import { recurrenceLabel } from '../../../../shared/recurrence';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
 import { useAnimatedNavigate } from '../../../shared/components/AnimatedOutlet';
 import QuillCheckbox from '../../../shared/components/QuillCheckbox';
@@ -800,6 +801,16 @@ function SortableQuestRow({ task, expanded, selected, subtasks, todayCount,
             const status = getDueDateStatus(task.dueDate);
             return <span className={`quest-due--${status}`}>{status === 'today' ? t('questify.dueToday') : status === 'overdue' ? t('questify.overdueLabel', 'vencida') : new Date(task.dueDate).toLocaleDateString()}</span>;
           })()}
+
+          {/* Recurrence badge */}
+          {task.recurrenceRule && (
+            <span className="quest-due--later" title={t('questify.recurs', 'Tarea recurrente')} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
+                <path d="M2 8a6 6 0 0 1 10-4.5M13 2.5v3h-3M14 8a6 6 0 0 1-10 4.5M3 13.5v-3h3" />
+              </svg>
+              {recurrenceLabel(task.recurrenceRule)}
+            </span>
+          )}
 
           {/* Note icon */}
           <span onClick={onOpenNotes} style={{ position: 'relative', cursor: 'pointer', display: 'inline-flex' }}>
