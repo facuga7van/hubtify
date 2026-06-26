@@ -138,6 +138,13 @@ export default function CharacterPage() {
     return () => window.removeEventListener('account:switched', handler);
   }, [load]);
 
+  // Hooks must run on every render — compute these before any early return,
+  // guarding against the not-yet-loaded (stats === null) state.
+  const titleTrail = useMemo(() => (stats ? buildTitleTrail(stats.level, t) : []), [stats, t]);
+  const virtues = useMemo(() => (stats ? deriveVirtues(stats, t) : []), [stats, t]);
+  const xpForNext = useMemo(() => (stats ? xpThreshold(stats.level + 1) : 0), [stats]);
+  const nextTitle = useMemo(() => titleTrail.find((tt) => !tt.done), [titleTrail]);
+
   if (loadError) return (
     <div style={{ padding: 24, textAlign: 'center' }}>
       <p style={{ marginBottom: 12, color: 'var(--rubric)' }}>{t('common.somethingWentWrong')}</p>
@@ -150,15 +157,9 @@ export default function CharacterPage() {
   const translatedTitle = t(getTitleKey(stats.level), stats.title);
   const playerName = characterName || authUser?.displayName || translatedTitle;
   const levelDisplay = stats.level;
-  const titleTrail = useMemo(() => buildTitleTrail(stats.level, t), [stats.level, t]);
-  const virtues = useMemo(() => deriveVirtues(stats, t), [stats, t]);
   const xpNeeded = stats.xpToNextLevel;
   const xpTotal = stats.xp;
-  const xpForNext = useMemo(() => xpThreshold(stats.level + 1), [stats.level]);
   const xpPct = xpForNext > 0 ? Math.round((xpTotal / xpForNext) * 100) : 0;
-
-  // Find next title info
-  const nextTitle = useMemo(() => titleTrail.find((t) => !t.done), [titleTrail]);
 
   return (
     <BookPage
