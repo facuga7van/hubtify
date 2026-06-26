@@ -164,6 +164,7 @@ export interface HubtifyApi {
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
   questsGetHabitHeatmap: (days?: number) => Promise<{ days: Array<{ date: string; count: number }>; totalHabits: number }>;
+  questsGetHabitHistory: (habitId: string, days?: number) => Promise<{ days: Array<{ date: string; checked: boolean }>; bestStreak: number }>;
   questsGetHabits: () => Promise<unknown[]>;
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => Promise<string>;
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => Promise<void>;

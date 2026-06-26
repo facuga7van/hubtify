@@ -463,6 +463,50 @@ export function registerQuestsIpcHandlers(): void {
     return { days: result, totalHabits };
   });
 
+  // Per-habit history for the individual heatmap: a consecutive run of the last
+  // `days` days, each flagged checked/not. Also returns the best (longest) historical
+  // run of consecutive checked days as a personal record to beat.
+  ipcHandle('quests:getHabitHistory', (_e, habitId: string, days: number = 91) => {
+    const db = getDb();
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - days + 1);
+    const startStr = formatDateString(startDate);
+
+    const rows = db.prepare(
+      'SELECT date FROM habit_checks WHERE habit_id = ? AND deleted_at IS NULL AND date >= ?'
+    ).all(habitId, startStr) as Array<{ date: string }>;
+    const checkedDates = new Set(rows.map((r) => r.date));
+
+    const result: Array<{ date: string; checked: boolean }> = [];
+    const d = new Date(startDate);
+    for (let i = 0; i < days; i++) {
+      const ds = formatDateString(d);
+      result.push({ date: ds, checked: checkedDates.has(ds) });
+      d.setDate(d.getDate() + 1);
+    }
+
+    // Best historical streak across ALL recorded checks (not limited to the window).
+    const allDates = (db.prepare(
+      'SELECT date FROM habit_checks WHERE habit_id = ? AND deleted_at IS NULL ORDER BY date ASC'
+    ).all(habitId) as Array<{ date: string }>).map((r) => r.date);
+    let bestStreak = 0;
+    let run = 0;
+    let prev: Date | null = null;
+    for (const ds of allDates) {
+      const cur = new Date(ds + 'T12:00:00');
+      if (prev && Math.round((cur.getTime() - prev.getTime()) / 86400000) === 1) {
+        run++;
+      } else {
+        run = 1;
+      }
+      if (run > bestStreak) bestStreak = run;
+      prev = cur;
+    }
+
+    return { days: result, bestStreak };
+  });
+
   ipcHandle('quests:addHabit', (_e, habit: { name: string; frequency: string; timesPerWeek: number }) => {
     const db = getDb();
     const id = genId();

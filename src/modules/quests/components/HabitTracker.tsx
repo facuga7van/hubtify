@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useToast } from '../../../shared/components/useToast';
@@ -41,6 +41,12 @@ export default function HabitTracker({ onXpGained }: Props) {
   });
   const [heatmapData, setHeatmapData] = useState<CellLevel[]>([]);
   const [heatmapStart, setHeatmapStart] = useState('');
+  // Per-habit history heatmap (expandable per row)
+  const [expandedHabitId, setExpandedHabitId] = useState<string | null>(null);
+  const [historyCells, setHistoryCells] = useState<CellLevel[]>([]);
+  const [historyStart, setHistoryStart] = useState('');
+  const [historyTooltips, setHistoryTooltips] = useState<string[]>([]);
+  const [historyBest, setHistoryBest] = useState(0);
 
   const toggleHeatmap = useCallback(() => {
     setHeatmapOpen(prev => {
@@ -78,6 +84,25 @@ export default function HabitTracker({ onXpGained }: Props) {
     setHeatmapData(cells);
   }, []);
 
+  const loadHistory = useCallback(async (habitId: string) => {
+    const { days, bestStreak } = await window.api.questsGetHabitHistory(habitId, 91);
+    const todayStr = formatDateString(new Date());
+    setHistoryStart(days[0]?.date ?? '');
+    setHistoryCells(days.map(d =>
+      d.date === todayStr ? (d.checked ? 'today' : 'l0') : (d.checked ? 'l4' : 'l0')
+    ));
+    setHistoryTooltips(days.map(d => (d.checked ? `${d.date} ✓` : d.date)));
+    setHistoryBest(bestStreak);
+  }, []);
+
+  const toggleHistory = useCallback((habitId: string) => {
+    setExpandedHabitId(prev => {
+      if (prev === habitId) return null;
+      loadHistory(habitId);
+      return habitId;
+    });
+  }, [loadHistory]);
+
   useEffect(() => { loadHabits(); }, [loadHabits]);
   useEffect(() => { if (heatmapOpen) loadHeatmap(); }, [heatmapOpen, loadHeatmap]);
 
@@ -97,6 +122,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     await processHabitCheck(habitId, habits, { toast, t, onXpGained });
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
+    if (expandedHabitId === habitId) loadHistory(habitId);
   };
 
   const canRetroCheck = useCallback((h: HabitWithStreak): boolean => {
@@ -119,6 +145,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     await processHabitCheck(habitId, habits, { toast, t, onXpGained }, yesterday);
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
+    if (expandedHabitId === habitId) loadHistory(habitId);
   };
 
   const isDuplicateName = (name: string, excludeId?: string) => {
@@ -239,7 +266,8 @@ export default function HabitTracker({ onXpGained }: Props) {
 
       {/* Habit list */}
       {habits.slice(page * HABITS_PER_PAGE, (page + 1) * HABITS_PER_PAGE).map((h) => (
-        <div key={h.id} className="quest-habit-row">
+        <Fragment key={h.id}>
+        <div className="quest-habit-row">
           {editingId === h.id ? (
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <input className="rpg-input" value={editName} onChange={(e) => setEditName(e.target.value)}
@@ -321,6 +349,24 @@ export default function HabitTracker({ onXpGained }: Props) {
                   label={h.name}
                 />
 
+                {/* History heatmap toggle */}
+                <svg onClick={() => toggleHistory(h.id)} width="11" height="11" viewBox="0 0 14 14"
+                  className="quest-icon-hover"
+                  style={{ cursor: 'pointer', opacity: expandedHabitId === h.id ? 0.75 : 0.25, flexShrink: 0 }}
+                  fill="var(--ink-faded)"
+                  role="button" tabIndex={0} aria-label={t('questify.habitHistory', 'Ver historial')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHistory(h.id); } }}>
+                  <rect x="0.5" y="0.5" width="3" height="3" rx="0.6"/>
+                  <rect x="5.5" y="0.5" width="3" height="3" rx="0.6"/>
+                  <rect x="10.5" y="0.5" width="3" height="3" rx="0.6"/>
+                  <rect x="0.5" y="5.5" width="3" height="3" rx="0.6"/>
+                  <rect x="5.5" y="5.5" width="3" height="3" rx="0.6"/>
+                  <rect x="10.5" y="5.5" width="3" height="3" rx="0.6"/>
+                  <rect x="0.5" y="10.5" width="3" height="3" rx="0.6"/>
+                  <rect x="5.5" y="10.5" width="3" height="3" rx="0.6"/>
+                  <rect x="10.5" y="10.5" width="3" height="3" rx="0.6"/>
+                </svg>
+
                 {/* Edit */}
                 <svg onClick={() => startEdit(h)} width="10" height="10" viewBox="0 0 16 16"
                   className="quest-icon-hover"
@@ -344,6 +390,17 @@ export default function HabitTracker({ onXpGained }: Props) {
             </>
           )}
         </div>
+        {expandedHabitId === h.id && historyCells.length > 0 && (
+          <div style={{ padding: '6px 2px 12px' }}>
+            <HeatmapCalendar data={historyCells} startDate={historyStart} tooltips={historyTooltips} columns={7} legend={false} />
+            {historyBest > 0 && (
+              <div style={{ marginTop: 6, fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', textAlign: 'center' }}>
+                {t('questify.bestStreak', 'Mejor racha')}: <strong>{historyBest}</strong>
+              </div>
+            )}
+          </div>
+        )}
+        </Fragment>
       ))}
 
       {/* Pagination */}
