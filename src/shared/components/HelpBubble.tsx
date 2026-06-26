@@ -26,7 +26,6 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     return () => window.removeEventListener('helpBubbles:changed', handler);
   }, []);
 
-  if (hidden) return null;
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const tipId = useId();
@@ -65,6 +64,9 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
       window.removeEventListener('scroll', reposition, true);
     };
   }, [open, positionTip]);
+
+  // All hooks above run on every render; bail out only after they're declared.
+  if (hidden) return null;
 
   const show = () => {
     setOpen(true);

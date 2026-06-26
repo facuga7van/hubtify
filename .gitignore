@@ -13,3 +13,11 @@ functions/node_modules/
 .worktrees/
 docsexample/
 designIdeas/
+
+# Visual test screenshots (generated)
+tests/visual/screens/
+e2e/screens/
+e2e/.artifacts/
+
+# Claude Code worktrees (local)
+.claude/

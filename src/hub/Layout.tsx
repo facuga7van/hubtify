@@ -72,35 +72,58 @@ export default function Layout() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
-  useEffect(() => {
-    const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
-    const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
-    const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
-    const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
-
-    // Also actively check on mount — the passive listener may have missed
-    // the message if it was sent before React mounted
-    window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
-      if (res?.available && res.version) {
-        setUpdateAvailable({ version: res.version });
-      }
-    }).catch(() => { /* not available in dev */ });
-
-    return () => { c1(); c2(); c3(); c4(); };
-  }, []);
-
-  const handleUpdate = async () => {
+  const handleUpdate = useCallback(async () => {
     setUpdateState('downloading');
     setUpdateError(null);
     try {
       await window.api.updaterDownload();
       setUpdateState('ready'); // staged — user chooses when to restart
     } catch { setUpdateState('idle'); }
-  };
+  }, []);
 
-  const handleRestart = () => {
+  const handleRestart = useCallback(() => {
     window.api.updaterRestart?.();
-  };
+  }, []);
+
+  // Dismiss the banner and remember this version so it isn't shown again until
+  // a newer one ships.
+  const handleDismissUpdate = useCallback(() => {
+    setUpdateAvailable((cur) => {
+      if (cur) localStorage.setItem('hubtify_update_dismissed_version', cur.version);
+      return null;
+    });
+  }, []);
+
+  // Decide whether to surface an update given the user's preference + snooze.
+  // 'off' suppresses everything; a dismissed version stays hidden; 'auto' starts
+  // the download right away so only the banner's 'ready' state is shown.
+  const considerUpdate = useCallback((version: string) => {
+    const mode = localStorage.getItem('hubtify_update_mode') || 'notify';
+    if (mode === 'off') return;
+    if (localStorage.getItem('hubtify_update_dismissed_version') === version) return;
+    setUpdateAvailable({ version });
+    if (mode === 'auto') handleUpdate();
+  }, [handleUpdate]);
+
+  useEffect(() => {
+    const c1 = window.api.onUpdateAvailable((info) => considerUpdate(info.version));
+    const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
+    const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
+    const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
+
+    const check = () => {
+      window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
+        if (res?.available && res.version) considerUpdate(res.version);
+      }).catch(() => { /* not available in dev */ });
+    };
+
+    // Check on mount (the passive listener may miss a message fired before React
+    // mounted) and every 6 hours for long-running sessions.
+    check();
+    const interval = setInterval(check, 6 * 60 * 60 * 1000);
+
+    return () => { c1(); c2(); c3(); c4(); clearInterval(interval); };
+  }, [considerUpdate]);
 
   // Ctrl+Q to open quick add
   useEffect(() => {
@@ -501,7 +524,7 @@ export default function Layout() {
           error={updateError}
           onViewDetails={() => setShowUpdateDetails(true)}
           onRestart={handleRestart}
-          onDismiss={() => setUpdateAvailable(null)}
+          onDismiss={handleDismissUpdate}
         />
       )}
       {/* Full changelog modal — opened from the banner's "View what's new" */}
