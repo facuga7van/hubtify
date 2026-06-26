@@ -386,6 +386,9 @@ export interface FavoriteFood {
   calories: number;
   source: string;
   aiBreakdown?: string;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -395,10 +398,16 @@ export interface FavoriteFood {
 interface EstimationItem {
   name: string;
   calories: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
 }
 
 export interface EstimationResult {
   totalCalories: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   items: EstimationItem[];
   aiError?: string;
 }

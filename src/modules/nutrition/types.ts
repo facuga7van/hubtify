@@ -37,10 +37,24 @@ export interface DailySummary {
   bmr: number;
   tdee: number;
   balance: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
+}
+
+export interface MacroTargets {
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  /** true when the targets came from the auto helper, false when the user overrode them. */
+  auto: boolean;
 }
 
 export interface EstimationResult {
   totalCalories: number;
-  items: Array<{ name: string; calories: number }>;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
+  items: Array<{ name: string; calories: number; proteinG?: number | null; carbsG?: number | null; fatG?: number | null }>;
   aiError?: string;
 }
