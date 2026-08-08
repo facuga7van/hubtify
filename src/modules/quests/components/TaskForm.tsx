@@ -4,7 +4,10 @@ import { XP_MAP, PROJECT_COLORS, type TaskTier, type Task, type Project } from '
 import { TierBadge, TIER_LABEL } from '../utils';
 import { parseQuickTask } from '../parseQuickTask';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
+import RpgStepper from '../../../shared/components/RpgStepper';
 import Checkbox from '../../../shared/components/Checkbox';
+import { buildRecurrenceRule, parseRecurrenceRule, type RecurrenceFreq, type RecurrenceAnchor } from '../../../../shared/recurrence';
+import { todayDateString } from '../../../../shared/date-utils';
 
 interface Props {
   editingTask: Task | null;
@@ -28,6 +31,9 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   const [newProject, setNewProject] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [dismissedQuickDate, setDismissedQuickDate] = useState(false);
+  const [recurrenceFreq, setRecurrenceFreq] = useState<'' | RecurrenceFreq>('');
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1);
+  const [recurrenceAnchor, setRecurrenceAnchor] = useState<RecurrenceAnchor>('fixed');
 
   // Natural-language quick-add: parse a date from the tail of the name as you type.
   const quick = useMemo(() => parseQuickTask(name), [name]);
@@ -58,8 +64,13 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       setProjectId(editingTask.projectId ?? null);
       setDueDate(editingTask.dueDate ?? '');
       setUseDate(!!editingTask.dueDate);
+      const parsedRec = parseRecurrenceRule(editingTask.recurrenceRule);
+      setRecurrenceFreq(parsedRec?.freq ?? '');
+      setRecurrenceInterval(parsedRec?.interval ?? 1);
+      setRecurrenceAnchor(editingTask.recurrenceAnchor === 'completion' ? 'completion' : 'fixed');
     } else {
       setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(''); setUseDate(false);
+      setRecurrenceFreq(''); setRecurrenceInterval(1); setRecurrenceAnchor('fixed');
       setProjectId(activeProjectId);
     }
   }, [editingTask, activeProjectId]);
@@ -73,8 +84,12 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     // Quick-add: when a date was recognized in the name, use the cleaned name and that date;
     // otherwise fall back to the manual name + date-picker value.
     const resolvedName = quickActive ? quick.cleanName : name.trim();
-    const resolvedDueDate = quickActive ? quick.dueDate : (useDate && dueDate ? dueDate : null);
+    let resolvedDueDate = quickActive ? quick.dueDate : (useDate && dueDate ? dueDate : null);
     if (!resolvedName) return;
+
+    // Recurrence: a recurring task needs a starting due date — default to today if none given.
+    const recurrenceRule = recurrenceFreq ? buildRecurrenceRule(recurrenceFreq, recurrenceInterval) : null;
+    if (recurrenceRule && !resolvedDueDate) resolvedDueDate = todayDateString();
 
     // Resolve the project: if the user chose "new project", create it first and use its id.
     let resolvedProjectId: string | null = projectId === '__new__' ? null : projectId;
@@ -91,6 +106,8 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       category: resolvedCategory,
       projectId: resolvedProjectId,
       dueDate: resolvedDueDate,
+      recurrenceRule,
+      recurrenceAnchor: recurrenceRule ? recurrenceAnchor : null,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
     };
@@ -98,6 +115,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     await window.api.questsUpsertTask(task as Record<string, unknown>);
 
     setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setRecurrenceFreq(''); setRecurrenceInterval(1); setRecurrenceAnchor('fixed');
     setDismissedQuickDate(false);
     setProjectId(activeProjectId);
     onSaved();
@@ -246,6 +264,31 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
         </div>
         {useDate && (
           <RpgDateTimePicker value={dueDate} onChange={setDueDate} />
+        )}
+
+        {/* Recurrence */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-label)', cursor: 'pointer' }}
+          onClick={() => setRecurrenceFreq(recurrenceFreq ? '' : 'DAILY')}>
+          <Checkbox checked={!!recurrenceFreq} onChange={() => setRecurrenceFreq(recurrenceFreq ? '' : 'DAILY')} size={16} />
+          <span>{t('questify.repeat', 'Repetir')}</span>
+        </div>
+        {recurrenceFreq && (
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.every', 'Cada')}</span>
+            <RpgStepper value={recurrenceInterval} onChange={setRecurrenceInterval} min={1} max={30} />
+            <select value={recurrenceFreq} onChange={(e) => setRecurrenceFreq(e.target.value as RecurrenceFreq)}
+              className="rpg-select" style={{ fontSize: 'var(--fs-label)' }}>
+              <option value="DAILY">{recurrenceInterval > 1 ? t('questify.unitDays', 'días') : t('questify.unitDay', 'día')}</option>
+              <option value="WEEKLY">{recurrenceInterval > 1 ? t('questify.unitWeeks', 'semanas') : t('questify.unitWeek', 'semana')}</option>
+              <option value="MONTHLY">{recurrenceInterval > 1 ? t('questify.unitMonths', 'meses') : t('questify.unitMonth', 'mes')}</option>
+            </select>
+            <select value={recurrenceAnchor} onChange={(e) => setRecurrenceAnchor(e.target.value as RecurrenceAnchor)}
+              className="rpg-select" style={{ fontSize: 'var(--fs-label)' }}
+              title={t('questify.recurrenceAnchorHint', 'Cómo se calcula la próxima fecha')}>
+              <option value="fixed">{t('questify.anchorFixed', 'fecha fija')}</option>
+              <option value="completion">{t('questify.anchorCompletion', 'tras completar')}</option>
+            </select>
+          </div>
         )}
       </div>
     </form>

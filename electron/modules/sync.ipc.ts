@@ -14,6 +14,9 @@ interface SyncTask {
   dueDate: string | null;
   order: number;
   completedAt: string | null;
+  recurrenceRule: string | null;
+  recurrenceParentId: string | null;
+  recurrenceAnchor: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -225,6 +228,8 @@ export function registerSyncIpcHandlers(): void {
       SELECT id, name, description, status, tier, category,
              project_id AS projectId, due_date AS dueDate, task_order AS "order",
              completed_at AS completedAt,
+             recurrence_rule AS recurrenceRule, recurrence_parent_id AS recurrenceParentId,
+             recurrence_anchor AS recurrenceAnchor,
              created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM tasks
     `).all();
@@ -311,12 +316,13 @@ export function registerSyncIpcHandlers(): void {
       if (remote.tasks?.length) {
         const getTask = db.prepare('SELECT id, updated_at FROM tasks WHERE id = ?');
         const insertTask = db.prepare(`
-          INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, recurrence_rule, recurrence_parent_id, recurrence_anchor, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const updateTask = db.prepare(`
           UPDATE tasks SET name = ?, description = ?, status = ?, tier = ?, category = ?,
-                 project_id = ?, due_date = ?, task_order = ?, completed_at = ?, updated_at = ?, deleted_at = ?
+                 project_id = ?, due_date = ?, task_order = ?, completed_at = ?,
+                 recurrence_rule = ?, recurrence_parent_id = ?, recurrence_anchor = ?, updated_at = ?, deleted_at = ?
           WHERE id = ?
         `);
 
@@ -324,11 +330,15 @@ export function registerSyncIpcHandlers(): void {
           const local = getTask.get(rt.id) as { id: string; updated_at: string } | undefined;
           if (!local) {
             insertTask.run(rt.id, rt.name, rt.description, rt.status, rt.tier, rt.category,
-              rt.projectId, rt.dueDate, rt.order, rt.completedAt ?? null, rt.createdAt, rt.updatedAt, rt.deletedAt);
+              rt.projectId, rt.dueDate, rt.order, rt.completedAt ?? null,
+              rt.recurrenceRule ?? null, rt.recurrenceParentId ?? null, rt.recurrenceAnchor ?? null,
+              rt.createdAt, rt.updatedAt, rt.deletedAt);
             changed = true;
           } else if (rt.updatedAt > local.updated_at) {
             updateTask.run(rt.name, rt.description, rt.status, rt.tier, rt.category,
-              rt.projectId, rt.dueDate, rt.order, rt.completedAt ?? null, rt.updatedAt, rt.deletedAt, rt.id);
+              rt.projectId, rt.dueDate, rt.order, rt.completedAt ?? null,
+              rt.recurrenceRule ?? null, rt.recurrenceParentId ?? null, rt.recurrenceAnchor ?? null,
+              rt.updatedAt, rt.deletedAt, rt.id);
             changed = true;
           }
         }

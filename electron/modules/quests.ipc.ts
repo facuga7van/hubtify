@@ -2,6 +2,7 @@ import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
 import { todayDateString, formatDateString, yesterdayDateString } from '../../shared/date-utils';
+import { computeNextDue, instanceId, type RecurrenceAnchor } from '../../shared/recurrence';
 
 function genId(): string {
   return crypto.randomUUID();
@@ -16,6 +17,8 @@ export function registerQuestsIpcHandlers(): void {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
+               recurrence_rule AS recurrenceRule, recurrence_parent_id AS recurrenceParentId,
+               recurrence_anchor AS recurrenceAnchor,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL ORDER BY task_order ASC
       `).all();
@@ -23,6 +26,8 @@ export function registerQuestsIpcHandlers(): void {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
+               recurrence_rule AS recurrenceRule, recurrence_parent_id AS recurrenceParentId,
+               recurrence_anchor AS recurrenceAnchor,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL AND project_id IS ? ORDER BY task_order ASC
       `).all(projectId);
@@ -32,28 +37,33 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:upsertTask', (_e, task: {
     id?: string; name: string; description?: string; tier?: number;
     category?: string; projectId?: string | null; dueDate?: string | null; order?: number; status?: boolean;
+    recurrenceRule?: string | null; recurrenceAnchor?: string | null;
   }) => {
     const db = getDb();
     const id = task.id || genId();
     const now = new Date().toISOString();
     const validTier = [1, 2, 3].includes(task.tier ?? 2) ? (task.tier ?? 2) : 2;
+    const recurrenceRule = task.recurrenceRule ?? null;
+    const recurrenceAnchor = recurrenceRule ? (task.recurrenceAnchor === 'completion' ? 'completion' : 'fixed') : null;
 
     if (task.id) {
       db.prepare(`
         UPDATE tasks SET name = ?, description = ?, tier = ?, category = ?,
-               project_id = ?, due_date = ?, task_order = ?, status = ?, updated_at = ?
+               project_id = ?, due_date = ?, task_order = ?, status = ?,
+               recurrence_rule = ?, recurrence_anchor = ?, updated_at = ?
         WHERE id = ?
       `).run(
         task.name, task.description ?? '', validTier, task.category ?? '',
-        task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now, id
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0,
+        recurrenceRule, recurrenceAnchor, now, id
       );
     } else {
       const maxOrder = db.prepare('SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks WHERE deleted_at IS NULL').get() as { next: number };
       db.prepare(`
-        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, recurrence_rule, recurrence_anchor, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
       `).run(id, task.name, task.description ?? '', validTier, task.category ?? '',
-        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, now, now);
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, recurrenceRule, recurrenceAnchor, now, now);
     }
     return id;
   });
@@ -72,6 +82,40 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:setTaskStatus', (_e, taskId: string, status: boolean) => {
     const db = getDb();
     const now = new Date().toISOString();
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) as Record<string, unknown> | undefined;
+    if (!task) return;
+
+    const isRecurringTemplate = !!task.recurrence_rule && !task.recurrence_parent_id;
+
+    if (status && isRecurringTemplate) {
+      // Completing a recurring template: record a historical instance for THIS occurrence
+      // and advance the template to the next due date (it stays pending).
+      const today = todayDateString();
+      const occDue = (task.due_date as string | null) ?? today;
+      const anchor: RecurrenceAnchor = task.recurrence_anchor === 'completion' ? 'completion' : 'fixed';
+      const instId = instanceId(taskId, occDue);
+      const nextDue = computeNextDue(task.recurrence_rule as string, anchor, task.due_date as string | null, today, today);
+
+      const advanceTx = db.transaction(() => {
+        // Deterministic id → if two devices complete the same occurrence offline, the rows
+        // collapse on sync instead of duplicating.
+        db.prepare(`
+          INSERT OR IGNORE INTO tasks
+            (id, name, description, tier, category, project_id, due_date, task_order, status,
+             completed_at, recurrence_parent_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+        `).run(
+          instId, task.name, task.description ?? '', task.tier ?? 2, task.category ?? '',
+          task.project_id ?? null, occDue, task.task_order ?? 0, now, taskId, now, now,
+        );
+
+        db.prepare('UPDATE tasks SET due_date = ?, status = 0, completed_at = NULL, updated_at = ? WHERE id = ?')
+          .run(nextDue, now, taskId);
+      });
+      advanceTx();
+      return { recurred: true, nextDue };
+    }
+
     db.prepare('UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
       .run(status ? 1 : 0, status ? now : null, now, taskId);
   });
