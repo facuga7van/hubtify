@@ -258,10 +258,17 @@ export function registerFinanceIpcHandlers(): void {
     return computeExpenseBreakdown(db, monthRangeBetween(startMonth, endMonth));
   });
 
-  ipcHandle('finance:getProjection', (_e, months: number) => {
+  /**
+   * Forward projection of installments + recurring expenses.
+   *
+   * `fromMonth` anchors the projection: month `i` of the result is
+   * `fromMonth + i`. Omitted, it falls back to the real current month, so the
+   * dashboard widget and any older caller keep the previous behaviour.
+   */
+  ipcHandle('finance:getProjection', (_e, months: number, fromMonth?: string) => {
     const db = getDb();
     const count = Number.isFinite(months) ? Math.max(0, Math.min(Math.trunc(months), 60)) : 0;
-    const currentMonth = todayDateString().slice(0, 7);
+    const currentMonth = isValidMonthString(fromMonth) ? fromMonth : todayDateString().slice(0, 7);
 
     const recurringRows = db.prepare(`
       SELECT currency, COALESCE(SUM(amount), 0) AS total
@@ -657,8 +664,26 @@ export function registerFinanceIpcHandlers(): void {
 
   // ── Installment Groups ───────────────────────────────
 
-  ipcHandle('finance:getInstallmentGroups', () => {
+  /**
+   * `month` narrows the list to the plans that actually bill in that month —
+   * the plans a "N cuotas activas" figure is supposed to be counting. Without it
+   * the answer is every plan ever created, finished ones included.
+   */
+  ipcHandle('finance:getInstallmentGroups', (_e, month?: string) => {
     const db = getDb();
+    const conditions = ['g.deleted_at IS NULL'];
+    const params: unknown[] = [];
+
+    if (isValidMonthString(month)) {
+      const { start, end } = monthRange(month);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM finance_transactions t2
+        WHERE t2.installment_group_id = g.id AND t2.deleted_at IS NULL
+          AND t2.date >= ? AND t2.date < ?
+      )`);
+      params.push(start, end);
+    }
+
     return db.prepare(`
       SELECT g.id, g.description, g.total_amount AS totalAmount, g.currency,
              g.total_installments AS totalInstallments, g.category, g.date,
@@ -666,10 +691,10 @@ export function registerFinanceIpcHandlers(): void {
              COUNT(t.id) AS transactionCount
       FROM finance_installment_groups g
       LEFT JOIN finance_transactions t ON t.installment_group_id = g.id AND t.deleted_at IS NULL
-      WHERE g.deleted_at IS NULL
+      WHERE ${conditions.join(' AND ')}
       GROUP BY g.id
       ORDER BY g.date DESC, g.created_at DESC
-    `).all();
+    `).all(...params);
   });
 
   ipcHandle('finance:getInstallmentsForMonth', (_e, month: string) => {
@@ -1032,9 +1057,24 @@ export function registerFinanceIpcHandlers(): void {
   /**
    * Outstanding loans per currency (never mix ARS with USD) and net of the
    * repayments already registered in `finance_loan_payments`.
+   *
+   * `asOfMonth` rebuilds the same figure at the *end* of that month: only loans
+   * taken by then count, only repayments made by then are subtracted, and a loan
+   * settled after that date is still outstanding. A loan flagged settled with no
+   * `settled_date` (pre-column history) is treated as settled all along. Omitted,
+   * the answer is the present state, exactly as before.
    */
-  ipcHandle('finance:getActiveLoanSummary', () => {
+  ipcHandle('finance:getActiveLoanSummary', (_e, asOfMonth?: string) => {
     const db = getDb();
+    const cutoff = isValidMonthString(asOfMonth) ? monthRange(asOfMonth).end : null;
+
+    const loanFilter = cutoff
+      ? `l.deleted_at IS NULL AND l.date < ?
+         AND (l.settled = 0 OR (l.settled_date IS NOT NULL AND l.settled_date >= ?))`
+      : 'l.settled = 0 AND l.deleted_at IS NULL';
+    const paymentFilter = cutoff ? 'deleted_at IS NULL AND date < ?' : 'deleted_at IS NULL';
+    const params = cutoff ? [cutoff, cutoff, cutoff] : [];
+
     const rows = db.prepare(`
       SELECT l.direction, l.currency,
              COALESCE(SUM(l.amount), 0) AS total,
@@ -1043,12 +1083,12 @@ export function registerFinanceIpcHandlers(): void {
       LEFT JOIN (
         SELECT loan_id, SUM(amount) AS paid
         FROM finance_loan_payments
-        WHERE deleted_at IS NULL
+        WHERE ${paymentFilter}
         GROUP BY loan_id
       ) p ON p.loan_id = l.id
-      WHERE l.settled = 0 AND l.deleted_at IS NULL
+      WHERE ${loanFilter}
       GROUP BY l.direction, l.currency
-    `).all() as Array<{ direction: string; currency: string; total: number; pending: number }>;
+    `).all(...params) as Array<{ direction: string; currency: string; total: number; pending: number }>;
 
     const summary = {
       ARS: { lent: 0, borrowed: 0, lentPending: 0, borrowedPending: 0 },
@@ -1221,9 +1261,10 @@ export function registerFinanceIpcHandlers(): void {
 
   // ── C3: Monthly expenses sparkline (last 6 months) ────────
 
-  ipcHandle('finance:getMonthlyExpenses', () => {
+  /** Six-month expense sparkline ending on `endMonth` (default: the real current month). */
+  ipcHandle('finance:getMonthlyExpenses', (_e, endMonth?: string) => {
     const db = getDb();
-    const currentMonth = todayDateString().slice(0, 7);
+    const currentMonth = isValidMonthString(endMonth) ? endMonth : todayDateString().slice(0, 7);
 
     const result: number[] = [];
     for (let i = 5; i >= 0; i--) {

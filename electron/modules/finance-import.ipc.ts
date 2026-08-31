@@ -237,10 +237,27 @@ export function registerFinanceImportIpcHandlers(): void {
 
   ipcHandle(
     'finance:importConfirm',
-    (_e, rows: ParsedRow[], statementMonth: string, fileName: string) => {
+    (_e, rows: ParsedRow[], statementMonth: string, fileName: string, creditCardId?: string | null) => {
       const db = getDb();
       const batchId = crypto.randomUUID();
       const now = nowIso();
+
+      // A card statement belongs to a card. Rows written without one used to keep
+      // `payment_method = 'credit_card'` while still impacting the balance and
+      // belonging to no statement — the purchase was counted once on import and
+      // again when the statement was paid. Now the flow is explicit:
+      //   - a real card  → `impacts_balance = 0`, rolls into that card's statement
+      //   - no card      → `payment_method = 'cash'`, impacts the balance right away
+      const cardId = typeof creditCardId === 'string' && creditCardId.trim() !== ''
+        ? creditCardId.trim()
+        : null;
+      const card = cardId
+        ? db.prepare('SELECT id FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL').get(cardId)
+        : undefined;
+      if (cardId && !card) return { ok: false, reason: 'credit_card_not_found' };
+
+      const paymentMethod = cardId ? 'credit_card' : 'cash';
+      const impactsBalance = cardId ? 0 : 1;
 
       const insertBatch = db.prepare(
         `INSERT INTO finance_import_batches (id, source, filename, row_count, created_at)
@@ -255,8 +272,8 @@ export function registerFinanceImportIpcHandlers(): void {
       const insertTx = db.prepare(
         `INSERT INTO finance_transactions
          (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
-          installments, billed_amount_ars, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'credit_card', 'import', ?, ?, ?, ?, ?)`,
+          installments, billed_amount_ars, credit_card_id, impacts_balance, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?)`,
       );
 
       // One transaction: a failure halfway used to leave a partial import with a
@@ -293,16 +310,19 @@ export function registerFinanceImportIpcHandlers(): void {
             row.suggestedCategory,
             row.merchant,
             row.date,
+            paymentMethod,
             batchId,
             row.installmentTotal ?? 1,
             billedArs,
+            cardId,
+            impactsBalance,
             now,
             now,
           );
           inserted++;
         }
 
-        return { batchId, count: inserted, duplicateCount };
+        return { batchId, count: inserted, duplicateCount, creditCardId: cardId };
       });
 
       return run();

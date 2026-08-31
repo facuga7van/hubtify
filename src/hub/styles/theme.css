@@ -1,4 +1,11 @@
-@import "tailwindcss";
+/* source(none): la app no usa NI UNA utility de Tailwind (barrido de 954 tokens
+   unicos sobre 1621 sitios de className: cero coincidencias, cero variantes, cero
+   valores arbitrarios). Lo unico que aporta el import es Preflight.
+   Sin este token, el escaner de Tailwind v4 recorre la raiz del repo y emite 94
+   utilities muertas — 60 de ellas salen de docs/superpowers/plans/2026-03-29-coinify-v2.md,
+   un plan en markdown con markup de Tailwind adentro, y el resto de palabras sueltas
+   en objetos de estilo (position: 'relative' -> .relative). */
+@import "tailwindcss" source(none);
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=UnifrakturCook:wght@700&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Code:wght@400;700&display=swap');
 
 :root {

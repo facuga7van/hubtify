@@ -172,9 +172,13 @@
   opacity: 0.3;
 }
 
-.treasure-chart--themed .treasure-area {
-  fill: url(var(--area-gradient-ref));
-}
+/* Aca habia:  .treasure-chart--themed .treasure-area { fill: url(var(--area-gradient-ref)); }
+   Doble problema: --area-gradient-ref no esta definida en ningun lado, y
+   url(var(--x)) no es sintaxis valida en ningun caso (esbuild avisaba
+   "Expected ) to end URL token" en cada build). La declaracion se descartaba,
+   asi que el degradado seguia funcionando solo porque TreasureLineChart pone
+   fill={`url(#${areaGradientId})`} como atributo. Si alguien "arreglaba" la
+   variable, la regla habria ganado sobre el atributo y roto el id dinamico. */
 
 .treasure-marker {
   cursor: default;

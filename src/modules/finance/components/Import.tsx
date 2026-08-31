@@ -4,7 +4,8 @@ import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { ParsedRow } from '../../../../shared/types';
-import { CATEGORIES } from '../types';
+import { CATEGORIES, type CreditCard } from '../types';
+import CreditCardManager from './shared/CreditCardManager';
 import { ChevronDown, ChevronRight } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 import {
@@ -17,6 +18,30 @@ import {
 interface RowState extends ParsedRow {
   included: boolean;
   category: string;
+}
+
+/**
+ * Which card a statement most likely belongs to.
+ *
+ * The filename usually carries the issuer ("Resumen_Galicia_VISA_2026-01.pdf"),
+ * so a card whose name is contained in it wins. Otherwise the first (oldest)
+ * card is a better guess than nothing — the user can always change it, and the
+ * choice is spelled out right next to the confirm button.
+ */
+export function pickLikelyCard(cards: CreditCard[], fileName: string): string {
+  if (cards.length === 0) return '';
+  const norm = (v: string) =>
+    v.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '');
+  const file = norm(fileName);
+  if (file) {
+    const full = cards.find((c) => norm(c.name).length >= 3 && file.includes(norm(c.name)));
+    if (full) return full.id;
+    const byWord = cards.find((c) =>
+      c.name.split(/\s+/).some((w) => norm(w).length >= 4 && file.includes(norm(w))),
+    );
+    if (byWord) return byWord.id;
+  }
+  return cards[0].id;
 }
 
 interface ImportProps {
@@ -52,6 +77,11 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchesExpanded, setBatchesExpanded] = useState(false);
   const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [cards, setCards] = useState<CreditCard[]>([]);
+  const [creditCardId, setCreditCardId] = useState('');
+  /** The user explicitly picked "none"; stop re-guessing a card for them. */
+  const [cardTouched, setCardTouched] = useState(false);
+  const [showCardManager, setShowCardManager] = useState(false);
 
   const batchSupport = hasImportBatchSupport();
 
@@ -71,6 +101,21 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
 
   useEffect(() => { loadBatches(); }, [loadBatches]);
 
+  const loadCards = useCallback(() => {
+    window.api.financeGetCreditCards()
+      .then((data) => setCards(data as CreditCard[]))
+      .catch((err) => console.error('[Import] financeGetCreditCards failed:', err));
+  }, []);
+
+  useEffect(() => { loadCards(); }, [loadCards]);
+
+  // Guess the card for the statement the moment there is something to guess from,
+  // but never overrule a choice the user already made.
+  useEffect(() => {
+    if (cardTouched || rows.length === 0) return;
+    setCreditCardId((prev) => (prev ? prev : pickLikelyCard(cards, fileName)));
+  }, [cards, fileName, rows.length, cardTouched]);
+
   // Parsed-but-unconfirmed rows are minutes of work: let the host warn before closing.
   useEffect(() => { onDirtyChange?.(rows.length > 0); }, [rows.length, onDirtyChange]);
 
@@ -82,16 +127,22 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
       setShowSeal(false);
       setParsing(false);
       setImporting(false);
+      setCreditCardId('');
+      setCardTouched(false);
       loadBatches();
+      loadCards();
     };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [resetPreview, loadBatches]);
+  }, [resetPreview, loadBatches, loadCards]);
 
   const handleSelectFile = async () => {
     resetPreview();
     setSuccessCount(null);
     setShowSeal(false);
+    // A different statement may belong to a different card — guess again.
+    setCreditCardId('');
+    setCardTouched(false);
 
     setParsing(true);
     try {
@@ -167,13 +218,24 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
     setSuccessCount(null);
 
     try {
-      const result = await window.api.financeImportConfirm(toImport, statementMonth, fileName);
+      const result = await window.api.financeImportConfirm(toImport, statementMonth, fileName, creditCardId || null);
+      if ('ok' in result) {
+        // The chosen card vanished (deleted in another window / another account).
+        setImportError(t('coinify.importErrorCardMissing', 'La tarjeta elegida ya no existe. Elegí otra y volvé a intentar.'));
+        toast({ type: 'warning', message: t('coinify.importErrorCardMissing', 'La tarjeta elegida ya no existe. Elegí otra y volvé a intentar.') });
+        setCreditCardId('');
+        loadCards();
+        return;
+      }
       setSuccessCount(result.count);
       setRows([]);
       setFileName('');
       setSkippedLines([]);
       loadBatches();
       onImported?.(result.count);
+      // Card-assigned rows change what the statements and the dashboard owe;
+      // the undo path already announced itself, the confirm path never did.
+      window.dispatchEvent(new Event('finance:dataChanged'));
 
       // Seal animation + toast
       setShowSeal(true);
@@ -388,6 +450,53 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
             </div>
           )}
 
+          {/* Which card this statement belongs to.
+              Without one the rows used to hit the balance immediately AND never
+              reach any statement, so paying the statement counted them twice. */}
+          <div className="coin-import-card">
+            <label className="coin-import-card__label" htmlFor="coin-import-card">
+              {t('coinify.importCard', 'Tarjeta del resumen')}
+            </label>
+            {cards.length > 0 ? (
+              <select
+                id="coin-import-card"
+                className="rpg-select coin-import-card__select"
+                value={creditCardId}
+                onChange={(e) => { setCardTouched(true); setCreditCardId(e.target.value); }}
+              >
+                {cards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {card.name} ({t('coinify.closingDay')}: {card.closingDay})
+                  </option>
+                ))}
+                <option value="">{t('coinify.importCardNone', 'Ninguna / efectivo')}</option>
+              </select>
+            ) : (
+              <span className="coin-import-card__empty">
+                {t('coinify.importNoCards', 'No tenés ninguna tarjeta cargada.')}
+                {' '}
+                <button
+                  type="button"
+                  className="rpg-button coin-import-card__create"
+                  onClick={() => setShowCardManager(true)}
+                >
+                  {t('coinify.importCreateCard', 'Crear tarjeta')}
+                </button>
+              </span>
+            )}
+            <p className="coin-import-card__hint">
+              {creditCardId
+                ? t(
+                    'coinify.importCardHint',
+                    'Los movimientos entran al resumen de esa tarjeta y no descuentan del saldo hasta que pagues el resumen.',
+                  )
+                : t(
+                    'coinify.importCardHintNone',
+                    'Sin tarjeta, los movimientos descuentan del saldo en el acto y no forman parte de ningún resumen. Si además pagás el resumen de la tarjeta, el gasto se cuenta dos veces.',
+                  )}
+            </p>
+          </div>
+
           {/* Month selector + confirm */}
           <div className="coin-import-confirm-row">
             <div className="coin-import-confirm-row__month">
@@ -435,6 +544,14 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
           </svg>
           {t('coinify.importSuccess', { count: successCount })}
         </div>
+      )}
+
+      {showCardManager && (
+        <CreditCardManager
+          cards={cards}
+          onClose={() => setShowCardManager(false)}
+          onSaved={loadCards}
+        />
       )}
 
       {/* Previous imports — undo a batch that already landed. */}

@@ -184,7 +184,7 @@ const api = {
   financeDeleteTransaction: (id: string) => ipcRenderer.invoke('finance:deleteTransaction', id),
 
   // Finance - Installments
-  financeGetInstallmentGroups: () => ipcRenderer.invoke('finance:getInstallmentGroups'),
+  financeGetInstallmentGroups: (month?: string) => ipcRenderer.invoke('finance:getInstallmentGroups', month),
   financeGetInstallmentsForMonth: (month: string) => ipcRenderer.invoke('finance:getInstallmentsForMonth', month),
   financeGetInstallmentProjection: (months: number) => ipcRenderer.invoke('finance:getInstallmentProjection', months),
   financeCreateInstallmentGroup: (group: Record<string, unknown>) => ipcRenderer.invoke('finance:createInstallmentGroup', group),
@@ -200,7 +200,7 @@ const api = {
   financeGetLoanPayments: (loanId: string) => ipcRenderer.invoke('finance:getLoanPayments', loanId),
   financeDeleteLoanPayment: (id: string) => ipcRenderer.invoke('finance:deleteLoanPayment', id),
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => ipcRenderer.invoke('finance:createThirdPartyPurchase', data),
-  financeGetActiveLoanSummary: () => ipcRenderer.invoke('finance:getActiveLoanSummary'),
+  financeGetActiveLoanSummary: (asOfMonth?: string) => ipcRenderer.invoke('finance:getActiveLoanSummary', asOfMonth),
 
   // Finance - Recurring
   financeGetRecurring: () => ipcRenderer.invoke('finance:getRecurring'),
@@ -214,7 +214,7 @@ const api = {
 
   // Finance - Import
   financeImportSelectAndParsePDF: () => ipcRenderer.invoke('finance:importSelectAndParsePDF'),
-  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName),
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName, creditCardId),
   financeUndoImportBatch: (batchId: string) => ipcRenderer.invoke('finance:undoImportBatch', batchId),
   financeGetImportBatches: () => ipcRenderer.invoke('finance:getImportBatches'),
   financeGetCategoryMappings: () => ipcRenderer.invoke('finance:getCategoryMappings'),
@@ -225,13 +225,13 @@ const api = {
   financeGetCategoryBreakdown: (month?: string) => ipcRenderer.invoke('finance:getCategoryBreakdown', month),
   financeGetBalanceForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getBalanceForRange', startMonth, endMonth),
   financeGetCategoryBreakdownForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getCategoryBreakdownForRange', startMonth, endMonth),
-  financeGetProjection: (months: number) => ipcRenderer.invoke('finance:getProjection', months),
+  financeGetProjection: (months: number, fromMonth?: string) => ipcRenderer.invoke('finance:getProjection', months, fromMonth),
 
   // Finance - Export
   financeExportCsv: (month?: string) => ipcRenderer.invoke('finance:exportCsv', month),
 
   // Finance - Dashboard (new)
-  financeGetMonthlyExpenses: () => ipcRenderer.invoke('finance:getMonthlyExpenses'),
+  financeGetMonthlyExpenses: (endMonth?: string) => ipcRenderer.invoke('finance:getMonthlyExpenses', endMonth),
   financeGetCategoryAverages: () => ipcRenderer.invoke('finance:getCategoryAverages'),
   financeGetPreviousMonthSummary: () => ipcRenderer.invoke('finance:getPreviousMonthSummary'),
 

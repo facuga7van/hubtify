@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
-import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
+import { Section, Gauge, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
 import { SparklineChart } from '../../../shared/components/charts';
 import { Scale, Key, Compass, ArrowUp, ArrowDown, ChevronRight } from '../../../shared/components/icons';
 import { useToast } from '../../../shared/components/useToast';
@@ -428,14 +428,25 @@ export default function Dashboard() {
   }, [month, rangeMode, startMonth, endMonth, refreshKey]);
 
   /**
-   * "As of today" data. These handlers take no period argument — they always
-   * answer for the real current date — so the UI labels them as such instead of
-   * letting them masquerade as figures for the navigated period.
+   * The month these secondary panels answer for. "Todo" has no meaningful anchor
+   * (its range ends in the year 2999), so it falls back to the real current month;
+   * every other range anchors on the last month it covers.
    */
-  const loadTodayData = useCallback(() => {
-    window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[])).catch((err) => console.error('[Dashboard] financeGetProjection failed:', err));
-    window.api.financeGetActiveLoanSummary().then((data) => setLoans({ ...EMPTY_LOANS, ...(data as LoanSummary) })).catch((err) => console.error('[Dashboard] financeGetActiveLoanSummary failed:', err));
-    window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length)).catch((err) => console.error('[Dashboard] financeGetInstallmentGroups failed:', err));
+  const anchorMonth = rangeMode === 'all' ? realCurrentMonth() : endMonth;
+
+  /**
+   * Panels that follow the navigated period. They used to be hard-anchored to
+   * today while sitting under a header naming a different month.
+   *
+   * `financeGetCreditCardStatements({ status: 'pending' })` is the one deliberate
+   * exception: an unpaid statement is a present-tense debt, not a historical
+   * figure, so it stays "as of today" — and the copy says so instead of leaving a
+   * rune to explain it.
+   */
+  const loadPeriodData = useCallback((forMonth: string) => {
+    window.api.financeGetProjection(3, forMonth).then((data) => setProjection(data as ProjectionMonth[])).catch((err) => console.error('[Dashboard] financeGetProjection failed:', err));
+    window.api.financeGetActiveLoanSummary(forMonth).then((data) => setLoans({ ...EMPTY_LOANS, ...(data as LoanSummary) })).catch((err) => console.error('[Dashboard] financeGetActiveLoanSummary failed:', err));
+    window.api.financeGetInstallmentGroups(forMonth).then((data) => setInstallmentCount((data as unknown[]).length)).catch((err) => console.error('[Dashboard] financeGetInstallmentGroups failed:', err));
     window.api.financeGetCreditCardStatements({ status: 'pending' }).then((data) => {
       const rows = data as Array<{ calculatedAmount?: number; calculatedAmountUsd?: number }>;
       setPendingCC({
@@ -443,10 +454,10 @@ export default function Dashboard() {
         USD: rows.reduce((sum, s) => sum + (s.calculatedAmountUsd ?? 0), 0),
       });
     }).catch((err) => console.error('[Dashboard] financeGetCreditCardStatements failed:', err));
-    window.api.financeGetMonthlyExpenses().then((data) => setMonthlyExpenses(data)).catch((err) => console.error('[Dashboard] financeGetMonthlyExpenses failed:', err));
+    window.api.financeGetMonthlyExpenses(forMonth).then((data) => setMonthlyExpenses(data)).catch((err) => console.error('[Dashboard] financeGetMonthlyExpenses failed:', err));
   }, []);
 
-  useEffect(() => { loadTodayData(); }, [loadTodayData]);
+  useEffect(() => { loadPeriodData(anchorMonth); }, [loadPeriodData, anchorMonth, refreshKey]);
 
   /**
    * Recurring generation used to run on every mount, writing rows the freshly
@@ -465,13 +476,12 @@ export default function Dashboard() {
   useEffect(() => {
     const handler = () => {
       resetRecurringGuard();
-      loadTodayData();
       isFirstLoad.current = true;
       setRefreshKey(k => k + 1);
     };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadTodayData]);
+  }, []);
 
   // Expense trend vs the previous month. Purely expenses — never the net balance.
   const trendPct = (() => {
@@ -719,8 +729,7 @@ export default function Dashboard() {
                   <>
                     {installmentCount} {t('coinify.activeInstallments').toLowerCase()}
                     {' '}<span className="coin-separator">·</span>{' '}
-                    {t('coinify.pendingCC', 'TC Pendiente')} {formatCurrency(pendingCC.ARS, { currency: 'ARS' })}
-                    {' '}<span className="coin-as-of">{t('coinify.asOfToday', 'a hoy')}</span>
+                    {t('coinify.pendingCCToday', 'TC sin pagar al día de hoy')} {formatCurrency(pendingCC.ARS, { currency: 'ARS' })}
                   </>
                 )}
               </div>
@@ -792,10 +801,7 @@ export default function Dashboard() {
             title={t('coinify.alliancesAndDebts').toUpperCase()}
             icon={<Key width="12" height="12" style={{ color: 'var(--rubric)' }} />}
             rightSlot={
-              <span className="coin-section-slot">
-                <Rune tone="ink">{t('coinify.asOfToday', 'a hoy')}</Rune>
-                <HelpBubble variant="inline" text={t('coinify.loansHelp', 'Resumen de préstamos activos: lo que te deben y lo que debés. Siempre al día de hoy — no depende del período elegido arriba.')} />
-              </span>
+              <HelpBubble variant="inline" text={t('coinify.loansHelp', 'Lo que te deben y lo que debés al cierre del período elegido arriba: préstamos tomados hasta esa fecha, menos los pagos registrados hasta esa fecha.')} />
             }
           >
             <div className="coin-loan-mini-grid">
@@ -841,10 +847,7 @@ export default function Dashboard() {
             title={t('coinify.nextBattles').toUpperCase()}
             icon={<Compass width="12" height="12" style={{ color: 'var(--rubric)' }} />}
             rightSlot={
-              <span className="coin-section-slot">
-                <Rune tone="ink">{t('coinify.asOfToday', 'a hoy')}</Rune>
-                <HelpBubble variant="inline" text={t('coinify.projectionHelp', 'Proyección a 3 meses de cuotas y gastos recurrentes, contada desde hoy — no depende del período elegido arriba.')} />
-              </span>
+              <HelpBubble variant="inline" text={t('coinify.projectionHelp', 'Proyección a 3 meses de cuotas y gastos recurrentes, contada desde el período elegido arriba.')} />
             }
           >
             {projection.length > 0 ? (

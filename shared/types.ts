@@ -418,7 +418,7 @@ export interface HubtifyApi {
   financeDeleteTransaction: (id: string) => Promise<void>;
 
   // Finance - Installments
-  financeGetInstallmentGroups: () => Promise<unknown[]>;
+  financeGetInstallmentGroups: (month?: string) => Promise<unknown[]>;
   financeGetInstallmentsForMonth: (month: string) => Promise<unknown[]>;
   financeGetInstallmentProjection: (months: number) => Promise<Array<{ month: string; total: number }>>;
   financeCreateInstallmentGroup: (group: Record<string, unknown>) => Promise<string>;
@@ -434,7 +434,7 @@ export interface HubtifyApi {
   financeGetLoanPayments: (loanId: string) => Promise<unknown[]>;
   financeDeleteLoanPayment: (id: string) => Promise<void>;
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => Promise<string>;
-  financeGetActiveLoanSummary: () => Promise<unknown>;
+  financeGetActiveLoanSummary: (asOfMonth?: string) => Promise<unknown>;
 
   // Finance - Recurring
   financeGetRecurring: () => Promise<unknown[]>;
@@ -448,7 +448,7 @@ export interface HubtifyApi {
 
   // Finance - Import
   financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
-  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ batchId: string; count: number; duplicateCount: number }>;
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
   financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;
   financeGetImportBatches: () => Promise<FinanceImportBatch[]>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
@@ -459,13 +459,13 @@ export interface HubtifyApi {
   financeGetCategoryBreakdown: (month?: string) => Promise<unknown[]>;
   financeGetBalanceForRange: (startMonth: string, endMonth: string) => Promise<{ ARS: { income: number; expenses: number; balance: number }; USD: { income: number; expenses: number; balance: number } }>;
   financeGetCategoryBreakdownForRange: (startMonth: string, endMonth: string) => Promise<Array<{ category: string; ARS: number; USD: number }>>;
-  financeGetProjection: (months: number) => Promise<unknown[]>;
+  financeGetProjection: (months: number, fromMonth?: string) => Promise<unknown[]>;
 
   // Finance - Export
   financeExportCsv: (month?: string) => Promise<{ success: boolean; canceled?: boolean; path?: string; count?: number; error?: string }>;
 
   // Finance - Dashboard (new)
-  financeGetMonthlyExpenses: () => Promise<number[]>;
+  financeGetMonthlyExpenses: (endMonth?: string) => Promise<number[]>;
   financeGetCategoryAverages: () => Promise<Record<string, number>>;
   financeGetPreviousMonthSummary: () => Promise<{ income: number; expenses: number; month: string }>;
 

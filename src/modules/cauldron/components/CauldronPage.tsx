@@ -455,7 +455,7 @@ export default function CauldronPage() {
   /* -- Render -- */
   return (
     <BookPage
-      eyebrow="CALDERO"
+      eyebrow={t('cauldron.eyebrow', 'CALDERO')}
       title={t('cauldron.title', 'The Cauldron')}
       subtitle={t(
         'cauldron.subtitle',
