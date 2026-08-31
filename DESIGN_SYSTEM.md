@@ -718,6 +718,28 @@ Location: `src/shared/animations/`
 | Loading | Shimmer animation (1.5s infinite) |
 | Success | Particle burst + sound |
 
+### List Item Entry / Exit
+
+Used whenever rows appear or disappear in a list (tasks, food entries, transactions).
+
+| Phase | From | To | Timing |
+|-------|------|----|--------|
+| Entry | `translateY(-10px)`, `opacity: 0` | `translateY(0)`, `opacity: 1` | 300ms ease-out |
+| Exit  | `opacity: 1` | `translateX(-20px)`, `opacity: 0` | 300ms ease-in |
+
+For a staggered reveal of sibling sections, add an incremental `animation-delay`
+(`0ms`, `50ms`, `100ms`, …) via `:nth-child()`.
+
+### Active / Inactive Toggle Glow
+
+For togglable rows (recurring transactions, habits, reminders):
+
+| State | Style |
+|-------|-------|
+| Active | `border-left: 3px solid var(--moss); box-shadow: inset 3px 0 6px rgba(64, 82, 44, 0.15);` |
+| Inactive | `border-left: 3px solid rgba(0, 0, 0, 0.1);` |
+| Transition | `border-color 0.3s ease, box-shadow 0.3s ease` |
+
 ---
 
 ## Responsive Breakpoints
@@ -785,6 +807,10 @@ Custom scrollbar: parchment gradient track with gold border.
 
 Each module scopes its CSS with a unique prefix to avoid collisions.
 
+**Naming: BEM-lite.** `block`, `block--modifier`, `block__element` — e.g.
+`.coin-tx`, `.coin-tx--income`, `.coin-tx__amount`. Prefix stays on the block.
+One dedicated CSS file per module, imported from `src/App.tsx`.
+
 | Module | Prefix | Primary Colors | CSS File |
 |--------|--------|---------------|----------|
 | Finance (Coinify) | `.coin-*` | Gold, Rubric | `modules/finance/styles/coinify.css` |
@@ -798,14 +824,22 @@ Each module scopes its CSS with a unique prefix to avoid collisions.
 | Help | `.help-bubble*` | Gold, Leather | `shared/styles/help-bubble.css` |
 | Notifications | `.notif-*` | Parchment | `shared/styles/notifications.css` |
 
-### Quest Tier Colors
+### Quest Tiers
 
-| Tier | Visual Indicator |
-|------|-----------------|
-| Communis | Neutral (default) |
-| Rara | Colored left border |
-| Epica | Stronger color |
-| Legendaria | Maximum emphasis |
+The real task tiers are defined in `src/modules/quests/types.ts` as
+`TASK_TIER = { QUICK: 1, NORMAL: 2, EPIC: 3 }`.
+
+| Tier | Value | XP | i18n key | Visual Indicator |
+|------|-------|----|----------|------------------|
+| Quick | `1` | 5 | `questify.tier.quick` | Neutral (default) |
+| Normal | `2` | 15 | `questify.tier.normal` | Colored left border |
+| Epic | `3` | 40 | `questify.tier.epic` | Strongest emphasis |
+
+**Not to be confused with the Latin *rarity* labels.** `quests.css` also defines
+`.quest-tier-label--{communis,rara,epica,legendaria,delata}` (with matching
+`questify.tiers.*` strings). Those are a separate rarity vocabulary, and as of
+today **no `.tsx` renders them** — treat both the CSS block and the i18n section
+as unwired until something claims them.
 
 ---
 

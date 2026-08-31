@@ -15,7 +15,7 @@ src/               Renderer: React + Vite
   shared/          Shared components, hooks, animations
   hub/             Shell: Layout, Sidebar, PlayerCard, Auth
   i18n/            es.json, en.json
-  core/            ModuleRegistry
+  core/            `ModuleDefinition` type only (module contract — no runtime registry)
 shared/            Types shared between main & renderer (types.ts)
 ```
 
@@ -72,10 +72,33 @@ This event fires on: account switch, add account, logout (auto-switch to next ac
 
 ### CSS
 
-- **Theme vars**: `--rpg-parchment`, `--rpg-gold`, `--rpg-wood`, `--rpg-hp-red`, `--rpg-xp-green` (see `hub/styles/theme.css`)
-- **Module prefixes**: Finance `.coin-*`, Quests `.quest-*`, Nutrition `.nutri-*`
+**Full reference: `DESIGN_SYSTEM.md`** — read it before writing any new CSS.
+
+- **Theme vars** (canonical names, defined in `src/hub/styles/theme.css`):
+  - Ink / text: `--ink`, `--ink-soft`, `--ink-faded`
+  - Parchment surfaces: `--parch-0`, `--parch-1`, `--parch-2`, `--parch-3`
+  - Gold accents: `--gold`, `--gold-light`, `--gold-dark`
+  - Leather / frames: `--leather`, `--leather-light`, `--leather-dark`
+  - Red (rubric / HP / danger): `--rubric`, `--rubric-light`
+  - Green (moss / XP / success): `--moss`, `--moss-light`, `--moss-dark`
+  - Type scale: `--fs-timer`, `--fs-display`, `--fs-hero`, `--fs-stat`, `--fs-accent`,
+    `--fs-heading`, `--fs-nav`, `--fs-sub`, `--fs-body`, `--fs-quote`, `--fs-label`
+  - Z-index scale: `--z-base`, `--z-dropdown`, `--z-floating`, `--z-sidebar`, `--z-overlay`,
+    `--z-drawer`, `--z-modal`, `--z-toast`, `--z-dropdown-top`, `--z-tour`, `--z-system-toast`
+- **`--rpg-*` names are legacy aliases only.** `--rpg-gold`, `--rpg-parchment`, `--rpg-wood`,
+  `--rpg-hp-red` and `--rpg-xp-green` exist in `theme.css` purely as `var()` aliases of the real
+  tokens above, kept so older module CSS keeps rendering. **Use the canonical names in new code.**
+  Any other `--rpg-*` name you invent is undefined, and an undefined `var()` without a fallback
+  silently drops the whole declaration — the #1 source of "why is this style not applying".
+- **Module prefixes**: Finance `.coin-*`, Quests `.quest-*`, Nutrition `.nutri-*`, Cauldron `.cauldron-*`
 - **Base components**: `.rpg-card`, `.rpg-button`, `.rpg-input`, `.rpg-select`, `.rpg-bar`
-- **Font**: Cinzel (headers), Crimson Text (body)
+- **Fonts** (loaded via the Google Fonts `@import` at the top of `theme.css`):
+  - `UnifrakturCook` — display / page titles (`--ff-display`)
+  - `IM Fell English` — body (`--ff-body`)
+  - `IM Fell English SC` — small-caps accents, labels (`--ff-accent`)
+  - `Cormorant Garamond` — quotes and epigraphs (`--ff-quote`)
+  - `Fira Code` — numeric / monospace
+  Prefer the `--ff-*` aliases over literal family names.
 
 ### i18n
 
@@ -101,9 +124,21 @@ Format: `type(scope): description`
 - Tests in `tests/` directory mirroring source structure
 - Path aliases: `@core`, `@modules`, `@shared`
 
-## Module Registry
+## Module Wiring (there is NO runtime registry)
 
-Each module exports a `ModuleDefinition` with: id, name, routes, dashboardWidget, migrations, rpgEventHandlers. Registered in `src/App.tsx`.
+`src/modules/{quests,nutrition,finance,cauldron}/index.ts` each export a `ModuleDefinition`
+(id, name, icon, routes, dashboardWidget, migrations, rpgEventHandlers). **That object is a
+descriptor only — nothing dispatches through it.** The `ModuleRegistry` class was removed; only
+the type survives in `src/core/module-registry.ts`.
+
+Where wiring actually happens — change these when you add a module:
+
+| Concern           | Real location                                                    |
+| ----------------- | ---------------------------------------------------------------- |
+| Migrations        | called directly from `electron/main.ts` via `runModuleMigrations()` |
+| Dashboard widgets | imported directly in `src/hub/widgets/widget-registry.ts`          |
+| Routes            | hardcoded JSX `<Route>` elements in `src/App.tsx`                  |
+| RPG events        | `electron/ipc/rpg-handlers.ts`                                     |
 
 ## Don't
 

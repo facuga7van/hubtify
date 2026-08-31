@@ -25,6 +25,16 @@ jobs:
       - name: Rebuild native modules
         run: npm run rebuild
 
+      # ── Quality gates: nothing gets published if any of these fail ──
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build installers
         run: npm run make
 
