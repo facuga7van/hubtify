@@ -305,6 +305,36 @@ export function computeMonthlyBalance(db: Database.Database, month: string): Mon
 }
 
 /**
+ * THE definition of "what did I spend on category X".
+ *
+ * Every live expense counts, including card purchases whose statement has not
+ * landed yet (`balanceScope: 'all'`); the auto-generated `Pago Tarjeta` row is
+ * excluded so card spending is not counted twice.
+ *
+ * This is what the dashboard wheel draws, and — deliberately — what a budget is
+ * measured against. A budget bar that disagreed with the wheel drawn 40px above
+ * it would make the user distrust both numbers, so both go through this one
+ * function. `finance.budgets.test.ts` compares the two outputs and fails if they
+ * ever drift.
+ */
+export function categorySpendFilter(range: { start: string; end: string }): TransactionFilter {
+  return {
+    ...range,
+    type: 'expense',
+    balanceScope: 'all',
+    excludeCategories: [CARD_PAYMENT_CATEGORY],
+  };
+}
+
+/** Category spend for a range, using {@link categorySpendFilter}. */
+export function computeCategorySpend(
+  db: Database.Database,
+  range: { start: string; end: string },
+): CategoryTotals[] {
+  return aggregateByCategory(db, categorySpendFilter(range));
+}
+
+/**
  * Named, explicit answer to "how much did I spend?", so the UI never has to
  * guess which of the three historical definitions a number came from.
  */
@@ -422,4 +452,143 @@ export function generateRecurringForMonth(db: Database.Database, month: string):
   });
 
   return run();
+}
+
+// ── Budgets ────────────────────────────────────────────────────────────────
+
+/**
+ * A monthly spending limit for one category.
+ *
+ * The category name is the primary key: budgets are an attribute of the slices
+ * the expense wheel already draws, not an entity of their own.
+ */
+export interface BudgetRow {
+  category: string;
+  monthlyLimit: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetCategoryStatus {
+  category: string;
+  limit: number;
+  /** ARS spend for the month, from {@link computeCategorySpend}. */
+  spent: number;
+  /** `spent / limit * 100`, unclamped — over 100 means the limit was blown. */
+  pct: number;
+}
+
+export interface BudgetStatus {
+  month: string;
+  categories: BudgetCategoryStatus[];
+  totalLimit: number;
+  totalSpent: number;
+}
+
+const EMPTY_BUDGET_STATUS = (month: string): BudgetStatus => ({
+  month, categories: [], totalLimit: 0, totalSpent: 0,
+});
+
+/** Live budgets, cheapest category first is meaningless — alphabetical is stable. */
+export function listBudgets(db: Database.Database): BudgetRow[] {
+  return db.prepare(`
+    SELECT category, monthly_limit AS monthlyLimit,
+           created_at AS createdAt, updated_at AS updatedAt
+    FROM finance_budgets
+    WHERE deleted_at IS NULL
+    ORDER BY category ASC
+  `).all() as BudgetRow[];
+}
+
+/**
+ * Sets (or clears) the monthly limit for a category.
+ *
+ * `limit === null` is a soft delete, so the removal travels through sync; a row
+ * that comes back is revived by clearing `deleted_at` rather than inserting a
+ * duplicate (the category is the primary key, so there can only ever be one).
+ */
+export function setBudget(
+  db: Database.Database,
+  category: unknown,
+  limit: unknown,
+): { ok: true; category: string; monthlyLimit: number | null } | { ok: false; reason: string } {
+  const name = parseNonEmptyString(category);
+  if (name === null) return { ok: false, reason: 'invalid_category' };
+  if (RESERVED_CATEGORIES.includes(name as (typeof RESERVED_CATEGORIES)[number])) {
+    return { ok: false, reason: 'reserved_category' };
+  }
+
+  const now = nowIso();
+
+  if (limit === null || limit === undefined || limit === '') {
+    db.prepare(`
+      UPDATE finance_budgets SET deleted_at = ?, updated_at = ? WHERE category = ?
+    `).run(now, now, name);
+    return { ok: true, category: name, monthlyLimit: null };
+  }
+
+  const amount = parsePositiveAmount(limit);
+  if (amount === null) return { ok: false, reason: 'invalid_amount' };
+
+  db.prepare(`
+    INSERT INTO finance_budgets (category, monthly_limit, created_at, updated_at, deleted_at)
+    VALUES (?, ?, ?, ?, NULL)
+    ON CONFLICT(category) DO UPDATE SET
+      monthly_limit = excluded.monthly_limit,
+      updated_at = excluded.updated_at,
+      deleted_at = NULL
+  `).run(name, amount, now, now);
+
+  return { ok: true, category: name, monthlyLimit: amount };
+}
+
+/**
+ * Budget vs. reality for one month.
+ *
+ * Only categories that HAVE a budget appear: a category without a limit is not
+ * "at 0%", it is simply not being watched, and printing it as a full green bar
+ * would be a lie. Spend comes from {@link computeCategorySpend} — the very same
+ * aggregation the wheel is drawn from.
+ *
+ * ARS only, like the wheel: adding pesos to dollars would mean inventing an
+ * exchange rate, and a budget built on an invented rate is worse than none.
+ */
+export function computeBudgetStatus(db: Database.Database, month: string): BudgetStatus {
+  if (!isValidMonthString(month)) return EMPTY_BUDGET_STATUS(month);
+
+  const budgets = listBudgets(db);
+  if (budgets.length === 0) return EMPTY_BUDGET_STATUS(month);
+
+  const spendByCategory = new Map(
+    computeCategorySpend(db, monthRange(month)).map((c) => [c.category, c.ARS]),
+  );
+
+  const categories: BudgetCategoryStatus[] = budgets.map((b) => {
+    const spent = spendByCategory.get(b.category) ?? 0;
+    return {
+      category: b.category,
+      limit: b.monthlyLimit,
+      spent,
+      pct: b.monthlyLimit > 0 ? (spent / b.monthlyLimit) * 100 : 0,
+    };
+  });
+
+  return {
+    month,
+    categories,
+    totalLimit: categories.reduce((sum, c) => sum + c.limit, 0),
+    totalSpent: categories.reduce((sum, c) => sum + c.spent, 0),
+  };
+}
+
+/**
+ * Did the month close inside every limit the user set?
+ *
+ * Requires at least one budget — a month with nothing to respect cannot be
+ * "respected", and paying 100 XP for having configured nothing would make the
+ * reward worthless.
+ */
+export function isBudgetMonthMet(status: BudgetStatus): boolean {
+  if (status.categories.length === 0) return false;
+  return status.categories.every((c) => c.spent <= c.limit);
 }

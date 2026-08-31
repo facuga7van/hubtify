@@ -5,16 +5,22 @@ import { MonthNavigator } from './shared/MonthNavigator';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 import { Section, Gauge, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
 import { SparklineChart } from '../../../shared/components/charts';
-import { Scale, Key, Compass, ArrowUp, ArrowDown, ChevronRight } from '../../../shared/components/icons';
+import { Scale, Key, Compass, ArrowUp, ArrowDown, ChevronRight, Pencil, CrossMark, Checkmark } from '../../../shared/components/icons';
 import { useToast } from '../../../shared/components/useToast';
 import HelpBubble from '../../../shared/components/HelpBubble';
+import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { formatCurrency, formatCurrencyCompact, currencyPrefix } from '../utils/format';
 import {
   getExpenseBreakdown,
   getExpenseBreakdownForRange,
+  getBudgetStatus,
+  setBudget,
+  hasBudgetSupport,
   type ExpenseBreakdownByCurrency,
+  type BudgetStatus,
 } from '../utils/api-ext';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
+import { checkBudgetMonthClose, resetBudgetGuards } from '../utils/budget-guards';
 import { playCoinClink } from '../../../shared/audio';
 
 // ── Types ──
@@ -81,6 +87,13 @@ function addMonths(month: string, delta: number): string {
 
 function getPrevMonth(month: string): string {
   return addMonths(month, -1);
+}
+
+/** "agosto 2026" / "August 2026" — for prose, not for a header. */
+function monthLabel(month: string, language: string): string {
+  const [y, m] = month.split('-').map(Number);
+  const name = new Date(y, m - 1).toLocaleDateString(language === 'en' ? 'en-US' : 'es', { month: 'long' });
+  return `${name} ${y}`;
 }
 
 /** Inclusive [start, end] month pair for the selected range mode. */
@@ -269,14 +282,43 @@ function ChestClickable() {
   );
 }
 
-function CategoryWheel({ data, total }: { data: { label: string; value: number; color: string }[]; total: number }) {
+/**
+ * The expense wheel — and, since phase 2, the budget too.
+ *
+ * A category with a monthly limit gets a thin outer ring spanning exactly its
+ * own slice, filled with the share of the limit already spent. Same slice, same
+ * angle, one extra stroke: the budget is not a second screen, it is an attribute
+ * of the picture that was already there. Over the limit, the ring goes full and
+ * turns `--rubric`.
+ *
+ * `budgetPct` is keyed by category label and is UNCLAMPED (120 means 20% over).
+ */
+function CategoryWheel({
+  data,
+  total,
+  budgetPct,
+}: {
+  data: { label: string; value: number; color: string }[];
+  total: number;
+  budgetPct?: Map<string, number>;
+}) {
   if (data.length === 0 || total === 0) return null;
 
   let acc = 0;
   const r = 54, cx = 70, cy = 70;
+  const ringR = 62;
   const centreLabel = formatCurrencyCompact(total, 'ARS');
   // The hole is 56px across; shrink the type once the label outgrows it.
   const centreFontSize = centreLabel.length <= 8 ? 16 : centreLabel.length <= 11 ? 13 : 11;
+
+  /** Stroke-only arc between two angles (radians, 0 = 3 o'clock). */
+  const arc = (radius: number, a0: number, a1: number): string => {
+    const x1 = cx + Math.cos(a0) * radius, y1 = cy + Math.sin(a0) * radius;
+    const x2 = cx + Math.cos(a1) * radius, y2 = cy + Math.sin(a1) * radius;
+    const large = (a1 - a0) > Math.PI ? 1 : 0;
+    return `M${x1} ${y1} A${radius} ${radius} 0 ${large} 1 ${x2} ${y2}`;
+  };
+
   return (
     <svg viewBox="0 0 140 140" style={{ width: '100%', maxWidth: 160, display: 'block', margin: '0 auto' }}>
       {data.map((d, i) => {
@@ -287,7 +329,38 @@ function CategoryWheel({ data, total }: { data: { label: string; value: number; 
         const x1 = cx + Math.cos(start) * r, y1 = cy + Math.sin(start) * r;
         const x2 = cx + Math.cos(end) * r, y2 = cy + Math.sin(end) * r;
         const large = (end - start) > Math.PI ? 1 : 0;
-        return <path key={i} d={`M${cx} ${cy} L${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`} fill={d.color} opacity=".75" stroke="var(--parch-1)" strokeWidth="1.5" />;
+
+        const bPct = budgetPct?.get(d.label);
+        const hasBudget = bPct !== undefined;
+        const filled = hasBudget ? Math.min(bPct, 100) / 100 : 0;
+        const over = hasBudget && bPct > 100;
+
+        return (
+          <g key={i}>
+            <path
+              d={`M${cx} ${cy} L${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
+              fill={d.color}
+              opacity=".75"
+              stroke="var(--parch-1)"
+              strokeWidth="1.5"
+            />
+            {hasBudget && (
+              <>
+                {/* Track: how much of this slice's ring is "the limit". */}
+                <path d={arc(ringR, start, end)} fill="none" stroke="var(--ink-faded)" strokeWidth="2" opacity=".35" strokeLinecap="butt" />
+                {filled > 0 && (
+                  <path
+                    d={arc(ringR, start, start + (end - start) * filled)}
+                    fill="none"
+                    stroke={over ? 'var(--rubric)' : 'var(--moss)'}
+                    strokeWidth="2.5"
+                    strokeLinecap="butt"
+                  />
+                )}
+              </>
+            )}
+          </g>
+        );
       })}
       <circle cx={cx} cy={cy} r="28" fill="rgba(245,231,192,.9)" stroke="var(--ink)" strokeWidth="0.8" />
       <text x={cx} y={cy - 2} textAnchor="middle" fontSize="11" fontFamily="'IM Fell English SC',serif" fill="var(--rubric)">TOTAL</text>
@@ -373,6 +446,11 @@ export default function Dashboard() {
   const [pendingCC, setPendingCC] = useState<{ ARS: number; USD: number }>({ ARS: 0, USD: 0 });
   const [monthlyExpenses, setMonthlyExpenses] = useState<number[]>([]);
   const [showPrevComparison, setShowPrevComparison] = useState(false);
+  /** Budget vs. reality for the navigated month. `null` = no budgets, or no bridge. */
+  const [budgets, setBudgets] = useState<BudgetStatus | null>(null);
+  /** Category whose limit is being typed inline in the legend. */
+  const [editingBudget, setEditingBudget] = useState<string | null>(null);
+  const [budgetDraft, setBudgetDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [fadeState, setFadeState] = useState<'in' | 'out'>('in');
   const isFirstLoad = useRef(true);
@@ -460,6 +538,50 @@ export default function Dashboard() {
   useEffect(() => { loadPeriodData(anchorMonth); }, [loadPeriodData, anchorMonth, refreshKey]);
 
   /**
+   * Budgets are a monthly promise, so they only speak in the monthly view — a
+   * "50.000 limit" drawn over a whole year's spending would be a lie by three
+   * quarters.
+   */
+  const budgetsApply = rangeMode === 'month' && hasBudgetSupport();
+
+  const loadBudgets = useCallback((forMonth: string, apply: boolean) => {
+    if (!apply) { setBudgets(null); return; }
+    getBudgetStatus(forMonth)
+      .then(setBudgets)
+      .catch((err) => console.error('[Dashboard] getBudgetStatus failed:', err));
+  }, []);
+
+  useEffect(() => { loadBudgets(month, budgetsApply); }, [loadBudgets, month, budgetsApply, refreshKey]);
+
+  /**
+   * The month-close reward — the one big payout Coinify has.
+   *
+   * Detected the way `ensure-recurring` detects a new month: comparing against
+   * the last month this profile saw. If the month that just closed had budgets
+   * and respected every one of them, 100 XP and a celebration. If it did not:
+   * nothing at all. No message, no summary of the failure. The new month starts
+   * clean — that silence is a deliberate design rule, not an oversight.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    checkBudgetMonthClose(realCurrentMonth())
+      .then((met) => {
+        if (!met || cancelled) return;
+        toast({
+          type: 'xp',
+          message: t('coinify.budgetMonthMet', 'Libro Mayor Cerrado: {{month}} dentro del presupuesto', {
+            month: monthLabel(met.month, i18n.language),
+          }),
+          details: { xp: met.xpGained },
+        });
+      })
+      .catch((err) => console.error('[Dashboard] checkBudgetMonthClose failed:', err));
+    return () => { cancelled = true; };
+    // Once per mount: the guard inside does the real "once per month" work.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
    * Recurring generation used to run on every mount, writing rows the freshly
    * fetched totals did not include — the number then moved on its own next
    * visit. Now it runs at most once per month and refreshes when it wrote.
@@ -476,6 +598,10 @@ export default function Dashboard() {
   useEffect(() => {
     const handler = () => {
       resetRecurringGuard();
+      // The other account has its own budgets, and its month-close was never
+      // evaluated on this machine.
+      resetBudgetGuards();
+      setEditingBudget(null);
       isFirstLoad.current = true;
       setRefreshKey(k => k + 1);
     };
@@ -503,6 +629,53 @@ export default function Dashboard() {
     }));
 
   const donutTotal = donutData.reduce((sum, d) => sum + d.value, 0);
+
+  /** category → status, for the legend rows and the wheel's outer rings. */
+  const budgetByCategory = useMemo(() => {
+    const map = new Map<string, { limit: number; spent: number; pct: number }>();
+    for (const c of budgets?.categories ?? []) {
+      map.set(c.category, { limit: c.limit, spent: c.spent, pct: c.pct });
+    }
+    return map;
+  }, [budgets]);
+
+  const budgetPct = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [cat, b] of budgetByCategory) map.set(cat, b.pct);
+    return map;
+  }, [budgetByCategory]);
+
+  /**
+   * Legend rows = the wheel's slices, plus any budgeted category that happens to
+   * have spent nothing this month. Without that second group a budget could
+   * become uneditable the moment it started working perfectly, which would be a
+   * cruel joke.
+   */
+  const legendRows = useMemo(() => {
+    const rows = donutData.map((d) => ({ ...d, inWheel: true }));
+    if (!budgetsApply) return rows;
+    const shown = new Set(rows.map((r) => r.label));
+    for (const [cat] of budgetByCategory) {
+      if (!shown.has(cat)) rows.push({ label: cat, value: 0, color: 'var(--ink-faded)', inWheel: false });
+    }
+    return rows;
+  }, [donutData, budgetByCategory, budgetsApply]);
+
+  const openBudgetEditor = (category: string) => {
+    setEditingBudget(category);
+    setBudgetDraft(String(budgetByCategory.get(category)?.limit ?? ''));
+  };
+
+  /** `limit === null` clears the budget. Reloads so the wheel and the bars agree. */
+  const commitBudget = async (category: string, limit: number | null) => {
+    const res = await setBudget(category, limit);
+    setEditingBudget(null);
+    if (res && res.ok === false) {
+      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+      return;
+    }
+    loadBudgets(month, budgetsApply);
+  };
 
   /**
    * Categories the wheel cannot show: everything spent there was in dollars.
@@ -785,20 +958,119 @@ export default function Dashboard() {
         <div className="coin-middle-grid">
           {/* Category breakdown */}
           <Section title={t('coinify.expenseBreakdown', 'REPARTO DEL GASTO')} icon={<Scale width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.categoryHelp', 'Distribución de gastos por categoría. La leyenda de abajo muestra el monto y el porcentaje de cada una.')} />}>
-            <CategoryWheel data={donutData} total={donutTotal} />
-            {donutData.length > 0 && (
-              <div className="coin-category-legend">
-                {donutData.map((c, i) => (
-                  <div key={i} className="coin-category-legend__row">
-                    <span className="coin-category-legend__swatch" style={{ background: c.color }} />
-                    <span className="qb-hand coin-category-legend__label" title={c.label}>{c.label}</span>
-                    <span className="qb-numeral coin-category-legend__amount">{formatCurrency(c.value, { currency: 'ARS' })}</span>
-                    <span className="qb-small-caps coin-category-legend__pct">{Math.round((c.value / donutTotal) * 100)}%</span>
-                  </div>
-                ))}
+            {/* One line, not another card: the month's budget in a sentence,
+                right above the wheel it is drawn on. Only when there is at least
+                one limit — an empty budget has nothing to say. */}
+            {budgetsApply && budgets && budgets.categories.length > 0 && (
+              <div className="coin-budget-summary">
+                <div className="coin-budget-summary__line">
+                  <span className="qb-small-caps">
+                    {t('coinify.budgetMonthLine', 'Presupuesto del mes: {{spent}} de {{limit}}', {
+                      spent: formatCurrency(budgets.totalSpent, { currency: 'ARS' }),
+                      limit: formatCurrency(budgets.totalLimit, { currency: 'ARS' }),
+                    })}
+                  </span>
+                  <HelpBubble variant="inline" text={t('coinify.budgetHint', 'Poné un límite mensual con el lápiz de cada categoría. Elegí 3 o 4 categorías, no todas.')} />
+                </div>
+                <Gauge
+                  value={Math.min(budgets.totalSpent, budgets.totalLimit)}
+                  max={budgets.totalLimit || 1}
+                  tone={budgets.totalSpent > budgets.totalLimit ? 'rubric' : 'sage'}
+                  showPips={false}
+                />
               </div>
             )}
-            {donutData.length === 0 && usdOnlyCategories.length === 0 && (
+
+            <CategoryWheel data={donutData} total={donutTotal} budgetPct={budgetsApply ? budgetPct : undefined} />
+            {legendRows.length > 0 && (
+              <div className="coin-category-legend">
+                {legendRows.map((c, i) => {
+                  const budget = budgetByCategory.get(c.label);
+                  const editing = editingBudget === c.label;
+                  const over = budget ? budget.spent > budget.limit : false;
+                  return (
+                    <div key={i} className="coin-category-legend__item">
+                      <div className="coin-category-legend__row">
+                        <span className="coin-category-legend__swatch" style={{ background: c.color }} />
+                        <span className="qb-hand coin-category-legend__label" title={c.label}>{c.label}</span>
+                        <span className="qb-numeral coin-category-legend__amount">{formatCurrency(c.value, { currency: 'ARS' })}</span>
+                        <span className="qb-small-caps coin-category-legend__pct">
+                          {donutTotal > 0 && c.inWheel ? `${Math.round((c.value / donutTotal) * 100)}%` : '—'}
+                        </span>
+                        {/* The whole budget UI: one pencil per legend row, shown
+                            on hover or keyboard focus so the resting state of the
+                            panel is exactly what it was before. */}
+                        {budgetsApply && (
+                          <button
+                            type="button"
+                            className={`coin-budget-pencil${budget ? ' coin-budget-pencil--set' : ''}`}
+                            onClick={() => (editing ? setEditingBudget(null) : openBudgetEditor(c.label))}
+                            aria-label={t('coinify.budgetEditLabel', 'Límite mensual de {{category}}', { category: c.label })}
+                            title={t('coinify.budgetEditLabel', 'Límite mensual de {{category}}', { category: c.label })}
+                          >
+                            <Pencil width="10" height="10" />
+                          </button>
+                        )}
+                      </div>
+
+                      {budgetsApply && editing && (
+                        <div className="coin-budget-edit">
+                          <RpgNumberInput
+                            value={budgetDraft}
+                            onChange={setBudgetDraft}
+                            min={0}
+                            step={1000}
+                            autoFocus
+                            placeholder={t('coinify.budgetPlaceholder', 'Límite mensual')}
+                            aria-label={t('coinify.budgetEditLabel', 'Límite mensual de {{category}}', { category: c.label })}
+                            style={{ flex: 1 }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { e.preventDefault(); commitBudget(c.label, parseFloat(budgetDraft) || null); }
+                              if (e.key === 'Escape') { e.preventDefault(); setEditingBudget(null); }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="rpg-button coin-budget-edit__btn"
+                            onClick={() => commitBudget(c.label, parseFloat(budgetDraft) || null)}
+                            aria-label={t('coinify.budgetSave', 'Guardar límite')}
+                            title={t('coinify.budgetSave', 'Guardar límite')}
+                          >
+                            <Checkmark width="11" height="11" />
+                          </button>
+                          {budget && (
+                            <button
+                              type="button"
+                              className="rpg-button coin-budget-edit__btn"
+                              onClick={() => commitBudget(c.label, null)}
+                              aria-label={t('coinify.budgetRemove', 'Quitar presupuesto')}
+                              title={t('coinify.budgetRemove', 'Quitar presupuesto')}
+                            >
+                              <CrossMark width="11" height="11" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {budgetsApply && budget && !editing && (
+                        <div className={`coin-budget-row${over ? ' coin-budget-row--over' : ''}`}>
+                          <span className="qb-numeral coin-budget-row__figures">
+                            {formatCurrency(budget.spent, { currency: 'ARS' })} / {formatCurrency(budget.limit, { currency: 'ARS' })}
+                          </span>
+                          <span className="coin-budget-bar">
+                            <span
+                              className="coin-budget-bar__fill"
+                              style={{ width: `${Math.min(budget.pct, 100)}%` }}
+                            />
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {legendRows.length === 0 && usdOnlyCategories.length === 0 && (
               <div className="coin-empty-codex">{t('coinify.noExpensesThisMonth')}</div>
             )}
             {usdOnlyCategories.length > 0 && (

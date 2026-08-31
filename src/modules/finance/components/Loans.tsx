@@ -171,7 +171,18 @@ export default function Loans() {
     setSettlingId(id);
     try {
       await window.api.financeSettleLoan(id);
-      toast({ type: 'coin', message: t('coinify.loanSettled'), details: { transactionType: 'settled' } });
+      // A settle is a one-shot manual act per loan (no farming vector), so it
+      // pays like the module's declared handler intended. Feeds 'debt_free'.
+      const rpg = await window.api.processRpgEvent({
+        type: 'LOAN_SETTLED', moduleId: 'finance',
+        payload: { xp: 10, hp: 0, loanId: id }, timestamp: Date.now(),
+      }).catch(() => null);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+      toast({
+        type: 'coin',
+        message: `${t('coinify.loanSettled')}${rpg ? ` · +${rpg.xpGained} XP` : ''}`,
+        details: { transactionType: 'settled' },
+      });
 
       const rowEl = loanRowRefs.current.get(id);
       const animDuration = rowEl ? 1200 : 0;

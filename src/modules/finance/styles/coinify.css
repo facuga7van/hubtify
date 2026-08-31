@@ -2157,3 +2157,112 @@ button.coin-sort-header--amount {
   font-style: italic;
   cursor: help;
 }
+
+/* ── Budgets (phase 2) ──
+   The budget lives inside the expense wheel that was already on this screen:
+   one line above it, one pencil per legend row, one bar under a row that has a
+   limit. No new panel, no new screen. */
+
+.coin-budget-summary {
+  margin: 0 0 8px;
+}
+
+.coin-budget-summary__line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  margin-bottom: 3px;
+}
+
+.coin-category-legend__item {
+  padding: 1px 0;
+}
+
+/* The row gained a fifth column for the pencil. It keeps its width whether the
+   button is visible or not, so revealing it on hover never reflows the legend. */
+.coin-category-legend__item .coin-category-legend__row {
+  grid-template-columns: 10px minmax(0, 1fr) minmax(80px, auto) 42px 18px;
+}
+
+.coin-budget-pencil {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.coin-category-legend__item:hover .coin-budget-pencil,
+.coin-category-legend__item:focus-within .coin-budget-pencil,
+.coin-budget-pencil:focus-visible,
+/* A category that already has a limit shows its pencil permanently: the control
+   that changes a number the user is looking at must not be a hidden one. */
+.coin-budget-pencil--set {
+  opacity: 1;
+}
+
+.coin-budget-pencil:hover,
+.coin-budget-pencil:focus-visible {
+  color: var(--gold-dark);
+}
+
+.coin-budget-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px 16px;
+}
+
+.coin-budget-edit__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  min-width: 26px;
+}
+
+.coin-budget-row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(48px, 1fr);
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 3px 16px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.coin-budget-row__figures {
+  white-space: nowrap;
+}
+
+.coin-budget-bar {
+  display: block;
+  height: 4px;
+  background: rgba(74, 55, 32, 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.coin-budget-bar__fill {
+  display: block;
+  height: 100%;
+  background: var(--moss);
+  transition: width 0.25s ease;
+}
+
+.coin-budget-row--over {
+  color: var(--rubric);
+}
+
+.coin-budget-row--over .coin-budget-bar__fill {
+  background: var(--rubric);
+}

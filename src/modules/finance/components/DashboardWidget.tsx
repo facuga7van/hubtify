@@ -7,6 +7,8 @@ import { currencyPrefix, formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
 import { useToast } from '../../../shared/components/useToast';
 import { todayDateString } from '../../../../shared/date-utils';
+import { emitMovementLogged } from '../utils/rpg-events';
+import { checkBudgetOverflow } from '../utils/budget-guards';
 
 export default function DashboardWidget() {
   const { t } = useTranslation();
@@ -86,10 +88,28 @@ export default function DashboardWidget() {
         toast({ type: 'warning', message: failureMessage(result.reason, t) });
         return;
       }
+
+      // The manual act of logging a movement pays XP. Import, automatic
+      // recurring generation, statement payments and edits deliberately do not —
+      // see `utils/rpg-events.ts`.
+      const rpg = await emitMovementLogged(quickType);
+      const xpSuffix = rpg ? ` · +${rpg.xpGained} XP` : '';
       toast({
         type: 'coin',
-        message: formatCurrency(quickType === 'expense' ? -amount : amount, { currency: 'ARS', decimals: 2, showSign: true }),
+        message: `${formatCurrency(quickType === 'expense' ? -amount : amount, { currency: 'ARS', decimals: 2, showSign: true })}${xpSuffix}`,
+        details: { transactionType: quickType },
       });
+
+      if (quickType === 'expense') {
+        const blown = await checkBudgetOverflow(todayDateString().slice(0, 7), quickCategory || 'Otros');
+        if (blown) {
+          toast({
+            type: 'warning',
+            message: t('coinify.budgetOverflow', '{{category}}: te pasaste del límite del mes', { category: blown }),
+          });
+        }
+      }
+
       // Reset
       setQuickAmount('');
       setQuickDesc('');

@@ -9,10 +9,13 @@ import {
   MAX_INSTALLMENTS,
   addMonthsClamped,
   addMonthsToMonth,
-  aggregateByCategory,
+  computeBudgetStatus,
+  computeCategorySpend,
   computeExpenseBreakdown,
   computeMonthlyBalance,
   generateRecurringForMonth,
+  listBudgets,
+  setBudget,
   getStatementPeriod,
   isValidDateString,
   isValidMonthString,
@@ -249,25 +252,14 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getCategoryBreakdown', (_e, month?: string) => {
     const db = getDb();
     const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
-    const { start, end } = monthRange(m);
-    return aggregateByCategory(db, {
-      start, end,
-      type: 'expense',
-      balanceScope: 'all',
-      excludeCategories: [CARD_PAYMENT_CATEGORY],
-    });
+    return computeCategorySpend(db, monthRange(m));
   });
 
   ipcHandle('finance:getCategoryBreakdownForRange', (_e, startMonth: string, endMonth: string) => {
     const db = getDb();
     if (!isValidMonthString(startMonth) || !isValidMonthString(endMonth)) return [];
-    const { start, end } = monthRangeBetween(startMonth, endMonth);
-    return aggregateByCategory(db, {
-      start, end,
-      type: 'expense',
-      balanceScope: 'all',
-      excludeCategories: [CARD_PAYMENT_CATEGORY],
-    }).sort((a, b) => b.ARS - a.ARS);
+    return computeCategorySpend(db, monthRangeBetween(startMonth, endMonth))
+      .sort((a, b) => b.ARS - a.ARS);
   });
 
   ipcHandle('finance:getBalanceForRange', (_e, startMonth: string, endMonth: string) => {
@@ -380,6 +372,28 @@ export function registerFinanceIpcHandlers(): void {
     }
     const now = nowIso();
     db.prepare('UPDATE finance_categories SET deleted_at = ?, updated_at = ? WHERE name = ?').run(now, now, name);
+  });
+
+  // ── Budgets ─────────────────────────────────────────
+  //
+  // A budget is an attribute of a category the expense wheel already draws, not
+  // a screen of its own — hence no id, no month column, no CRUD surface beyond
+  // "set the number" and "clear it".
+
+  ipcHandle('finance:getBudgets', () => listBudgets(getDb()));
+
+  /** `limit === null` clears the budget (soft delete, so the removal syncs). */
+  ipcHandle('finance:setBudget', (_e, category: string, limit: number | null) =>
+    setBudget(getDb(), category, limit));
+
+  /**
+   * Budget vs. reality for a month. Spend comes from the exact aggregation the
+   * dashboard wheel is drawn from (`computeCategorySpend`), so the bar under a
+   * slice and the slice itself can never disagree.
+   */
+  ipcHandle('finance:getBudgetStatus', (_e, month?: string) => {
+    const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
+    return computeBudgetStatus(getDb(), m);
   });
 
   // ── Credit Cards ──────────────────────────────────

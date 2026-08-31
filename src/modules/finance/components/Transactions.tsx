@@ -20,6 +20,8 @@ import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
+import { emitMovementLogged } from '../utils/rpg-events';
+import { checkBudgetOverflow } from '../utils/budget-guards';
 
 interface TransactionRow {
   id: string;
@@ -335,12 +337,32 @@ export default function Transactions() {
       setEnteringId(newId);
       setEnteringType(data.type);
       setTimeout(() => { setEnteringId(null); setEnteringType(null); }, 600);
+
+      // A movement typed by hand pays XP — one event for the act, including an
+      // instalment plan (six instalments are one purchase, not six). See
+      // `utils/rpg-events.ts` for the full list of paths that deliberately stay
+      // silent (import, recurring generation, statement payments, edits).
+      const rpg = await emitMovementLogged(data.type);
+
+      // One toast, not two: the success message and the XP are the same event.
       const formatted = formatCurrency(data.amount, { currency: data.currency });
+      const xpSuffix = rpg ? ` · +${rpg.xpGained} XP` : '';
       toast({
         type: 'coin',
-        message: `${formatted} ${t('coinify.in')} ${data.category}`,
+        message: `${formatted} ${t('coinify.in')} ${data.category}${xpSuffix}`,
         details: { transactionType: data.type === 'income' ? 'income' : 'expense' },
       });
+
+      // Informative, never punitive: no HP damage, and once per category-month.
+      if (data.type === 'expense') {
+        const blown = await checkBudgetOverflow(data.date.slice(0, 7), data.category);
+        if (blown) {
+          toast({
+            type: 'warning',
+            message: t('coinify.budgetOverflow', '{{category}}: te pasaste del límite del mes', { category: blown }),
+          });
+        }
+      }
     } catch (err) {
       console.error('[Transactions] handleAdd failed:', err);
       toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });

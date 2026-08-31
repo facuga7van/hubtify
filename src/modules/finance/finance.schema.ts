@@ -396,4 +396,29 @@ export const financeMigrations: Migration[] = [
       );
     `,
   },
+  {
+    namespace: 'finance',
+    version: 15,
+    up: `
+      -- Monthly spending limits, one row per category. The category name IS the
+      -- key: budgets live inside the existing expense wheel (one ring per slice),
+      -- never on a screen of their own, so there is nothing else to identify.
+      --
+      -- Removing a budget is a soft delete like everywhere else in this module,
+      -- so the removal travels through last-write-wins sync instead of the row
+      -- coming back from the other device on the next pull.
+      --
+      -- The defaults are written in ISO on purpose (strftime, not datetime('now')):
+      -- LWW compares updated_at as a plain string and 'T' > ' ' — see the v13
+      -- normalisation above. Every write from the IPC layer passes nowIso().
+      CREATE TABLE IF NOT EXISTS finance_budgets (
+        category TEXT PRIMARY KEY,
+        monthly_limit REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        deleted_at TEXT DEFAULT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_finance_budgets_deleted ON finance_budgets(deleted_at);
+    `,
+  },
 ];

@@ -235,6 +235,13 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         loadCards();
         return;
       }
+      // Record-only (xp 0): imports are deliberately excluded from paying XP
+      // (60 rows per PDF would be pure farming — see utils/rpg-events.ts), but
+      // the act still feeds the 'scribe_of_accounts' achievement.
+      await window.api.processRpgEvent({
+        type: 'STATEMENT_IMPORTED', moduleId: 'finance',
+        payload: { xp: 0, hp: 0, count: result.count, month: statementMonth }, timestamp: Date.now(),
+      }).catch(() => null);
       setSuccessCount(result.count);
       setRows([]);
       setFileName('');

@@ -171,3 +171,79 @@ export function payStatement(
   ) => Promise<unknown>;
   return fn(id, paidAmount, paidAmountUsd);
 }
+
+// ── Budgets ────────────────────────────────────────────────────────────────
+//
+// `finance:setBudget` / `finance:getBudgets` / `finance:getBudgetStatus` exist in
+// the main process but are not on the context bridge yet (this module may not
+// edit `electron/preload.ts` or `shared/types.ts`). Same degrade-to-null contract
+// as the helpers above: the budget UI simply does not appear until the bridge
+// catches up, instead of throwing on every dashboard mount.
+
+export interface Budget {
+  category: string;
+  monthlyLimit: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetCategoryStatus {
+  category: string;
+  limit: number;
+  spent: number;
+  /** Unclamped: over 100 means the limit was blown. */
+  pct: number;
+}
+
+export interface BudgetStatus {
+  month: string;
+  categories: BudgetCategoryStatus[];
+  totalLimit: number;
+  totalSpent: number;
+}
+
+/** `null` when the handler is not exposed on the bridge yet. */
+export async function getBudgets(): Promise<Budget[] | null> {
+  const fn = bridge('financeGetBudgets');
+  if (!fn) return null;
+  try {
+    return (await fn()) as Budget[];
+  } catch (err) {
+    console.error('[finance] getBudgets failed:', err);
+    return null;
+  }
+}
+
+/** `limit === null` clears the budget. `null` when the bridge is not there yet. */
+export async function setBudget(
+  category: string,
+  limit: number | null,
+): Promise<{ ok: true } | FinanceFailure | null> {
+  const fn = bridge('financeSetBudget');
+  if (!fn) return null;
+  try {
+    const res = await fn(category, limit);
+    if (isFailure(res)) return res;
+    return { ok: true };
+  } catch (err) {
+    console.error('[finance] setBudget failed:', err);
+    return { ok: false, reason: 'ipc_error' };
+  }
+}
+
+/** `null` when the handler is not exposed on the bridge yet. */
+export async function getBudgetStatus(month?: string): Promise<BudgetStatus | null> {
+  const fn = bridge('financeGetBudgetStatus');
+  if (!fn) return null;
+  try {
+    return (await fn(month)) as BudgetStatus;
+  } catch (err) {
+    console.error('[finance] getBudgetStatus failed:', err);
+    return null;
+  }
+}
+
+/** True once the budget handlers are reachable. */
+export function hasBudgetSupport(): boolean {
+  return bridge('financeGetBudgetStatus') !== null && bridge('financeSetBudget') !== null;
+}
