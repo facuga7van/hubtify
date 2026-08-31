@@ -12,6 +12,7 @@ import { cauldronMigrations } from '../src/modules/cauldron/cauldron.schema';
 import { startNotificationEngine, stopNotificationEngine } from './modules/notifications.ipc';
 import { generateRecurringForMonth } from './modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
+import { todayDateString } from '../shared/date-utils';
 
 // Handle Squirrel events (Windows installer lifecycle)
 if (require('electron-squirrel-startup')) app.quit();
@@ -320,7 +321,10 @@ app.whenReady().then(() => {
   // Shares the exact implementation used by `finance:generateRecurringForMonth`,
   // so billing_day, deterministic ids and soft-delete awareness cannot drift.
   try {
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    // Local month, not UTC: on the last day of the month after 21:00 ART this
+    // wrote NEXT month's rent and subscriptions a day early, and never generated
+    // the month the user was actually looking at.
+    const currentMonth = todayDateString().slice(0, 7); // YYYY-MM
     const generated = generateRecurringForMonth(getDb(), currentMonth);
     if (generated > 0) {
       console.log(`[bootstrap] generated ${generated} recurring transaction(s) for ${currentMonth}`);

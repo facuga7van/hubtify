@@ -126,8 +126,12 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
     .prepare(
       `SELECT id, name FROM tasks
        WHERE status = 0
-         AND updated_at < datetime('now', '-7 days')
-         AND updated_at >= datetime('now', '-30 days')
+         -- The finance v13 / nutrition v9 migrations normalised these columns to
+         -- ISO ('...T...Z'), and this compares strings: 'T' (0x54) > ' ' (0x20),
+         -- so a bare datetime('now') bound lost for the whole day and the notice
+         -- fired up to 24h late. Compare ISO against ISO.
+         AND updated_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-7 days')
+         AND updated_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')
          AND deleted_at IS NULL`
     )
     .all() as { id: string; name: string }[];
@@ -331,7 +335,8 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
       `SELECT id, person_name, amount, currency
        FROM finance_loans
        WHERE settled = 0
-         AND created_at < datetime('now', '-30 days')`
+         -- See the quest-stale query: these columns are ISO now.
+         AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')`
     )
     .all() as { id: string; person_name: string; amount: number; currency: string }[];
 

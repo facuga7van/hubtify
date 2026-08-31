@@ -166,6 +166,9 @@
 
 .notif-drawer-header-actions {
   display: flex;
+  /* La X esta primera en el DOM (recibe el foco inicial); row-reverse la deja
+     visualmente a la derecha, que es donde el usuario la espera. */
+  flex-direction: row-reverse;
   align-items: center;
   gap: 8px;
 }

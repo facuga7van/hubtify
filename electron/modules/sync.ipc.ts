@@ -891,6 +891,8 @@ export function registerSyncIpcHandlers(): void {
              import_batch_id AS importBatchId,
              credit_card_id AS creditCardId,
              impacts_balance AS impactsBalance,
+             installment_number AS installmentNumber,
+             billed_amount_ars AS billedAmountArs,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_transactions ORDER BY date DESC
@@ -952,6 +954,9 @@ export function registerSyncIpcHandlers(): void {
       SELECT id, credit_card_id AS creditCardId, period_month AS periodMonth,
              calculated_amount AS calculatedAmount, paid_amount AS paidAmount,
              status, paid_date AS paidDate, transaction_id AS transactionId,
+             calculated_amount_usd AS calculatedAmountUsd,
+             paid_amount_usd AS paidAmountUsd,
+             transaction_id_usd AS transactionIdUsd,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_credit_card_statements
@@ -1084,14 +1089,16 @@ export function registerSyncIpcHandlers(): void {
             (id, type, amount, currency, category, description, date, payment_method,
              source, installments, installment_group_id, for_third_party,
              recurring_id, import_batch_id, credit_card_id, impacts_balance,
+             installment_number, billed_amount_ars,
              created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const updateTx = db.prepare(`
           UPDATE finance_transactions SET type = ?, amount = ?, currency = ?, category = ?,
             description = ?, date = ?, payment_method = ?, source = ?, installments = ?,
             installment_group_id = ?, for_third_party = ?, recurring_id = ?,
-            import_batch_id = ?, credit_card_id = ?, impacts_balance = ?, updated_at = ?,
+            import_batch_id = ?, credit_card_id = ?, impacts_balance = ?,
+            installment_number = ?, billed_amount_ars = ?, updated_at = ?,
             deleted_at = ?
           WHERE id = ?
         `);
@@ -1106,6 +1113,7 @@ export function registerSyncIpcHandlers(): void {
               t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
               t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
               t.creditCardId ?? null, t.impactsBalance ?? 1,
+              t.installmentNumber ?? null, t.billedAmountArs ?? null,
               t.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt,
             );
             if (result.changes > 0) changed = true;
@@ -1115,7 +1123,8 @@ export function registerSyncIpcHandlers(): void {
               t.description ?? '', t.date, t.paymentMethod ?? 'cash',
               t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
               t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
-              t.creditCardId ?? null, t.impactsBalance ?? 1, remoteUpdatedAt,
+              t.creditCardId ?? null, t.impactsBalance ?? 1,
+              t.installmentNumber ?? null, t.billedAmountArs ?? null, remoteUpdatedAt,
               remoteDeletedAt, t.id,
             );
             changed = true;
@@ -1270,12 +1279,16 @@ export function registerSyncIpcHandlers(): void {
         const insertCCS = db.prepare(`
           INSERT OR IGNORE INTO finance_credit_card_statements
             (id, credit_card_id, period_month, calculated_amount, paid_amount,
-             status, paid_date, transaction_id, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             status, paid_date, transaction_id,
+             calculated_amount_usd, paid_amount_usd, transaction_id_usd,
+             created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const updateCCS = db.prepare(`
           UPDATE finance_credit_card_statements SET calculated_amount = ?, paid_amount = ?,
-                 status = ?, paid_date = ?, transaction_id = ?, updated_at = ?, deleted_at = ?
+                 status = ?, paid_date = ?, transaction_id = ?,
+                 calculated_amount_usd = ?, paid_amount_usd = ?, transaction_id_usd = ?,
+                 updated_at = ?, deleted_at = ?
           WHERE id = ?
         `);
         for (const s of data.creditCardStatements as Array<Record<string, unknown>>) {
@@ -1288,6 +1301,9 @@ export function registerSyncIpcHandlers(): void {
               s.calculatedAmount ?? s.calculated_amount ?? 0, s.paidAmount ?? s.paid_amount ?? null,
               s.status ?? 'pending', s.paidDate ?? s.paid_date ?? null,
               s.transactionId ?? s.transaction_id ?? null,
+              s.calculatedAmountUsd ?? s.calculated_amount_usd ?? null,
+              s.paidAmountUsd ?? s.paid_amount_usd ?? null,
+              s.transactionIdUsd ?? s.transaction_id_usd ?? null,
               s.createdAt ?? s.created_at ?? now, remoteUpdatedAt, remoteDeletedAt,
             );
             changed = true;
@@ -1296,6 +1312,9 @@ export function registerSyncIpcHandlers(): void {
               s.calculatedAmount ?? s.calculated_amount ?? 0, s.paidAmount ?? s.paid_amount ?? null,
               s.status ?? 'pending', s.paidDate ?? s.paid_date ?? null,
               s.transactionId ?? s.transaction_id ?? null,
+              s.calculatedAmountUsd ?? s.calculated_amount_usd ?? null,
+              s.paidAmountUsd ?? s.paid_amount_usd ?? null,
+              s.transactionIdUsd ?? s.transaction_id_usd ?? null,
               remoteUpdatedAt, remoteDeletedAt, s.id,
             );
             changed = true;

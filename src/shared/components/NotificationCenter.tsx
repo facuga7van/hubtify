@@ -114,15 +114,18 @@ export default function NotificationCenter({ open, onClose, onNavigate }: Notifi
       >
         <div className="notif-drawer-header">
           <span>{t('notifications.title', 'Notificaciones')}</span>
+          {/* La X va PRIMERA en el DOM a proposito: useModalA11y enfoca el primer
+              elemento focusable, y "Descartar todas" borra todo sin confirmacion ni
+              undo. El orden visual se recompone con flex-direction: row-reverse. */}
           <div className="notif-drawer-header-actions">
+          <button className="notif-drawer-close" onClick={handleClose}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+          </button>
             {notifications.length > 0 && (
               <button className="notif-dismiss-all" onClick={handleDismissAll}>
                 {t('notifications.dismissAll', 'Descartar todas')}
               </button>
             )}
-          <button className="notif-drawer-close" onClick={handleClose}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
-          </button>
           </div>
         </div>
 

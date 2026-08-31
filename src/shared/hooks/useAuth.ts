@@ -263,7 +263,7 @@ export function useAuth() {
       const pushResult = await syncPush(user.uid);
       if (!pushResult.success) {
         console.error('[switchAccount] Aborted: push failed, local data NOT cleared:', pushResult.error);
-        return { success: false, pushFailed: true, error: 'auth.errors.switchFailed' };
+        return { success: false, pushFailed: true, error: 'auth.switchPushFailed' };
       }
       await window.api.syncClearUserData();
 
@@ -282,7 +282,7 @@ export function useAuth() {
         setActiveAppName(user.uid); // Won't match but we restore data below
         await window.api.syncSetCurrentUser(user.uid);
         await syncPull(user.uid);
-        return { success: false, error: 'auth.errors.switchFailed' };
+        return { success: false, error: 'auth.switchPushFailed' };
       }
 
       setUser({
@@ -300,7 +300,7 @@ export function useAuth() {
       return { success: true };
     } catch (err) {
       console.error('Failed to switch account:', err);
-      return { success: false, error: 'auth.errors.switchFailed' };
+      return { success: false, error: 'auth.switchPushFailed' };
     } finally {
       setSwitching(false);
     }
@@ -325,12 +325,6 @@ export function useAuth() {
 
     try {
       const cred = await signInWithEmailAndPassword(newAuth, email, password);
-      addCachedAccount({
-        uid: cred.user.uid,
-        email: cred.user.email ?? email,
-        firebaseAppName: newAppName,
-        username: cred.user.displayName ?? undefined,
-      });
 
       // Switch to the new account
       const previousUid = user?.uid;
@@ -341,10 +335,19 @@ export function useAuth() {
         const pushResult = await syncPush(user.uid);
         if (!pushResult.success) {
           console.error('[addAccount] Aborted: push failed, local data NOT cleared:', pushResult.error);
-          return { success: false, pushFailed: true, error: 'auth.errors.switchFailed' };
+          return { success: false, pushFailed: true, error: 'auth.switchPushFailed' };
         }
         await window.api.syncClearUserData();
       }
+
+      // Caching AFTER the push guard: doing it first left the account listed in the
+      // dropdown even when the abort meant it was never activated and never pulled.
+      addCachedAccount({
+        uid: cred.user.uid,
+        email: cred.user.email ?? email,
+        firebaseAppName: newAppName,
+        username: cred.user.displayName ?? undefined,
+      });
 
       setActiveAppName(newAppName);
       setActiveAppVersion(v => v + 1);
@@ -362,7 +365,7 @@ export function useAuth() {
           await window.api.syncSetCurrentUser(previousUid);
           await syncPull(previousUid);
         }
-        return { success: false, error: 'auth.errors.switchFailed' };
+        return { success: false, error: 'auth.switchPushFailed' };
       }
 
       setUser({

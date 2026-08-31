@@ -264,12 +264,18 @@
 }
 
 /* ── System toast container ────────────────────────
-   Top-right, below the 32px title bar. Moved off the bottom-right corner,
-   which is contested by the Cauldron floating timer, the Questify XP toast
-   and the Cauldron toast — the system toast covered the timer controls. */
+   Top-right. Moved off the bottom-right corner, which is contested by the
+   Cauldron floating timer, the Questify XP toast and the Cauldron toast — the
+   system toast covered the timer controls.
+
+   `top` clears BOTH the 32px title bar and the page header: `.qb-page` pads 24px
+   and `.qb-header-extra` (the dollar/crypto chips) sits at its top edge. At 46px
+   the toast landed on those chips and, being pointer-events:auto, swallowed the
+   click that should have opened their dropdown — and painted over it, since the
+   dropdowns are z-index 100 against the toast's 10003. */
 .system-toast-container {
   position: fixed;
-  top: 46px;
+  top: 96px;
   right: 20px;
   display: flex;
   flex-direction: column;

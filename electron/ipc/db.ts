@@ -121,8 +121,24 @@ export const coreMigrations: Migration[] = [
 
       -- Disambiguate the rare genuine collision (two identical events in the same
       -- second) so the UNIQUE index below can be created.
-      UPDATE rpg_events SET sync_id = sync_id || '#' || id
-        WHERE id NOT IN (SELECT MIN(id) FROM rpg_events GROUP BY sync_id);
+      --
+      -- The tiebreaker MUST be deterministic across devices. Using the local
+      -- AUTOINCREMENT id produced '...#2' here and '...#7' there for the same
+      -- logical event, and the merge keys on sync_id alone: both rows survived and
+      -- the XP-per-day chart double-counted. ROW_NUMBER over the row's own content
+      -- gives every device the same answer.
+      UPDATE rpg_events SET sync_id = sync_id || '#' || (
+        SELECT rn FROM (
+          SELECT id AS rid,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY sync_id
+                   ORDER BY COALESCE(payload, ''), COALESCE(module_id, ''),
+                            hp_change, combo_multiplier, bonus_multiplier
+                 ) AS rn
+          FROM rpg_events
+        ) WHERE rid = rpg_events.id
+      )
+      WHERE id NOT IN (SELECT MIN(id) FROM rpg_events GROUP BY sync_id);
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_rpg_events_sync_id ON rpg_events(sync_id);
       CREATE INDEX IF NOT EXISTS idx_rpg_events_type_ref ON rpg_events(event_type, ref_id, id DESC);
