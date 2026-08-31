@@ -16,8 +16,13 @@ import { useDashboardDrag } from './layouts/useDashboardDrag';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 import { playSealPress } from '../shared/audio';
+import { SealRosette } from './codex/CodexSealIcons';
+import { useSealInvite } from './codex/useSealInvite';
+import { humanise, titleKey } from './codex/achievementCatalog';
+import { CODEX_SEALED_EVENT, getAchievements, openCodex } from './codex/codexApi';
 import './styles/components.css';
 import './styles/dashboard-layouts.css';
+import './styles/codex-seal.css';
 
 /* ── latin epigraphs ─────────────────────────────────────── */
 
@@ -169,6 +174,9 @@ export default function Dashboard() {
     eventsToday: number;
   } | null>(null);
   const [recentEvents, setRecentEvents] = useState<RpgEventRecord[]>([]);
+  /** Most recent achievement unlocked in the last 24 h — one brief line, no banner. */
+  const [freshAchievementId, setFreshAchievementId] = useState<string | null>(null);
+  const { available: codexAvailable, invite: sealInvite, todaySealed } = useSealInvite();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const epigraph = useMemo(() => EPIGRAPHS[Math.floor(Math.random() * EPIGRAPHS.length)], []);
@@ -195,6 +203,15 @@ export default function Dashboard() {
     ])
       .then(([questsOverdue, mealsToday]) => setTodo({ questsOverdue, mealsToday }))
       .catch(() => { /* the brief just stays generic */ });
+
+    getAchievements().then((list) => {
+      if (!list) { setFreshAchievementId(null); return; }
+      const cutoff = Date.now() - 24 * 60 * 60_000;
+      const fresh = list
+        .filter((a) => a.unlocked && a.unlockedAt && new Date(a.unlockedAt).getTime() >= cutoff)
+        .sort((a, b) => new Date(b.unlockedAt as string).getTime() - new Date(a.unlockedAt as string).getTime())[0];
+      setFreshAchievementId(fresh?.id ?? null);
+    });
   }, []);
 
   /** Ctrl+↑ / Ctrl+↓ move the focused card — the reorder was drag-only. */
@@ -212,7 +229,13 @@ export default function Dashboard() {
   useEffect(() => {
     const handler = () => load();
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
+    window.addEventListener(CODEX_SEALED_EVENT, handler);
+    window.addEventListener('rpg:achievementUnlocked', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener(CODEX_SEALED_EVENT, handler);
+      window.removeEventListener('rpg:achievementUnlocked', handler);
+    };
   }, [load]);
 
   if (loading)
@@ -267,28 +290,78 @@ export default function Dashboard() {
   /* ── What actually needs doing today ─────────────────────────
      This block replaces "Salve, noble …" plus a random Latin epigraph: two
      paragraphs that never once told you there were overdue quests. */
-  const briefLines: string[] = [];
+  const briefLines: Array<{ key: string; node: ReactNode }> = [];
   if (todo.questsOverdue > 0) {
-    briefLines.push(t('dashboard.briefOverdue', {
-      n: todo.questsOverdue,
-      defaultValue: 'Tenés {{n}} misiones vencidas.',
-    }));
+    briefLines.push({
+      key: 'overdue',
+      node: t('dashboard.briefOverdue', {
+        n: todo.questsOverdue,
+        defaultValue: 'Tenés {{n}} misiones vencidas.',
+      }),
+    });
   }
   if (todo.mealsToday === 0) {
-    briefLines.push(t('dashboard.briefNoMeals', 'Todavía no registraste ninguna comida hoy.'));
+    briefLines.push({
+      key: 'no-meals',
+      node: t('dashboard.briefNoMeals', 'Todavía no registraste ninguna comida hoy.'),
+    });
   }
   if (streak > 0 && eventsToday === 0) {
-    briefLines.push(t('dashboard.briefStreakAtRisk', {
-      n: streak,
-      defaultValue: 'Tu racha de {{n}} días está en riesgo: registrá algo hoy.',
-    }));
+    briefLines.push({
+      key: 'streak',
+      node: t('dashboard.briefStreakAtRisk', {
+        n: streak,
+        defaultValue: 'Tu racha de {{n}} días está en riesgo: registrá algo hoy.',
+      }),
+    });
   }
   if (briefLines.length === 0) {
-    briefLines.push(
-      eventsToday > 0
+    briefLines.push({
+      key: 'default',
+      node: eventsToday > 0
         ? t('dashboard.briefAllGood', { n: eventsToday, defaultValue: 'Todo al día: {{n}} hechos registrados hoy.' })
-        : t('dashboard.briefNothingPending', 'Nada pendiente. Buen momento para sumar algo.')
-    );
+        : t('dashboard.briefNothingPending', 'Nada pendiente. Buen momento para sumar algo.'),
+    });
+  }
+
+  /* The loop closes here. One line in the brief, never a banner: past 21:00
+     with an unsealed day (or yesterday still open), the invitation joins the
+     things worth doing tonight. */
+  if (sealInvite) {
+    briefLines.push({
+      key: 'seal',
+      node: (
+        <>
+          {sealInvite.which === 'yesterday'
+            ? t('dashboard.briefSealYesterday', 'Te quedó ayer sin sellar. ')
+            : ''}
+          <button
+            type="button"
+            className="dash-brief__seal"
+            onClick={() => openCodex(sealInvite.date)}
+          >
+            {t('dashboard.briefSealDay', 'Sellá tu día')}
+          </button>
+        </>
+      ),
+    });
+  }
+  if (freshAchievementId) {
+    briefLines.push({
+      key: 'achievement',
+      node: (
+        <>
+          {t('dashboard.briefNewAchievement', 'Nuevo logro: ')}
+          <button
+            type="button"
+            className="dash-brief__seal"
+            onClick={() => animatedNavigate('/achievements')}
+          >
+            {t(titleKey(freshAchievementId), humanise(freshAchievementId))}
+          </button>
+        </>
+      ),
+    });
   }
 
   /** A fresh install used to be a wall of zeroes with no call to action. */
@@ -317,7 +390,7 @@ export default function Dashboard() {
             </div>
             <ul className="dash-brief__list">
               {briefLines.map((line) => (
-                <li key={line} className="dash-brief__line">{line}</li>
+                <li key={line.key} className="dash-brief__line">{line.node}</li>
               ))}
             </ul>
           </div>
@@ -356,8 +429,24 @@ export default function Dashboard() {
             </span>
           </div>
         </div>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
           <SealButton level={level} />
+          {/* The permanent way in. The evening invitation is an offer; this is
+              always here, sealed or not, so the ritual is never something you
+              can only reach when the app decides to ask. */}
+          {codexAvailable && (
+            <button
+              type="button"
+              className="codex-link"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={() => openCodex()}
+            >
+              <SealRosette width={12} height={12} />
+              {todaySealed
+                ? t('dashboard.codexOpenSealed', 'Ver la página de hoy')
+                : t('dashboard.codexOpen', 'Abrir el códice del día')}
+            </button>
+          )}
           <div
             style={{
               position: 'absolute',

@@ -1,0 +1,643 @@
+/* ══════════════════════════════════════════════════════
+   CIERRE DEL CÓDICE + LOGROS
+   The day-sealing ritual (modal, wax, seal strip), the sidebar/dashboard
+   invitations, and the achievements shelf.
+
+   Everything here reuses the codex language already in codex.css — parchment,
+   iron corners, wax, rubric ink. No new visual vocabulary.
+   ══════════════════════════════════════════════════════ */
+
+/* ── modal shell ──────────────────────────────────── */
+
+.codex-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgba(20, 12, 4, 0.72);
+  backdrop-filter: blur(2px);
+  animation: codex-fade-in 0.22s ease-out;
+}
+
+@keyframes codex-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.codex-modal {
+  position: relative;
+  width: min(880px, 96vw);
+  max-height: min(92vh, 960px);
+  overflow-y: auto;
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  background: var(--parch-0) url('../../assets/bg.jpg') repeat;
+  background-size: 600px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+  animation: codex-rise 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes codex-rise {
+  from { transform: translateY(14px) scale(0.985); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codex-overlay,
+  .codex-modal { animation: none; }
+}
+
+.codex-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--ink-soft);
+  background: var(--parch-1);
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.codex-modal__close:hover {
+  color: var(--rubric);
+  border-color: var(--rubric);
+}
+
+.codex-book {
+  padding-top: 20px;
+}
+
+/* ── the day's numbers ────────────────────────────── */
+
+.codex-cartouches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .codex-cartouches { grid-template-columns: repeat(2, 1fr); }
+}
+
+.codex-module-seals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.codex-module-seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── marginalia (events grouped by module) ────────── */
+
+.codex-marginalia {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 4px 20px;
+}
+
+.codex-marginalia__icon {
+  color: var(--rubric);
+  display: inline-flex;
+}
+
+.codex-marginalia__count {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.codex-marginalia__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.codex-marginalia__row {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.28);
+}
+
+.codex-marginalia__time {
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+}
+
+.codex-marginalia__text {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.codex-marginalia__xp {
+  color: var(--moss);
+  font-size: var(--fs-label);
+}
+
+/* ── prose ────────────────────────────────────────── */
+
+.codex-phrase {
+  margin: 14px 0 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-quote);
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.codex-note {
+  margin: 8px 0;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+}
+
+.codex-problem {
+  margin: 12px auto 0;
+  max-width: 36em;
+  text-align: center;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  border-top: 1px dotted rgba(74, 55, 32, 0.35);
+  padding-top: 8px;
+}
+
+/* ── the wax (hold to seal) ───────────────────────── */
+
+.codex-wax-zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 0 6px;
+}
+
+.codex-wax {
+  --codex-hold: 0%;
+  position: relative;
+  width: 86px;
+  height: 86px;
+  padding: 0;
+  border: 2px dashed rgba(122, 30, 30, 0.45);
+  border-radius: 50%;
+  background: rgba(122, 30, 30, 0.08);
+  color: var(--rubric);
+  cursor: pointer;
+  overflow: hidden;
+  touch-action: none;
+  transition: border-color 0.18s ease, transform 0.12s ease;
+}
+
+.codex-wax:hover { border-color: var(--rubric); }
+.codex-wax:active { transform: scale(0.97); }
+
+.codex-wax--holding {
+  border-style: solid;
+  border-color: var(--rubric);
+}
+
+/* The wax "charging": a pool of molten red rising from the bottom. */
+.codex-wax__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%);
+  clip-path: inset(calc(100% - var(--codex-hold)) 0 0 0);
+}
+
+.codex-wax__face {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--rubric);
+  transition: color 0.2s ease;
+}
+
+.codex-wax--holding .codex-wax__face { color: var(--parch-0); }
+
+.codex-wax__hint {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* ── the stamped seal ─────────────────────────────── */
+
+.codex-sealed {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  width: 100%;
+}
+
+.codex-seal-halo {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 150px;
+  height: 150px;
+  margin-left: -75px;
+  border-radius: 50%;
+  border: 2px solid rgba(196, 168, 78, 0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.codex-seal-disc {
+  /* .qb-seal supplies the wax gradient, ring and -6deg tilt. */
+  width: 88px;
+  height: 88px;
+}
+
+.codex-seal-mark {
+  display: grid;
+  place-items: center;
+  color: rgba(245, 231, 192, 0.85);
+}
+
+.codex-sealed__text {
+  text-align: center;
+}
+
+.codex-sealed__label {
+  color: var(--ink-faded);
+}
+
+.codex-award {
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-hero);
+  color: var(--moss);
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.codex-award__breakdown {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.codex-unlocks {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--gold-dark);
+  border-radius: 4px;
+  background: rgba(196, 168, 78, 0.1);
+  display: inline-block;
+}
+
+.codex-unlocks__title {
+  color: var(--gold-dark);
+}
+
+.codex-unlocks__list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.codex-unlocks__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.codex-unlocks__item svg { color: var(--gold-dark); }
+
+/* ── the 14 day strip ─────────────────────────────── */
+
+.codex-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.codex-strip__cell {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(74, 55, 32, 0.3);
+  border-radius: 4px;
+  background: rgba(244, 228, 193, 0.35);
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* A day left unsealed is NOT a failure: neutral parchment, never red. */
+.codex-strip__cell--open:not(:disabled) {
+  cursor: pointer;
+}
+
+.codex-strip__cell--open:not(:disabled):hover {
+  border-color: var(--rubric);
+  color: var(--ink);
+}
+
+.codex-strip__cell--sealed {
+  background: radial-gradient(circle at 35% 30%, #b13636 0%, #8a1b1b 55%, #5a0e0e 100%);
+  border-color: #5a0e0e;
+  color: rgba(245, 231, 192, 0.9);
+}
+
+.codex-strip__cell--current {
+  outline: 2px solid var(--gold-dark);
+  outline-offset: 1px;
+}
+
+.codex-strip__cell--today {
+  border-style: solid;
+  border-width: 2px;
+}
+
+.codex-strip__cell:disabled { cursor: default; }
+
+.codex-strip__legend {
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* ── loading skeleton ─────────────────────────────── */
+
+.codex-skeleton { padding: 8px 0; }
+
+.codex-skeleton__line {
+  height: 12px;
+  border-radius: 3px;
+  background: rgba(74, 55, 32, 0.09);
+  margin-bottom: 8px;
+}
+
+.codex-skeleton__line--short { width: 60%; }
+
+.codex-skeleton__block {
+  height: 140px;
+  border-radius: 5px;
+  background: rgba(74, 55, 32, 0.06);
+}
+
+/* ══════════════════════════════════════════════════════
+   THE INVITATION (sidebar)
+   Warm, small, and easy to ignore — it must never read as a nag.
+   ══════════════════════════════════════════════════════ */
+
+.sidebar-seal-invite-slot {
+  padding: 0 12px 8px;
+}
+
+.sidebar-seal-invite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(196, 168, 78, 0.4);
+  border-radius: 4px;
+  background: rgba(122, 30, 30, 0.14);
+  color: rgba(245, 231, 192, 0.9);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.05em;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.sidebar-seal-invite:hover {
+  border-color: var(--gold-light);
+  background: rgba(122, 30, 30, 0.24);
+}
+
+.sidebar-seal-invite__wax {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: rgba(245, 231, 192, 0.9);
+  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 50%, #5a0e0e 100%);
+  box-shadow: 0 0 0 0 rgba(196, 168, 78, 0.55);
+  animation: codex-wax-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes codex-wax-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 168, 78, 0); }
+  50%      { box-shadow: 0 0 0 5px rgba(196, 168, 78, 0.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-seal-invite__wax { animation: none; }
+}
+
+.sidebar-seal-invite__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.sidebar-seal-invite__sub {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  letter-spacing: 0;
+  color: rgba(245, 231, 192, 0.6);
+}
+
+/* Collapsed rail: the wax alone, still tappable. */
+.sidebar--collapsed .sidebar-seal-invite-slot {
+  padding: 0 12px 8px;
+}
+
+.sidebar-seal-invite {
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.sidebar--collapsed .sidebar-seal-invite__text { display: none; }
+
+/* ══════════════════════════════════════════════════════
+   THE SHELF (achievements page)
+   ══════════════════════════════════════════════════════ */
+
+.ach-counter {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: 'UnifrakturCook', cursive;
+  font-size: var(--fs-accent);
+  color: var(--ink);
+}
+
+.ach-counter__total {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.ach-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  /* the plank the medallions rest on */
+  padding: 12px 0 16px;
+  border-bottom: 2px solid rgba(74, 55, 32, 0.25);
+  box-shadow: 0 2px 0 rgba(244, 228, 193, 0.5);
+}
+
+.ach-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  border-radius: 4px;
+  background: rgba(244, 228, 193, 0.45);
+}
+
+/* Unlocked: gold. */
+.ach-card--unlocked {
+  border-color: var(--gold-dark);
+  background: linear-gradient(180deg, rgba(196, 168, 78, 0.18), rgba(244, 228, 193, 0.5));
+}
+
+/* Visible but not earned: stone. The description stays readable — these are
+   the map of what to try next, not a locked door. */
+.ach-card--locked { opacity: 0.82; }
+
+/* Hidden and not earned: silhouette only. */
+.ach-card--secret {
+  border-style: dashed;
+  background: rgba(74, 55, 32, 0.06);
+}
+
+.ach-card__medal {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  background: rgba(74, 55, 32, 0.1);
+  color: var(--ink-faded);
+}
+
+.ach-card--unlocked .ach-card__medal {
+  border-color: var(--gold-dark);
+  color: var(--gold-dark);
+  background: radial-gradient(circle at 38% 32%, rgba(230, 205, 130, 0.9) 0%, rgba(196, 168, 78, 0.75) 55%, rgba(138, 112, 48, 0.8) 100%);
+}
+
+.ach-card--secret .ach-card__medal {
+  color: rgba(74, 55, 32, 0.45);
+}
+
+.ach-card__body { min-width: 0; }
+
+.ach-card__title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  letter-spacing: 0.03em;
+}
+
+.ach-card--unlocked .ach-card__title { color: var(--ink); }
+.ach-card--locked .ach-card__title { color: var(--ink-soft); }
+.ach-card--secret .ach-card__title {
+  font-family: 'Fira Code', monospace;
+  color: var(--ink-faded);
+}
+
+.ach-card__desc {
+  margin: 2px 0 0;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+
+.ach-card__date {
+  margin-top: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--gold-dark);
+}
+
+.ach-empty {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+}
+
+/* A quiet inline link into the codex / the shelf. Used by both the character
+   sheet and the dashboard, hence the neutral name. */
+.codex-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.codex-link:hover { color: var(--rubric); }
+
+.codex-link__count {
+  font-family: 'Fira Code', monospace;
+  color: var(--gold-dark);
+}
+
+/* Dashboard brief: the seal call-to-action reads as a line, not a banner. */
+.dash-brief__seal {
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--rubric);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.dash-brief__seal:hover { color: var(--rubric-light); }

@@ -6,10 +6,14 @@ import type { PlayerStats } from '../../shared/types';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
-import { Scroll, Shield, Sword, Bread, Coin, Cauldron, MoonCrescent } from '../shared/components/icons';
+import { Scroll, Shield, Sword, Bread, Coin, Cauldron, Chalice, MoonCrescent } from '../shared/components/icons';
+import { SealRosette } from './codex/CodexSealIcons';
+import { useSealInvite } from './codex/useSealInvite';
+import { openCodex } from './codex/codexApi';
 import Tooltip from '../shared/components/Tooltip';
 import { useVisibleInterval } from '../shared/hooks/useVisibleInterval';
 import './styles/layout.css';
+import './styles/codex-seal.css';
 
 const STREAK_BAR_SCALE = 3.3; // 30 days = ~100% width
 
@@ -40,6 +44,7 @@ const NAV_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement
   bread: Bread,
   coin: Coin,
   cauldron: Cauldron,
+  chalice: Chalice,
 };
 
 function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -62,6 +67,10 @@ const navKeys: Array<{ path: string; key: string; icon: string }> = [
   { path: '/nutrition', key: 'nav.nutrify', icon: 'bread' },
   { path: '/finance', key: 'nav.coinify', icon: 'coin' },
   { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron' },
+  /* 'Logros' was pulled from this list while it was vapour (a focusable button
+     at opacity .4 that did nothing). The shelf exists now, so it is back —
+     Chalice, because a footed cup already IS the trophy in this icon family. */
+  { path: '/achievements', key: 'nav.achievements', icon: 'chalice' },
 ];
 
 const bottomNavKeys: Array<{ path: string; key: string; icon: string }> = [
@@ -74,6 +83,7 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
   const animatedNavigate = useAnimatedNavigate();
   const [badges, setBadges] = useState<SidebarBadges>({ questsOverdue: 0, nutritionNoMeals: false });
   const [cauldronHidden, setCauldronHidden] = useState(false);
+  const { invite } = useSealInvite();
 
   // Listen for floating timer visibility changes
   useEffect(() => {
@@ -202,6 +212,40 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
           </div>
           );
         })()}
+
+        {/* The invitation to close the day. It sits OUTSIDE .sidebar-bars on
+            purpose: that block is capped at max-height 0 while the rail is
+            collapsed, and the invitation has to survive a collapse (reduced to
+            the wax alone, with a tooltip). Discreet by design — a warm offer
+            under the streak, never a modal that interrupts. */}
+        {invite && (() => {
+          const headline = invite.which === 'yesterday'
+            ? t('rpg.sealInviteYesterday', 'Te quedó ayer sin sellar')
+            : t('rpg.sealInvite', 'Sellar el día');
+          const btn = (
+            <button
+              type="button"
+              className="sidebar-seal-invite tap-target"
+              onClick={() => openCodex(invite.date)}
+              title={headline}
+            >
+              <span className="sidebar-seal-invite__wax" aria-hidden="true">
+                <SealRosette width={14} height={14} />
+              </span>
+              <span className="sidebar-seal-invite__text">
+                <span>{headline}</span>
+                <span className="sidebar-seal-invite__sub">
+                  {t('rpg.sealInviteSub', { n: invite.eventsCount, defaultValue: '{{n}} hechos por cerrar' })}
+                </span>
+              </span>
+            </button>
+          );
+          return (
+            <div className="sidebar-seal-invite-slot">
+              {collapsed ? <Tooltip text={headline}>{btn}</Tooltip> : btn}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="sidebar-divider" />
@@ -221,6 +265,8 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
               key={item.path}
               className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''}`}
               aria-current={isActive(item.path) ? 'page' : undefined}
+              /* anchor for the unlock spark fired from Layout's watcher */
+              data-codex-nav={item.path === '/achievements' ? 'achievements' : undefined}
               onClick={() => animatedNavigate(item.path)}
             >
               <span className="sidebar-nav-item__ico">

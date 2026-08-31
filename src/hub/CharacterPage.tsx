@@ -35,7 +35,12 @@ import { xpThreshold, getTitleKey } from '../../shared/rpg-engine';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
+import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
+import { Medallion } from './codex/CodexSealIcons';
+import { catalogSize } from './codex/achievementCatalog';
+import { CODEX_SEALED_EVENT, getAchievements } from './codex/codexApi';
 import './styles/character.css';
+import './styles/codex-seal.css';
 
 /* ── helpers ─────────────────────────────────────── */
 
@@ -96,7 +101,10 @@ export default function CharacterPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === 'en' ? 'en-US' : 'es-ES';
   const { user: authUser } = useAuthContext();
+  const animatedNavigate = useAnimatedNavigate();
   const [stats, setStats] = useState<PlayerStats | null>(null);
+  /** null while the achievement handlers are not wired — the line stays hidden. */
+  const [achievements, setAchievements] = useState<{ unlocked: number; total: number } | null>(null);
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [characterName, setCharacterName] = useState<string>('');
@@ -112,6 +120,14 @@ export default function CharacterPage() {
     ]).then(results => {
       if (results[0] === null && results[1] === null) setLoadError(true);
     });
+
+    getAchievements().then((list) => {
+      if (!list) { setAchievements(null); return; }
+      setAchievements({
+        unlocked: list.filter(a => a.unlocked).length,
+        total: Math.max(list.length, catalogSize()),
+      });
+    });
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -120,7 +136,13 @@ export default function CharacterPage() {
   useEffect(() => {
     const handler = () => load();
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
+    window.addEventListener(CODEX_SEALED_EVENT, handler);
+    window.addEventListener('rpg:achievementUnlocked', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener(CODEX_SEALED_EVENT, handler);
+      window.removeEventListener('rpg:achievementUnlocked', handler);
+    };
   }, [load]);
 
   // ── Hooks MUST run on every render ──────────────────────────
@@ -284,6 +306,21 @@ export default function CharacterPage() {
           <div className="qb-hand hero-seals-hint">
             {t('character.sealsHint', 'sellos de hazañas \u2014 misiones, racha, favor real')}
           </div>
+
+          {/* One line, straight to the shelf. */}
+          {achievements && (
+            <button
+              type="button"
+              className="codex-link"
+              onClick={() => animatedNavigate('/achievements')}
+            >
+              <Medallion width={14} height={14} />
+              {t('nav.achievements', 'Logros')}{':'}{' '}
+              <span className="codex-link__count">
+                {achievements.unlocked}/{achievements.total}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* === RIGHT COLUMN === */}

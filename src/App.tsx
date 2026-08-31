@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, Outlet } from 'react-router-dom';
 import Layout from './hub/Layout';
 import Onboarding from './hub/Onboarding';
@@ -30,6 +30,12 @@ import {
   prefetchRoutes,
 } from './routes';
 import { useAuthContext } from './shared/AuthContext';
+
+/* The Logros shelf is a rarely-first screen and its own chunk. It is lazied
+   here rather than in `routes.tsx` because that module is owned by another
+   pass; `fallback={null}` keeps the page-flip transition from ever being
+   handed a spinner as if it were the destination page. */
+const AchievementsPage = lazy(() => import('./hub/AchievementsPage'));
 
 function AuthPageWrapper() {
   const navigate = useNavigate();
@@ -98,6 +104,10 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/character" element={<CharacterPage />} />
+          <Route
+            path="/achievements"
+            element={<Suspense fallback={null}><AchievementsPage /></Suspense>}
+          />
           <Route path="/quests" element={<TaskList />} />
           <Route path="/nutrition" element={<Outlet />}>
             <Route index element={<Today />} />

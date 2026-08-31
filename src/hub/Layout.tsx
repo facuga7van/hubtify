@@ -13,7 +13,7 @@ import ShortcutModal from '../shared/components/ShortcutModal';
 import QuickAdd from '../shared/components/QuickAdd';
 import NotificationCenter from '../shared/components/NotificationCenter';
 import ToastProvider from '../shared/components/ToastProvider';
-import AnimatedOutlet, { AnimatedNavigateContext, type AnimatedOutletHandle } from '../shared/components/AnimatedOutlet';
+import AnimatedOutlet, { AnimatedNavigateContext, useAnimatedNavigate, type AnimatedOutletHandle } from '../shared/components/AnimatedOutlet';
 import CauldronFloatingTimer from '../modules/cauldron/components/CauldronFloatingTimer';
 import { TourProvider, TourOverlay } from '../shared/components/tour';
 import '../shared/components/tour/tour.css';
@@ -24,6 +24,16 @@ import ChangelogModal from '../shared/components/ChangelogModal';
 import { changelog } from '../shared/changelog';
 import { useModalA11y } from '../shared/hooks/useModalA11y';
 import { useToast } from '../shared/components/useToast';
+import CodexSealModal from './codex/CodexSealModal';
+import { humanise, titleKey } from './codex/achievementCatalog';
+import {
+  CODEX_OPEN_EVENT,
+  type CodexOpenDetail,
+  isCodexModalOpen,
+  localDateISO,
+  onAchievementUnlocked,
+} from './codex/codexApi';
+import { createParticleBurst } from '../shared/animations/particles';
 
 /** Below this window width the sidebar collapses on its own. */
 const AUTO_COLLAPSE_WIDTH = 820;
@@ -72,6 +82,10 @@ function SyncPushFailedWatcher() {
 function RpgMomentsWatcher() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const animatedNavigate = useAnimatedNavigate();
+  /** Messages of achievement toasts still on screen, for click-to-navigate. */
+  const achievementToastsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const offPardon = window.api.onRpgPardonUsed?.(() => {
       toast({
@@ -94,6 +108,75 @@ function RpgMomentsWatcher() {
       window.removeEventListener('rpg:innChanged', innHandler);
     };
   }, [t, toast]);
+
+  /* ── achievement backfill ───────────────────────────
+     One silent sweep of the whole catalog against rpg_events, on boot and on
+     every account switch: history earned before the catalog existed (or on
+     another machine, arriving via sync) gets its medallions without waiting
+     for the lazy sweep to trip over them. Fire-and-forget — the shelf listens
+     for the unlock broadcasts this may emit. */
+  useEffect(() => {
+    const sweep = () => { window.api.rpgBackfillAchievements?.().catch(() => {}); };
+    sweep();
+    window.addEventListener('account:switched', sweep);
+    return () => window.removeEventListener('account:switched', sweep);
+  }, []);
+
+  /* ── achievement unlocks ────────────────────────────
+     Suppressed entirely while the Codex modal is up: a seal that unlocks
+     something shows it INSIDE its own ceremony, and a toast landing on top of
+     that ceremony would announce the same thing twice. The flag lives on
+     `window` (see codexApi.setCodexModalOpen) because this callback never
+     re-renders and the modal is a sibling, not a descendant. */
+  useEffect(() => {
+    const off = onAchievementUnlocked((id) => {
+      // Let the rest of the app know regardless — the shelf refreshes on it.
+      window.dispatchEvent(new CustomEvent('rpg:achievementUnlocked', { detail: { id } }));
+      if (isCodexModalOpen()) return;
+
+      const title = t(titleKey(id), humanise(id));
+      const message = t('rpg.achievements.unlockedToast', {
+        title,
+        defaultValue: 'Logro desbloqueado: {{title}}',
+      });
+      toast({ message, type: 'success' });
+
+      const seen = achievementToastsRef.current;
+      seen.add(message);
+      setTimeout(() => seen.delete(message), 12_000);
+
+      // A pinch of gold on the nav item it belongs to — cheap, and it points
+      // at where the medallion just landed. Skipped under reduced motion.
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const anchor = document.querySelector<HTMLElement>('[data-codex-nav="achievements"] .sidebar-nav-item__ico');
+        if (anchor) createParticleBurst({ parent: anchor, count: 10 }).start();
+      }
+    });
+    return () => off();
+  }, [t, toast]);
+
+  /* Toast.tsx hard-wires its own onClick to onDismiss and takes no action
+     prop, and `src/shared/components/**` is outside this pass. So the "click
+     the toast to see the shelf" behaviour is delegated from here: we remember
+     the exact message we emitted and route when a click lands on a toast card
+     carrying it. Unique per unlock, and it goes away the day Toast grows a
+     real action prop. */
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (achievementToastsRef.current.size === 0) return;
+      const target = e.target as HTMLElement | null;
+      const card = target?.closest('.system-toast-container > div');
+      if (!card) return;
+      const text = card.textContent ?? '';
+      const hit = [...achievementToastsRef.current].find((m) => text.includes(m));
+      if (!hit) return;
+      achievementToastsRef.current.delete(hit);
+      animatedNavigate('/achievements');
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [animatedNavigate]);
+
   return null;
 }
 
@@ -197,6 +280,19 @@ export default function Layout() {
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  /* The Cierre del Códice. Layout owns it so the sidebar invitation, the
+     dashboard brief and the seal strip can all reach it with one window event
+     instead of threading state through three components. */
+  const [codexDate, setCodexDate] = useState<string | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<CodexOpenDetail>).detail;
+      setCodexDate(detail?.date ?? localDateISO());
+    };
+    window.addEventListener(CODEX_OPEN_EVENT, handler);
+    return () => window.removeEventListener(CODEX_OPEN_EVENT, handler);
+  }, []);
 
   // Auto-updater
   const [syncError, setSyncError] = useState(false);
@@ -651,6 +747,14 @@ export default function Layout() {
 
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
       <ShortcutModal open={shortcutModalOpen} onClose={() => setShortcutModalOpen(false)} />
+
+      {codexDate && (
+        <CodexSealModal
+          date={codexDate}
+          onClose={() => setCodexDate(null)}
+          onSelectDate={setCodexDate}
+        />
+      )}
 
       <CauldronFloatingTimer />
 
