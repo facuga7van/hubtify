@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DawnSun, NoonSun, MoonCrescent, Herb } from '../../../../shared/components/icons';
-import { MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../../shared/meal-utils';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Chalice } from '../../../../shared/components/icons';
+import { MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, ensureMerienda } from '../../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../../shared/meal-utils';
 
 interface Props {
@@ -19,6 +19,7 @@ interface Props {
 const MEAL_ICONS: Record<MealType, React.ReactNode> = {
   breakfast: <DawnSun width={16} height={16} />,
   lunch: <NoonSun width={16} height={16} />,
+  merienda: <Chalice width={16} height={16} />,
   dinner: <MoonCrescent width={16} height={16} />,
   snack: <Herb width={16} height={16} />,
 };
@@ -39,7 +40,7 @@ function fromTimeStr(str: string): { hour: number; minute: number } {
 /** Check if two enabled meals overlap */
 function hasOverlap(schedule: MealSchedule): boolean {
   const ranges = MEAL_ORDER
-    .filter(m => m !== 'snack' && schedule[m].enabled)
+    .filter(m => m !== 'snack' && schedule[m]?.enabled)
     .map(m => {
       const r = schedule[m];
       return { start: r.startHour * 60 + r.startMinute, end: r.endHour * 60 + r.endMinute };
@@ -55,8 +56,11 @@ function hasOverlap(schedule: MealSchedule): boolean {
   return false;
 }
 
-export default function MealScheduleEditor({ schedule, onChange, showDefaults, onValidityChange }: Props) {
+export default function MealScheduleEditor({ schedule: rawSchedule, onChange, showDefaults, onValidityChange }: Props) {
   const { t } = useTranslation();
+  // A schedule saved before merienda existed has no `merienda` key at all —
+  // graft it on (disabled if it would collide) rather than rendering undefined.
+  const schedule = ensureMerienda(rawSchedule);
   const overlap = hasOverlap(schedule);
 
   useEffect(() => { onValidityChange?.(!overlap); }, [overlap, onValidityChange]);

@@ -9,6 +9,8 @@ export interface NutritionProfile {
   weightCheckDay: number;
   weightPopupEnabled: number;
   mealSchedule?: import('../../../shared/meal-utils').MealSchedule | null;
+  /** Hour the nutritional day flips (0-23, default 4). 0 = strict midnight. */
+  dayCutoffHour?: number;
 }
 
 export interface FrequentFood {

@@ -4,9 +4,10 @@ import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
 import { useToast } from '../../../shared/components/useToast';
 import { estimateNutrition } from '../estimate-service';
-import { todayDateString } from '../../../../shared/date-utils';
 import { resolveMealType } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
+import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
+import type { NutritionProfile } from '../types';
 
 export default function NutritionDashboardWidget() {
   const { t } = useTranslation();
@@ -25,13 +26,16 @@ export default function NutritionDashboardWidget() {
   const [showManualFallback, setShowManualFallback] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
   const [mealSchedule, setMealSchedule] = useState<MealSchedule | null>(null);
+  // Cached with the profile the widget already loads: the widget must write its
+  // logs to the SAME day the backend counts them on (see nutrition-day.ts).
+  const [dayCutoffHour, setDayCutoffHour] = useState(0);
 
   /** Same meal resolution the full page uses, so widget entries are not orphaned with a "?". */
   const resolveNowMeal = useCallback(() => {
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    const resolved = resolveMealType(now, mealSchedule);
+    const resolved = resolveMealType(now, mealSchedule, dayCutoffHour);
     return resolved.ambiguous.length === 0 ? resolved.meal : undefined;
-  }, [mealSchedule]);
+  }, [mealSchedule, dayCutoffHour]);
 
   const loadData = useCallback(() => {
     Promise.all([
@@ -39,11 +43,13 @@ export default function NutritionDashboardWidget() {
       window.api.nutritionGetTodayTarget(),
       window.api.nutritionGetWeekCalories(),
       window.api.nutritionGetMealSchedule(),
-    ]).then(([c, t, wk, schedule]) => {
+      window.api.nutritionGetProfile(),
+    ]).then(([c, t, wk, schedule, prof]) => {
       setCalories(c);
       setTarget(t);
       setWeekCalories(wk);
       setMealSchedule(schedule ?? null);
+      setDayCutoffHour((prof as NutritionProfile | null)?.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR);
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
@@ -86,7 +92,7 @@ export default function NutritionDashboardWidget() {
     try {
       await window.api.nutritionLogFood({
         // Local date, never UTC: past 21:00 in UTC-3 the UTC slice is tomorrow.
-        date: todayDateString(),
+        date: nutritionToday(dayCutoffHour),
         description: foodInput.trim(),
         calories: estimation.totalCalories,
         source: 'ai_estimate',
@@ -279,7 +285,7 @@ export default function NutritionDashboardWidget() {
                 onClick={async () => {
                   const cal = Number(manualCalories);
                   await window.api.nutritionLogFood({
-                    date: todayDateString(),
+                    date: nutritionToday(dayCutoffHour),
                     description: foodInput.trim() || t('nutrify.manualEntry', 'Entrada manual'),
                     calories: cal,
                     source: 'manual',

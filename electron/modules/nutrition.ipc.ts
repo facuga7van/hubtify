@@ -1,9 +1,13 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 
-import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
-import { resolveMealType, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../shared/meal-utils';
-import type { MealSchedule } from '../../shared/meal-utils';
+import { formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
+import {
+  resolveMealType, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay,
+  ensureMerienda, clampCutoffHour, nutritionDayString, shiftDateString,
+  computeNutritionStreak, DEFAULT_DAY_CUTOFF_HOUR,
+} from '../../shared/meal-utils';
+import type { MealSchedule, StreakDay } from '../../shared/meal-utils';
 import { getLevel, getTitle, clampHp } from '../../shared/rpg-engine';
 
 function genId(): string {
@@ -22,6 +26,41 @@ function syncStamp(): string {
   return new Date().toISOString();
 }
 
+/**
+ * The profile's nutritional-day cutoff hour (0-23, default 4). 0 = midnight.
+ * Cheap enough to read per call: one indexed row on a single-row table.
+ */
+export function getDayCutoffHour(db: ReturnType<typeof getDb>): number {
+  const row = db.prepare('SELECT day_cutoff_hour FROM nutrition_profile WHERE id = 1')
+    .get() as { day_cutoff_hour: number | null } | undefined;
+  if (!row || row.day_cutoff_hour == null) return DEFAULT_DAY_CUTOFF_HOUR;
+  return clampCutoffHour(row.day_cutoff_hour);
+}
+
+/**
+ * "Today" for NUTRITION — not the calendar's today.
+ *
+ * Every nutrition path that used to call `todayDateString()` goes through here:
+ * at 00:30 with a cutoff of 4 the answer is still yesterday, so the late dessert
+ * lands on the day the user is actually living instead of ruining two of them.
+ * With a cutoff of 0 this is exactly `todayDateString()`.
+ */
+export function nutritionToday(db: ReturnType<typeof getDb>): string {
+  return nutritionDayString(new Date(), getDayCutoffHour(db));
+}
+
+/** The stored meal schedule, always with a `merienda` entry (see ensureMerienda). */
+function readMealSchedule(db: ReturnType<typeof getDb>): MealSchedule {
+  const row = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1')
+    .get() as { meal_schedule: string | null } | undefined;
+  if (!row?.meal_schedule) return DEFAULT_MEAL_SCHEDULE;
+  try {
+    return ensureMerienda(JSON.parse(row.meal_schedule) as MealSchedule);
+  } catch {
+    return DEFAULT_MEAL_SCHEDULE;
+  }
+}
+
 export function registerNutritionIpcHandlers(): void {
   // ── Profile ────────────────────────────────────────
 
@@ -31,7 +70,7 @@ export function registerNutritionIpcHandlers(): void {
     if (!row) return null;
     let mealSchedule: MealSchedule | null = null;
     if (row.meal_schedule) {
-      try { mealSchedule = JSON.parse(row.meal_schedule as string); } catch { /* invalid JSON */ }
+      try { mealSchedule = ensureMerienda(JSON.parse(row.meal_schedule as string)); } catch { /* invalid JSON */ }
     }
     return {
       dateOfBirth: row.date_of_birth, weightCheckDay: row.weight_check_day,
@@ -40,6 +79,9 @@ export function registerNutritionIpcHandlers(): void {
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal,
       mealSchedule,
+      // The renderer needs the cutoff to agree with the backend on which day
+      // "today" is; it caches it alongside the profile it already loads.
+      dayCutoffHour: row.day_cutoff_hour == null ? DEFAULT_DAY_CUTOFF_HOUR : clampCutoffHour(row.day_cutoff_hour),
     };
   });
 
@@ -47,7 +89,7 @@ export function registerNutritionIpcHandlers(): void {
     dateOfBirth: string; sex: string; heightCm: number; initialWeightKg: number;
     activityLevel: string; deficitTargetKcal?: number;
     weightCheckDay?: number; weightPopupEnabled?: boolean;
-    mealSchedule?: MealSchedule;
+    mealSchedule?: MealSchedule; dayCutoffHour?: number;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
     const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
@@ -58,28 +100,26 @@ export function registerNutritionIpcHandlers(): void {
     const age = getAgeFromDob(profile.dateOfBirth);
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const weightPopupEnabled = profile.weightPopupEnabled !== false ? 1 : 0;
-    const mealScheduleJson = profile.mealSchedule ? JSON.stringify(profile.mealSchedule) : null;
+    const mealScheduleJson = profile.mealSchedule ? JSON.stringify(ensureMerienda(profile.mealSchedule)) : null;
     const db = getDb();
-    // Read existing meal_schedule to preserve it when not provided
-    const existing = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
+    // Read existing meal_schedule / cutoff to preserve them when not provided
+    const existing = db.prepare('SELECT meal_schedule, day_cutoff_hour FROM nutrition_profile WHERE id = 1')
+      .get() as { meal_schedule: string | null; day_cutoff_hour: number | null } | undefined;
     const finalMealSchedule = mealScheduleJson ?? existing?.meal_schedule ?? null;
+    const dayCutoffHour = profile.dayCutoffHour !== undefined
+      ? clampCutoffHour(profile.dayCutoffHour)
+      : (existing?.day_cutoff_hour ?? DEFAULT_DAY_CUTOFF_HOUR);
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule, dayCutoffHour);
 
     // Recalc today's summary with new profile
-    const today = todayDateString();
-    recalcSummary(db, today);
+    recalcSummary(db, nutritionToday(db));
   });
 
-  ipcHandle('nutrition:getMealSchedule', () => {
-    const db = getDb();
-    const row = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
-    if (!row?.meal_schedule) return DEFAULT_MEAL_SCHEDULE;
-    try { return JSON.parse(row.meal_schedule); } catch { return DEFAULT_MEAL_SCHEDULE; }
-  });
+  ipcHandle('nutrition:getMealSchedule', () => readMealSchedule(getDb()));
 
   // ── Food Log ───────────────────────────────────────
 
@@ -90,18 +130,16 @@ export function registerNutritionIpcHandlers(): void {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
     const db = getDb();
-    const date = entry.date ?? todayDateString();
+    const cutoffHour = getDayCutoffHour(db);
+    const date = entry.date ?? nutritionDayString(new Date(), cutoffHour);
     if (isDayClosed(db, date)) throw new Error('Cannot modify a closed day');
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     // Resolve meal type if not provided
     let meal = entry.meal ?? null;
     if (!meal) {
-      const profileRow = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1').get() as { meal_schedule: string | null } | undefined;
-      let schedule: MealSchedule | null = null;
-      if (profileRow?.meal_schedule) {
-        try { schedule = JSON.parse(profileRow.meal_schedule); } catch { /* use default */ }
-      }
-      const resolved = resolveMealType(time, schedule);
+      // The cutoff matters here too: at 01:00 the log belongs to yesterday's
+      // dinner, never to this morning's breakfast.
+      const resolved = resolveMealType(time, readMealSchedule(db), cutoffHour);
       if (resolved.ambiguous.length === 0) {
         meal = resolved.meal;
       }
@@ -131,7 +169,7 @@ export function registerNutritionIpcHandlers(): void {
    */
   ipcHandle('nutrition:copyDay', (_e, opts?: { from?: string; to?: string }) => {
     const db = getDb();
-    const to = opts?.to ?? todayDateString();
+    const to = opts?.to ?? nutritionToday(db);
     const from = opts?.from ?? (() => {
       const d = new Date(`${to}T12:00:00`);
       d.setDate(d.getDate() - 1);
@@ -278,7 +316,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number; gym?: boolean }) => {
     if (metrics.steps !== undefined && (!Number.isFinite(metrics.steps) || metrics.steps < 0)) throw new Error('Invalid steps: must be >= 0');
     const db = getDb();
-    const date = metrics.date ?? todayDateString();
+    const date = metrics.date ?? nutritionToday(db);
     db.prepare(`
       INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym, updated_at)
       VALUES (?, ?, ?, datetime('now'))
@@ -299,7 +337,7 @@ export function registerNutritionIpcHandlers(): void {
     const date = metrics.date ?? getMondayOfWeek();
     db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm, updated_at) VALUES (?, ?, ?, datetime(\'now\'))')
       .run(date, metrics.weightKg ?? null, metrics.waistCm ?? null);
-    recalcSummary(db, todayDateString());
+    recalcSummary(db, nutritionToday(db));
   });
 
   // ── Summary ────────────────────────────────────────
@@ -331,45 +369,35 @@ export function registerNutritionIpcHandlers(): void {
     `).all();
   });
 
+  /**
+   * Returns `{ streak, todayPending, graceUsedOn? }` — no longer a bare number.
+   *
+   * The old rule (`total_calories_in <= target * 1.1`) was goal-blind: on a
+   * SURPLUS goal, eating far too little kept the streak alive. Compliance now
+   * comes from `scoreNutritionDay`, the same function XP, HP and the ring use.
+   * See `computeNutritionStreak` for pending-today and the weekly grace day.
+   */
   ipcHandle('nutrition:getStreak', () => {
-    // Streak tolerance: ±10% of daily target
-    // This matches the HP system's "on target" threshold (±10% → +10 HP).
-    // XP precision uses finer gradations (5%/15%/30%) for reward scaling,
-    // but streak is binary (on/off) so the ±10% HP band is the right match.
     const db = getDb();
-    const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
-    if (!profile) return 0;
+    const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1')
+      .get() as { deficit_target_kcal: number } | undefined;
+    if (!profile) return { streak: 0, todayPending: true };
 
-    const today = todayDateString();
-    const summaries = db.prepare(
-      'SELECT date, total_calories_in, tdee FROM nutrition_daily_summary WHERE date <= ? AND total_calories_in > 0 ORDER BY date DESC LIMIT 365'
-    ).all(today) as Array<{ date: string; total_calories_in: number; tdee: number }>;
+    const today = nutritionToday(db);
+    const rows = db.prepare(
+      `SELECT date, total_calories_in AS totalCaloriesIn, tdee
+       FROM nutrition_daily_summary
+       WHERE date <= ? AND total_calories_in > 0
+       ORDER BY date DESC LIMIT 366`
+    ).all(today) as StreakDay[];
 
-    if (summaries.length === 0) return 0;
-
-    let streak = 0;
-    let expectedDate = new Date();
-    const deficitTarget = profile.deficit_target_kcal as number;
-
-    for (const row of summaries) {
-      const expectedStr = formatDateString(expectedDate);
-      if (row.date !== expectedStr) break; // non-consecutive day → stop
-
-      const target = row.tdee - deficitTarget;
-      if (row.total_calories_in <= target * 1.1) {
-        streak++;
-      } else {
-        break;
-      }
-      expectedDate.setDate(expectedDate.getDate() - 1);
-    }
-    return streak;
+    return computeNutritionStreak(rows, today, profile.deficit_target_kcal ?? 0);
   });
 
   ipcHandle('nutrition:getWeekCalories', () => {
     const db = getDb();
-    const today = todayDateString();
-    const sevenAgo = daysAgoDateString(6);
+    const today = nutritionToday(db);
+    const sevenAgo = shiftDateString(today, -6);
     const rows = db.prepare(`
       SELECT date, COALESCE(SUM(calories), 0) AS total
       FROM food_log
@@ -393,21 +421,21 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:getTodayCalories', () => {
     const db = getDb();
-    const today = todayDateString();
+    const today = nutritionToday(db);
     const row = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ? AND deleted_at IS NULL').get(today) as { total: number };
     return row.total;
   });
 
   ipcHandle('nutrition:getTodayMealsCount', () => {
     const db = getDb();
-    const today = todayDateString();
+    const today = nutritionToday(db);
     const row = db.prepare('SELECT COUNT(*) AS c FROM food_log WHERE date = ? AND deleted_at IS NULL').get(today) as { c: number };
     return row.c;
   });
 
   ipcHandle('nutrition:getTodayTarget', () => {
     const db = getDb();
-    const today = todayDateString();
+    const today = nutritionToday(db);
     const summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(today) as { tdee: number } | undefined;
     const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1').get() as { deficit_target_kcal: number } | undefined;
     if (!summary || !profile) return null;
@@ -546,12 +574,14 @@ export function registerNutritionIpcHandlers(): void {
     if (!profile.weight_popup_enabled) return { shouldAsk: false };
 
     const checkDay = profile.weight_check_day ?? 1;
-    const today = new Date();
-    const dow = today.getDay() || 7; // Monday=1, Sunday=7
+    // Nutritional today: at 01:00 on Monday with a 4 AM cutoff it is still Sunday,
+    // and the reminder must not jump the week ahead of the day being logged.
+    const today = nutritionToday(db);
+    const dow = new Date(today + 'T12:00:00').getDay() || 7; // Monday=1, Sunday=7
 
     if (dow < checkDay) return { shouldAsk: false };
 
-    const monday = getMondayOfWeek();
+    const monday = getMondayOfWeek(today);
     const thisWeekWeight = db.prepare(
       'SELECT weight_kg FROM nutrition_weekly_metrics WHERE date = ? AND weight_kg IS NOT NULL'
     ).get(monday) as { weight_kg: number } | undefined;
@@ -626,8 +656,8 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:getPendingDays', () => {
     const db = getDb();
-    const today = todayDateString();
-    const sevenAgo = daysAgoDateString(7);
+    const today = nutritionToday(db);
+    const sevenAgo = shiftDateString(today, -7);
 
     const rows = db.prepare(`
       SELECT DISTINCT f.date

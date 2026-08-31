@@ -2,7 +2,7 @@ import { useState, memo, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import { registerFood } from '../../../shared/animations/feedback';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart, Chalice } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
 import { estimateNutrition } from '../estimate-service';
@@ -25,6 +25,8 @@ interface Props {
   onMealChange?: (id: number, meal: string) => void;
   onFavorite?: () => void;
   mealSchedule?: MealSchedule | null;
+  /** Profile cutoff hour, so a 01:00 entry reads as last night's dinner. */
+  dayCutoffHour?: number;
   readOnly?: boolean;
   className?: string;
   isNew?: boolean;
@@ -33,6 +35,7 @@ interface Props {
 const MEAL_ICON_MAP: Record<MealType, React.ReactNode> = {
   breakfast: <DawnSun width={16} height={16} />,
   lunch: <NoonSun width={16} height={16} />,
+  merienda: <Chalice width={16} height={16} />,
   dinner: <MoonCrescent width={16} height={16} />,
   snack: <Herb width={16} height={16} />,
 };
@@ -40,17 +43,17 @@ const MEAL_ICON_MAP: Record<MealType, React.ReactNode> = {
 function getMealLabel(meal: MealType, t: ReturnType<typeof useTranslation>['t']): string {
   const key = `nutrify.meal${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
   const fallback: Record<MealType, string> = {
-    breakfast: 'Desayuno', lunch: 'Almuerzo', dinner: 'Cena', snack: 'Snack',
+    breakfast: 'Desayuno', lunch: 'Almuerzo', merienda: 'Merienda', dinner: 'Cena', snack: 'Snack',
   };
   return t(key, fallback[meal]);
 }
 
-function getMealForEntry(entry: FoodEntry, schedule?: MealSchedule | null): MealType {
+function getMealForEntry(entry: FoodEntry, schedule?: MealSchedule | null, cutoffHour = 0): MealType {
   if (entry.meal) return entry.meal as MealType;
-  return resolveMealType(entry.time, schedule).meal;
+  return resolveMealType(entry.time, schedule, cutoffHour).meal;
 }
 
-export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChange, onFavorite, mealSchedule, readOnly, className, isNew }: Props) {
+export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChange, onFavorite, mealSchedule, dayCutoffHour = 0, readOnly, className, isNew }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -63,7 +66,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
   const dropdownRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  const currentMeal = getMealForEntry(entry, mealSchedule);
+  const currentMeal = getMealForEntry(entry, mealSchedule, dayCutoffHour);
 
   const breakdownItems = useMemo<BreakdownItem[]>(() => {
     if (!entry.aiBreakdown) return [];

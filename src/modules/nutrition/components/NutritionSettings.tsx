@@ -11,6 +11,7 @@ import { Gear, Shield, Compass, Chalice, Scale } from '../../../shared/component
 import { todayDateString } from '../../../../shared/date-utils';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
+import { DAY_CUTOFF_OPTIONS, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import type { NutritionProfile } from '../types';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
@@ -48,6 +49,7 @@ export default function NutritionSettings() {
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
+  const [dayCutoffHour, setDayCutoffHour] = useState(DEFAULT_DAY_CUTOFF_HOUR);
   const [scheduleValid, setScheduleValid] = useState(true);
   /** TDEE the backend actually uses today (dynamic activity blend), not the static guess. */
   const [effectiveTdee, setEffectiveTdee] = useState<number | null>(null);
@@ -88,6 +90,7 @@ export default function NutritionSettings() {
         else { setGoal('maintain'); setGoalAmount(0); }
 
         if (p.mealSchedule) setMealSchedule(p.mealSchedule);
+        setDayCutoffHour(p.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR);
       }
     }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
@@ -97,8 +100,8 @@ export default function NutritionSettings() {
   // Snapshot of everything the Save button writes — used to tell the user when
   // walking away would throw work out.
   const snapshot = useMemo(() => JSON.stringify({
-    dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule,
-  }), [dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule]);
+    dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule, dayCutoffHour,
+  }), [dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule, dayCutoffHour]);
 
   const baselineSetRef = useRef(false);
   useEffect(() => {
@@ -143,7 +146,7 @@ export default function NutritionSettings() {
 
       await window.api.nutritionSaveProfile({
         dateOfBirth, weightCheckDay, weightPopupEnabled, sex, heightCm: height, initialWeightKg: weight,
-        activityLevel: activity, deficitTargetKcal, mealSchedule,
+        activityLevel: activity, deficitTargetKcal, mealSchedule, dayCutoffHour,
       });
       baselineRef.current = snapshot;
       setDirty(false);
@@ -335,6 +338,25 @@ export default function NutritionSettings() {
           <span className="nutri-card-subtitle">{t('nutrify.mealScheduleDesc', 'Configurá los horarios de cada comida')}</span>
         </h3>
         <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} onValidityChange={setScheduleValid} showDefaults />
+
+        <div className="nutri-field" style={{ marginTop: 14 }}>
+          <label className="nutri-label" htmlFor="nutri-day-cutoff">
+            {t('nutrify.dayCutoff', 'El día termina a las')}
+          </label>
+          <select
+            id="nutri-day-cutoff"
+            className="nutri-select"
+            value={dayCutoffHour}
+            onChange={(e) => setDayCutoffHour(+e.target.value)}
+          >
+            {DAY_CUTOFF_OPTIONS.map(h => (
+              <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+            ))}
+          </select>
+          <span className="nutri-field-hint">
+            {t('nutrify.dayCutoffHint', 'Lo que comas antes de esa hora cuenta para el día anterior.')}
+          </span>
+        </div>
       </div>
 
       {/* ── Weight Reminder ── */}

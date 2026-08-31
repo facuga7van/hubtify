@@ -229,4 +229,38 @@ export const nutritionMigrations: Migration[] = [
       ALTER TABLE nutrition_daily_closed ADD COLUMN deleted_at TEXT DEFAULT NULL;
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 11,
+    up: `
+      -- ── The nutritional day has a cutoff hour ───────────────────────────────
+      -- The 00:30 dessert used to count for TOMORROW: it ruined the day that was
+      -- still running AND opened the next one with a debt. day_cutoff_hour is the
+      -- hour the nutritional day flips (default 4 AM). 0 = strict midnight, i.e.
+      -- exactly the old behaviour, for anyone who wants it back.
+      ALTER TABLE nutrition_profile ADD COLUMN day_cutoff_hour INTEGER DEFAULT 4;
+      UPDATE nutrition_profile SET day_cutoff_hour = 4 WHERE day_cutoff_hour IS NULL;
+
+      -- ── Merienda ────────────────────────────────────────────────────────────
+      -- New defaults: desayuno 6-10, almuerzo 11-15, MERIENDA 16-19, cena
+      -- 20:30-23:59, snack catch-all. Only schedules that are NULL or still the
+      -- untouched v6 default (6-10 / 11-15 / 18-22, no merienda key) are rewritten.
+      -- A schedule the user edited is left exactly as it is: merienda is grafted
+      -- onto it lazily by ensureMerienda() in shared/meal-utils.ts, which adds it
+      -- disabled when 16-19 would collide with a window they chose by hand.
+      UPDATE nutrition_profile
+      SET meal_schedule = '{"breakfast":{"enabled":true,"startHour":6,"startMinute":0,"endHour":10,"endMinute":0},"lunch":{"enabled":true,"startHour":11,"startMinute":0,"endHour":15,"endMinute":0},"merienda":{"enabled":true,"startHour":16,"startMinute":0,"endHour":19,"endMinute":0},"dinner":{"enabled":true,"startHour":20,"startMinute":30,"endHour":23,"endMinute":59},"snack":{"enabled":true,"startHour":0,"startMinute":0,"endHour":0,"endMinute":0}}'
+      WHERE meal_schedule IS NULL
+         OR (
+           json_valid(meal_schedule)
+           AND json_extract(meal_schedule, '$.merienda') IS NULL
+           AND json_extract(meal_schedule, '$.breakfast.startHour') = 6
+           AND json_extract(meal_schedule, '$.breakfast.endHour') = 10
+           AND json_extract(meal_schedule, '$.lunch.startHour') = 11
+           AND json_extract(meal_schedule, '$.lunch.endHour') = 15
+           AND json_extract(meal_schedule, '$.dinner.startHour') = 18
+           AND json_extract(meal_schedule, '$.dinner.endHour') = 22
+         );
+    `,
+  },
 ];

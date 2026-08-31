@@ -1564,6 +1564,24 @@
   margin-top: 2px;
 }
 
+/* Streak footnotes: "in play today" and the weekly grace day. Deliberately
+   quiet — they explain the number, they must not compete with it. */
+.nutri-streak-note {
+  font-family: 'IM Fell English', serif;
+  font-size: calc(var(--fs-label) * 0.9);
+  font-style: italic;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+
+.nutri-streak-note--pending {
+  color: var(--gold-dark);
+}
+
+.nutri-streak-note--grace {
+  color: var(--ink-faded);
+}
+
 .nutri-kpi-delta.up   { color: var(--moss); }
 .nutri-kpi-delta.down { color: var(--rubric); }
 
@@ -2036,6 +2054,19 @@
   color: var(--ink);
   border-color: var(--gold);
   font-weight: 700;
+}
+
+/* Per-pill portion badge: shows the multiplier THIS favourite would log with,
+   so a staged ×2 is never invisible on the button you are about to press. */
+.nutri-pill-portion {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(var(--fs-label) * 0.85);
+  font-weight: 700;
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--gold-dark);
+  color: var(--parchment, #f5e7c0);
 }
 
 /* ── Day closed banner + reopen ── */

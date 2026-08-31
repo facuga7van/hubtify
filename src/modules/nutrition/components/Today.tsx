@@ -13,9 +13,10 @@ import { estimateNutrition } from '../estimate-service';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark, Chalice } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
+import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import type { TFunction } from 'i18next';
 import type { NutritionProfile } from '../types';
 
@@ -77,6 +78,7 @@ interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 const MEAL_ICON: Record<MealType, React.ReactNode> = {
   breakfast: <DawnSun width={18} height={18} />,
   lunch: <NoonSun width={18} height={18} />,
+  merienda: <Chalice width={18} height={18} />,
   dinner: <MoonCrescent width={18} height={18} />,
   snack: <Herb width={18} height={18} />,
 };
@@ -93,7 +95,11 @@ interface EstimationResult {
 export default function Today() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  // Starts on the CALENDAR day; the profile's cutoff arrives with loadData and,
+  // as long as the user has not navigated, snaps this to the nutritional day.
   const [date, setDate] = useState(() => todayDateString());
+  const [dayCutoffHour, setDayCutoffHour] = useState(0);
+  const [userPickedDate, setUserPickedDate] = useState(false);
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });
@@ -129,7 +135,13 @@ export default function Today() {
   const [showFavorites, setShowFavorites] = useState(() => {
     try { return localStorage.getItem(FAVORITES_OPEN_KEY) !== 'false'; } catch { return true; }
   });
-  const [portion, setPortion] = useState(1);
+  // Portion is per PILL, not one value for the whole panel: the ×2 you picked for
+  // the milanesa used to silently double the next favourite you clicked. The chips
+  // now stage a multiplier for the NEXT pill clicked (`nextPortion`, null = none
+  // staged) and clear themselves after the log, while each pill remembers the
+  // multiplier it was last logged with (`pillPortions`) and previews it.
+  const [nextPortion, setNextPortion] = useState<number | null>(null);
+  const [pillPortions, setPillPortions] = useState<Record<string, number>>({});
   const [logMenuOpen, setLogMenuOpen] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
@@ -162,7 +174,10 @@ export default function Today() {
     const closed = closedDay as typeof dayClosed;
     setDayClosed(closed);
 
-    const isPastDate = d < todayDateString();
+    const cutoff = (prof as NutritionProfile | null)?.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR;
+    setDayCutoffHour(cutoff);
+
+    const isPastDate = d < nutritionToday(cutoff);
     const deficitKcal = (prof as NutritionProfile | null)?.deficitTargetKcal ?? 0;
     if (isPastDate && closed?.target) {
       setTarget(closed.target);
@@ -176,6 +191,13 @@ export default function Today() {
   }, []);
 
   useEffect(() => { loadData(date); }, [date, loadData]);
+
+  // Once the cutoff is known, "today" may be yesterday's calendar date. Only
+  // move the view while the user is still on the auto-selected day.
+  useEffect(() => {
+    if (userPickedDate) return;
+    setDate(nutritionToday(dayCutoffHour));
+  }, [dayCutoffHour, userPickedDate]);
 
   useEffect(() => {
     try { localStorage.setItem(FAVORITES_OPEN_KEY, String(showFavorites)); } catch { /* private mode */ }
@@ -210,9 +232,13 @@ export default function Today() {
     };
   }, [date, loadData, loadPendingDays]);
 
+  /** Nutritional today — the same day the backend writes logs to. */
+  const nutriToday = nutritionToday(dayCutoffHour);
+
   const goDay = (offset: number) => {
     const [y, m, d] = date.split('-').map(Number);
     const newDate = new Date(y, m - 1, d + offset);
+    setUserPickedDate(true);
     setDate(formatDateString(newDate));
   };
 
@@ -245,7 +271,7 @@ export default function Today() {
     }
 
     try {
-      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
+      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
       await window.api.nutritionLogFood({
         date,
         description: foodInput.trim(),
@@ -279,7 +305,7 @@ export default function Today() {
     const cal = parseInt(manualCalories);
     if (!foodInput.trim() || isNaN(cal) || cal <= 0) return;
     try {
-      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
+      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
       await window.api.nutritionLogFood({
         date,
         description: foodInput.trim(),
@@ -338,14 +364,18 @@ export default function Today() {
     }
   };
 
+  /** What clicking this pill would log: a staged chip wins, else the pill's own. */
+  const portionFor = (id: string): number => nextPortion ?? pillPortions[id] ?? 1;
+
   const handleLogFavorite = async (food: FavoriteFood) => {
     // Portion chips scale the saved calories, so "half a milanesa" is one click.
+    const portion = portionFor(food.id);
     const calories = Math.round(food.calories * portion);
     const description = portion === 1
       ? food.description
       : `${food.description} (×${portion})`;
     try {
-      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
+      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
       await window.api.nutritionLogFood({
         date, description, calories, source: 'favorite',
         // The breakdown belongs to the x1 portion — keep it only when it still adds up.
@@ -357,6 +387,10 @@ export default function Today() {
         payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
       });
       toast({ type: 'nutri', message: `+${calories} kcal` });
+      // The pill keeps the multiplier it was logged with (so its preview tells the
+      // truth); the CHIP clears, so it cannot contaminate the next pill unseen.
+      setPillPortions(prev => ({ ...prev, [food.id]: portion }));
+      setNextPortion(null);
       const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
@@ -441,17 +475,17 @@ export default function Today() {
 
   // Weight check-in: only when viewing today, re-check after sync restores profile
   useEffect(() => {
-    if (!hasProfile || date !== todayDateString()) return;
+    if (!hasProfile || date !== nutriToday) return;
     if (localStorage.getItem('hubtify_notifications_module_nutrition') === 'false') return;
     const dismissed = localStorage.getItem('hubtify_weight_dismiss_date');
-    if (dismissed === todayDateString()) return;
+    if (dismissed === nutriToday) return;
     window.api.nutritionShouldAskWeight().then(result => {
       if (result.shouldAsk) {
         setWeightPopup({ show: true, lastWeight: result.lastWeight });
         if (result.lastWeight) setWeightInput(String(result.lastWeight));
       }
     }).catch(console.error);
-  }, [date, hasProfile]);
+  }, [date, hasProfile, nutriToday]);
 
   const [weightError, setWeightError] = useState('');
   const handleWeightSave = async () => {
@@ -472,7 +506,7 @@ export default function Today() {
 
   /** Explicit "Later": stop asking until tomorrow. Only the button does this. */
   const handleWeightDismiss = () => {
-    localStorage.setItem('hubtify_weight_dismiss_date', todayDateString());
+    localStorage.setItem('hubtify_weight_dismiss_date', nutriToday);
     setWeightPopup({ show: false });
   };
 
@@ -561,29 +595,36 @@ export default function Today() {
     const groups: Record<MealType, { foods: FoodEntry[]; calories: number }> = {
       breakfast: { foods: [], calories: 0 },
       lunch: { foods: [], calories: 0 },
+      merienda: { foods: [], calories: 0 },
       dinner: { foods: [], calories: 0 },
       snack: { foods: [], calories: 0 },
     };
     for (const f of foods) {
-      const meal = (f.meal as MealType) ?? resolveMealType(f.time, mealSchedule).meal;
+      const stored = f.meal as MealType | null | undefined;
+      // A meal value we don't know (a future type, or a corrupted sync row) must
+      // not crash the log — it falls back to the schedule, then to snack.
+      const meal = stored && groups[stored]
+        ? stored
+        : resolveMealType(f.time, mealSchedule, dayCutoffHour).meal;
       groups[meal].foods.push(f);
       groups[meal].calories += f.calories;
     }
     return SHARED_MEAL_ORDER
-      .filter(m => mealSchedule[m].enabled || groups[m].foods.length > 0)
+      .filter(m => mealSchedule[m]?.enabled || groups[m].foods.length > 0)
       .filter(m => groups[m].foods.length > 0)
       .map(m => ({ type: m, ...groups[m] }));
-  }, [foods, mealSchedule]);
+  }, [foods, mealSchedule, dayCutoffHour]);
 
   const mealI18n: Record<MealType, string> = {
     breakfast: t('nutrify.mealBreakfast', 'Desayuno'),
     lunch: t('nutrify.mealLunch', 'Almuerzo'),
+    merienda: t('nutrify.mealMerienda', 'Merienda'),
     dinner: t('nutrify.mealDinner', 'Cena'),
     snack: t('nutrify.mealSnack', 'Snack'),
   };
 
   const pendingBeforeCount = pendingDays.filter(d => d < date).length;
-  const isToday = date === todayDateString();
+  const isToday = date === nutriToday;
   const isPending = pendingDays.includes(date);
 
   const toleranceLow = Math.round(target * 0.95);
@@ -706,7 +747,7 @@ export default function Today() {
             </button>
             <button
               className={`nutri-date-pill${dayClosed ? ' nutri-date-pill--closed' : ''}`}
-              onClick={() => !isToday && setDate(todayDateString())}
+              onClick={() => { if (!isToday) { setUserPickedDate(false); setDate(nutriToday); } }}
               disabled={isToday}
             >
               {dayClosed && (
@@ -717,8 +758,8 @@ export default function Today() {
               {isToday ? t('nutrify.today', 'Hoy') : `${date} \u00B7 ${dateDayName}`}
             </button>
             <button className="nutri-day-btn" onClick={() => goDay(1)}
-              disabled={date >= todayDateString()}
-              style={{ opacity: date >= todayDateString() ? 0.3 : 1 }}
+              disabled={date >= nutriToday}
+              style={{ opacity: date >= nutriToday ? 0.3 : 1 }}
               aria-label={t('nutrify.nextDay', 'Día siguiente')}>
               {'\u203A'}
             </button>
@@ -981,26 +1022,29 @@ export default function Today() {
                   <button
                     key={mult}
                     type="button"
-                    className={`nutri-portion-chip${portion === mult ? ' active' : ''}`}
-                    onClick={() => setPortion(mult)}
-                    aria-pressed={portion === mult}
+                    className={`nutri-portion-chip${nextPortion === mult ? ' active' : ''}`}
+                    onClick={() => setNextPortion(prev => (prev === mult ? null : mult))}
+                    aria-pressed={nextPortion === mult}
                   >
                     {'×'}{mult}
                   </button>
                 ))}
               </div>
               <div className="nutri-frequent-pills">
-                {favoriteFoods.map((f) => (
+                {favoriteFoods.map((f) => {
+                  const mult = portionFor(f.id);
+                  return (
                   <span key={f.id} className="nutri-fav-pill">
                     <button
                       className="nutri-btn nutri-pill"
                       onClick={() => handleLogFavorite(f)}
                       title={t('nutrify.favoriteLogTitle', 'Registrar {{name}} ({{kcal}} kcal)', {
                         name: f.description,
-                        kcal: Math.round(f.calories * portion),
+                        kcal: Math.round(f.calories * mult),
                       })}
                     >
-                      {f.description} ({Math.round(f.calories * portion)})
+                      {f.description} ({Math.round(f.calories * mult)})
+                      {mult !== 1 && <span className="nutri-pill-portion">{'×'}{mult}</span>}
                     </button>
                     <button
                       className="nutri-fav-remove tap-target"
@@ -1011,10 +1055,13 @@ export default function Today() {
                       <CrossMark width={10} height={10} />
                     </button>
                   </span>
-                ))}
+                  );
+                })}
               </div>
               <p className="nutri-hint" style={{ fontSize: 'var(--fs-label)', marginTop: 6 }}>
                 {t('nutrify.favoriteClickHint2', 'Click para registrar. La × quita el favorito.')}
+                {' '}
+                {t('nutrify.portionPerPillHint', 'La porción elegida se aplica al próximo favorito que toques y después vuelve a ×1.')}
               </p>
             </>
           )}
@@ -1076,7 +1123,7 @@ export default function Today() {
               <span className="nutri-meal-group-kcal">{group.calories} kcal</span>
             </div>
             {group.foods.map((f) => (
-              <FoodLogItem key={f.id} entry={f} isNew={lastAddedId === f.id} className="" readOnly={!!dayClosed} onDelete={handleDelete} onMealChange={handleMealChange} mealSchedule={mealSchedule} onFavorite={() => handleAddFavorite(f.description, f.calories, f.source || undefined, f.aiBreakdown || undefined)} onUpdate={async (id, fields) => {
+              <FoodLogItem key={f.id} entry={f} isNew={lastAddedId === f.id} className="" readOnly={!!dayClosed} onDelete={handleDelete} onMealChange={handleMealChange} mealSchedule={mealSchedule} dayCutoffHour={dayCutoffHour} onFavorite={() => handleAddFavorite(f.description, f.calories, f.source || undefined, f.aiBreakdown || undefined)} onUpdate={async (id, fields) => {
                 await window.api.nutritionUpdateFood(id, fields);
                 loadData(date);
               }} />

@@ -11,6 +11,8 @@ import type { BarDatum, PointDatum, CellLevel } from '../../../shared/components
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal } from '../../../shared/components/icons';
+import { normalizeStreak, nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
+import type { StreakInfo } from '../nutrition-day';
 import type { NutritionProfile, DailySummary } from '../types';
 
 interface WeightEntry {
@@ -72,7 +74,7 @@ export default function NutritionCharts() {
   const [range, setRange] = useState<Range>('30d');
   const [summaries, setSummaries] = useState<DailySummary[]>([]);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
-  const [streak, setStreak] = useState(0);
+  const [streakInfo, setStreakInfo] = useState<StreakInfo>({ streak: 0, todayPending: false });
   const [profile, setProfile] = useState<NutritionProfile | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ export default function NutritionCharts() {
       .then(([sums, wts, str, prof]) => {
         setSummaries(sums as DailySummary[]);
         setWeights(wts as WeightEntry[]);
-        setStreak(str);
+        setStreakInfo(normalizeStreak(str));
         setProfile(prof as NutritionProfile | null);
         setLoading(false);
       })
@@ -117,7 +119,10 @@ export default function NutritionCharts() {
 
   // ── Derived data ───────────────────────────────────────────
 
-  const today = todayDateString();
+  // Nutritional today (profile cutoff), so the heatmap's "today" cell is the same
+  // day the backend is writing logs to. Falls back to the calendar day until the
+  // profile lands.
+  const today = profile ? nutritionToday(profile.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR) : todayDateString();
 
   // Filter weights by range
   const filteredWeights = useMemo(() => {
@@ -176,8 +181,8 @@ export default function NutritionCharts() {
       }
     }
 
-    return { precision, latestWeight, weightDelta, streak, daysLogged, weightVelocity };
-  }, [summaries, filteredWeights, dailyTarget, streak]);
+    return { precision, latestWeight, weightDelta, streak: streakInfo.streak, daysLogged, weightVelocity };
+  }, [summaries, filteredWeights, dailyTarget, streakInfo.streak]);
 
   // ── Bar chart data ─────────────────────────────────────────
 
@@ -231,6 +236,9 @@ export default function NutritionCharts() {
 
     return allDates.map((date) => {
       if (date === today) return 'today';
+      // The bridged day gets its own first-class tone (dashed gold): neither
+      // achieved nor missed — 'miss' would punish exactly what the grace forgave.
+      if (date === streakInfo.graceUsedOn) return 'grace';
       const s = summaryMap.get(date);
       if (!s || s.totalCaloriesIn === 0) return 'miss';
 
@@ -244,7 +252,7 @@ export default function NutritionCharts() {
       if (pct < 80) return 'l3';
       return 'l4';
     });
-  }, [summaries, dailyTarget, heatmapStart, today]);
+  }, [summaries, dailyTarget, heatmapStart, today, streakInfo.graceUsedOn]);
 
   const heatmapTooltips = useMemo(() => {
     const allDates = dateRange(heatmapStart, today);
@@ -255,12 +263,17 @@ export default function NutritionCharts() {
       const s = summaryMap.get(date);
       const cal = s ? Math.round(s.totalCaloriesIn) : 0;
       const label = date === today ? `${date} (${t('nutrify.today', 'hoy')})` : date;
-      if (!cal) return `${label}\n${t('nutrify.noRecord', 'Sin registro')}`;
-      return target
+      // The bridged day reads as a hole in the grid; the tooltip is where it says
+      // it did not cost the streak.
+      const grace = date === streakInfo.graceUsedOn
+        ? `\n${t('nutrify.streakGraceCell', 'Día de gracia: no cortó la racha')}`
+        : '';
+      if (!cal) return `${label}\n${t('nutrify.noRecord', 'Sin registro')}${grace}`;
+      return (target
         ? `${label}\n${cal.toLocaleString()} / ${target.toLocaleString()} kcal`
-        : `${label}\n${cal.toLocaleString()} kcal`;
+        : `${label}\n${cal.toLocaleString()} kcal`) + grace;
     });
-  }, [summaries, dailyTarget, heatmapStart, today, t]);
+  }, [summaries, dailyTarget, heatmapStart, today, t, streakInfo.graceUsedOn]);
 
   // ── Render ─────────────────────────────────────────────────
 
@@ -440,6 +453,18 @@ export default function NutritionCharts() {
                 {t('nutrify.days', 'days')}
               </span>
             </div>
+            {/* Pending is not broken: the streak stands, today is still in play. */}
+            {streakInfo.todayPending && kpis.streak > 0 && (
+              <div className="nutri-streak-note nutri-streak-note--pending">
+                {t('nutrify.streakTodayPending', 'En juego hoy')}
+              </div>
+            )}
+            {streakInfo.graceUsedOn && (
+              <div className="nutri-streak-note nutri-streak-note--grace"
+                title={t('nutrify.streakGraceHelp', 'Un día por semana no te corta la racha.')}>
+                {t('nutrify.streakGraceUsed', 'Día de gracia usado ({{date}})', { date: streakInfo.graceUsedOn })}
+              </div>
+            )}
           </div>
         </div>
 
