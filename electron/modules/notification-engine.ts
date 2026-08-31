@@ -86,8 +86,14 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
 
   const dueSoon = db
     .prepare(
+      // Half-open range, not equality: the date picker emits '2026-03-22T14:30'
+      // while DATE() yields '2026-03-22', so `due_date = DATE(...)` never matched
+      // and the "due tomorrow" notice never fired for any task with a time.
+      // The range covers both bare dates and datetimes, and keeps idx_tasks_due_open
+      // usable (wrapping the column in DATE() would discard it).
       `SELECT id, name FROM tasks
-       WHERE due_date = DATE('now', 'localtime', '+1 day')
+       WHERE due_date >= DATE('now', 'localtime', '+1 day')
+         AND due_date < DATE('now', 'localtime', '+2 days')
          AND status = 0
          AND deleted_at IS NULL`
     )
