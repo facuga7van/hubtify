@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tierXp, bonusMultiplierToTier } from './utils';
+import { tierXp, bonusMultiplierToTier, getDueDateStatus } from './utils';
 
 describe('tierXp', () => {
   it('quick tier returns 5', () => {
@@ -27,5 +27,29 @@ describe('bonusMultiplierToTier', () => {
     expect(bonusMultiplierToTier(1.4)).toBe('normal');
     expect(bonusMultiplierToTier(1.9)).toBe('good');
     expect(bonusMultiplierToTier(2.5)).toBe('critical');
+  });
+});
+
+describe('getDueDateStatus', () => {
+  const dayOffset = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toLocaleDateString('en-CA');
+  };
+
+  it('classifies bare dates', () => {
+    expect(getDueDateStatus(dayOffset(-1))).toBe('overdue');
+    expect(getDueDateStatus(dayOffset(0))).toBe('today');
+    expect(getDueDateStatus(dayOffset(3))).toBe('this-week');
+    expect(getDueDateStatus(dayOffset(30))).toBe('later');
+  });
+
+  // A due date carrying a time used to build 'YYYY-MM-DDT09:00T00:00:00' —
+  // Invalid Date — and every timed quest was quietly filed under "later".
+  it('classifies dates that carry a time exactly like bare ones', () => {
+    expect(getDueDateStatus(`${dayOffset(-1)}T09:00`)).toBe('overdue');
+    expect(getDueDateStatus(`${dayOffset(0)}T23:59`)).toBe('today');
+    expect(getDueDateStatus(`${dayOffset(3)}T09:00`)).toBe('this-week');
+    expect(getDueDateStatus(`${dayOffset(30)}T09:00`)).toBe('later');
   });
 });

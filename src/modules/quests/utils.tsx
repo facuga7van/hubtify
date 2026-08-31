@@ -38,6 +38,28 @@ export function bonusMultiplierToTier(multiplier: number): 'normal' | 'good' | '
 
 /* ── Shared habit check logic ──────────────────── */
 
+/**
+ * Whether a habit owes nothing more for its current period.
+ *
+ * An explicitly skipped day counts as settled — that is the whole point of
+ * skipping: the row stops nagging without pretending the habit was done.
+ */
+export function isHabitPeriodComplete(h: HabitWithStreak): boolean {
+  if (h.skippedToday) return true;
+  if (h.frequency === 'daily') return h.checkedToday;
+  return h.checksThisPeriod >= h.targetThisPeriod;
+}
+
+/**
+ * Whether a habit belongs in "today's" list at all.
+ *
+ * A Mon/Wed/Fri habit on a Tuesday is neither pending nor complete — it is
+ * simply not today's business, so listing it as unchecked is a false debt.
+ */
+export function isHabitRelevantToday(h: HabitWithStreak): boolean {
+  return h.pendingToday || isHabitPeriodComplete(h);
+}
+
 export interface HabitCheckCallbacks {
   toast: (data: Omit<ToastData, 'id'>) => void;
   t: TFunction;
@@ -124,7 +146,12 @@ export async function processHabitCheck(
 
 export function getDueDateStatus(dueDate: string): 'overdue' | 'today' | 'this-week' | 'later' {
   const now = new Date();
-  const due = new Date(dueDate + 'T00:00:00');
+  // due_date is stored EITHER as 'YYYY-MM-DD' or, when the picker supplied a
+  // time, as 'YYYY-MM-DDTHH:mm'. Appending 'T00:00:00' to the second shape
+  // produced '…T09:00T00:00:00' — an Invalid Date, whose every comparison is
+  // false, so every timed quest silently fell through to 'later' and could
+  // never be shown as overdue or due today. Only the day part matters here.
+  const due = new Date(dueDate.slice(0, 10) + 'T00:00:00');
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);
   todayEnd.setDate(todayEnd.getDate() + 1);

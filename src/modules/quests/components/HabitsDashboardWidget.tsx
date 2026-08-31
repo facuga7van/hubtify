@@ -3,21 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { Tick } from '../../../shared/components/codex';
 import { useToast } from '../../../shared/components/useToast';
 import type { HabitWithStreak } from '../types';
-import { processHabitCheck } from '../utils';
+import { processHabitCheck, isHabitPeriodComplete, isHabitRelevantToday } from '../utils';
 
 const MAX_WIDGET_HABITS = 8;
 
 export default function HabitsDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [habits, setHabits] = useState<HabitWithStreak[]>([]);
+  const [allHabits, setAllHabits] = useState<HabitWithStreak[]>([]);
   const [loading, setLoading] = useState(true);
   const checkingRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
       const result = await window.api.questsGetHabits();
-      setHabits(result as HabitWithStreak[]);
+      setAllHabits(result as HabitWithStreak[]);
     } catch (e) {
       console.error('HabitsDashboardWidget load error', e);
     } finally {
@@ -43,10 +43,10 @@ export default function HabitsDashboardWidget() {
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
 
-  const isPeriodComplete = (h: HabitWithStreak) => {
-    if (h.frequency === 'daily') return h.checkedToday;
-    return h.checksThisPeriod >= h.targetThisPeriod;
-  };
+  const isPeriodComplete = isHabitPeriodComplete;
+  // A Mon/Wed/Fri habit on a Tuesday is not today business: showing it unticked
+  // invents a debt and quietly drags the "3/5 hoy" counter down every Tuesday.
+  const habits = allHabits.filter(isHabitRelevantToday);
 
   const handleCheck = useCallback(async (habitId: string) => {
     if (checkingRef.current) return;
@@ -61,10 +61,12 @@ export default function HabitsDashboardWidget() {
 
   if (loading) return null;
 
-  if (habits.length === 0) {
+  if (allHabits.length === 0 || habits.length === 0) {
     return (
       <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', fontStyle: 'italic', margin: '4px 0' }}>
-        {t('questify.noHabits', 'Sin rituales configurados')}
+        {allHabits.length === 0
+          ? t('questify.noHabits', 'Sin rituales configurados')
+          : t('questify.noHabitsToday', 'Ningun ritual toca hoy')}
       </p>
     );
   }

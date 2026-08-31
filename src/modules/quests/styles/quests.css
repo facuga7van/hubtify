@@ -1125,3 +1125,169 @@
 .widget-more-link:focus-visible {
   color: var(--ink);
 }
+
+/* ── Fase 1: postpone, chosen days, streak shields ──────────────────────── */
+
+/* The reschedule shortcut sits next to the date it changes, but a permanently
+   visible clock on every row is four icons where the row already had too many.
+   It surfaces on hover/focus and stays reachable by keyboard at all times. */
+.quest-row-postpone {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.quest-row:hover .quest-row-postpone,
+.quest-row:focus-within .quest-row-postpone,
+.quest-row-postpone[aria-expanded='true'] {
+  opacity: 0.6;
+}
+
+.quest-row-postpone:hover,
+.quest-row-postpone:focus-visible {
+  opacity: 1;
+}
+
+/* Coarse pointers have no hover: never hide the control there. */
+@media (hover: none) {
+  .quest-row-postpone { opacity: 0.6; }
+}
+
+.quest-postpone-menu {
+  min-width: 140px;
+}
+
+.quest-postpone-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+}
+
+/* Nested Today / Tomorrow / pick-a-date list inside the row overflow menu. */
+.quest-row-submenu {
+  margin-left: 10px;
+  padding-left: 4px;
+  border-left: 1px solid rgba(74, 55, 32, 0.3);
+}
+
+/* "Move everything to today" on the Overdue group header. */
+.quest-group-action {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ── Chosen weekday toggles (habit form) ────────────────────────────────── */
+.quest-habit-days {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.quest-habit-day {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  line-height: 1;
+  color: var(--ink-faded);
+  background: rgba(245, 231, 192, 0.4);
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.quest-habit-day:hover,
+.quest-habit-day:focus-visible {
+  border-color: var(--gold-dark);
+  color: var(--ink);
+}
+
+.quest-habit-day--on {
+  background: var(--gold);
+  border-color: var(--ink-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ── Chosen days shown on the habit row ─────────────────────────────────── */
+.quest-habit-daytags {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.quest-habit-daytag {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  line-height: 1;
+  padding: 2px 3px;
+  color: var(--ink-faded);
+  opacity: 0.75;
+}
+
+/* Today's letter is the only one that asks anything of you right now. */
+.quest-habit-daytag--today {
+  color: var(--ink);
+  opacity: 1;
+  font-weight: 700;
+  border-bottom: 1px solid var(--gold-dark);
+}
+
+/* ── Streak shields and skipped days ────────────────────────────────────── */
+.quest-habit-shields {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  color: var(--moss);
+}
+
+.quest-habit-shield-used {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.55;
+}
+
+.quest-habit-skipped {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  color: var(--ink-faded);
+  border: 1px dashed rgba(74, 55, 32, 0.4);
+}
+
+/* ── Habit heatmap: a skipped day is neither earned nor missed ──────────── */
+/* The shared calendar has exactly one spare level ('miss'), painted rubric red
+   for a broken day. In THIS calendar it means "excused", so it is re-tinted to
+   a neutral slate and its ✕ is dropped. The legend below is ours for the same
+   reason — the shared one would label the swatch "missed". */
+.quest-habit-heatmap .heatmap-cell--miss,
+.quest-habit-heatmap .heatmap-calendar--themed .heatmap-cell--miss {
+  background: linear-gradient(135deg, rgba(90, 82, 70, 0.28), rgba(66, 60, 50, 0.34));
+  border-color: rgba(74, 55, 32, 0.45);
+}
+
+.quest-habit-heatmap .heatmap-miss-mark {
+  display: none;
+}
+
+.quest-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+}
+
+.quest-heatmap-swatch {
+  width: 12px;
+  height: 12px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+}

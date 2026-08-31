@@ -1,11 +1,62 @@
+import type Database from 'better-sqlite3';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
 import { todayDateString, formatDateString, yesterdayDateString, localTimestamp, nextDateString } from '../../shared/date-utils';
-import { computeHabits } from './quests.habits';
+import { reconcileHabitShields, serializeSpecificDays } from './quests.habits';
 
 function genId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * Resolves the new `due_date` for a postponed task.
+ *
+ * `target` is either a bare 'YYYY-MM-DD' or a full 'YYYY-MM-DDTHH:mm' (what the
+ * date picker emits). A bare target keeps whatever time the task already had —
+ * "tomorrow" on a 9am standup must stay a 9am standup, not silently become an
+ * all-day item — and stays bare when it had none.
+ */
+export function postponedDueDate(current: string | null | undefined, target: string): string {
+  if (target.includes('T')) return target;
+  const time = typeof current === 'string' && current.includes('T') ? current.split('T')[1] : '';
+  return time ? `${target}T${time}` : target;
+}
+
+/**
+ * Moves a batch of tasks to a new due date. Neutral by design: no XP, no HP,
+ * no completion side effects — the whole point is that rescheduling costs
+ * nothing, so the "Overdue" pile stops being a guilt trip nobody clears.
+ *
+ * Every row moves `updated_at` (LWW sync key) — a bulk write that forgets it is
+ * silently discarded on the other device.
+ */
+export function postponeTasks(
+  db: Database.Database,
+  ids: string[],
+  target: string,
+  now: string = new Date().toISOString(),
+): number {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+  const select = db.prepare('SELECT id, due_date AS dueDate FROM tasks WHERE id = ? AND deleted_at IS NULL');
+  const update = db.prepare('UPDATE tasks SET due_date = ?, updated_at = ? WHERE id = ?');
+  let moved = 0;
+  db.transaction(() => {
+    for (const id of ids) {
+      const row = select.get(id) as { id: string; dueDate: string | null } | undefined;
+      if (!row) continue;
+      update.run(postponedDueDate(row.dueDate, target), now, id);
+      moved++;
+    }
+  })();
+  return moved;
+}
+
+/** 'today' / 'tomorrow' shorthands, or a literal date the picker produced. */
+function resolvePostponeTarget(target: string): string {
+  if (target === 'today') return todayDateString();
+  if (target === 'tomorrow') return nextDateString(todayDateString());
+  return target;
 }
 
 /**
@@ -86,6 +137,15 @@ export function registerQuestsIpcHandlers(): void {
       }
     });
     deleteTx(ids, now);
+  });
+
+  /**
+   * `target` is 'today' | 'tomorrow' | 'YYYY-MM-DD' | 'YYYY-MM-DDTHH:mm'.
+   * Returns how many tasks actually moved (ids that no longer exist are skipped).
+   */
+  ipcHandle('quests:postponeTasks', (_e, ids: string[], target: string) => {
+    const moved = postponeTasks(getDb(), ids, resolvePostponeTarget(String(target || 'today')));
+    return { moved };
   });
 
   ipcHandle('quests:setTaskStatus', (_e, taskId: string, status: boolean) => {
@@ -350,8 +410,10 @@ export function registerQuestsIpcHandlers(): void {
 
   // ── Habits ───────────────────────────────────────
 
+  // Reconciles (and persists) streak shields on the way out — see
+  // reconcileHabitShields. Read-only callers (the Syl snapshot) use computeHabits.
   ipcHandle('quests:getHabits', () => {
-    return computeHabits(getDb(), new Date());
+    return reconcileHabitShields(getDb(), new Date());
   });
 
   ipcHandle('quests:getHabitHeatmap', (_e, days: number = 91) => {
@@ -361,50 +423,74 @@ export function registerQuestsIpcHandlers(): void {
     startDate.setDate(today.getDate() - days + 1);
     const startStr = formatDateString(startDate);
 
+    // Skips and shields are NOT achievements: counting them would paint an
+    // excused day the same gold as a day actually earned. They come back in
+    // their own bucket so the calendar can give them a neutral tone.
     const rows = db.prepare(`
-      SELECT date, COUNT(DISTINCT habit_id) AS count
+      SELECT date,
+             COUNT(DISTINCT CASE WHEN kind = 'check' THEN habit_id END) AS count,
+             COUNT(DISTINCT CASE WHEN kind = 'skip'  THEN habit_id END) AS skipCount
       FROM habit_checks
       WHERE deleted_at IS NULL AND date >= ?
       GROUP BY date
-    `).all(startStr) as Array<{ date: string; count: number }>;
+    `).all(startStr) as Array<{ date: string; count: number; skipCount: number }>;
 
     const totalHabits = (db.prepare(
       'SELECT COUNT(*) AS c FROM habits WHERE deleted_at IS NULL'
     ).get() as { c: number }).c;
 
-    const countMap = new Map<string, number>();
+    const countMap = new Map<string, { count: number; skipCount: number }>();
     for (const row of rows) {
-      countMap.set(row.date, row.count);
+      countMap.set(row.date, { count: row.count, skipCount: row.skipCount });
     }
 
-    const result: Array<{ date: string; count: number }> = [];
+    const result: Array<{ date: string; count: number; skipCount: number }> = [];
     const d = new Date(startDate);
     for (let i = 0; i < days; i++) {
       const ds = formatDateString(d);
-      result.push({ date: ds, count: countMap.get(ds) ?? 0 });
+      const hit = countMap.get(ds);
+      result.push({ date: ds, count: hit?.count ?? 0, skipCount: hit?.skipCount ?? 0 });
       d.setDate(d.getDate() + 1);
     }
 
     return { days: result, totalHabits };
   });
 
-  ipcHandle('quests:addHabit', (_e, habit: { name: string; frequency: string; timesPerWeek: number }) => {
+  // `specificDays` (ISO 1=Mon..7=Sun) and `timesPerWeek` are mutually exclusive
+  // ways to express a weekly habit: storing days pins times_per_week to their
+  // count so any reader that ignores the new column still sees a sane target.
+  ipcHandle('quests:addHabit', (_e, habit: { name: string; frequency: string; timesPerWeek: number; specificDays?: number[] | null }) => {
     const db = getDb();
     const id = genId();
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO habits (id, name, frequency, times_per_week, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, habit.name, habit.frequency, habit.timesPerWeek, now, now);
+    const days = habit.frequency === 'weekly' ? serializeSpecificDays(habit.specificDays) : null;
+    const times = days ? days.split(',').length : habit.timesPerWeek;
+    db.prepare('INSERT INTO habits (id, name, frequency, times_per_week, specific_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, habit.name, habit.frequency, times, days, now, now);
     return id;
   });
 
-  ipcHandle('quests:updateHabit', (_e, id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => {
+  ipcHandle('quests:updateHabit', (_e, id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number; specificDays?: number[] | null }) => {
     const db = getDb();
     const now = new Date().toISOString();
     const fields: string[] = ['updated_at = ?'];
     const values: unknown[] = [now];
     if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
     if (updates.frequency !== undefined) { fields.push('frequency = ?'); values.push(updates.frequency); }
-    if (updates.timesPerWeek !== undefined) { fields.push('times_per_week = ?'); values.push(updates.timesPerWeek); }
+    if (updates.specificDays !== undefined) {
+      const days = updates.frequency === 'weekly' ? serializeSpecificDays(updates.specificDays) : null;
+      fields.push('specific_days = ?'); values.push(days);
+      // Choosing days wins over the stepper; clearing them hands control back.
+      if (days) { fields.push('times_per_week = ?'); values.push(days.split(',').length); }
+      else if (updates.timesPerWeek !== undefined) { fields.push('times_per_week = ?'); values.push(updates.timesPerWeek); }
+    } else if (updates.timesPerWeek !== undefined) {
+      fields.push('times_per_week = ?'); values.push(updates.timesPerWeek);
+    }
+    // Leaving chosen days behind on a habit that is no longer weekly means they
+    // silently resurrect the day it becomes weekly again.
+    if (updates.frequency !== undefined && updates.frequency !== 'weekly') {
+      fields.push('specific_days = NULL');
+    }
     db.prepare(`UPDATE habits SET ${fields.join(', ')} WHERE id = ?`).run(...values, id);
   });
 
@@ -421,57 +507,73 @@ export function registerQuestsIpcHandlers(): void {
     tx();
   });
 
-  ipcHandle('quests:checkHabit', (_e, habitId: string) => {
-    const db = getDb();
-    const today = todayDateString();
+  /**
+   * Toggles a real check for `date`. A row that is currently a 'skip' or a
+   * 'shield' is PROMOTED to a check rather than toggled off — the user asking
+   * for a check on an excused day means "actually, I did it", not "undo".
+   */
+  function toggleCheck(db: Database.Database, habitId: string, date: string): { checked: boolean } {
     const now = new Date().toISOString();
-    const checkTx = db.transaction(() => {
-      const existing = db.prepare('SELECT id, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?').get(habitId, today) as { id: string; deleted_at: string | null } | undefined;
-      if (existing && !existing.deleted_at) {
+    return db.transaction(() => {
+      const existing = db.prepare(
+        'SELECT id, kind, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?'
+      ).get(habitId, date) as { id: string; kind: string | null; deleted_at: string | null } | undefined;
+
+      if (existing && !existing.deleted_at && (existing.kind ?? 'check') === 'check') {
         db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, existing.id);
         return { checked: false };
-      } else if (existing && existing.deleted_at) {
-        db.prepare('UPDATE habit_checks SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now, existing.id);
-        return { checked: true };
-      } else {
-        const id = genId();
-        db.prepare('INSERT INTO habit_checks (id, habit_id, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-          .run(id, habitId, today, now, now);
+      }
+      if (existing) {
+        db.prepare("UPDATE habit_checks SET kind = 'check', deleted_at = NULL, updated_at = ? WHERE id = ?")
+          .run(now, existing.id);
         return { checked: true };
       }
-    });
-    return checkTx();
-  });
+      db.prepare("INSERT INTO habit_checks (id, habit_id, date, kind, created_at, updated_at) VALUES (?, ?, ?, 'check', ?, ?)")
+        .run(genId(), habitId, date, now, now);
+      return { checked: true };
+    })();
+  }
+
+  ipcHandle('quests:checkHabit', (_e, habitId: string) => toggleCheck(getDb(), habitId, todayDateString()));
 
   ipcHandle('quests:checkHabitForDate', (_e, habitId: string, date: string) => {
-    const db = getDb();
     const yesterday = yesterdayDateString();
     if (date !== yesterday) {
       throw new Error(`Retroactive check only allowed for yesterday (${yesterday}), got: ${date}`);
     }
+    return toggleCheck(getDb(), habitId, date);
+  });
+
+  /**
+   * Toggles "skip this day" — the flu/travel escape hatch.
+   *
+   * A skip is a `habit_checks` row with `kind = 'skip'`: it respects the
+   * existing UNIQUE(habit_id, date), rides the sync path already in place, and
+   * the streak walk bridges over it. It is NOT a completion: no XP, it doesn't
+   * count towards the period (it lowers the bar instead), and the heatmap gives
+   * it a neutral tone.
+   */
+  ipcHandle('quests:skipHabit', (_e, habitId: string, date?: string) => {
+    const db = getDb();
+    const day = date || todayDateString();
     const now = new Date().toISOString();
-
-    const checkTx = db.transaction(() => {
+    return db.transaction(() => {
       const existing = db.prepare(
-        'SELECT id, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?'
-      ).get(habitId, date) as { id: string; deleted_at: string | null } | undefined;
+        'SELECT id, kind, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?'
+      ).get(habitId, day) as { id: string; kind: string | null; deleted_at: string | null } | undefined;
 
-      if (existing && !existing.deleted_at) {
-        db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE id = ?')
-          .run(now, now, existing.id);
-        return { checked: false };
-      } else if (existing && existing.deleted_at) {
-        db.prepare('UPDATE habit_checks SET deleted_at = NULL, updated_at = ? WHERE id = ?')
-          .run(now, existing.id);
-        return { checked: true };
-      } else {
-        const id = genId();
-        db.prepare('INSERT INTO habit_checks (id, habit_id, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-          .run(id, habitId, date, now, now);
-        return { checked: true };
+      if (existing && !existing.deleted_at && existing.kind === 'skip') {
+        db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, existing.id);
+        return { skipped: false };
       }
-    });
-
-    return checkTx();
+      if (existing) {
+        db.prepare("UPDATE habit_checks SET kind = 'skip', deleted_at = NULL, updated_at = ? WHERE id = ?")
+          .run(now, existing.id);
+        return { skipped: true };
+      }
+      db.prepare("INSERT INTO habit_checks (id, habit_id, date, kind, created_at, updated_at) VALUES (?, ?, ?, 'skip', ?, ?)")
+        .run(genId(), habitId, day, now, now);
+      return { skipped: true };
+    })();
   });
 }

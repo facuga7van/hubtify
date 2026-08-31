@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
 import { getDueDateStatus } from '../utils';
+import PostponeMenu, { PostponeOptions } from './PostponeMenu';
 import type { Task } from '../types';
 
 interface Props {
@@ -13,6 +14,19 @@ interface Props {
   onOpenNotes: () => void;
   onDelete: () => void;
   onToggleSelect: () => void;
+  /** Receives 'today' | 'tomorrow' | 'YYYY-MM-DDTHH:mm'. */
+  onPostpone: (target: string) => void;
+}
+
+function ClockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="8.5" r="6" />
+      <path d="M8 5v3.5l2.2 1.5" />
+      <path d="M5.5 1.6L3.4 3M10.5 1.6L12.6 3" />
+    </svg>
+  );
 }
 
 /**
@@ -24,18 +38,22 @@ interface Props {
  * different kind of control.
  */
 export default function QuestRowActions({
-  task, selected, drawingCount, onEdit, onOpenNotes, onDelete, onToggleSelect,
+  task, selected, drawingCount, onEdit, onOpenNotes, onDelete, onToggleSelect, onPostpone,
 }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [postponeOpen, setPostponeOpen] = useState(false);
   // Portaled so the menu is never clipped by a row/column with overflow hidden.
   const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
     const onDocDown = (e: MouseEvent) => {
-      const target = e.target as Node;
+      const target = e.target as HTMLElement;
       if (popupRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      // The postpone submenu's date picker lives in its own portal — a click on
+      // a day is still a click inside this menu, not outside it.
+      if (target.closest?.('.rpg-anchored-popup')) return;
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -46,6 +64,8 @@ export default function QuestRowActions({
       window.removeEventListener('keydown', onKey);
     };
   }, [open, anchorRef, popupRef]);
+
+  useEffect(() => { if (!open) setPostponeOpen(false); }, [open]);
 
   const run = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,6 +86,19 @@ export default function QuestRowActions({
               ? t('questify.overdueLabel', 'vencida')
               : new Date(task.dueDate).toLocaleDateString()}
         </span>
+      )}
+
+      {/* Reschedule shortcut, right beside the date it changes. Revealed on
+          hover/focus of the row (see .quest-row-postpone in quests.css) so the
+          resting row stays quiet, but reachable in one click when it matters. */}
+      {!task.status && (
+        <PostponeMenu
+          onPick={onPostpone}
+          className="quest-icon-btn tap-target quest-row-postpone"
+          title={t('questify.postpone', 'Posponer')}
+        >
+          <ClockIcon />
+        </PostponeMenu>
       )}
 
       {/* Notes shortcut stays visible only when there is something to see */}
@@ -129,6 +162,26 @@ export default function QuestRowActions({
             {t('questify.notes', 'Notas')}
             {drawingCount > 0 && <span className="quest-row-menu-count">{drawingCount}</span>}
           </button>
+          {!task.status && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                className="quest-row-menu-item"
+                aria-expanded={postponeOpen}
+                onClick={(e) => { e.stopPropagation(); setPostponeOpen((v) => !v); }}
+              >
+                <ClockIcon />
+                {t('questify.postpone', 'Posponer')}
+                <span className="quest-row-menu-count" aria-hidden="true">{postponeOpen ? '−' : '+'}</span>
+              </button>
+              {postponeOpen && (
+                <div className="quest-row-submenu">
+                  <PostponeOptions onPick={(target) => { setOpen(false); onPostpone(target); }} />
+                </div>
+              )}
+            </>
+          )}
           <button type="button" role="menuitem" className="quest-row-menu-item quest-row-menu-item--danger" onClick={run(onDelete)}>
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"
               fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">

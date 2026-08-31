@@ -19,20 +19,38 @@ export interface Project {
 
 export type HabitFrequency = 'daily' | 'weekly' | 'monthly';
 
+/** Cap enforced by the backend; the row renders at most this many shield pips. */
+export const MAX_HABIT_SHIELDS = 3;
+
+/** ISO weekday numbers, Monday first — the order the day toggles are drawn in. */
+export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
+
 export interface Habit {
   id: string;
   name: string;
   frequency: HabitFrequency;
   timesPerWeek: number;
   createdAt: string;
+  /** ISO weekdays (1 = Monday … 7 = Sunday), or null for "N times a week". */
+  specificDays: number[] | null;
 }
 
 export interface HabitWithStreak extends Habit {
   streak: number;
+  /** Consecutive fully-met weeks. Only meaningful for weekly habits. */
+  weekStreak: number;
   checkedToday: boolean;
   checkedYesterday: boolean;
+  /** Today is explicitly excused: not done, but not owed either. */
+  skippedToday: boolean;
   checksThisPeriod: number;
   targetThisPeriod: number;
+  /** Whether the habit still wants a check TODAY (respects chosen days + skips). */
+  pendingToday: boolean;
+  /** Streak shields in the bank (0..MAX_HABIT_SHIELDS). */
+  shieldCount: number;
+  /** A shield is currently holding this streak together. */
+  shieldUsed: boolean;
 }
 
 export const PROJECT_COLORS = [

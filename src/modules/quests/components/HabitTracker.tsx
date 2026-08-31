@@ -4,11 +4,16 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useToast } from '../../../shared/components/useToast';
 import { Tick } from '../../../shared/components/codex/CodexPrimitives';
 import { HeatmapCalendar, type CellLevel } from '../../../shared/components/charts/HeatmapCalendar';
+import { Shield } from '../../../shared/components/icons/CodexIcons';
 import type { HabitWithStreak, HabitFrequency } from '../types';
-import { processHabitCheck } from '../utils';
+import { MAX_HABIT_SHIELDS } from '../types';
+import { processHabitCheck, isHabitPeriodComplete } from '../utils';
+import { questsApi } from '../api';
 import { formatDateString, daysAgoDateString } from '../../../../shared/date-utils';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import RpgStepper from '../../../shared/components/RpgStepper';
+import HabitDayPicker, { weekdayLetter } from './HabitDayPicker';
+import HabitRowMenu from './HabitRowMenu';
 
 interface Props {
   onXpGained: () => void;
@@ -20,6 +25,12 @@ const FREQ_LABEL_KEYS: Record<HabitFrequency, string> = {
   monthly: 'questify.frequency.monthly',
 };
 
+/** ISO weekday (1 = Monday … 7 = Sunday) of today, for highlighting. */
+function todayIsoWeekday(): number {
+  const d = new Date().getDay();
+  return d === 0 ? 7 : d;
+}
+
 export default function HabitTracker({ onXpGained }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -30,10 +41,16 @@ export default function HabitTracker({ onXpGained }: Props) {
   const [newName, setNewName] = useState('');
   const [newFreq, setNewFreq] = useState<HabitFrequency>('daily');
   const [newTimes, setNewTimes] = useState(1);
+  // A weekly habit is expressed EITHER as "N times" OR as named days, never
+  // both — saving one clears the other (see handleAdd / handleEditSave).
+  const [newDays, setNewDays] = useState<number[]>([]);
+  const [newByDays, setNewByDays] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editFreq, setEditFreq] = useState<HabitFrequency>('daily');
   const [editTimes, setEditTimes] = useState(1);
+  const [editDays, setEditDays] = useState<number[]>([]);
+  const [editByDays, setEditByDays] = useState(false);
   const HABITS_PER_PAGE = 10;
   const [page, setPage] = useState(0);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
@@ -52,13 +69,16 @@ export default function HabitTracker({ onXpGained }: Props) {
   }, []);
 
   const loadHeatmap = useCallback(async () => {
-    const { days, totalHabits } = await window.api.questsGetHabitHeatmap(30);
+    const { days, totalHabits } = await questsApi().questsGetHabitHeatmap(30);
     if (totalHabits === 0) { setHeatmapData([]); return; }
     const todayStr = formatDateString(new Date());
     if (days.length > 0) setHeatmapStart(days[0].date);
     const cells: CellLevel[] = days.map(d => {
       if (d.date === todayStr) return 'today';
-      if (d.count === 0) return 'l0';
+      // A day whose only activity was a skip is neither earned nor missed.
+      // 'miss' is the calendar's one spare slot; quests.css re-tints it to a
+      // neutral tone inside .quest-habit-heatmap (and the legend is ours).
+      if (d.count === 0) return d.skipCount > 0 ? 'miss' : 'l0';
       const ratio = d.count / totalHabits;
       if (ratio >= 1) return 'l4';
       if (ratio >= 0.75) return 'l3';
@@ -97,6 +117,13 @@ export default function HabitTracker({ onXpGained }: Props) {
     if (new Date().getHours() >= 12) return false;
     if (h.frequency === 'daily') return true;
     if (h.frequency === 'weekly') {
+      // A habit pinned to Mon/Wed/Fri has nothing to catch up on a Wednesday:
+      // yesterday was a Tuesday, and a check there would not count anyway.
+      if (h.specificDays && h.specificDays.length > 0) {
+        const dow = new Date().getDay() || 7;
+        const yesterdayDow = dow === 1 ? 7 : dow - 1;
+        if (!h.specificDays.includes(yesterdayDow)) return false;
+      }
       // Yesterday must be in current week (today is NOT Monday)
       return new Date().getDay() !== 1;
     }
@@ -114,6 +141,23 @@ export default function HabitTracker({ onXpGained }: Props) {
     if (heatmapOpen) loadHeatmap();
   };
 
+  /**
+   * Skipping is the flu/travel escape hatch: the day is bridged, the streak
+   * survives, and nothing is awarded — an honest "not today", not a fake check.
+   */
+  const handleSkip = async (h: HabitWithStreak) => {
+    const { skipped } = await questsApi().questsSkipHabit(h.id);
+    toast({
+      type: 'info',
+      message: skipped
+        ? t('questify.habitSkippedToast', 'Día salteado — la racha sigue en pie')
+        : t('questify.habitUnskippedToast', 'Día ya no salteado'),
+    });
+    await loadHabits();
+    if (heatmapOpen) loadHeatmap();
+    window.dispatchEvent(new Event('quests:dataChanged'));
+  };
+
   const isDuplicateName = (name: string, excludeId?: string) => {
     return habits.some(h => h.name.toLowerCase() === name.toLowerCase() && h.id !== excludeId);
   };
@@ -124,14 +168,18 @@ export default function HabitTracker({ onXpGained }: Props) {
       toast({ type: 'warning', message: t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre') });
       return;
     }
-    await window.api.questsAddHabit({
+    const useDays = newFreq === 'weekly' && newByDays && newDays.length > 0;
+    await questsApi().questsAddHabit({
       name: newName.trim(),
       frequency: newFreq,
-      timesPerWeek: newFreq === 'weekly' ? newTimes : 1,
+      timesPerWeek: useDays ? newDays.length : (newFreq === 'weekly' ? newTimes : 1),
+      specificDays: useDays ? newDays : null,
     });
     setNewName('');
     setNewFreq('daily');
     setNewTimes(1);
+    setNewDays([]);
+    setNewByDays(false);
     setAdding(false);
     await loadHabits();
     window.dispatchEvent(new Event('quests:dataChanged'));
@@ -142,6 +190,8 @@ export default function HabitTracker({ onXpGained }: Props) {
     setEditName(h.name);
     setEditFreq(h.frequency);
     setEditTimes(h.timesPerWeek);
+    setEditDays(h.specificDays ?? []);
+    setEditByDays(!!h.specificDays && h.specificDays.length > 0);
   };
 
   const handleEditSave = async () => {
@@ -150,10 +200,12 @@ export default function HabitTracker({ onXpGained }: Props) {
       toast({ type: 'warning', message: t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre') });
       return;
     }
-    await window.api.questsUpdateHabit(editingId, {
+    const useDays = editFreq === 'weekly' && editByDays && editDays.length > 0;
+    await questsApi().questsUpdateHabit(editingId, {
       name: editName.trim(),
       frequency: editFreq,
-      timesPerWeek: editFreq === 'weekly' ? editTimes : 1,
+      timesPerWeek: useDays ? editDays.length : (editFreq === 'weekly' ? editTimes : 1),
+      specificDays: useDays ? editDays : null,
     });
     setEditingId(null);
     await loadHabits();
@@ -169,6 +221,8 @@ export default function HabitTracker({ onXpGained }: Props) {
   };
 
   const getFreqLabel = (h: HabitWithStreak) => {
+    // Chosen days speak for themselves — the row renders the letters instead.
+    if (h.specificDays && h.specificDays.length > 0) return null;
     if (h.frequency === 'weekly' && h.timesPerWeek > 1) return `${h.timesPerWeek}${t('questify.timesPerWeek')}`;
     return t(FREQ_LABEL_KEYS[h.frequency]);
   };
@@ -191,10 +245,8 @@ export default function HabitTracker({ onXpGained }: Props) {
     return `${h.checksThisPeriod}/${h.targetThisPeriod}`;
   };
 
-  const isPeriodComplete = (h: HabitWithStreak) => {
-    if (h.frequency === 'daily') return h.checkedToday;
-    return h.checksThisPeriod >= h.targetThisPeriod;
-  };
+  const isPeriodComplete = isHabitPeriodComplete;
+  const todayDow = todayIsoWeekday();
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -249,7 +301,19 @@ export default function HabitTracker({ onXpGained }: Props) {
                 ))}
               </select>
               {editFreq === 'weekly' && (
-                <RpgStepper value={editTimes} onChange={setEditTimes} min={1} max={7} />
+                <>
+                  <button
+                    type="button"
+                    className={`qb-rune quest-rune-btn${editByDays ? ' qb-rune--active' : ''}`}
+                    aria-pressed={editByDays}
+                    onClick={() => setEditByDays(v => !v)}
+                  >
+                    {editByDays ? t('questify.chooseDays', 'Elegir dias') : t('questify.timesMode', 'N veces')}
+                  </button>
+                  {editByDays
+                    ? <HabitDayPicker value={editDays} onChange={setEditDays} />
+                    : <RpgStepper value={editTimes} onChange={setEditTimes} min={1} max={7} />}
+                </>
               )}
               <button type="button" className="qb-rune qb-rune--sage quest-rune-btn tap-target" onClick={handleEditSave}>
                 {t('questify.save')}
@@ -273,7 +337,21 @@ export default function HabitTracker({ onXpGained }: Props) {
 
               <div className="quest-habit-right">
                 {/* Frequency label */}
-                <span className="quest-habit-freq">{getFreqLabel(h)}</span>
+                {getFreqLabel(h) && <span className="quest-habit-freq">{getFreqLabel(h)}</span>}
+
+                {/* Chosen days, with the one that is TODAY picked out */}
+                {h.specificDays && h.specificDays.length > 0 && (
+                  <span className="quest-habit-daytags" aria-label={t('questify.chooseDays', 'Elegir dias')}>
+                    {h.specificDays.map(d => (
+                      <span
+                        key={d}
+                        className={`quest-habit-daytag${d === todayDow ? ' quest-habit-daytag--today' : ''}`}
+                      >
+                        {weekdayLetter(t, d)}
+                      </span>
+                    ))}
+                  </span>
+                )}
 
                 {/* Progress for weekly/monthly */}
                 {getProgressLabel(h) && (
@@ -290,6 +368,35 @@ export default function HabitTracker({ onXpGained }: Props) {
                       <path d="M7 1c-1 1.5-3.5 3.5-3.5 6a3.5 3.5 0 007 0c0-1-.5-1.8-1.3-2.6.4.8.4 1.7-.4 2.6-.9-.9-.9-2.6-1.8-3.5-.4 1.3-.9 2.2-.9 3a1.3 1.3 0 002.6 0c0-.4-.3-1.3-.9-2.2z"/>
                     </svg>
                     {h.streak}
+                  </span>
+                )}
+
+                {/* Streak shields in the bank */}
+                {h.shieldCount > 0 && (
+                  <span
+                    className="quest-habit-shields"
+                    title={t('questify.habitShieldTitle', 'Escudos de racha: {{count}} de {{max}}. Cubren un dia perdido.', { count: h.shieldCount, max: MAX_HABIT_SHIELDS })}
+                  >
+                    <Shield width={10} height={10} style={{ color: 'var(--moss)', flexShrink: 0 }} />
+                    {h.shieldCount}
+                  </span>
+                )}
+
+                {/* A shield is currently holding this streak together. Discreet
+                    on purpose: reassurance, not a celebration. */}
+                {h.shieldUsed && (
+                  <span
+                    className="quest-habit-shield-used"
+                    title={t('questify.habitShieldUsed', 'Un escudo cubrio un dia perdido: la racha sigue')}
+                  >
+                    <Shield width={10} height={10} style={{ color: 'var(--ink-faded)', flexShrink: 0 }} />
+                  </span>
+                )}
+
+                {/* Today is excused */}
+                {h.skippedToday && (
+                  <span className="quest-habit-skipped">
+                    {t('questify.habitSkippedLabel', 'Salteado')}
                   </span>
                 )}
 
@@ -316,32 +423,14 @@ export default function HabitTracker({ onXpGained }: Props) {
                 />
               </div>
 
-              {/* Edit / delete, kept clear of the tick by a divider */}
+              {/* Edit / skip / delete, kept clear of the tick by a divider */}
               <div className="quest-habit-actions">
-                <button
-                  type="button"
-                  className="quest-icon-btn tap-target"
-                  onClick={() => startEdit(h)}
-                  aria-label={t('questify.edit', 'Edit')}
-                  title={t('questify.edit', 'Edit')}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"
-                    fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
-                    <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="quest-icon-btn tap-target"
-                  onClick={() => handleDelete(h.id)}
-                  aria-label={t('questify.deleteHabit', 'Delete habit')}
-                  title={t('questify.deleteHabit', 'Delete habit')}
-                >
-                  <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"
-                    fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
-                    <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
-                  </svg>
-                </button>
+                <HabitRowMenu
+                  skipped={h.skippedToday}
+                  onEdit={() => startEdit(h)}
+                  onSkip={() => handleSkip(h)}
+                  onDelete={() => handleDelete(h.id)}
+                />
               </div>
             </>
           )}
@@ -399,9 +488,24 @@ export default function HabitTracker({ onXpGained }: Props) {
             ))}
           </select>
           {newFreq === 'weekly' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <RpgStepper value={newTimes} onChange={setNewTimes} min={1} max={7} />
-              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.timesPerWeek')}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {/* Two ways to say the same thing, never both at once. */}
+              <button
+                type="button"
+                className={`qb-rune quest-rune-btn${newByDays ? ' qb-rune--active' : ''}`}
+                aria-pressed={newByDays}
+                onClick={() => setNewByDays(v => !v)}
+              >
+                {newByDays ? t('questify.chooseDays', 'Elegir dias') : t('questify.timesMode', 'N veces')}
+              </button>
+              {newByDays ? (
+                <HabitDayPicker value={newDays} onChange={setNewDays} />
+              ) : (
+                <>
+                  <RpgStepper value={newTimes} onChange={setNewTimes} min={1} max={7} />
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.timesPerWeek')}</span>
+                </>
+              )}
             </div>
           )}
           <button type="button" className="qb-rune qb-rune--sage quest-rune-btn tap-target" onClick={handleAdd}>
@@ -439,7 +543,20 @@ export default function HabitTracker({ onXpGained }: Props) {
           {heatmapOpen && (
             <div style={{ marginTop: 6 }}>
               {heatmapData.length > 0 ? (
-                <HeatmapCalendar data={heatmapData} startDate={heatmapStart} columns={7} legend />
+                <div className="quest-habit-heatmap">
+                  {/* Own legend: the shared one labels the spare slot "missed",
+                      and inside this calendar that slot means "skipped". */}
+                  <HeatmapCalendar data={heatmapData} startDate={heatmapStart} columns={7} legend={false} />
+                  <div className="quest-heatmap-legend">
+                    <span>{t('common.less', 'Menos')}</span>
+                    <span className="heatmap-cell heatmap-cell--l1 quest-heatmap-swatch" />
+                    <span className="heatmap-cell heatmap-cell--l3 quest-heatmap-swatch" />
+                    <span className="heatmap-cell heatmap-cell--l4 quest-heatmap-swatch" />
+                    <span>{t('common.more', 'Mas')}</span>
+                    <span className="heatmap-cell heatmap-cell--miss quest-heatmap-swatch" />
+                    <span>{t('questify.habitSkippedLabel', 'Salteado')}</span>
+                  </div>
+                </div>
               ) : (
                 <p className="quest-empty" style={{ padding: 8, fontSize: 'var(--fs-label)' }}>
                   {t('questify.heatmapEmpty', 'Todavía no hay actividad registrada.')}

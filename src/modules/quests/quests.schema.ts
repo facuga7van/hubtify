@@ -217,4 +217,31 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_habit_checks_live  ON habit_checks(deleted_at, habit_id, date);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 12,
+    up: `
+      -- ── Fase 1: specific weekday habits + forgiving streaks ───────────────
+      -- specific_days: CSV of ISO weekday numbers ('1,3,5' = Mon/Wed/Fri).
+      -- NULL keeps the legacy "N times per week" counting behaviour.
+      ALTER TABLE habits ADD COLUMN specific_days TEXT DEFAULT NULL;
+
+      -- Streak shields: earned once per multiple-of-7 streak milestone (capped
+      -- at 3). last_shield_streak remembers the highest milestone already paid
+      -- so oscillating around 7 never farms shields.
+      ALTER TABLE habits ADD COLUMN shield_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE habits ADD COLUMN last_shield_streak INTEGER NOT NULL DEFAULT 0;
+
+      -- habit_checks rows are no longer all "I did it":
+      --   'check'  — the habit was done (counts, gives XP)          [legacy default]
+      --   'skip'   — explicitly excused (bridges the streak, no XP, no count)
+      --   'shield' — a streak shield was spent on this day (bridges, no count)
+      -- 'shield' rows are what makes shield consumption idempotent: the day is
+      -- marked as paid for, so recomputing the streak never spends a second one.
+      ALTER TABLE habit_checks ADD COLUMN kind TEXT NOT NULL DEFAULT 'check';
+      UPDATE habit_checks SET kind = 'check' WHERE kind IS NULL OR kind = '';
+
+      CREATE INDEX IF NOT EXISTS idx_habit_checks_kind ON habit_checks(kind, deleted_at);
+    `,
+  },
 ];

@@ -13,6 +13,8 @@ import { Compass, Map as MapIcon } from '../../../shared/components/icons/CodexI
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import QuestRowActions from './QuestRowActions';
+import PostponeMenu from './PostponeMenu';
+import { questsApi } from '../api';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { XpToastData } from '../types';
@@ -281,6 +283,39 @@ export default function TaskList() {
     window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
+  /**
+   * Rescheduling is NEUTRAL: no XP, no HP, no penalty event. The "Overdue"
+   * group grows until it is background noise precisely because clearing it
+   * feels like admitting failure — so moving a quest costs exactly nothing.
+   */
+  const postpone = useCallback(async (ids: string[], target: string) => {
+    if (ids.length === 0) return 0;
+    const { moved } = await questsApi().questsPostponeTasks(ids, target);
+    if (moved > 0) {
+      toast({ type: 'info', message: t('questify.postponed', '{{count}} misión(es) pospuesta(s)', { count: moved }) });
+      await loadTasks();
+      window.dispatchEvent(new Event('quests:dataChanged'));
+    }
+    return moved;
+  }, [loadTasks, toast, t]);
+
+  const handleBatchPostpone = async (target: string) => {
+    const moved = await postpone(Array.from(selectedIds), target);
+    if (moved > 0) setSelectedIds(new Set());
+  };
+
+  /** Header shortcut on the Overdue group: one tap empties the whole pile. */
+  const handleMoveGroupToToday = async (groupTasks: Task[]) => {
+    if (groupTasks.length > 5) {
+      const ok = await confirm({
+        message: t('questify.moveAllToTodayConfirm', '¿Mover {{count}} misiones vencidas a hoy?', { count: groupTasks.length }),
+        confirmText: t('questify.moveAllToToday', 'Mover todo a hoy'),
+      });
+      if (!ok) return;
+    }
+    await postpone(groupTasks.map((task) => task.id), 'today');
+  };
+
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
     const ok = await confirm({
@@ -410,6 +445,7 @@ export default function TaskList() {
     onComplete: () => handleComplete(task),
     onEdit: () => setEditingTask(task),
     onDelete: () => handleDeleteOne(task),
+    onPostpone: (target: string) => postpone([task.id], target),
     onToggleSelect: () => setSelectedIds((prev) => {
       const next = new Set(prev); next.has(task.id) ? next.delete(task.id) : next.add(task.id); return next;
     }),
@@ -567,6 +603,13 @@ export default function TaskList() {
             <button type="button" className="qb-rune qb-rune--sage quest-rune-btn" onClick={handleBatchComplete}>
               {t('questify.batchComplete', 'Complete')} ({selectedIds.size})
             </button>
+            <PostponeMenu
+              onPick={handleBatchPostpone}
+              className="qb-rune quest-rune-btn"
+              title={t('questify.postpone', 'Posponer')}
+            >
+              {t('questify.postpone', 'Posponer')} ({selectedIds.size})
+            </PostponeMenu>
             <button type="button" className="qb-rune qb-rune--rubric quest-rune-btn" onClick={handleDelete}>
               {t('questify.delete')} ({selectedIds.size})
             </button>
@@ -623,6 +666,17 @@ export default function TaskList() {
                               {t('questify.pendingCount', { count: sectionTasks.length })}
                             </span>
                           </button>
+                          {/* The overdue pile is the one group nobody ever
+                              clears one row at a time. One button empties it. */}
+                          {groupKey === 'overdue' && (
+                            <button
+                              type="button"
+                              className="qb-rune quest-rune-btn quest-group-action"
+                              onClick={(e) => { e.stopPropagation(); handleMoveGroupToToday(sectionTasks); }}
+                            >
+                              {t('questify.moveAllToToday', 'Mover todo a hoy')}
+                            </button>
+                          )}
                         </div>
                         {!isCollapsed && (
                           <DndContext collisionDetection={closestCenter} onDragEnd={(event) => onDragEnd(event, sectionTasks)}>
@@ -694,6 +748,7 @@ export default function TaskList() {
                       onEdit={() => setEditingTask(task)}
                       onOpenNotes={() => setNotesTaskId(task.id)}
                       onDelete={() => handleDeleteOne(task)}
+                      onPostpone={(target) => postpone([task.id], target)}
                       onToggleSelect={() => setSelectedIds((prev) => {
                         const next = new Set(prev); next.has(task.id) ? next.delete(task.id) : next.add(task.id); return next;
                       })}
@@ -772,11 +827,12 @@ export default function TaskList() {
 /* ── SortableQuestRow ─────────────────────────────── */
 
 function SortableQuestRow({ task, expanded, selected, subtasks,
-  onToggleExpand, onComplete, onEdit, onDelete, onToggleSelect, onShowToast, onSubtaskChanged,
+  onToggleExpand, onComplete, onEdit, onDelete, onPostpone, onToggleSelect, onShowToast, onSubtaskChanged,
   drawingCount, onOpenNotes, isEditing, grouped }: {
   task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
   onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
   onDelete: () => void;
+  onPostpone: (target: string) => void;
   onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
   onSubtaskChanged: () => void;
   drawingCount: number; onOpenNotes: () => void;
@@ -892,6 +948,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
           onEdit={onEdit}
           onOpenNotes={onOpenNotes}
           onDelete={onDelete}
+          onPostpone={onPostpone}
           onToggleSelect={onToggleSelect}
         />
       </div>
