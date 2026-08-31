@@ -7,15 +7,23 @@ import {
   playCauldronWarning,
   playCauldronCycleEnd,
 } from '../../../shared/audio';
-import type { CauldronTimerState, CauldronSessionEndResult } from '../../../../shared/types';
+import type { CauldronSessionEndResult } from '../../../../shared/types';
+import {
+  autoStartSecondsLeft,
+  type CauldronTimerStateEx,
+  type CauldronSessionEndResultEx,
+} from '../types';
+import { cancelAutoStart } from '../api';
 import { formatTime } from '../utils';
 import '../styles/cauldron-window.css';
 
 export default function CauldronFloatingWindow() {
   const { t } = useTranslation();
-  const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
+  const [timerState, setTimerState] = useState<CauldronTimerStateEx | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   const warningFiredRef = useRef(false);
+  /** True while the last broadcast had an auto-start armed — see the tick handler. */
+  const autoStartArmedRef = useRef(false);
 
   const loadState = useCallback(() => {
     window.api.cauldronGetState().then((s) => setTimerState(s));
@@ -27,7 +35,18 @@ export default function CauldronFloatingWindow() {
 
   // Tick events — with 10s warning sound
   useEffect(() => {
-    const cleanup = window.api.onCauldronTick((state) => {
+    const cleanup = window.api.onCauldronTick((next) => {
+      const state = next as CauldronTimerStateEx;
+      const wasArmed = autoStartArmedRef.current;
+      const isArmed = state.status === 'awaiting_next' && state.autoStartAt != null;
+      autoStartArmedRef.current = isArmed;
+
+      // Countdown expired and the segment started on its own: a quiet cue, not the
+      // full manual-start fanfare.
+      if (wasArmed && !isArmed && (state.status === 'work' || state.status === 'on_break')) {
+        playCauldronResume();
+      }
+
       setTimerState(state);
       if (state.remainingMs <= 10000 && !warningFiredRef.current) {
         warningFiredRef.current = true;
@@ -39,13 +58,15 @@ export default function CauldronFloatingWindow() {
 
   // Session end — play sounds + reset warning ref
   useEffect(() => {
-    const cleanup = window.api.onCauldronSessionEnd((result: CauldronSessionEndResult) => {
+    const cleanup = window.api.onCauldronSessionEnd((raw: CauldronSessionEndResult) => {
+      const result = raw as CauldronSessionEndResultEx;
       warningFiredRef.current = false;
 
       // The 10 s heads-up already uses playCauldronWarning; a segment ending gets
-      // its own cue so the two events do not sound identical.
+      // its own cue so the two events do not sound identical. The loop runs past
+      // the long break now, so a closed lap is flagged, not inferred from `null`.
       if (result.completed) {
-        if (result.nextType === null) playCauldronCycleEnd();
+        if (result.cycleComplete || result.nextType === null) playCauldronCycleEnd();
         else playCauldronPause();
       }
 
@@ -75,6 +96,8 @@ export default function CauldronFloatingWindow() {
   const isRunning = timerState.status === 'work' || timerState.status === 'on_break';
   const isPaused = timerState.status === 'work_paused' || timerState.status === 'break_paused';
   const isAwaiting = timerState.status === 'awaiting_next';
+  const autoSeconds = autoStartSecondsLeft(timerState);
+  const isAutoStarting = autoSeconds !== null;
 
   const phaseClass =
     timerState.sessionType === 'work'
@@ -113,6 +136,11 @@ export default function CauldronFloatingWindow() {
     await window.api.cauldronConfirmNext();
   };
 
+  /** «Esperá» — disarms the auto-start, back to waiting for an explicit Continue. */
+  const handleWait = async () => {
+    await cancelAutoStart();
+  };
+
   const extMin = timerState.extensionMinutes ?? 5;
 
   const handleExtend = async () => {
@@ -143,6 +171,11 @@ export default function CauldronFloatingWindow() {
       <div className="cfw__info">
         <div className="cfw__top">
           <span className="cfw__label">{isAwaiting ? t('cauldron.segmentDone', '¡Tiempo!') : isPaused ? t('cauldron.paused', 'Pausado') : segmentLabel}</span>
+          {isAutoStarting && (
+            <span className="cfw__autostart">
+              {t('cauldron.autoStart.short', 'auto {{seconds}}s', { seconds: autoSeconds })}
+            </span>
+          )}
           {timerState.presetName && (
             <span className="cfw__preset">{timerState.presetName}</span>
           )}
@@ -154,10 +187,25 @@ export default function CauldronFloatingWindow() {
               current: timerState.currentCycle,
               total: timerState.totalCycles,
             })}
+            {(timerState.round ?? 1) > 1 &&
+              ` · ${t('cauldron.round', '{{round}}ª ronda', { round: timerState.round })}`}
           </span>
         </div>
       </div>
       <div className="cfw__controls">
+        {isAutoStarting && (
+          <button
+            className="cfw__btn cfw__btn--wait"
+            onClick={handleWait}
+            aria-label={t('cauldron.autoStart.wait', 'Esperá')}
+            title={t(
+              'cauldron.autoStart.waitHelp',
+              'Cancela el arranque automático: el siguiente segmento espera a que le des Continuar.',
+            )}
+          >
+            <PauseIcon width={14} height={14} />
+          </button>
+        )}
         {isAwaiting ? (
           <>
             <button

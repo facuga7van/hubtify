@@ -11,7 +11,13 @@ import {
 } from '../../../shared/audio';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { PlayIcon, PauseIcon, StopIcon, CrossMark, PopOutIcon, SkipForwardIcon } from '../../../shared/components/icons/CodexIcons';
-import type { CauldronTimerState, CauldronSessionEndResult } from '../../../../shared/types';
+import type { CauldronSessionEndResult } from '../../../../shared/types';
+import {
+  autoStartSecondsLeft,
+  type CauldronTimerStateEx,
+  type CauldronSessionEndResultEx,
+} from '../types';
+import { cancelAutoStart } from '../api';
 import { formatTime } from '../utils';
 
 export default function CauldronFloatingTimer() {
@@ -19,9 +25,11 @@ export default function CauldronFloatingTimer() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const animatedNavigate = useAnimatedNavigate();
-  const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
+  const [timerState, setTimerState] = useState<CauldronTimerStateEx | null>(null);
   const [hidden, setHidden] = useState(false);
   const warningFiredRef = useRef(false);
+  /** True while the last broadcast had an auto-start armed — see the tick handler. */
+  const autoStartArmedRef = useRef(false);
   /** The external PiP window owns the audio while it is open. */
   const externalWindowOpenRef = useRef(false);
 
@@ -38,7 +46,19 @@ export default function CauldronFloatingTimer() {
   // only cauldron surface still mounted, so it is the only one that can promise
   // the session never ends in silence.
   useEffect(() => {
-    const cleanup = window.api.onCauldronTick((state) => {
+    const cleanup = window.api.onCauldronTick((next) => {
+      const state = next as CauldronTimerStateEx;
+      const wasArmed = autoStartArmedRef.current;
+      const isArmed = state.status === 'awaiting_next' && state.autoStartAt != null;
+      autoStartArmedRef.current = isArmed;
+
+      // The countdown just expired and the next segment started by itself. It gets
+      // a quiet cue on purpose: nobody wants the full "start brew" fanfare from an
+      // empty room.
+      if (wasArmed && !isArmed && (state.status === 'work' || state.status === 'on_break')) {
+        if (!externalWindowOpenRef.current) playCauldronResume();
+      }
+
       setTimerState(state);
       if (state.remainingMs <= 10000 && !warningFiredRef.current) {
         warningFiredRef.current = true;
@@ -59,7 +79,8 @@ export default function CauldronFloatingTimer() {
 
   // Session end — grant XP for completed work sessions (this component is always mounted)
   useEffect(() => {
-    const cleanup = window.api.onCauldronSessionEnd((result: CauldronSessionEndResult) => {
+    const cleanup = window.api.onCauldronSessionEnd((raw: CauldronSessionEndResult) => {
+      const result = raw as CauldronSessionEndResultEx;
       warningFiredRef.current = false;
       const muted = externalWindowOpenRef.current;
 
@@ -68,7 +89,9 @@ export default function CauldronFloatingTimer() {
       const isRealPomodoro = result.sessionType === 'work' && result.completed && !result.isExtension;
 
       if (!muted) {
-        if (result.completed && result.nextType === null) {
+        // The loop keeps going past the long break now, so "a lap just closed" is
+        // an explicit flag instead of "there is nothing next".
+        if (result.completed && (result.cycleComplete || result.nextType === null)) {
           playCauldronCycleEnd();
         } else if (result.completed) {
           // Segment boundary — distinct from the 10 s warning above.
@@ -144,6 +167,8 @@ export default function CauldronFloatingTimer() {
   const isRunning = timerState.status === 'work' || timerState.status === 'on_break';
   const isPaused = timerState.status === 'work_paused' || timerState.status === 'break_paused';
   const isAwaiting = timerState.status === 'awaiting_next';
+  const autoSeconds = autoStartSecondsLeft(timerState);
+  const isAutoStarting = autoSeconds !== null;
   const sessionTypeClass =
     timerState.sessionType === 'work'
       ? 'work'
@@ -184,6 +209,12 @@ export default function CauldronFloatingTimer() {
   const handleConfirmNext = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await window.api.cauldronConfirmNext();
+  };
+
+  /** «Esperá» — disarms the auto-start, back to waiting for an explicit Continue. */
+  const handleWait = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await cancelAutoStart();
   };
 
   const extMin = timerState.extensionMinutes ?? 5;
@@ -236,8 +267,23 @@ export default function CauldronFloatingTimer() {
       aria-label={t('cauldron.openCauldron', 'Open Cauldron')}
     >
       <Rune tone={runeTone}>{isAwaiting ? t('cauldron.segmentDone', '¡Tiempo!') : isPaused ? t('cauldron.paused', 'Pausado') : segmentLabel}</Rune>
-      <span className="cauldron-ft-time">{isAwaiting ? '00:00' : formatTime(timerState.remainingMs)}</span>
+      <span className="cauldron-ft-time">
+        {isAutoStarting ? `${autoSeconds}s` : isAwaiting ? '00:00' : formatTime(timerState.remainingMs)}
+      </span>
       <div className="cauldron-ft-controls">
+        {isAutoStarting && (
+          <button
+            className="cauldron-ft-btn cauldron-ft-btn--wait"
+            onClick={handleWait}
+            title={t(
+              'cauldron.autoStart.waitHelp',
+              'Cancela el arranque automático: el siguiente segmento espera a que le des Continuar.',
+            )}
+            aria-label={t('cauldron.autoStart.wait', 'Esperá')}
+          >
+            <PauseIcon width={12} height={12} />
+          </button>
+        )}
         {isAwaiting ? (
           <>
             <button

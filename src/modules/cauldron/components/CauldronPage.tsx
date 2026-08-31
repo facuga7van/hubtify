@@ -22,8 +22,13 @@ import { CastleBarChart } from '../../../shared/components/charts/CastleBarChart
 import CauldronSVG from './CauldronSVG';
 import { formatTime } from '../utils';
 import { useCauldronLabels, usePresetName, POPOUT_ON_START_KEY } from '../hooks';
+import { cancelAutoStart } from '../api';
+import {
+  autoStartSecondsLeft,
+  type CauldronTimerStateEx,
+  type CauldronPresetEx,
+} from '../types';
 import type {
-  CauldronTimerState,
   CauldronPreset,
   CauldronStats,
   CauldronSession,
@@ -76,10 +81,10 @@ export default function CauldronPage() {
   /* -- State -- */
   const [presets, setPresets] = useState<CauldronPreset[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
-  const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
+  const [timerState, setTimerState] = useState<CauldronTimerStateEx | null>(null);
   const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
   const [actionPending, setActionPending] = useState(false);
-  const [editingPreset, setEditingPreset] = useState<Partial<CauldronPreset> | null>(null);
+  const [editingPreset, setEditingPreset] = useState<Partial<CauldronPresetEx> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [flavorIdx, setFlavorIdx] = useState(0);
   const [sessions, setSessions] = useState<(CauldronSession & { presetName?: string | null })[]>([]);
@@ -204,6 +209,12 @@ export default function CauldronPage() {
   const isRunning = timerState?.status === 'work' || timerState?.status === 'on_break';
   const isPaused = timerState?.status === 'work_paused' || timerState?.status === 'break_paused';
   const isAwaiting = timerState?.status === 'awaiting_next';
+  /**
+   * The 5 s grace before the queued segment starts on its own. The deadline lives
+   * in the main process; this only reflects the broadcast.
+   */
+  const autoSeconds = autoStartSecondsLeft(timerState);
+  const isAutoStarting = autoSeconds !== null;
 
   /* -- Timer display calculations -- */
   const remainingSeconds = timerState ? Math.ceil(timerState.remainingMs / 1000) : 0;
@@ -312,6 +323,12 @@ export default function CauldronPage() {
     setTimerState(state);
   });
 
+  /** «Esperá» — disarms the countdown and leaves the segment queued. */
+  const handleWait = guarded(async () => {
+    const state = await cancelAutoStart();
+    setTimerState(state);
+  });
+
   const extMin = timerState?.extensionMinutes ?? 5;
 
   const handleExtend = guarded(async () => {
@@ -374,6 +391,8 @@ export default function CauldronPage() {
       longBreakMinutes: 15,
       cyclesBeforeLong: 4,
       extensionMinutes: 5,
+      autoStartBreak: true,
+      autoStartWork: false,
       name: '',
     });
     setIsCreating(true);
@@ -396,6 +415,8 @@ export default function CauldronPage() {
       longBreakMinutes: preset.longBreakMinutes,
       cyclesBeforeLong: preset.cyclesBeforeLong,
       extensionMinutes: preset.extensionMinutes ?? 5,
+      autoStartBreak: (preset as CauldronPresetEx).autoStartBreak ?? true,
+      autoStartWork: (preset as CauldronPresetEx).autoStartWork ?? false,
     });
     setIsCreating(true);
   };
@@ -421,6 +442,8 @@ export default function CauldronPage() {
       longBreakMinutes: editingPreset.longBreakMinutes,
       cyclesBeforeLong: editingPreset.cyclesBeforeLong,
       extensionMinutes: editingPreset.extensionMinutes ?? 5,
+      autoStartBreak: !!(editingPreset.autoStartBreak ?? true),
+      autoStartWork: !!(editingPreset.autoStartWork ?? false),
     };
     if (editingPreset.id) payload.id = editingPreset.id;
     try {
@@ -447,6 +470,15 @@ export default function CauldronPage() {
         : sessionType === 'long_break'
           ? 'gold'
           : 'ink';
+
+  /* What is queued behind the current pause, for the auto-start countdown copy. */
+  const nextSegmentLabel = useMemo(() => {
+    if (!timerState || !isAwaiting) return '';
+    if (timerState.sessionType !== 'work') return t('cauldron.work', 'Enfoque');
+    return timerState.currentCycle >= timerState.totalCycles
+      ? t('cauldron.longBreak', 'Descanso largo')
+      : t('cauldron.break', 'Descanso');
+  }, [timerState, isAwaiting, t]);
 
   /* One name per phase. `segmentLabel` ("Preparando…") and this used to be on
      screen at the same time, saying two different things about one state. */
@@ -589,6 +621,14 @@ export default function CauldronPage() {
               })}
               <span className="cauldron-cycle-cap">
                 {timerState.currentCycle}/{timerState.totalCycles}
+                {/* The loop no longer stops after the long break, so say which lap
+                    this is — but only once there is more than one. */}
+                {(timerState.round ?? 1) > 1 && (
+                  <span className="cauldron-cycle-round">
+                    {' · '}
+                    {t('cauldron.round', '{{round}}ª ronda', { round: timerState.round })}
+                  </span>
+                )}
               </span>
             </div>
           )}
@@ -708,6 +748,27 @@ export default function CauldronPage() {
                     {t('cauldron.stop', 'Stop')}
                   </button>
                 </>
+              )}
+              {isAutoStarting && (
+                <div className="cauldron-autostart-row">
+                  <span className="cauldron-autostart-countdown">
+                    {t('cauldron.autoStart.countdown', '{{next}} en {{seconds}} s', {
+                      next: nextSegmentLabel,
+                      seconds: autoSeconds,
+                    })}
+                  </span>
+                  <button
+                    className="cauldron-btn"
+                    onClick={handleWait}
+                    disabled={actionPending}
+                    title={t(
+                      'cauldron.autoStart.waitHelp',
+                      'Cancela el arranque automático: el siguiente segmento espera a que le des Continuar.',
+                    )}
+                  >
+                    {t('cauldron.autoStart.wait', 'Esperá')}
+                  </button>
+                </div>
               )}
               {isAwaiting && (
                 <>
@@ -974,6 +1035,48 @@ export default function CauldronPage() {
                     })
                   }
                 />
+              </div>
+              {/* Auto-chaining: the whole point of the technique is that the rest
+                  arrives whether or not you are at the keyboard. */}
+              <div className="full cauldron-autostart-field">
+                <label className="cauldron-autostart-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!!(editingPreset.autoStartBreak ?? true)}
+                    onChange={(e) =>
+                      setEditingPreset({ ...editingPreset, autoStartBreak: e.target.checked })
+                    }
+                  />
+                  <span className="cauldron-kv-key">
+                    {t('cauldron.autoStart.breakLabel', 'Arrancar el descanso solo')}
+                  </span>
+                </label>
+                <p className="cauldron-autostart-hint">
+                  {t(
+                    'cauldron.autoStart.breakHelp',
+                    'Al terminar un enfoque, el descanso empieza solo tras 5 segundos. Podés cancelarlo con «Esperá».',
+                  )}
+                </p>
+              </div>
+              <div className="full cauldron-autostart-field">
+                <label className="cauldron-autostart-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!!(editingPreset.autoStartWork ?? false)}
+                    onChange={(e) =>
+                      setEditingPreset({ ...editingPreset, autoStartWork: e.target.checked })
+                    }
+                  />
+                  <span className="cauldron-kv-key">
+                    {t('cauldron.autoStart.workLabel', 'Arrancar el enfoque solo')}
+                  </span>
+                </label>
+                <p className="cauldron-autostart-hint">
+                  {t(
+                    'cauldron.autoStart.workHelp',
+                    'Al terminar un descanso, el próximo enfoque empieza solo tras 5 segundos. Podés cancelarlo con «Esperá».',
+                  )}
+                </p>
               </div>
             </div>
             <CyclePreviewBar preset={editingPreset as CauldronPreset} />

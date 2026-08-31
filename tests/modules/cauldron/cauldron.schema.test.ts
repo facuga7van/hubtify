@@ -117,6 +117,23 @@ describe('cauldron schema migration', () => {
     }).toThrow();
   });
 
+  it('adds the auto-start columns with break on and work off', () => {
+    runMigrations(db);
+    expect(columnExists(db, 'cauldron_presets', 'auto_start_break')).toBe(true);
+    expect(columnExists(db, 'cauldron_presets', 'auto_start_work')).toBe(true);
+
+    // Recipes seeded before v5 must inherit the defaults, not NULL: the break is
+    // the point of the technique, the next focus should never ambush you.
+    const seeded = db
+      .prepare('SELECT auto_start_break, auto_start_work FROM cauldron_presets WHERE is_default = 1')
+      .all() as Array<{ auto_start_break: number; auto_start_work: number }>;
+    expect(seeded).toHaveLength(3);
+    for (const row of seeded) {
+      expect(row.auto_start_break).toBe(1);
+      expect(row.auto_start_work).toBe(0);
+    }
+  });
+
   it('cauldron_sessions foreign key to presets works', () => {
     runMigrations(db);
     // Valid FK

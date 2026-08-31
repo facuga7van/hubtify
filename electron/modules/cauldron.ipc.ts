@@ -15,6 +15,27 @@ function genId(): string {
 }
 
 /**
+ * Fase 1 del Caldero added three fields that still need to land in
+ * `shared/types.ts` (CauldronTimerState / CauldronPreset / CauldronSessionEndResult).
+ * (Los campos ya viven en shared/types.ts; quedan los alias.)
+ */
+type CauldronTimerStateEx = CauldronTimerState;
+
+/** Shape as it leaves SQLite: the two auto-start flags arrive as 0 | 1. */
+type CauldronPresetEx = Omit<CauldronPreset, 'autoStartBreak' | 'autoStartWork'> & {
+  autoStartBreak: number;
+  autoStartWork: number;
+};
+
+type CauldronSessionEndResultEx = CauldronSessionEndResult;
+
+/**
+ * Grace window between a segment ending and the next one starting by itself.
+ * Long enough to say "wait", short enough that walking away still works.
+ */
+const AUTO_START_GRACE_MS = 5000;
+
+/**
  * OS-notification texts, supplied by the renderer (which owns i18n) via
  * `cauldron:setLabels`. Defaults keep the previous Spanish strings so nothing
  * breaks if the renderer hasn't pushed translations yet.
@@ -59,7 +80,7 @@ function broadcast(channel: string, data: unknown): void {
 
 // ─── Timer State ───────────────────────────────────────────
 
-let timerState: CauldronTimerState = {
+const IDLE_STATE: CauldronTimerStateEx = {
   status: 'idle',
   remainingMs: 0,
   totalMs: 0,
@@ -69,9 +90,15 @@ let timerState: CauldronTimerState = {
   presetId: null,
   presetName: null,
   extensionMinutes: 5,
+  autoStartAt: null,
+  round: 1,
 };
 
+let timerState: CauldronTimerStateEx = { ...IDLE_STATE };
+
 let timerInterval: NodeJS.Timeout | null = null;
+/** Ticks the 5 s auto-start countdown; null whenever no auto-start is armed. */
+let autoStartInterval: NodeJS.Timeout | null = null;
 let targetEndTime = 0;
 let activePreset: {
   workMinutes: number;
@@ -79,6 +106,8 @@ let activePreset: {
   longBreakMinutes: number;
   cyclesBeforeLong: number;
   extensionMinutes: number;
+  autoStartBreak: boolean;
+  autoStartWork: boolean;
 } | null = null;
 let currentSessionDbId: string | null = null;
 /** True while the running segment is an extension (see cauldron:extend). */
@@ -92,7 +121,22 @@ function clearTimer(): void {
   }
 }
 
-function getSnapshotState(): CauldronTimerState {
+/**
+ * Disarms the pending auto-start. The segment stays queued in
+ * `pendingNextSegment`, so the timer simply falls back to the classic
+ * "waiting for you to press Continue" state.
+ */
+function clearAutoStart(): void {
+  if (autoStartInterval) {
+    clearInterval(autoStartInterval);
+    autoStartInterval = null;
+  }
+  if (timerState.autoStartAt !== null) {
+    timerState = { ...timerState, autoStartAt: null };
+  }
+}
+
+function getSnapshotState(): CauldronTimerStateEx {
   return { ...timerState };
 }
 
@@ -127,11 +171,17 @@ function onTimeUp(): void {
   // Determine next segment before changing state
   const nextSegment = getNextSegment();
 
-  const sessionEndResult: CauldronSessionEndResult = {
+  // A lap closes when the LONG BREAK ends. The loop no longer stops there, but the
+  // milestone is still worth announcing, so it is flagged explicitly instead of
+  // being inferred from `nextType === null`.
+  const cycleComplete = timerState.sessionType === 'long_break';
+
+  const sessionEndResult: CauldronSessionEndResultEx = {
     sessionType: timerState.sessionType,
     completed: true,
     nextType: nextSegment ? nextSegment.type : null,
     isExtension: wasExtension,
+    cycleComplete,
   };
 
   broadcast('cauldron:sessionEnd', sessionEndResult);
@@ -141,7 +191,7 @@ function onTimeUp(): void {
   if (Notification.isSupported() && isModuleNotificationEnabled('cauldron')) {
     const presetLabel = timerState.presetName ? ` (${timerState.presetName})` : '';
     const cycleInfo = `${labels.cycle} ${timerState.currentCycle}/${timerState.totalCycles}`;
-    if (nextSegment === null) {
+    if (cycleComplete || nextSegment === null) {
       new Notification({
         title: labels.cycleComplete,
         body: `${labels.cycleCompleteBody}${presetLabel}`,
@@ -158,16 +208,51 @@ function onTimeUp(): void {
   clearTimer();
 
   if (nextSegment) {
-    // Wait for user confirmation before advancing
     pendingNextSegment = nextSegment;
-    timerState = { ...timerState, status: 'awaiting_next', remainingMs: 0 };
+
+    // Should the next segment start by itself? An extension is a prolongation of
+    // the segment you are already in, so it never auto-chains.
+    const auto =
+      !wasExtension &&
+      !!activePreset &&
+      (wasWork ? activePreset.autoStartBreak : activePreset.autoStartWork);
+
+    timerState = {
+      ...timerState,
+      status: 'awaiting_next',
+      remainingMs: 0,
+      autoStartAt: auto ? Date.now() + AUTO_START_GRACE_MS : null,
+    };
     broadcast('cauldron:tick', getSnapshotState());
+    if (auto) armAutoStart();
   } else {
-    // Full cycle complete
+    // No recipe loaded — nothing to chain into.
     pendingNextSegment = null;
-    timerState = { ...timerState, status: 'idle', remainingMs: 0 };
+    timerState = { ...timerState, status: 'idle', remainingMs: 0, autoStartAt: null };
     broadcast('cauldron:tick', getSnapshotState());
   }
+}
+
+/**
+ * Runs the visible countdown and fires the queued segment when it expires. Every
+ * surface just reflects the broadcast: the deadline lives here, in the main
+ * process, so it survives navigating away and popping the window in and out.
+ */
+function armAutoStart(): void {
+  if (autoStartInterval) clearInterval(autoStartInterval);
+  autoStartInterval = setInterval(() => {
+    if (timerState.status !== 'awaiting_next' || timerState.autoStartAt === null) {
+      clearAutoStart();
+      return;
+    }
+    if (Date.now() >= timerState.autoStartAt) {
+      clearAutoStart();
+      const next = pendingNextSegment;
+      pendingNextSegment = null;
+      if (next) startSegment(next.type, next.durationMs, next.resetCycle);
+    }
+    broadcast('cauldron:tick', getSnapshotState());
+  }, 1000);
 }
 
 // ─── Segment Logic ─────────────────────────────────────────
@@ -175,6 +260,8 @@ function onTimeUp(): void {
 interface NextSegment {
   type: 'work' | 'break' | 'long_break';
   durationMs: number;
+  /** Opens a new lap: cycle counter back to 1, round + 1. */
+  resetCycle?: boolean;
 }
 
 function getNextSegment(): NextSegment | null {
@@ -200,14 +287,21 @@ function getNextSegment(): NextSegment | null {
       durationMs: activePreset.workMinutes * 60 * 1000,
     };
   } else {
-    // After long_break -> done
-    return null;
+    // After long_break -> a NEW LAP, not the end. This used to return null and
+    // drop the timer to 'idle', so a working day meant four manual starts. The
+    // loop now only ends when the user says stop.
+    return {
+      type: 'work',
+      durationMs: activePreset.workMinutes * 60 * 1000,
+      resetCycle: true,
+    };
   }
 }
 
 function startSegment(
   type: 'work' | 'break' | 'long_break',
   durationMs: number,
+  resetCycle = false,
 ): void {
   const db = getDb();
   const now = new Date().toISOString();
@@ -216,12 +310,14 @@ function startSegment(
   // - First work segment starts at cycle 1
   // - After a break, increment cycle for the next work segment
   // - Break/long_break segments keep the current cycle number
+  // - A new lap (after the long break) restarts at cycle 1 and bumps the round
   let newCycle = timerState.currentCycle;
+  let newRound = timerState.round;
   if (type === 'work') {
-    if (
-      timerState.sessionType === 'break' ||
-      timerState.sessionType === 'long_break'
-    ) {
+    if (resetCycle) {
+      newCycle = 1;
+      newRound = timerState.round + 1;
+    } else if (timerState.sessionType === 'break') {
       // Coming back from a break -> next cycle
       newCycle = timerState.currentCycle + 1;
     } else {
@@ -258,6 +354,8 @@ function startSegment(
     totalMs: durationMs,
     sessionType: type,
     currentCycle: newCycle,
+    round: newRound,
+    autoStartAt: null,
   };
 
   if (!timerInterval) {
@@ -337,6 +435,7 @@ export function registerCauldronIpcHandlers(): void {
         `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
               long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
               extension_minutes AS extensionMinutes,
+              auto_start_break AS autoStartBreak, auto_start_work AS autoStartWork,
               is_default AS isDefault, created_at AS createdAt, updated_at AS updatedAt
        FROM cauldron_presets WHERE deleted_at IS NULL
        ORDER BY is_default DESC, name ASC`,
@@ -351,6 +450,11 @@ export function registerCauldronIpcHandlers(): void {
       const id = (preset.id as string) || genId();
       const now = new Date().toISOString();
 
+      // Auto-start flags arrive as booleans from the renderer and live as 0/1 in
+      // SQLite. Undefined keeps the schema defaults: break on, work off.
+      const autoBreak = (preset.autoStartBreak ?? true) ? 1 : 0;
+      const autoWork = (preset.autoStartWork ?? false) ? 1 : 0;
+
       if (preset.id) {
         const existing = db
           .prepare('SELECT is_default FROM cauldron_presets WHERE id = ?')
@@ -360,7 +464,8 @@ export function registerCauldronIpcHandlers(): void {
         }
         db.prepare(
           `UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?,
-          long_break_minutes = ?, cycles_before_long = ?, extension_minutes = ?, updated_at = ?
+          long_break_minutes = ?, cycles_before_long = ?, extension_minutes = ?,
+          auto_start_break = ?, auto_start_work = ?, updated_at = ?
           WHERE id = ? AND deleted_at IS NULL`,
         ).run(
           preset.name,
@@ -369,13 +474,15 @@ export function registerCauldronIpcHandlers(): void {
           preset.longBreakMinutes,
           preset.cyclesBeforeLong,
           preset.extensionMinutes ?? 5,
+          autoBreak,
+          autoWork,
           now,
           id,
         );
       } else {
         db.prepare(
-          `INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, is_default, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+          `INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, auto_start_break, auto_start_work, is_default, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
         ).run(
           id,
           preset.name,
@@ -384,6 +491,8 @@ export function registerCauldronIpcHandlers(): void {
           preset.longBreakMinutes,
           preset.cyclesBeforeLong,
           preset.extensionMinutes ?? 5,
+          autoBreak,
+          autoWork,
           now,
           now,
         );
@@ -418,10 +527,11 @@ export function registerCauldronIpcHandlers(): void {
       .prepare(
         `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
               long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
-              extension_minutes AS extensionMinutes
+              extension_minutes AS extensionMinutes,
+              auto_start_break AS autoStartBreak, auto_start_work AS autoStartWork
        FROM cauldron_presets WHERE id = ? AND deleted_at IS NULL`,
       )
-      .get(presetId) as CauldronPreset | undefined;
+      .get(presetId) as CauldronPresetEx | undefined;
 
     if (!preset) throw new Error('Preset not found');
 
@@ -431,15 +541,13 @@ export function registerCauldronIpcHandlers(): void {
       longBreakMinutes: preset.longBreakMinutes,
       cyclesBeforeLong: preset.cyclesBeforeLong,
       extensionMinutes: preset.extensionMinutes ?? 5,
+      autoStartBreak: (preset.autoStartBreak ?? 1) !== 0,
+      autoStartWork: (preset.autoStartWork ?? 0) !== 0,
     };
 
     timerState = {
-      status: 'idle',
-      remainingMs: 0,
-      totalMs: 0,
-      currentCycle: 0,
+      ...IDLE_STATE,
       totalCycles: preset.cyclesBeforeLong,
-      sessionType: 'work',
       presetId: preset.id,
       presetName: preset.name,
       extensionMinutes: preset.extensionMinutes ?? 5,
@@ -449,7 +557,28 @@ export function registerCauldronIpcHandlers(): void {
     return getSnapshotState();
   });
 
+  /**
+   * "Esperá" — disarms the pending auto-start and falls back to the classic
+   * awaiting_next, where the queued segment waits for an explicit Continue.
+   */
+  ipcHandle('cauldron:cancelAutoStart', () => {
+    if (timerState.status !== 'awaiting_next' || timerState.autoStartAt === null) {
+      return getSnapshotState();
+    }
+    clearAutoStart();
+    broadcast('cauldron:tick', getSnapshotState());
+    return getSnapshotState();
+  });
+
   ipcHandle('cauldron:pause', () => {
+    // Pausing during the auto-start countdown means the same thing as "Esperá".
+    // Also the fallback the renderer uses while preload does not expose
+    // cauldron:cancelAutoStart yet.
+    if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null) {
+      clearAutoStart();
+      broadcast('cauldron:tick', getSnapshotState());
+      return getSnapshotState();
+    }
     if (timerState.status !== 'work' && timerState.status !== 'on_break') {
       throw new Error('Timer not running');
     }
@@ -503,6 +632,7 @@ export function registerCauldronIpcHandlers(): void {
     currentSessionIsExtension = false;
 
     clearTimer();
+    clearAutoStart();
     pendingNextSegment = null;
 
     // Broadcast sessionEnd so stats refresh in all UIs
@@ -516,7 +646,7 @@ export function registerCauldronIpcHandlers(): void {
     const nextSegment = getNextSegment();
 
     if (nextSegment) {
-      startSegment(nextSegment.type, nextSegment.durationMs);
+      startSegment(nextSegment.type, nextSegment.durationMs, nextSegment.resetCycle);
     } else {
       timerState = { ...timerState, status: 'idle', remainingMs: 0 };
       activePreset = null;
@@ -530,9 +660,10 @@ export function registerCauldronIpcHandlers(): void {
     if (timerState.status !== 'awaiting_next' || !pendingNextSegment) {
       throw new Error('No segment awaiting confirmation');
     }
+    clearAutoStart();
     const next = pendingNextSegment;
     pendingNextSegment = null;
-    startSegment(next.type, next.durationMs);
+    startSegment(next.type, next.durationMs, next.resetCycle);
     broadcast('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -541,6 +672,9 @@ export function registerCauldronIpcHandlers(): void {
     if (timerState.status !== 'awaiting_next') {
       throw new Error('Can only extend at segment end');
     }
+    // Asking for more time is itself a "not yet" — the queued segment stops
+    // auto-starting underneath the extension.
+    clearAutoStart();
     // Resume same segment with extra time, track in DB
     const extMin = minutes ?? activePreset?.extensionMinutes ?? 5;
     const durationMs = extMin * 60 * 1000;
@@ -565,6 +699,7 @@ export function registerCauldronIpcHandlers(): void {
       status: timerState.sessionType === 'work' ? 'work' : 'on_break',
       remainingMs: durationMs,
       totalMs: durationMs,
+      autoStartAt: null,
     };
     if (!timerInterval) {
       timerInterval = setInterval(tick, 1000);
@@ -588,18 +723,10 @@ export function registerCauldronIpcHandlers(): void {
     currentSessionIsExtension = false;
 
     clearTimer();
+    clearAutoStart();
     pendingNextSegment = null;
-    timerState = {
-      status: 'idle',
-      remainingMs: 0,
-      totalMs: 0,
-      currentCycle: 0,
-      totalCycles: 0,
-      sessionType: 'work',
-      presetId: null,
-      presetName: null,
-      extensionMinutes: 5,
-    };
+    // The loop runs until here: `stop` is the only thing that ends it.
+    timerState = { ...IDLE_STATE };
     activePreset = null;
     broadcast('cauldron:tick', getSnapshotState());
   });
@@ -779,10 +906,11 @@ export function registerCauldronIpcHandlers(): void {
           .prepare(
             `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
                     long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
-                    extension_minutes AS extensionMinutes
+                    extension_minutes AS extensionMinutes,
+                    auto_start_break AS autoStartBreak, auto_start_work AS autoStartWork
              FROM cauldron_presets WHERE id = ? AND deleted_at IS NULL`,
           )
-          .get(session.presetId) as CauldronPreset | undefined)
+          .get(session.presetId) as CauldronPresetEx | undefined)
       : undefined;
     if (!preset) return { success: false, reason: 'preset_missing' };
 
@@ -792,6 +920,8 @@ export function registerCauldronIpcHandlers(): void {
       longBreakMinutes: preset.longBreakMinutes,
       cyclesBeforeLong: preset.cyclesBeforeLong,
       extensionMinutes: preset.extensionMinutes ?? 5,
+      autoStartBreak: (preset.autoStartBreak ?? 1) !== 0,
+      autoStartWork: (preset.autoStartWork ?? 0) !== 0,
     };
 
     const type = session.type as 'work' | 'break' | 'long_break';
@@ -809,6 +939,8 @@ export function registerCauldronIpcHandlers(): void {
       presetId: preset.id,
       presetName: preset.name,
       extensionMinutes: preset.extensionMinutes ?? 5,
+      autoStartAt: null,
+      round: 1,
     };
 
     const nowIso = new Date().toISOString();

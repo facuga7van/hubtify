@@ -80,4 +80,17 @@ export const cauldronMigrations: Migration[] = [
         ON cauldron_sessions(type, completed, deleted_at, started_at);
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 5,
+    up: `
+      -- A finished work segment parked the timer in 'awaiting_next' and waited for
+      -- a click: get up for water and the break never started. The break now
+      -- arrives on its own after a short grace window you can cancel.
+      -- Default ON for the break (the rest is the point of the technique) and OFF
+      -- for the work (nobody wants to be dragged back to the desk unannounced).
+      ALTER TABLE cauldron_presets ADD COLUMN auto_start_break INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE cauldron_presets ADD COLUMN auto_start_work INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

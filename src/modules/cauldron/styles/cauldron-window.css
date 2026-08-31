@@ -274,3 +274,18 @@ html, body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Auto-start countdown badge — the next segment starts by itself in N seconds. */
+.cfw__autostart {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* «Esperá» — cancels the auto-start, back to waiting for an explicit Continue. */
+.cfw__btn--wait {
+  border-color: rgba(196, 168, 78, 0.6);
+}

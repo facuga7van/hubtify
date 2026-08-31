@@ -1178,3 +1178,58 @@
 .cauldron-book .qb-gauge {
   height: 18px;
 }
+
+/* -- Auto-start grace window ---------------------------------
+   The break arrives on its own five seconds after the focus ends. The countdown
+   and its «Esperá» escape hatch sit on their own row, above the usual awaiting
+   controls, so the primary action does not move under the cursor. */
+
+.cauldron-autostart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 6px 10px;
+  border: 1px dashed rgba(74, 55, 32, 0.4);
+  background: rgba(245, 231, 192, 0.35);
+}
+
+.cauldron-autostart-countdown {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Which lap of the recipe — only rendered once there is more than one. */
+.cauldron-cycle-round {
+  color: var(--ink-faded);
+}
+
+/* Auto-start toggles in the recipe editor */
+.cauldron-autostart-field {
+  gap: 2px;
+}
+
+.cauldron-autostart-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.cauldron-autostart-hint {
+  margin: 0;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  line-height: 1.35;
+  color: var(--ink-faded);
+}
+
+/* Floating chip: «Esperá» sits first so it is the easy target while counting. */
+.cauldron-ft-btn--wait {
+  border-color: rgba(196, 168, 78, 0.6);
+}
