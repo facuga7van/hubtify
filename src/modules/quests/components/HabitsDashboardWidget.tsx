@@ -5,7 +5,9 @@ import { useToast } from '../../../shared/components/useToast';
 import type { HabitWithStreak } from '../types';
 import { processHabitCheck } from '../utils';
 
-export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: number; rowSpan?: number }) {
+const MAX_WIDGET_HABITS = 8;
+
+export default function HabitsDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [habits, setHabits] = useState<HabitWithStreak[]>([]);
@@ -68,11 +70,14 @@ export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: 
   }
 
   const checkedCount = habits.filter(h => isPeriodComplete(h)).length;
+  // Same cap as the tasks widget — an unbounded list turned this card into a
+  // permanent scroll well once you had a dozen habits.
+  const displayHabits = habits.slice(0, MAX_WIDGET_HABITS);
 
   return (
     <div>
       <div className="widget-list-flow">
-        {habits.map((h) => (
+        {displayHabits.map((h) => (
           <div
             key={h.id}
             style={{
@@ -98,6 +103,7 @@ export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: 
                 textDecoration: isPeriodComplete(h) ? 'line-through' : undefined,
                 opacity: isPeriodComplete(h) ? 0.6 : 1,
               }}
+              title={h.name}
             >
               {h.name}
             </span>
@@ -122,6 +128,11 @@ export default function HabitsDashboardWidget({ colSpan, rowSpan }: { colSpan?: 
             )}
           </div>
         ))}
+        {habits.length > MAX_WIDGET_HABITS && (
+          <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', padding: '2px 0' }}>
+            +{habits.length - MAX_WIDGET_HABITS} {t('questify.showMore', 'más')}
+          </span>
+        )}
       </div>
 
       {/* Footer */}

@@ -5,6 +5,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
 import Checkbox from '../../../shared/components/Checkbox';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { XpToastData } from '../types';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
 import { TierBadge, tierXp, bonusMultiplierToTier } from '../utils';
@@ -15,13 +16,13 @@ import { playTaskComplete } from '../../../shared/audio';
 interface Props {
   taskId: string;
   subtasks: Subtask[];
-  countCompletedToday: number;
   onShowToast: (data: XpToastData) => void;
   onSubtaskChanged: () => void;
 }
 
-export default function SubtaskList({ taskId, subtasks, countCompletedToday, onShowToast, onSubtaskChanged }: Props) {
+export default function SubtaskList({ taskId, subtasks, onShowToast, onSubtaskChanged }: Props) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [editingSubtask, setEditingSubtask] = useState<Subtask | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -78,10 +79,16 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
     window.dispatchEvent(new Event('rpg:statsChanged'));
   };
 
-  const handleDelete = async (subtaskId: string) => {
+  const handleDelete = useCallback(async (subtaskId: string) => {
+    const ok = await confirm({
+      message: t('questify.subtaskDeleteConfirm'),
+      danger: true,
+      confirmText: t('questify.delete'),
+    });
+    if (!ok) return;
     await window.api.questsDeleteSubtask(subtaskId);
     onSubtaskChanged();
-  };
+  }, [confirm, t, onSubtaskChanged]);
 
   const onDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -96,29 +103,42 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
 
   const atLimit = subtasks.length >= MAX_SUBTASKS;
 
+  const cancelForm = () => { setShowForm(false); setEditingSubtask(null); };
+
   return (
     <div className="subtask-list">
       <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={pending.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           {pending.map((subtask) => (
-            <SortableSubtaskItem
-              key={subtask.id}
-              subtask={subtask}
-              onComplete={handleComplete}
-              onEdit={(s) => { setEditingSubtask(s); setShowForm(true); }}
-              onDelete={handleDelete}
-            />
+            /* The edit form replaces the row it belongs to, so the field never
+               appears hundreds of pixels away from the subtask being edited. */
+            editingSubtask?.id === subtask.id ? (
+              <SubtaskInlineForm
+                key={subtask.id}
+                editing={editingSubtask}
+                onSave={handleSave}
+                onCancel={cancelForm}
+              />
+            ) : (
+              <SortableSubtaskItem
+                key={subtask.id}
+                subtask={subtask}
+                onComplete={handleComplete}
+                onEdit={(s) => { setEditingSubtask(s); setShowForm(false); }}
+                onDelete={handleDelete}
+              />
+            )
           ))}
         </SortableContext>
       </DndContext>
 
-      {showForm || editingSubtask ? (
+      {showForm && !editingSubtask ? (
         <SubtaskInlineForm
-          editing={editingSubtask}
+          editing={null}
           onSave={handleSave}
-          onCancel={() => { setShowForm(false); setEditingSubtask(null); }}
+          onCancel={cancelForm}
         />
-      ) : (
+      ) : !editingSubtask ? (
         <button className="rpg-button" disabled={atLimit} title={atLimit ? t('questify.subtaskLimit', 'Max 30 subtasks reached') : undefined} onClick={() => setShowForm(true)}
           style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', marginTop: 6 }}>
           {t('questify.addSubtask')}
@@ -126,17 +146,29 @@ export default function SubtaskList({ taskId, subtasks, countCompletedToday, onS
             <span style={{ marginLeft: 6, opacity: 0.7 }}>({subtasks.length}/{MAX_SUBTASKS})</span>
           )}
         </button>
-      )}
+      ) : null}
 
       {completed.length > 0 && (
         <div style={{ marginTop: 6 }}>
           <button className="subtask-toggle-completed" onClick={() => setShowCompleted(!showCompleted)}>
             {showCompleted ? t('questify.hideCompleted') : t('questify.showCompleted')} ({completed.length})
           </button>
+          {/* Same cell sequence as a pending row (with empty placeholders) so the
+              columns line up when the completed list is revealed. */}
           {showCompleted && completed.map((subtask) => (
             <div key={subtask.id} className="subtask-item subtask-item--completed">
-              <div><Checkbox checked onChange={() => handleComplete(subtask)} /></div>
-              <span style={{ textDecoration: 'line-through', opacity: 0.7, flex: 1 }}>{subtask.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <Checkbox checked onChange={() => handleComplete(subtask)} />
+              </div>
+              <span className="subtask-cell--drag" aria-hidden="true" />
+              <span className="subtask-name" style={{ textDecoration: 'line-through', opacity: 0.7, flex: 1, minWidth: 0 }} title={subtask.name}>
+                {subtask.name}
+              </span>
+              <TierBadge tier={subtask.tier} />
+              <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.7 }}>
+                +{tierXp(subtask.tier)}
+              </span>
+              <span className="subtask-cell--action" aria-hidden="true" />
             </div>
           ))}
         </div>
@@ -150,11 +182,10 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
   onEdit: (s: Subtask) => void; onDelete: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [animatingComplete, setAnimatingComplete] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
   const rowRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLButtonElement>(null);
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   const handleCheckboxComplete = useCallback(() => {
@@ -172,44 +203,34 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
       <div onPointerDown={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center' }}>
         <Checkbox checked={animatingComplete} onChange={handleCheckboxComplete} onDrawComplete={handleDrawComplete} />
       </div>
-      <div {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '0 4px', opacity: 0.3 }}>
-        <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>
+      <div {...listeners} className="subtask-cell--drag" style={{ cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+        <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>
       </div>
-      <span ref={textRef} className="subtask-name" onClick={() => onEdit(subtask)} style={{ cursor: 'pointer', flex: 1 }}>
+      <button
+        type="button"
+        ref={textRef}
+        className="subtask-name subtask-name-btn"
+        onClick={() => onEdit(subtask)}
+        title={subtask.name}
+      >
         {subtask.name}
-      </span>
+      </button>
       <TierBadge tier={subtask.tier} />
       <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.7 }}>
         +{tierXp(subtask.tier)}
       </span>
-      {confirmDelete ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '4px 10px', background: 'rgba(139,32,32,0.1)',
-          border: '1px solid var(--rubric)', borderRadius: '6px',
-        }}>
-          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)', whiteSpace: 'nowrap' }}>
-            {t('questify.subtaskDeleteConfirm')}
-          </span>
-          <button className="rpg-button" onClick={() => onDelete(subtask.id)}
-            style={{ background: 'var(--rubric)', padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-            {t('questify.delete')}
-          </button>
-          <button className="rpg-button" onClick={() => setConfirmDelete(false)}
-            style={{ padding: '3px 10px', fontSize: 'var(--fs-label)', opacity: 0.7 }}>
-            {t('questify.cancel')}
-          </button>
-        </div>
-      ) : (
-        <svg onClick={() => setConfirmDelete(true)} width="12" height="12" viewBox="0 0 12 12"
-          className="quest-icon-hover"
-          style={{ cursor: 'pointer', opacity: 0.4 }}
-          stroke="var(--rubric)" strokeWidth="1.8" strokeLinecap="round"
-          role="button" tabIndex={0} aria-label={t('questify.delete', 'Delete')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDelete(true); } }}>
-          <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+      <button
+        type="button"
+        className="subtask-cell--action quest-icon-btn"
+        onClick={() => onDelete(subtask.id)}
+        aria-label={t('questify.delete', 'Delete')}
+        title={t('questify.delete', 'Delete')}
+      >
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true"
+          stroke="var(--rubric)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
         </svg>
-      )}
+      </button>
     </div>
   );
 }

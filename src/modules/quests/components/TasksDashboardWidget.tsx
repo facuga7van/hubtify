@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Tick } from '../../../shared/components/codex';
 import Loading from '../../../shared/components/Loading';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
-import { type Task, type Project, XP_MAP } from '../types';
+import { type Task, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier } from '../utils';
 
-export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: number; rowSpan?: number }) {
+export default function TasksDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
   const [allPendingTasks, setAllPendingTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const completingRef = useRef(false);
@@ -24,13 +24,11 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
       window.api.questsGetPendingCount(),
       window.api.questsGetCompletedTodayCount(),
       window.api.questsGetTasks().catch(() => []),
-      window.api.questsGetProjects().catch(() => []),
-    ]).then(([p, c, tasks, projs]) => {
+    ]).then(([p, c, tasks]) => {
       setPendingCount(p);
       setCompletedToday(c);
       const all = tasks as Task[];
       setAllPendingTasks(all.filter((t) => !t.status));
-      setProjects(projs as Project[]);
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
@@ -53,15 +51,12 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
 
-  const filteredTasks = useMemo(() => {
-    if (selectedProjectId === null) return allPendingTasks;
-    if (selectedProjectId === '__none__') return allPendingTasks.filter(t => !t.projectId);
-    return allPendingTasks.filter(t => t.projectId === selectedProjectId);
-  }, [allPendingTasks, selectedProjectId]);
-
+  /* The project selector was removed: it duplicated the one on the Questify
+     page, ate the full width of a small card, and its footer counters still
+     reported global totals, so a filtered list read "2 listed / 3 of 17". */
   const actualOverdueCount = useMemo(() =>
-    filteredTasks.filter(t => t.dueDate && getDueDateStatus(t.dueDate) === 'overdue').length,
-    [filteredTasks]
+    allPendingTasks.filter(t => t.dueDate && getDueDateStatus(t.dueDate) === 'overdue').length,
+    [allPendingTasks]
   );
 
   const MAX_WIDGET_TASKS = 8;
@@ -73,10 +68,10 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
       if (status === 'today') return 1;
       return 2;
     };
-    return [...filteredTasks]
+    return [...allPendingTasks]
       .sort((a, b) => urgencyOrder(a) - urgencyOrder(b))
       .slice(0, MAX_WIDGET_TASKS);
-  }, [filteredTasks]);
+  }, [allPendingTasks]);
 
   const handleComplete = useCallback(async (task: Task) => {
     if (completingRef.current) return;
@@ -110,26 +105,6 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
 
   return (
     <div>
-      {/* Project filter */}
-      {projects.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <select
-            className="rpg-select"
-            value={selectedProjectId ?? ''}
-            onChange={(e) => setSelectedProjectId(e.target.value === '' ? null : e.target.value)}
-            style={{ fontSize: 'var(--fs-label)', padding: '2px 6px', width: '100%' }}
-          >
-            <option value="">{t('questify.allProjects', 'Todas las misiones')}</option>
-            <option value="__none__">{t('questify.noProject', 'Sin proyecto')}</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Task checklist */}
       {displayTasks.length > 0 ? (
         <div className="widget-list-flow">
@@ -152,15 +127,21 @@ export default function TasksDashboardWidget({ colSpan, rowSpan }: { colSpan?: n
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}
+                title={task.name}
               >
                 {task.name}
               </span>
             </div>
           ))}
-          {filteredTasks.length > MAX_WIDGET_TASKS && (
-            <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', padding: '2px 0' }}>
-              +{filteredTasks.length - MAX_WIDGET_TASKS} {t('questify.showMore', 'más')}
-            </span>
+          {/* "+N más" now actually goes somewhere instead of being a dead span. */}
+          {allPendingTasks.length > MAX_WIDGET_TASKS && (
+            <button
+              type="button"
+              className="qb-hand widget-more-link"
+              onClick={() => navigate('/quests')}
+            >
+              +{allPendingTasks.length - MAX_WIDGET_TASKS} {t('questify.showMore', 'más')}
+            </button>
           )}
         </div>
       ) : (

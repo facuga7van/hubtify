@@ -92,6 +92,9 @@ export default function HabitTracker({ onXpGained }: Props) {
   const canRetroCheck = useCallback((h: HabitWithStreak): boolean => {
     // Only show badge if yesterday was NOT checked (checkedToday is irrelevant)
     if (h.checkedYesterday) return false;
+    // Catching up on yesterday is a first-thing-in-the-morning action. Past noon
+    // the badge is just noise repeated on nearly every row.
+    if (new Date().getHours() >= 12) return false;
     if (h.frequency === 'daily') return true;
     if (h.frequency === 'weekly') {
       // Yesterday must be in current week (today is NOT Monday)
@@ -207,9 +210,9 @@ export default function HabitTracker({ onXpGained }: Props) {
         <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', marginBottom: 8 }}>
           {t('questify.habitsEmptyHint', 'Rituales diarios o semanales que querés mantener.')}
         </p>
-        <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setAdding(true)}>
+        <button type="button" className="qb-rune quest-rune-btn" onClick={() => setAdding(true)}>
           + {t('questify.addHabit')}
-        </span>
+        </button>
       </div>
     );
   }
@@ -221,7 +224,14 @@ export default function HabitTracker({ onXpGained }: Props) {
         <span className="quest-habit-progress">
           {habits.filter(h => isPeriodComplete(h)).length}/{habits.length}
         </span>
-        <span className="qb-rune" style={{ cursor: 'pointer', fontSize: 'var(--fs-label)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, minWidth: 22, minHeight: 22 }} onClick={() => setAdding(!adding)}>+</span>
+        <button
+          type="button"
+          className="qb-rune quest-rune-btn"
+          onClick={() => setAdding(!adding)}
+          aria-expanded={adding}
+        >
+          + {t('questify.addHabit')}
+        </button>
       </div>
 
       {/* Habit list */}
@@ -241,22 +251,25 @@ export default function HabitTracker({ onXpGained }: Props) {
               {editFreq === 'weekly' && (
                 <RpgStepper value={editTimes} onChange={setEditTimes} min={1} max={7} />
               )}
-              <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleEditSave}>OK</span>
-              <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setEditingId(null)}>
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M1 1l6 6M7 1l-6 6"/>
-                </svg>
-              </span>
+              <button type="button" className="qb-rune qb-rune--sage quest-rune-btn tap-target" onClick={handleEditSave}>
+                {t('questify.save')}
+              </button>
+              <button type="button" className="qb-rune quest-rune-btn tap-target" onClick={() => setEditingId(null)}>
+                {t('questify.cancel')}
+              </button>
             </div>
           ) : (
             <>
-              <span
+              {/* The biggest target in the row does the most common thing: check it. */}
+              <button
+                type="button"
                 className={`quest-habit-name${isPeriodComplete(h) ? ' quest-habit-name--done' : ''}`}
-                onClick={() => startEdit(h)}
-                title={t('questify.edit')}
+                onClick={() => handleCheck(h.id)}
+                title={h.name}
+                aria-pressed={isPeriodComplete(h)}
               >
                 {h.name}
-              </span>
+              </button>
 
               <div className="quest-habit-right">
                 {/* Frequency label */}
@@ -291,33 +304,44 @@ export default function HabitTracker({ onXpGained }: Props) {
                     {t('questify.yesterday', 'Ayer')}
                   </button>
                 )}
+              </div>
 
-                {/* Check button — using Tick component */}
+              {/* Check button — using Tick component (own fixed column so every
+                  row's tick lands on the same X, whatever badges precede it) */}
+              <div className="quest-habit-tick">
                 <Tick
                   checked={h.checkedToday}
                   onChange={() => handleCheck(h.id)}
                   label={h.name}
                 />
+              </div>
 
-                {/* Edit */}
-                <svg onClick={() => startEdit(h)} width="10" height="10" viewBox="0 0 16 16"
-                  className="quest-icon-hover"
-                  style={{ cursor: 'pointer', opacity: 0.25, flexShrink: 0 }}
-                  fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round"
-                  role="button" tabIndex={0} aria-label={t('questify.edit', 'Edit')}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(h); } }}>
-                  <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
-                </svg>
-
-                {/* Delete */}
-                <svg onClick={() => handleDelete(h.id)} width="10" height="10" viewBox="0 0 14 14"
-                  className="quest-icon-hover"
-                  style={{ cursor: 'pointer', opacity: 0.25, flexShrink: 0 }}
-                  fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round"
-                  role="button" tabIndex={0} aria-label={t('questify.deleteHabit', 'Delete habit')}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDelete(h.id); } }}>
-                  <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
-                </svg>
+              {/* Edit / delete, kept clear of the tick by a divider */}
+              <div className="quest-habit-actions">
+                <button
+                  type="button"
+                  className="quest-icon-btn tap-target"
+                  onClick={() => startEdit(h)}
+                  aria-label={t('questify.edit', 'Edit')}
+                  title={t('questify.edit', 'Edit')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"
+                    fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
+                    <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="quest-icon-btn tap-target"
+                  onClick={() => handleDelete(h.id)}
+                  aria-label={t('questify.deleteHabit', 'Delete habit')}
+                  title={t('questify.deleteHabit', 'Delete habit')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"
+                    fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round">
+                    <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
+                  </svg>
+                </button>
               </div>
             </>
           )}
@@ -329,23 +353,29 @@ export default function HabitTracker({ onXpGained }: Props) {
         const totalPages = Math.ceil(habits.length / HABITS_PER_PAGE);
         return (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 'var(--fs-label)' }}>
-            <span
-              className="qb-rune"
-              style={{ cursor: page > 0 ? 'pointer' : 'default', opacity: page > 0 ? 1 : 0.3 }}
+            <button
+              type="button"
+              className="qb-rune quest-rune-btn tap-target"
+              style={{ opacity: page > 0 ? 1 : 0.3 }}
+              disabled={page === 0}
+              aria-label={t('questify.previousPage', 'Página anterior')}
               onClick={() => page > 0 && setPage(page - 1)}
             >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5 1L2 4l3 3"/></svg>
-            </span>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M5 1L2 4l3 3"/></svg>
+            </button>
             <span className="qb-hand" style={{ color: 'var(--ink-faded)' }}>
               {page + 1}/{totalPages}
             </span>
-            <span
-              className="qb-rune"
-              style={{ cursor: page < totalPages - 1 ? 'pointer' : 'default', opacity: page < totalPages - 1 ? 1 : 0.3 }}
+            <button
+              type="button"
+              className="qb-rune quest-rune-btn tap-target"
+              style={{ opacity: page < totalPages - 1 ? 1 : 0.3 }}
+              disabled={page >= totalPages - 1}
+              aria-label={t('questify.nextPage', 'Página siguiente')}
               onClick={() => page < totalPages - 1 && setPage(page + 1)}
             >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 1l3 3-3 3"/></svg>
-            </span>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M3 1l3 3-3 3"/></svg>
+            </button>
           </div>
         );
       })()}
@@ -374,33 +404,47 @@ export default function HabitTracker({ onXpGained }: Props) {
               <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>{t('questify.timesPerWeek')}</span>
             </div>
           )}
-          <span className="qb-rune qb-rune--sage" style={{ cursor: 'pointer' }} onClick={handleAdd}>OK</span>
-          <span className="qb-rune" style={{ cursor: 'pointer' }} onClick={() => setAdding(false)}>
+          <button type="button" className="qb-rune qb-rune--sage quest-rune-btn tap-target" onClick={handleAdd}>
+            {t('questify.save')}
+          </button>
+          <button type="button" className="qb-rune quest-rune-btn tap-target" onClick={() => setAdding(false)}>
             {t('questify.cancel')}
-          </span>
+          </button>
         </div>
       )}
 
       {/* Heatmap calendar (collapsible) */}
       {habits.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div
-            className="quest-project-header"
-            style={{ padding: '4px 6px', cursor: 'pointer' }}
-            onClick={() => setHeatmapOpen(!heatmapOpen)}
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-              style={{ transition: 'transform 0.2s', transform: heatmapOpen ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.5 }}>
-              <path d="M3 1l4 4-4 4"/>
-            </svg>
-            <span className="quest-project-header-name">
-              {t('questify.habitHeatmap', 'Activity Map')}
-            </span>
+          {/* The help bubble sits OUTSIDE the toggle button — asking for help
+              used to collapse the very section you were asking about. */}
+          <div className="quest-project-header" style={{ padding: '4px 6px' }}>
+            <button
+              type="button"
+              className="quest-project-header-btn"
+              onClick={() => setHeatmapOpen(!heatmapOpen)}
+              aria-expanded={heatmapOpen}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                aria-hidden="true"
+                style={{ transition: 'transform 0.2s', transform: heatmapOpen ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.5 }}>
+                <path d="M3 1l4 4-4 4"/>
+              </svg>
+              <span className="quest-project-header-name">
+                {t('questify.habitHeatmap', 'Activity Map')}
+              </span>
+            </button>
             <HelpBubble variant="inline" text={t('questify.heatmapHelp', 'Mapa de actividad de los últimos 30 días. Los colores más intensos indican más hábitos completados ese día.')} />
           </div>
-          {heatmapOpen && heatmapData.length > 0 && (
+          {heatmapOpen && (
             <div style={{ marginTop: 6 }}>
-              <HeatmapCalendar data={heatmapData} startDate={heatmapStart} columns={7} legend />
+              {heatmapData.length > 0 ? (
+                <HeatmapCalendar data={heatmapData} startDate={heatmapStart} columns={7} legend />
+              ) : (
+                <p className="quest-empty" style={{ padding: 8, fontSize: 'var(--fs-label)' }}>
+                  {t('questify.heatmapEmpty', 'Todavía no hay actividad registrada.')}
+                </p>
+              )}
             </div>
           )}
         </div>

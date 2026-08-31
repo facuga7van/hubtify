@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { useModalA11y } from '../../../shared/hooks/useModalA11y';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import parchmentBg from '../../../assets/bg.jpg';
 
@@ -21,10 +22,10 @@ interface Props {
 const CANVAS_W = 500;
 const CANVAS_H = 350;
 const INK_COLOR = '#3a2a1a';
-const ERASER_SIZE = 18;
 const LINE_WIDTH = 2;
+const UNDO_WINDOW_MS = 8000;
 
-type Tool = 'pen' | 'eraser';
+type SaveState = 'idle' | 'saving' | 'saved';
 
 export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) {
   const { t } = useTranslation();
@@ -33,18 +34,24 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
+  const undoTimerRef = useRef<number | null>(null);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [tool, setTool] = useState<Tool>('pen');
   const [bgReady, setBgReady] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [undoSnapshot, setUndoSnapshot] = useState<string | null>(null);
 
   // Preload bg image
   useEffect(() => {
     const img = new Image();
     img.src = parchmentBg;
     img.onload = () => { bgImageRef.current = img; setBgReady(true); };
+  }, []);
+
+  useEffect(() => () => {
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
   }, []);
 
   const clearCanvas = useCallback(() => {
@@ -100,7 +107,9 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     const data = canvas.toDataURL('image/png');
     const drawing = drawings[currentIdx];
     if (drawing) {
+      setSaveState('saving');
       await window.api.questsSaveDrawing({ id: drawing.id, taskId, data });
+      setSaveState('saved');
     }
     setDirty(false);
   }, [dirty, drawings, currentIdx, taskId]);
@@ -116,40 +125,11 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   const onPointerDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     isDrawingRef.current = true;
     lastPosRef.current = getPos(e);
-    if (tool === 'eraser') {
-      eraseAt(getPos(e));
-    }
-  };
-
-  const eraseAt = (pos: { x: number; y: number }) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    // Save and restore to draw the bg texture in the erased area
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, ERASER_SIZE / 2, 0, Math.PI * 2);
-    ctx.clip();
-    if (bgImageRef.current) {
-      ctx.drawImage(bgImageRef.current, 0, 0, CANVAS_W, CANVAS_H);
-    } else {
-      ctx.fillStyle = '#f5f0e1';
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    }
-    ctx.restore();
-    setDirty(true);
   };
 
   const onPointerMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
     const pos = getPos(e);
-
-    if (tool === 'eraser') {
-      eraseAt(pos);
-      lastPosRef.current = pos;
-      return;
-    }
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -166,6 +146,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     ctx.stroke();
     lastPosRef.current = pos;
     setDirty(true);
+    setSaveState('idle');
   };
 
   const onPointerUp = () => {
@@ -191,9 +172,43 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     }
   }, [drawings, currentIdx]);
 
-  const handleClear = () => {
+  /* Clearing used to be one silent click away from an auto-saved blank page.
+     Now it asks first, and keeps the previous pixels around for a few seconds. */
+  const handleClear = async () => {
+    const ok = await confirm({
+      message: t('questify.clearCanvasConfirm', '¿Limpiar este pergamino? Se borrará todo lo dibujado en esta página.'),
+      danger: true,
+      confirmText: t('questify.clearCanvas'),
+    });
+    if (!ok) return;
+    const canvas = canvasRef.current;
+    const snapshot = canvas ? canvas.toDataURL('image/png') : null;
     clearCanvas();
     setDirty(true);
+    setSaveState('idle');
+    if (snapshot) {
+      setUndoSnapshot(snapshot);
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = window.setTimeout(() => setUndoSnapshot(null), UNDO_WINDOW_MS);
+    }
+  };
+
+  const handleUndoClear = () => {
+    const snapshot = undoSnapshot;
+    if (!snapshot) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const img = new Image();
+    img.onload = () => {
+      clearCanvas();
+      ctx.drawImage(img, 0, 0);
+      setDirty(true);
+      setSaveState('idle');
+    };
+    img.src = snapshot;
+    setUndoSnapshot(null);
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
   };
 
   const handleDelete = async () => {
@@ -210,31 +225,56 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
   const goPage = async (delta: number) => {
     await saveCurrent();
+    setUndoSnapshot(null);
     setCurrentIdx((prev) => Math.max(0, Math.min(drawings.length - 1, prev + delta)));
   };
 
-  const handleClose = async () => {
+  const handleClose = useCallback(async () => {
     await saveCurrent();
     onClose();
-  };
+  }, [saveCurrent, onClose]);
+
+  // Escape / focus trap / focus restore — and, crucially, focus is set ONCE on
+  // mount instead of on every stroke (the old inline `ref={el => el?.focus()}`).
+  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose: handleClose });
+
+  const statusText =
+    saveState === 'saving' ? t('questify.saving', 'Guardando…')
+      : dirty ? t('questify.unsaved', 'Sin guardar')
+        : saveState === 'saved' ? t('questify.saved', 'Guardado')
+          : '';
 
   const bgUrl = parchmentBg;
 
   return (
-    <div onKeyDown={(e) => e.key === 'Escape' && handleClose()} role="dialog" aria-modal="true" tabIndex={-1} ref={(el) => el?.focus()} style={{
-      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.75)', zIndex: 'var(--z-modal)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={handleClose}>
-      <div style={{
-        backgroundImage: `url(${bgUrl})`,
-        backgroundSize: '400px',
-        backgroundRepeat: 'repeat',
-        borderRadius: 6, padding: '16px 20px',
-        boxShadow: '0 12px 40px rgba(44,24,16,0.6), 0 0 0 1px rgba(201,168,76,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
-        border: '3px solid var(--gold-dark)',
-        minWidth: CANVAS_W + 40,
-        position: 'relative',
-      }} onClick={(e) => e.stopPropagation()}>
+    <div className="quest-notes-overlay" onClick={handleClose}>
+      <div
+        {...dialogProps}
+        aria-label={t('questify.scrollNotes', 'Notas')}
+        style={{
+          backgroundImage: `url(${bgUrl})`,
+          backgroundSize: '400px',
+          backgroundRepeat: 'repeat',
+          borderRadius: 6, padding: '16px 20px',
+          boxShadow: '0 12px 40px rgba(44,24,16,0.6), 0 0 0 1px rgba(201,168,76,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+          border: '3px solid var(--gold-dark)',
+          minWidth: CANVAS_W + 40,
+          position: 'relative',
+        }}
+        onClick={stopPropagation}
+      >
+        {/* Close first in the DOM: it takes the initial focus and it is the safe action. */}
+        <button
+          type="button"
+          className="quest-modal-close tap-target"
+          onClick={handleClose}
+          aria-label={t('questify.close', 'Cerrar')}
+          title={t('questify.close', 'Cerrar')}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M2 2l10 10M12 2L2 12"/>
+          </svg>
+        </button>
 
         {/* Decorative top edge */}
         <div style={{
@@ -243,12 +283,13 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         }} />
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingRight: 32 }}>
           {drawings.length > 1 && (
             <button className="rpg-button" onClick={() => goPage(-1)}
               disabled={currentIdx === 0}
+              aria-label={t('questify.previousPage', 'Página anterior')}
               style={{ padding: '3px 10px', fontSize: 'var(--fs-quote)' }}>
-              ‹
+              &lsaquo;
             </button>
           )}
           <span style={{
@@ -264,8 +305,9 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
           {drawings.length > 1 && (
             <button className="rpg-button" onClick={() => goPage(1)}
               disabled={currentIdx >= drawings.length - 1}
+              aria-label={t('questify.nextPage', 'Página siguiente')}
               style={{ padding: '3px 10px', fontSize: 'var(--fs-quote)' }}>
-              ›
+              &rsaquo;
             </button>
           )}
           <button className="rpg-button" onClick={handleNewNote}
@@ -284,7 +326,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
           style={{
-            cursor: tool === 'eraser' ? 'cell' : 'crosshair',
+            cursor: 'crosshair',
             borderRadius: 4,
             border: '1px solid rgba(201,168,76,0.4)',
             display: drawings.length === 0 ? 'none' : 'block',
@@ -305,45 +347,35 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
         {/* Toolbar */}
         {drawings.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center' }}>
-            {/* Pen */}
-            <button className="rpg-button" onClick={() => setTool('pen')}
-              style={{
-                padding: '4px 8px', opacity: tool === 'pen' ? 1 : 0.5,
-                background: tool === 'pen' ? 'var(--gold)' : undefined,
-              }}
-              title={t('questify.penTool', 'Pen')}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                <path d="M11.5 2.5l2 2M4 10l7-7 2 2-7 7H4v-2z"/>
-              </svg>
-            </button>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className="quest-notes-status" aria-live="polite">{statusText}</span>
 
-            {/* Eraser */}
-            <button className="rpg-button" onClick={() => setTool('eraser')}
-              style={{
-                padding: '4px 8px', opacity: tool === 'eraser' ? 1 : 0.5,
-                background: tool === 'eraser' ? 'var(--gold)' : undefined,
-              }}
-              title={t('questify.eraserTool', 'Eraser')}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12.5 5.5l-5 5-3-3 5-5z"/>
-                <path d="M4.5 10.5l-2 2h5l2-2"/>
-              </svg>
-            </button>
+            {undoSnapshot && (
+              <button className="rpg-button" onClick={handleUndoClear}
+                style={{ padding: '4px 10px', fontSize: 'var(--fs-label)' }}>
+                {t('questify.undoClear', 'Deshacer')}
+              </button>
+            )}
 
             <div style={{ flex: 1 }} />
 
+            <button className="rpg-button" onClick={saveCurrent} disabled={!dirty}
+              style={{ padding: '4px 10px', fontSize: 'var(--fs-label)' }}>
+              {t('questify.save')}
+            </button>
+
             {/* Clear */}
             <button className="rpg-button" onClick={handleClear}
-              style={{ padding: '4px 10px', fontSize: 'var(--fs-label)', opacity: 0.6 }}>
+              style={{ padding: '4px 10px', fontSize: 'var(--fs-label)', opacity: 0.75 }}>
               {t('questify.clearCanvas')}
             </button>
 
             {/* Delete (trash icon) */}
             <button className="rpg-button" onClick={handleDelete}
-              style={{ padding: '4px 8px', opacity: 0.4 }}
+              style={{ padding: '4px 8px', opacity: 0.6 }}
+              aria-label={t('questify.deleteNote')}
               title={t('questify.deleteNote')}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
                 <path d="M2 4h10M5 4V2.5h4V4M3.5 4l.7 8h5.6l.7-8"/>
               </svg>
             </button>

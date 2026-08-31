@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
-import { Rune } from '../../../shared/components/codex/CodexPrimitives';
+import { useModalA11y } from '../../../shared/hooks/useModalA11y';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import type { Project } from '../types';
 import { PROJECT_COLORS } from '../types';
@@ -23,6 +23,11 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
     const used = new Set(projects.map(p => p.color));
     return PROJECT_COLORS.find(c => !used.has(c)) ?? PROJECT_COLORS[0];
   });
+
+  // Escape at window level + focus trap + focus restore. The old hand-rolled
+  // onKeyDown lived on a non-focusable div, so Escape died the moment you
+  // clicked anything inside.
+  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose });
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -53,36 +58,27 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
     setEditColor(p.color);
   };
 
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Auto-focus first input on mount
-    const firstInput = modalRef.current?.querySelector('input') as HTMLInputElement | null;
-    firstInput?.focus();
-  }, []);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { onClose(); return; }
-    if (e.key === 'Tab' && modalRef.current) {
-      const focusable = modalRef.current.querySelectorAll<HTMLElement>(
-        'input, button, select, [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  };
-
   return (
-    <div className="quest-project-modal-overlay" onClick={onClose} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label={t('questify.manageProjects')}>
-      <div ref={modalRef} className="quest-project-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="quest-project-modal-overlay" onClick={onClose}>
+      <div
+        {...dialogProps}
+        className="quest-project-modal"
+        aria-label={t('questify.manageProjects')}
+        onClick={stopPropagation}
+      >
+        {/* Close first in the DOM: it takes the initial focus and it is the safe action. */}
+        <button
+          type="button"
+          className="quest-modal-close tap-target"
+          onClick={onClose}
+          aria-label={t('questify.close', 'Cerrar')}
+          title={t('questify.close', 'Cerrar')}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M2 2l10 10M12 2L2 12"/>
+          </svg>
+        </button>
+
         <div className="quest-project-modal-title">{t('questify.manageProjects')} <HelpBubble variant="inline" text={t('questify.projectsHelp', 'Proyectos agrupan misiones en campañas. Su progreso se muestra en la barra de Campañas.')} /></div>
 
         {projects.map((p) => (
@@ -91,28 +87,29 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
               <>
                 <ColorPicker value={editColor} onChange={setEditColor} />
                 <input className="subtask-input" value={editName} onChange={(e) => setEditName(e.target.value)}
-                  style={{ flex: 1 }} autoFocus onKeyDown={(e) => e.key === 'Enter' && handleUpdate(p.id)} />
-                <Rune tone="sage">
-                  <span style={{ cursor: 'pointer' }} onClick={() => handleUpdate(p.id)}>OK</span>
-                </Rune>
-                <Rune>
-                  <span style={{ cursor: 'pointer' }} onClick={() => setEditingId(null)}>{t('questify.cancel')}</span>
-                </Rune>
+                  style={{ flex: 1, minWidth: 0 }} autoFocus onKeyDown={(e) => e.key === 'Enter' && handleUpdate(p.id)} />
+                <button type="button" className="qb-rune qb-rune--sage quest-rune-btn" onClick={() => handleUpdate(p.id)}>
+                  {t('questify.save')}
+                </button>
+                <button type="button" className="qb-rune quest-rune-btn" onClick={() => setEditingId(null)}>
+                  {t('questify.cancel')}
+                </button>
               </>
             ) : (
               <>
                 <span style={{
                   width: 12, height: 12, borderRadius: '50%', background: p.color, flexShrink: 0,
-                }} />
+                }} aria-hidden="true" />
                 <span style={{
-                  flex: 1, fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)', color: 'var(--ink)',
-                }}>{p.name}</span>
-                <Rune>
-                  <span style={{ cursor: 'pointer' }} onClick={() => startEdit(p)}>{t('questify.edit')}</span>
-                </Rune>
-                <Rune tone="rubric">
-                  <span style={{ cursor: 'pointer' }} onClick={() => handleDelete(p.id)}>{t('questify.delete')}</span>
-                </Rune>
+                  flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)', color: 'var(--ink)',
+                }} title={p.name}>{p.name}</span>
+                <button type="button" className="qb-rune quest-rune-btn" onClick={() => startEdit(p)}>
+                  {t('questify.edit')}
+                </button>
+                <button type="button" className="qb-rune qb-rune--rubric quest-rune-btn" onClick={() => handleDelete(p.id)}>
+                  {t('questify.delete')}
+                </button>
               </>
             )}
           </div>
@@ -121,11 +118,11 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
           <ColorPicker value={newColor} onChange={setNewColor} />
           <input className="subtask-input" placeholder={t('questify.projectName')} value={newName}
-            onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }}
+            onChange={(e) => setNewName(e.target.value)} style={{ flex: 1, minWidth: 0 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
-          <Rune tone="sage">
-            <span style={{ cursor: 'pointer' }} onClick={handleCreate}>+ {t('questify.newProject')}</span>
-          </Rune>
+          <button type="button" className="qb-rune qb-rune--sage quest-rune-btn" onClick={handleCreate}>
+            + {t('questify.newProject')}
+          </button>
         </div>
       </div>
     </div>
@@ -133,14 +130,18 @@ export default function ProjectManager({ projects, onClose, onSaved }: Props) {
 }
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  const { t } = useTranslation();
   return (
-    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', width: 80 }}>
+    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', width: 80, flexShrink: 0 }}>
       {PROJECT_COLORS.map((c) => (
-        <button key={c} type="button" onClick={() => onChange(c)} style={{
-          width: 14, height: 14, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
-          outline: c === value ? '2px solid var(--gold)' : '2px solid transparent',
-          outlineOffset: 1,
-        }} />
+        <button key={c} type="button" onClick={() => onChange(c)}
+          aria-label={t('questify.projectColor', 'Color del proyecto')}
+          aria-pressed={c === value}
+          style={{
+            width: 14, height: 14, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+            outline: c === value ? '2px solid var(--gold)' : '2px solid transparent',
+            outlineOffset: 1,
+          }} />
       ))}
     </div>
   );

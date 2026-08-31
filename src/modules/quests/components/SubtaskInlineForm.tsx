@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TaskTier, Subtask } from '../types';
-import { TierBadge } from '../utils';
+import type { Subtask } from '../types';
+import { XP_MAP, type TaskTier } from '../types';
+import { TierBadge, TIER_LABEL } from '../utils';
 
 interface Props {
   editing?: Subtask | null;
@@ -61,10 +62,19 @@ export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) 
         onChange={(e) => setDescription(e.target.value)}
         onKeyDown={handleKeyDown}
       />
+      {/* Same tier vocabulary + XP hint as the quest form, so the two never disagree. */}
       <div className="subtask-tier-buttons">
-        <button type="button" className={`subtask-tier-btn ${tier === 1 ? 'tierActive' : ''}`} onClick={() => setTier(1)}><TierBadge tier={1} size={14} /></button>
-        <button type="button" className={`subtask-tier-btn ${tier === 2 ? 'tierActive' : ''}`} onClick={() => setTier(2)}><TierBadge tier={2} size={14} /></button>
-        <button type="button" className={`subtask-tier-btn ${tier === 3 ? 'tierActive' : ''}`} onClick={() => setTier(3)}><TierBadge tier={3} size={14} /></button>
+        {([1, 2, 3] as TaskTier[]).map((tierVal) => (
+          <button
+            key={tierVal}
+            type="button"
+            className={`quest-tier-btn${tier === tierVal ? ' quest-tier-btn--active' : ''}`}
+            onClick={() => setTier(tierVal)}
+          >
+            <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
+            <span style={{ opacity: 0.7, fontSize: '0.85em', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>
+          </button>
+        ))}
       </div>
       <div className="subtask-form-actions">
         <button className="rpg-button" onClick={handleSubmit}>{t('questify.save')}</button>
