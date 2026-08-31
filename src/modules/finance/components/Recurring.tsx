@@ -6,17 +6,18 @@ import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { Currency, TransactionType } from '../types';
-import { Rune, Gauge } from '../../../shared/components/codex/CodexPrimitives';
-import { PlayIcon, PauseIcon, Pencil, CrossMark } from '../../../shared/components/icons';
+import { Rune } from '../../../shared/components/codex/CodexPrimitives';
+import { PlayIcon, PauseIcon, Pencil, CrossMark, Checkmark, Scroll } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
+import { unwrap, failureMessage } from '../utils/api-ext';
 
 interface RecurringRow {
   id: string;
   name: string;
   type: 'expense' | 'income';
   amount: number;
-  currency: string;
+  currency: 'ARS' | 'USD';
   category: string;
   billingDay: number;
   active: boolean | number;
@@ -104,16 +105,17 @@ export default function Recurring() {
     }
     setFormSubmitting(true);
     try {
-      await window.api.financeAddRecurring({
+      const result = await unwrap(window.api.financeAddRecurring({
         name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory, billingDay: formBillingDay,
-      });
+      }));
+      if (!result.ok) {
+        toast({ type: 'warning', message: failureMessage(result.reason, t) });
+        return;
+      }
       setFormName(''); setFormAmount(''); setFormType('expense');
       setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setShowForm(false);
       load();
       window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch (err) {
-      console.error('[Recurring] financeAddRecurring failed:', err);
-      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
     } finally {
       setFormSubmitting(false);
     }
@@ -132,16 +134,17 @@ export default function Recurring() {
 
   const saveEdit = async (id: string) => {
     const parsed = parseFloat(editingAmount);
-    if (!isNaN(parsed) && parsed > 0) {
-      try {
-        await window.api.financeUpdateRecurringAmount(id, parsed);
-        load();
-        window.dispatchEvent(new Event('finance:dataChanged'));
-      } catch (err) {
-        console.error('[Recurring] financeUpdateRecurringAmount failed:', err);
-        toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
-      }
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
+      return;
     }
+    const result = await unwrap(window.api.financeUpdateRecurringAmount(id, parsed));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
+    }
+    load();
+    window.dispatchEvent(new Event('finance:dataChanged'));
     setEditingId(null);
     setEditingAmount('');
   };
@@ -166,19 +169,19 @@ export default function Recurring() {
       toast({ type: 'warning', message: t('coinify.validationName', 'Ingresá un nombre') });
       return;
     }
-    try {
-      await window.api.financeUpdateRecurring(id, {
-        name: editRecurringFields.name,
-        type: editRecurringFields.type,
-        category: editRecurringFields.category,
-        billingDay: editRecurringFields.billingDay,
-      });
-      setEditingRecurringId(null);
-      load();
-      window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch {
-      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+    const result = await unwrap(window.api.financeUpdateRecurring(id, {
+      name: editRecurringFields.name,
+      type: editRecurringFields.type,
+      category: editRecurringFields.category,
+      billingDay: editRecurringFields.billingDay,
+    }));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
     }
+    setEditingRecurringId(null);
+    load();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const cancelRecurringEdit = () => {
@@ -324,7 +327,9 @@ export default function Recurring() {
                   aria-label={isActive(item) ? t('coinify.pause', 'Pausar') : t('coinify.resume', 'Reanudar')}
                   title={isActive(item) ? t('coinify.pause', 'Pausar') : t('coinify.resume', 'Reanudar')}
                 >
-                  {isActive(item) ? <PlayIcon style={{ width: '0.7em', height: '0.7em' }} /> : <PauseIcon style={{ width: '0.7em', height: '0.7em' }} />}
+                  {/* The icon is the ACTION, not the state: an active recurring
+                      shows a pause glyph because that is what clicking does. */}
+                  {isActive(item) ? <PauseIcon style={{ width: '0.7em', height: '0.7em' }} /> : <PlayIcon style={{ width: '0.7em', height: '0.7em' }} />}
                 </button>
 
                 {/* Name, Type, Category, Billing Day */}
@@ -351,12 +356,16 @@ export default function Recurring() {
                     <RpgNumberInput value={String(editRecurringFields.billingDay)}
                       onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
                       style={{ width: 55 }} fontSize="0.8rem" min={1} max={31} step={1} />
-                    <button className="rpg-button coin-action-btn coin-action-btn--confirm" onClick={() => saveRecurringEdit(item.id)}>ok</button>
-                    <button className="rpg-button coin-action-btn coin-action-btn--cancel" onClick={cancelRecurringEdit}>x</button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--confirm"
+                      aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}
+                      onClick={() => saveRecurringEdit(item.id)}><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--cancel"
+                      aria-label={t('coinify.cancel', 'Cancelar')} title={t('coinify.cancel', 'Cancelar')}
+                      onClick={cancelRecurringEdit}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
                   </>
                 ) : (
                   <>
-                    <span className="coin-recurring-card__name qb-hand">{item.name}</span>
+                    <span className="coin-recurring-card__name qb-hand" title={item.name}>{item.name}</span>
                     <Rune tone={item.type === 'income' ? 'sage' : 'rubric'}>
                       {item.type === 'income' ? t('coinify.income') : t('coinify.expense')}
                     </Rune>
@@ -384,14 +393,20 @@ export default function Recurring() {
                         if (e.key === 'Escape') cancelEdit();
                       }}
                     />
-                    <button className="rpg-button coin-action-btn coin-action-btn--confirm" onClick={() => saveEdit(item.id)}>ok</button>
-                    <button className="rpg-button coin-action-btn coin-action-btn--cancel" onClick={cancelEdit}>x</button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--confirm"
+                      aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}
+                      onClick={() => saveEdit(item.id)}><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
+                    <button className="rpg-button coin-action-btn coin-action-btn--cancel"
+                      aria-label={t('coinify.cancel', 'Cancelar')} title={t('coinify.cancel', 'Cancelar')}
+                      onClick={cancelEdit}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
                   </div>
                 ) : (
-                  <button className="coin-recurring-card__amount-btn qb-numeral" onClick={() => startEdit(item)}
+                  /* Dotted underline + pencil on hover: a borderless transparent
+                     button gave no hint that the amount was editable at all. */
+                  <button className="coin-recurring-card__amount-btn qb-numeral coin-editable-amount" onClick={() => startEdit(item)}
                     title={t('coinify.editAmount')}>
-                    {formatCurrency(item.amount, { currency: item.currency as 'ARS' | 'USD' })}
-                    <span style={{ marginLeft: 4, fontSize: 'var(--fs-label)', opacity: 0.5 }}>{item.currency}</span>
+                    {formatCurrency(item.amount, { currency: item.currency })}
+                    <Pencil className="coin-editable-amount__pencil" style={{ width: '0.7em', height: '0.7em' }} />
                   </button>
                 )}
 
@@ -406,8 +421,10 @@ export default function Recurring() {
 
                 {/* History Toggle */}
                 <button className="rpg-button coin-action-btn coin-action-btn--muted" onClick={() => toggleHistory(item.id)}
+                  aria-label={t('coinify.amountHistory')}
+                  aria-expanded={expandedHistory === item.id}
                   title={t('coinify.amountHistory')}>
-                  hist
+                  <Scroll style={{ width: '0.85em', height: '0.85em' }} />
                 </button>
 
                 {/* Delete */}
@@ -427,11 +444,11 @@ export default function Recurring() {
                       {history[item.id].map((h) => (
                         <div key={h.id} className="coin-recurring-card__timeline-item">
                           <span style={{ color: 'var(--rubric)', textDecoration: 'line-through', opacity: 0.6 }}>
-                            {formatCurrency(h.previousAmount, { currency: item.currency as 'ARS' | 'USD' })}
+                            {formatCurrency(h.previousAmount, { currency: item.currency })}
                           </span>
                           <span style={{ opacity: 0.5 }}>{'\u2192'}</span>
                           <span style={{ color: 'var(--moss)' }}>
-                            {formatCurrency(h.newAmount, { currency: item.currency as 'ARS' | 'USD' })}
+                            {formatCurrency(h.newAmount, { currency: item.currency })}
                           </span>
                           <span style={{ marginLeft: 'auto', opacity: 0.5 }}>
                             {new Date(h.changedAt).toLocaleDateString()}

@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../../shared/components/useToast';
+import { useConfirm } from '../../../../shared/components/ConfirmDialog';
+import { useModalA11y } from '../../../../shared/hooks/useModalA11y';
+import { CrossMark } from '../../../../shared/components/icons';
+import { unwrap, failureMessage } from '../../utils/api-ext';
 
 interface Props {
   categories: string[];
@@ -12,26 +16,35 @@ interface Props {
 export default function CategoryManager({ categories, onClose, onSaved }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [newName, setNewName] = useState('');
-  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+
+  const { dialogProps, stopPropagation } = useModalA11y({ onClose });
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    try {
-      await window.api.financeAddCategory(newName.trim());
-      setNewName('');
-      onSaved();
-      window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch (err) {
-      console.error('[CategoryManager] financeAddCategory failed:', err);
-      toast({ type: 'warning', message: t('coinify.createError', 'Error al crear') });
+    // `addCategory` answers `{ ok: false, reason }` for an invalid name.
+    const result = await unwrap(window.api.financeAddCategory(newName.trim()));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
     }
+    setNewName('');
+    onSaved();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const handleDelete = async (name: string) => {
+    // The module-wide ConfirmDialog, with the copy that actually explains the
+    // consequence — the inline yes/no said only "¿Eliminar?".
+    const ok = await confirm({
+      message: t('coinify.deleteCategoryConfirm', '¿Eliminar esta categoría? Las transacciones existentes no se verán afectadas.'),
+      danger: true,
+      confirmText: t('coinify.delete'),
+    });
+    if (!ok) return;
     try {
       await window.api.financeDeleteCategory(name);
-      setConfirmingDelete(null);
       onSaved();
       window.dispatchEvent(new Event('finance:dataChanged'));
     } catch (err) {
@@ -41,13 +54,23 @@ export default function CategoryManager({ categories, onClose, onSaved }: Props)
   };
 
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.7)', zIndex: 9999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onClose}>
-      <div className="rpg-card" style={{ width: 420, maxHeight: '80vh', overflow: 'auto' }}
-        onClick={(e) => e.stopPropagation()}>
-        <div className="rpg-card-title">{t('coinify.manageCategories')}</div>
+    <div className="coin-modal-overlay" onClick={onClose}>
+      <div
+        {...dialogProps}
+        className="rpg-card coin-modal coin-modal--narrow"
+        aria-label={t('coinify.manageCategories')}
+        onClick={stopPropagation}
+      >
+        <div className="coin-modal__header">
+          <div className="rpg-card-title" style={{ margin: 0 }}>{t('coinify.manageCategories')}</div>
+          <button
+            className="rpg-button tap-target"
+            aria-label={t('coinify.close', 'Cerrar')}
+            title={t('coinify.close', 'Cerrar')}
+            onClick={onClose}
+            style={{ padding: '2px 8px' }}
+          ><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
+        </div>
 
         {categories.map((cat) => (
           <div key={cat} style={{
@@ -55,31 +78,15 @@ export default function CategoryManager({ categories, onClose, onSaved }: Props)
             borderBottom: '1px solid var(--parch-1)',
           }}>
             <span style={{ flex: 1, fontWeight: 'bold' }}>{cat}</span>
-            {confirmingDelete === cat ? (
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
-                  {t('coinify.confirmDelete')}
-                </span>
-                <button className="rpg-button" onClick={() => handleDelete(cat)}
-                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
-                  {t('common.yes', 'Sí')}
-                </button>
-                <button className="rpg-button" onClick={() => setConfirmingDelete(null)}
-                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
-                  {t('coinify.no')}
-                </button>
-              </div>
-            ) : (
-              <button className="rpg-button" onClick={() => setConfirmingDelete(cat)}
-                style={{ padding: '3px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
-                {t('coinify.delete')}
-              </button>
-            )}
+            <button className="rpg-button coin-manager__delete" onClick={() => handleDelete(cat)}>
+              {t('coinify.delete')}
+            </button>
           </div>
         ))}
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
           <input className="rpg-input" placeholder={t('coinify.categoryName')} value={newName}
+            aria-label={t('coinify.categoryName')}
             onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <button className="rpg-button" onClick={handleCreate} disabled={!newName.trim()}>

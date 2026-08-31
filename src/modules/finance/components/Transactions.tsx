@@ -12,10 +12,13 @@ import type { TransactionType, PaymentMethod, Currency } from '../types';
 import { addTransaction } from '../../../shared/animations/feedback';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { useModalA11y } from '../../../shared/hooks/useModalA11y';
 import { CategorySelect } from './shared/CategorySelect';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
-import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark } from '../../../shared/components/icons';
+import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark, Coin } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
+import { unwrap, failureMessage } from '../utils/api-ext';
+import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 
 interface TransactionRow {
   id: string;
@@ -55,17 +58,38 @@ const SourceIcon = ({ source }: { source: string }) => {
   );
 };
 
-function toRoman(n: number): string {
-  const numerals: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
-  let result = '';
-  for (const [val, sym] of numerals) {
-    while (n >= val) { result += sym; n -= val; }
-  }
-  return result;
-}
-
 type SortField = 'date' | 'description' | 'category' | 'amount';
 type SortDir = 'asc' | 'desc';
+
+/**
+ * Ledger section header. Defined at module scope on purpose — nested inside the
+ * component it was a brand new component type on every render, so React
+ * unmounted and remounted the header (losing focus and replaying transitions)
+ * on every keystroke in the search box.
+ */
+function SectionHeader({
+  title,
+  count,
+  collapsed,
+  onToggle,
+}: {
+  title: string;
+  count: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="coin-ledger-section-header" onClick={onToggle}>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
+        strokeWidth="1.5" strokeLinecap="round"
+        style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+        <path d="M3 1l4 4-4 4" />
+      </svg>
+      <span className="coin-ledger-section-header__title">{title}</span>
+      <span className="coin-ledger-section-header__count">{count}</span>
+    </div>
+  );
+}
 
 export default function Transactions() {
   const { t } = useTranslation();
@@ -79,11 +103,31 @@ export default function Transactions() {
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(50);
+  const [importDirty, setImportDirty] = useState(false);
+
+  // Debounced search: re-filtering + re-sorting the whole ledger on every
+  // keystroke made typing visibly laggy on a full month.
+  useEffect(() => {
+    const id = setTimeout(() => setSearchQuery(searchInput), 200);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  const hasAnyFilter = !!(filterCategory || filterType || filterPayment || searchQuery);
+
+  const clearFilters = () => {
+    setFilterCategory('');
+    setFilterType('');
+    setFilterPayment('');
+    setSearchInput('');
+    setSearchQuery('');
+  };
 
   // Sort state
   const [sortField, setSortField] = useState<SortField>('date');
@@ -98,12 +142,12 @@ export default function Transactions() {
     }
   };
 
+  /**
+   * Filters survive month navigation — comparing one category across months was
+   * impossible when every arrow press wiped what you had typed.
+   */
   const handleMonthChange = (newMonth: string) => {
     setMonth(newMonth);
-    setFilterCategory('');
-    setFilterType('');
-    setFilterPayment('');
-    setSearchQuery('');
     setVisibleCount(50);
   };
 
@@ -148,15 +192,30 @@ export default function Transactions() {
     window.api.financeGetTransactions({ month }).then((data) => setTransactions(data as TransactionRow[]));
   }, [month]);
 
-  const recurringTx = transactions.filter((tx) => tx.source === 'recurring');
-  const normalTx = transactions.filter((tx) => tx.source !== 'recurring');
-  const filteredNormalTx = normalTx.filter((tx) => {
-    if (filterCategory && tx.category !== filterCategory) return false;
-    if (filterType && tx.type !== filterType) return false;
-    if (filterPayment && tx.paymentMethod !== filterPayment) return false;
-    if (searchQuery && !(tx.description?.toLowerCase().includes(searchQuery.toLowerCase()) || tx.category?.toLowerCase().includes(searchQuery.toLowerCase()))) return false;
-    return true;
-  });
+  /**
+   * One memo for the whole split + filter pass. These used to be bare
+   * `.filter()` calls in the render body, so `filteredNormalTx` was a brand new
+   * array every render and the sort memo below never hit its cache.
+   * Recurring rows get the same filters as normal ones — filtering to "income"
+   * used to leave expenses on show in the recurring section below.
+   */
+  const { filteredNormalTx, filteredRecurringTx } = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const matches = (tx: TransactionRow) => {
+      if (filterCategory && tx.category !== filterCategory) return false;
+      if (filterType && tx.type !== filterType) return false;
+      if (filterPayment && tx.paymentMethod !== filterPayment) return false;
+      if (q && !(tx.description?.toLowerCase().includes(q) || tx.category?.toLowerCase().includes(q))) return false;
+      return true;
+    };
+    const normal: TransactionRow[] = [];
+    const recurring: TransactionRow[] = [];
+    for (const tx of transactions) {
+      if (!matches(tx)) continue;
+      (tx.source === 'recurring' ? recurring : normal).push(tx);
+    }
+    return { filteredNormalTx: normal, filteredRecurringTx: recurring };
+  }, [transactions, filterCategory, filterType, filterPayment, searchQuery]);
 
   // Sorted transactions
   const sortedTx = useMemo(() => {
@@ -196,38 +255,30 @@ export default function Transactions() {
     return result;
   }, [month, transactions, categoryAverages]);
 
-  const filteredRecurringTx = recurringTx.filter((tx) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return tx.description?.toLowerCase().includes(q) || tx.category?.toLowerCase().includes(q);
-  });
-
-  // Ledger section header
-  const SectionHeader = ({ sectionKey, title, count }: { sectionKey: string; title: string; count: number }) => {
-    const isCollapsed = collapsedSections.has(sectionKey);
-    return (
-      <div className="coin-ledger-section-header" onClick={() => toggleSection(sectionKey)}>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
-          strokeWidth="1.5" strokeLinecap="round"
-          style={{ transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
-          <path d="M3 1l4 4-4 4" />
-        </svg>
-        <span className="coin-ledger-section-header__title">{title}</span>
-        <span className="coin-ledger-section-header__count">{count}</span>
-      </div>
-    );
-  };
-
   useEffect(() => {
     loadTransactions();
     loadCategoryAverages();
-    const freshNow = new Date();
-    const currentMonth = `${freshNow.getFullYear()}-${String(freshNow.getMonth() + 1).padStart(2, '0')}`;
-    window.api.financeGenerateRecurringForMonth(currentMonth);
   }, [loadTransactions, loadCategoryAverages]);
 
   useEffect(() => {
-    const handler = () => { loadTransactions(); loadCategoryAverages(); };
+    window.api.financeGetCategories().then(setCategories).catch(() => setCategories([]));
+  }, []);
+
+  /**
+   * Recurring generation is no longer a per-mount database write. It runs once
+   * per month and reloads afterwards, so the ledger never shows a total that is
+   * missing rows it just created.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    ensureRecurringGenerated(realCurrentMonth()).then((generated) => {
+      if (generated && !cancelled) loadTransactions();
+    });
+    return () => { cancelled = true; };
+  }, [loadTransactions]);
+
+  useEffect(() => {
+    const handler = () => { resetRecurringGuard(); loadTransactions(); loadCategoryAverages(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [loadTransactions, loadCategoryAverages]);
@@ -246,9 +297,10 @@ export default function Transactions() {
     creditCardId?: string;
   }) => {
     try {
-      let newId: string;
-      if (data.paymentMethod === 'credit_card' && data.installments > 1) {
-        newId = await window.api.financeCreateInstallmentGroup({
+      // These handlers now answer `{ ok: false, reason }` for bad input instead
+      // of writing garbage, so the result has to be checked before celebrating.
+      const result = data.paymentMethod === 'credit_card' && data.installments > 1
+        ? await unwrap(window.api.financeCreateInstallmentGroup({
           description: data.description || data.category,
           totalAmount: data.amount * data.installments,
           installmentCount: data.installments,
@@ -257,9 +309,8 @@ export default function Transactions() {
           category: data.category,
           startDate: data.date,
           creditCardId: data.creditCardId,
-        });
-      } else {
-        newId = await window.api.financeAddTransaction({
+        }))
+        : await unwrap(window.api.financeAddTransaction({
           type: data.type,
           amount: data.amount,
           currency: data.currency,
@@ -268,8 +319,13 @@ export default function Transactions() {
           date: data.date,
           paymentMethod: data.paymentMethod,
           creditCardId: data.creditCardId,
-        });
+        }));
+
+      if (!result.ok) {
+        toast({ type: 'warning', message: failureMessage(result.reason, t) });
+        return;
       }
+      const newId = result.value;
       loadTransactions();
       window.dispatchEvent(new Event('finance:dataChanged'));
       setEnteringId(newId);
@@ -323,21 +379,20 @@ export default function Transactions() {
       toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
       return;
     }
-    try {
-      await window.api.financeUpdateTransaction(editingId, {
-        amount,
-        description: editFields.description,
-        category: editFields.category,
-        date: editFields.date,
-        paymentMethod: editFields.paymentMethod,
-      });
-      setEditingId(null);
-      loadTransactions();
-      window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch (err) {
-      console.error('[Transactions] financeUpdateTransaction failed:', err);
-      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+    const result = await unwrap(window.api.financeUpdateTransaction(editingId, {
+      amount,
+      description: editFields.description,
+      category: editFields.category,
+      date: editFields.date,
+      paymentMethod: editFields.paymentMethod,
+    }));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
     }
+    setEditingId(null);
+    loadTransactions();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const paymentMethodLabel = (pm: string) => {
@@ -404,8 +459,12 @@ export default function Transactions() {
           </div>
         ) : (
           <>
+            {/* Exactly six cells, matching the six columns declared for both the
+                header and the row. The origin icon, the payment method and the
+                card marker share one cell so the amount can never drift into a
+                neighbouring column. */}
             <span className="coin-ledger-row__day qb-small-caps">{day}</span>
-            <span className="coin-ledger-row__desc">
+            <span className="coin-ledger-row__desc" title={tx.description || tx.category}>
               {tx.description || tx.category}
               {!!tx.forThirdParty && (
                 <span className="coin-ledger-row__third-party">
@@ -421,13 +480,21 @@ export default function Transactions() {
                 </Tooltip>
               )}
             </span>
-            <span className="coin-ledger-row__source">
-              <SourceIcon source={tx.source} />
+            <span className="coin-ledger-row__meta">
+              <span className="coin-ledger-row__source">
+                <SourceIcon source={tx.source} />
+              </span>
+              <span className="coin-ledger-row__payment">{paymentMethodLabel(tx.paymentMethod)}</span>
+              {tx.impactsBalance === 0 && (
+                <span
+                  className="coin-ledger-row__card-flag"
+                  title={t('coinify.cardPendingFlag', 'Compra con tarjeta: no descuenta del saldo hasta que pagues el resumen')}
+                  aria-label={t('coinify.cardPendingFlag', 'Compra con tarjeta: no descuenta del saldo hasta que pagues el resumen')}
+                >
+                  <Coin style={{ width: '0.85em', height: '0.85em' }} />
+                </span>
+              )}
             </span>
-            <span className="coin-ledger-row__payment">{paymentMethodLabel(tx.paymentMethod)}</span>
-            {tx.impactsBalance === 0 && (
-              <Rune tone="gold">TC</Rune>
-            )}
             <span className={`coin-ledger-row__amount qb-numeral ${tx.type === 'income' ? 'coin-ledger-row__amount--income' : 'coin-ledger-row__amount--expense'}`}>
               {formatCurrency(
                 tx.type === 'income' ? tx.amount : -tx.amount,
@@ -435,11 +502,11 @@ export default function Transactions() {
               )}
             </span>
             <div className="coin-ledger-row__actions">
-              <button className="rpg-button coin-ledger-row__action-btn"
+              <button className="rpg-button coin-ledger-row__action-btn tap-target"
                 aria-label={t('coinify.editTransaction', 'Editar transacción')}
                 title={t('coinify.editTransaction', 'Editar transacción')}
                 onClick={() => startEdit(tx)}><Pencil style={{ width: '0.8em', height: '0.8em' }} /></button>
-              <button className="rpg-button coin-ledger-row__action-btn"
+              <button className="rpg-button coin-ledger-row__action-btn tap-target"
                 aria-label={t('coinify.deleteTransaction', 'Eliminar transacción')}
                 title={t('coinify.deleteTransaction', 'Eliminar transacción')}
                 onClick={() => handleDelete(tx.id)}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
@@ -453,15 +520,27 @@ export default function Transactions() {
   useEffect(() => {
     if (!showImport) return;
     document.body.style.overflow = 'hidden';
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowImport(false);
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKey);
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [showImport]);
+
+  /**
+   * Closing the importer discards a preview that can take minutes to prepare,
+   * so once there are parsed rows the backdrop and Escape ask first.
+   */
+  const requestCloseImport = useCallback(async () => {
+    if (importDirty) {
+      const ok = await confirm({
+        message: t('coinify.importDiscardConfirm', '¿Descartar la importación? Se perderán las filas ya procesadas.'),
+        danger: true,
+        confirmText: t('coinify.importDiscard', 'Descartar'),
+      });
+      if (!ok) return;
+    }
+    setImportDirty(false);
+    setShowImport(false);
+  }, [importDirty, confirm, t]);
+
+  const importModal = useModalA11y({ onClose: requestCloseImport, active: showImport });
 
   return (
     <div>
@@ -478,9 +557,16 @@ export default function Transactions() {
           <button className="rpg-button coin-month-nav__btn" onClick={() => setShowImport(true)}>
             {t('coinify.import')}
           </button>
-          <button className="rpg-button coin-month-nav__btn"
+          {/* The label stays put and the chevron rotates — the button used to
+              collapse to a bare 0.65em glyph with no text at all. */}
+          <button className="rpg-button coin-month-nav__btn coin-toggle-btn"
+            aria-expanded={showForm}
             onClick={() => setShowForm(!showForm)}>
-            {showForm ? <ChevronUp style={{ width: '0.65em', height: '0.65em' }} /> : `+ ${t('coinify.quickAdd')}`}
+            <ChevronUp
+              className={`coin-toggle-btn__chevron ${showForm ? '' : 'coin-toggle-btn__chevron--collapsed'}`}
+              style={{ width: '0.65em', height: '0.65em' }}
+            />
+            {t('coinify.quickAdd')}
           </button>
         </div>
       </div>
@@ -494,14 +580,16 @@ export default function Transactions() {
       <div style={{ marginBottom: 8 }}>
         <input
           className="rpg-input"
+          type="search"
           placeholder={t('coinify.searchTransactions')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           style={{ width: '100%' }}
         />
       </div>
 
-      {/* Ledger header */}
+      {/* Ledger header — one cell per column the row actually emits, so the
+          sort arrow always sits over the data it sorts. */}
       <div className="coin-ledger-header">
         <button className="coin-sort-header" onClick={() => toggleSort('date')}>
           {t('coinify.colDate', 'DÍA')} {sortIndicator('date')}
@@ -512,37 +600,68 @@ export default function Transactions() {
         <button className="coin-sort-header" onClick={() => toggleSort('category')}>
           {t('coinify.colCategory', 'CATEGORÍA')} {sortIndicator('category')}
         </button>
-        <button className="coin-sort-header" onClick={() => toggleSort('amount')} style={{ textAlign: 'right' }}>
-          {t('coinify.colAmount', 'MONEDAS')} {sortIndicator('amount')}
+        <span className="coin-ledger-header__spacer" aria-hidden="true" />
+        <button className="coin-sort-header coin-sort-header--amount" onClick={() => toggleSort('amount')}>
+          {t('coinify.colAmount', 'MONTO')} {sortIndicator('amount')}
         </button>
+        <span className="coin-ledger-header__spacer" aria-hidden="true" />
       </div>
 
       {/* Transactions Section */}
-      <SectionHeader sectionKey="transactions" title={t('coinify.transactions')} count={filteredNormalTx.length} />
+      <SectionHeader
+        title={t('coinify.transactions')}
+        count={filteredNormalTx.length}
+        collapsed={collapsedSections.has('transactions')}
+        onToggle={() => toggleSection('transactions')}
+      />
       {!collapsedSections.has('transactions') && (
         <>
           {/* Filters */}
           <div className="coin-filters">
-            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rpg-select">
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rpg-select"
+              aria-label={`${t('coinify.expense')} / ${t('coinify.income')}`}>
               <option value="">{t('coinify.expense')} / {t('coinify.income')}</option>
               <option value="expense">{t('coinify.expense')}</option>
               <option value="income">{t('coinify.income')}</option>
             </select>
-            <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="rpg-select">
+            <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="rpg-select"
+              aria-label={t('coinify.paymentMethod')}>
               <option value="">{t('coinify.paymentMethod')}</option>
               <option value="cash">{t('coinify.cash')}</option>
               <option value="debit">{t('coinify.debit')}</option>
               <option value="transfer">{t('coinify.transfer')}</option>
               <option value="credit_card">{t('coinify.creditCard')}</option>
             </select>
+            {/* The category filter used to exist in state and in the empty-state
+                copy, but had no control to set it. */}
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="rpg-select"
+              aria-label={t('coinify.colCategory', 'Categoría')}>
+              <option value="">{t('coinify.allCategories', 'Todas las categorías')}</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {hasAnyFilter && (
+              <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }} onClick={clearFilters}>
+                {t('coinify.clearFilters', 'Limpiar filtros')}
+              </button>
+            )}
           </div>
 
           <div className="coin-ledger">
             {sortedTx.length === 0 ? (
               <div className="coin-empty-codex">
-                <p>{t('coinify.noTransactions', 'Sin transacciones este mes')}</p>
-                {(filterCategory || filterType || filterPayment) && (
-                  <p style={{ fontSize: 'var(--fs-label)', marginTop: 4 }}>{t('coinify.filterActive', 'Hay filtros activos — probá limpiarlos')}</p>
+                {/* "Nothing matched your filters" and "this month is empty" are
+                    different problems and need different answers. */}
+                {hasAnyFilter ? (
+                  <>
+                    <p>{t('coinify.noMatchingTransactions', 'Ningún movimiento coincide con los filtros')}</p>
+                    <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', marginTop: 6 }} onClick={clearFilters}>
+                      {t('coinify.clearFilters', 'Limpiar filtros')}
+                    </button>
+                  </>
+                ) : (
+                  <p>{t('coinify.noTransactions', 'Sin transacciones este mes')}</p>
                 )}
               </div>
             ) : (
@@ -562,7 +681,12 @@ export default function Transactions() {
       )}
 
       {/* Recurring Section */}
-      <SectionHeader sectionKey="recurring" title={t('coinify.recurringLabel')} count={filteredRecurringTx.length} />
+      <SectionHeader
+        title={t('coinify.recurringLabel')}
+        count={filteredRecurringTx.length}
+        collapsed={collapsedSections.has('recurring')}
+        onToggle={() => toggleSection('recurring')}
+      />
       {!collapsedSections.has('recurring') && (
         <div className="coin-ledger">
           {filteredRecurringTx.length === 0 ? (
@@ -580,20 +704,35 @@ export default function Transactions() {
             {t('coinify.showingOf', {
               visible: Math.min(visibleCount, filteredNormalTx.length),
               total: filteredNormalTx.length,
-              defaultValue: `Showing ${Math.min(visibleCount, filteredNormalTx.length)} of ${filteredNormalTx.length} entries`,
+              defaultValue: `Mostrando ${Math.min(visibleCount, filteredNormalTx.length)} de ${filteredNormalTx.length} movimientos`,
             })}
           </span>
         </div>
       )}
 
       {showImport && createPortal(
-        <div className="coin-import-overlay" onClick={() => setShowImport(false)}>
-          <div className="coin-import-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="coin-import-overlay" onClick={requestCloseImport}>
+          <div
+            {...importModal.dialogProps}
+            className="coin-import-modal"
+            aria-label={t('coinify.importTitle', 'Importar Resumen Bancario')}
+            onClick={importModal.stopPropagation}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span className="qb-small-caps" style={{ letterSpacing: '.14em', color: 'var(--rubric)' }}>{t('coinify.import')}</span>
-              <button className="rpg-button" onClick={() => setShowImport(false)} style={{ padding: '2px 8px' }}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
+              <span className="qb-small-caps" style={{ letterSpacing: '.14em', color: 'var(--rubric)' }}>{t('coinify.importTitle', 'Importar Resumen Bancario')}</span>
+              <button className="rpg-button tap-target"
+                aria-label={t('coinify.close', 'Cerrar')}
+                title={t('coinify.close', 'Cerrar')}
+                onClick={requestCloseImport} style={{ padding: '2px 8px' }}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
             </div>
-            <Import />
+            {/* `embedded` suppresses Import's own <h2>: the modal already has a
+                heading, and the two used to stack. */}
+            <Import
+              embedded
+              onDirtyChange={setImportDirty}
+              onDiscard={() => { setImportDirty(false); setShowImport(false); }}
+              onImported={() => { setImportDirty(false); loadTransactions(); }}
+            />
           </div>
         </div>,
         document.body,

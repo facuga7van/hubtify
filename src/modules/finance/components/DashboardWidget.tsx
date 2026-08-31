@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Gauge, Rune } from '../../../shared/components/codex';
 import { AnimatedNumber } from './shared/AnimatedNumber';
-import { currencyPrefix } from '../utils/format';
+import { CategorySelect } from './shared/CategorySelect';
+import { currencyPrefix, formatCurrency } from '../utils/format';
+import { unwrap, failureMessage } from '../utils/api-ext';
 import { useToast } from '../../../shared/components/useToast';
+import { todayDateString } from '../../../../shared/date-utils';
 
 export default function DashboardWidget() {
   const { t } = useTranslation();
@@ -17,6 +20,10 @@ export default function DashboardWidget() {
   const [quickType, setQuickType] = useState<'expense' | 'income'>('expense');
   const [quickAmount, setQuickAmount] = useState('');
   const [quickDesc, setQuickDesc] = useState('');
+  // The shortcut used to hard-code "Otros", quietly wrecking the category
+  // breakdown the dashboard shows two panels away.
+  const [quickCategory, setQuickCategory] = useState('Otros');
+  const [quickPayment, setQuickPayment] = useState<'cash' | 'debit' | 'transfer' | 'credit_card'>('cash');
   const [submitting, setSubmitting] = useState(false);
 
   const loadData = useCallback(() => {
@@ -58,25 +65,31 @@ export default function DashboardWidget() {
     if (!Number.isFinite(amount) || amount <= 0 || submitting) return;
     setSubmitting(true);
     try {
-      await window.api.financeAddTransaction({
+      const result = await unwrap(window.api.financeAddTransaction({
         type: quickType,
         amount,
         description: quickDesc.trim() || (quickType === 'expense' ? t('coinify.quickExpense', 'Gasto rápido') : t('coinify.quickIncome', 'Ingreso rápido')),
-        date: new Date().toISOString().slice(0, 10),
-        category: 'Otros',
+        // Local date, not UTC: everything logged after 21:00 in Argentina used
+        // to be filed under tomorrow.
+        date: todayDateString(),
+        category: quickCategory || 'Otros',
         currency: 'ARS',
-        paymentMethod: 'cash',
+        paymentMethod: quickPayment,
+      }));
+      if (!result.ok) {
+        toast({ type: 'warning', message: failureMessage(result.reason, t) });
+        return;
+      }
+      toast({
+        type: 'coin',
+        message: formatCurrency(quickType === 'expense' ? -amount : amount, { currency: 'ARS', decimals: 2, showSign: true }),
       });
-      toast({ type: 'coin', message: `${quickType === 'expense' ? '-' : '+'}$${amount.toFixed(2)}` });
       // Reset
       setQuickAmount('');
       setQuickDesc('');
       setShowQuickAdd(false);
       loadData();
       window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch (err) {
-      console.warn('[DashboardWidget] quickAdd failed:', err);
-      toast({ type: 'warning', message: t('coinify.quickAddError', 'Error al registrar') });
     } finally {
       setSubmitting(false);
     }
@@ -190,6 +203,23 @@ export default function DashboardWidget() {
             onKeyDown={handleQuickAddKeyDown}
             style={{ width: '100%' }}
           />
+
+          {/* Category + payment method: without them this shortcut filed every
+              entry under "Otros" in cash. */}
+          <div className="coin-dash-quick__meta-row">
+            <CategorySelect value={quickCategory} onChange={setQuickCategory} />
+            <select
+              className="rpg-select"
+              value={quickPayment}
+              aria-label={t('coinify.paymentMethod', 'Medio de pago')}
+              onChange={(e) => setQuickPayment(e.target.value as typeof quickPayment)}
+            >
+              <option value="cash">{t('coinify.cash', 'Efectivo')}</option>
+              <option value="debit">{t('coinify.debit', 'Débito')}</option>
+              <option value="transfer">{t('coinify.transfer', 'Transferencia')}</option>
+              <option value="credit_card">{t('coinify.creditCard', 'Tarjeta de crédito')}</option>
+            </select>
+          </div>
 
           {/* Submit button */}
           <button

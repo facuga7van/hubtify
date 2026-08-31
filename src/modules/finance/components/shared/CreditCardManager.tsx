@@ -3,8 +3,11 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../../shared/components/ConfirmDialog';
 import { useToast } from '../../../../shared/components/useToast';
+import { useModalA11y } from '../../../../shared/hooks/useModalA11y';
+import { CrossMark, Pencil, Checkmark } from '../../../../shared/components/icons';
 import type { CreditCard } from '../../types';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
+import { unwrap, failureMessage } from '../../utils/api-ext';
 
 interface Props {
   cards: CreditCard[];
@@ -22,21 +25,27 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
   const [editName, setEditName] = useState('');
   const [editClosingDay, setEditClosingDay] = useState(1);
 
+  const { dialogProps, stopPropagation } = useModalA11y({ onClose });
+
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    try {
-      await window.api.financeAddCreditCard({ name: newName.trim(), closingDay: newClosingDay });
-      setNewName('');
-      setNewClosingDay(1);
-      onSaved();
-    } catch (err) {
-      console.error('[CreditCardManager] financeAddCreditCard failed:', err);
-      toast({ type: 'warning', message: t('coinify.createError', 'Error al crear') });
+    const result = await unwrap(window.api.financeAddCreditCard({ name: newName.trim(), closingDay: newClosingDay }));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
     }
+    setNewName('');
+    setNewClosingDay(1);
+    onSaved();
   };
 
   const handleDelete = async (id: string) => {
-    const ok = await confirm({ message: t('coinify.confirmDelete'), danger: true, confirmText: t('coinify.delete') });
+    // Spell out the consequence instead of the bare generic "¿Eliminar?".
+    const ok = await confirm({
+      message: t('coinify.deleteCardConfirm', '¿Eliminar esta tarjeta? Los gastos asociados no se verán afectados.'),
+      danger: true,
+      confirmText: t('coinify.delete'),
+    });
     if (!ok) return;
     try {
       await window.api.financeDeleteCreditCard(id);
@@ -55,24 +64,33 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
 
   const handleUpdate = async () => {
     if (!editingId || !editName.trim()) return;
-    try {
-      await window.api.financeUpdateCreditCard(editingId, { name: editName.trim(), closingDay: editClosingDay });
-      setEditingId(null);
-      onSaved();
-    } catch (err) {
-      console.error('[CreditCardManager] financeUpdateCreditCard failed:', err);
-      toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
+    const result = await unwrap(window.api.financeUpdateCreditCard(editingId, { name: editName.trim(), closingDay: editClosingDay }));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
     }
+    setEditingId(null);
+    onSaved();
   };
 
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.7)', zIndex: 9999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onClose}>
-      <div className="rpg-card" style={{ width: 420, maxHeight: '80vh', overflow: 'auto' }}
-        onClick={(e) => e.stopPropagation()}>
-        <div className="rpg-card-title">{t('coinify.manageCreditCards')}</div>
+    <div className="coin-modal-overlay" onClick={onClose}>
+      <div
+        {...dialogProps}
+        className="rpg-card coin-modal coin-modal--narrow"
+        aria-label={t('coinify.manageCreditCards')}
+        onClick={stopPropagation}
+      >
+        <div className="coin-modal__header">
+          <div className="rpg-card-title" style={{ margin: 0 }}>{t('coinify.manageCreditCards')}</div>
+          <button
+            className="rpg-button tap-target"
+            aria-label={t('coinify.close', 'Cerrar')}
+            title={t('coinify.close', 'Cerrar')}
+            onClick={onClose}
+            style={{ padding: '2px 8px' }}
+          ><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
+        </div>
 
         {cards.map((card) => (
           <div key={card.id} style={{
@@ -82,27 +100,37 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
             {editingId === card.id ? (
               <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1 }}>
                 <input className="rpg-input" value={editName}
-                  onChange={(e) => setEditName(e.target.value)} style={{ flex: 1 }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleUpdate()} />
+                  aria-label={t('coinify.cardName')}
+                  onChange={(e) => setEditName(e.target.value)} style={{ flex: 1, minWidth: 0 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleUpdate();
+                    if (e.key === 'Escape') setEditingId(null);
+                  }} />
                 <RpgNumberInput value={String(editClosingDay)}
                   onChange={(v) => setEditClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
                   style={{ width: 70 }} min={1} max={31} step={1} />
-                <button className="rpg-button" onClick={handleUpdate}
-                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)' }}>
-                  {t('common.ok', 'OK')}
+                <button className="rpg-button coin-action-btn coin-action-btn--confirm" onClick={handleUpdate}
+                  aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}>
+                  <Checkmark style={{ width: '0.8em', height: '0.8em' }} />
                 </button>
-                <button className="rpg-button" onClick={() => setEditingId(null)}
-                  style={{ padding: '2px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
-                  {t('coinify.cancel')}
+                <button className="rpg-button coin-action-btn coin-action-btn--cancel" onClick={() => setEditingId(null)}
+                  aria-label={t('coinify.cancel', 'Cancelar')} title={t('coinify.cancel', 'Cancelar')}>
+                  <CrossMark style={{ width: '0.7em', height: '0.7em' }} />
                 </button>
               </div>
             ) : (
               <>
-                <span style={{ flex: 1, fontWeight: 'bold', cursor: 'pointer' }} onClick={() => startEdit(card)}>
+                <span style={{ flex: 1, fontWeight: 'bold', minWidth: 0 }}>
                   {card.name} <span style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>({t('coinify.closingDay')}: {card.closingDay})</span>
                 </span>
-                <button className="rpg-button" onClick={() => handleDelete(card.id)}
-                  style={{ padding: '3px 8px', fontSize: 'var(--fs-label)', opacity: 0.4 }}>
+                {/* Editing used to mean clicking the name — a bare <span> with a
+                    pointer cursor and no other hint that it did anything. */}
+                <button className="rpg-button coin-action-btn coin-action-btn--muted" onClick={() => startEdit(card)}
+                  aria-label={t('coinify.editCard', 'Editar tarjeta')}
+                  title={t('coinify.editCard', 'Editar tarjeta')}>
+                  <Pencil style={{ width: '0.75em', height: '0.75em' }} />
+                </button>
+                <button className="rpg-button coin-manager__delete" onClick={() => handleDelete(card.id)}>
                   {t('coinify.delete')}
                 </button>
               </>
@@ -112,7 +140,8 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
           <input className="rpg-input" placeholder={t('coinify.cardName')} value={newName}
-            onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }}
+            aria-label={t('coinify.cardName')}
+            onChange={(e) => setNewName(e.target.value)} style={{ flex: 1, minWidth: 0 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <RpgNumberInput value={String(newClosingDay)}
             onChange={(v) => setNewClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}

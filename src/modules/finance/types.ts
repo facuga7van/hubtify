@@ -96,10 +96,14 @@ export interface CreditCardStatement {
   creditCardName?: string;
   periodMonth: string;
   calculatedAmount: number;
+  /** USD side of the statement (cards can bill both currencies in one period). */
+  calculatedAmountUsd?: number;
   paidAmount: number | null;
+  paidAmountUsd?: number | null;
   status: 'pending' | 'paid';
   paidDate: string | null;
   transactionId: string | null;
+  transactionIdUsd?: string | null;
   createdAt: string;
 }
 

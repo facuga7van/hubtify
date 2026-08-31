@@ -1,20 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import type { ParsedRow } from '../../../../shared/types';
 import { CATEGORIES } from '../types';
 import { ChevronDown, ChevronRight } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
+import {
+  getImportBatches,
+  undoImportBatch,
+  hasImportBatchSupport,
+  type ImportBatch,
+} from '../utils/api-ext';
 
 interface RowState extends ParsedRow {
   included: boolean;
   category: string;
 }
 
-export default function Import() {
-  const { t } = useTranslation();
+interface ImportProps {
+  /** Rendered inside a modal that already has a heading — suppresses our own. */
+  embedded?: boolean;
+  /** Fires whenever there is (or is no longer) unsaved parsed work. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** "Discard" pressed with nothing left to keep. */
+  onDiscard?: () => void;
+  /** A batch was confirmed — the host can reload its own data. */
+  onImported?: (count: number) => void;
+}
+
+export default function Import({ embedded, onDirtyChange, onDiscard, onImported }: ImportProps = {}) {
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -30,30 +49,47 @@ export default function Import() {
   const [showSeal, setShowSeal] = useState(false);
   const [skippedLines, setSkippedLines] = useState<string[]>([]);
   const [skippedExpanded, setSkippedExpanded] = useState(false);
+  const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [batchesExpanded, setBatchesExpanded] = useState(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
 
-  // Reset all state when account is switched
-  useEffect(() => {
-    const handler = () => {
-      setFileName('');
-      setRows([]);
-      setSkippedLines([]);
-      setSkippedExpanded(false);
-      setParseError('');
-      setImportError('');
-      setSuccessCount(null);
-      setShowSeal(false);
-      setParsing(false);
-      setImporting(false);
-    };
-    window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
-  }, []);
+  const batchSupport = hasImportBatchSupport();
 
-  const handleSelectFile = async () => {
+  const resetPreview = useCallback(() => {
+    setFileName('');
     setRows([]);
     setSkippedLines([]);
     setSkippedExpanded(false);
     setParseError('');
+    setImportError('');
+  }, []);
+
+  const loadBatches = useCallback(() => {
+    if (!batchSupport) return;
+    getImportBatches().then((data) => setBatches(data ?? []));
+  }, [batchSupport]);
+
+  useEffect(() => { loadBatches(); }, [loadBatches]);
+
+  // Parsed-but-unconfirmed rows are minutes of work: let the host warn before closing.
+  useEffect(() => { onDirtyChange?.(rows.length > 0); }, [rows.length, onDirtyChange]);
+
+  // Reset all state when account is switched
+  useEffect(() => {
+    const handler = () => {
+      resetPreview();
+      setSuccessCount(null);
+      setShowSeal(false);
+      setParsing(false);
+      setImporting(false);
+      loadBatches();
+    };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [resetPreview, loadBatches]);
+
+  const handleSelectFile = async () => {
+    resetPreview();
     setSuccessCount(null);
     setShowSeal(false);
 
@@ -93,6 +129,34 @@ export default function Import() {
     );
   };
 
+  const includedCount = rows.filter((r) => r.included).length;
+  const allIncluded = rows.length > 0 && includedCount === rows.length;
+
+  /** One control for "todas / ninguna" — 200 checkboxes was the only option before. */
+  const toggleAll = () => {
+    const next = !allIncluded;
+    setRows((prev) => prev.map((r) => ({ ...r, included: next })));
+  };
+
+  /** The currency column is noise when the whole statement is in pesos. */
+  const showCurrencyColumn = useMemo(
+    () => rows.some((r) => r.amountUSD != null),
+    [rows],
+  );
+
+  const handleDiscard = async () => {
+    if (rows.length > 0) {
+      const ok = await confirm({
+        message: t('coinify.importDiscardConfirm', '¿Descartar la importación? Se perderán las filas ya procesadas.'),
+        danger: true,
+        confirmText: t('coinify.importDiscard', 'Descartar'),
+      });
+      if (!ok) return;
+    }
+    resetPreview();
+    onDiscard?.();
+  };
+
   const handleConfirm = async () => {
     const toImport: ParsedRow[] = rows
       .filter((r) => r.included)
@@ -108,6 +172,8 @@ export default function Import() {
       setRows([]);
       setFileName('');
       setSkippedLines([]);
+      loadBatches();
+      onImported?.(result.count);
 
       // Seal animation + toast
       setShowSeal(true);
@@ -125,9 +191,34 @@ export default function Import() {
     }
   };
 
+  /** Reverts a confirmed import — soft-deletes every row of that batch. */
+  const handleUndoBatch = async (batch: ImportBatch) => {
+    const ok = await confirm({
+      message: t('coinify.importUndoConfirm', '¿Revertir esta importación? Se eliminarán {{count}} movimientos.', { count: batch.liveCount }),
+      danger: true,
+      confirmText: t('coinify.importUndo', 'Revertir'),
+    });
+    if (!ok) return;
+
+    setUndoingId(batch.id);
+    try {
+      const res = await undoImportBatch(batch.id);
+      if (!res || res.ok === false) {
+        toast({ type: 'warning', message: t('coinify.importUndoError', 'No se pudo revertir la importación') });
+        return;
+      }
+      toast({ type: 'coin', message: t('coinify.importUndone', '{{count}} movimientos revertidos', { count: res.deleted }) });
+      loadBatches();
+      onImported?.(0);
+      window.dispatchEvent(new Event('finance:dataChanged'));
+    } finally {
+      setUndoingId(null);
+    }
+  };
+
   const formatRowAmount = (row: RowState) => {
     if (row.amountUSD != null) return formatCurrency(row.amountUSD, { currency: 'USD' });
-    if (row.amountARS != null) return formatCurrency(row.amountARS);
+    if (row.amountARS != null) return formatCurrency(row.amountARS, { currency: 'ARS' });
     return '-';
   };
 
@@ -144,14 +235,20 @@ export default function Import() {
     return '-';
   };
 
-  const includedCount = rows.filter((r) => r.included).length;
+  const formatBatchDate = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'es-AR');
+  };
 
   return (
     <div style={{ position: 'relative' }}>
-      <HelpBubble text={t('coinify.importHelp', 'Importá el PDF de tu resumen de tarjeta. El sistema extrae movimientos y sugiere categorías.')} />
-      <h2 style={{ color: 'var(--leather)', fontSize: 'var(--fs-nav)', fontFamily: "'UnifrakturCook', cursive", margin: 0, marginBottom: 16 }}>
-        {t('coinify.importTitle')}
-      </h2>
+      <HelpBubble variant="inline" className="coin-import-help" text={t('coinify.importHelp', 'Importá el PDF de tu resumen de tarjeta. El sistema extrae movimientos y sugiere categorías.')} />
+      {!embedded && (
+        <h2 style={{ color: 'var(--leather)', fontSize: 'var(--fs-nav)', fontFamily: "'UnifrakturCook', cursive", margin: 0, marginBottom: 16 }}>
+          {t('coinify.importTitle')}
+        </h2>
+      )}
 
       {/* File picker — styled drop zone */}
       <div className="coin-import-drop">
@@ -182,12 +279,25 @@ export default function Import() {
             <table className="coin-import-table">
               <thead>
                 <tr>
-                  <th>{t('coinify.importColInclude')}</th>
+                  <th>
+                    <label className="coin-import-table__all">
+                      <input
+                        type="checkbox"
+                        checked={allIncluded}
+                        // Partially selected reads as neither on nor off.
+                        ref={(el) => { if (el) el.indeterminate = includedCount > 0 && !allIncluded; }}
+                        onChange={toggleAll}
+                        aria-label={t('coinify.importToggleAll', 'Marcar todo / ninguno')}
+                        title={t('coinify.importToggleAll', 'Marcar todo / ninguno')}
+                      />
+                      <span>{t('coinify.importColInclude')}</span>
+                    </label>
+                  </th>
                   <th>{t('coinify.importColDate')}</th>
                   <th>{t('coinify.importColMerchant')}</th>
                   <th>{t('coinify.importColInstallment')}</th>
                   <th>{t('coinify.importColAmount')}</th>
-                  <th>{t('coinify.importColCurrency')}</th>
+                  {showCurrencyColumn && <th>{t('coinify.importColCurrency')}</th>}
                   <th>{t('coinify.importColCategory')}</th>
                 </tr>
               </thead>
@@ -198,7 +308,8 @@ export default function Import() {
                     className={`coin-import-row ${!row.included ? 'coin-import-row--excluded' : ''}`}
                   >
                     <td>
-                      <input type="checkbox" checked={row.included} onChange={() => toggleRow(idx)} />
+                      <input type="checkbox" checked={row.included} onChange={() => toggleRow(idx)}
+                        aria-label={`${t('coinify.importColInclude')}: ${row.merchant}`} />
                     </td>
                     <td style={{ whiteSpace: 'nowrap', opacity: 0.7 }}>{row.date}</td>
                     <td className="coin-import-row__merchant" title={row.merchant}>
@@ -206,7 +317,7 @@ export default function Import() {
                     </td>
                     <td className="coin-import-row__installment">{formatInstallment(row)}</td>
                     <td className="coin-import-row__amount">{formatRowAmount(row)}</td>
-                    <td className="coin-import-row__currency">{formatRowCurrency(row)}</td>
+                    {showCurrencyColumn && <td className="coin-import-row__currency">{formatRowCurrency(row)}</td>}
                     <td>
                       <select
                         value={row.category}
@@ -214,6 +325,7 @@ export default function Import() {
                         className="rpg-select"
                         style={{ fontSize: 'var(--fs-label)' }}
                         disabled={!row.included}
+                        aria-label={`${t('coinify.importColCategory')}: ${row.merchant}`}
                       >
                         {CATEGORIES.map((cat) => (
                           <option key={cat} value={cat}>{cat}</option>
@@ -279,8 +391,9 @@ export default function Import() {
           {/* Month selector + confirm */}
           <div className="coin-import-confirm-row">
             <div className="coin-import-confirm-row__month">
-              <label className="coin-import-confirm-row__month-label">{t('coinify.importStatementMonth')}</label>
+              <label className="coin-import-confirm-row__month-label" htmlFor="coin-import-month">{t('coinify.importStatementMonth')}</label>
               <input
+                id="coin-import-month"
                 type="month"
                 value={statementMonth}
                 onChange={(e) => setStatementMonth(e.target.value)}
@@ -302,6 +415,10 @@ export default function Import() {
                 </span>
               )}
             </button>
+            {/* There was no way out of the importer other than closing the whole modal. */}
+            <button className="rpg-button coin-import-discard" onClick={handleDiscard} disabled={importing}>
+              {t('coinify.importDiscard', 'Descartar')}
+            </button>
           </div>
 
           {importError && (
@@ -317,6 +434,45 @@ export default function Import() {
             <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
           </svg>
           {t('coinify.importSuccess', { count: successCount })}
+        </div>
+      )}
+
+      {/* Previous imports — undo a batch that already landed. */}
+      {batchSupport && batches.length > 0 && (
+        <div className="coin-import-batches">
+          <button
+            type="button"
+            className="coin-import-batches__toggle"
+            aria-expanded={batchesExpanded}
+            onClick={() => setBatchesExpanded((v) => !v)}
+          >
+            {batchesExpanded ? <ChevronDown style={{ width: '0.7em', height: '0.7em' }} /> : <ChevronRight style={{ width: '0.7em', height: '0.7em' }} />}
+            {' '}{t('coinify.importPreviousBatches', 'Importaciones anteriores')} ({batches.length})
+          </button>
+          {batchesExpanded && (
+            <ul className="coin-import-batches__list">
+              {batches.map((batch) => (
+                <li key={batch.id} className="coin-import-batches__row">
+                  <span className="coin-import-batches__name" title={batch.filename ?? batch.source}>
+                    {batch.filename || batch.source}
+                  </span>
+                  <span className="coin-import-batches__meta">
+                    {formatBatchDate(batch.createdAt)}
+                    {' · '}
+                    {t('coinify.importBatchRows', '{{live}} de {{total}} vigentes', { live: batch.liveCount, total: batch.rowCount })}
+                  </span>
+                  <button
+                    className="rpg-button"
+                    style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
+                    disabled={batch.liveCount === 0 || undoingId === batch.id}
+                    onClick={() => handleUndoBatch(batch)}
+                  >
+                    {t('coinify.importUndo', 'Revertir')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

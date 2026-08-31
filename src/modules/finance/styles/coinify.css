@@ -58,15 +58,46 @@
   padding-right: 40px;
 }
 
-/* ── Tab Navigation (codex styled, inside BookPage) ── */
+/* ── Tab Navigation (codex styled, inside BookPage) ──
+   Six nowrap tabs at .14em tracking need ~600px; the module gets ~360px of
+   content width at the 700px window minimum. The nav scrolls itself instead of
+   overflowing and dragging a horizontal scrollbar onto the whole page. The
+   wrapper paints a fading edge so it is visible that there is more to reach. */
+
+.coin-tab-nav-wrap {
+  position: relative;
+  margin-bottom: 10px;
+  z-index: 3;
+}
+
+.coin-tab-nav-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 2px;
+  width: 24px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(245, 231, 192, 0), rgba(232, 213, 163, 0.85));
+}
 
 .coin-tab-nav {
   display: flex;
   gap: 0;
-  margin-bottom: 10px;
   border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
   position: relative;
-  z-index: 3;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.coin-tab-nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+.coin-tab-nav::-webkit-scrollbar-thumb {
+  background: rgba(74, 55, 32, 0.35);
 }
 
 .coin-tab-link {
@@ -80,6 +111,9 @@
   border-bottom: none;
   transition: all 0.15s ease;
   white-space: nowrap;
+  /* Flex items default to min-width:auto and refuse to shrink; without this
+     they force the nav past its container instead of scrolling inside it. */
+  flex-shrink: 0;
 }
 
 .coin-tab-link:hover {
@@ -261,6 +295,37 @@
 .coin-summary-card__value--sage { color: var(--moss); }
 .coin-summary-card__value--rubric { color: var(--rubric); }
 
+/* Both summary cards are columns with the gauge pinned to the bottom, so the
+   reconciliation line under the expense figure cannot push its bar out of
+   alignment with the income card's. */
+.coin-summary-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.coin-summary-card__note {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+
+.coin-summary-card .qb-gauge {
+  margin-top: auto;
+}
+
+.coin-as-of {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  opacity: 0.7;
+}
+
+.coin-section-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ── Middle Grid ── */
 
 .coin-middle-grid {
@@ -277,11 +342,20 @@
 
 .coin-category-legend__row {
   display: grid;
-  grid-template-columns: 10px 1fr 60px 38px;
+  /* The amount column was a fixed 60px for numbers that need ~80, so the figure
+     spilled into the percentage beside it. */
+  grid-template-columns: 10px minmax(0, 1fr) minmax(80px, auto) 42px;
   gap: 6px;
   align-items: center;
   font-size: var(--fs-label);
   padding: 2px 0;
+}
+
+.coin-category-legend__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .coin-category-legend__swatch {
@@ -331,16 +405,26 @@
   background: rgba(122, 30, 30, 0.1);
 }
 
+/* A real button now, and legible at rest: as a 0.5-opacity <div onClick> it was
+   neither visible nor reachable by keyboard. */
 .coin-loan-mini__link {
+  display: block;
   margin-top: 8px;
+  margin-left: auto;
   cursor: pointer;
   text-align: right;
-  opacity: 0.5;
+  opacity: 0.85;
   transition: opacity 0.15s;
 }
 
-.coin-loan-mini__link:hover {
+.coin-loan-mini__link:hover,
+.coin-loan-mini__link:focus-visible {
   opacity: 1;
+}
+
+.coin-loan-mini__usd {
+  font-size: var(--fs-label);
+  opacity: 0.75;
 }
 
 /* ── Projection Labels ── */
@@ -370,15 +454,32 @@
 
 /* ── Ledger (Transactions table) ── */
 
-.coin-ledger-header {
+/* ── Ledger grid ──
+   Header and row share ONE column definition, and the row emits exactly one
+   child per column. Previously both declared four columns while the row emitted
+   seven or eight cells: the overflow wrapped onto an implicit second row, the
+   amount landed under "CONCEPTO", and the conditional card chip shifted it one
+   column further on any card purchase — so sorting by amount pointed its arrow
+   at a column with no amounts in it. */
+.coin-ledger-header,
+.coin-ledger-row {
   display: grid;
-  grid-template-columns: 60px 1fr 120px 90px;
+  grid-template-columns: 44px minmax(0, 1fr) 110px 96px 104px 68px;
+  gap: 6px;
+}
+
+.coin-ledger-header {
   padding: 6px 2px;
   border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.14em;
   color: var(--rubric);
+}
+
+/* Columns that carry no title still need a cell, or the grid shifts. */
+.coin-ledger-header__spacer {
+  display: block;
 }
 
 button.coin-sort-header {
@@ -389,16 +490,17 @@ button.coin-sort-header {
   cursor: pointer;
   padding: 0;
   user-select: none;
+  text-align: left;
   transition: color 0.15s;
 }
 button.coin-sort-header:hover {
   color: var(--gold);
 }
-button.coin-sort-header:focus-visible {
-  outline: 2px solid var(--rpg-gold);
-  outline-offset: 2px;
-  border-radius: 2px;
+button.coin-sort-header--amount {
+  text-align: right;
 }
+/* Focus ring comes from the global `button:focus-visible` rule in
+   components.css — no module-local override needed. */
 
 .coin-sort-arrow {
   font-size: 0.65em;
@@ -414,13 +516,11 @@ button.coin-sort-header:focus-visible {
 }
 
 .coin-ledger-row {
-  display: grid;
-  grid-template-columns: 60px 1fr 120px 90px;
   align-items: center;
   padding: 7px 2px;
   border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
   font-size: calc(12.5px * var(--font-scale));
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .coin-ledger-row:last-child {
@@ -429,7 +529,10 @@ button.coin-sort-header:focus-visible {
 
 .coin-ledger-row--income { background: rgba(76, 110, 60, 0.08); }
 
+/* The edit form is a single child; leaving the row as a grid dropped it into
+   the 44px day track and crushed every input inside it. */
 .coin-ledger-row--editing {
+  display: block;
   animation: coinPulseGold 1.5s ease infinite;
   border: 1px solid var(--gold);
   padding: 8px;
@@ -461,24 +564,47 @@ button.coin-sort-header:focus-visible {
 }
 
 .coin-ledger-row__cat {
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Origin icon + payment method + card marker share one grid cell. */
+.coin-ledger-row__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .coin-ledger-row__source {
   display: inline-flex;
   align-items: center;
-  opacity: 0.4;
+  opacity: 0.55;
+  flex-shrink: 0;
 }
 
 .coin-ledger-row__payment {
   font-size: var(--fs-label);
-  opacity: 0.4;
+  opacity: 0.6;
   font-family: 'IM Fell English SC', serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Replaces a bare "TC" chip that explained nothing. */
+.coin-ledger-row__card-flag {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gold);
+  flex-shrink: 0;
 }
 
 .coin-ledger-row__amount {
   text-align: right;
   font-size: var(--fs-label);
+  white-space: nowrap;
 }
 
 .coin-ledger-row__amount--income { color: var(--moss); }
@@ -486,26 +612,79 @@ button.coin-sort-header:focus-visible {
 
 .coin-ledger-row__actions {
   display: flex;
-  gap: 4px;
-  flex-shrink: 0;
+  gap: 2px;
+  justify-content: flex-end;
 }
 
+/* Was 0.3 — edit and delete only appeared once the pointer was already over
+   them, so correcting a spending entry meant hunting blind every single day. */
 .coin-ledger-row__action-btn {
-  opacity: 0.3;
+  opacity: 0.6;
   font-size: var(--fs-label);
-  padding: 2px 6px;
+  padding: 2px 4px;
   transition: opacity 0.15s;
 }
 
-.coin-ledger-row__action-btn:hover {
+.coin-ledger-row__action-btn:hover,
+.coin-ledger-row__action-btn:focus-visible {
   opacity: 1;
 }
 
 .coin-ledger-row__edit {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   width: 100%;
+}
+
+/* ── Editable amount affordance ──
+   A transparent borderless button reads as static text; the dotted underline
+   plus a pencil on hover says "this is a control". */
+.coin-editable-amount {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.55);
+  padding: 1px 2px;
+}
+
+.coin-editable-amount:hover,
+.coin-editable-amount:focus-visible {
+  border-bottom-color: var(--gold);
+}
+
+.coin-editable-amount__pencil {
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.coin-editable-amount:hover .coin-editable-amount__pencil,
+.coin-editable-amount:focus-visible .coin-editable-amount__pencil {
+  opacity: 0.7;
+}
+
+/* ── Collapsible section toggle (keeps its label, rotates its chevron) ── */
+.coin-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.coin-toggle-btn__chevron {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.coin-toggle-btn__chevron--collapsed {
+  transform: rotate(180deg);
 }
 
 .coin-ledger-section-header {
@@ -617,9 +796,9 @@ button.coin-sort-header:focus-visible {
 .coin-quick-add-form__toggle {
   background: none;
   border: none;
-  color: var(--ink-faded, #8a7a5a);
+  color: var(--ink-faded);
   font-family: 'Cormorant Garamond', serif;
-  font-size: var(--fs-label, 13px);
+  font-size: var(--fs-label);
   cursor: pointer;
   padding: 4px 0;
   margin-bottom: 8px;
@@ -627,7 +806,7 @@ button.coin-sort-header:focus-visible {
 }
 
 .coin-quick-add-form__toggle:hover {
-  color: var(--gold, #a88a3c);
+  color: var(--gold);
 }
 
 .coin-quick-add-form__advanced {
@@ -675,6 +854,54 @@ button.coin-sort-header:focus-visible {
 
 .coin-filters .rpg-select {
   font-size: var(--fs-label);
+}
+
+/* ── Shared modal shell ──
+   StatementDetail, CategoryManager and CreditCardManager all used to inline
+   the same overlay styles and offered no exit but a backdrop click. */
+
+.coin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 24, 16, 0.7);
+  z-index: var(--z-modal, 9999);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.coin-modal {
+  width: 520px;
+  max-width: 100%;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.coin-modal--narrow {
+  width: 420px;
+}
+
+.coin-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Destructive action, legible at rest — was opacity 0.4. */
+.coin-manager__delete {
+  padding: 3px 8px;
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.coin-manager__delete:hover,
+.coin-manager__delete:focus-visible {
+  opacity: 1;
 }
 
 /* ── Import Overlay ─────────────────────────────────────────── */
@@ -761,8 +988,10 @@ button.coin-sort-header:focus-visible {
   background: rgba(232, 213, 163, 0.3);
 }
 
+/* Was 0.3: an excluded row has to stay readable, because re-including it means
+   reading it first. */
 .coin-import-row--excluded {
-  opacity: 0.3;
+  opacity: 0.6;
   text-decoration: line-through;
 }
 
@@ -838,6 +1067,72 @@ button.coin-sort-header:focus-visible {
   gap: 8px;
   border: 1px solid rgba(85, 107, 60, 0.4);
   background: rgba(85, 107, 60, 0.1);
+}
+
+.coin-import-help {
+  float: right;
+  margin-left: 8px;
+}
+
+.coin-import-table__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.coin-import-discard {
+  font-size: var(--fs-label);
+  padding: 4px 12px;
+  color: var(--rubric);
+}
+
+/* ── Previous import batches (undo) ── */
+
+.coin-import-batches {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px dotted rgba(74, 55, 32, 0.4);
+}
+
+.coin-import-batches__toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  color: var(--rubric);
+}
+
+.coin-import-batches__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.coin-import-batches__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.3);
+  font-size: var(--fs-label);
+}
+
+.coin-import-batches__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.coin-import-batches__meta {
+  opacity: 0.6;
+  white-space: nowrap;
 }
 
 /* ── Month Navigator ─────────────────────────────────────────── */
@@ -918,18 +1213,34 @@ button.coin-sort-header:focus-visible {
   color: var(--rubric);
   min-width: 70px;
   text-align: right;
+  /* It is an inline-flex button now (see `.coin-editable-amount`), so the
+     alignment has to be a flex property, not text-align. */
+  justify-content: flex-end;
 }
 
 .coin-installment-row--complete .coin-installment-row__amount {
   color: var(--moss);
 }
 
+.coin-installment-summary__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: var(--fs-label);
+}
+
+.coin-installment-summary__title {
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.14em;
+  color: var(--rubric);
+}
+
 .coin-installment-summary {
-  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
-  margin: 16px 0;
+  margin: 8px 0 16px;
 }
 
 /* ── Loans ──────────────────────────────────────────────────── */
@@ -1000,8 +1311,12 @@ button.coin-sort-header:focus-visible {
   flex-shrink: 0;
 }
 
+/* Grid, not flex: "Pago único" rows and "Cuotas" rows carry different middle
+   content, so under flex the amounts drifted out of line with each other inside
+   a single person's card. */
 .coin-loan-card__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 90px 100px 110px;
   align-items: center;
   gap: 8px;
   padding: 6px 0;
@@ -1013,14 +1328,38 @@ button.coin-sort-header:focus-visible {
 }
 
 .coin-loan-card__row .qb-gauge {
-  width: 60px;
+  width: 100%;
+}
+
+.coin-loan-card__desc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coin-loan-card__date {
+  margin-left: 6px;
+  font-size: var(--fs-label);
+  opacity: 0.55;
+}
+
+.coin-loan-card__progress {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .coin-loan-card__amount {
   font-size: var(--fs-label);
   color: var(--gold);
-  min-width: 80px;
   text-align: right;
+  white-space: nowrap;
+}
+
+.coin-loan-card__action {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .coin-loan-card__settled {
@@ -1120,12 +1459,10 @@ button.coin-sort-header:focus-visible {
   white-space: nowrap;
 }
 
+/* Sizing / colour only — the affordance (dotted underline + pencil) comes from
+   `.coin-editable-amount`, and a `border: none` here would erase it. */
 .coin-recurring-card__amount-btn {
   font-size: var(--fs-label);
-  padding: 2px 8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
   color: var(--ink);
 }
 
@@ -1221,7 +1558,7 @@ button.coin-sort-header:focus-visible {
 }
 
 .coin-dash-quick__toggle:hover {
-  color: var(--gold, #a88a3c);
+  color: var(--gold);
 }
 
 .coin-dash-quick {
@@ -1251,15 +1588,27 @@ button.coin-sort-header:focus-visible {
 .coin-dash-quick__type-btn--active-expense {
   opacity: 1;
   background: rgba(163, 72, 72, 0.18);
-  border-color: var(--rubric, #a34848);
-  color: var(--rubric, #a34848);
+  border-color: var(--rubric);
+  color: var(--rubric);
 }
 
 .coin-dash-quick__type-btn--active-income {
   opacity: 1;
   background: rgba(86, 124, 72, 0.18);
-  border-color: var(--moss, #567c48);
-  color: var(--moss, #567c48);
+  border-color: var(--moss);
+  color: var(--moss);
+}
+
+.coin-dash-quick__meta-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.coin-dash-quick__meta-row .rpg-select {
+  font-size: var(--fs-label);
+  padding: 4px 6px;
+  max-width: 45%;
 }
 
 .coin-dash-quick .rpg-input {
@@ -1386,9 +1735,17 @@ button.coin-sort-header:focus-visible {
   background: var(--parch-2);
 }
 
-/* ── Responsive: Narrow mode ─────���──────────────────────────── */
+/* ── Responsive ──
+   These thresholds are viewport widths, but what matters is the module's own
+   content width, and the two differ by a lot: the window cannot go below 700px
+   (electron/main.ts `minWidth`), where the sidebar takes 220px and the page
+   padding another 120px, leaving ~360px of content. The old 500px and 480px
+   breakpoints were therefore dead code — and they held exactly the rules that
+   would have rescued the narrow layout. Re-anchored:
+     viewport  980px -> ~600px content   (stack the multi-column grids)
+     viewport  780px -> ~440px content   (drop to the compact ledger) */
 
-@media (max-width: 700px) {
+@media (max-width: 980px) {
   .coin-top-grid {
     grid-template-columns: 1fr;
   }
@@ -1397,22 +1754,8 @@ button.coin-sort-header:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .coin-installment-summary {
-    grid-template-columns: 1fr;
-  }
-
   .coin-loan-mini-grid {
     grid-template-columns: 1fr;
-  }
-
-  .coin-tab-nav {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .coin-tab-nav::-webkit-scrollbar {
-    display: none;
   }
 
   .coin-chest-panel {
@@ -1426,9 +1769,18 @@ button.coin-sort-header:focus-visible {
   .coin-chest-panel__amount {
     font-size: 26px;
   }
+
+  .coin-loan-card__row {
+    grid-template-columns: auto minmax(0, 1fr) 90px 100px;
+    row-gap: 4px;
+  }
+
+  .coin-loan-card__action {
+    grid-column: 1 / -1;
+  }
 }
 
-@media (max-width: 500px) {
+@media (max-width: 780px) {
   .coin-book .qb-page {
     padding-left: 50px;
     padding-right: 20px;
@@ -1450,18 +1802,16 @@ button.coin-sort-header:focus-visible {
     width: 100%;
   }
 
-  .coin-ledger-row__source,
-  .coin-ledger-row__payment {
+  /* Origin + payment method go first when space runs out; the amount never does. */
+  .coin-ledger-row__meta,
+  .coin-ledger-header__spacer:first-of-type {
     display: none;
-  }
-
-  .coin-ledger-row__edit {
-    flex-wrap: wrap;
   }
 
   .coin-ledger-header,
   .coin-ledger-row {
-    grid-template-columns: 40px 1fr 70px;
+    /* The action column keeps room for two 32px tap targets. */
+    grid-template-columns: 28px minmax(0, 1fr) 76px 88px 68px;
   }
 
   .coin-recurring-card__main {
@@ -1486,6 +1836,7 @@ button.coin-sort-header:focus-visible {
 
   .coin-import-confirm-row {
     flex-direction: column;
+    align-items: stretch;
     gap: 8px;
   }
 
@@ -1494,9 +1845,15 @@ button.coin-sort-header:focus-visible {
     padding: 8px 0;
   }
 
-  .coin-loan-card__row {
-    flex-wrap: wrap;
-    gap: 6px;
+  .coin-comparison-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+  }
+
+  .coin-comparison-toggle .coin-comparison-toggle__btn {
+    width: 100%;
   }
 }
 
@@ -1519,27 +1876,12 @@ button.coin-sort-header:focus-visible {
   margin-top: 8px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .coin-comparison-grid {
     grid-template-columns: 1fr;
   }
-
-  .coin-middle-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .coin-comparison-toggle {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: stretch;
-  }
-
-  .coin-comparison-toggle .coin-comparison-toggle__btn {
-    width: 100%;
-  }
+  /* `.coin-middle-grid` is already a single 1fr column at every width — the
+     override here was a no-op and is gone. */
 }
 
 /* ── DollarChip menu ── */

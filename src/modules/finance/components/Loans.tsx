@@ -7,9 +7,11 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { LoanDirection, LoanType, Currency } from '../types';
 import { loanPaidOff } from '../../../shared/animations/epic';
 import { CategorySelect } from './shared/CategorySelect';
-import { Section, Gauge, Rune } from '../../../shared/components/codex/CodexPrimitives';
+import { Gauge, Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { Checkmark, ChevronUp } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
+import { unwrap, failureMessage } from '../utils/api-ext';
+import { todayDateString } from '../../../../shared/date-utils';
 
 interface LoanRow {
   id: string;
@@ -45,7 +47,9 @@ export default function Loans() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const today = new Date().toISOString().split('T')[0];
+  // Local date, not UTC: `toISOString()` rolled anything logged after 21:00 in
+  // Argentina into the next day.
+  const today = todayDateString();
 
   const [direction, setDirection] = useState<LoanDirection>('lent');
   const [activeLoans, setActiveLoans] = useState<LoanRow[]>([]);
@@ -71,9 +75,29 @@ export default function Loans() {
   const [formDate, setFormDate] = useState(today);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadLoans = useCallback(() => {
-    window.api.financeGetLoans({ direction, settled: false }).then((rows) => setActiveLoans(rows as LoanRow[]));
-    window.api.financeGetLoans({ direction, settled: true }).then((rows) => setSettledLoans(rows as LoanRow[]));
+  const loadLoans = useCallback(async () => {
+    const [active, settled] = await Promise.all([
+      window.api.financeGetLoans({ direction, settled: false }) as Promise<LoanRow[]>,
+      window.api.financeGetLoans({ direction, settled: true }) as Promise<LoanRow[]>,
+    ]);
+    setActiveLoans(active);
+    setSettledLoans(settled);
+
+    // Partial payments were fetched but never rendered — you could not tell a
+    // loan half repaid from one untouched. Load them up front for active loans
+    // so every row can show what is actually left.
+    const singles = active.filter((l) => !l.installmentGroupId);
+    const entries = await Promise.all(
+      singles.map(async (loan) => {
+        try {
+          const rows = await window.api.financeGetLoanPayments(loan.id);
+          return [loan.id, rows as LoanPaymentRow[]] as const;
+        } catch {
+          return [loan.id, [] as LoanPaymentRow[]] as const;
+        }
+      }),
+    );
+    setPayments((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
   }, [direction]);
 
   useEffect(() => { loadLoans(); }, [loadLoans]);
@@ -103,8 +127,10 @@ export default function Loans() {
 
     setSubmitting(true);
     try {
-      if (formType === 'installments') {
-        await window.api.financeCreateThirdPartyPurchase({
+      // Both handlers now reject bad input with `{ ok: false, reason }` rather
+      // than throwing, so a silent no-op would otherwise look like a save.
+      const result = formType === 'installments'
+        ? await unwrap(window.api.financeCreateThirdPartyPurchase({
           description: formDescription || formCategory,
           installmentCount: formInstallments,
           installmentAmount: parsed,
@@ -113,9 +139,8 @@ export default function Loans() {
           startDate: formDate,
           personName: formPerson.trim(),
           direction: formDirection,
-        });
-      } else {
-        await window.api.financeAddLoan({
+        }))
+        : await unwrap(window.api.financeAddLoan({
           personName: formPerson.trim(),
           direction: formDirection,
           type: 'single',
@@ -123,16 +148,17 @@ export default function Loans() {
           currency: formCurrency,
           date: formDate,
           description: formDescription,
-        });
+        }));
+
+      if (!result.ok) {
+        toast({ message: failureMessage(result.reason, t), type: 'warning' });
+        return;
       }
 
       setFormPerson(''); setFormAmount(''); setFormDescription('');
       setFormInstallments(1); setShowForm(false);
       loadLoans();
       window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch (err) {
-      console.error('[Loans] handleAddLoan failed:', err);
-      toast({ message: t('coinify.saveError', 'Error al guardar'), type: 'warning' });
     } finally {
       setSubmitting(false);
     }
@@ -176,18 +202,20 @@ export default function Loans() {
 
   const handleAddPayment = async (loanId: string) => {
     const parsed = parseFloat(paymentAmount);
-    if (isNaN(parsed) || parsed <= 0) return;
-    try {
-      await window.api.financeAddLoanPayment(loanId, { amount: parsed, date: paymentDate });
-      const rows = await window.api.financeGetLoanPayments(loanId);
-      setPayments((prev) => ({ ...prev, [loanId]: rows as LoanPaymentRow[] }));
-      setPayingLoanId(null);
-      loadLoans();
-      window.dispatchEvent(new Event('finance:dataChanged'));
-    } catch (err) {
-      console.error('[Loans] handleAddPayment failed:', err);
-      toast({ type: 'warning', message: t('coinify.paymentError', 'Error al registrar pago') });
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
+      return;
     }
+    const result = await unwrap(window.api.financeAddLoanPayment(loanId, { amount: parsed, date: paymentDate }));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
+    }
+    const rows = await window.api.financeGetLoanPayments(loanId);
+    setPayments((prev) => ({ ...prev, [loanId]: rows as LoanPaymentRow[] }));
+    setPayingLoanId(null);
+    loadLoans();
+    window.dispatchEvent(new Event('finance:dataChanged'));
   };
 
   const isSettled = (loan: LoanRow) => loan.settled === true || loan.settled === 1;
@@ -225,35 +253,50 @@ export default function Loans() {
             <span className="qb-hand">{person}</span>
           </div>
 
-          {/* Single loans */}
-          {singleLoans.map((loan) => (
-            <div
-              key={loan.id}
-              className="coin-loan-card__row"
-              ref={(el) => {
-                if (el) loanRowRefs.current.set(loan.id, el);
-                else loanRowRefs.current.delete(loan.id);
-              }}
-            >
-              <Rune>{t('coinify.singlePayment')}</Rune>
-              <span className="qb-hand" style={{ flex: 1 }} title={loan.description}>
-                {loan.description || loan.date}
-              </span>
-              <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>{loan.date.slice(0, 10)}</span>
-              <span className="qb-numeral coin-loan-card__amount">{formatCurrency(loan.amount, { currency: loan.currency })}</span>
-              {!isSettled(loan) && (
-                <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
-                  aria-label={t('coinify.settleLoan', 'Liquidar préstamo')}
-                  title={t('coinify.settleLoan', 'Liquidar préstamo')}
-                  onClick={() => handleSettle(loan.id)}>
-                  {t('coinify.settle')}
-                </button>
-              )}
-              {isSettled(loan) && (
-                <span className="coin-loan-card__settled"><Checkmark style={{ width: '0.8em', height: '0.8em' }} /> {t('coinify.settled')}</span>
-              )}
-            </div>
-          ))}
+          {/* Single loans. Fixed grid columns so amounts line up between rows
+              of different kinds inside one person's card. */}
+          {singleLoans.map((loan) => {
+            const paidSoFar = (payments[loan.id] ?? []).reduce((sum, p) => sum + p.amount, 0);
+            const remaining = Math.max(loan.amount - paidSoFar, 0);
+            return (
+              <div
+                key={loan.id}
+                className="coin-loan-card__row"
+                ref={(el) => {
+                  if (el) loanRowRefs.current.set(loan.id, el);
+                  else loanRowRefs.current.delete(loan.id);
+                }}
+              >
+                <Rune>{t('coinify.singlePayment')}</Rune>
+                <span className="qb-hand coin-loan-card__desc" title={loan.description || loan.date}>
+                  {loan.description || loan.date}
+                  <span className="coin-loan-card__date">{loan.date.slice(0, 10)}</span>
+                </span>
+                <span className="coin-loan-card__progress">
+                  {paidSoFar > 0 && !isSettled(loan) && (
+                    <Rune tone="sage">
+                      {t('coinify.loanRemaining', 'resta {{amount}}', {
+                        amount: formatCurrency(remaining, { currency: loan.currency }),
+                      })}
+                    </Rune>
+                  )}
+                </span>
+                <span className="qb-numeral coin-loan-card__amount">{formatCurrency(loan.amount, { currency: loan.currency })}</span>
+                <span className="coin-loan-card__action">
+                  {!isSettled(loan) ? (
+                    <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
+                      aria-label={t('coinify.settleLoan', 'Saldar préstamo')}
+                      title={t('coinify.settleLoan', 'Saldar préstamo')}
+                      onClick={() => handleSettle(loan.id)}>
+                      {t('coinify.settle')}
+                    </button>
+                  ) : (
+                    <span className="coin-loan-card__settled"><Checkmark style={{ width: '0.8em', height: '0.8em' }} /> {t('coinify.settledSingular', 'Saldado')}</span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
 
           {/* Installment groups */}
           {Object.entries(installmentGroups).map(([groupId, groupLoans]) => {
@@ -262,25 +305,30 @@ export default function Loans() {
             const firstLoan = groupLoans[0];
             const allSettled = paid === total;
             const totalAmount = groupLoans.reduce((sum, l) => sum + l.amount, 0);
-            const progressPct = total > 0 ? (paid / total) * 100 : 0;
 
             return (
               <div key={groupId} className="coin-loan-card__row">
                 <Rune tone="gold">{t('coinify.installmentsLabel')}</Rune>
-                <span className="qb-hand" style={{ flex: 1 }}>{firstLoan.description || firstLoan.date}</span>
-                <Gauge value={paid} max={total} tone={allSettled ? 'sage' : 'gold'} showPips={false} label={`${paid}/${total}`} />
+                <span className="qb-hand coin-loan-card__desc" title={firstLoan.description || firstLoan.date}>
+                  {firstLoan.description || firstLoan.date}
+                  <span className="coin-loan-card__date">{firstLoan.date.slice(0, 10)}</span>
+                </span>
+                <span className="coin-loan-card__progress">
+                  <Gauge value={paid} max={total} tone={allSettled ? 'sage' : 'gold'} showPips={false} label={`${paid}/${total}`} />
+                </span>
                 <span className="qb-numeral coin-loan-card__amount">{formatCurrency(totalAmount, { currency: firstLoan.currency })}</span>
-                {!allSettled && (
-                  <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
-                    aria-label={t('coinify.markPayment')}
-                    title={t('coinify.markPayment')}
-                    onClick={() => openPayment(firstLoan.id)}>
-                    {t('coinify.markPayment')}
-                  </button>
-                )}
-                {allSettled && (
-                  <span className="coin-loan-card__settled"><Checkmark style={{ width: '0.8em', height: '0.8em' }} /> {t('coinify.settled')}</span>
-                )}
+                <span className="coin-loan-card__action">
+                  {!allSettled ? (
+                    <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '2px 8px' }}
+                      aria-label={t('coinify.markPayment')}
+                      title={t('coinify.markPayment')}
+                      onClick={() => openPayment(firstLoan.id)}>
+                      {t('coinify.markPayment')}
+                    </button>
+                  ) : (
+                    <span className="coin-loan-card__settled"><Checkmark style={{ width: '0.8em', height: '0.8em' }} /> {t('coinify.settledSingular', 'Saldado')}</span>
+                  )}
+                </span>
               </div>
             );
           })}
@@ -290,9 +338,9 @@ export default function Loans() {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
-      <HelpBubble text={t('coinify.loansPageHelp', 'Prestado: dinero que diste. Recibido: dinero que debés. Podés registrar pagos parciales y liquidar.')} />
-      {/* Header */}
+    <div>
+      {/* Header. The help bubble is inline next to the tabs — as a sealed bubble
+          it was absolutely positioned right on top of "+ Agregar Préstamo". */}
       <div className="coin-loan-header">
         <div className="coin-loan-tabs">
           <button
@@ -307,10 +355,16 @@ export default function Loans() {
           >
             {t('coinify.borrowed')}
           </button>
+          <HelpBubble variant="inline" text={t('coinify.loansPageHelp', 'Prestado: dinero que diste. Tomado prestado: dinero que debés. Podés registrar pagos parciales y saldar.')} />
         </div>
-        <button className="rpg-button" style={{ padding: '4px 12px', fontSize: 'var(--fs-label)' }}
+        <button className="rpg-button coin-toggle-btn" style={{ padding: '4px 12px', fontSize: 'var(--fs-label)' }}
+          aria-expanded={showForm}
           onClick={() => setShowForm(!showForm)}>
-          {showForm ? <ChevronUp style={{ width: '0.65em', height: '0.65em' }} /> : `+ ${t('coinify.addLoan')}`}
+          <ChevronUp
+            className={`coin-toggle-btn__chevron ${showForm ? '' : 'coin-toggle-btn__chevron--collapsed'}`}
+            style={{ width: '0.65em', height: '0.65em' }}
+          />
+          {t('coinify.addLoan')}
         </button>
       </div>
 
@@ -410,7 +464,7 @@ export default function Loans() {
 
       {/* Settled Section */}
       <div>
-        <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', opacity: 0.5, padding: '4px 12px', marginBottom: 8 }}
+        <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', opacity: 0.75, padding: '4px 12px', marginBottom: 8 }}
           onClick={() => setShowSettled(!showSettled)}>
           {showSettled ? t('coinify.hideSettled') : t('coinify.showSettled')}
           {settledLoans.length > 0 && ` (${settledLoans.length})`}

@@ -6,18 +6,18 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { MonthNavigator } from './shared/MonthNavigator';
-import { AnimatedNumber } from './shared/AnimatedNumber';
 import InstallmentAddForm from './shared/InstallmentAddForm';
 import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
-import { Compass, CrossMark, ArrowRight } from '../../../shared/components/icons';
+import { Compass, CrossMark, ArrowRight, Checkmark, Pencil } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
+import { unwrap, failureMessage } from '../utils/api-ext';
 
 interface InstallmentRow {
   id: string;
   description: string;
   amount: number;
-  currency: string;
+  currency: 'ARS' | 'USD';
   category: string;
   installments: number;
   installmentCount?: number;
@@ -127,11 +127,34 @@ export default function Installments() {
     }
   };
 
-  const ownRows = rows.filter((r) => !r.forThirdParty);
-  const thirdPartyRows = rows.filter((r) => !!r.forThirdParty);
-  const totalOwn = ownRows.reduce((acc, r) => acc + r.amount, 0);
-  const totalThirdParty = thirdPartyRows.reduce((acc, r) => acc + r.amount, 0);
-  const net = totalOwn + totalThirdParty;
+  /**
+   * ARS only — mixing currencies into one sum is exactly the bug the unified
+   * `formatCurrency` signature is there to prevent.
+   */
+  const arsRows = rows.filter((r) => r.currency !== 'USD');
+  const usdRows = rows.filter((r) => r.currency === 'USD');
+  const totalOwn = arsRows.filter((r) => !r.forThirdParty).reduce((acc, r) => acc + r.amount, 0);
+  const totalThirdParty = arsRows.filter((r) => !!r.forThirdParty).reduce((acc, r) => acc + r.amount, 0);
+  /** What the card bills you this month. NOT a net — third-party rows get reimbursed. */
+  const totalBilled = totalOwn + totalThirdParty;
+  const totalUsd = usdRows.reduce((acc, r) => acc + r.amount, 0);
+
+  const saveInstallmentAmount = async (rowId: string, raw: string) => {
+    const val = parseFloat(raw);
+    if (!Number.isFinite(val) || val <= 0) {
+      toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
+      return;
+    }
+    const result = await unwrap(window.api.financeUpdateInstallmentAmount(rowId, val));
+    if (!result.ok) {
+      toast({ type: 'warning', message: failureMessage(result.reason, t) });
+      return;
+    }
+    setEditingId(null);
+    loadRows(month);
+    loadProjection();
+    window.dispatchEvent(new Event('finance:dataChanged'));
+  };
 
   const projectionLabel = (m: string) => {
     const [y, mo] = m.split('-').map(Number);
@@ -229,24 +252,10 @@ export default function Installments() {
                         )}
                         <Gauge value={current} max={total} tone={isComplete ? 'sage' : 'gold'} showPips={false} />
                         {editingId === row.id ? (
-                          <div
-                            style={{ display: 'flex', gap: 4, alignItems: 'center' }}
-                            onBlur={(e) => {
-                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                const val = parseFloat(editAmount);
-                                if (val > 0) {
-                                  window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
-                                    setEditingId(null);
-                                    loadRows(month);
-                                    loadProjection();
-                                    window.dispatchEvent(new Event('finance:dataChanged'));
-                                  });
-                                } else {
-                                  setEditingId(null);
-                                }
-                              }
-                            }}
-                          >
+                          /* Explicit confirm / cancel. Enter and Escape were the
+                             only ways out, so a mouse user clicked away, saw the
+                             field keep their number, and left convinced it saved. */
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             <RpgNumberInput
                               value={editAmount}
                               onChange={setEditAmount}
@@ -257,32 +266,37 @@ export default function Installments() {
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
-                                  const val = parseFloat(editAmount);
-                                  if (val > 0) {
-                                    window.api.financeUpdateInstallmentAmount(row.id, val).then(() => {
-                                      setEditingId(null);
-                                      loadRows(month);
-                                      loadProjection();
-                                      window.dispatchEvent(new Event('finance:dataChanged'));
-                                    });
-                                  }
+                                  saveInstallmentAmount(row.id, editAmount);
                                 }
                                 if (e.key === 'Escape') setEditingId(null);
                               }}
                             />
+                            <button
+                              className="rpg-button coin-action-btn coin-action-btn--confirm"
+                              aria-label={t('coinify.save', 'Guardar')}
+                              title={t('coinify.save', 'Guardar')}
+                              onClick={() => saveInstallmentAmount(row.id, editAmount)}
+                            ><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
+                            <button
+                              className="rpg-button coin-action-btn coin-action-btn--cancel"
+                              aria-label={t('coinify.cancel', 'Cancelar')}
+                              title={t('coinify.cancel', 'Cancelar')}
+                              onClick={() => setEditingId(null)}
+                            ><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
                           </div>
                         ) : (
-                          <span
-                            className="qb-numeral coin-installment-row__amount"
-                            style={{ cursor: 'pointer' }}
+                          <button
+                            type="button"
+                            className="qb-numeral coin-installment-row__amount coin-editable-amount"
                             title={t('coinify.clickToEdit', 'Click para editar')}
                             onClick={() => {
                               setEditingId(row.id);
                               setEditAmount(String(row.amount));
                             }}
                           >
-                            {formatCurrency(row.amount)}
-                          </span>
+                            {formatCurrency(row.amount, { currency: row.currency })}
+                            <Pencil className="coin-editable-amount__pencil" style={{ width: '0.7em', height: '0.7em' }} />
+                          </button>
                         )}
                       </div>
                     </div>
@@ -294,14 +308,26 @@ export default function Installments() {
         )}
       </Section>
 
-      {/* Month summary */}
+      {/* Month summary. The third figure is the sum the card bills you, not a
+          net — third-party instalments get reimbursed, so calling it "neto"
+          was simply wrong. */}
       {rows.length > 0 && (
-        <div className="coin-installment-summary">
-          <HelpBubble text={t('coinify.installmentSummaryHelp', 'Resumen mensual de cuotas: propias, de terceros (cargadas a tu tarjeta) y el neto que pagás.')} />
-          <Cartouche label={t('coinify.ownInstallments', 'CUOTAS PROPIAS')} value={formatCurrency(totalOwn)} />
-          <Cartouche label={t('coinify.thirdPartyInstallments', 'DE TERCEROS')} value={formatCurrency(totalThirdParty)} />
-          <Cartouche label={t('coinify.netInstallments', 'TOTAL NETO')} value={formatCurrency(net)} />
-        </div>
+        <>
+          <div className="coin-installment-summary__head">
+            <span className="qb-small-caps coin-installment-summary__title">
+              {t('coinify.installmentSummary', 'RESUMEN DEL MES')}
+            </span>
+            <HelpBubble variant="inline" text={t('coinify.installmentSummaryHelp', 'Cuotas propias: lo que realmente pagás vos. De terceros: cargadas a tu tarjeta pero que te reintegran. Total facturado: lo que la tarjeta te cobra este mes.')} />
+          </div>
+          <div className="coin-installment-summary">
+            <Cartouche label={t('coinify.ownInstallments', 'CUOTAS PROPIAS')} value={formatCurrency(totalOwn, { currency: 'ARS' })} />
+            <Cartouche label={t('coinify.thirdPartyInstallments', 'DE TERCEROS')} value={formatCurrency(totalThirdParty, { currency: 'ARS' })} />
+            <Cartouche label={t('coinify.billedInstallments', 'TOTAL FACTURADO')} value={formatCurrency(totalBilled, { currency: 'ARS' })} />
+            {totalUsd > 0 && (
+              <Cartouche label={t('coinify.usdInstallments', 'CUOTAS EN USD')} value={formatCurrency(totalUsd, { currency: 'USD' })} />
+            )}
+          </div>
+        </>
       )}
 
       {/* 12-month projection chart */}

@@ -93,8 +93,13 @@ export default function CreditCards() {
                   {stmt ? (
                     <div className="coin-cc-card__stmt">
                       <span className="qb-numeral" style={{ fontWeight: 'bold', fontSize: 'var(--fs-sub)' }}>
-                        {formatCurrency(stmt.calculatedAmount)}
+                        {formatCurrency(stmt.calculatedAmount, { currency: 'ARS' })}
                       </span>
+                      {(stmt.calculatedAmountUsd ?? 0) > 0 && (
+                        <span className="qb-numeral" style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>
+                          {formatCurrency(stmt.calculatedAmountUsd ?? 0, { currency: 'USD' })}
+                        </span>
+                      )}
                       <Rune tone={stmt.status === 'paid' ? 'sage' : 'rubric'}>
                         {stmt.status === 'paid' ? t('coinify.statementPaid') : t('coinify.statementPending')}
                       </Rune>
@@ -114,8 +119,25 @@ export default function CreditCards() {
             );
           })}
 
+          {/* The condition is "no cards", so say that: the old copy claimed
+              there were no statements for the period, sending new users off to
+              hunt through months for something that could not exist yet. */}
           {cards.length === 0 && (
-            <p className="coin-empty-codex">{t('coinify.noStatements')}</p>
+            <div className="coin-empty-codex">
+              <p>{t('coinify.noCardsYet', 'Todavía no cargaste ninguna tarjeta')}</p>
+              <p style={{ fontSize: 'var(--fs-label)', marginTop: 4 }}>
+                {t('coinify.noCardsYetHint', 'Agregá una tarjeta para ver sus resúmenes mes a mes')}
+              </p>
+              <button className="rpg-button" style={{ marginTop: 8 }} onClick={() => setShowManager(true)}>
+                + {t('coinify.newCard', 'Nueva tarjeta')}
+              </button>
+            </div>
+          )}
+
+          {cards.length > 0 && statements.length === 0 && (
+            <p className="coin-empty-codex" style={{ fontSize: 'var(--fs-label)' }}>
+              {t('coinify.noStatements')}
+            </p>
           )}
         </Section>
       </div>

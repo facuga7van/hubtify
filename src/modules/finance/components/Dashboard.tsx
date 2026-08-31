@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MonthNavigator } from './shared/MonthNavigator';
@@ -8,7 +8,13 @@ import { SparklineChart } from '../../../shared/components/charts';
 import { Scale, Key, Compass, ArrowUp, ArrowDown, ChevronRight } from '../../../shared/components/icons';
 import { useToast } from '../../../shared/components/useToast';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { formatCurrency, currencyPrefix } from '../utils/format';
+import { formatCurrency, formatCurrencyCompact, currencyPrefix } from '../utils/format';
+import {
+  getExpenseBreakdown,
+  getExpenseBreakdownForRange,
+  type ExpenseBreakdownByCurrency,
+} from '../utils/api-ext';
+import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { playCoinClink } from '../../../shared/audio';
 
 // ── Types ──
@@ -35,30 +41,58 @@ interface ProjectionMonth {
   installments: number;
   recurring: number;
   total: number;
+  ARS?: { installments: number; recurring: number; total: number };
+  USD?: { installments: number; recurring: number; total: number };
+}
+
+interface LoanSideSummary {
+  lent: number;
+  borrowed: number;
+  lentPending: number;
+  borrowedPending: number;
 }
 
 interface LoanSummary {
+  ARS: LoanSideSummary;
+  USD: LoanSideSummary;
+  /** Legacy flat ARS fields, kept by the backend for older consumers. */
   lent: number;
   borrowed: number;
 }
+
+const EMPTY_LOAN_SIDE: LoanSideSummary = { lent: 0, borrowed: 0, lentPending: 0, borrowedPending: 0 };
+const EMPTY_LOANS: LoanSummary = { ARS: EMPTY_LOAN_SIDE, USD: EMPTY_LOAN_SIDE, lent: 0, borrowed: 0 };
+
+type RangeMode = 'month' | 'quarter' | 'year' | 'all';
+
+/** The oldest / newest month the "Todo" range can reach. */
+const ALL_START_MONTH = '1970-01';
+const ALL_END_MONTH = '2999-12';
 
 // ── Helpers ──
 
 const CATEGORY_COLORS = ['#6b4a2b', '#7a1e1e', '#556b3c', '#a88a3c', '#8a6a3d', '#3a2513', '#5c3a1e', '#4a3520', '#cd853f', '#bc8f8f'];
 
-function getPrevMonth(month: string): string {
+function addMonths(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number);
-  const d = new Date(y, m - 2, 1);
+  const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function toRoman(n: number): string {
-  const numerals: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
-  let result = '';
-  for (const [val, sym] of numerals) {
-    while (n >= val) { result += sym; n -= val; }
+function getPrevMonth(month: string): string {
+  return addMonths(month, -1);
+}
+
+/** Inclusive [start, end] month pair for the selected range mode. */
+function rangeBounds(month: string, mode: RangeMode): { startMonth: string; endMonth: string } {
+  if (mode === 'month') return { startMonth: month, endMonth: month };
+  // A quarter is three months, ending on the navigated month.
+  if (mode === 'quarter') return { startMonth: addMonths(month, -2), endMonth: month };
+  if (mode === 'year') {
+    const y = month.split('-')[0];
+    return { startMonth: `${y}-01`, endMonth: `${y}-12` };
   }
-  return result;
+  return { startMonth: ALL_START_MONTH, endMonth: ALL_END_MONTH };
 }
 
 // ── Inline SVGs ──
@@ -240,6 +274,9 @@ function CategoryWheel({ data, total }: { data: { label: string; value: number; 
 
   let acc = 0;
   const r = 54, cx = 70, cy = 70;
+  const centreLabel = formatCurrencyCompact(total, 'ARS');
+  // The hole is 56px across; shrink the type once the label outgrows it.
+  const centreFontSize = centreLabel.length <= 8 ? 16 : centreLabel.length <= 11 ? 13 : 11;
   return (
     <svg viewBox="0 0 140 140" style={{ width: '100%', maxWidth: 160, display: 'block', margin: '0 auto' }}>
       {data.map((d, i) => {
@@ -254,7 +291,19 @@ function CategoryWheel({ data, total }: { data: { label: string; value: number; 
       })}
       <circle cx={cx} cy={cy} r="28" fill="rgba(245,231,192,.9)" stroke="var(--ink)" strokeWidth="0.8" />
       <text x={cx} y={cy - 2} textAnchor="middle" fontSize="11" fontFamily="'IM Fell English SC',serif" fill="var(--rubric)">TOTAL</text>
-      <text x={cx} y={cy + 14} textAnchor="middle" fontSize="16" fontFamily="'UnifrakturCook',serif" fill="var(--ink)">{formatCurrency(total)}</text>
+      {/* Abbreviated and size-clamped: the raw grouped number is wider than the
+          hole and used to print straight over the slices. */}
+      <text
+        x={cx}
+        y={cy + 14}
+        textAnchor="middle"
+        fontSize={centreFontSize}
+        fontFamily="'UnifrakturCook',serif"
+        fill="var(--ink)"
+      >
+        <title>{formatCurrency(total, { currency: 'ARS' })}</title>
+        {centreLabel}
+      </text>
       <circle cx={cx} cy={cy} r={r + 4} fill="none" stroke="var(--ink-faded)" strokeWidth="0.5" />
     </svg>
   );
@@ -285,7 +334,18 @@ function ProjectionChart({ data }: { data: ProjectionMonth[] }) {
       {coords.map((p, i) => (
         <g key={i}>
           <circle cx={p[0]} cy={p[1]} r="3" fill={i < 1 ? 'var(--moss)' : 'var(--rubric)'} stroke="var(--ink)" strokeWidth="0.7" />
-          <text x={p[0]} y={p[1] - 6} textAnchor="middle" fontSize="9" fontFamily="'UnifrakturCook',serif" fill="var(--ink)">{formatCurrency(pts[i])}</text>
+          {/* First and last points sit on the viewBox edge — anchoring them
+              'middle' clipped half of each number away. */}
+          <text
+            x={p[0]}
+            y={p[1] - 6}
+            textAnchor={i === 0 ? 'start' : i === coords.length - 1 ? 'end' : 'middle'}
+            fontSize="9"
+            fontFamily="'UnifrakturCook',serif"
+            fill="var(--ink)"
+          >
+            {formatCurrencyCompact(pts[i], 'ARS')}
+          </text>
         </g>
       ))}
     </svg>
@@ -295,29 +355,31 @@ function ProjectionChart({ data }: { data: ProjectionMonth[] }) {
 // ── Component ──
 
 export default function Dashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-  const [rangeMode, setRangeMode] = useState<'month' | 'quarter' | 'year' | 'all'>('month');
+  const [rangeMode, setRangeMode] = useState<RangeMode>('month');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [balance, setBalance] = useState<MonthlyBalance | null>(null);
   const [prevBalance, setPrevBalance] = useState<MonthlyBalance | null>(null);
   const [categories, setCategories] = useState<CategoryBreakdown[]>([]);
+  const [breakdown, setBreakdown] = useState<ExpenseBreakdownByCurrency | null>(null);
   const [projection, setProjection] = useState<ProjectionMonth[]>([]);
-  const [loans, setLoans] = useState<LoanSummary>({ lent: 0, borrowed: 0 });
+  const [loans, setLoans] = useState<LoanSummary>(EMPTY_LOANS);
   const [installmentCount, setInstallmentCount] = useState(0);
-  const [pendingCC, setPendingCC] = useState(0);
+  const [pendingCC, setPendingCC] = useState<{ ARS: number; USD: number }>({ ARS: 0, USD: 0 });
   const [monthlyExpenses, setMonthlyExpenses] = useState<number[]>([]);
-  const [prevSummary, setPrevSummary] = useState<{ income: number; expenses: number; month: string } | null>(null);
   const [showPrevComparison, setShowPrevComparison] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fadeState, setFadeState] = useState<'in' | 'out'>('in');
   const isFirstLoad = useRef(true);
 
-  // Fetch month-dependent data
+  const { startMonth, endMonth } = useMemo(() => rangeBounds(month, rangeMode), [month, rangeMode]);
+
+  // Fetch range-dependent data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -329,39 +391,26 @@ export default function Dashboard() {
 
         if (rangeMode === 'month') {
           const prevMonth = getPrevMonth(month);
-          const [bal, prev, cats] = await Promise.all([
+          const [bal, prev, cats, bd] = await Promise.all([
             window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
             window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
             window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
+            getExpenseBreakdown(month),
           ]);
           setBalance(bal);
           setPrevBalance(prev);
           setCategories(cats);
+          setBreakdown(bd);
         } else {
-          let startMonth: string;
-          let endMonth: string;
-
-          if (rangeMode === 'quarter') {
-            const [y, m] = month.split('-').map(Number);
-            const start = new Date(y, m - 3, 1);
-            startMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-            endMonth = month;
-          } else if (rangeMode === 'year') {
-            const y = month.split('-')[0];
-            startMonth = `${y}-01`;
-            endMonth = `${y}-12`;
-          } else {
-            startMonth = '2020-01';
-            endMonth = '2099-12';
-          }
-
-          const [bal, cats] = await Promise.all([
+          const [bal, cats, bd] = await Promise.all([
             window.api.financeGetBalanceForRange(startMonth, endMonth) as Promise<MonthlyBalance>,
             window.api.financeGetCategoryBreakdownForRange(startMonth, endMonth) as Promise<CategoryBreakdown[]>,
+            getExpenseBreakdownForRange(startMonth, endMonth),
           ]);
           setBalance(bal);
           setPrevBalance(null);
           setCategories(cats);
+          setBreakdown(bd);
         }
 
         isFirstLoad.current = false;
@@ -376,46 +425,55 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [month, rangeMode, refreshKey]);
+  }, [month, rangeMode, startMonth, endMonth, refreshKey]);
 
-  // Fetch static data
-  const loadStaticData = useCallback(() => {
+  /**
+   * "As of today" data. These handlers take no period argument — they always
+   * answer for the real current date — so the UI labels them as such instead of
+   * letting them masquerade as figures for the navigated period.
+   */
+  const loadTodayData = useCallback(() => {
     window.api.financeGetProjection(3).then((data) => setProjection(data as ProjectionMonth[])).catch((err) => console.error('[Dashboard] financeGetProjection failed:', err));
-    window.api.financeGetActiveLoanSummary().then((data) => setLoans(data as LoanSummary)).catch((err) => console.error('[Dashboard] financeGetActiveLoanSummary failed:', err));
+    window.api.financeGetActiveLoanSummary().then((data) => setLoans({ ...EMPTY_LOANS, ...(data as LoanSummary) })).catch((err) => console.error('[Dashboard] financeGetActiveLoanSummary failed:', err));
     window.api.financeGetInstallmentGroups().then((data) => setInstallmentCount((data as unknown[]).length)).catch((err) => console.error('[Dashboard] financeGetInstallmentGroups failed:', err));
     window.api.financeGetCreditCardStatements({ status: 'pending' }).then((data) => {
-      const total = (data as Array<{ calculatedAmount: number }>).reduce((sum, s) => sum + s.calculatedAmount, 0);
-      setPendingCC(total);
+      const rows = data as Array<{ calculatedAmount?: number; calculatedAmountUsd?: number }>;
+      setPendingCC({
+        ARS: rows.reduce((sum, s) => sum + (s.calculatedAmount ?? 0), 0),
+        USD: rows.reduce((sum, s) => sum + (s.calculatedAmountUsd ?? 0), 0),
+      });
     }).catch((err) => console.error('[Dashboard] financeGetCreditCardStatements failed:', err));
     window.api.financeGetMonthlyExpenses().then((data) => setMonthlyExpenses(data)).catch((err) => console.error('[Dashboard] financeGetMonthlyExpenses failed:', err));
-    window.api.financeGetPreviousMonthSummary().then((data) => setPrevSummary(data)).catch((err) => console.error('[Dashboard] financeGetPreviousMonthSummary failed:', err));
   }, []);
 
-  useEffect(() => { loadStaticData(); }, [loadStaticData]);
+  useEffect(() => { loadTodayData(); }, [loadTodayData]);
 
+  /**
+   * Recurring generation used to run on every mount, writing rows the freshly
+   * fetched totals did not include — the number then moved on its own next
+   * visit. Now it runs at most once per month and refreshes when it wrote.
+   * Statement generation is gone entirely: reads recalculate pending statements.
+   */
   useEffect(() => {
-    const now = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    window.api.financeGenerateRecurringForMonth(month);
-  }, []);
-
-  useEffect(() => {
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    window.api.financeGetCreditCards().then((cards) => {
-      for (const card of cards as Array<{ id: string }>) {
-        window.api.financeGenerateStatement(card.id, currentMonth);
-      }
+    let cancelled = false;
+    ensureRecurringGenerated(realCurrentMonth()).then((generated) => {
+      if (generated && !cancelled) setRefreshKey((k) => k + 1);
     });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    const handler = () => { loadStaticData(); isFirstLoad.current = true; setRefreshKey(k => k + 1); };
+    const handler = () => {
+      resetRecurringGuard();
+      loadTodayData();
+      isFirstLoad.current = true;
+      setRefreshKey(k => k + 1);
+    };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadStaticData]);
+  }, [loadTodayData]);
 
-  // Trend calculation
+  // Expense trend vs the previous month. Purely expenses — never the net balance.
   const trendPct = (() => {
     if (!balance || !prevBalance) return null;
     const currExpenses = balance.ARS.expenses;
@@ -443,10 +501,28 @@ export default function Dashboard() {
 
   const hasUsd = balance ? (balance.USD.income > 0 || balance.USD.expenses > 0) : false;
 
-  // Month label for the header
-  const monthLabel = (() => {
+  /**
+   * Header label for the period actually being summed. It used to always print
+   * the navigated month, so "Año" showed "AGOSTO 2026" over the whole year's
+   * numbers.
+   */
+  const periodLabel = (() => {
+    const shortMonth = (m: string) =>
+      new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1)
+        .toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'es', { month: 'short' })
+        .toUpperCase()
+        .replace('.', '')
+        .slice(0, 3);
+
+    if (rangeMode === 'all') return t('coinify.range_all', 'Todo').toUpperCase();
+    if (rangeMode === 'year') return month.slice(0, 4);
+    if (rangeMode === 'quarter') {
+      return `${shortMonth(startMonth)}–${shortMonth(endMonth)} ${endMonth.slice(0, 4)}`;
+    }
     const [y, m] = month.split('-').map(Number);
-    const monthName = new Date(y, m - 1).toLocaleDateString('es', { month: 'long' }).toUpperCase();
+    const monthName = new Date(y, m - 1)
+      .toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'es', { month: 'long' })
+      .toUpperCase();
     return `${monthName} ${y}`;
   })();
 
@@ -468,7 +544,8 @@ export default function Dashboard() {
     <select
       className="rpg-select coin-range-select"
       value={rangeMode}
-      onChange={(e) => setRangeMode(e.target.value as typeof rangeMode)}
+      aria-label={t('coinify.rangeMode', 'Período')}
+      onChange={(e) => setRangeMode(e.target.value as RangeMode)}
     >
       <option value="month">{t('coinify.range_month')}</option>
       <option value="quarter">{t('coinify.range_quarter')}</option>
@@ -477,13 +554,43 @@ export default function Dashboard() {
     </select>
   );
 
+  /**
+   * Every range except "Todo" is navigable. Month and quarter step by month
+   * (the quarter ends on the navigated month); year steps by year.
+   */
+  const periodNav = (() => {
+    if (rangeMode === 'all') {
+      return <span className="coin-month-nav__label">{periodLabel}</span>;
+    }
+    if (rangeMode === 'year') {
+      return (
+        <div className="coin-month-nav">
+          <button
+            className="rpg-button coin-month-nav__btn tap-target"
+            aria-label={t('coinify.prevYear', 'Año anterior')}
+            title={t('coinify.prevYear', 'Año anterior')}
+            onClick={() => setMonth(addMonths(month, -12))}
+          >&lt;</button>
+          <span className="coin-month-nav__label">{periodLabel}</span>
+          <button
+            className="rpg-button coin-month-nav__btn tap-target"
+            aria-label={t('coinify.nextYear', 'Año siguiente')}
+            title={t('coinify.nextYear', 'Año siguiente')}
+            onClick={() => setMonth(addMonths(month, 12))}
+          >&gt;</button>
+        </div>
+      );
+    }
+    return <MonthNavigator month={month} onChange={setMonth} compact />;
+  })();
+
   // ── Skeleton ──
 
   if (loading && isFirstLoad.current) {
     return (
       <div className="coin-dashboard coin-dashboard--loading">
         <div className="coin-dashboard__header">
-          {rangeMode === 'month' && <MonthNavigator month={month} onChange={setMonth} compact />}
+          {periodNav}
           {rangeModeSelect}
         </div>
         <div className="coin-skeleton coin-skeleton--card" style={{ height: 120 }} />
@@ -502,7 +609,7 @@ export default function Dashboard() {
     <div className="coin-dashboard" data-tour="finance">
       {/* Header */}
       <div className="coin-dashboard__header">
-        {rangeMode === 'month' && <MonthNavigator month={month} onChange={setMonth} compact />}
+        {periodNav}
         {rangeModeSelect}
         <button
           className="rpg-button coin-export-btn"
@@ -533,28 +640,29 @@ export default function Dashboard() {
               <ChestClickable />
               <div className="coin-chest-panel__info">
                 <div className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
-                  {t('coinify.treasureChest', 'COFRE DEL TESORO')} · {monthLabel}
+                  {t('coinify.treasureChest', 'COFRE DEL TESORO')} · {periodLabel}
                 </div>
                 <div className="coin-chest-panel__balance">
                   <AnimatedNumber
                     value={balance.ARS.balance}
-                    prefix={currencyPrefix()}
+                    prefix={currencyPrefix('ARS')}
                     className={`coin-chest-panel__amount ${balance.ARS.balance >= 0 ? 'coin-chest-panel__amount--positive' : 'coin-chest-panel__amount--negative'}`}
                   />
                 </div>
                 {hasUsd && (
                   <div className="qb-hand" style={{ fontSize: 'var(--fs-label)' }}>
-                    <AnimatedNumber value={balance.USD.balance} prefix="U$S " locale="en-US" className="coin-chest-panel__usd" />
+                    <AnimatedNumber value={balance.USD.balance} prefix={currencyPrefix('USD')} locale="en-US" className="coin-chest-panel__usd" />
                   </div>
                 )}
                 <div className="qb-hand" style={{ fontSize: 'var(--fs-label)', marginTop: 2, color: 'var(--ink-soft)' }}>
                   {trendPct !== null && (
                     <span>
-                      saldo del mes {'\u2014'}{' '}
+                      {t('coinify.monthExpenses', 'gasto del mes')} {'\u2014'}{' '}
                       <span style={{ color: trendPct <= 0 ? 'var(--moss)' : 'var(--rubric)' }}>
+                        {/* The arrow is the direction of spending, so "less" points down. */}
                         {trendPct <= 0
-                          ? <ArrowUp style={{ width: '0.75em', height: '0.75em' }} />
-                          : <ArrowDown style={{ width: '0.75em', height: '0.75em' }} />
+                          ? <ArrowDown style={{ width: '0.75em', height: '0.75em' }} />
+                          : <ArrowUp style={{ width: '0.75em', height: '0.75em' }} />
                         }{' '}{Math.abs(trendPct)}%
                       </span>{' '}
                       {trendPct <= 0 ? t('coinify.lessThanLastMonth') : t('coinify.moreThanLastMonth')}
@@ -564,7 +672,7 @@ export default function Dashboard() {
                 {monthlyExpenses.length >= 2 && (
                   <div style={{ marginTop: 4 }}>
                     <SparklineChart data={monthlyExpenses} width={120} height={24} color="var(--rubric)" showArea />
-                    <span className="qb-small-caps" style={{ fontSize: '0.55rem', color: 'var(--ink-faded)', marginLeft: 4 }}>
+                    <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', marginLeft: 4 }}>
                       {t('coinify.last6Months', '6 meses')}
                     </span>
                   </div>
@@ -575,35 +683,56 @@ export default function Dashboard() {
 
             {/* Income card */}
             <div className="coin-summary-card">
-              <HelpBubble text={t('coinify.incomeHelp', 'Total de ingresos registrados en el mes seleccionado.')} />
               <div className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--moss)' }}>
                 {t('coinify.income').toUpperCase()}
               </div>
               <div className="coin-summary-card__value coin-summary-card__value--sage">
-                <AnimatedNumber value={balance.ARS.income} prefix={currencyPrefix()} />
+                <AnimatedNumber value={balance.ARS.income} prefix={currencyPrefix('ARS')} />
               </div>
+              {/* Placeholder keeps this card's gauge level with the expense card's. */}
+              <div className="coin-summary-card__note" aria-hidden="true">&nbsp;</div>
               <Gauge value={balance.ARS.income} max={Math.max(balance.ARS.income, balance.ARS.expenses) * 1.2 || 1} tone="sage" showPips={false} />
             </div>
 
             {/* Expenses card */}
             <div className="coin-summary-card">
-              <HelpBubble text={t('coinify.expensesHelp', 'Total de gastos del mes. Incluye cuotas activas y saldo pendiente de tarjetas de crédito.')} />
               <div className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
                 {t('coinify.expense').toUpperCase()}
               </div>
               <div className="coin-summary-card__value coin-summary-card__value--rubric">
-                <AnimatedNumber value={balance.ARS.expenses} prefix={currencyPrefix()} />
+                <AnimatedNumber value={balance.ARS.expenses} prefix={currencyPrefix('ARS')} />
               </div>
-              <div className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>
-                {installmentCount} {t('coinify.activeInstallments').toLowerCase()} <span className="coin-separator">·</span> TC {formatCurrency(pendingCC)}
+              {/* Where the number comes from, instead of a help bubble promising
+                  a composition the figure did not actually have. */}
+              <div className="coin-summary-card__note qb-hand">
+                {breakdown ? (
+                  <>
+                    {formatCurrency(breakdown.ARS.total, { currency: 'ARS' })}
+                    {' = '}
+                    {formatCurrency(breakdown.ARS.direct, { currency: 'ARS' })} {t('coinify.breakdownDirect', 'directo')}
+                    {' + '}
+                    {formatCurrency(breakdown.ARS.installments, { currency: 'ARS' })} {t('coinify.breakdownInstallments', 'cuotas')}
+                    {' + '}
+                    {formatCurrency(breakdown.ARS.pendingCard, { currency: 'ARS' })} {t('coinify.breakdownPendingCard', 'tarjeta pendiente')}
+                  </>
+                ) : (
+                  <>
+                    {installmentCount} {t('coinify.activeInstallments').toLowerCase()}
+                    {' '}<span className="coin-separator">·</span>{' '}
+                    {t('coinify.pendingCC', 'TC Pendiente')} {formatCurrency(pendingCC.ARS, { currency: 'ARS' })}
+                    {' '}<span className="coin-as-of">{t('coinify.asOfToday', 'a hoy')}</span>
+                  </>
+                )}
               </div>
               <Gauge value={balance.ARS.expenses} max={Math.max(balance.ARS.income, balance.ARS.expenses) * 1.2 || 1} tone="rubric" showPips={false} />
             </div>
           </div>
         )}
 
-        {/* ── C8: Month vs Previous Comparison ── */}
-        {rangeMode === 'month' && prevSummary && balance && (
+        {/* ── Month vs Previous Comparison ──
+             Compares against the month before the *navigated* one, not the month
+             before today. */}
+        {rangeMode === 'month' && prevBalance && balance && (
           <div className="coin-comparison-toggle">
             <button
               className="rpg-button coin-comparison-toggle__btn"
@@ -617,15 +746,15 @@ export default function Dashboard() {
             {showPrevComparison && (
               <div className="coin-comparison-grid">
                 <Cartouche
-                  label={t('coinify.prevIncome', 'Ingreso anterior')}
-                  value={formatCurrency(prevSummary.income)}
-                  foot={`${formatCurrency(balance.ARS.income)} ${t('coinify.currentLabel', 'actual')}`}
+                  label={`${t('coinify.prevIncome', 'Ingreso anterior')} · ${getPrevMonth(month)}`}
+                  value={formatCurrency(prevBalance.ARS.income, { currency: 'ARS' })}
+                  foot={`${formatCurrency(balance.ARS.income, { currency: 'ARS' })} ${t('coinify.currentLabel', 'actual')}`}
                   tone="sage"
                 />
                 <Cartouche
-                  label={t('coinify.prevExpenses', 'Gasto anterior')}
-                  value={formatCurrency(prevSummary.expenses)}
-                  foot={`${formatCurrency(balance.ARS.expenses)} ${t('coinify.currentLabel', 'actual')}`}
+                  label={`${t('coinify.prevExpenses', 'Gasto anterior')} · ${getPrevMonth(month)}`}
+                  value={formatCurrency(prevBalance.ARS.expenses, { currency: 'ARS' })}
+                  foot={`${formatCurrency(balance.ARS.expenses, { currency: 'ARS' })} ${t('coinify.currentLabel', 'actual')}`}
                   tone="rubric"
                 />
               </div>
@@ -636,15 +765,15 @@ export default function Dashboard() {
         {/* ── Middle: Ledger + Category Chart ── */}
         <div className="coin-middle-grid">
           {/* Category breakdown */}
-          <Section title={t('coinify.expenseBreakdown', 'REPARTO DEL GASTO')} icon={<Scale width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.categoryHelp', 'Distribución de gastos por categoría. Tocá una porción para ver el detalle.')} />}>
+          <Section title={t('coinify.expenseBreakdown', 'REPARTO DEL GASTO')} icon={<Scale width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.categoryHelp', 'Distribución de gastos por categoría. La leyenda de abajo muestra el monto y el porcentaje de cada una.')} />}>
             <CategoryWheel data={donutData} total={donutTotal} />
             {donutData.length > 0 && (
               <div className="coin-category-legend">
                 {donutData.map((c, i) => (
                   <div key={i} className="coin-category-legend__row">
                     <span className="coin-category-legend__swatch" style={{ background: c.color }} />
-                    <span className="qb-hand">{c.label}</span>
-                    <span className="qb-numeral coin-category-legend__amount">{formatCurrency(c.value)}</span>
+                    <span className="qb-hand coin-category-legend__label" title={c.label}>{c.label}</span>
+                    <span className="qb-numeral coin-category-legend__amount">{formatCurrency(c.value, { currency: 'ARS' })}</span>
                     <span className="qb-small-caps coin-category-legend__pct">{Math.round((c.value / donutTotal) * 100)}%</span>
                   </div>
                 ))}
@@ -659,35 +788,65 @@ export default function Dashboard() {
         {/* ── Bottom: Loans + Projection ── */}
         <div className="coin-bottom-grid">
           {/* Loans & Debts */}
-          <Section title={t('coinify.alliancesAndDebts').toUpperCase()} icon={<Key width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.loansHelp', 'Resumen de préstamos activos: lo que te deben y lo que debés.')} />}>
+          <Section
+            title={t('coinify.alliancesAndDebts').toUpperCase()}
+            icon={<Key width="12" height="12" style={{ color: 'var(--rubric)' }} />}
+            rightSlot={
+              <span className="coin-section-slot">
+                <Rune tone="ink">{t('coinify.asOfToday', 'a hoy')}</Rune>
+                <HelpBubble variant="inline" text={t('coinify.loansHelp', 'Resumen de préstamos activos: lo que te deben y lo que debés. Siempre al día de hoy — no depende del período elegido arriba.')} />
+              </span>
+            }
+          >
             <div className="coin-loan-mini-grid">
               <div className="coin-loan-mini coin-loan-mini--sage">
                 <div className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--moss)' }}>
                   {t('coinify.owed').toUpperCase()}
                 </div>
+                {/* Pending = original amount minus partial payments. */}
                 <div style={{ fontFamily: "'UnifrakturCook',serif", fontSize: 'var(--fs-accent)', color: 'var(--moss)' }}>
-                  {formatCurrency(loans.lent)}
+                  {formatCurrency(loans.ARS.lentPending, { currency: 'ARS' })}
                 </div>
+                {loans.USD.lentPending > 0 && (
+                  <div className="qb-numeral coin-loan-mini__usd">
+                    {formatCurrency(loans.USD.lentPending, { currency: 'USD' })}
+                  </div>
+                )}
               </div>
               <div className="coin-loan-mini coin-loan-mini--rubric">
                 <div className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
                   {t('coinify.owing').toUpperCase()}
                 </div>
                 <div style={{ fontFamily: "'UnifrakturCook',serif", fontSize: 'var(--fs-accent)', color: 'var(--rubric)' }}>
-                  {formatCurrency(loans.borrowed)}
+                  {formatCurrency(loans.ARS.borrowedPending, { currency: 'ARS' })}
                 </div>
+                {loans.USD.borrowedPending > 0 && (
+                  <div className="qb-numeral coin-loan-mini__usd">
+                    {formatCurrency(loans.USD.borrowedPending, { currency: 'USD' })}
+                  </div>
+                )}
               </div>
             </div>
-            <div
-              className="coin-loan-mini__link"
+            <button
+              type="button"
+              className="rpg-button coin-loan-mini__link"
               onClick={() => navigate('/finance/loans')}
             >
               <span className="qb-small-caps">{t('coinify.loans')} <ChevronRight style={{ width: '0.7em', height: '0.7em' }} /></span>
-            </div>
+            </button>
           </Section>
 
           {/* Projection */}
-          <Section title={t('coinify.nextBattles').toUpperCase()} icon={<Compass width="12" height="12" style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('coinify.projectionHelp', 'Proyección a 3 meses de cuotas y gastos recurrentes. Ayuda a planificar el flujo de fondos.')} />}>
+          <Section
+            title={t('coinify.nextBattles').toUpperCase()}
+            icon={<Compass width="12" height="12" style={{ color: 'var(--rubric)' }} />}
+            rightSlot={
+              <span className="coin-section-slot">
+                <Rune tone="ink">{t('coinify.asOfToday', 'a hoy')}</Rune>
+                <HelpBubble variant="inline" text={t('coinify.projectionHelp', 'Proyección a 3 meses de cuotas y gastos recurrentes, contada desde hoy — no depende del período elegido arriba.')} />
+              </span>
+            }
+          >
             {projection.length > 0 ? (
               <>
                 <ProjectionChart data={projection} />

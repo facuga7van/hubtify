@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 
 interface MonthNavigatorProps {
   month: string;
@@ -7,7 +6,6 @@ interface MonthNavigatorProps {
 }
 
 export function MonthNavigator({ month, onChange, compact }: MonthNavigatorProps) {
-  const { t } = useTranslation();
 
   const navigate = (delta: number) => {
     const [y, m] = month.split('-').map(Number);

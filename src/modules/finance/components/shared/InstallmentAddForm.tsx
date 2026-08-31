@@ -151,7 +151,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--fs-label)' }}>
           <div style={{
             width: 32, height: 18, borderRadius: 9, position: 'relative',
-            background: customLastAmount ? 'var(--gold, #c8a96e)' : 'var(--parch-1, #8b7355)',
+            background: customLastAmount ? 'var(--gold)' : 'var(--parch-1)',
             transition: 'background 0.2s ease',
           }}>
             <div style={{
