@@ -88,6 +88,48 @@ export function clampHp(hp: number): number {
   return Math.max(0, Math.min(100, Math.round(hp)));
 }
 
+// ── Cierre del Códice (phase 2) ────────────────────────────────────────────
+//
+// Sealing a day is a RITUAL, not a chore:
+//   - skipping it costs nothing (no decay, no seal-streak, no penalty),
+//   - it can be back-sealed for one day (the grace window below),
+//   - it refuses to seal a day with no events, because the seal certifies a day
+//     that was LIVED, not a button that was pressed.
+
+/** Floor paid by any seal. */
+export const SEAL_BASE_XP = 10;
+/** XP per event of the sealed day. */
+export const SEAL_XP_PER_EVENT = 2;
+/** Events beyond this stop paying — a busy day is not a farm. */
+export const SEAL_EVENT_CAP = 20;
+/** How many days back a day may still be sealed. 1 = today or yesterday. */
+export const SEAL_GRACE_DAYS = 1;
+
+/**
+ * XP paid for sealing a day.
+ *
+ *   XP = round((SEAL_BASE_XP + SEAL_XP_PER_EVENT * min(events, SEAL_EVENT_CAP)) * vigorBonus(vigor))
+ *
+ * Range: 12 XP (one event, low vigor) … 55 XP (20+ events, vigor >= 90).
+ * Flat — the seal never takes the daily combo or the random bonus, so the
+ * ritual cannot be used to amplify anything.
+ */
+export function sealXp(eventsCount: number, vigor: number): number {
+  const paid = Math.max(0, Math.min(SEAL_EVENT_CAP, Math.floor(eventsCount)));
+  return Math.round((SEAL_BASE_XP + SEAL_XP_PER_EVENT * paid) * vigorBonus(vigor));
+}
+
+/**
+ * Whether `date` is inside the sealing window relative to `today`.
+ * Returns the reason it is not, so callers can report it verbatim.
+ */
+export function sealWindowStatus(date: string, today: string): 'ok' | 'future' | 'too_old' {
+  const gap = daysDiff(date, today);
+  if (gap < 0) return 'future';
+  if (gap > SEAL_GRACE_DAYS) return 'too_old';
+  return 'ok';
+}
+
 /** Full Vigor. The day always starts here. */
 export const MAX_VIGOR = 100;
 

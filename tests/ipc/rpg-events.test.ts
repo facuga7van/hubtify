@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
 import { processRpgEvent } from '../../electron/ipc/rpg-handlers';
+import { ACHIEVEMENT_XP } from '../../shared/achievements';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');
@@ -128,7 +129,9 @@ describe('XP undo (task 14)', () => {
     });
     // Callers send an ALREADY-NEGATIVE xp; falling back to it deducted twice.
     expect(undo.xpGained).toBe(0);
-    expect(stats(db).xp).toBe(before);
+    // The only XP that may have moved is the achievement shelf's flat +25 per
+    // unlock, which rides on top of the event and is not part of the reversal.
+    expect(stats(db).xp).toBe(before + ACHIEVEMENT_XP * undo.achievementIds.length);
   });
 });
 
@@ -149,13 +152,17 @@ describe('zero-XP events and payload validation (task 15)', () => {
   });
 
   it('clamps an absurd negative xp instead of persisting it', () => {
-    processRpgEvent(db, {
+    const result = processRpgEvent(db, {
       type: 'TASK_COMPLETED', moduleId: 'quests',
       payload: { xp: -99999, hp: 0, taskId: 't1' }, timestamp: Date.now(),
     });
-    const total = db.prepare('SELECT COALESCE(SUM(xp_gained), 0) AS t FROM rpg_events').get() as { t: number };
+    // ACHIEVEMENT_UNLOCKED rows are excluded: they are the shelf's own flat
+    // reward, not XP this event paid.
+    const total = db.prepare(
+      "SELECT COALESCE(SUM(xp_gained), 0) AS t FROM rpg_events WHERE event_type <> 'ACHIEVEMENT_UNLOCKED'"
+    ).get() as { t: number };
     expect(total.t).toBe(0);
-    expect(stats(db).xp).toBe(0);
+    expect(stats(db).xp).toBe(ACHIEVEMENT_XP * result.achievementIds.length);
   });
 
   it('still applies the HP delta of a zero-XP event', () => {

@@ -181,6 +181,40 @@ export const coreMigrations: Migration[] = [
       UPDATE player_stats SET best_streak = streak WHERE best_streak < streak;
     `,
   },
+  {
+    namespace: 'core',
+    version: 4,
+    up: `
+      -- ── RPG phase 2: the shelf and the Códice ───────────────────────────────
+      -- achievements_unlocked: one row per EARNED achievement. The catalogue
+      -- itself lives in code (shared/achievements.ts); only the unlock is data.
+      -- An unlocked achievement is never re-checked and never revoked, so this
+      -- table is append-only in practice and merges across devices by union.
+      CREATE TABLE IF NOT EXISTS achievements_unlocked (
+        id TEXT PRIMARY KEY,
+        unlocked_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- day_seals: the Cierre del Códice ledger. One row per sealed local day.
+      -- The modules column is a JSON array of module ids with an event that day.
+      -- Sealing is optional and never punitive: a missing row means nothing.
+      CREATE TABLE IF NOT EXISTS day_seals (
+        date TEXT PRIMARY KEY,
+        sealed_at TEXT NOT NULL,
+        xp_awarded INTEGER NOT NULL,
+        vigor INTEGER NOT NULL,
+        events_count INTEGER NOT NULL,
+        modules TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- The day summary groups the day's events by module; the existing
+      -- idx_rpg_events_created_at already covers the date range scan.
+      CREATE INDEX IF NOT EXISTS idx_rpg_events_module_created
+        ON rpg_events(module_id, created_at);
+    `,
+  },
 ];
 
 const DUPLICATE_COLUMN = 'duplicate column name';
