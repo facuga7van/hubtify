@@ -47,6 +47,35 @@ export interface RpgEventRecord {
   createdAt: string;
 }
 
+// ── Códice & Achievements (Fase 2) ────────────────────────
+
+export interface AchievementState { id: string; hidden: boolean; unlocked: boolean; unlockedAt?: string }
+
+export interface DaySummaryEvent {
+  id: number; moduleId: string; eventType: string;
+  xpGained: number; hpChange: number; comboMultiplier: number; bonusMultiplier: number;
+  payload: string | null; createdAt: string; time: string;
+}
+export interface DaySummaryModule { moduleId: string; count: number; xp: number; events: DaySummaryEvent[] }
+export interface DaySeal {
+  date: string; sealedAt: string; xpAwarded: number; vigor: number;
+  eventsCount: number; modules: string[];
+}
+export type SealBlockedReason = 'already_sealed' | 'too_old' | 'future' | 'empty_day';
+export interface DaySummary {
+  date: string; isToday: boolean;
+  events: DaySummaryEvent[];
+  byModule: DaySummaryModule[];
+  eventsCount: number; totalXp: number; maxCombo: number; modules: string[];
+  vigor: number; streak: number;
+  sealed: boolean; seal: DaySeal | null;
+  canSeal: boolean; sealBlockedReason: SealBlockedReason | null;
+}
+export type SealResult =
+  | { ok: true; date: string; xpAwarded: number; vigor: number; eventsCount: number;
+      modules: string[]; achievementIds: string[] }
+  | { ok: false; reason: SealBlockedReason };
+
 // ── Module Types ───────────────────────────────────────────
 
 export interface Migration {
@@ -137,6 +166,11 @@ export interface CauldronTimerState {
   autoStartAt: number | null;
   /** Vuelta del bucle continuo (1 = primera ronda de ciclos). */
   round: number;
+  /** Misión de Questify vinculada a la sesión en curso, o null. */
+  taskId: string | null;
+  taskName: string | null;
+  taskProjectId: string | null;
+  taskProjectColor: string | null;
 }
 
 export interface CauldronPreset {
@@ -162,6 +196,21 @@ export interface CauldronSession {
   completed: boolean;
   startedAt: string;
   completedAt: string | null;
+  abandoned?: boolean;
+  elapsedMinutes?: number | null;
+  taskId?: string | null;
+  taskName?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
+  projectColor?: string | null;
+}
+
+export interface CauldronWeekTaskRow {
+  taskId: string | null;
+  taskName: string | null;
+  projectId: string | null;
+  projectColor: string | null;
+  minutes: number;
 }
 
 export interface CauldronStats {
@@ -183,6 +232,11 @@ export interface CauldronSessionEndResult {
   isExtension?: boolean;
   /** True en el segmento que cierra una vuelta completa de ciclos. */
   cycleComplete?: boolean;
+  /** El work fue abandonado con >5 min: deja frasco roto, jamás castigo numérico. */
+  abandoned?: boolean;
+  elapsedMinutes?: number;
+  taskId?: string | null;
+  taskName?: string | null;
 }
 
 /** A session that was running when the app closed and can be resumed. */
@@ -305,7 +359,14 @@ export interface HubtifyApi {
   getRpgStats: () => Promise<PlayerStats>;
   rpgSetInnMode: (on: boolean) => Promise<{ innSince: string | null }>;
   onRpgPardonUsed: (callback: () => void) => () => void;
-  processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number; pardonUsed?: boolean }>;
+  rpgGetAchievements: () => Promise<AchievementState[]>;
+  rpgBackfillAchievements: () => Promise<{ unlocked: string[]; total: number }>;
+  rpgGetDaySummary: (date?: string | null) => Promise<DaySummary>;
+  rpgSealDay: (date?: string | null) => Promise<SealResult>;
+  rpgGetSeals: (fromDate: string, toDate: string) => Promise<DaySeal[]>;
+  onRpgAchievementUnlocked: (callback: (id: string) => void) => () => void;
+  onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => () => void;
+  processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number; pardonUsed?: boolean; achievementIds?: string[] }>;
   getRpgHistory: (limit: number) => Promise<RpgEventRecord[]>;
   rpgGetDashboardStats: () => Promise<{ xpToday: number; xpHistory: Array<{ date: string; xp: number }>; eventsToday: number }>;
   windowMinimize: () => void;
@@ -354,6 +415,14 @@ export interface HubtifyApi {
   nutritionSaveProfile: (profile: Record<string, unknown>) => Promise<void>;
   nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
+  nutritionSearchHistory: (query?: string, limit?: number) => Promise<Array<{
+    description: string; calories: number; timesLogged: number;
+    lastLogged: string | null; source: 'history' | 'favorite'; proteinG?: number;
+  }>>;
+  nutritionGetCachedEstimate: (description: string) => Promise<{
+    calories: number; aiBreakdown: string | null; proteinG: number | null; hits: number;
+  } | null>;
+  nutritionCacheEstimate: (entry: Record<string, unknown>) => Promise<{ cached: boolean }>;
   nutritionCopyDay: (opts?: { from?: string; to?: string }) => Promise<{ success: boolean; reason?: string; copied: number; from?: string; to?: string }>;
   nutritionDeleteFood: (id: number) => Promise<void>;
   nutritionDeleteByDate: (date: string) => Promise<void>;
@@ -476,6 +545,13 @@ export interface HubtifyApi {
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
   financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;
   financeGetImportBatches: () => Promise<FinanceImportBatch[]>;
+  financeGetBudgets: () => Promise<Array<{ category: string; monthlyLimit: number; createdAt: string; updatedAt: string }>>;
+  financeSetBudget: (category: string, limit: number | null) => Promise<{ ok: true; category: string; monthlyLimit: number | null } | { ok: false; reason: string }>;
+  financeGetBudgetStatus: (month?: string) => Promise<{
+    month: string;
+    categories: Array<{ category: string; limit: number; spent: number; pct: number }>;
+    totalLimit: number; totalSpent: number;
+  }>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
 
@@ -518,7 +594,7 @@ export interface HubtifyApi {
   cauldronGetPresets: () => Promise<CauldronPreset[]>;
   cauldronUpsertPreset: (preset: Record<string, unknown>) => Promise<string>;
   cauldronDeletePreset: (id: string) => Promise<void>;
-  cauldronStart: (presetId: string) => Promise<CauldronTimerState>;
+  cauldronStart: (presetId: string, taskId?: string | null) => Promise<CauldronTimerState>;
   cauldronPause: () => Promise<CauldronTimerState>;
   cauldronResume: () => Promise<CauldronTimerState>;
   cauldronSkip: () => Promise<CauldronTimerState>;
@@ -534,6 +610,8 @@ export interface HubtifyApi {
   cauldronResumeInterruptedSession: () => Promise<{ success: boolean; reason?: string; state?: CauldronTimerState }>;
   cauldronDiscardInterruptedSession: () => Promise<{ success: boolean }>;
   cauldronCancelAutoStart: () => Promise<CauldronTimerState>;
+  cauldronSetSessionTask: (taskId: string | null) => Promise<CauldronTimerState>;
+  cauldronGetWeekByProject: () => Promise<CauldronWeekTaskRow[]>;
   /** Pushes already-translated OS-notification texts to the main process. */
   cauldronSetLabels: (labels: Record<string, string>) => Promise<void>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;

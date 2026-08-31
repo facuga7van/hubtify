@@ -134,11 +134,19 @@ interface SyncQuestData {
   habitChecks: SyncHabitCheck[];
   drawings: SyncDrawing[];
   rpgEvents?: SyncRpgEvent[];
+  /** Fase 2: union pura entre dispositivos — un logro desbloqueado en cualquiera queda en todos. */
+  achievements?: Array<{ id: string; unlockedAt: string; updatedAt: string }>;
+  /** Fase 2: PK = date; el primer sello gana, re-sellar no existe. */
+  daySeals?: Array<{ date: string; sealedAt: string; xpAwarded: number; vigor: number;
+                     eventsCount: number; modules: string; updatedAt: string }>;
 }
 
 const USER_DATA_TABLES = [
   'player_stats',
   'rpg_events',
+  'achievements_unlocked',
+  'day_seals',
+  'finance_budgets',
   'user_profile',
   'character_data',
   'tasks',
@@ -628,6 +636,35 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
         if (result.changes > 0) changed = true;
       }
     });
+
+    step('achievements', () => {
+      // Pure union: PK is the catalog id, INSERT OR IGNORE, never deleted.
+      const ins = db.prepare(
+        'INSERT OR IGNORE INTO achievements_unlocked (id, unlocked_at, updated_at) VALUES (?, ?, ?)',
+      );
+      for (const a of rows<{ id: string; unlockedAt: string; updatedAt: string }>(remote.achievements)) {
+        if (!a || typeof a.id !== 'string' || !a.id) continue;
+        const r = ins.run(a.id, a.unlockedAt ?? a.updatedAt, a.updatedAt ?? a.unlockedAt);
+        if (r.changes > 0) changed = true;
+      }
+    });
+
+    step('daySeals', () => {
+      // First seal wins (PK = date); a day cannot be re-sealed, so LWW is moot.
+      const ins = db.prepare(`
+        INSERT OR IGNORE INTO day_seals (date, sealed_at, xp_awarded, vigor, events_count, modules, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const d of rows<{ date: string; sealedAt: string; xpAwarded: number; vigor: number;
+                             eventsCount: number; modules: string; updatedAt: string }>(remote.daySeals)) {
+        if (!d || typeof d.date !== 'string' || !d.date) continue;
+        const r = ins.run(
+          d.date, d.sealedAt ?? d.updatedAt, d.xpAwarded ?? 0, d.vigor ?? 100,
+          d.eventsCount ?? 0, typeof d.modules === 'string' ? d.modules : '[]', d.updatedAt ?? d.sealedAt,
+        );
+        if (r.changes > 0) changed = true;
+      }
+    });
   });
 
   tx();
@@ -746,7 +783,17 @@ export function registerSyncIpcHandlers(): void {
       FROM rpg_events WHERE created_at >= ? ORDER BY id ASC
     `).all(daysAgoStamp(RPG_EVENTS_PUSH_DAYS));
 
-    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents };
+    const achievements = db.prepare(`
+      SELECT id, unlocked_at AS unlockedAt, updated_at AS updatedAt FROM achievements_unlocked
+    `).all();
+
+    const daySeals = db.prepare(`
+      SELECT date, sealed_at AS sealedAt, xp_awarded AS xpAwarded, vigor,
+             events_count AS eventsCount, modules, updated_at AS updatedAt
+      FROM day_seals
+    `).all();
+
+    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents, achievements, daySeals };
   });
 
   // Merges remote quest data with local using last-write-wins
@@ -1005,10 +1052,16 @@ export function registerSyncIpcHandlers(): void {
       FROM finance_income_sources
     `).all();
 
+    const budgets = db.prepare(`
+      SELECT category, monthly_limit AS monthlyLimit,
+             created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
+      FROM finance_budgets
+    `).all();
+
     return {
       transactions, loans, loanPayments, recurring, recurringHistory,
       installmentGroups, categoryMappings, categories, creditCards,
-      creditCardStatements, importBatches, incomeSources,
+      creditCardStatements, importBatches, incomeSources, budgets,
     };
   });
 
@@ -1257,6 +1310,30 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
+      if (data.budgets && Array.isArray(data.budgets)) {
+        const getB = db.prepare('SELECT updated_at FROM finance_budgets WHERE category = ?');
+        const insB = db.prepare(`
+          INSERT INTO finance_budgets (category, monthly_limit, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        const updB = db.prepare(`
+          UPDATE finance_budgets SET monthly_limit = ?, updated_at = ?, deleted_at = ? WHERE category = ?
+        `);
+        for (const b of data.budgets as Array<Record<string, unknown>>) {
+          if (!isUsableRow(b, 'budgets', ['category'])) continue;
+          const remoteUpdated = (b.updatedAt as string) ?? (b.createdAt as string) ?? now;
+          const local = getB.get(b.category) as { updated_at: string } | undefined;
+          if (!local) {
+            const r = insB.run(b.category, b.monthlyLimit ?? b.monthly_limit ?? 0,
+              b.createdAt ?? now, remoteUpdated, b.deletedAt ?? null);
+            if (r.changes > 0) changed = true;
+          } else if (remoteUpdated > (local.updated_at || '')) {
+            updB.run(b.monthlyLimit ?? b.monthly_limit ?? 0, remoteUpdated, b.deletedAt ?? null, b.category);
+            changed = true;
+          }
+        }
+      }
+
       // Legacy income sources — no longer written by the UI, but older installs
       // still hold rows and they were leaking between accounts.
       if (data.incomeSources && Array.isArray(data.incomeSources)) {
@@ -1445,7 +1522,9 @@ export function registerSyncIpcHandlers(): void {
       // is_extension travels too: without it, a +5min extension synced from
       // another device landed as is_extension = 0 and counted as a full pomodoro
       // in every stat (+1 today, +minutes on the weekly chart, +XP eligibility).
-      const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at, is_extension) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      // task_id and abandoned travel too: without them, mission links and broken
+      // flasks (the shelf's scars) never crossed devices.
+      const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at, is_extension, task_id, abandoned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const completeSession = db.prepare(`UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ? WHERE id = ?`);
       // preset_id is a FOREIGN KEY: a session whose preset this device has never
       // seen would fail the constraint and (now that this runs in a transaction)
@@ -1456,7 +1535,7 @@ export function registerSyncIpcHandlers(): void {
         const local = getSession.get(s.id) as { id: string; completed: number } | undefined;
         if (!local) {
           const presetId = s.preset_id && presetExists.get(s.preset_id) ? s.preset_id : null;
-          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null, s.is_extension ?? 0);
+          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null, s.is_extension ?? 0, s.task_id ?? null, s.abandoned ?? 0);
           if (result.changes > 0) changed = true;
         } else if (s.completed === 1 && local.completed === 0) {
           completeSession.run(s.completed_at, s.updated_at, s.id);

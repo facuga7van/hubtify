@@ -14,9 +14,12 @@
   },
   "dashboard": {
     "briefAllGood": "Todo al día: {{n}} hechos registrados hoy.",
+    "briefNewAchievement": "Nuevo logro: ",
     "briefNoMeals": "Todavía no registraste ninguna comida hoy.",
     "briefNothingPending": "Nada pendiente. Buen momento para sumar algo.",
     "briefOverdue": "Tenés {{n}} misiones vencidas.",
+    "briefSealDay": "Sellá tu día",
+    "briefSealYesterday": "Te quedó ayer sin sellar. ",
     "briefStreakAtRisk": "Tu racha de {{n}} días está en riesgo: registrá algo hoy.",
     "briefTitle": "HOY",
     "cartDueToday": "MISIONES HOY",
@@ -42,6 +45,8 @@
     "cartXpTip": "Experiencia ganada hoy",
     "chronicle": "CRÓNICA RECIENTE",
     "chronicleHelp": "Últimos eventos que otorgaron XP: misiones, nutrición, finanzas y logros.",
+    "codexOpen": "Abrir el códice del día",
+    "codexOpenSealed": "Ver la página de hoy",
     "daysShort": [
       "DOM",
       "LUN",
@@ -114,116 +119,26 @@
     "title": "Notificaciones"
   },
   "questify": {
-    "title": "Libro de Misiones",
-    "subtitle": "Gestiona tus aventuras diarias",
-    "addQuest": "Agregar Quest",
-    "tier": {
-      "quick": "Rápida",
-      "normal": "Normal",
-      "epic": "Épica"
-    },
-    "frequency": {
-      "daily": "Diario",
-      "weekly": "Semanal",
-      "monthly": "Mensual"
-    },
-    "timesPerWeek": "x/sem",
-    "resetsOn": "Se resetea el {{date}}",
-    "dueLabel": "Vence:",
-    "update": "Actualizar",
-    "questName": "Nombre de la quest...",
-    "description": "Descripción (opcional)",
-    "noCategory": "Sin categoría",
-    "dueDate": "Fecha límite",
-    "pending": "Pendientes",
-    "completed": "Completadas",
-    "allCategories": "Todas las categorías",
-    "allProjects": "Todos los proyectos",
-    "noProject": "Sin proyecto",
-    "newProject": "Nuevo proyecto",
-    "projectName": "Nombre del proyecto",
-    "manageProjects": "Gestionar proyectos",
-    "deleteProjectConfirm": "Las tasks de este proyecto pasarán a 'Sin proyecto'. ¿Continuar?",
-    "pendingCount": "{{count}} pendientes",
-    "showMore": "Ver más",
-    "scrollNotes": "Notas",
-    "noteOf": "Nota {{current}} de {{total}}",
-    "newNote": "Nueva",
-    "clearCanvas": "Limpiar",
-    "deleteNote": "Eliminar nota",
-    "deleteNoteConfirm": "¿Eliminar esta nota? No se puede deshacer.",
-    "noNotes": "Sin notas. ¡Creá una!",
-    "habitHeatmap": "Mapa de Actividad",
-    "heatmapHelp": "Mapa de actividad de los últimos 30 días. Los colores más intensos indican más hábitos completados ese día.",
-    "habits": "Hábitos",
-    "habitsHelp": "Hábitos que se reinician por período (diario/semanal/mensual). Completarlos da XP y mantiene tu racha.",
-    "habitsEmptyHint": "Rituales diarios o semanales que querés mantener.",
-    "habitsToday": "hoy",
-    "addHabit": "Nuevo hábito",
-    "habitDuplicate": "Ya existe un hábito con ese nombre",
-    "habitName": "Nombre del hábito",
-    "habitUnchecked": "Hábito desmarcado — XP deducido",
-    "dragHandle": "Reordenar",
-    "selectTask": "Seleccionar misión",
-    "streakDays": "{{count}} días",
-    "deleteHabitConfirm": "¿Eliminar este hábito y todo su historial?",
-    "quickAdd": "Agregar rápido",
-    "retroCheckTitle": "Marcar hábito de ayer",
-    "reward": "RECOMPENSA",
-    "edit": "Editar",
-    "eraserTool": "Goma",
-    "delete": "Eliminar",
-    "noQuests": "No hay quests todavía. ¡Agregá una arriba!",
-    "addSubtask": "+ Agregar Subtarea",
-    "save": "Guardar",
-    "cancel": "Cancelar",
-    "subtaskName": "Nombre de subtarea",
-    "deleteConfirm": "¿Eliminar {{count}} quest(s)? No se puede deshacer.",
-    "subtaskDeleteConfirm": "¿Eliminar esta subtarea?",
-    "subtaskLimit": "Máximo 30 subtareas alcanzado",
-    "showCompleted": "Mostrar completadas",
-    "hideCompleted": "Ocultar completadas",
-    "doneToday": "hechas hoy",
-    "questsPending": "quests pendientes",
-    "newCategory": "+ Nueva categoría",
-    "categoryName": "Nombre de categoría",
-    "dueToday": "Hoy",
-    "eyebrow": "QUESTIFY — LIBER MISSIONUM",
-    "groupLater": "Después",
-    "groupNoDate": "Sin Fecha",
-    "groupOverdue": "Vencidas",
-    "groupThisWeek": "Esta Semana",
-    "groupToday": "Hoy",
-    "inProgress": "EN CURSO",
-    "overdue": "VENCIDAS",
-    "todayDue": "HOY",
-    "completedCount": "CUMPLIDAS",
-    "penalty": "CASTIGO",
-    "penTool": "Lápiz",
-    "pendingBanner": "MISIONES PENDIENTES",
-    "projectsHelp": "Proyectos agrupan misiones en campañas. Su progreso se muestra en la barra de Campañas.",
-    "scrollNotesHelp": "Pergaminos: dibujá apuntes a mano alzada para cada misión. Podés crear varias páginas.",
-    "statsHelp": "Resumen de misiones: en progreso, vencidas, para hoy y completadas.",
-    "taskListHelp": "Misiones ordenadas por vencimiento y prioridad. Tier I = 5 XP, Tier II = 15 XP, Tier III = 40 XP.",
-    "overdueCount": "{{count}} vencidas",
-    "overdueLabel": "vencida",
-    "subtasksLabel": "subtareas",
-    "campaigns": "Campañas",
-    "campaignsHelp": "Progreso de tus proyectos activos. Cada tarea completada avanza la barra del proyecto.",
-    "noHabits": "Sin rituales configurados",
-    "noCampaigns": "Sin campañas activas",
-    "tiers": {
-      "common": "Communis",
-      "epic": "Epica",
-      "legendary": "Legendaria",
-      "overdue": "Delata",
-      "rare": "Rara"
-    },
     "actions": "ACCIONES",
     "actionsHelp": "Accesos directos para gestionar proyectos, notas y configuración de misiones.",
+    "addHabit": "Nuevo hábito",
+    "addQuest": "Agregar Quest",
+    "addSubtask": "+ Agregar Subtarea",
+    "allCategories": "Todas las categorías",
+    "allProjects": "Todos los proyectos",
     "batchComplete": "Completar",
     "batchCompleted": "{{count}} misiones completadas!",
+    "brewAttached": "Misión enlazada a la sesión activa",
+    "brewStarted": "El caldero hierve con esta misión",
+    "brewThis": "Enfocar en el Caldero",
+    "campaigns": "Campañas",
+    "campaignsHelp": "Progreso de tus proyectos activos. Cada tarea completada avanza la barra del proyecto.",
+    "cancel": "Cancelar",
+    "categoryName": "Nombre de categoría",
     "chooseDays": "Elegir días",
+    "clearCanvas": "Limpiar",
+    "completed": "Completadas",
+    "completedCount": "CUMPLIDAS",
     "dayLetters": {
       "1": "L",
       "2": "M",
@@ -233,24 +148,126 @@
       "6": "S",
       "7": "D"
     },
+    "delete": "Eliminar",
+    "deleteConfirm": "¿Eliminar {{count}} quest(s)? No se puede deshacer.",
+    "deleteHabitConfirm": "¿Eliminar este hábito y todo su historial?",
+    "deleteNote": "Eliminar nota",
+    "deleteNoteConfirm": "¿Eliminar esta nota? No se puede deshacer.",
+    "deleteProjectConfirm": "Las tasks de este proyecto pasarán a 'Sin proyecto'. ¿Continuar?",
+    "description": "Descripción (opcional)",
+    "doneToday": "hechas hoy",
+    "dragHandle": "Reordenar",
+    "dueDate": "Fecha límite",
+    "dueLabel": "Vence:",
+    "dueToday": "Hoy",
+    "edit": "Editar",
+    "eraserTool": "Goma",
+    "eyebrow": "QUESTIFY — LIBER MISSIONUM",
+    "frequency": {
+      "daily": "Diario",
+      "weekly": "Semanal",
+      "monthly": "Mensual"
+    },
+    "groupLater": "Después",
+    "groupNoDate": "Sin Fecha",
+    "groupOverdue": "Vencidas",
+    "groupThisWeek": "Esta Semana",
+    "groupToday": "Hoy",
+    "habitDuplicate": "Ya existe un hábito con ese nombre",
+    "habitHeatmap": "Mapa de Actividad",
+    "habitName": "Nombre del hábito",
     "habitShieldTitle": "Escudos de racha: {{count}} de {{max}}. Cubren un día perdido.",
     "habitShieldUsed": "Un escudo cubrió un día perdido — la racha sigue",
     "habitSkipToday": "Saltear hoy",
     "habitSkipUndo": "No saltear hoy",
     "habitSkippedLabel": "Salteado",
     "habitSkippedToast": "Día salteado — la racha sigue en pie",
+    "habitUnchecked": "Hábito desmarcado — XP deducido",
     "habitUnskippedToast": "El día ya no está salteado",
+    "habits": "Hábitos",
+    "habitsEmptyHint": "Rituales diarios o semanales que querés mantener.",
+    "habitsHelp": "Hábitos que se reinician por período (diario/semanal/mensual). Completarlos da XP y mantiene tu racha.",
+    "habitsToday": "hoy",
+    "heatmapHelp": "Mapa de actividad de los últimos 30 días. Los colores más intensos indican más hábitos completados ese día.",
+    "hideCompleted": "Ocultar completadas",
+    "inProgress": "EN CURSO",
+    "manageProjects": "Gestionar proyectos",
     "moveAllToToday": "Mover todo a hoy",
     "moveAllToTodayConfirm": "¿Mover {{count}} misiones vencidas a hoy?",
+    "newCategory": "+ Nueva categoría",
+    "newNote": "Nueva",
+    "newProject": "Nuevo proyecto",
+    "noCampaigns": "Sin campañas activas",
+    "noCategory": "Sin categoría",
     "noCompletedQuests": "Aún no has completado ninguna misión. ¡Adelante, héroe!",
+    "noHabits": "Sin rituales configurados",
     "noHabitsToday": "Ningún ritual toca hoy",
+    "noNotes": "Sin notas. ¡Creá una!",
+    "noProject": "Sin proyecto",
+    "noQuests": "No hay quests todavía. ¡Agregá una arriba!",
+    "noteOf": "Nota {{current}} de {{total}}",
+    "overdue": "VENCIDAS",
+    "overdueCount": "{{count}} vencidas",
+    "overdueLabel": "vencida",
+    "penTool": "Lápiz",
+    "penalty": "CASTIGO",
+    "pending": "Pendientes",
+    "pendingBanner": "MISIONES PENDIENTES",
+    "pendingCount": "{{count}} pendientes",
     "postpone": "Posponer",
     "postponePick": "Elegir fecha",
     "postponeToday": "Hoy",
     "postponeTomorrow": "Mañana",
     "postponed": "{{count}} misión(es) pospuesta(s)",
+    "projectName": "Nombre del proyecto",
+    "projectsHelp": "Proyectos agrupan misiones en campañas. Su progreso se muestra en la barra de Campañas.",
+    "questName": "Nombre de la quest...",
+    "questsPending": "quests pendientes",
+    "quickAdd": "Agregar rápido",
+    "quickAddHint": "Probá «entregar informe mañana 15hs !epica #proyecto»",
+    "quickAddRelease": "Click para devolverlo al título",
+    "resetsOn": "Se resetea el {{date}}",
+    "retroCheckTitle": "Marcar hábito de ayer",
+    "reward": "RECOMPENSA",
+    "save": "Guardar",
+    "scrollNotes": "Notas",
+    "scrollNotesHelp": "Pergaminos: dibujá apuntes a mano alzada para cada misión. Podés crear varias páginas.",
     "searchPlaceholder": "Buscar...",
+    "selectTask": "Seleccionar misión",
+    "showCompleted": "Mostrar completadas",
+    "showMore": "Ver más",
+    "statsHelp": "Resumen de misiones: en progreso, vencidas, para hoy y completadas.",
+    "streakDays": "{{count}} días",
+    "subtaskDeleteConfirm": "¿Eliminar esta subtarea?",
+    "subtaskLimit": "Máximo 30 subtareas alcanzado",
+    "subtaskName": "Nombre de subtarea",
+    "subtasksLabel": "subtareas",
+    "subtitle": "Gestiona tus aventuras diarias",
+    "taskListHelp": "Misiones ordenadas por vencimiento y prioridad. Tier I = 5 XP, Tier II = 15 XP, Tier III = 40 XP.",
+    "tier": {
+      "quick": "Rápida",
+      "normal": "Normal",
+      "epic": "Épica"
+    },
+    "tiers": {
+      "common": "Communis",
+      "epic": "Epica",
+      "legendary": "Legendaria",
+      "overdue": "Delata",
+      "rare": "Rara"
+    },
     "timesMode": "N veces",
+    "timesPerWeek": "x/sem",
+    "title": "Libro de Misiones",
+    "todayClear1": "El día está conquistado.",
+    "todayClear2": "Nada pende sobre tu cabeza. Descansá, héroe.",
+    "todayClear3": "El códice de hoy quedó cerrado y en orden.",
+    "todayClear4": "Ni una misión en pie. El reino puede esperar a mañana.",
+    "todayDue": "HOY",
+    "todayHabits": "Rituales de hoy",
+    "todayPlanAhead": "Planear mañana",
+    "todayTab": "Hoy",
+    "update": "Actualizar",
     "widgetHelp": "Vista rápida de tus misiones pendientes más próximas.",
     "yesterday": "Ayer"
   },
@@ -364,6 +381,13 @@
     "gymCaloriesHint": "Calorías extra que quemás en un día de gym",
     "height": "Altura (cm)",
     "heightLabel": "Altura",
+    "historyCached": "Al instante",
+    "historyCachedHint": "Ya habías registrado esto: reusamos el valor que confirmaste, sin llamar a la IA.",
+    "historyKeysHint": "↑↓ elegir · Enter registra · Tab completa · Esc cierra",
+    "historySuggestions": "Sugerencias de tu historial",
+    "historyTimesLogged": "{{count}} vez",
+    "historyTimesLogged_other": "{{count}} veces",
+    "historyUsuals": "Tus de siempre",
     "hpExplanation": "HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP",
     "inProgress": "en curso",
     "invalidCalories": "Las calorías deben ser mayores a 0",
@@ -430,6 +454,7 @@
     "range365d": "365 d",
     "range7d": "7 d",
     "range90d": "90 d",
+    "reEstimate": "Re-estimar con IA",
     "remaining": "restantes",
     "reopenDay": "Reabrir día",
     "reopenDayConfirm": "Se revierten el XP y el HP que ganaste al cerrar este día. Vas a poder registrar comidas de nuevo y cerrarlo otra vez.",
@@ -568,6 +593,14 @@
     "billingDay": "Día de cobro",
     "amountHistory": "Historial de montos",
     "borrowed": "Tomado prestado",
+    "budgetEditLabel": "Límite mensual de {{category}}",
+    "budgetHint": "Poné un límite mensual con el lápiz de cada categoría. Elegí 3 o 4 categorías, no todas.",
+    "budgetMonthLine": "Presupuesto del mes: {{spent}} de {{limit}}",
+    "budgetMonthMet": "Libro Mayor Cerrado: {{month}} dentro del presupuesto",
+    "budgetOverflow": "{{category}}: te pasaste del límite del mes",
+    "budgetPlaceholder": "Límite mensual",
+    "budgetRemove": "Quitar presupuesto",
+    "budgetSave": "Guardar límite",
     "byCategory": "Por Categoría",
     "cancel": "Cancelar",
     "cancelEdit": "Cancelar",
@@ -836,6 +869,9 @@
     "xpToNextLevel": "xp para el próximo ascenso"
   },
   "cauldron": {
+    "abandoned": {
+      "toast": "Poción rota — {{minutes}} min quedaron en el estante"
+    },
     "autoStart": {
       "breakHelp": "Al terminar un enfoque, el descanso empieza solo tras 5 segundos. Podés cancelarlo con «Esperá».",
       "breakLabel": "Arrancar el descanso solo",
@@ -897,6 +933,21 @@
       "resumeHelp": "Continúa desde el tiempo que quedaba."
     },
     "longBreak": "Descanso largo",
+    "mission": {
+      "change": "cambiar",
+      "clear": "Sin misión",
+      "complete": "Completar misión",
+      "completeHelp": "Marca la misión como completada en Questify, con su XP. Si no lo tocás, no pasa nada.",
+      "deleted": "Misión ya no disponible",
+      "gone": "Esa misión ya no está disponible.",
+      "label": "Misión",
+      "noMatches": "Ninguna misión coincide.",
+      "noProject": "Sin proyecto",
+      "none": "Sin misión",
+      "noneOpen": "No hay misiones abiertas.",
+      "prompt": "¿Sobre qué misión?",
+      "search": "Buscar misión…"
+    },
     "noBrewInProgress": "Sin poción en curso",
     "notify": {
       "breakDone": "¡Descanso terminado!",
@@ -945,6 +996,20 @@
     "resume": "Continuar",
     "round": "{{round}}ª ronda",
     "selectedRecipe": "Receta seleccionada",
+    "shelf": {
+      "abandonedAt": "abandonada a los {{minutes}} min",
+      "count": "{{count}} frascos",
+      "empty": "El estante está vacío. La primera poción lo estrena.",
+      "looseMany": "{{count}} sueltas",
+      "looseOne": "{{count}} suelta",
+      "ofProject": "{{count}} de {{project}}",
+      "title": "Estante de Pociones",
+      "today": "Hoy",
+      "unlabeled": "sin etiqueta",
+      "weekSummary": "Esta semana: {{count}} pociones — {{breakdown}}",
+      "yesterday": "Ayer"
+    },
+    "shelfHelp": "Cada enfoque completado deja un frasco, del color del proyecto de la misión. Un enfoque cortado a mano después de 5 minutos deja un frasco roto. El estante nunca se vacía.",
     "skip": "Saltar",
     "skipBreakHelp": "Termina el descanso ya y arranca el próximo enfoque.",
     "skipWorkHelp": "Termina este enfoque ya y pasa al descanso. El ciclo no cuenta y no otorga XP.",
@@ -1040,9 +1105,240 @@
     }
   },
   "rpg": {
+    "achievements": {
+      "awakening": {
+        "title": "El Despertar",
+        "desc": "Tu personaje ya tiene nombre. La aventura empieza ahí."
+      },
+      "cauldron_master": {
+        "title": "Maestro del Caldero",
+        "desc": "Cien pomodoros completados sin dejar que el fuego se apague."
+      },
+      "chronicler_i": {
+        "title": "Cronista I",
+        "desc": "Cien hechos anotados en la crónica de tu cuenta."
+      },
+      "chronicler_ii": {
+        "title": "Cronista II",
+        "desc": "Quinientos hechos anotados en la crónica."
+      },
+      "chronicler_iii": {
+        "title": "Cronista III",
+        "desc": "Dos mil hechos anotados. La crónica ya pesa."
+      },
+      "combo_master": {
+        "title": "Maestro del Combo",
+        "desc": "Alcanzaste el multiplicador máximo (x2) en un mismo día."
+      },
+      "day_off": {
+        "title": "Día Libre",
+        "desc": "Salteaste un hábito a propósito. Descansar también es decidir."
+      },
+      "debt_free": {
+        "title": "Deuda Saldada",
+        "desc": "Cerraste tu primer préstamo en Coinify."
+      },
+      "deep_work": {
+        "title": "Inmersión",
+        "desc": "Cuatro pomodoros en un mismo día."
+      },
+      "deserved_rest": {
+        "title": "Descanso Merecido",
+        "desc": "Jugaste desde la Posada. La racha te esperaba igual."
+      },
+      "early_bird": {
+        "title": "Madrugador",
+        "desc": "Un hecho registrado antes de las 06:00."
+      },
+      "epic_quest": {
+        "title": "Jornada Épica",
+        "desc": "Diez misiones completadas en un mismo día."
+      },
+      "first_brew": {
+        "title": "Primer Hervor",
+        "desc": "Completaste tu primer pomodoro."
+      },
+      "first_coin": {
+        "title": "Primera Moneda",
+        "desc": "Anotaste tu primer movimiento en Coinify."
+      },
+      "first_habit": {
+        "title": "Primer Rito",
+        "desc": "Marcaste tu primer hábito."
+      },
+      "first_meal": {
+        "title": "Primer Bocado",
+        "desc": "Registraste tu primera comida."
+      },
+      "first_quest": {
+        "title": "Primera Misión",
+        "desc": "Completaste tu primera tarea."
+      },
+      "first_seal": {
+        "title": "Primer Sello",
+        "desc": "Cerraste tu primer día en el Códice."
+      },
+      "first_step": {
+        "title": "Primer Paso",
+        "desc": "Todo héroe empieza por algo. Vos ya empezaste."
+      },
+      "golden_day": {
+        "title": "Jornada Dorada",
+        "desc": "Doscientos XP en un solo día."
+      },
+      "hero_return": {
+        "title": "El Regreso del Héroe",
+        "desc": "Volviste después de dos semanas. La taberna te guardó el lugar."
+      },
+      "hiddenDesc": "Un secreto que todavía no revelaste.",
+      "hiddenTitle": "???",
+      "late_memory": {
+        "title": "Memoria Tardía",
+        "desc": "Sellaste el día de ayer. Nunca es tarde para cerrar el libro."
+      },
+      "ledger_closed": {
+        "title": "Libro Mayor Cerrado",
+        "desc": "Cerraste un mes entero dentro del presupuesto."
+      },
+      "lucky_strike": {
+        "title": "Golpe de Suerte",
+        "desc": "Sacaste un x3 en la tirada de bonus. Dos por ciento de probabilidad."
+      },
+      "monthly_vow": {
+        "title": "Voto Mensual",
+        "desc": "Treinta días de racha."
+      },
+      "night_owl": {
+        "title": "Trasnochador",
+        "desc": "Un hecho registrado después de las 23:00."
+      },
+      "perfect_day": {
+        "title": "Día Perfecto",
+        "desc": "Los cuatro módulos con actividad en un mismo día."
+      },
+      "polymath": {
+        "title": "Polímata",
+        "desc": "Cinco tipos distintos de hecho en un mismo día."
+      },
+      "radiant_seal": {
+        "title": "Sello Radiante",
+        "desc": "Sellaste un día con el Vigor casi intacto."
+      },
+      "ritualist": {
+        "title": "Ritualista",
+        "desc": "Cinco hábitos distintos marcados alguna vez."
+      },
+      "scribe_of_accounts": {
+        "title": "Escriba de Cuentas",
+        "desc": "Importaste tu primer resumen bancario."
+      },
+      "sealed_week": {
+        "title": "Semana Sellada",
+        "desc": "Siete días cerrados en el Códice."
+      },
+      "second_chance": {
+        "title": "Segunda Oportunidad",
+        "desc": "Reabriste un día en Nutrify. Cerrar nunca es definitivo."
+      },
+      "squire": {
+        "title": "Escudero",
+        "desc": "Llegaste al nivel 5."
+      },
+      "steadfast": {
+        "title": "Constancia",
+        "desc": "Siete días de racha."
+      },
+      "steady_hand": {
+        "title": "Mano Firme",
+        "desc": "Treinta días cerrados en el Códice."
+      },
+      "sunday_guardian": {
+        "title": "Guardián del Domingo",
+        "desc": "Cinco hechos un domingo. El descanso es opcional."
+      },
+      "table_guardian": {
+        "title": "Guardián de la Mesa",
+        "desc": "Siete días cerrados en Nutrify."
+      },
+      "the_pardon": {
+        "title": "El Indulto",
+        "desc": "Un día perdido no te costó la racha."
+      },
+      "three_epics": {
+        "title": "Tres Épicas",
+        "desc": "Tres tiradas de x3 en un mismo día. Los dados te aman."
+      },
+      "unlockedToast": "Logro desbloqueado: {{title}}"
+    },
+    "achEmpty": "Todavía no hay nada en el estante. Se llena solo, jugando.",
+    "achEyebrow": "ESTANTE DE LOS LOGROS",
+    "achGroupCauldron": "Del Caldero",
+    "achGroupChronicle": "Cronista",
+    "achGroupCodex": "Del Códice",
+    "achGroupFinance": "Del Coinify",
+    "achGroupHidden": "Ocultos",
+    "achGroupMastery": "Maestría",
+    "achGroupNutrition": "Del Nutrify",
+    "achGroupOther": "Del héroe",
+    "achGroupProgress": "Progresión",
+    "achGroupQuests": "Del Questify",
+    "achGroupRhythm": "Ritmo y tiempo",
+    "achGroupStarts": "Primeros pasos",
+    "achSecretDesc": "Algo espera a ser encontrado.",
+    "achSubtitle": "Dó se guardan los medallones ganados y los que aún esperan dueño",
+    "achUnavailable": "Los logros todavía no están disponibles en esta versión.",
+    "achUnlockedOn": "Obtenido",
     "bestShort": "récord",
     "bestStreak": "Mejor racha",
     "clickDismiss": "Click para cerrar",
+    "codexAlreadySealed": "Este día ya estaba sellado. Acá está su página.",
+    "codexAwardBreakdown": "día vivo × vigor {{vigor}}",
+    "codexComboFoot": "en un mismo día",
+    "codexDeeds": "HECHOS",
+    "codexDeedsFoot": "entradas del día",
+    "codexEmptyDay": "El códice registra días vividos. Volvé cuando haya algo que anotar.",
+    "codexEyebrow": "CIERRE DEL CÓDICE",
+    "codexHoldHint": "Mantené apretado para estampar el lacre",
+    "codexHoldToSeal": "Mantené apretado para sellar el día",
+    "codexMaxCombo": "COMBO MÁXIMO",
+    "codexNoPage": "No pudimos leer la página de este día.",
+    "codexPhrases": {
+      "constancy": [
+        "Otro día encadenado al anterior. La constancia ya es tuya.",
+        "La racha no se sostiene sola: la sostuviste vos."
+      ],
+      "focus": [
+        "Hoy el fuego del caldero ardió parejo. Eso es concentración.",
+        "Largos ratos en una sola cosa. El oficio se construye así."
+      ],
+      "gentle": [
+        "Un día tranquilo también se escribe. Acá queda.",
+        "Poco y bueno. El códice registra días vividos, no días perfectos."
+      ],
+      "steady": [
+        "Un día honesto, de los que suman sin hacer ruido.",
+        "Nada extraordinario, nada perdido. Así se avanza."
+      ],
+      "variety": [
+        "Tocaste varios frentes y ninguno quedó a medias.",
+        "Día de muchas manos: el códice lo anota con gusto."
+      ]
+    },
+    "codexSealedOn": "Sellado",
+    "codexStrip": "ÚLTIMOS XIV DÍAS",
+    "codexStripLegend": "Un día sin sellar no es una falta — es una página que quedó abierta.",
+    "codexStripOpen": "{{date}} — sin sellar",
+    "codexStripSealed": "{{date}} — sellado, +{{xp}} XP",
+    "codexSubtitle": "Leé el día, y si querés, cerralo. Podés irte cuando quieras.",
+    "codexSubtitleSealed": "Esta página está cerrada. Lo que pasó, pasó, y quedó escrito.",
+    "codexTitle": "Cierre del Códice",
+    "codexTooOld": "Esta página ya se encuadernó. Los días viejos se quedan como quedaron, y está bien.",
+    "codexUnavailable": "El cierre del códice todavía no está disponible en esta versión.",
+    "codexUnlocked": "Desbloqueaste",
+    "codexXpFoot": "anotados al margen",
+    "codexXpToday": "XP DEL DÍA",
+    "codexXpUnit": "XP",
+    "codexYesterdayTag": "PÁGINA DE AYER",
     "combo": "Combo",
     "days": "días",
     "inn": "Posada",
@@ -1061,6 +1357,9 @@
     "pardonsEmpty": "Sin indultos este mes",
     "pardonsHint": "Perdonan un día perdido. Se recargan cada mes.",
     "pardonsRemaining": "Indultos: {{count}} de {{total}}",
+    "sealInvite": "Sellar el día",
+    "sealInviteSub": "{{n}} hechos por cerrar",
+    "sealInviteYesterday": "Te quedó ayer sin sellar",
     "streak": "racha",
     "titles": {
       "peasant": "Campesino",

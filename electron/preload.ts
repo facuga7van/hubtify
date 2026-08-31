@@ -5,6 +5,11 @@ const api = {
   getRpgStats: () => ipcRenderer.invoke('rpg:getStats'),
   processRpgEvent: (event: RpgEvent) => ipcRenderer.invoke('rpg:processEvent', event),
   rpgSetInnMode: (on: boolean) => ipcRenderer.invoke('rpg:setInnMode', on),
+  rpgGetAchievements: () => ipcRenderer.invoke('rpg:getAchievements'),
+  rpgBackfillAchievements: () => ipcRenderer.invoke('rpg:backfillAchievements'),
+  rpgGetDaySummary: (date?: string | null) => ipcRenderer.invoke('rpg:getDaySummary', date),
+  rpgSealDay: (date?: string | null) => ipcRenderer.invoke('rpg:sealDay', date),
+  rpgGetSeals: (fromDate: string, toDate: string) => ipcRenderer.invoke('rpg:getSeals', fromDate, toDate),
   getRpgHistory: (limit: number) => ipcRenderer.invoke('rpg:getHistory', limit),
   rpgGetDashboardStats: () => ipcRenderer.invoke('rpg:getDashboardStats'),
   windowMinimize: () => ipcRenderer.send('window:minimize'),
@@ -54,6 +59,9 @@ const api = {
   nutritionLogFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:logFood', entry),
   nutritionGetFoodByDate: (date: string) => ipcRenderer.invoke('nutrition:getFoodByDate', date),
   nutritionCopyDay: (opts?: { from?: string; to?: string }) => ipcRenderer.invoke('nutrition:copyDay', opts),
+  nutritionSearchHistory: (query?: string, limit?: number) => ipcRenderer.invoke('nutrition:searchHistory', query, limit),
+  nutritionGetCachedEstimate: (description: string) => ipcRenderer.invoke('nutrition:getCachedEstimate', description),
+  nutritionCacheEstimate: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:cacheEstimate', entry),
   nutritionDeleteFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFood', id),
   nutritionDeleteByDate: (date: string) => ipcRenderer.invoke('nutrition:deleteByDate', date),
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => ipcRenderer.invoke('nutrition:updateFood', id, fields),
@@ -122,6 +130,16 @@ const api = {
   notificationsSetLocale: (locale: string) => ipcRenderer.invoke('notifications:setLocale', locale),
   notificationsSetModuleEnabled: (module: string, enabled: boolean) => ipcRenderer.invoke('notifications:setModuleEnabled', module, enabled),
   notificationsSetHabitReminder: (enabled: boolean, time: string) => ipcRenderer.invoke('notifications:setHabitReminder', enabled, time),
+  onRpgAchievementUnlocked: (callback: (id: string) => void) => {
+    const handler = (_e: unknown, payload: { id: string }) => callback(payload?.id);
+    ipcRenderer.on('rpg:achievementUnlocked', handler);
+    return () => { ipcRenderer.removeListener('rpg:achievementUnlocked', handler); };
+  },
+  onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => {
+    const handler = (_e: unknown, payload: { date: string; xpAwarded: number }) => callback(payload);
+    ipcRenderer.on('rpg:daySealed', handler);
+    return () => { ipcRenderer.removeListener('rpg:daySealed', handler); };
+  },
   onRpgPardonUsed: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('rpg:pardonUsed', handler);
@@ -137,7 +155,7 @@ const api = {
   cauldronGetPresets: () => ipcRenderer.invoke('cauldron:getPresets'),
   cauldronUpsertPreset: (preset: Record<string, unknown>) => ipcRenderer.invoke('cauldron:upsertPreset', preset),
   cauldronDeletePreset: (id: string) => ipcRenderer.invoke('cauldron:deletePreset', id),
-  cauldronStart: (presetId: string) => ipcRenderer.invoke('cauldron:start', presetId),
+  cauldronStart: (presetId: string, taskId?: string | null) => ipcRenderer.invoke('cauldron:start', presetId, taskId),
   cauldronPause: () => ipcRenderer.invoke('cauldron:pause'),
   cauldronResume: () => ipcRenderer.invoke('cauldron:resume'),
   cauldronSkip: () => ipcRenderer.invoke('cauldron:skip'),
@@ -152,6 +170,8 @@ const api = {
   cauldronResumeInterruptedSession: () => ipcRenderer.invoke('cauldron:resumeInterruptedSession'),
   cauldronDiscardInterruptedSession: () => ipcRenderer.invoke('cauldron:discardInterruptedSession'),
   cauldronCancelAutoStart: () => ipcRenderer.invoke('cauldron:cancelAutoStart'),
+  cauldronSetSessionTask: (taskId: string | null) => ipcRenderer.invoke('cauldron:setSessionTask', taskId),
+  cauldronGetWeekByProject: () => ipcRenderer.invoke('cauldron:getWeekByProject'),
   cauldronSetLabels: (labels: Record<string, string>) => ipcRenderer.invoke('cauldron:setLabels', labels),
   onCauldronTick: (callback: (state: unknown) => void) => {
     const handler = (_e: unknown, state: unknown) => callback(state);
@@ -227,6 +247,9 @@ const api = {
   financeUndoImportBatch: (batchId: string) => ipcRenderer.invoke('finance:undoImportBatch', batchId),
   financeGetImportBatches: () => ipcRenderer.invoke('finance:getImportBatches'),
   financeGetCategoryMappings: () => ipcRenderer.invoke('finance:getCategoryMappings'),
+  financeGetBudgets: () => ipcRenderer.invoke('finance:getBudgets'),
+  financeSetBudget: (category: string, limit: number | null) => ipcRenderer.invoke('finance:setBudget', category, limit),
+  financeGetBudgetStatus: (month?: string) => ipcRenderer.invoke('finance:getBudgetStatus', month),
   financeUpdateCategoryMapping: (pattern: string, category: string) => ipcRenderer.invoke('finance:updateCategoryMapping', pattern, category),
 
   // Finance - Dashboard

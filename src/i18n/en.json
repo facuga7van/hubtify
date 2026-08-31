@@ -14,9 +14,12 @@
   },
   "dashboard": {
     "briefAllGood": "All caught up: {{n}} deeds logged today.",
+    "briefNewAchievement": "New achievement: ",
     "briefNoMeals": "You have not logged any meal today.",
     "briefNothingPending": "Nothing pending. Good moment to add something.",
     "briefOverdue": "You have {{n}} overdue quests.",
+    "briefSealDay": "Seal your day",
+    "briefSealYesterday": "You left yesterday unsealed. ",
     "briefStreakAtRisk": "Your {{n}}-day streak is at risk: log something today.",
     "briefTitle": "TODAY",
     "cartDueToday": "QUESTS TODAY",
@@ -42,6 +45,8 @@
     "cartXpTip": "Experience earned today",
     "chronicle": "RECENT CHRONICLE",
     "chronicleHelp": "Recent events that earned XP: quests, nutrition, finance and achievements.",
+    "codexOpen": "Open today's codex",
+    "codexOpenSealed": "See today's page",
     "daysShort": [
       "SUN",
       "MON",
@@ -114,116 +119,26 @@
     "title": "Notifications"
   },
   "questify": {
-    "title": "Book of Quests",
-    "subtitle": "Manage your daily adventures",
-    "addQuest": "Add Quest",
-    "tier": {
-      "quick": "Quick",
-      "normal": "Normal",
-      "epic": "Epic"
-    },
-    "frequency": {
-      "daily": "Daily",
-      "weekly": "Weekly",
-      "monthly": "Monthly"
-    },
-    "timesPerWeek": "x/wk",
-    "resetsOn": "Resets on {{date}}",
-    "dueLabel": "Due:",
-    "update": "Update",
-    "questName": "Quest name...",
-    "description": "Description (optional)",
-    "noCategory": "No category",
-    "dueDate": "Due date",
-    "pending": "Pending",
-    "completed": "Completed",
-    "allCategories": "All categories",
-    "allProjects": "All projects",
-    "noProject": "No project",
-    "newProject": "New project",
-    "projectName": "Project name",
-    "manageProjects": "Manage projects",
-    "deleteProjectConfirm": "Tasks from this project will move to 'No project'. Continue?",
-    "pendingCount": "{{count}} pending",
-    "showMore": "Show more",
-    "scrollNotes": "Notes",
-    "noteOf": "Note {{current}} of {{total}}",
-    "newNote": "New",
-    "clearCanvas": "Clear",
-    "deleteNote": "Delete note",
-    "deleteNoteConfirm": "Delete this note? This cannot be undone.",
-    "noNotes": "No notes yet. Create one!",
-    "habitHeatmap": "Activity Map",
-    "heatmapHelp": "Activity map of the last 30 days. Darker colors indicate more habits completed that day.",
-    "habits": "Habits",
-    "habitsHelp": "Habits that reset per period (daily/weekly/monthly). Completing them grants XP and keeps your streak.",
-    "habitsEmptyHint": "Daily or weekly rituals you want to maintain.",
-    "habitsToday": "today",
-    "addHabit": "New habit",
-    "habitDuplicate": "A habit with that name already exists",
-    "habitName": "Habit name",
-    "habitUnchecked": "Habit unchecked — XP deducted",
-    "dragHandle": "Reorder",
-    "selectTask": "Select task",
-    "streakDays": "{{count}} days",
-    "deleteHabitConfirm": "Delete this habit and all its history?",
-    "quickAdd": "Quick add",
-    "retroCheckTitle": "Check yesterday's habit",
-    "reward": "REWARD",
-    "edit": "Edit",
-    "eraserTool": "Eraser",
-    "delete": "Delete",
-    "noQuests": "No quests yet. Add one above!",
-    "addSubtask": "+ Add Subtask",
-    "save": "Save",
-    "cancel": "Cancel",
-    "subtaskName": "Subtask name",
-    "deleteConfirm": "Delete {{count}} quest(s)? This cannot be undone.",
-    "subtaskDeleteConfirm": "Delete this subtask?",
-    "subtaskLimit": "Max 30 subtasks reached",
-    "showCompleted": "Show completed",
-    "hideCompleted": "Hide completed",
-    "doneToday": "done today",
-    "questsPending": "quests pending",
-    "newCategory": "+ New category",
-    "categoryName": "Category name",
-    "dueToday": "Today",
-    "eyebrow": "QUESTIFY — LIBER MISSIONUM",
-    "groupLater": "Later",
-    "groupNoDate": "No Date",
-    "groupOverdue": "Overdue",
-    "groupThisWeek": "This Week",
-    "groupToday": "Today",
-    "inProgress": "IN PROGRESS",
-    "overdue": "OVERDUE",
-    "todayDue": "TODAY",
-    "completedCount": "COMPLETED",
-    "penalty": "PENALTY",
-    "penTool": "Pen",
-    "pendingBanner": "QUESTS TO UNDERTAKE",
-    "projectsHelp": "Projects group quests into campaigns. Their progress is shown in the Campaigns bar.",
-    "scrollNotesHelp": "Scrolls: draw freehand notes for each quest. You can create multiple pages.",
-    "statsHelp": "Quest summary: in progress, overdue, due today, and completed.",
-    "taskListHelp": "Quests sorted by due date and priority. Tier I = 5 XP, Tier II = 15 XP, Tier III = 40 XP.",
-    "overdueCount": "{{count}} overdue",
-    "overdueLabel": "overdue",
-    "subtasksLabel": "subtasks",
-    "campaigns": "Campaigns",
-    "campaignsHelp": "Progress of your active projects. Each completed task advances the project bar.",
-    "noHabits": "No rituals configured",
-    "noCampaigns": "No active campaigns",
-    "tiers": {
-      "common": "Common",
-      "epic": "Epic",
-      "legendary": "Legendary",
-      "overdue": "Overdue",
-      "rare": "Rare"
-    },
     "actions": "ACTIONS",
     "actionsHelp": "Quick shortcuts to manage projects, notes, and quest settings.",
+    "addHabit": "New habit",
+    "addQuest": "Add Quest",
+    "addSubtask": "+ Add Subtask",
+    "allCategories": "All categories",
+    "allProjects": "All projects",
     "batchComplete": "Complete",
     "batchCompleted": "{{count}} quests completed!",
+    "brewAttached": "Quest linked to the active session",
+    "brewStarted": "The cauldron brews for this quest",
+    "brewThis": "Focus in the Cauldron",
+    "campaigns": "Campaigns",
+    "campaignsHelp": "Progress of your active projects. Each completed task advances the project bar.",
+    "cancel": "Cancel",
+    "categoryName": "Category name",
     "chooseDays": "Pick days",
+    "clearCanvas": "Clear",
+    "completed": "Completed",
+    "completedCount": "COMPLETED",
     "dayLetters": {
       "1": "M",
       "2": "T",
@@ -233,24 +148,126 @@
       "6": "S",
       "7": "S"
     },
+    "delete": "Delete",
+    "deleteConfirm": "Delete {{count}} quest(s)? This cannot be undone.",
+    "deleteHabitConfirm": "Delete this habit and all its history?",
+    "deleteNote": "Delete note",
+    "deleteNoteConfirm": "Delete this note? This cannot be undone.",
+    "deleteProjectConfirm": "Tasks from this project will move to 'No project'. Continue?",
+    "description": "Description (optional)",
+    "doneToday": "done today",
+    "dragHandle": "Reorder",
+    "dueDate": "Due date",
+    "dueLabel": "Due:",
+    "dueToday": "Today",
+    "edit": "Edit",
+    "eraserTool": "Eraser",
+    "eyebrow": "QUESTIFY — LIBER MISSIONUM",
+    "frequency": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
+    },
+    "groupLater": "Later",
+    "groupNoDate": "No Date",
+    "groupOverdue": "Overdue",
+    "groupThisWeek": "This Week",
+    "groupToday": "Today",
+    "habitDuplicate": "A habit with that name already exists",
+    "habitHeatmap": "Activity Map",
+    "habitName": "Habit name",
     "habitShieldTitle": "Streak shields: {{count}} of {{max}}. Each covers one missed day.",
     "habitShieldUsed": "A shield covered a missed day — the streak holds",
     "habitSkipToday": "Skip today",
     "habitSkipUndo": "Don't skip today",
     "habitSkippedLabel": "Skipped",
     "habitSkippedToast": "Day skipped — your streak still stands",
+    "habitUnchecked": "Habit unchecked — XP deducted",
     "habitUnskippedToast": "Day no longer skipped",
+    "habits": "Habits",
+    "habitsEmptyHint": "Daily or weekly rituals you want to maintain.",
+    "habitsHelp": "Habits that reset per period (daily/weekly/monthly). Completing them grants XP and keeps your streak.",
+    "habitsToday": "today",
+    "heatmapHelp": "Activity map of the last 30 days. Darker colors indicate more habits completed that day.",
+    "hideCompleted": "Hide completed",
+    "inProgress": "IN PROGRESS",
+    "manageProjects": "Manage projects",
     "moveAllToToday": "Move all to today",
     "moveAllToTodayConfirm": "Move {{count}} overdue quests to today?",
+    "newCategory": "+ New category",
+    "newNote": "New",
+    "newProject": "New project",
+    "noCampaigns": "No active campaigns",
+    "noCategory": "No category",
     "noCompletedQuests": "No completed quests yet. Onward, hero!",
+    "noHabits": "No rituals configured",
     "noHabitsToday": "No rituals due today",
+    "noNotes": "No notes yet. Create one!",
+    "noProject": "No project",
+    "noQuests": "No quests yet. Add one above!",
+    "noteOf": "Note {{current}} of {{total}}",
+    "overdue": "OVERDUE",
+    "overdueCount": "{{count}} overdue",
+    "overdueLabel": "overdue",
+    "penTool": "Pen",
+    "penalty": "PENALTY",
+    "pending": "Pending",
+    "pendingBanner": "QUESTS TO UNDERTAKE",
+    "pendingCount": "{{count}} pending",
     "postpone": "Postpone",
     "postponePick": "Pick a date",
     "postponeToday": "Today",
     "postponeTomorrow": "Tomorrow",
     "postponed": "{{count}} quest(s) postponed",
+    "projectName": "Project name",
+    "projectsHelp": "Projects group quests into campaigns. Their progress is shown in the Campaigns bar.",
+    "questName": "Quest name...",
+    "questsPending": "quests pending",
+    "quickAdd": "Quick add",
+    "quickAddHint": "Try «hand in report mañana 15hs !epica #project» — dates in Spanish",
+    "quickAddRelease": "Click to put it back in the title",
+    "resetsOn": "Resets on {{date}}",
+    "retroCheckTitle": "Check yesterday's habit",
+    "reward": "REWARD",
+    "save": "Save",
+    "scrollNotes": "Notes",
+    "scrollNotesHelp": "Scrolls: draw freehand notes for each quest. You can create multiple pages.",
     "searchPlaceholder": "Search...",
+    "selectTask": "Select task",
+    "showCompleted": "Show completed",
+    "showMore": "Show more",
+    "statsHelp": "Quest summary: in progress, overdue, due today, and completed.",
+    "streakDays": "{{count}} days",
+    "subtaskDeleteConfirm": "Delete this subtask?",
+    "subtaskLimit": "Max 30 subtasks reached",
+    "subtaskName": "Subtask name",
+    "subtasksLabel": "subtasks",
+    "subtitle": "Manage your daily adventures",
+    "taskListHelp": "Quests sorted by due date and priority. Tier I = 5 XP, Tier II = 15 XP, Tier III = 40 XP.",
+    "tier": {
+      "quick": "Quick",
+      "normal": "Normal",
+      "epic": "Epic"
+    },
+    "tiers": {
+      "common": "Common",
+      "epic": "Epic",
+      "legendary": "Legendary",
+      "overdue": "Overdue",
+      "rare": "Rare"
+    },
     "timesMode": "N times",
+    "timesPerWeek": "x/wk",
+    "title": "Book of Quests",
+    "todayClear1": "The day is conquered.",
+    "todayClear2": "Nothing hangs over your head. Rest, hero.",
+    "todayClear3": "Today's codex is closed and in order.",
+    "todayClear4": "Not a single quest standing. The realm can wait until tomorrow.",
+    "todayDue": "TODAY",
+    "todayHabits": "Today's rituals",
+    "todayPlanAhead": "Plan tomorrow",
+    "todayTab": "Today",
+    "update": "Update",
     "widgetHelp": "Quick view of your nearest pending quests.",
     "yesterday": "Yesterday"
   },
@@ -364,6 +381,13 @@
     "gymCaloriesHint": "Extra calories burned on a gym day",
     "height": "Height (cm)",
     "heightLabel": "Height",
+    "historyCached": "Instantly",
+    "historyCachedHint": "You logged this before — we reused the value you confirmed, without calling the AI.",
+    "historyKeysHint": "↑↓ to pick · Enter logs · Tab completes · Esc closes",
+    "historySuggestions": "Suggestions from your history",
+    "historyTimesLogged": "{{count}} time",
+    "historyTimesLogged_other": "{{count}} times",
+    "historyUsuals": "Your usuals",
     "hpExplanation": "HP based on target accuracy: within range = +HP, outside range = -HP",
     "inProgress": "in progress",
     "invalidCalories": "Calories must be greater than 0",
@@ -430,6 +454,7 @@
     "range365d": "365 d",
     "range7d": "7 d",
     "range90d": "90 d",
+    "reEstimate": "Re-estimate with AI",
     "remaining": "remaining",
     "reopenDay": "Reopen day",
     "reopenDayConfirm": "The XP and HP you earned closing this day get reverted. You will be able to log meals again and close it once more.",
@@ -568,6 +593,14 @@
     "billingDay": "Billing day",
     "amountHistory": "Amount history",
     "borrowed": "Borrowed",
+    "budgetEditLabel": "Monthly limit for {{category}}",
+    "budgetHint": "Set a monthly limit with the pencil on each category. Pick 3 or 4 categories, not all of them.",
+    "budgetMonthLine": "This month's budget: {{spent}} of {{limit}}",
+    "budgetMonthMet": "Ledger Closed: {{month}} within budget",
+    "budgetOverflow": "{{category}}: you went over this month's limit",
+    "budgetPlaceholder": "Monthly limit",
+    "budgetRemove": "Remove budget",
+    "budgetSave": "Save limit",
     "byCategory": "By Category",
     "cancel": "Cancel",
     "cancelEdit": "Cancel",
@@ -836,6 +869,9 @@
     "xpToNextLevel": "xp to next rank"
   },
   "cauldron": {
+    "abandoned": {
+      "toast": "Potion broken — {{minutes}} min stayed on the shelf"
+    },
     "autoStart": {
       "breakHelp": "When a focus ends, the break starts on its own after 5 seconds. You can cancel it with \"Wait\".",
       "breakLabel": "Start the break on its own",
@@ -897,6 +933,21 @@
       "resumeHelp": "Continues from the time that was left."
     },
     "longBreak": "Long Break",
+    "mission": {
+      "change": "change",
+      "clear": "No quest",
+      "complete": "Complete quest",
+      "completeHelp": "Marks the quest complete in Questify, with its XP. Leave it alone and nothing happens.",
+      "deleted": "Quest no longer available",
+      "gone": "That quest is no longer available.",
+      "label": "Quest",
+      "noMatches": "No quest matches.",
+      "noProject": "No project",
+      "none": "No quest",
+      "noneOpen": "No open quests.",
+      "prompt": "On which quest?",
+      "search": "Search quest…"
+    },
     "noBrewInProgress": "No brew in progress",
     "notify": {
       "breakDone": "Break over!",
@@ -945,6 +996,20 @@
     "resume": "Resume",
     "round": "round {{round}}",
     "selectedRecipe": "Selected recipe",
+    "shelf": {
+      "abandonedAt": "abandoned at {{minutes}} min",
+      "count": "{{count}} vials",
+      "empty": "The shelf is empty. The first potion opens it.",
+      "looseMany": "{{count}} loose",
+      "looseOne": "{{count}} loose",
+      "ofProject": "{{count}} from {{project}}",
+      "title": "Potion Shelf",
+      "today": "Today",
+      "unlabeled": "unlabelled",
+      "weekSummary": "This week: {{count}} potions — {{breakdown}}",
+      "yesterday": "Yesterday"
+    },
+    "shelfHelp": "Every completed focus leaves a vial, coloured by its quest’s project. A focus cut short by hand after 5 minutes leaves a broken vial. The shelf never empties.",
     "skip": "Skip",
     "skipBreakHelp": "Ends the break now and starts the next focus.",
     "skipWorkHelp": "Ends this focus now and moves to the break. The cycle does not count and pays no XP.",
@@ -1040,9 +1105,240 @@
     }
   },
   "rpg": {
+    "achievements": {
+      "awakening": {
+        "title": "The Awakening",
+        "desc": "Your character has a name. That is where the adventure starts."
+      },
+      "cauldron_master": {
+        "title": "Cauldron Master",
+        "desc": "One hundred pomodoros finished without letting the fire go out."
+      },
+      "chronicler_i": {
+        "title": "Chronicler I",
+        "desc": "One hundred deeds written into your chronicle."
+      },
+      "chronicler_ii": {
+        "title": "Chronicler II",
+        "desc": "Five hundred deeds written into the chronicle."
+      },
+      "chronicler_iii": {
+        "title": "Chronicler III",
+        "desc": "Two thousand deeds. The chronicle has weight now."
+      },
+      "combo_master": {
+        "title": "Combo Master",
+        "desc": "You hit the top multiplier (x2) in a single day."
+      },
+      "day_off": {
+        "title": "Day Off",
+        "desc": "You skipped a habit on purpose. Resting is a decision too."
+      },
+      "debt_free": {
+        "title": "Debt Settled",
+        "desc": "You closed your first loan in Coinify."
+      },
+      "deep_work": {
+        "title": "Deep Work",
+        "desc": "Four pomodoros in one day."
+      },
+      "deserved_rest": {
+        "title": "Well-Earned Rest",
+        "desc": "You played from the Inn. The streak waited for you anyway."
+      },
+      "early_bird": {
+        "title": "Early Bird",
+        "desc": "A deed logged before 06:00."
+      },
+      "epic_quest": {
+        "title": "Epic Journey",
+        "desc": "Ten quests completed in a single day."
+      },
+      "first_brew": {
+        "title": "First Brew",
+        "desc": "You finished your first pomodoro."
+      },
+      "first_coin": {
+        "title": "First Coin",
+        "desc": "You logged your first movement in Coinify."
+      },
+      "first_habit": {
+        "title": "First Rite",
+        "desc": "You checked your first habit."
+      },
+      "first_meal": {
+        "title": "First Bite",
+        "desc": "You logged your first meal."
+      },
+      "first_quest": {
+        "title": "First Quest",
+        "desc": "You completed your first task."
+      },
+      "first_seal": {
+        "title": "First Seal",
+        "desc": "You closed your first day in the Codex."
+      },
+      "first_step": {
+        "title": "First Step",
+        "desc": "Every hero starts somewhere. You already did."
+      },
+      "golden_day": {
+        "title": "Golden Day",
+        "desc": "Two hundred XP in a single day."
+      },
+      "hero_return": {
+        "title": "Return of the Hero",
+        "desc": "You came back after two weeks. The tavern kept your seat."
+      },
+      "hiddenDesc": "A secret you have not uncovered yet.",
+      "hiddenTitle": "???",
+      "late_memory": {
+        "title": "Late Memory",
+        "desc": "You sealed yesterday. It is never too late to close the book."
+      },
+      "ledger_closed": {
+        "title": "Ledger Closed",
+        "desc": "You closed a whole month inside your budget."
+      },
+      "lucky_strike": {
+        "title": "Lucky Strike",
+        "desc": "You rolled a x3 bonus. Two percent odds."
+      },
+      "monthly_vow": {
+        "title": "Monthly Vow",
+        "desc": "A thirty-day streak."
+      },
+      "night_owl": {
+        "title": "Night Owl",
+        "desc": "A deed logged after 23:00."
+      },
+      "perfect_day": {
+        "title": "Perfect Day",
+        "desc": "All four modules active on the same day."
+      },
+      "polymath": {
+        "title": "Polymath",
+        "desc": "Five different kinds of deed in one day."
+      },
+      "radiant_seal": {
+        "title": "Radiant Seal",
+        "desc": "You sealed a day with your Vigor almost untouched."
+      },
+      "ritualist": {
+        "title": "Ritualist",
+        "desc": "Five different habits checked over time."
+      },
+      "scribe_of_accounts": {
+        "title": "Scribe of Accounts",
+        "desc": "You imported your first bank statement."
+      },
+      "sealed_week": {
+        "title": "Sealed Week",
+        "desc": "Seven days closed in the Codex."
+      },
+      "second_chance": {
+        "title": "Second Chance",
+        "desc": "You reopened a day in Nutrify. Closing is never final."
+      },
+      "squire": {
+        "title": "Squire",
+        "desc": "You reached level 5."
+      },
+      "steadfast": {
+        "title": "Steadfast",
+        "desc": "A seven-day streak."
+      },
+      "steady_hand": {
+        "title": "Steady Hand",
+        "desc": "Thirty days closed in the Codex."
+      },
+      "sunday_guardian": {
+        "title": "Sunday Guardian",
+        "desc": "Five deeds on a Sunday. Resting is optional."
+      },
+      "table_guardian": {
+        "title": "Guardian of the Table",
+        "desc": "Seven days closed in Nutrify."
+      },
+      "the_pardon": {
+        "title": "The Pardon",
+        "desc": "A missed day did not cost you the streak."
+      },
+      "three_epics": {
+        "title": "Three Epics",
+        "desc": "Three x3 rolls in one day. The dice love you."
+      },
+      "unlockedToast": "Achievement unlocked: {{title}}"
+    },
+    "achEmpty": "Nothing on the shelf yet. It fills up on its own, by playing.",
+    "achEyebrow": "SHELF OF ACHIEVEMENTS",
+    "achGroupCauldron": "Of the Cauldron",
+    "achGroupChronicle": "Chronicler",
+    "achGroupCodex": "Of the Codex",
+    "achGroupFinance": "Of Coinify",
+    "achGroupHidden": "Hidden",
+    "achGroupMastery": "Mastery",
+    "achGroupNutrition": "Of Nutrify",
+    "achGroupOther": "Of the hero",
+    "achGroupProgress": "Progression",
+    "achGroupQuests": "Of Questify",
+    "achGroupRhythm": "Rhythm and time",
+    "achGroupStarts": "First steps",
+    "achSecretDesc": "Something waits to be found.",
+    "achSubtitle": "Where the medallions won are kept, and those still awaiting an owner",
+    "achUnavailable": "Achievements are not available in this version yet.",
+    "achUnlockedOn": "Earned",
     "bestShort": "best",
     "bestStreak": "Best streak",
     "clickDismiss": "Click to dismiss",
+    "codexAlreadySealed": "This day was already sealed. Here is its page.",
+    "codexAwardBreakdown": "day lived × vigour {{vigor}}",
+    "codexComboFoot": "within one day",
+    "codexDeeds": "DEEDS",
+    "codexDeedsFoot": "entries for the day",
+    "codexEmptyDay": "The codex records days lived. Come back when there is something to write.",
+    "codexEyebrow": "CLOSING OF THE CODEX",
+    "codexHoldHint": "Press and hold to stamp the wax",
+    "codexHoldToSeal": "Press and hold to seal the day",
+    "codexMaxCombo": "HIGHEST COMBO",
+    "codexNoPage": "We could not read this day's page.",
+    "codexPhrases": {
+      "constancy": [
+        "Another day chained to the last. The constancy is yours now.",
+        "A streak does not hold itself up: you held it."
+      ],
+      "focus": [
+        "The cauldron fire burned steady today. That is focus.",
+        "Long stretches on one thing. That is how craft is built."
+      ],
+      "gentle": [
+        "A quiet day gets written down too. Here it is.",
+        "Little and good. The codex records days lived, not perfect ones."
+      ],
+      "steady": [
+        "An honest day, the kind that adds up without any noise.",
+        "Nothing extraordinary, nothing lost. This is how you move."
+      ],
+      "variety": [
+        "You touched several fronts and left none half done.",
+        "A day of many hands: the codex notes it gladly."
+      ]
+    },
+    "codexSealedOn": "Sealed",
+    "codexStrip": "LAST XIV DAYS",
+    "codexStripLegend": "An unsealed day is not a fault — it is a page left open.",
+    "codexStripOpen": "{{date}} — unsealed",
+    "codexStripSealed": "{{date}} — sealed, +{{xp}} XP",
+    "codexSubtitle": "Read the day, and close it if you want. You can leave whenever you like.",
+    "codexSubtitleSealed": "This page is closed. What happened, happened, and it is written down.",
+    "codexTitle": "Closing of the Codex",
+    "codexTooOld": "This page has already been bound. Old days stay as they were, and that is fine.",
+    "codexUnavailable": "Closing the codex is not available in this version yet.",
+    "codexUnlocked": "You unlocked",
+    "codexXpFoot": "noted in the margin",
+    "codexXpToday": "XP TODAY",
+    "codexXpUnit": "XP",
+    "codexYesterdayTag": "YESTERDAY'S PAGE",
     "combo": "Combo",
     "days": "days",
     "inn": "Inn",
@@ -1061,6 +1357,9 @@
     "pardonsEmpty": "No pardons left this month",
     "pardonsHint": "They forgive a missed day. They recharge every month.",
     "pardonsRemaining": "Pardons: {{count}} of {{total}}",
+    "sealInvite": "Seal the day",
+    "sealInviteSub": "{{n}} deeds still open",
+    "sealInviteYesterday": "You left yesterday unsealed",
     "streak": "streak",
     "titles": {
       "peasant": "Peasant",
