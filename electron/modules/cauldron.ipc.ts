@@ -15,11 +15,21 @@ function genId(): string {
 }
 
 /**
- * Fase 1 del Caldero added three fields that still need to land in
- * `shared/types.ts` (CauldronTimerState / CauldronPreset / CauldronSessionEndResult).
- * (Los campos ya viven en shared/types.ts; quedan los alias.)
+ * Fase 2 del Caldero: la misión vinculada viaja EN EL ESTADO, no se consulta.
+ * Cada superficie (página, chip flotante, ventana PiP) refleja el broadcast de
+ * `cauldron:tick` y ya tiene el nombre y el color a mano.
+ *
+ * TODO(shared/types.ts): estos cuatro campos deberían aterrizar en
+ * `CauldronTimerState`. Fuera del alcance de este cambio — el alias los declara
+ * mientras tanto.
  */
-type CauldronTimerStateEx = CauldronTimerState;
+type CauldronTimerStateEx = CauldronTimerState & {
+  /** Misión vinculada, o null. Opcional SIEMPRE: nunca bloquea el play. */
+  taskId: string | null;
+  taskName: string | null;
+  taskProjectId: string | null;
+  taskProjectColor: string | null;
+};
 
 /** Shape as it leaves SQLite: the two auto-start flags arrive as 0 | 1. */
 type CauldronPresetEx = Omit<CauldronPreset, 'autoStartBreak' | 'autoStartWork'> & {
@@ -27,7 +37,19 @@ type CauldronPresetEx = Omit<CauldronPreset, 'autoStartBreak' | 'autoStartWork'>
   autoStartWork: number;
 };
 
-type CauldronSessionEndResultEx = CauldronSessionEndResult;
+/**
+ * TODO(shared/types.ts): `abandoned` / `elapsedMinutes` en
+ * `CauldronSessionEndResult`. El renderer los usa para emitir
+ * POMODORO_ABANDONED (XP 0 — es registro, no castigo).
+ */
+type CauldronSessionEndResultEx = CauldronSessionEndResult & {
+  /** True cuando un enfoque se cortó a mano habiendo pasado el umbral. */
+  abandoned?: boolean;
+  /** Minutos efectivamente enfocados antes de cortar (sin contar pausas). */
+  elapsedMinutes?: number;
+  taskId?: string | null;
+  taskName?: string | null;
+};
 
 /**
  * Grace window between a segment ending and the next one starting by itself.
@@ -72,6 +94,13 @@ let labels: CauldronLabels = {
  */
 const INTERRUPTED_SESSION_GRACE_MS = 12 * 60 * 60 * 1000;
 
+/**
+ * Debajo de este umbral, cortar un enfoque NO deja cicatriz: la fila se descarta
+ * y el estante ni se entera. Un arranque en falso ("me equivoqué de receta") no
+ * es una promesa rota. Por encima, queda un frasco roto — memoria, no acusación.
+ */
+const ABANDON_THRESHOLD_MS = 5 * 60 * 1000;
+
 function broadcast(channel: string, data: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send(channel, data);
@@ -92,6 +121,10 @@ const IDLE_STATE: CauldronTimerStateEx = {
   extensionMinutes: 5,
   autoStartAt: null,
   round: 1,
+  taskId: null,
+  taskName: null,
+  taskProjectId: null,
+  taskProjectColor: null,
 };
 
 let timerState: CauldronTimerStateEx = { ...IDLE_STATE };
@@ -113,6 +146,89 @@ let currentSessionDbId: string | null = null;
 /** True while the running segment is an extension (see cauldron:extend). */
 let currentSessionIsExtension = false;
 let pendingNextSegment: NextSegment | null = null;
+/**
+ * La última fila de enfoque REAL (no prórroga) que se completó en esta corrida.
+ *
+ * Es el corte de `cauldron:setSessionTask` en `awaiting_next`: al terminar un
+ * enfoque ya no hay sesión activa, y ese es exactamente el momento en que el
+ * usuario sabe sobre qué trabajó. Se escribe ahí, en el frasco que acaba de
+ * depositarse. Una prórroga no lo mueve: el frasco es el pomodoro original.
+ */
+let lastCompletedWorkSessionId: string | null = null;
+
+// ─── Puente con Questify ───────────────────────────────────
+
+/**
+ * ¿Existen ya las tablas de quests en esta base?
+ *
+ * Misma base de datos, así que el JOIN es directo — pero las migraciones de
+ * quests las dispara el renderer al registrar el módulo, y estos handlers se
+ * registran en el main al arrancar. En una base nueva (o en un test que solo
+ * corre las migraciones del caldero) `tasks` puede no existir todavía, y un
+ * JOIN a una tabla inexistente no devuelve vacío: tira. Sin este guard, el
+ * estante se rompería entero por un frasco sin etiqueta.
+ *
+ * No se cachea el `true` para siempre porque la respuesta cambia una sola vez
+ * (de false a true) y la consulta a sqlite_master es trivial.
+ */
+let questsTablesSeen = false;
+function hasQuestsTables(): boolean {
+  if (questsTablesSeen) return true;
+  try {
+    const row = getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM sqlite_master
+         WHERE type = 'table' AND name IN ('tasks', 'projects')`,
+      )
+      .get() as { n: number };
+    questsTablesSeen = row.n === 2;
+    return questsTablesSeen;
+  } catch {
+    return false;
+  }
+}
+
+interface TaskMeta {
+  taskId: string;
+  taskName: string;
+  taskProjectId: string | null;
+  taskProjectColor: string | null;
+}
+
+/** Nombre y color de proyecto de una misión, o null si no existe / fue borrada. */
+function readTaskMeta(taskId: string | null): TaskMeta | null {
+  if (!taskId || !hasQuestsTables()) return null;
+  try {
+    const row = getDb()
+      .prepare(
+        `SELECT t.id AS taskId, t.name AS taskName,
+                t.project_id AS taskProjectId, p.color AS taskProjectColor
+         FROM tasks t
+         LEFT JOIN projects p ON p.id = t.project_id AND p.deleted_at IS NULL
+         WHERE t.id = ? AND t.deleted_at IS NULL`,
+      )
+      .get(taskId) as TaskMeta | undefined;
+    return row ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Adjunta la misión al estado. Un id que ya no resuelve (tarea borrada, o traída
+ * por sync desde un dispositivo que este no vio) NO se descarta: el vínculo
+ * sobrevive, solo se queda sin nombre. El estante lo mostrará «sin etiqueta».
+ */
+function withTask(state: CauldronTimerStateEx, taskId: string | null): CauldronTimerStateEx {
+  const meta = readTaskMeta(taskId);
+  return {
+    ...state,
+    taskId: taskId ?? null,
+    taskName: meta?.taskName ?? null,
+    taskProjectId: meta?.taskProjectId ?? null,
+    taskProjectColor: meta?.taskProjectColor ?? null,
+  };
+}
 
 function clearTimer(): void {
   if (timerInterval) {
@@ -164,6 +280,10 @@ function onTimeUp(): void {
     db.prepare(
       'UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ?, target_end_time = NULL WHERE id = ?',
     ).run(now, now, currentSessionDbId);
+    // Un enfoque real acaba de depositar su frasco: es la fila que
+    // `cauldron:setSessionTask` va a etiquetar si el usuario elige la misión
+    // recién ahora. Una prórroga NO lo mueve — no es otro frasco.
+    if (wasWork && !wasExtension) lastCompletedWorkSessionId = currentSessionDbId;
     currentSessionDbId = null;
   }
   currentSessionIsExtension = false;
@@ -182,6 +302,8 @@ function onTimeUp(): void {
     nextType: nextSegment ? nextSegment.type : null,
     isExtension: wasExtension,
     cycleComplete,
+    taskId: timerState.taskId,
+    taskName: timerState.taskName,
   };
 
   broadcast('cauldron:sessionEnd', sessionEndResult);
@@ -332,8 +454,8 @@ function startSegment(
   targetEndTime = Date.now() + durationMs;
   const sessionId = genId();
   db.prepare(
-    `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at, target_end_time, is_extension)
-     VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0)`,
+    `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at, target_end_time, is_extension, task_id)
+     VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0, ?)`,
   ).run(
     sessionId,
     timerState.presetId,
@@ -343,6 +465,9 @@ function startSegment(
     now,
     now,
     targetEndTime,
+    // La misión acompaña a toda la corrida, no solo al primer enfoque: cambiarla
+    // a mitad de camino solo afecta de ahí en adelante.
+    timerState.taskId ?? null,
   );
   currentSessionDbId = sessionId;
   currentSessionIsExtension = false;
@@ -379,8 +504,12 @@ function cleanupOrphanedSessions(): void {
     const now = new Date().toISOString();
     const staleBefore = Date.now() - INTERRUPTED_SESSION_GRACE_MS;
     db.prepare(
+      // `abandoned = 0`: un frasco roto es una fila incompleta y sin
+      // target_end_time — exactamente el perfil que esta limpieza borra. Sin esta
+      // condición, el estante se vaciaba de cicatrices en el próximo arranque, y
+      // el estante NUNCA se vacía: ese es todo el mecanismo.
       `UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?
-       WHERE completed = 0 AND deleted_at IS NULL
+       WHERE completed = 0 AND deleted_at IS NULL AND abandoned = 0
          AND (target_end_time IS NULL OR target_end_time < ?)`,
     ).run(now, now, staleBefore);
   } catch {
@@ -392,16 +521,18 @@ function cleanupOrphanedSessions(): void {
 function readInterruptedSession(): {
   id: string; presetId: string | null; presetName: string | null;
   type: string; durationMinutes: number; startedAt: string;
-  remainingMs: number; totalMs: number;
+  remainingMs: number; totalMs: number; taskId: string | null;
 } | null {
   const db = getDb();
   const row = db.prepare(
     `SELECT s.id, s.preset_id AS presetId, s.type, s.duration_minutes AS durationMinutes,
             s.started_at AS startedAt, s.target_end_time AS targetEndTime,
+            s.task_id AS taskId,
             p.name AS presetName
      FROM cauldron_sessions s
      LEFT JOIN cauldron_presets p ON p.id = s.preset_id
-     WHERE s.completed = 0 AND s.deleted_at IS NULL AND s.target_end_time IS NOT NULL
+     WHERE s.completed = 0 AND s.deleted_at IS NULL AND s.abandoned = 0
+       AND s.target_end_time IS NOT NULL
      ORDER BY s.started_at DESC LIMIT 1`,
   ).get() as Record<string, unknown> | undefined;
   if (!row) return null;
@@ -418,6 +549,7 @@ function readInterruptedSession(): {
     startedAt: row.startedAt as string,
     remainingMs: Math.max(0, targetEnd - Date.now()),
     totalMs: (row.durationMinutes as number) * 60 * 1000,
+    taskId: (row.taskId as string) ?? null,
   };
 }
 
@@ -517,7 +649,12 @@ export function registerCauldronIpcHandlers(): void {
 
   // ─── Timer Control ───
 
-  ipcHandle('cauldron:start', (_e, presetId: string) => {
+  /**
+   * `taskId` es el TERCER estado de un parámetro opcional, y es a propósito:
+   * encender el caldero nunca exige elegir una misión. Podés arrancar a ciegas y
+   * etiquetar después (o nunca). El peaje previo es lo que hundió a Focus To-Do.
+   */
+  ipcHandle('cauldron:start', (_e, presetId: string, taskId?: string | null) => {
     if (timerState.status !== 'idle') {
       throw new Error('Timer already active');
     }
@@ -545,15 +682,57 @@ export function registerCauldronIpcHandlers(): void {
       autoStartWork: (preset.autoStartWork ?? 0) !== 0,
     };
 
-    timerState = {
-      ...IDLE_STATE,
-      totalCycles: preset.cyclesBeforeLong,
-      presetId: preset.id,
-      presetName: preset.name,
-      extensionMinutes: preset.extensionMinutes ?? 5,
-    };
+    lastCompletedWorkSessionId = null;
+
+    timerState = withTask(
+      {
+        ...IDLE_STATE,
+        totalCycles: preset.cyclesBeforeLong,
+        presetId: preset.id,
+        presetName: preset.name,
+        extensionMinutes: preset.extensionMinutes ?? 5,
+      },
+      taskId ?? null,
+    );
 
     startSegment('work', preset.workMinutes * 60 * 1000);
+    return getSnapshotState();
+  });
+
+  /**
+   * Asignar o cambiar la misión SIN detener nada. Opcional y post-hoc: se puede
+   * llamar durante el foco, con el timer pausado, o en `awaiting_next`.
+   *
+   * El corte en `awaiting_next`:
+   *  - si el segmento que acaba de terminar era un ENFOQUE, escribe en el último
+   *    frasco depositado (`lastCompletedWorkSessionId`) — ese es el momento en
+   *    que el usuario sabe qué hizo, y ese frasco es lo que va a etiquetar;
+   *  - si venía de un descanso, no hay frasco que corregir: solo queda cargada
+   *    para los segmentos siguientes.
+   *
+   * En `idle` no hay a qué adjuntarla: la elección previa al play vive en el
+   * renderer y viaja como segundo parámetro de `cauldron:start`.
+   */
+  ipcHandle('cauldron:setSessionTask', (_e, taskId: string | null) => {
+    if (timerState.status === 'idle') return getSnapshotState();
+
+    const next = taskId ?? null;
+    timerState = withTask(timerState, next);
+
+    const targetRow =
+      currentSessionDbId ??
+      (timerState.status === 'awaiting_next' && timerState.sessionType === 'work'
+        ? lastCompletedWorkSessionId
+        : null);
+
+    if (targetRow) {
+      const now = new Date().toISOString();
+      getDb()
+        .prepare('UPDATE cauldron_sessions SET task_id = ?, updated_at = ? WHERE id = ?')
+        .run(next, now, targetRow);
+    }
+
+    broadcast('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -688,9 +867,9 @@ export function registerCauldronIpcHandlers(): void {
     const sessionId = genId();
     targetEndTime = Date.now() + durationMs;
     db.prepare(
-      `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at, target_end_time, is_extension)
-       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 1)`,
-    ).run(sessionId, timerState.presetId, timerState.sessionType, extMin, now, now, now, targetEndTime);
+      `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at, target_end_time, is_extension, task_id)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 1, ?)`,
+    ).run(sessionId, timerState.presetId, timerState.sessionType, extMin, now, now, now, targetEndTime, timerState.taskId ?? null);
     currentSessionDbId = sessionId;
     currentSessionIsExtension = true;
 
@@ -708,23 +887,91 @@ export function registerCauldronIpcHandlers(): void {
     return getSnapshotState();
   });
 
+  /**
+   * Cortar la corrida a mano. Es lo ÚNICO que la termina — y es la única puerta
+   * que puede dejar una cicatriz.
+   *
+   * Cortar un enfoque después del umbral no borra la sesión: la marca
+   * `abandoned = 1` y deja un frasco roto en el mismo lugar del estante. La
+   * pérdida es simbólica y legible, jamás numérica: no se descuenta XP, no baja
+   * ningún contador. El evento POMODORO_ABANDONED que emite el renderer paga 0.
+   *
+   * `skip` deliberadamente NO deja cicatriz: es la salida barata de un segmento,
+   * no una promesa rota.
+   */
   ipcHandle('cauldron:stop', () => {
     if (timerState.status === 'idle') return;
 
-    // Record current session as incomplete
+    const db = getDb();
+    const now = new Date().toISOString();
+
+    // Tiempo REALMENTE enfocado: el pausado no cuenta. `remainingMs` puede tener
+    // hasta un segundo de atraso respecto al reloj, así que se recalcula.
+    const remainingMs =
+      timerState.status === 'work' || timerState.status === 'on_break'
+        ? Math.max(0, targetEndTime - Date.now())
+        : timerState.remainingMs;
+    const elapsedMs = Math.max(0, timerState.totalMs - remainingMs);
+
+    const wasWorkSegment =
+      timerState.sessionType === 'work' &&
+      (timerState.status === 'work' || timerState.status === 'work_paused');
+    // Una prórroga es tiempo extra de un ciclo YA cobrado: cortarla no rompe
+    // ninguna promesa, el frasco ya está en el estante.
+    const scar =
+      !!currentSessionDbId &&
+      wasWorkSegment &&
+      !currentSessionIsExtension &&
+      elapsedMs > ABANDON_THRESHOLD_MS;
+
+    const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+
     if (currentSessionDbId) {
-      const db = getDb();
-      const now = new Date().toISOString();
-      db.prepare(
-        'UPDATE cauldron_sessions SET updated_at = ?, target_end_time = NULL WHERE id = ?',
-      ).run(now, currentSessionDbId);
+      if (scar) {
+        // `completed_at` guarda el instante en que este reloj se detuvo
+        // (started_at + lo efectivamente enfocado), así el estante puede decir
+        // «abandonada a los N min» sin una columna más y sin que las pausas
+        // inflen el número.
+        const started = db
+          .prepare('SELECT started_at AS startedAt FROM cauldron_sessions WHERE id = ?')
+          .get(currentSessionDbId) as { startedAt: string } | undefined;
+        const stoppedAt = started
+          ? new Date(new Date(started.startedAt).getTime() + elapsedMs).toISOString()
+          : now;
+        db.prepare(
+          `UPDATE cauldron_sessions
+           SET abandoned = 1, completed_at = ?, updated_at = ?, target_end_time = NULL
+           WHERE id = ?`,
+        ).run(stoppedAt, now, currentSessionDbId);
+      } else {
+        // Arranque en falso (o un descanso cortado): se descarta sin dejar rastro.
+        db.prepare(
+          'UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?, target_end_time = NULL WHERE id = ?',
+        ).run(now, now, currentSessionDbId);
+      }
       currentSessionDbId = null;
     }
     currentSessionIsExtension = false;
 
+    // Se emite ANTES de resetear el estado para que lleve la misión vinculada.
+    // Una sola vez: el segundo `stop` sale por el `status === 'idle'` de arriba.
+    if (scar) {
+      const abandonResult: CauldronSessionEndResultEx = {
+        sessionType: 'work',
+        completed: false,
+        nextType: null,
+        abandoned: true,
+        elapsedMinutes,
+        taskId: timerState.taskId,
+        taskName: timerState.taskName,
+      };
+      broadcast('cauldron:sessionEnd', abandonResult);
+    }
+
     clearTimer();
     clearAutoStart();
     pendingNextSegment = null;
+    lastCompletedWorkSessionId = null;
     // The loop runs until here: `stop` is the only thing that ends it.
     timerState = { ...IDLE_STATE };
     activePreset = null;
@@ -737,35 +984,129 @@ export function registerCauldronIpcHandlers(): void {
 
   // ─── Stats ───
 
+  /**
+   * El Estante de Pociones. Misma API paginada de siempre, ampliada: cada fila
+   * es un frasco.
+   *
+   * Ahora incluye también los ABANDONADOS (`abandoned = 1`), que antes ni
+   * existían. El estante no es un log de logros — es memoria completa, y por eso
+   * nunca se vacía. El conteo de pomodoros (`cauldron:getStats`) sigue mirando
+   * solo `completed = 1`: un frasco roto se ve, no se cuenta.
+   */
   ipcHandle('cauldron:getSessions', (_e, offset = 0, limit = 20) => {
     const db = getDb();
+    // El JOIN a quests es condicional: en una base donde el módulo todavía no
+    // migró, `tasks` no existe y el JOIN tiraría en vez de devolver vacío.
+    const withTasks = hasQuestsTables();
+    const taskCols = withTasks
+      ? `t.name AS taskName, t.project_id AS projectId,
+         pr.name AS projectName, pr.color AS projectColor`
+      : `NULL AS taskName, NULL AS projectId, NULL AS projectName, NULL AS projectColor`;
+    const taskJoin = withTasks
+      ? `LEFT JOIN tasks t ON t.id = s.task_id AND t.deleted_at IS NULL
+         LEFT JOIN projects pr ON pr.id = t.project_id AND pr.deleted_at IS NULL`
+      : '';
+
     const rows = db
       .prepare(
         `SELECT s.id, s.preset_id AS presetId, s.type, s.duration_minutes AS durationMinutes,
                 s.completed, s.started_at AS startedAt, s.completed_at AS completedAt,
-                p.name AS presetName
+                s.abandoned, s.task_id AS taskId,
+                p.name AS presetName,
+                ${taskCols}
          FROM cauldron_sessions s
          LEFT JOIN cauldron_presets p ON s.preset_id = p.id
-         WHERE s.type = 'work' AND s.completed = 1 AND s.deleted_at IS NULL
-           AND s.is_extension = 0
+         ${taskJoin}
+         WHERE s.type = 'work' AND s.deleted_at IS NULL AND s.is_extension = 0
+           AND (s.completed = 1 OR s.abandoned = 1)
          ORDER BY s.started_at DESC
          LIMIT ? OFFSET ?`,
       )
       .all(limit + 1, offset) as Array<Record<string, unknown>>;
 
     const hasMore = rows.length > limit;
-    const sessions = rows.slice(0, limit).map((r) => ({
-      id: r.id,
-      presetId: r.presetId,
-      type: r.type,
-      durationMinutes: r.durationMinutes,
-      completed: r.completed,
-      startedAt: r.startedAt,
-      completedAt: r.completedAt,
-      presetName: r.presetName ?? null,
-    }));
+    const sessions = rows.slice(0, limit).map((r) => {
+      const abandoned = (r.abandoned as number) === 1;
+      // Para un frasco roto, `completed_at` es el instante en que el reloj se
+      // detuvo: la diferencia son los minutos que sí se enfocaron.
+      let elapsedMinutes: number | null = null;
+      if (abandoned && r.completedAt && r.startedAt) {
+        const ms = new Date(r.completedAt as string).getTime() - new Date(r.startedAt as string).getTime();
+        elapsedMinutes = Number.isFinite(ms) ? Math.max(1, Math.round(ms / 60000)) : null;
+      }
+      return {
+        id: r.id,
+        presetId: r.presetId,
+        type: r.type,
+        durationMinutes: r.durationMinutes,
+        completed: (r.completed as number) === 1,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+        presetName: r.presetName ?? null,
+        abandoned,
+        elapsedMinutes,
+        taskId: r.taskId ?? null,
+        // Una tarea borrada deja el vínculo pero se queda sin nombre: el frasco
+        // conserva su lugar y pasa a ser «sin etiqueta».
+        taskName: r.taskName ?? null,
+        projectId: r.projectId ?? null,
+        projectName: r.projectName ?? null,
+        projectColor: r.projectColor ?? null,
+      };
+    });
 
     return { sessions, hasMore };
+  });
+
+  /**
+   * La respuesta semanal a «¿en qué se me fue el foco?»: enfoques COMPLETADOS de
+   * la semana calendario (lunes), agrupados por misión, con el color del proyecto
+   * para pintar los frascos.
+   *
+   * Los abandonados quedan fuera a propósito — el estante ya los muestra; el
+   * resumen es de lo que se logró, no un balance con signo negativo.
+   */
+  ipcHandle('cauldron:getWeekByProject', () => {
+    const db = getDb();
+    const monday = getMondayOfWeek();
+    const withTasks = hasQuestsTables();
+
+    const taskCols = withTasks
+      ? `t.name AS taskName, t.project_id AS projectId,
+         pr.name AS projectName, pr.color AS projectColor`
+      : `NULL AS taskName, NULL AS projectId, NULL AS projectName, NULL AS projectColor`;
+    const taskJoin = withTasks
+      ? `LEFT JOIN tasks t ON t.id = s.task_id AND t.deleted_at IS NULL
+         LEFT JOIN projects pr ON pr.id = t.project_id AND pr.deleted_at IS NULL`
+      : '';
+
+    const rows = db
+      .prepare(
+        // 'localtime' por lo mismo que en getWeeklyFocusTime: started_at es un
+        // instante UTC y un date() pelado rueda a las 21:00 en UTC-3.
+        `SELECT s.task_id AS taskId,
+                ${taskCols},
+                COUNT(*) AS sessions,
+                COALESCE(SUM(s.duration_minutes), 0) AS minutes
+         FROM cauldron_sessions s
+         ${taskJoin}
+         WHERE s.type = 'work' AND s.completed = 1 AND s.deleted_at IS NULL
+           AND s.is_extension = 0 AND s.abandoned = 0
+           AND date(s.started_at, 'localtime') >= ?
+         GROUP BY s.task_id
+         ORDER BY minutes DESC`,
+      )
+      .all(monday) as Array<Record<string, unknown>>;
+
+    return rows.map((r) => ({
+      taskId: (r.taskId as string) ?? null,
+      taskName: (r.taskName as string) ?? null,
+      projectId: (r.projectId as string) ?? null,
+      projectName: (r.projectName as string) ?? null,
+      projectColor: (r.projectColor as string) ?? null,
+      sessions: r.sessions as number,
+      minutes: r.minutes as number,
+    }));
   });
 
   ipcHandle('cauldron:getWeeklyFocusTime', () => {
@@ -929,19 +1270,26 @@ export function registerCauldronIpcHandlers(): void {
     currentSessionDbId = session.id;
     currentSessionIsExtension = false;
 
-    timerState = {
-      status: type === 'work' ? 'work' : 'on_break',
-      remainingMs: session.remainingMs,
-      totalMs: session.totalMs,
-      currentCycle: 1,
-      totalCycles: preset.cyclesBeforeLong,
-      sessionType: type,
-      presetId: preset.id,
-      presetName: preset.name,
-      extensionMinutes: preset.extensionMinutes ?? 5,
-      autoStartAt: null,
-      round: 1,
-    };
+    lastCompletedWorkSessionId = null;
+
+    // La misión vuelve con la sesión: retomar no debería costar re-etiquetar.
+    timerState = withTask(
+      {
+        ...IDLE_STATE,
+        status: type === 'work' ? 'work' : 'on_break',
+        remainingMs: session.remainingMs,
+        totalMs: session.totalMs,
+        currentCycle: 1,
+        totalCycles: preset.cyclesBeforeLong,
+        sessionType: type,
+        presetId: preset.id,
+        presetName: preset.name,
+        extensionMinutes: preset.extensionMinutes ?? 5,
+        autoStartAt: null,
+        round: 1,
+      },
+      session.taskId,
+    );
 
     const nowIso = new Date().toISOString();
     db.prepare('UPDATE cauldron_sessions SET target_end_time = ?, updated_at = ? WHERE id = ?')

@@ -10,6 +10,7 @@ import {
 import type { CauldronSessionEndResult } from '../../../../shared/types';
 import {
   autoStartSecondsLeft,
+  UNLABELED_POTION_COLOR,
   type CauldronTimerStateEx,
   type CauldronSessionEndResultEx,
 } from '../types';
@@ -180,6 +181,18 @@ export default function CauldronFloatingWindow() {
             <span className="cfw__preset">{timerState.presetName}</span>
           )}
         </div>
+        {/* La misión vinculada. Esta ventana es de solo-mirar: se cambia en la
+            página del caldero, no acá. */}
+        {timerState.taskId && (
+          <div className="cfw__mission" title={timerState.taskName ?? undefined}>
+            <span
+              className="cauldron-mission-swatch"
+              style={{ background: timerState.taskProjectColor ?? UNLABELED_POTION_COLOR }}
+              aria-hidden="true"
+            />
+            {timerState.taskName ?? t('cauldron.shelf.unlabeled', 'sin etiqueta')}
+          </div>
+        )}
         <div className="cfw__bottom">
           <span className="cfw__time">{formatTime(timerState.remainingMs)}</span>
           <span className="cfw__cycle">

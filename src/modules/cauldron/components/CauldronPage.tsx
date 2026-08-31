@@ -20,18 +20,32 @@ import {
 import { Cauldron as CauldronIcon, Flame, Potion, ChevronUp, ChevronDown } from '../../../shared/components/icons/CodexIcons';
 import { CastleBarChart } from '../../../shared/components/charts/CastleBarChart';
 import CauldronSVG from './CauldronSVG';
+import MissionPicker, { useOpenMissions } from './MissionPicker';
+import PotionShelf from './PotionShelf';
 import { formatTime } from '../utils';
-import { useCauldronLabels, usePresetName, POPOUT_ON_START_KEY } from '../hooks';
-import { cancelAutoStart } from '../api';
+import { useCauldronLabels, usePresetName, rememberLastPreset, POPOUT_ON_START_KEY } from '../hooks';
+import {
+  cancelAutoStart,
+  getWeekByProject,
+  isTaskLinkWired,
+  setSessionTask,
+  startBrew,
+} from '../api';
 import {
   autoStartSecondsLeft,
+  UNLABELED_POTION_COLOR,
   type CauldronTimerStateEx,
   type CauldronPresetEx,
+  type CauldronShelfSession,
+  type CauldronWeekTaskRow,
 } from '../types';
+// Completar la misión desde el caldero DEBE pagar exactamente lo mismo que
+// tildarla en Questify: mismos XP por tier, mismo combo, mismo toast. Por eso se
+// reusan los helpers de quests en vez de reimplementar la tabla acá.
+import { tierXp, bonusMultiplierToTier } from '../../quests/utils';
 import type {
   CauldronPreset,
   CauldronStats,
-  CauldronSession,
   CauldronSessionEndResult,
   CauldronWeeklyFocusDay,
   CauldronInterruptedSession,
@@ -87,12 +101,26 @@ export default function CauldronPage() {
   const [editingPreset, setEditingPreset] = useState<Partial<CauldronPresetEx> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [flavorIdx, setFlavorIdx] = useState(0);
-  const [sessions, setSessions] = useState<(CauldronSession & { presetName?: string | null })[]>([]);
+  const [sessions, setSessions] = useState<CauldronShelfSession[]>([]);
   const [sessionsHasMore, setSessionsHasMore] = useState(false);
   const [sessionsOffset, setSessionsOffset] = useState(0);
   // Collapsed by default made the section look broken — a title with an empty body.
   const [historyOpen, setHistoryOpen] = useState(true);
   const [weeklyFocus, setWeeklyFocus] = useState<CauldronWeeklyFocusDay[]>([]);
+  const [weekByProject, setWeekByProject] = useState<CauldronWeekTaskRow[]>([]);
+  /**
+   * La misión elegida ANTES de encender. Vive en el renderer a propósito: el
+   * main no guarda una misión "pendiente" porque en `idle` no hay a qué
+   * adjuntarla — y porque elegir nunca es requisito para arrancar.
+   */
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  /**
+   * El vínculo con Questify necesita canales que preload todavía no expone (ver
+   * `api.ts`). Mientras no estén, las afordancias de misión se esconden: un
+   * enlace que no hace nada es peor que ninguno.
+   */
+  const taskLinkWired = useMemo(() => isTaskLinkWired(), []);
+  const { missions, reloadMissions } = useOpenMissions(taskLinkWired);
   const [interrupted, setInterrupted] = useState<CauldronInterruptedSession | null>(null);
   const [popoutOnStart, setPopoutOnStart] = useState(() => {
     try { return localStorage.getItem(POPOUT_ON_START_KEY) === 'true'; } catch { return false; }
@@ -130,12 +158,14 @@ export default function CauldronPage() {
     });
   }, []);
 
+  /** Los frascos del estante, paginados hacia atrás. Nunca se vacía. */
   const loadSessions = useCallback((offset = 0) => {
     window.api.cauldronGetSessions(offset, 20).then((result) => {
+      const page = result.sessions as unknown as CauldronShelfSession[];
       if (offset === 0) {
-        setSessions(result.sessions as (CauldronSession & { presetName?: string | null })[]);
+        setSessions(page);
       } else {
-        setSessions((prev) => [...prev, ...(result.sessions as (CauldronSession & { presetName?: string | null })[])]);
+        setSessions((prev) => [...prev, ...page]);
       }
       setSessionsHasMore(result.hasMore);
       setSessionsOffset(offset + result.sessions.length);
@@ -144,6 +174,11 @@ export default function CauldronPage() {
 
   const loadWeeklyFocus = useCallback(() => {
     window.api.cauldronGetWeeklyFocusTime().then((data) => setWeeklyFocus(data));
+  }, []);
+
+  /** El resumen de una línea sobre el estante: en qué se fue el foco esta semana. */
+  const loadWeekByProject = useCallback(() => {
+    getWeekByProject().then(setWeekByProject).catch(() => setWeekByProject([]));
   }, []);
 
   /** A session the app was killed in the middle of — offer it back instead of losing it. */
@@ -160,8 +195,9 @@ export default function CauldronPage() {
     loadState();
     loadSessions(0);
     loadWeeklyFocus();
+    loadWeekByProject();
     loadInterrupted();
-  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadInterrupted]);
+  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
 
   /* -- Account switch reload -- */
   useEffect(() => {
@@ -171,11 +207,12 @@ export default function CauldronPage() {
       loadState();
       loadSessions(0);
       loadWeeklyFocus();
+      loadWeekByProject();
       loadInterrupted();
     };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadInterrupted]);
+  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
 
   /* -- Subscribe to tick events -- */
   /* Sounds live in CauldronFloatingTimer: it is the only surface mounted no
@@ -199,10 +236,11 @@ export default function CauldronPage() {
       loadStats();
       loadSessions(0);
       loadWeeklyFocus();
+      loadWeekByProject();
       loadInterrupted();
     });
     return cleanup;
-  }, [loadStats, loadSessions, loadWeeklyFocus, loadInterrupted]);
+  }, [loadStats, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
 
   /* -- Derived state -- */
   const isIdle = !timerState || timerState.status === 'idle';
@@ -289,7 +327,12 @@ export default function CauldronPage() {
     if (!selectedPresetId) return;
     setEditingPreset(null);
     try {
-      const state = await window.api.cauldronStart(selectedPresetId);
+      // La misión viaja SI se eligió una. Si no, se enciende igual: el botón
+      // grande nunca depende del enlace tenue de abajo.
+      const state = await startBrew(selectedPresetId, pendingTaskId);
+      // Se recuerda para el arranque de un click desde afuera (ver
+      // `quickStartPresetId`): el atajo tiene que respetar la última elección.
+      rememberLastPreset(selectedPresetId);
       setTimerState(state);
       playCauldronStart();
       setFlavorIdx(0);
@@ -299,6 +342,71 @@ export default function CauldronPage() {
     } catch (err) {
       toast({ type: 'warning', message: String(err) });
     }
+  });
+
+  /**
+   * Vincular / cambiar / desvincular la misión SIN tocar el timer.
+   *
+   * En `idle` la elección es local (viaja al encender). Con el caldero andando o
+   * en `awaiting_next` va al main, que la escribe en la fila que corresponde y
+   * la difunde: todas las superficies la reflejan sin consultar nada.
+   */
+  const handlePickMission = async (taskId: string | null) => {
+    if (isIdle) {
+      setPendingTaskId(taskId);
+      return;
+    }
+    const state = await setSessionTask(taskId);
+    if (state) setTimerState(state);
+  };
+
+  /**
+   * «Completar misión» — el tercer botón de `awaiting_next`, y SOLO cuando hubo
+   * una misión vinculada. Si no lo tocás, no pasa nada: el enfoque ya se cobró
+   * solo, la misión sigue abierta.
+   *
+   * Va por el flujo normal de Questify (`questsSetTaskStatus` + TASK_COMPLETED)
+   * para que XP, combo, racha y toast salgan idénticos a tildarla en la lista.
+   */
+  const handleCompleteMission = guarded(async () => {
+    const taskId = timerState?.taskId;
+    if (!taskId) return;
+
+    // Se relee la tarea en el momento del click: pudo borrarse o completarse en
+    // Questify mientras el pomodoro corría. Vincularse no es adueñarse.
+    const tasks = (await window.api.questsGetTasks()) as Array<{ id: string; status: number; tier: number }>;
+    const task = tasks.find((x) => x.id === taskId);
+    if (!task || task.status) {
+      toast({
+        type: 'warning',
+        message: t('cauldron.mission.gone', 'Esa misión ya no está disponible.'),
+      });
+      reloadMissions();
+      return;
+    }
+
+    const xp = tierXp(task.tier);
+    const [, result] = await Promise.all([
+      window.api.questsSetTaskStatus(task.id, true),
+      window.api.processRpgEvent({
+        type: 'TASK_COMPLETED', moduleId: 'quests',
+        payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
+        timestamp: Date.now(),
+      }),
+    ]);
+    toast({
+      type: 'xp',
+      message: `+${result.xpGained} XP`,
+      details: {
+        xp: result.xpGained,
+        bonusTier: bonusMultiplierToTier(result.bonusMultiplier),
+        comboMultiplier: result.comboMultiplier,
+        streakMilestone: result.milestoneXp || undefined,
+      },
+    });
+    window.dispatchEvent(new Event('rpg:statsChanged'));
+    window.dispatchEvent(new Event('quests:dataChanged'));
+    reloadMissions();
   });
 
   const handlePause = guarded(async () => {
@@ -484,6 +592,30 @@ export default function CauldronPage() {
      screen at the same time, saying two different things about one state. */
   const phaseRuneLabel = segmentLabel;
 
+  /* -- La misión vinculada, en las dos vidas del timer ---------------------- */
+
+  /* En `idle` la elección es local; con el caldero andando manda el estado del
+     main, que ya trae nombre y color en el broadcast. */
+  const pendingMission = useMemo(
+    () => missions.find((m) => m.id === pendingTaskId) ?? null,
+    [missions, pendingTaskId],
+  );
+  const activeTaskId = isIdle ? pendingTaskId : (timerState?.taskId ?? null);
+  const activeTaskName = isIdle ? (pendingMission?.name ?? null) : (timerState?.taskName ?? null);
+  const activeTaskColor = isIdle
+    ? (pendingMission?.projectColor ?? UNLABELED_POTION_COLOR)
+    : (timerState?.taskProjectColor ?? UNLABELED_POTION_COLOR);
+
+  /* Una misión borrada entre medio conserva el vínculo pero pierde el nombre. */
+  const missionTriggerLabel = activeTaskId
+    ? (activeTaskName ?? t('cauldron.mission.deleted', 'Misión ya no disponible'))
+    : t('cauldron.mission.prompt', '¿Sobre qué misión?');
+
+  /* El tercer botón de `awaiting_next`: solo tras un ENFOQUE y solo si hubo
+     misión. Es una oferta, nunca un trámite. */
+  const canCompleteMission =
+    isAwaiting && timerState?.sessionType === 'work' && !!timerState?.taskId;
+
   /* -- Render -- */
   return (
     <BookPage
@@ -648,6 +780,25 @@ export default function CauldronPage() {
               >
                 <Flame width={16} height={16} /> {t('cauldron.startBrew', 'Start Brew')}
               </button>
+              {/* Secundario y tenue, DEBAJO del botón grande: elegir misión no es
+                  un peaje previo al play. Se puede saltear siempre. */}
+              {taskLinkWired && (
+                <div className="cauldron-mission-row">
+                  {activeTaskId && (
+                    <span
+                      className="cauldron-mission-swatch"
+                      style={{ background: activeTaskColor }}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <MissionPicker
+                    missions={missions}
+                    selectedId={activeTaskId}
+                    onPick={handlePickMission}
+                    label={missionTriggerLabel}
+                  />
+                </div>
+              )}
               <label className="cauldron-popout-toggle">
                 <input
                   type="checkbox"
@@ -700,6 +851,38 @@ export default function CauldronPage() {
                     {timerState.presetName ?? presetLabel(selectedPreset)}
                   </span>
                 </div>
+                {/* La misión vinculada, visible durante el foco Y en
+                    `awaiting_next` — que es justo cuando el usuario sabe qué
+                    hizo y puede etiquetar tarde. */}
+                {taskLinkWired && (
+                  <div className="cauldron-kv-row cauldron-mission-kv">
+                    <span className="cauldron-kv-key">
+                      {t('cauldron.mission.label', 'Misión')}
+                    </span>
+                    <span className="cauldron-mission-value">
+                      {activeTaskId && (
+                        <span
+                          className="cauldron-mission-swatch"
+                          style={{ background: activeTaskColor }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span className="cauldron-mission-name">
+                        {activeTaskId
+                          ? (activeTaskName ?? t('cauldron.shelf.unlabeled', 'sin etiqueta'))
+                          : t('cauldron.mission.none', 'Sin misión')}
+                      </span>
+                      <MissionPicker
+                        missions={missions}
+                        selectedId={activeTaskId}
+                        onPick={handlePickMission}
+                        label={activeTaskId
+                          ? t('cauldron.mission.change', 'cambiar')
+                          : t('cauldron.mission.prompt', '¿Sobre qué misión?')}
+                      />
+                    </span>
+                  </div>
+                )}
                 <div className="cauldron-progress-row">
                   <Gauge
                     value={Math.round(progress * 100)}
@@ -775,6 +958,19 @@ export default function CauldronPage() {
                   <button className="cauldron-btn cauldron-btn--primary" onClick={handleConfirmNext} disabled={actionPending}>
                     {t('cauldron.confirmNext', 'Continuar')}
                   </button>
+                  {canCompleteMission && (
+                    <button
+                      className="cauldron-btn"
+                      onClick={handleCompleteMission}
+                      disabled={actionPending}
+                      title={t(
+                        'cauldron.mission.completeHelp',
+                        'Marca la misión como completada en Questify, con su XP. Si no lo tocás, no pasa nada.',
+                      )}
+                    >
+                      {t('cauldron.mission.complete', 'Completar misión')}
+                    </button>
+                  )}
                   <button
                     className="cauldron-btn"
                     onClick={handleExtend}
@@ -838,66 +1034,34 @@ export default function CauldronPage() {
         )}
       </Section>
 
-      {/* === Session History === */}
+      {/* === El Estante de Pociones =============================
+           Reemplaza al viejo «Historial de sesiones» (una lista de texto plano).
+           Cada enfoque completado deposita un frasco; cada enfoque abandonado
+           pasado el umbral deja uno roto en el mismo lugar. Solo crece. */}
       <Section
-        title={t('cauldron.history.title', 'Session History')}
+        title={t('cauldron.shelf.title', 'Estante de Pociones')}
         icon={<Potion width={14} height={14} />}
         rightSlot={
           <>
-            <HelpBubble variant="inline" text={t('cauldron.historyHelp', 'Registro de sesiones completadas con fecha, receta utilizada y ciclos logrados.')} />
+            <HelpBubble variant="inline" text={t('cauldron.shelfHelp', 'Cada enfoque completado deja un frasco, del color del proyecto de la misión. Un enfoque cortado a mano después de 5 minutos deja un frasco roto. El estante nunca se vacía.')} />
             <button
               className="cauldron-collapse-toggle"
               onClick={() => setHistoryOpen((prev) => !prev)}
               aria-expanded={historyOpen}
             >
-              {t('cauldron.history.count', '{{count}} sesiones', { count: sessions.length })}
+              {t('cauldron.shelf.count', '{{count}} frascos', { count: sessions.length })}
               {historyOpen ? <ChevronUp width={12} height={12} /> : <ChevronDown width={12} height={12} />}
             </button>
           </>
         }
       >
         {historyOpen && (
-          <>
-            {sessions.length === 0 ? (
-              <div className="cauldron-empty-state">
-                {t('cauldron.history.noSessions', 'No sessions recorded yet.')}
-              </div>
-            ) : (
-              <ul className="cauldron-session-list">
-                {sessions.map((s) => {
-                  const date = new Date(s.startedAt);
-                  const dateStr = date.toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  });
-                  const timeStr = date.toLocaleTimeString(undefined, {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-                  return (
-                    <li key={s.id} className="cauldron-session-item">
-                      <span className="cauldron-session-date">
-                        {dateStr} &middot; {timeStr}
-                      </span>
-                      <span className="cauldron-session-detail">
-                        {s.durationMinutes} {t('cauldron.weeklyFocus.unit', 'min')} &middot;{' '}
-                        {s.presetName ?? t('cauldron.history.unknownPreset', 'Unknown recipe')}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {sessionsHasMore && (
-              <button
-                className="cauldron-btn cauldron-load-more"
-                onClick={() => loadSessions(sessionsOffset)}
-              >
-                {t('cauldron.history.loadMore', 'Load more')}
-              </button>
-            )}
-          </>
+          <PotionShelf
+            sessions={sessions}
+            week={weekByProject}
+            hasMore={sessionsHasMore}
+            onLoadMore={() => loadSessions(sessionsOffset)}
+          />
         )}
       </Section>
 

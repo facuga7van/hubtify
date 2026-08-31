@@ -17,5 +17,12 @@ export const cauldronModule: ModuleDefinition = {
       const p = payload as { xp?: number };
       return { xp: p.xp ?? 8, hp: 0 };
     },
+    /**
+     * Un enfoque cortado a mano pasado el umbral. Paga CERO: la pérdida es
+     * simbólica y legible — el frasco roto en el estante —, jamás numérica.
+     * No se descuenta XP, no baja el vigor, no se corta la racha. Este handler
+     * existe solo para que el abandono quede REGISTRADO.
+     */
+    POMODORO_ABANDONED: () => ({ xp: 0, hp: 0 }),
   },
 };

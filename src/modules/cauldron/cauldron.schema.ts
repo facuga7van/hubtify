@@ -93,4 +93,35 @@ export const cauldronMigrations: Migration[] = [
       ALTER TABLE cauldron_presets ADD COLUMN auto_start_work INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 6,
+    up: `
+      -- Fase 2: el vínculo con Questify y el Estante de Pociones.
+      --
+      -- task_id: la misión sobre la que se enfocó esta sesión. Es OPCIONAL y
+      -- POST-HOC: nunca es un peaje antes de apretar play (ese fue el fracaso de
+      -- Focus To-Do), se puede asignar durante el foco o al terminarlo, que es
+      -- justo cuando el usuario sabe qué hizo.
+      --
+      -- DELIBERADAMENTE SIN FOREIGN KEY a tasks(id): sync puede traer sesiones de
+      -- otro dispositivo cuyas tareas este todavía no vio, y una FK dura haría que
+      -- todo el merge del caldero se caiga por un id colgado. El JOIN es LEFT y
+      -- una tarea borrada simplemente deja el frasco «sin etiqueta».
+      ALTER TABLE cauldron_sessions ADD COLUMN task_id TEXT DEFAULT NULL;
+
+      -- abandoned: la CICATRIZ. Un enfoque cortado a mano después de 5 minutos
+      -- deja un frasco roto en el estante en vez de desaparecer. La pérdida es
+      -- simbólica y legible, nunca numérica: POMODORO_ABANDONED paga 0 XP.
+      -- Menos de 5 minutos no deja rastro — un arranque en falso no es una
+      -- promesa rota.
+      ALTER TABLE cauldron_sessions ADD COLUMN abandoned INTEGER NOT NULL DEFAULT 0;
+
+      CREATE INDEX IF NOT EXISTS idx_cauldron_sessions_task ON cauldron_sessions(task_id);
+      -- El estante lee completadas Y abandonadas; el índice anterior solo cubría
+      -- (type, completed, deleted_at, started_at).
+      CREATE INDEX IF NOT EXISTS idx_cauldron_shelf
+        ON cauldron_sessions(type, deleted_at, is_extension, started_at);
+    `,
+  },
 ];

@@ -1058,6 +1058,232 @@
   text-align: center;
 }
 
+/* -- 17b. El vínculo con Questify ---------------------------- */
+
+/* El disparador «¿Sobre qué misión?»: SIEMPRE secundario. Nunca debe competir
+   visualmente con «Encender el caldero» — elegir misión es opcional. */
+.cauldron-mission-trigger {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  text-decoration: underline dotted rgba(107, 85, 53, 0.5);
+  text-underline-offset: 3px;
+  transition: color 150ms ease;
+}
+
+.cauldron-mission-trigger:hover:not(:disabled),
+.cauldron-mission-trigger:focus-visible {
+  color: var(--ink);
+}
+
+.cauldron-mission-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cauldron-mission-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cauldron-mission-kv {
+  align-items: center;
+}
+
+.cauldron-mission-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cauldron-mission-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 18ch;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+}
+
+/* El color del proyecto, que es el mismo que pinta el frasco en el estante. */
+.cauldron-mission-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(44, 24, 16, 0.35);
+}
+
+.cauldron-mission-popover {
+  z-index: var(--z-modal);
+  min-width: 220px;
+  max-width: 320px;
+  padding: 4px;
+  background: var(--parch-0);
+  border: 1px solid rgba(74, 55, 32, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(245, 231, 192, 0.6), 0 8px 24px rgba(44, 24, 16, 0.35);
+}
+
+.cauldron-mission-search {
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+}
+
+.cauldron-mission-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.cauldron-mission-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 2px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.cauldron-mission-item {
+  display: block;
+  width: 100%;
+  padding: 5px 8px 5px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cauldron-mission-item:hover,
+.cauldron-mission-item:focus-visible {
+  background: rgba(245, 231, 192, 0.75);
+}
+
+.cauldron-mission-item.selected {
+  color: var(--rubric);
+}
+
+.cauldron-mission-item--clear {
+  padding-left: 8px;
+  font-style: italic;
+  color: var(--ink-faded);
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.25);
+}
+
+.cauldron-mission-empty {
+  padding: 10px 8px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* -- 17c. El Estante de Pociones ----------------------------- */
+
+.cauldron-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* La respuesta a «¿en qué se me fue el foco?», en una línea y sin un gráfico. */
+.cauldron-shelf-summary {
+  margin: 0 0 10px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.cauldron-shelf-row {
+  margin-bottom: 14px;
+}
+
+.cauldron-shelf-jars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 6px;
+  min-height: 46px;
+}
+
+/* La repisa: la tabla de madera sobre la que se apoyan los frascos. */
+.cauldron-shelf-plank {
+  position: relative;
+  height: 10px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #6b4f2a 0%, #4a3520 55%, #2f2415 100%);
+  box-shadow: 0 2px 4px rgba(44, 24, 16, 0.35);
+}
+
+.cauldron-shelf-day {
+  position: absolute;
+  right: 6px;
+  top: 12px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  white-space: nowrap;
+}
+
+.cauldron-jar {
+  display: block;
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.cauldron-jar:hover {
+  transform: translateY(-2px);
+}
+
+/* Un frasco roto es MEMORIA, no acusación: apagado, nunca rojo, nunca tachado. */
+.cauldron-jar--broken {
+  opacity: 0.62;
+}
+
+.cauldron-jar--broken:hover {
+  opacity: 0.85;
+}
+
+/* -- 17d. Misión en las superficies flotantes ---------------- */
+
+.cauldron-ft-mission,
+.cfw__mission {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  opacity: 0.85;
+}
+
 /* -- 18. Utility Classes ------------------------------------- */
 
 .cauldron-mono {

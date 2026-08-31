@@ -13,6 +13,29 @@ export function shouldPopOutOnStart(): boolean {
   }
 }
 
+/** La última receta con la que se encendió el caldero. */
+export const LAST_PRESET_KEY = 'hubtify_cauldron_last_preset';
+
+export function rememberLastPreset(id: string): void {
+  try { localStorage.setItem(LAST_PRESET_KEY, id); } catch { /* private mode */ }
+}
+
+/**
+ * Qué receta usar en un arranque de UN CLICK — el botón de la fila de misión en
+ * Questify, por ejemplo, donde no hay dónde elegir.
+ *
+ * La última usada gana sobre la primera de la lista: quien ya eligió «Enfoque
+ * Largo» tres veces no quiere que el atajo le arranque un «Clásico». Si esa
+ * receta se borró, cae en la primera disponible.
+ */
+export function quickStartPresetId(presets: Array<Pick<CauldronPreset, 'id'>>): string | null {
+  if (presets.length === 0) return null;
+  let last: string | null = null;
+  try { last = localStorage.getItem(LAST_PRESET_KEY); } catch { /* private mode */ }
+  if (last && presets.some((p) => p.id === last)) return last;
+  return presets[0].id;
+}
+
 /**
  * Seeded default presets carry English names in the database, so rendering
  * `preset.name` raw showed "Classic" to a Spanish user even though

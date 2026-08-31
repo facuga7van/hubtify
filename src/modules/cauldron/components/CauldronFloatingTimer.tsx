@@ -14,6 +14,7 @@ import { PlayIcon, PauseIcon, StopIcon, CrossMark, PopOutIcon, SkipForwardIcon }
 import type { CauldronSessionEndResult } from '../../../../shared/types';
 import {
   autoStartSecondsLeft,
+  UNLABELED_POTION_COLOR,
   type CauldronTimerStateEx,
   type CauldronSessionEndResultEx,
 } from '../types';
@@ -114,11 +115,39 @@ export default function CauldronFloatingTimer() {
             window.dispatchEvent(new Event('rpg:statsChanged'));
             window.dispatchEvent(new Event('cauldron:dataChanged'));
           });
+      } else if (result.abandoned) {
+        // Un enfoque cortado a mano pasado el umbral. El evento paga CERO: la
+        // pérdida es simbólica y legible — el frasco roto que quedó en el
+        // estante —, jamás numérica. Esto solo lo deja REGISTRADO.
+        //
+        // Se emite desde acá y solo desde acá: este componente se monta una vez
+        // por ventana principal (la PiP renderiza CauldronFloatingWindow en su
+        // lugar), así que un `stop` no puede pagar el evento dos veces. Es el
+        // mismo punto único desde el que sale POMODORO_COMPLETED.
+        window.api
+          .processRpgEvent({
+            type: 'POMODORO_ABANDONED',
+            moduleId: 'cauldron',
+            payload: { xp: 0, hp: 0, elapsedMinutes: result.elapsedMinutes ?? 0, taskId: result.taskId ?? null },
+            timestamp: Date.now(),
+          })
+          .then(() => {
+            // Sin toast de XP: no hubo XP. El aviso es el frasco roto, y una
+            // línea sobria que dice hasta dónde llegó.
+            toast({
+              type: 'info',
+              message: t('cauldron.abandoned.toast', 'Poción rota — {{minutes}} min quedaron en el estante', {
+                minutes: result.elapsedMinutes ?? 0,
+              }),
+            });
+            window.dispatchEvent(new Event('cauldron:dataChanged'));
+          })
+          .catch(() => { /* el frasco roto ya está en la base; el evento es registro */ });
       }
       loadState();
     });
     return cleanup;
-  }, [loadState, toast]);
+  }, [loadState, toast, t]);
 
   // Reset hidden when timer goes idle
   useEffect(() => {
@@ -270,6 +299,19 @@ export default function CauldronFloatingTimer() {
       <span className="cauldron-ft-time">
         {isAutoStarting ? `${autoSeconds}s` : isAwaiting ? '00:00' : formatTime(timerState.remainingMs)}
       </span>
+      {/* La misión vinculada, si la hay: el chip refleja el broadcast, no
+          consulta nada. Cambiarla se hace en la página — acá no entra un
+          popover de 24 px de alto. */}
+      {timerState.taskId && (
+        <span className="cauldron-ft-mission" title={timerState.taskName ?? undefined}>
+          <span
+            className="cauldron-mission-swatch"
+            style={{ background: timerState.taskProjectColor ?? UNLABELED_POTION_COLOR }}
+            aria-hidden="true"
+          />
+          {timerState.taskName ?? t('cauldron.shelf.unlabeled', 'sin etiqueta')}
+        </span>
+      )}
       <div className="cauldron-ft-controls">
         {isAutoStarting && (
           <button
