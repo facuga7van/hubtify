@@ -323,6 +323,14 @@ export default function Today() {
         });
         return;
       }
+      // Un solo MEAL_LOGGED por la accion, no uno por comida copiada: cuatro
+      // eventos de un click inflarian el combo igual que cuatro registros
+      // manuales sin el esfuerzo. El camino comodo paga, pero paga una vez.
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0, source: 'copy_day', copied: res.copied },
+        timestamp: Date.now(),
+      });
       toast({ type: 'nutri', message: t('nutrify.repeatYesterdayDone', 'Comidas de ayer copiadas') });
       await loadData(date);
     } catch (err) {
