@@ -3,27 +3,32 @@ import { Routes, Route, Navigate, useNavigate, Outlet } from 'react-router-dom';
 import Layout from './hub/Layout';
 import Onboarding from './hub/Onboarding';
 import Dashboard from './hub/Dashboard';
-import CharacterPage from './hub/CharacterPage';
 import AuthPage from './hub/AuthPage';
-import SettingsPage from './hub/SettingsPage';
 import ErrorBoundary from './shared/components/ErrorBoundary';
-import TaskList from './modules/quests/components/TaskList';
+// Module stylesheets stay eager: the dashboard on `/` renders a widget from
+// every module, so splitting them out would only trade a chunk for a FOUC.
 import './modules/quests/styles/quests.css';
 import './modules/finance/styles/coinify.css';
 import './modules/nutrition/styles/nutri.css';
-import Today from './modules/nutrition/components/Today';
-import NutritionCharts from './modules/nutrition/components/NutritionCharts';
-import NutritionSettings from './modules/nutrition/components/NutritionSettings';
-import FinanceLayout from './modules/finance/components/FinanceLayout';
-import FinanceDashboard from './modules/finance/components/Dashboard';
-import Transactions from './modules/finance/components/Transactions';
-import Installments from './modules/finance/components/Installments';
-import Loans from './modules/finance/components/Loans';
-import Recurring from './modules/finance/components/Recurring';
-import Import from './modules/finance/components/Import';
-import CreditCards from './modules/finance/components/CreditCards';
-import CauldronPage from './modules/cauldron/components/CauldronPage';
 import './modules/cauldron/styles/cauldron.css';
+import {
+  CharacterPage,
+  SettingsPage,
+  CauldronPage,
+  TaskList,
+  Today,
+  NutritionCharts,
+  NutritionSettings,
+  FinanceLayout,
+  FinanceDashboard,
+  Transactions,
+  Installments,
+  Loans,
+  Recurring,
+  Import,
+  CreditCards,
+  prefetchRoutes,
+} from './routes';
 import { useAuthContext } from './shared/AuthContext';
 
 function AuthPageWrapper() {
@@ -55,6 +60,15 @@ export default function App() {
       window.removeEventListener('account:switched', checkOnboarded);
     };
   }, [user]);
+
+  // Warm the route chunks while the main thread is idle, so navigating (Ctrl+1..6
+  // included) never waits on a chunk it could have fetched during the lull after
+  // startup. Only once past both gates — the shell is what the chunks belong to.
+  const shellVisible = !loading && !!user && onboarded;
+  useEffect(() => {
+    if (!shellVisible) return;
+    return prefetchRoutes();
+  }, [shellVisible]);
 
   // Show loading while Firebase checks auth state
   if (loading) return null;

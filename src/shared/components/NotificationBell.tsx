@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useVisibleInterval } from '../hooks/useVisibleInterval';
 
 interface NotificationBellProps {
   onClick: () => void;
@@ -29,11 +30,10 @@ export default function NotificationBell({ onClick }: NotificationBellProps) {
     setPulse(false);
   }, []);
 
-  useEffect(() => {
-    refreshCount();
-    const interval = setInterval(refreshCount, 30000);
-    return () => clearInterval(interval);
-  }, [refreshCount]);
+  // Poll only while the window is on screen — see useVisibleInterval. The
+  // onNotificationsUpdated push below already covers everything the engine does.
+  useEffect(() => { refreshCount(); }, [refreshCount]);
+  useVisibleInterval(refreshCount, 30_000);
 
   // Listen for engine updates (via IPC from main process)
   useEffect(() => {

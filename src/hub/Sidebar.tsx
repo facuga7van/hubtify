@@ -8,6 +8,7 @@ import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
 import { Scroll, Shield, Sword, Bread, Coin, Cauldron } from '../shared/components/icons';
 import Tooltip from '../shared/components/Tooltip';
+import { useVisibleInterval } from '../shared/hooks/useVisibleInterval';
 import './styles/layout.css';
 
 const STREAK_BAR_SCALE = 3.3; // 30 days = ~100% width
@@ -93,12 +94,10 @@ export default function Sidebar({ stats, collapsed, onBellClick }: SidebarProps)
     }).catch(() => { /* silent */ });
   }, []);
 
-  // Load badges on mount + periodic refresh (30s)
-  useEffect(() => {
-    loadBadges();
-    const interval = setInterval(loadBadges, 30_000);
-    return () => clearInterval(interval);
-  }, [loadBadges]);
+  // Load badges on mount + periodic refresh (30s), paused while the window is
+  // hidden — see useVisibleInterval.
+  useEffect(() => { loadBadges(); }, [loadBadges]);
+  useVisibleInterval(loadBadges, 30_000);
 
   // Refresh on account switch + data changes that affect badges
   useEffect(() => {

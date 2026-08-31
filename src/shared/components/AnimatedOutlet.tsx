@@ -1,8 +1,9 @@
-import { useRef, useLayoutEffect, useCallback, useImperativeHandle, forwardRef, createContext, useContext } from 'react'
+import { useRef, useLayoutEffect, useCallback, useImperativeHandle, forwardRef, createContext, useContext, Suspense } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { PageFlip } from 'page-flip'
 import { bookOpen } from '../animations/transitions'
 import { playPageFlip } from '../audio'
+import Loading from './Loading'
 import bgTexture from '../../assets/bg.jpg'
 
 let isFirstLoad = true
@@ -212,9 +213,16 @@ const AnimatedOutlet = forwardRef<AnimatedOutletHandle>(function AnimatedOutlet(
 
   useImperativeHandle(ref, () => ({ animatedNavigate }), [animatedNavigate])
 
+  // Routes are code-split. src/routes.tsx keeps each resolved chunk in a closure
+  // and prefetches them on idle, so in practice this fallback only shows if you
+  // navigate in the first moments after startup — the flip transition below
+  // still reads whatever is inside `outletRef`, spinner included, and degrades
+  // to a plain flip rather than breaking.
   return (
     <div ref={outletRef}>
-      <Outlet />
+      <Suspense fallback={<Loading />}>
+        <Outlet />
+      </Suspense>
     </div>
   )
 })
