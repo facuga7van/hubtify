@@ -1415,7 +1415,10 @@ export function registerSyncIpcHandlers(): void {
     const sessions = data.cauldron_sessions as Array<Record<string, unknown>> | undefined;
     if (sessions?.length) {
       const getSession = db.prepare('SELECT id, completed FROM cauldron_sessions WHERE id = ?');
-      const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      // is_extension travels too: without it, a +5min extension synced from
+      // another device landed as is_extension = 0 and counted as a full pomodoro
+      // in every stat (+1 today, +minutes on the weekly chart, +XP eligibility).
+      const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at, is_extension) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const completeSession = db.prepare(`UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ? WHERE id = ?`);
       // preset_id is a FOREIGN KEY: a session whose preset this device has never
       // seen would fail the constraint and (now that this runs in a transaction)
@@ -1426,7 +1429,7 @@ export function registerSyncIpcHandlers(): void {
         const local = getSession.get(s.id) as { id: string; completed: number } | undefined;
         if (!local) {
           const presetId = s.preset_id && presetExists.get(s.preset_id) ? s.preset_id : null;
-          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null);
+          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null, s.is_extension ?? 0);
           if (result.changes > 0) changed = true;
         } else if (s.completed === 1 && local.completed === 0) {
           completeSession.run(s.completed_at, s.updated_at, s.id);

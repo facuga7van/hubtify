@@ -13,7 +13,7 @@ export default function DashboardWidget() {
   const { toast } = useToast();
   const [total, setTotal] = useState<number | null>(null);
   const [loansCount, setLoansCount] = useState(0);
-  const [balance, setBalance] = useState<{ income: number; expenses: number } | null>(null);
+  const [balance, setBalance] = useState<{ income: number; expenses: number; usdIncome?: number; usdExpenses?: number } | null>(null);
 
   // Quick-add form state
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -33,10 +33,15 @@ export default function DashboardWidget() {
     window.api.financeGetMonthlyBalance().then((b) => {
       const data = b as { ARS?: { income: number; expenses: number }; USD?: { income: number; expenses: number } } | null;
       if (data) {
-        // Sum across currencies
-        const income = (data.ARS?.income ?? 0) + (data.USD?.income ?? 0);
-        const expenses = (data.ARS?.expenses ?? 0) + (data.USD?.expenses ?? 0);
-        setBalance({ income, expenses });
+        // ARS only — this widget renders a single peso-prefixed figure, and adding
+        // USD 300 to ARS 300.000 as "300.300" was the first number the user saw on
+        // opening the app. USD gets its own line when present (see render below).
+        setBalance({
+          income: data.ARS?.income ?? 0,
+          expenses: data.ARS?.expenses ?? 0,
+          usdIncome: data.USD?.income ?? 0,
+          usdExpenses: data.USD?.expenses ?? 0,
+        });
       }
     }).catch((err) => console.warn('[DashboardWidget] financeGetMonthlyBalance failed:', err));
   }, []);
@@ -53,6 +58,7 @@ export default function DashboardWidget() {
   const income = balance?.income ?? 0;
   const expenses = balance?.expenses ?? 0;
   const balanceNet = income - expenses;
+  const usdNet = (balance?.usdIncome ?? 0) - (balance?.usdExpenses ?? 0);
   const spendPct = income > 0 ? Math.round((expenses / income) * 100) : 0;
 
   const now = new Date();
@@ -136,7 +142,14 @@ export default function DashboardWidget() {
           <span>
             {t('coinify.thisMonth', 'este mes')} &middot;{' '}
             {total !== null ? (
-              <AnimatedNumber value={balanceNet} prefix={currencyPrefix()} />
+              <>
+                <AnimatedNumber value={balanceNet} prefix={currencyPrefix()} />
+                {usdNet !== 0 && (
+                  <span style={{ opacity: 0.75, marginLeft: 6 }}>
+                    {usdNet > 0 ? '+' : '−'}US$ {Math.abs(usdNet).toLocaleString('es-AR')}
+                  </span>
+                )}
+              </>
             ) : '---'}
           </span>
           <span>{monthPct}% {t('coinify.ofTheMonth', 'del mes')}</span>
