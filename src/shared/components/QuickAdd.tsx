@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalA11y } from '../hooks/useModalA11y';
 import type { Project } from '../../modules/quests/types';
 import { TierBadge, TIER_LABEL } from '../../modules/quests/utils';
 import type { TaskTier } from '../../modules/quests/types';
@@ -31,14 +32,8 @@ export default function QuickAdd({ onClose }: Props) {
     return () => window.removeEventListener('account:switched', handler);
   }, [loadProjects]);
 
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  // Escape, focus trap and focus restore.
+  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,17 +63,17 @@ export default function QuickAdd({ onClose }: Props) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.6)', zIndex: 99998,
+      position: 'fixed', inset: 0, background: 'rgba(44,24,16,0.6)', zIndex: 'var(--z-modal)' as unknown as number,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '20vh',
     }} onClick={onClose}>
-      <div style={{
+      <div {...dialogProps} aria-label={t('questify.quickAdd')} style={{
         backgroundImage: `url(${bgUrl})`,
         backgroundSize: '400px', backgroundRepeat: 'repeat',
         borderRadius: 8, padding: '16px 20px',
         boxShadow: '0 12px 40px rgba(44,24,16,0.6)',
         border: '3px solid var(--gold-dark)',
         width: 440,
-      }} onClick={(e) => e.stopPropagation()}>
+      }} onClick={stopPropagation}>
 
         <div style={{
           fontSize: 'var(--fs-label)', opacity: 0.65, marginBottom: 8,

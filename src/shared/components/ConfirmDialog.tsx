@@ -1,8 +1,12 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface ConfirmOptions {
   message: string;
+  /** Optional heading above the message. */
+  title?: string;
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
@@ -21,6 +25,7 @@ export function useConfirm() {
 }
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [state, setState] = useState<(ConfirmOptions & { visible: boolean }) | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
@@ -31,41 +36,37 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const cancelRef = useRef<HTMLButtonElement>(null);
-
-  const handleResult = (result: boolean) => {
+  const handleResult = useCallback((result: boolean) => {
     resolveRef.current?.(result);
     resolveRef.current = null;
     setState(null);
-  };
+  }, []);
 
-  // Escape key closes dialog
-  useEffect(() => {
-    if (!state?.visible) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleResult(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [state?.visible]);
+  const close = useCallback(() => handleResult(false), [handleResult]);
 
-  // Auto-focus cancel button on open (safer default for destructive dialogs)
-  useEffect(() => {
-    if (state?.visible) cancelRef.current?.focus();
-  }, [state?.visible]);
+  // Focus trap + Escape + focus restore. Cancel is first in the DOM, so this
+  // also keeps the safe default focus for destructive dialogs.
+  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({
+    onClose: close,
+    active: state?.visible ?? false,
+    role: 'alertdialog',
+  });
+
+  // A fresh {confirm} object every render re-rendered every consumer.
+  const value = useMemo(() => ({ confirm }), [confirm]);
 
   return (
-    <ConfirmContext.Provider value={{ confirm }}>
+    <ConfirmContext.Provider value={value}>
       {children}
       {state?.visible && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(42, 29, 14, 0.7)', zIndex: 99999,
+          position: 'fixed', inset: 0, background: 'rgba(42, 29, 14, 0.7)', zIndex: 'var(--z-confirm)' as unknown as number,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }} onClick={() => handleResult(false)}>
+        }} onClick={close}>
           <div
-            role="alertdialog"
-            aria-modal="true"
+            {...dialogProps}
             aria-describedby="confirm-dialog-message"
+            aria-labelledby={state.title ? 'confirm-dialog-title' : undefined}
             style={{
             background: 'linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%)',
             borderRadius: 6, padding: '24px 28px',
@@ -73,7 +74,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             border: '2px solid var(--gold-dark)',
             maxWidth: 380, width: '90%',
             position: 'relative',
-          }} onClick={(e) => e.stopPropagation()}>
+          }} onClick={stopPropagation}>
             {/* Top gold edge */}
             <div style={{
               position: 'absolute', top: -2, left: 20, right: 20, height: 2,
@@ -86,6 +87,15 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               borderRadius: 3, pointerEvents: 'none',
             }} />
 
+            {state.title && (
+              <h3 id="confirm-dialog-title" style={{
+                fontSize: 'var(--fs-heading)', color: 'var(--ink)',
+                textAlign: 'center', marginBottom: 10,
+              }}>
+                {state.title}
+              </h3>
+            )}
+
             <p id="confirm-dialog-message" style={{
               fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-sub)',
               color: 'var(--ink)', lineHeight: 1.5, marginBottom: 18,
@@ -94,18 +104,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               {state.message}
             </p>
 
+            {/* Windows convention: cancel on the left, confirm on the right. */}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button className="rpg-button" onClick={() => handleResult(true)}
-                style={{
-                  padding: '6px 20px', fontSize: 'var(--fs-quote)', fontWeight: 'bold',
-                  background: state.danger
-                    ? 'linear-gradient(180deg, var(--rubric-light) 0%, var(--rubric) 100%)'
-                    : undefined,
-                  color: state.danger ? 'var(--parch-0)' : undefined,
-                }}>
-                {state.confirmText ?? 'OK'}
-              </button>
-              <button ref={cancelRef} onClick={() => handleResult(false)}
+              <button className="tap-target" onClick={() => handleResult(false)}
                 style={{
                   padding: '6px 20px', fontSize: 'var(--fs-quote)',
                   background: 'transparent', border: '1px solid var(--gold-dark)',
@@ -114,7 +115,17 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   color: 'var(--ink-soft)', letterSpacing: '0.04em',
                   transition: 'all 0.2s ease',
                 }}>
-                {state.cancelText ?? 'Cancelar'}
+                {state.cancelText ?? t('common.cancel', 'Cancelar')}
+              </button>
+              <button className="rpg-button tap-target" onClick={() => handleResult(true)}
+                style={{
+                  padding: '6px 20px', fontSize: 'var(--fs-quote)', fontWeight: 'bold',
+                  background: state.danger
+                    ? 'linear-gradient(180deg, var(--rubric-light) 0%, var(--rubric) 100%)'
+                    : undefined,
+                  color: state.danger ? 'var(--parch-0)' : undefined,
+                }}>
+                {state.confirmText ?? t('common.ok', 'OK')}
               </button>
             </div>
           </div>

@@ -26,7 +26,6 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     return () => window.removeEventListener('helpBubbles:changed', handler);
   }, []);
 
-  if (hidden) return null;
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const tipId = useId();
@@ -70,6 +69,10 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     setOpen(true);
     requestAnimationFrame(() => requestAnimationFrame(positionTip));
   };
+
+  // Early return AFTER all hooks — toggling `helpBubbles:changed` must not
+  // change the number of hooks rendered (React: "Rendered fewer hooks than expected").
+  if (hidden) return null;
 
   return (
     <>

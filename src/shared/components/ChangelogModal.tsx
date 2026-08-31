@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { changelog } from '../changelog';
 import type { ChangelogEntry, ChangelogChange } from '../changelog';
 import { Sparkle, Shield, Quill } from './icons/CodexIcons';
-import { Flourish } from './icons/Ornaments';
+import { Flourish, QBDivider } from './icons/Ornaments';
+import { useModalA11y } from '../hooks/useModalA11y';
 import './ChangelogModal.css';
 
 interface ChangelogModalProps {
@@ -84,20 +85,18 @@ export default function ChangelogModal({ open, onClose, title, entries }: Change
     else setAnimOpen(false);
   }, [open]);
 
-  // Escape key + scroll lock
+  // Scroll lock while open
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
     const scrollContainer = document.querySelector('.main-content') as HTMLElement | null;
     if (scrollContainer) scrollContainer.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', handler);
       if (scrollContainer) scrollContainer.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open]);
+
+  // Escape, focus trap, initial focus and focus restore.
+  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose, active: open });
 
   if (!open) return null;
 
@@ -111,8 +110,10 @@ export default function ChangelogModal({ open, onClose, title, entries }: Change
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div
+        {...dialogProps}
+        aria-label={displayTitle}
         className={`changelog-card ${animOpen ? 'changelog-card--open' : 'changelog-card--entering'}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={stopPropagation}
       >
         {/* Top scroll roller */}
         <div className="changelog-roller changelog-roller--top">
@@ -123,12 +124,15 @@ export default function ChangelogModal({ open, onClose, title, entries }: Change
         {/* Parchment body */}
         <div className="changelog-parchment">
           {/* Close X */}
-          <button className="changelog-close-x" onClick={onClose}>×</button>
+          <button className="changelog-close-x" onClick={onClose}
+            aria-label={t('common.close', 'Cerrar')}>×</button>
 
           {/* Header */}
           <div className="changelog-header">
             <div className="changelog-header__eyebrow">
-              ✠ {displayTitle.toUpperCase()} ✠
+              <QBDivider width={40} height={8} aria-hidden="true" />
+              <span>{displayTitle.toUpperCase()}</span>
+              <QBDivider width={40} height={8} aria-hidden="true" />
             </div>
             <h1 className="changelog-header__title">
               {displayTitle}

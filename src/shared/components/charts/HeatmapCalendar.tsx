@@ -48,12 +48,19 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
   const tipRef = useRef<HTMLDivElement>(null);
 
-  const showTip = useCallback((e: React.MouseEvent, idx: number) => {
+  const showTip = useCallback((e: React.SyntheticEvent, idx: number) => {
     const text = tooltips?.[idx];
     if (!text) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setTip({ text, x: rect.left + rect.width / 2, y: rect.top });
   }, [tooltips]);
+
+  /** ISO date of cell `i`, so every cell can name its own day. */
+  const dateAt = useCallback((i: number) => {
+    const d = new Date(startDate + 'T12:00:00');
+    d.setDate(d.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  }, [startDate]);
 
   const hideTip = useCallback(() => setTip(null), []);
 
@@ -81,12 +88,22 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
           const isMiss = level === 'miss';
           const cellClass = LEVEL_CLASSES[level] ?? 'heatmap-cell--l0';
 
+          // The value of a day used to be reachable only by hovering with a
+          // mouse: no title, no keyboard focus.
+          const label = tooltips?.[i] ?? dateAt(i);
+
           return (
             <div
               key={i}
               className={`heatmap-cell ${cellClass}`}
+              title={label}
+              tabIndex={0}
+              role="img"
+              aria-label={label}
               onMouseEnter={(e) => showTip(e, i)}
               onMouseLeave={hideTip}
+              onFocus={(e) => showTip(e, i)}
+              onBlur={hideTip}
             >
               {isToday && <span className="heatmap-today-mark">{'\u2726'}</span>}
               {isMiss && <span className="heatmap-miss-mark">{'\u2715'}</span>}
@@ -139,7 +156,7 @@ const HeatmapLegend: React.FC<{ themed: boolean }> = ({ themed }) => {
           className={`heatmap-cell heatmap-cell--miss heatmap-legend-cell ${themeClass}`}
           style={{ width: 14, height: 14, aspectRatio: 'auto' }}
         />
-        Missed
+        {t('common.missed', 'Perdido')}
       </span>
     </div>
   );

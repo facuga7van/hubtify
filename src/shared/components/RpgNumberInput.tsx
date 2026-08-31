@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react';
+import { useHoldToRepeat } from '../hooks/useHoldToRepeat';
 
 interface Props {
   value: string;
@@ -13,11 +14,18 @@ interface Props {
   style?: React.CSSProperties;
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
   required?: boolean;
+  /** Para poder asociar un <label htmlFor>. */
+  id?: string;
+  /** Alternativa cuando no hay label visible. */
+  'aria-label'?: string;
+  'aria-describedby'?: string;
 }
 
-export default function RpgNumberInput({ value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, fontSize, style, onKeyDown, required }: Props) {
+export default function RpgNumberInput({
+  value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, fontSize, style, onKeyDown, required,
+  id, 'aria-label': ariaLabel, 'aria-describedby': ariaDescribedBy,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clamp = useCallback((v: number) => {
     if (min !== undefined && v < min) return min;
@@ -31,26 +39,12 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
     onChange(String(next));
   }, [value, step, clamp, onChange]);
 
-  const startHold = useCallback((dir: 1 | -1) => {
-    adjust(dir);
-    let speed = 200;
-    const tick = () => {
-      intervalRef.current = setTimeout(() => {
-        adjust(dir);
-        speed = Math.max(50, speed * 0.9);
-        tick();
-      }, speed);
-    };
-    intervalRef.current = setTimeout(tick, 400);
-  }, [adjust]);
-
-  const stopHold = useCallback(() => {
-    if (intervalRef.current) { clearTimeout(intervalRef.current); intervalRef.current = null; }
-  }, []);
+  const { startHold, stopHold, handleClick, handleKeyDown } = useHoldToRepeat(adjust);
 
   const arrowBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 18, height: '50%', border: 'none', cursor: 'pointer',
+    width: 32, minWidth: 32, height: '50%', minHeight: 16,
+    border: 'none', cursor: 'pointer',
     background: 'linear-gradient(180deg, var(--leather-light), var(--leather))',
     color: 'var(--gold)',
     userSelect: 'none', padding: 0, borderRadius: 2,
@@ -68,12 +62,18 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
       `}</style>
       <input
         ref={inputRef}
+        id={id}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         type="number"
         step={step}
         min={min}
         max={max}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        /* A number input steals the wheel when focused: scrolling the page
+           silently changes the amount. Blur instead of scrolling the value. */
+        onWheel={(e) => e.currentTarget.blur()}
         onKeyDown={(e) => {
           if (e.key === 'ArrowUp') { e.preventDefault(); adjust(1); }
           else if (e.key === 'ArrowDown') { e.preventDefault(); adjust(-1); }
@@ -84,7 +84,7 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
         className="rpg-input rpg-number-input"
         style={{
           width: '100%', textAlign: 'center',
-          paddingRight: 10,
+          paddingLeft: 36, paddingRight: 36,
           ...(fontSize ? { fontSize } : {}),
         }}
         autoFocus={autoFocus}
@@ -92,7 +92,7 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
       />
       {suffix && (
         <span style={{
-          position: 'absolute', right: 34, top: '50%', transform: 'translateY(-50%)',
+          position: 'absolute', right: 40, top: '50%', transform: 'translateY(-50%)',
           fontSize: 'var(--fs-label)', opacity: 0.65, pointerEvents: 'none',
         }}>
           {suffix}
@@ -102,15 +102,17 @@ export default function RpgNumberInput({ value, onChange, step = 1, min, max, pl
         position: 'absolute', right: 2, top: 2, bottom: 2,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <button type="button" style={arrowBtn}
-          onMouseDown={() => startHold(1)} onMouseUp={stopHold} onMouseLeave={stopHold}>
-          <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <button type="button" style={arrowBtn} aria-label="Increase"
+          onMouseDown={() => startHold(1)} onMouseUp={stopHold} onMouseLeave={stopHold}
+          onClick={() => handleClick(1)} onKeyDown={handleKeyDown}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M2 7L5 3l3 4"/>
           </svg>
         </button>
-        <button type="button" style={arrowBtn}
-          onMouseDown={() => startHold(-1)} onMouseUp={stopHold} onMouseLeave={stopHold}>
-          <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <button type="button" style={arrowBtn} aria-label="Decrease"
+          onMouseDown={() => startHold(-1)} onMouseUp={stopHold} onMouseLeave={stopHold}
+          onClick={() => handleClick(-1)} onKeyDown={handleKeyDown}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M2 3L5 7l3-4"/>
           </svg>
         </button>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import type { AppNotification } from '../../../shared/types';
+import { useModalA11y } from '../hooks/useModalA11y';
 import '../styles/notifications.css';
 
 interface NotificationCenterProps {
@@ -72,6 +73,13 @@ export default function NotificationCenter({ open, onClose, onNavigate }: Notifi
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
+  /** Con 8 notificaciones habia que descartarlas de a una. */
+  const handleDismissAll = useCallback(async () => {
+    const ids = notifications.map(n => n.id);
+    setNotifications([]);
+    await Promise.all(ids.map(id => window.api.notificationsDismiss(id)));
+  }, [notifications]);
+
   const handleSnooze = useCallback(async (id: string) => {
     await window.api.notificationsSnooze(id);
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -82,14 +90,8 @@ export default function NotificationCenter({ open, onClose, onNavigate }: Notifi
     handleClose();
   }, [onNavigate, handleClose]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, handleClose]);
+  // Escape, focus trap, initial focus and focus restore.
+  const { dialogProps } = useModalA11y<HTMLDivElement>({ onClose: handleClose, active: open });
 
   if (!open) return null;
 
@@ -101,12 +103,27 @@ export default function NotificationCenter({ open, onClose, onNavigate }: Notifi
   return (
     <>
       <div className="notif-overlay" ref={overlayRef} onClick={handleClose} />
-      <div className="notif-drawer" ref={drawerRef}>
+      <div
+        {...dialogProps}
+        ref={(el) => {
+          drawerRef.current = el;
+          dialogProps.ref.current = el;
+        }}
+        aria-label={t('notifications.title', 'Notificaciones')}
+        className="notif-drawer"
+      >
         <div className="notif-drawer-header">
           <span>{t('notifications.title', 'Notificaciones')}</span>
+          <div className="notif-drawer-header-actions">
+            {notifications.length > 0 && (
+              <button className="notif-dismiss-all" onClick={handleDismissAll}>
+                {t('notifications.dismissAll', 'Descartar todas')}
+              </button>
+            )}
           <button className="notif-drawer-close" onClick={handleClose}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
           </button>
+          </div>
         </div>
 
         <div className="notif-drawer-list">

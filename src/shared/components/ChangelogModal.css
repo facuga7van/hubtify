@@ -3,7 +3,7 @@
 .changelog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 5000;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   background: rgba(20, 12, 4, 0.7);
@@ -100,14 +100,14 @@
   top: 12px;
   right: 12px;
   z-index: 5;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: rgba(58, 37, 19, 0.9);
   color: #c4a84e;
   border: 1px solid var(--gold-dark);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1;
   display: grid;
   place-items: center;
@@ -127,15 +127,19 @@
 
 .changelog-header__eyebrow {
   font-family: var(--ff-accent);
-  font-size: 10px;
+  font-size: var(--fs-label);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--rubric);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .changelog-header__title {
   font-family: var(--ff-display);
-  font-size: 38px;
+  font-size: var(--fs-display);
   color: var(--ink);
   margin: 8px 0 4px;
   font-weight: 400;
@@ -144,7 +148,7 @@
 
 .changelog-header__version {
   font-family: var(--ff-accent);
-  font-size: 13px;
+  font-size: var(--fs-label);
   letter-spacing: 0.18em;
   color: var(--gold-dark);
 }
@@ -186,7 +190,7 @@
 
 .changelog-version-divider__tag {
   font-family: var(--ff-accent);
-  font-size: 14px;
+  font-size: var(--fs-body);
   letter-spacing: 0.15em;
   color: var(--gold-dark);
   font-weight: 600;
@@ -196,7 +200,7 @@
 .changelog-version-divider__date {
   font-family: var(--ff-quote);
   font-style: italic;
-  font-size: 12px;
+  font-size: var(--fs-label);
   color: var(--ink-faded);
   white-space: nowrap;
 }
@@ -229,7 +233,7 @@
 
 .changelog-group__label {
   font-family: var(--ff-accent);
-  font-size: 12px;
+  font-size: var(--fs-label);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   font-weight: 500;
@@ -243,7 +247,7 @@
 
 .changelog-group__count {
   font-family: var(--ff-accent);
-  font-size: 10px;
+  font-size: var(--fs-label);
   color: var(--ink-faded);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -274,7 +278,7 @@
 
 .changelog-item__scope {
   font-family: var(--ff-accent);
-  font-size: 10px;
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   color: var(--ink-faded);
   text-transform: uppercase;
@@ -283,7 +287,7 @@
 
 .changelog-item__text {
   font-family: var(--ff-body);
-  font-size: 14.5px;
+  font-size: var(--fs-body);
   color: var(--ink);
   line-height: 1.3;
 }

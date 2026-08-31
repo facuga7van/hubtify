@@ -1,4 +1,5 @@
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useHoldToRepeat } from '../hooks/useHoldToRepeat';
 
 interface Props {
   value: number;
@@ -11,8 +12,6 @@ interface Props {
 }
 
 export default function RpgStepper({ value, min = 0, max = 99, step = 1, onChange, suffix, style }: Props) {
-  const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const clamp = useCallback((v: number) => {
     if (v < min) return min;
     if (v > max) return max;
@@ -23,32 +22,19 @@ export default function RpgStepper({ value, min = 0, max = 99, step = 1, onChang
     onChange(clamp(+(value + step * dir).toFixed(2)));
   }, [value, step, clamp, onChange]);
 
-  const startHold = useCallback((dir: 1 | -1) => {
-    adjust(dir);
-    let speed = 200;
-    const tick = () => {
-      intervalRef.current = setTimeout(() => {
-        adjust(dir);
-        speed = Math.max(50, speed * 0.9);
-        tick();
-      }, speed);
-    };
-    intervalRef.current = setTimeout(tick, 400);
-  }, [adjust]);
-
-  const stopHold = useCallback(() => {
-    if (intervalRef.current) { clearTimeout(intervalRef.current); intervalRef.current = null; }
-  }, []);
+  const { startHold, stopHold, handleClick, handleKeyDown } = useHoldToRepeat(adjust);
 
   return (
     <div className="rpg-stepper" style={style}>
       <button
         type="button"
-        className="rpg-stepper-btn"
+        className="rpg-stepper-btn tap-target"
         disabled={value <= min}
         onMouseDown={() => startHold(-1)}
         onMouseUp={stopHold}
         onMouseLeave={stopHold}
+        onClick={() => handleClick(-1)}
+        onKeyDown={handleKeyDown}
         aria-label="Decrease"
       >−</button>
       <span className="rpg-stepper-value">
@@ -56,11 +42,13 @@ export default function RpgStepper({ value, min = 0, max = 99, step = 1, onChang
       </span>
       <button
         type="button"
-        className="rpg-stepper-btn"
+        className="rpg-stepper-btn tap-target"
         disabled={value >= max}
         onMouseDown={() => startHold(1)}
         onMouseUp={stopHold}
         onMouseLeave={stopHold}
+        onClick={() => handleClick(1)}
+        onKeyDown={handleKeyDown}
         aria-label="Increase"
       >+</button>
     </div>

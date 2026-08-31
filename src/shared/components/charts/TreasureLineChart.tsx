@@ -30,7 +30,10 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
   const stippleId = `${uid}-stipple`;
   const areaGradientId = `${uid}-areaGrad`;
 
-  const viewBoxWidth = 460;
+  // Was 460 while the host card is ~286px wide: everything, text included,
+  // was scaled by 0.62 on top of its own size (fontSize 7 -> 4.3px).
+  // Decorative coordinates below were rescaled by the same factor.
+  const viewBoxWidth = 300;
   const padding = { top: 20, right: 20, bottom: 25, left: 30 };
   const chartW = viewBoxWidth - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
@@ -89,6 +92,15 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
     todayIndex != null && todayIndex >= 0 && todayIndex < scaledPoints.length
       ? scaledPoints[todayIndex]
       : null;
+
+  // At 30 points the x labels overlap into a smear; show one every `labelStep`.
+  const labelStep = useMemo(() => {
+    if (!xLabels || xLabels.length < 2) return 1;
+    const longest = xLabels.reduce((m, l) => Math.max(m, l.length), 1);
+    const needed = longest * 6 + 6;             // approx. label width, viewBox units
+    const spacing = chartW / (xLabels.length - 1);
+    return Math.max(1, Math.ceil(needed / Math.max(1, spacing)));
+  }, [xLabels, chartW]);
 
   if (!themed) {
     return (
@@ -163,6 +175,7 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
                 scaledPoints.length > 0 && i < scaledPoints.length
                   ? scaledPoints[i].sx
                   : padding.left + (i / Math.max(1, (xLabels?.length ?? 1) - 1)) * chartW;
+              if (i % labelStep !== 0 && i !== xLabels.length - 1) return null;
               return (
                 <text
                   key={i}
@@ -239,7 +252,7 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
               y="-17"
               textAnchor="middle"
               fontFamily="IM Fell English SC"
-              fontSize="7"
+              fontSize="10"
               fill="#3B2314"
               fontWeight="700"
             >
@@ -250,19 +263,19 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
           {/* Decorative mountains in background */}
           <g opacity="0.5">
             <polygon
-              points="80,150 105,120 130,150"
+              points="52,150 68,120 85,150"
               fill="none"
               stroke="#6B3A2A"
               strokeWidth="0.8"
             />
             <polygon
-              points="95,150 115,130 135,150"
+              points="62,150 75,130 88,150"
               fill="none"
               stroke="#6B3A2A"
               strokeWidth="0.6"
             />
             <polygon
-              points="260,145 280,115 300,145"
+              points="170,145 183,115 196,145"
               fill="none"
               stroke="#6B3A2A"
               strokeWidth="0.7"
@@ -326,7 +339,7 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
                       y={p.sy - 18}
                       textAnchor="middle"
                       fontFamily="IM Fell English SC"
-                      fontSize="7"
+                      fontSize="9"
                       fontWeight="700"
                       fill="#fff6df"
                       letterSpacing="0.5"
@@ -353,7 +366,7 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
                       y={p.sy + 16}
                       textAnchor="middle"
                       fontFamily="Fira Code"
-                      fontSize="9"
+                      fontSize="11"
                       fontWeight="700"
                       fill="#e0c068"
                     >
@@ -372,6 +385,7 @@ export const TreasureLineChart: React.FC<TreasureLineChartProps> = ({
                 scaledPoints.length > 0 && i < scaledPoints.length
                   ? scaledPoints[i].sx
                   : padding.left + (i / Math.max(1, (xLabels?.length ?? 1) - 1)) * chartW;
+              if (i % labelStep !== 0 && i !== xLabels.length - 1) return null;
               return (
                 <text
                   key={i}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import gsap from 'gsap'
 import { ToastContext } from './useToast'
 import Toast from './Toast'
@@ -69,7 +69,7 @@ export default function ToastProvider({ children }: Props) {
     })
 
     startTimer(id, AUTO_DISMISS_MS)
-  }, [removeToast, startTimer])
+  }, [startTimer])
 
   const handleDismiss = useCallback((id: string) => {
     const state = timersRef.current.get(id)
@@ -99,24 +99,23 @@ export default function ToastProvider({ children }: Props) {
     state.startedAt = Date.now()
   }, [removeToast])
 
+  // A fresh {toast} object every render (one per toast shown AND per
+  // auto-dismiss) re-rendered every consumer: TaskList, Today, CauldronPage,
+  // Dashboard, HabitTracker.
+  const value = useMemo(() => ({ toast }), [toast])
+
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastContext.Provider value={value}>
       {children}
 
-      {/* Fixed bottom-right container — toasts stack upward */}
+      {/* Top-right, stacking downward. Bottom-right is contested by the
+          Cauldron floating timer, the Questify XP toast and the Cauldron
+          toast; the system toast used to cover the timer's Pause/Stop
+          buttons for ~3s. Top-right competes with nothing. */}
       <div
+        className="system-toast-container"
         role="status"
         aria-live="polite"
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          display: 'flex',
-          flexDirection: 'column-reverse',
-          gap: 8,
-          zIndex: 10003,
-          pointerEvents: 'none',
-        }}
       >
         {queue.map((data) => (
           <div

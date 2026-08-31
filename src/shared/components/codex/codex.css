@@ -211,9 +211,12 @@
 }
 
 /* ── progress gauge ───────────────────────────────── */
+/* 18px, no 10: la etiqueta del porcentaje va adentro a --fs-label (13px) y con
+   overflow:hidden los numeros quedaban cortados por la mitad en Coinify, Caldero
+   y Personaje a la vez. */
 .qb-gauge {
   position: relative;
-  height: 10px;
+  height: 18px;
   border: 1px solid rgba(74, 55, 32, 0.5);
   background: rgba(245, 231, 192, 0.6);
   box-shadow: inset 0 1px 2px rgba(74, 55, 32, 0.35);
@@ -245,7 +248,7 @@
 }
 
 .qb-gauge-fill--sage {
-  background: repeating-linear-gradient(135deg, var(--moss) 0 4px, #3d4d2a 4px 8px);
+  background: repeating-linear-gradient(135deg, var(--moss) 0 4px, var(--moss-dark) 4px 8px);
 }
 
 .qb-gauge-fill--gold {
@@ -316,7 +319,7 @@
 }
 
 .qb-banner--sage {
-  background: linear-gradient(180deg, var(--moss) 0%, #3d4d2a 100%);
+  background: linear-gradient(180deg, var(--moss) 0%, var(--moss-dark) 100%);
 }
 
 .qb-banner--gold {

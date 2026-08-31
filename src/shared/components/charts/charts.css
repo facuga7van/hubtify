@@ -236,7 +236,7 @@
 .heatmap-day-label {
   text-align: center;
   font-family: 'IM Fell English SC', serif;
-  font-size: 9px;
+  font-size: var(--fs-label);
   font-weight: 600;
   color: var(--ink-faded);
   letter-spacing: 0.5px;
@@ -260,7 +260,9 @@
   background: rgba(245, 231, 192, 0.6);
   display: grid;
   place-items: center;
-  font-size: 7px;
+  /* Ornamental glyph only (today mark / miss cross) inside an 18px cell;
+     the day's actual value is exposed via title + keyboard focus. */
+  font-size: 10px;
   transition: box-shadow 0.2s ease;
 }
 
@@ -470,4 +472,11 @@
   .heatmap-grid {
     gap: 2px;
   }
+}
+
+
+/* ── Heatmap cell keyboard focus ─────────────────── */
+.heatmap-cell:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 1px;
 }

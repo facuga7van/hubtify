@@ -1,8 +1,7 @@
 import { gsap } from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useGSAP } from '@gsap/react'
 
-gsap.registerPlugin(ScrollTrigger, useGSAP)
+gsap.registerPlugin(useGSAP)
 
 gsap.defaults({
   duration: 0.3,
@@ -15,6 +14,4 @@ gsap.matchMedia().add('(prefers-reduced-motion: reduce)', () => {
     duration: 0.1,
     ease: 'none',
   })
-  // Disable ScrollTrigger globally
-  ScrollTrigger.disable()
 })

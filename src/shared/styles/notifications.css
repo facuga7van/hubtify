@@ -138,11 +138,14 @@
   background: rgba(245, 231, 192, 0.7);
 }
 
+/* Titulo, cuerpo y hora usaban los tres --fs-label: sin jerarquia, el drawer
+   entero se leia como un bloque gris. Ahora el peso baja de arriba hacia abajo. */
 .notif-item-title {
   font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-label);
+  font-size: var(--fs-sub);
+  font-weight: 600;
   color: var(--ink);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   letter-spacing: 0.03em;
 }
 
@@ -159,6 +162,27 @@
   font-size: var(--fs-label);
   color: var(--ink-faded);
   margin-bottom: 6px;
+}
+
+.notif-drawer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notif-dismiss-all {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  border-bottom: 1px dotted currentColor;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.notif-dismiss-all:hover {
+  color: var(--ink);
 }
 
 .notif-item-actions {

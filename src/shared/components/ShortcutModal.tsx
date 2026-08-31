@@ -1,34 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalA11y } from '../hooks/useModalA11y';
+import { SHORTCUTS } from '../shortcuts';
 
 interface ShortcutModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const SHORTCUTS = [
-  { keys: 'Ctrl+1', i18nKey: 'shortcuts.goHome', fallback: 'Go to Dashboard' },
-  { keys: 'Ctrl+2', i18nKey: 'shortcuts.goQuests', fallback: 'Go to Questify' },
-  { keys: 'Ctrl+3', i18nKey: 'shortcuts.goNutrition', fallback: 'Go to Nutrify' },
-  { keys: 'Ctrl+4', i18nKey: 'shortcuts.goFinance', fallback: 'Go to Coinify' },
-  { keys: 'Ctrl+5', i18nKey: 'shortcuts.goCharacter', fallback: 'Go to Character' },
-  { keys: 'Ctrl+6', i18nKey: 'shortcuts.goCauldron', fallback: 'Go to Cauldron' },
-  { keys: 'Ctrl+,', i18nKey: 'shortcuts.goSettings', fallback: 'Open Settings' },
-  { keys: 'Ctrl+?', i18nKey: 'shortcuts.showShortcuts', fallback: 'Show this reference' },
-];
 
 export default function ShortcutModal({ open, onClose }: ShortcutModalProps) {
   const { t } = useTranslation();
   const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  // Escape, focus trap, initial focus and focus restore.
+  const { dialogProps } = useModalA11y<HTMLDivElement>({ onClose, active: open });
 
   if (!open) return null;
 
@@ -40,13 +25,15 @@ export default function ShortcutModal({ open, onClose }: ShortcutModalProps) {
         position: 'fixed',
         inset: 0,
         background: 'rgba(42, 29, 14, 0.55)',
-        zIndex: 2000,
+        zIndex: 'var(--z-modal)' as unknown as number,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
       <div
+        {...dialogProps}
+        aria-label={t('shortcuts.title', 'Atajos de teclado')}
         style={{
           background: 'linear-gradient(180deg, var(--parch-0) 0%, var(--parch-1) 100%)',
           border: '2px solid var(--gold-dark)',

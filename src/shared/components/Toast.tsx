@@ -1,6 +1,10 @@
 import { useRef } from 'react'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
+import { useTranslation } from 'react-i18next'
+import {
+  Sword, Coin, Apple, Checkmark, WarningTriangle, Scroll, Gear, ArrowUp, ArrowDown,
+} from './icons'
 import type { ToastData } from './useToast'
 
 // ── Border accent colours per type (codex palette) ───────────────────────────
@@ -14,23 +18,26 @@ const BORDER: Record<ToastData['type'], string> = {
 }
 
 // ── Default icons per type ────────────────────────────────────────────────────
-const DEFAULT_ICON: Record<ToastData['type'], string> = {
-  xp:      '\u2694',
-  coin:    '\u272A',
-  nutri:   '\u2663',
-  success: '\u2714',
-  warning: '\u26A0',
-  info:    '\u2139',
+// Codex SVGs, not Unicode glyphs: the old text glyphs had no stroke control
+// and could fall back to colour emoji in some Windows fonts.
+type IconComponent = (props: React.SVGProps<SVGSVGElement>) => React.ReactElement
+
+const DEFAULT_ICON: Record<ToastData['type'], IconComponent> = {
+  xp:      Sword,
+  coin:    Coin,
+  nutri:   Apple,
+  success: Checkmark,
+  warning: WarningTriangle,
+  info:    Scroll,
 }
 
-// ── Transaction-type icon overrides for coin toasts ──────────────────────────
 type TransactionType = NonNullable<NonNullable<ToastData['details']>['transactionType']>
-const TRANSACTION_ICON: Record<TransactionType, string> = {
-  expense:   '\u2212',
-  income:    '\u002B',
-  settled:   '\u2611',
-  imported:  '\u21E9',
-  generated: '\u2699',
+const TRANSACTION_ICON: Record<TransactionType, IconComponent> = {
+  expense:   ArrowDown,
+  income:    ArrowUp,
+  settled:   Checkmark,
+  imported:  Scroll,
+  generated: Gear,
 }
 
 interface Props {
@@ -40,6 +47,7 @@ interface Props {
 }
 
 export default function Toast({ data, onDismiss, style }: Props) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
 
   // Enter animation: slide from right (+40px), fade in, scale 0.95 → 1
@@ -52,8 +60,7 @@ export default function Toast({ data, onDismiss, style }: Props) {
   }, { scope: ref })
 
   // Resolve the icon to show
-  const resolvedIcon = (() => {
-    if (data.icon) return data.icon
+  const Icon: IconComponent = (() => {
     if (data.type === 'coin' && data.details?.transactionType) {
       return TRANSACTION_ICON[data.details.transactionType] ?? DEFAULT_ICON.coin
     }
@@ -61,6 +68,9 @@ export default function Toast({ data, onDismiss, style }: Props) {
   })()
 
   const borderColor = BORDER[data.type]
+  const tier = data.details?.bonusTier
+  // 'normal' means "no bonus" — showing it was pure noise.
+  const tierLabel = tier && tier !== 'normal' ? t(`toast.${tier}`, tier) : null
 
   return (
     <div
@@ -89,8 +99,10 @@ export default function Toast({ data, onDismiss, style }: Props) {
       }}
     >
       {/* Icon */}
-      <span style={{ fontSize: 'var(--fs-nav)', lineHeight: 1, flexShrink: 0, marginTop: 1 }}>
-        {resolvedIcon}
+      <span aria-hidden="true" style={{ lineHeight: 1, flexShrink: 0, marginTop: 2, color: borderColor }}>
+        {data.icon
+          ? <span style={{ fontSize: 'var(--fs-nav)' }}>{data.icon}</span>
+          : <Icon width={18} height={18} />}
       </span>
 
       {/* Content */}
@@ -110,11 +122,10 @@ export default function Toast({ data, onDismiss, style }: Props) {
             fontFamily: 'Fira Code, monospace',
             fontSize: 'var(--fs-label)',
             color: 'var(--ink-faded)',
-            opacity: 0.8,
           }}>
-            {data.details.comboMultiplier != null && `×${data.details.comboMultiplier} combo`}
-            {data.details.comboMultiplier != null && data.details.bonusTier != null && '  '}
-            {data.details.bonusTier != null && `${data.details.bonusTier} bonus`}
+            {data.details.comboMultiplier != null && `×${data.details.comboMultiplier} ${t('toast.combo', 'Combo')}`}
+            {data.details.comboMultiplier != null && tierLabel && '  '}
+            {tierLabel}
           </span>
         )}
       </div>

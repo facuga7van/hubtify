@@ -43,12 +43,21 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
   );
 
   const barCount = data.length;
-  const viewBoxWidth = 420;
+  // Was 420 while the host card is ~345px wide: everything, text included,
+  // was scaled down by 0.82 on top of its own size (fontSize 9 -> 7.4px).
+  const viewBoxWidth = 345;
   const chartTop = 40;
   const chartBottom = height - 20;
   const chartHeight = chartBottom - chartTop;
   const barSpacing = viewBoxWidth / barCount;
   const barWidth = Math.min(36, barSpacing * 0.6);
+
+  // At 30 bars the x labels overlap into a smear; show one every `labelStep`.
+  const labelStep = useMemo(() => {
+    const longest = data.reduce((m, d) => Math.max(m, d.label.length), 1);
+    const needed = longest * 7 + 6; // approx. label width in viewBox units
+    return Math.max(1, Math.ceil(needed / Math.max(1, barSpacing)));
+  }, [data, barSpacing]);
 
   const tallestIdx = useMemo(() => {
     let maxIdx = 0;
@@ -97,7 +106,7 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                   y={chartBottom - (goalLine / computedMax) * chartHeight - 4}
                   textAnchor="end"
                   fontFamily="IM Fell English SC"
-                  fontSize="9"
+                  fontSize="11"
                   fontWeight="700"
                   fill="#8B2020"
                 >
@@ -132,25 +141,27 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                   y={y - 4}
                   textAnchor="middle"
                   fontFamily="Fira Code"
-                  fontSize="9"
+                  fontSize="11"
                   fontWeight="700"
                   fill="#3B2314"
                 >
                   {formatValue(d.value)}
                 </text>
-                {/* X label */}
-                <text
-                  x={x + barWidth / 2}
-                  y={height - 2}
-                  textAnchor="middle"
-                  fontFamily="IM Fell English SC"
-                  fontSize="10"
-                  fontWeight="700"
-                  fill="#3B2314"
-                  letterSpacing="1"
-                >
-                  {d.label}
-                </text>
+                {/* X label — thinned so labels never overlap */}
+                {i % labelStep === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={height - 2}
+                    textAnchor="middle"
+                    fontFamily="IM Fell English SC"
+                    fontSize="12"
+                    fontWeight="700"
+                    fill="#3B2314"
+                    letterSpacing="1"
+                  >
+                    {d.label}
+                  </text>
+                )}
               </g>
             );
           })}
@@ -350,7 +361,7 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
               {/* Value badge */}
               {(() => {
                 const label = formatValue(d.value);
-                const badgeW = Math.max(barWidth + 4, label.length * 6 + 8);
+                const badgeW = Math.max(barWidth + 4, label.length * 7 + 8);
                 const badgeX = tx + barWidth / 2 - badgeW / 2;
                 return (
                   <>
@@ -366,9 +377,9 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                     <text
                       className="castle-value-label"
                       x={tx + barWidth / 2}
-                      y={ty - 28}
+                      y={ty - 27}
                       textAnchor="middle"
-                      fontSize="9"
+                      fontSize="11"
                     >
                       {label}
                     </text>
@@ -376,16 +387,18 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                 );
               })()}
 
-              {/* X-axis label */}
-              <text
-                className="castle-label"
-                x={tx + barWidth / 2}
-                y={height - 2}
-                textAnchor="middle"
-                fontSize="10"
-              >
-                {d.label}
-              </text>
+              {/* X-axis label — thinned so labels never overlap */}
+              {i % labelStep === 0 && (
+                <text
+                  className="castle-label"
+                  x={tx + barWidth / 2}
+                  y={height - 2}
+                  textAnchor="middle"
+                  fontSize="12"
+                >
+                  {d.label}
+                </text>
+              )}
             </g>
           );
         })}
@@ -481,7 +494,7 @@ const GoalBanner: React.FC<{
           y={y - 3}
           textAnchor="middle"
           fontFamily="IM Fell English SC"
-          fontSize="9"
+          fontSize="11"
           fontWeight="700"
           fill="#fff6df"
           letterSpacing="1"

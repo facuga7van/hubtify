@@ -12,10 +12,22 @@ export interface QuillCheckboxProps {
   onDrawComplete?: () => void;
 }
 
-// Codex palette colors
-const COLOR_PARCHMENT = '#f5e7c0'; // var(--parch-0)
-const COLOR_GOLD = '#a88a3c';      // var(--gold)
-const COLOR_SEPIA = '#4a3520';     // var(--ink-soft)
+// Codex palette — read straight from the CSS custom properties instead of
+// frozen JS constants, so a theme change reaches the checkbox. `fill`, `stroke`
+// and `background-color` are CSS properties, so var() resolves natively when
+// they are set through `style` (an SVG *attribute* would not resolve it).
+const COLOR_PARCHMENT = 'var(--parch-0)';
+const COLOR_GOLD = 'var(--gold)';
+const COLOR_SEPIA = 'var(--ink-soft)';
+
+// The checkmark polyline is a fixed shape, so its length is the same for every
+// instance. Measuring it per row forced a synchronous SVG geometry computation
+// once per list item (100 rows -> 100 layout reads in one frame).
+let checkLengthCache: number | null = null;
+function checkLength(path: SVGPolylineElement): number {
+  if (checkLengthCache == null) checkLengthCache = path.getTotalLength();
+  return checkLengthCache;
+}
 
 // Checkmark path: two segments — M6,13 L10,17 and L10,17 L18,7
 // Total path for a polyline M6,13 L10,17 L18,7 inside a 24x24 viewBox
@@ -78,7 +90,7 @@ export default function QuillCheckbox({
       const path = checkPathRef.current;
       if (!path) return;
 
-      const length = path.getTotalLength();
+      const length = checkLength(path);
       if (checked) {
         // Already checked (e.g. loaded from persisted state) — show fully drawn, no animation
         gsap.set(path, {
@@ -111,7 +123,7 @@ export default function QuillCheckbox({
       if (checked === wasChecked) return;
       prevCheckedRef.current = checked;
 
-      const length = path.getTotalLength();
+      const length = checkLength(path);
 
       if (checked) {
         // Ensure path is visible before animating
@@ -200,19 +212,17 @@ export default function QuillCheckbox({
           width="20"
           height="20"
           rx="3"
-          fill={COLOR_PARCHMENT}
-          stroke={COLOR_GOLD}
+          style={{ fill: COLOR_PARCHMENT, stroke: COLOR_GOLD }}
           strokeWidth="1.5"
         />
         {/* Checkmark drawn like quill on parchment */}
         <polyline
           ref={checkPathRef}
           points="6,13 10,17 18,7"
-          stroke={COLOR_SEPIA}
+          style={{ stroke: COLOR_SEPIA, fill: 'none' }}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          fill="none"
         />
       </svg>
     </span>

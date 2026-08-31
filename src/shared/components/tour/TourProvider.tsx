@@ -26,6 +26,29 @@ interface TourProviderProps {
 }
 
 const STORAGE_KEY = 'hubtify_toured';
+/** Paso donde quedo el tour, para poder retomarlo en vez de perderlo. */
+const PAUSED_STEP_KEY = 'hubtify_tour_paused_step';
+/** 'desync' = se corto solo por navegacion; 'user' = lo salteo a proposito. */
+const PAUSED_REASON_KEY = 'hubtify_tour_paused_reason';
+
+/**
+ * Desde donde arrancar el tour.
+ *
+ * Si se corto solo (el usuario navego fuera de la ruta del paso) retomamos donde
+ * quedo. Si venimos de un "Volver a ver la introduccion" desde Ajustes, o de un
+ * salteo explicito, arrancamos de cero y limpiamos el estado viejo.
+ */
+function resolveStartStep(totalSteps: number): number {
+  const reason = localStorage.getItem(PAUSED_REASON_KEY);
+  const raw = localStorage.getItem(PAUSED_STEP_KEY);
+  localStorage.removeItem(PAUSED_STEP_KEY);
+  localStorage.removeItem(PAUSED_REASON_KEY);
+  if (reason !== 'desync' || raw === null) return 0;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed >= totalSteps) return 0;
+  return parsed;
+}
+
 const ONBOARDED_KEY = 'hubtify_onboarded';
 const POLL_INTERVAL_MS = 100;
 const POLL_TIMEOUT_MS = 2000;
@@ -114,12 +137,13 @@ export function TourProvider({ children, autoStart = true }: TourProviderProps) 
     const onboarded = localStorage.getItem(ONBOARDED_KEY) === 'true';
     if (onboarded && !toured) {
       const timer = setTimeout(() => {
-        stepRef.current = 0;
+        const start = resolveStartStep(tourSteps.length);
+        stepRef.current = start;
         navigatingRef.current = true;
-        setCurrentStep(0);
+        setCurrentStep(start);
         setIsActive(true);
         requestAnimationFrame(() => {
-          navigateToStep(0);
+          navigateToStep(start);
         });
       }, 800);
       return () => clearTimeout(timer);
@@ -135,12 +159,13 @@ export function TourProvider({ children, autoStart = true }: TourProviderProps) 
       if (toured) {
         setIsActive(false);
       } else if (onboarded && autoStart) {
-        stepRef.current = 0;
+        const start = resolveStartStep(tourSteps.length);
+        stepRef.current = start;
         navigatingRef.current = true;
-        setCurrentStep(0);
+        setCurrentStep(start);
         setIsActive(true);
         requestAnimationFrame(() => {
-          navigateToStep(0);
+          navigateToStep(start);
         });
       }
     };
@@ -154,9 +179,13 @@ export function TourProvider({ children, autoStart = true }: TourProviderProps) 
     if (!isActive || navigatingRef.current) return;
     const step = tourSteps[stepRef.current];
     if (step?.route && location.pathname !== step.route) {
-      // User navigated manually away from the tour step's route
+      // El usuario navego a mano fuera de la ruta del paso. Antes esto marcaba el
+      // tour como completado PARA SIEMPRE: un click distraido en el sidebar lo
+      // mataba y solo se recuperaba desde la Zona de Peligro. Ahora se pausa
+      // guardando el paso, y la proxima vez retoma donde estaba.
       abortRef.current?.abort();
-      localStorage.setItem(STORAGE_KEY, 'true');
+      localStorage.setItem(PAUSED_STEP_KEY, String(stepRef.current));
+      localStorage.setItem(PAUSED_REASON_KEY, 'desync');
       setIsActive(false);
       stepRef.current = 0;
       setCurrentStep(0);
@@ -166,6 +195,8 @@ export function TourProvider({ children, autoStart = true }: TourProviderProps) 
   const completeTour = useCallback(() => {
     abortRef.current?.abort();
     localStorage.setItem(STORAGE_KEY, 'true');
+    localStorage.removeItem(PAUSED_STEP_KEY);
+    localStorage.removeItem(PAUSED_REASON_KEY);
     setIsActive(false);
     stepRef.current = 0;
     setCurrentStep(0);
@@ -244,8 +275,16 @@ export function TourProvider({ children, autoStart = true }: TourProviderProps) 
   }, [navigateToStep]);
 
   const skipTour = useCallback(() => {
-    completeTour();
-  }, [completeTour]);
+    // Salteo explicito: no volvemos a arrancar solos, pero guardamos el paso para
+    // que "Volver a ver la introduccion" desde Ajustes pueda retomarlo.
+    abortRef.current?.abort();
+    localStorage.setItem(STORAGE_KEY, 'true');
+    localStorage.setItem(PAUSED_STEP_KEY, String(stepRef.current));
+    localStorage.setItem(PAUSED_REASON_KEY, 'user');
+    setIsActive(false);
+    stepRef.current = 0;
+    setCurrentStep(0);
+  }, []);
 
   const value = useMemo<TourContextType>(() => ({
     isActive,

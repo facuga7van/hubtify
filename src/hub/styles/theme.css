@@ -21,10 +21,10 @@
   /* ── Codex palette ─────────────────────────────────── */
   --ink: #2a1d0e;
   --ink-soft: #4a3520;
-  --ink-faded: #4a3520;
+  --ink-faded: #6b5535;   /* distinct 3rd level; ~6:1 on parchment */
   --rubric: #7a1e1e;
   --rubric-light: #a43030;
-  --moss: #556b3c;
+  --moss: #40522c;        /* darkened for WCAG AA across the parchment gradient */
   --moss-light: #6b8a4c;
   --gold: #a88a3c;
   --gold-light: #c4a84e;
@@ -47,8 +47,28 @@
   --z-modal:        5000;   /* Full modals (import, project, scroll notes) */
   --z-toast:        8000;   /* XP toasts, feedback toasts */
   --z-dropdown-top: 9000;   /* Account dropdown, help tooltips */
+  --z-page-transition: 9400; /* Page-flip cover/container (must stay under the tour) */
   --z-tour:         9500;   /* Onboarding tour overlay + tooltip */
+  --z-confirm:      10001;  /* Confirm dialog (must sit above modals + tour) */
   --z-system-toast: 10003;  /* System toast container (topmost) */
+
+  /* ── Compatibility aliases ─────────────────────────
+     These names are referenced across module CSS/TSX but were never defined.
+     An undefined var() without a fallback invalidates the whole declaration,
+     so the property was silently dropped. They are ALIASES of the real tokens
+     above — do not give them independent values; change the real token instead. */
+  --rpg-gold:      var(--gold);
+  --rpg-hp-red:    var(--rubric);
+  --rpg-xp-green:  var(--moss);
+  --rpg-parchment: var(--parch-0);
+  --rpg-wood:      var(--leather);
+  --moss-dark:     #2e3c20;  /* one step below the (darkened) --moss */
+
+  /* Font-family aliases (compatibility) — the real stacks used by the project. */
+  --ff-display: 'UnifrakturCook', 'IM Fell English', cursive;
+  --ff-body:    'IM Fell English', 'Cormorant Garamond', Georgia, serif;
+  --ff-accent:  'IM Fell English SC', 'IM Fell English', serif;
+  --ff-quote:   'Cormorant Garamond', 'IM Fell English', Georgia, serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -57,8 +77,26 @@ body {
   font-family: 'IM Fell English', 'Cormorant Garamond', Georgia, serif;
   color: var(--ink);
   overflow: hidden;
-  user-select: none;
   background-color: var(--parch-0);
+}
+
+/* ── Text selection ────────────────────────────────
+   Content is selectable/copyable (amounts, food names, error messages).
+   Only UI chrome opts out, so drag-select never grabs button labels. */
+body { user-select: text; }
+
+button, [role="button"], a, label,
+nav, .title-bar, .title-bar-text, .sidebar, .sidebar-nav-item,
+h1, h2, h3, h4,
+.rpg-button, .rpg-btn-sm, .rpg-card-title, .page-header__title,
+.qb-eyebrow, .qb-small-caps, .qb-title,
+svg, .help-bubble, .help-bubble-inline, .tap-target {
+  user-select: none;
+}
+
+/* …but inputs and anything explicitly marked as content stay selectable. */
+input, textarea, [contenteditable], .selectable-text {
+  user-select: text;
 }
 
 h1, h2, h3 {
@@ -164,4 +202,18 @@ h4 {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+
+/* ── Reduced motion (global) ───────────────────────
+   Covers every keyframe in the app, including module CSS (quests, coinify,
+   nutri, notifications, tour, changelog, help-bubble) that was never covered
+   by the per-component prefers-reduced-motion blocks. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

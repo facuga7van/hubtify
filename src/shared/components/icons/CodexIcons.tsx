@@ -1,5 +1,8 @@
 import React from 'react';
 
+/** Inline SVGs sit on the text baseline; this drops them to optical centre. */
+const ALIGN: React.CSSProperties = { verticalAlign: '-0.125em' };
+
 const defaults: React.SVGProps<SVGSVGElement> = {
   viewBox: '0 0 24 24',
   width: 24,
@@ -9,6 +12,38 @@ const defaults: React.SVGProps<SVGSVGElement> = {
   strokeWidth: 1.2,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
+  style: ALIGN,
+};
+
+/**
+ * Shared defaults for the "UI" icons (chevrons, arrows, check, cross…).
+ * They used to hard-code strokeWidth 2 while the codex icons run at 1.2,
+ * so the two families never matched optically. 1.6 splits the difference and
+ * keeps small glyphs legible.
+ * NOTE: these keep `1em` sizing (they scale with the surrounding text) while
+ * the codex icons default to 24px — see the report for the call sites that
+ * still depend on that.
+ */
+const uiDefaults: React.SVGProps<SVGSVGElement> = {
+  viewBox: '0 0 24 24',
+  width: '1em',
+  height: '1em',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: ALIGN,
+};
+
+/** Solid (filled) variant of uiDefaults — play/pause/stop transport glyphs. */
+const uiSolidDefaults: React.SVGProps<SVGSVGElement> = {
+  viewBox: '0 0 24 24',
+  width: '1em',
+  height: '1em',
+  fill: 'currentColor',
+  stroke: 'none',
+  style: ALIGN,
 };
 
 export function Sword(props: React.SVGProps<SVGSVGElement>) {
@@ -502,63 +537,63 @@ export function Dragon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export function ChevronUp(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="18 15 12 9 6 15" /></svg>);
+  return (<svg {...uiDefaults} {...props}><polyline points="18 15 12 9 6 15" /></svg>);
 }
 
 export function ChevronDown(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="6 9 12 15 18 9" /></svg>);
+  return (<svg {...uiDefaults} {...props}><polyline points="6 9 12 15 18 9" /></svg>);
 }
 
 export function ChevronRight(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="9 18 15 12 9 6" /></svg>);
+  return (<svg {...uiDefaults} {...props}><polyline points="9 18 15 12 9 6" /></svg>);
 }
 
 export function ArrowUp(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>);
+  return (<svg {...uiDefaults} {...props}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>);
 }
 
 export function ArrowDown(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>);
+  return (<svg {...uiDefaults} {...props}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>);
 }
 
 export function ArrowRight(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>);
+  return (<svg {...uiDefaults} {...props}><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>);
 }
 
 export function Pencil(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>);
+  return (<svg {...uiDefaults} {...props}><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>);
 }
 
 export function CrossMark(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>);
+  return (<svg {...uiDefaults} {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>);
 }
 
 export function Checkmark(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="20 6 9 17 4 12" /></svg>);
+  return (<svg {...uiDefaults} {...props}><polyline points="20 6 9 17 4 12" /></svg>);
 }
 
 export function WarningTriangle(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>);
+  return (<svg {...uiDefaults} {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>);
 }
 
 export function PlayIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><polygon points="5 3 19 12 5 21 5 3" /></svg>);
+  return (<svg {...uiSolidDefaults} {...props}><polygon points="5 3 19 12 5 21 5 3" /></svg>);
 }
 
 export function PauseIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>);
+  return (<svg {...uiSolidDefaults} {...props}><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>);
 }
 
 export function StopIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><rect x="5" y="5" width="14" height="14" rx="2" /></svg>);
+  return (<svg {...uiSolidDefaults} {...props}><rect x="5" y="5" width="14" height="14" rx="2" /></svg>);
 }
 
 export function SkipForwardIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="1em" height="1em" {...props}><polygon points="5 4 15 12 5 20 5 4" /><rect x="17" y="4" width="3" height="16" /></svg>);
+  return (<svg {...uiSolidDefaults} {...props}><polygon points="5 4 15 12 5 20 5 4" /><rect x="17" y="4" width="3" height="16" /></svg>);
 }
 
 export function PopOutIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5" /></svg>);
+  return (<svg {...uiDefaults} {...props}><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5" /></svg>);
 }
 
 export function Sparkle(props: React.SVGProps<SVGSVGElement>) {
@@ -590,11 +625,11 @@ export function ResizeVertical(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export function ArrowUpRight(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>);
+  return (<svg {...uiDefaults} {...props}><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>);
 }
 
 export function CrossPlus(props: React.SVGProps<SVGSVGElement>) {
-  return (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1em" height="1em" {...props}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>);
+  return (<svg {...uiDefaults} {...props}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>);
 }
 
 export function FloralHeart(props: React.SVGProps<SVGSVGElement>) {

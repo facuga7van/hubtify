@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useAnchoredPopup } from '../hooks/useAnchoredPopup';
 
 interface Props {
   value: string; // ISO datetime-local format: "2026-03-22T14:30"
@@ -39,33 +41,9 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
   const [hour, setHour] = useState(parsed.hour);
   const [minute, setMinute] = useState(parsed.minute);
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
-  const [popupPos, setPopupPos] = useState<{ top?: string; bottom?: string; left?: string; right?: string }>({ top: '100%', left: '0' });
-
-  const repositionPopup = useCallback(() => {
-    const trigger = ref.current;
-    const popup = popupRef.current;
-    if (!trigger || !popup) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const popupRect = popup.getBoundingClientRect();
-    const pos: { top?: string; bottom?: string; left?: string; right?: string } = {};
-    if (triggerRect.bottom + popupRect.height + 8 > window.innerHeight) {
-      pos.bottom = '100%';
-    } else {
-      pos.top = '100%';
-    }
-    if (triggerRect.left + popupRect.width > window.innerWidth) {
-      pos.right = '0';
-    } else {
-      pos.left = '0';
-    }
-    setPopupPos(pos);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (open) repositionPopup();
-  }, [open, repositionPopup]);
+  // The popup is portalled to <body>: several parent forms are overflow:hidden
+  // and used to clip the whole calendar away.
+  const { anchorRef: ref, popupRef, pos: popupPos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
 
   const maxDay = daysInMonth(year, month);
 
@@ -80,11 +58,22 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // The popup lives in a portal, so it is NOT inside `ref` any more.
+      if (ref.current?.contains(target)) return;
+      if (popupRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [ref, popupRef]);
 
   function emit(y: number, m: number, d: number, h: number, min: number) {
     const clamped = Math.min(d, daysInMonth(y, m));
@@ -139,9 +128,9 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
         {display}
       </button>
 
-      {open && (
-        <div ref={popupRef} style={{
-          position: 'absolute', ...popupPos, margin: popupPos.bottom ? '0 0 4px' : '4px 0 0', zIndex: 100,
+      {open && createPortal(
+        <div ref={popupRef} className="rpg-anchored-popup" style={{
+          position: 'fixed', top: popupPos.top, left: popupPos.left,
           background: 'linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%)',
           border: '2px solid var(--gold-dark)', borderRadius: '6px',
           boxShadow: '0 4px 16px rgba(42, 29, 14, 0.4), inset 0 0 20px rgba(90, 60, 30, 0.1)',
@@ -199,7 +188,8 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
             style={{ marginTop: 10, width: '100%', padding: '4px 0', fontSize: 'var(--fs-label)' }}>
             OK
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

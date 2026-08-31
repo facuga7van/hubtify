@@ -100,3 +100,18 @@
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Tap target ────────────────────────────────────────────
+   The seal is a 22px (18px inline) decorative circle; blowing it up to 32px
+   would dominate every card corner. Instead an invisible pseudo-element
+   extends the *hit area* to 32x32 while the visual stays the same size. */
+.help-bubble::after,
+.help-bubble-inline::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+}
