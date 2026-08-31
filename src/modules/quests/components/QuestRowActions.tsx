@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { useToast } from '../../../shared/components/useToast';
+import { isTaskLinkWired, startBrew, setSessionTask } from '../../cauldron/api';
+import { quickStartPresetId } from '../../cauldron/hooks';
 import { getDueDateStatus } from '../utils';
 import PostponeMenu, { PostponeOptions } from './PostponeMenu';
 import type { Task } from '../types';
@@ -16,6 +19,17 @@ interface Props {
   onToggleSelect: () => void;
   /** Receives 'today' | 'tomorrow' | 'YYYY-MM-DDTHH:mm'. */
   onPostpone: (target: string) => void;
+}
+
+function CauldronIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h10M4 6c0 4 1.5 7 4 7s4-3 4-7" />
+      <path d="M2.5 7.5L1.5 9M13.5 7.5l1 1.5" />
+      <path d="M6 3.5c0-.8.7-1 .7-1.8M9.3 3.5c0-.8.7-1 .7-1.8" />
+    </svg>
+  );
 }
 
 function ClockIcon() {
@@ -41,6 +55,7 @@ export default function QuestRowActions({
   task, selected, drawingCount, onEdit, onOpenNotes, onDelete, onToggleSelect, onPostpone,
 }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [postponeOpen, setPostponeOpen] = useState(false);
   // Portaled so the menu is never clipped by a row/column with overflow hidden.
@@ -64,6 +79,29 @@ export default function QuestRowActions({
       window.removeEventListener('keydown', onKey);
     };
   }, [open, anchorRef, popupRef]);
+
+  // Vinculo Caldero <-> Questify: enciende el caldero sobre ESTA mision sin
+  // sacarte de la lista (navegar seria perder el contexto de trabajo). Si ya
+  // hay una sesion hirviendo, no la pisa: le adjunta la mision.
+  const handleBrew = async () => {
+    try {
+      const presets = await window.api.cauldronGetPresets();
+      const presetId = quickStartPresetId(presets);
+      if (!presetId) return;
+      try {
+        await startBrew(presetId, task.id);
+        toast({ type: 'info', message: t('questify.brewStarted', 'El caldero hierve con esta misión') });
+      } catch {
+        // Timer ya activo: adjuntar en vez de reiniciar.
+        const attached = await setSessionTask(task.id);
+        if (attached) {
+          toast({ type: 'info', message: t('questify.brewAttached', 'Misión enlazada a la sesión activa') });
+        }
+      }
+    } catch (err) {
+      console.warn('[QuestRowActions] brew failed:', err);
+    }
+  };
 
   useEffect(() => { if (!open) setPostponeOpen(false); }, [open]);
 
@@ -162,6 +200,12 @@ export default function QuestRowActions({
             {t('questify.notes', 'Notas')}
             {drawingCount > 0 && <span className="quest-row-menu-count">{drawingCount}</span>}
           </button>
+          {!task.status && isTaskLinkWired() && (
+            <button type="button" role="menuitem" className="quest-row-menu-item" onClick={run(handleBrew)}>
+              <CauldronIcon />
+              {t('questify.brewThis', 'Enfocar en el Caldero')}
+            </button>
+          )}
           {!task.status && (
             <>
               <button

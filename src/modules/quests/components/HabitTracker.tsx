@@ -147,6 +147,14 @@ export default function HabitTracker({ onXpGained }: Props) {
    */
   const handleSkip = async (h: HabitWithStreak) => {
     const { skipped } = await questsApi().questsSkipHabit(h.id);
+    if (skipped) {
+      // Record-only (xp 0): feeds the 'day_off' achievement and the chronicle.
+      // Zero-XP events move neither combo nor streak by design (phase 1).
+      await window.api.processRpgEvent({
+        type: 'HABIT_SKIPPED', moduleId: 'quests',
+        payload: { xp: 0, hp: 0, habitId: h.id }, timestamp: Date.now(),
+      });
+    }
     toast({
       type: 'info',
       message: skipped

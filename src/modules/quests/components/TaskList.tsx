@@ -14,6 +14,7 @@ import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import QuestRowActions from './QuestRowActions';
 import PostponeMenu from './PostponeMenu';
+import TodayView from './TodayView';
 import { questsApi } from '../api';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
@@ -57,7 +58,9 @@ export default function TaskList() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  /* «Hoy» is always the door: the active tab is deliberately NOT persisted, so
+     opening Questify never drops you into yesterday's management session. */
+  const [activeTab, setActiveTab] = useState<'today' | 'pending' | 'completed'>('today');
   const [activeProjectId, setActiveProjectId] = useState<string | null | undefined>(undefined);
   const [filter, setFilter] = useState('');
   const [showProjectManager, setShowProjectManager] = useState(false);
@@ -529,6 +532,15 @@ export default function TaskList() {
           <button
             type="button"
             role="tab"
+            aria-selected={activeTab === 'today'}
+            className={`qb-rune quest-rune-btn${activeTab === 'today' ? ' qb-rune--active' : ''}`}
+            onClick={() => setActiveTab('today')}
+          >
+            {t('questify.todayTab', 'Hoy')}
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={activeTab === 'pending'}
             className={`qb-rune quest-rune-btn${activeTab === 'pending' ? ' qb-rune--active' : ''}`}
             onClick={() => setActiveTab('pending')}
@@ -546,6 +558,9 @@ export default function TaskList() {
           </button>
         </div>
 
+        {/* «Hoy» is the execution list, not the management one: no project
+            picker, no category filter, no search. They are one tab away. */}
+        {activeTab !== 'today' && (<>
         <select
           className="quest-project-select"
           aria-label={t('questify.allProjects')}
@@ -615,13 +630,25 @@ export default function TaskList() {
             </button>
           </>
         )}
+        </>)}
       </div>
 
       {/* ── Two-column layout ────────────────────── */}
-      <div className="quest-columns">
+      <div className={`quest-columns${activeTab === 'today' ? ' quest-columns--single' : ''}`}>
         {/* ── LEFT: Quest rows ─────────────────── */}
         <div>
           {loading ? <SkeletonCards /> : (<>
+            {activeTab === 'today' && (
+              <TodayView
+                tasks={tasks}
+                projects={projects}
+                onComplete={handleComplete}
+                onPostpone={(taskId, target) => { postpone([taskId], target); }}
+                onPlanAhead={() => setActiveTab('pending')}
+                onHabitChecked={loadTasks}
+              />
+            )}
+
             {activeTab === 'pending' && (
               <>
                 {/* 10px left margin: the banner's ::before tail hangs outside
@@ -771,7 +798,10 @@ export default function TaskList() {
           </>)}
         </div>
 
-        {/* ── RIGHT: Habits + Campaigns + Notes ── */}
+        {/* ── RIGHT: Habits + Campaigns + Notes ──
+            Hidden on «Hoy»: the pending rituals are already inside that list,
+            and a second copy beside it would be the same debt counted twice. */}
+        {activeTab !== 'today' && (
         <div>
           {/* Habits */}
           <Section title={t('questify.habits', 'COSTUMBRES DEL HÉROE')} icon={<Compass width={12} height={12} style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('questify.habitsHelp', 'Hábitos diarios que se reinician cada día. Completarlos da XP y mantiene tu racha.')} />}>
@@ -803,6 +833,7 @@ export default function TaskList() {
             )}
           </Section>
         </div>
+        )}
       </div>
 
       {showProjectManager && (
