@@ -55,7 +55,9 @@ function buildQuestify(db: Database.Database, computedForDate: string): SylSnaps
     checksThisPeriod: h.checksThisPeriod,
     targetThisPeriod: h.targetThisPeriod,
     streak: h.streak,
-    pendingToday: h.checksThisPeriod < h.targetThisPeriod,
+    // From computeHabits, not re-derived: a Mon/Wed/Fri habit is NOT pending on
+    // a Tuesday even though checksThisPeriod < targetThisPeriod.
+    pendingToday: h.pendingToday,
   }));
   const habitsPendingToday = habits
     .filter((h) => h.pendingToday)

@@ -15,6 +15,17 @@ export interface PlayerStats {
   totalTasks: number;
   totalMeals: number;
   totalExpenses: number;
+  /** Dia local al que pertenece `hp`. El Vigor se resetea a 100 cada manana. */
+  hpDate: string | null;
+  /** Mes (YYYY-MM) de la cuota de indultos vigente. */
+  pardonsMonth: string | null;
+  pardonsUsed: number;
+  /** Derivado, ya mes-rolado: cuantos indultos quedan este mes. */
+  pardonsRemaining: number;
+  /** Record de racha. Nunca se resetea. */
+  bestStreak: number;
+  /** Fecha local de check-in en la Posada, o null si esta apagada. */
+  innSince: string | null;
 }
 
 export interface RpgEvent {
@@ -73,6 +84,8 @@ export interface ParsedRow {
   amountUSD?: number;
   isExcluded: boolean;
   suggestedCategory: string;
+  /** Linea de impuestos/cargos del resumen (sellos, IVA, percepciones). */
+  isTax?: boolean;
 }
 
 /** One confirmed PDF/CSV import, so the user can review and undo it. */
@@ -120,6 +133,10 @@ export interface CauldronTimerState {
   presetId: string | null;
   presetName: string | null;
   extensionMinutes: number;
+  /** Epoch ms en que el siguiente segmento arranca solo (gracia de 5 s), o null. */
+  autoStartAt: number | null;
+  /** Vuelta del bucle continuo (1 = primera ronda de ciclos). */
+  round: number;
 }
 
 export interface CauldronPreset {
@@ -130,6 +147,8 @@ export interface CauldronPreset {
   longBreakMinutes: number;
   cyclesBeforeLong: number;
   extensionMinutes: number;
+  autoStartBreak: boolean;
+  autoStartWork: boolean;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -162,6 +181,8 @@ export interface CauldronSessionEndResult {
    * they are excluded from every backend statistic for the same reason.
    */
   isExtension?: boolean;
+  /** True en el segmento que cierra una vuelta completa de ciclos. */
+  cycleComplete?: boolean;
 }
 
 /** A session that was running when the app closed and can be resumed. */
@@ -282,7 +303,9 @@ export interface SylSnapshot {
 
 export interface HubtifyApi {
   getRpgStats: () => Promise<PlayerStats>;
-  processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number }>;
+  rpgSetInnMode: (on: boolean) => Promise<{ innSince: string | null }>;
+  onRpgPardonUsed: (callback: () => void) => () => void;
+  processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number; pardonUsed?: boolean }>;
   getRpgHistory: (limit: number) => Promise<RpgEventRecord[]>;
   rpgGetDashboardStats: () => Promise<{ xpToday: number; xpHistory: Array<{ date: string; xp: number }>; eventsToday: number }>;
   windowMinimize: () => void;
@@ -303,10 +326,12 @@ export interface HubtifyApi {
   questsSyncSubtaskOrders: (taskId: string, orderedIds: string[]) => Promise<void>;
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
-  questsGetHabitHeatmap: (days?: number) => Promise<{ days: Array<{ date: string; count: number }>; totalHabits: number }>;
+  questsGetHabitHeatmap: (days?: number) => Promise<{ days: Array<{ date: string; count: number; skipCount: number }>; totalHabits: number }>;
   questsGetHabits: () => Promise<unknown[]>;
-  questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => Promise<string>;
-  questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => Promise<void>;
+  questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number; specificDays?: number[] | null }) => Promise<string>;
+  questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number; specificDays?: number[] | null }) => Promise<void>;
+  questsPostponeTasks: (ids: string[], target: string) => Promise<{ moved: number }>;
+  questsSkipHabit: (habitId: string, date?: string) => Promise<{ skipped: boolean }>;
   questsDeleteHabit: (id: string) => Promise<void>;
   questsCheckHabit: (habitId: string) => Promise<{ checked: boolean }>;
   questsCheckHabitForDate: (habitId: string, date: string) => Promise<{ checked: boolean }>;
@@ -344,7 +369,7 @@ export interface HubtifyApi {
   nutritionGetSummary: (date: string) => Promise<unknown>;
   nutritionGetSummaryRange: (start: string, end: string) => Promise<unknown[]>;
   nutritionGetWeights: () => Promise<unknown[]>;
-  nutritionGetStreak: () => Promise<number>;
+  nutritionGetStreak: () => Promise<{ streak: number; todayPending: boolean; graceUsedOn?: string }>;
   nutritionGetWeekCalories: () => Promise<number[]>;
   nutritionGetTodayCalories: () => Promise<number>;
   nutritionGetTodayMealsCount: () => Promise<number>;
@@ -430,7 +455,7 @@ export interface HubtifyApi {
   financeGetLoansByPerson: (name: string) => Promise<unknown[]>;
   financeAddLoan: (loan: Record<string, unknown>) => Promise<string>;
   financeSettleLoan: (id: string) => Promise<void>;
-  financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => Promise<string>;
+  financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => Promise<string | { ok: false; reason: string }>;
   financeGetLoanPayments: (loanId: string) => Promise<unknown[]>;
   financeDeleteLoanPayment: (id: string) => Promise<void>;
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => Promise<string>;
@@ -508,6 +533,7 @@ export interface HubtifyApi {
   cauldronGetInterruptedSession: () => Promise<CauldronInterruptedSession | null>;
   cauldronResumeInterruptedSession: () => Promise<{ success: boolean; reason?: string; state?: CauldronTimerState }>;
   cauldronDiscardInterruptedSession: () => Promise<{ success: boolean }>;
+  cauldronCancelAutoStart: () => Promise<CauldronTimerState>;
   /** Pushes already-translated OS-notification texts to the main process. */
   cauldronSetLabels: (labels: Record<string, string>) => Promise<void>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;

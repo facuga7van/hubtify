@@ -711,3 +711,52 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
+/* ── Racha: record, indultos y Posada (Fase 1 RPG) ───────────
+   El bloque vive dentro de .sidebar-bar de la racha. La Posada opaca la barra
+   (pausada, no rota) y el boton es el unico control del sistema: un click. */
+.sidebar-bar--resting .sidebar-bar__track { opacity: 0.45; }
+.sidebar-bar--resting .sidebar-bar__label { color: var(--gold); }
+
+.sidebar-streak__best {
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+}
+
+.sidebar-streak__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sidebar-streak__pardons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-label);
+  color: rgba(245, 231, 192, 0.75);
+  cursor: help;
+}
+
+.sidebar-streak__inn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-label);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.06em;
+  color: rgba(245, 231, 192, 0.8);
+  background: none;
+  border: 1px solid rgba(196, 168, 78, 0.35);
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.sidebar-streak__inn:hover,
+.sidebar-streak__inn[aria-pressed="true"] {
+  color: var(--gold-light);
+  border-color: var(--gold-light);
+}

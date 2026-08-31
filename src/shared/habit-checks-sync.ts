@@ -14,6 +14,8 @@ export interface HabitCheckRow {
   id: string;
   habitId: string;
   date: string;
+  /** 'check' | 'skip' | 'shield'; rows from before Fase 1 have 'check'. */
+  kind?: 'check' | 'skip' | 'shield';
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -31,6 +33,8 @@ export interface HabitCheckDoc {
   origin: 'desktop' | 'syl';
   /** 2b: transactional XP claim. Always null in 2a; consumed by 2b. */
   rpgClaimedAt: string | null;
+  /** 'check' | 'skip' | 'shield'. Absent on docs written before Fase 1 = 'check'. */
+  kind?: 'check' | 'skip' | 'shield';
 }
 
 /**
@@ -56,6 +60,7 @@ export function checkToDoc(row: HabitCheckRow): HabitCheckDoc {
     updatedAt: row.updatedAt,
     origin: 'desktop',
     rpgClaimedAt: null,
+    kind: row.kind ?? 'check',
   };
 }
 
@@ -76,6 +81,7 @@ export function docToCheck(doc: HabitCheckDoc): HabitCheckRow {
     createdAt,
     updatedAt,
     deletedAt: doc.checked ? null : updatedAt,
+    kind: doc.kind ?? 'check',
   };
 }
 

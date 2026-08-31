@@ -62,6 +62,41 @@ function SyncPushFailedWatcher() {
   return null;
 }
 
+/**
+ * Same pattern as SyncPushFailedWatcher: processRpgEvent is called from four
+ * modules, so the main process broadcasts 'rpg:pardonUsed' once and this single
+ * listener turns it into the one discreet toast. Inn transitions arrive as a
+ * window event from the toggle handler below (Layout itself sits above the
+ * ToastProvider and cannot toast).
+ */
+function RpgMomentsWatcher() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  useEffect(() => {
+    const offPardon = window.api.onRpgPardonUsed?.(() => {
+      toast({
+        message: t('rpg.pardonUsed', 'Se usó un indulto: tu racha sigue intacta.'),
+        type: 'info',
+      });
+    });
+    const innHandler = (e: Event) => {
+      const on = (e as CustomEvent<{ on: boolean }>).detail?.on;
+      toast({
+        message: on
+          ? t('rpg.innEntered', 'Descansás en la Posada. La racha te espera.')
+          : t('rpg.innWelcomeBack', 'De vuelta a la aventura. La racha retoma donde estaba.'),
+        type: on ? 'info' : 'success',
+      });
+    };
+    window.addEventListener('rpg:innChanged', innHandler);
+    return () => {
+      offPardon?.();
+      window.removeEventListener('rpg:innChanged', innHandler);
+    };
+  }, [t, toast]);
+  return null;
+}
+
 interface UpdateDialogProps {
   version: string;
   state: 'idle' | 'downloading';
@@ -272,6 +307,13 @@ export default function Layout() {
     });
   }, []);
 
+  const handleToggleInn = useCallback(async () => {
+    const current = stats?.innSince ?? null;
+    const res = await window.api.rpgSetInnMode(!current);
+    window.dispatchEvent(new CustomEvent('rpg:innChanged', { detail: { on: !!res.innSince } }));
+    window.dispatchEvent(new Event('rpg:statsChanged'));
+  }, [stats?.innSince]);
+
   const refreshStats = useCallback(() => {
     window.api.getRpgStats().then(setStats).catch(() => { /* Stats refresh is non-critical */ });
   }, []);
@@ -481,12 +523,13 @@ export default function Layout() {
     <AnimatedNavigateContext.Provider value={animatedNavigate}>
     <ToastProvider>
     <SyncPushFailedWatcher />
+    <RpgMomentsWatcher />
     <TourProvider>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
         <div className={`sidebar-wrapper ${sidebarCollapsed ? 'sidebar-wrapper--collapsed' : ''}`}>
-          <Sidebar stats={stats} collapsed={sidebarCollapsed} onBellClick={() => setShowNotifications(true)} />
+          <Sidebar stats={stats} collapsed={sidebarCollapsed} onBellClick={() => setShowNotifications(true)} onToggleInn={handleToggleInn} />
           <button onClick={toggleSidebar} className={`sidebar-toggle tap-target ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
             title={sidebarCollapsed ? t('hub.expand', 'Expandir') : t('hub.collapse', 'Colapsar')}
             aria-expanded={!sidebarCollapsed}

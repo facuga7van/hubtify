@@ -44,6 +44,7 @@ describe('checkToDoc', () => {
       updatedAt: T2,
       origin: 'desktop',
       rpgClaimedAt: null,
+      kind: 'check',
     });
   });
 

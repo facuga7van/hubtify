@@ -6,14 +6,14 @@ import type { PlayerStats } from '../../shared/types';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
-import { Scroll, Shield, Sword, Bread, Coin, Cauldron } from '../shared/components/icons';
+import { Scroll, Shield, Sword, Bread, Coin, Cauldron, MoonCrescent } from '../shared/components/icons';
 import Tooltip from '../shared/components/Tooltip';
 import { useVisibleInterval } from '../shared/hooks/useVisibleInterval';
 import './styles/layout.css';
 
 const STREAK_BAR_SCALE = 3.3; // 30 days = ~100% width
 
-interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onBellClick?: () => void; }
+interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onBellClick?: () => void; onToggleInn?: () => void; }
 
 /** Badge counts for sidebar nav items */
 interface SidebarBadges {
@@ -68,7 +68,7 @@ const bottomNavKeys: Array<{ path: string; key: string; icon: string }> = [
   { path: '/character', key: 'nav.character', icon: 'shield' },
 ];
 
-export default function Sidebar({ stats, collapsed, onBellClick }: SidebarProps) {
+export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: SidebarProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const animatedNavigate = useAnimatedNavigate();
@@ -133,7 +133,7 @@ export default function Sidebar({ stats, collapsed, onBellClick }: SidebarProps)
           <div className="sidebar-bars">
             <div className="sidebar-bar">
               <div className="sidebar-bar__row">
-                <span className="sidebar-bar__label">{t('rpg.vita', 'VITA')}</span>
+                <span className="sidebar-bar__label" title={t('rpg.vigorHint', 'Se recupera cada mañana. Es el estado del día, no una deuda.')}>{t('rpg.vigor', 'VIGOR')}</span>
                 <span className="sidebar-bar__val">{stats.hp} / {stats.maxHp}</span>
               </div>
               <div className="sidebar-bar__track">
@@ -156,14 +156,46 @@ export default function Sidebar({ stats, collapsed, onBellClick }: SidebarProps)
                   : t('sidebar.levelsTo', 'niveles para')} <span className="sidebar-bar__next-rank-title">{t(nextRank.nextTitleKey, nextRank.nextTitleFallback)}</span>
               </div>
             )}
-            {stats.streak > 0 && (
-              <div className="sidebar-bar">
+            {(stats.streak > 0 || stats.innSince) && (
+              <div className={`sidebar-bar${stats.innSince ? ' sidebar-bar--resting' : ''}`}>
                 <div className="sidebar-bar__row">
-                  <span className="sidebar-bar__label">{t('rpg.streak', 'RACHA').toUpperCase()}</span>
-                  <span className="sidebar-bar__val">{stats.streak} {t('rpg.days', 'días')}</span>
+                  <span className="sidebar-bar__label">
+                    {stats.innSince
+                      ? t('rpg.innResting', 'EN LA POSADA')
+                      : t('rpg.streak', 'RACHA').toUpperCase()}
+                  </span>
+                  <span className="sidebar-bar__val">
+                    {stats.streak} {t('rpg.days', 'días')}
+                    {stats.bestStreak > stats.streak && (
+                      <span className="sidebar-streak__best" title={t('rpg.bestStreak', 'Mejor racha')}>
+                        {' '}· {t('rpg.bestShort', 'récord')} {stats.bestStreak}
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="sidebar-bar__track">
                   <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * STREAK_BAR_SCALE, 100)}%` }} />
+                </div>
+                <div className="sidebar-streak__meta">
+                  <span
+                    className="sidebar-streak__pardons"
+                    title={t('rpg.pardonsHint', 'Indultos del mes: si te salteás un solo día, se usa uno solo y la racha sigue.')}
+                  >
+                    <Shield width={11} height={11} />
+                    {' '}{stats.pardonsRemaining ?? 0}/2
+                  </span>
+                  <button
+                    type="button"
+                    className="sidebar-streak__inn tap-target"
+                    onClick={() => onToggleInn?.()}
+                    title={stats.innSince
+                      ? t('rpg.innLeave', 'Salir de la Posada: la racha retoma donde estaba.')
+                      : t('rpg.innHint', 'Vacaciones sin culpa: la racha no avanza ni se rompe hasta que vuelvas.')}
+                    aria-pressed={!!stats.innSince}
+                  >
+                    <MoonCrescent width={12} height={12} />
+                    <span>{stats.innSince ? t('rpg.innLeaveShort', 'Volver') : t('rpg.inn', 'Posada')}</span>
+                  </button>
                 </div>
               </div>
             )}

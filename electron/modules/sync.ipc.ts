@@ -80,6 +80,10 @@ interface SyncHabit {
   name: string;
   frequency: string;
   timesPerWeek: number;
+  /** Comma list '1,3,5' (ISO weekdays) or null = count-based. */
+  specificDays?: string | null;
+  shieldCount?: number;
+  lastShieldStreak?: number;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -89,6 +93,8 @@ interface SyncHabitCheck {
   id: string;
   habitId: string;
   date: string;
+  /** 'check' | 'skip' | 'shield'; absent on pre-Fase-1 rows/docs = 'check'. */
+  kind?: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -220,17 +226,30 @@ export function pruneRpgEvents(db: Database.Database): number {
 // a stale remote never clobbers a newer local row.
 export function mergeHabitChecks(db: Database.Database, checks: SyncHabitCheck[]): boolean {
   let changed = false;
+  // `kind` semantics: a remote that never heard of `kind` (old device, Syl before
+  // the field existed) carries NO opinion about it — clobbering a local 'skip'
+  // with an implicit default would destroy intent the remote never expressed.
+  // So: an EXPLICIT remote kind wins by LWW like everything else; an absent one
+  // preserves whatever the local row says (COALESCE with the current value).
   const upsert = db.prepare(`
-    INSERT INTO habit_checks (id, habit_id, date, created_at, updated_at, deleted_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO habit_checks (id, habit_id, date, kind, created_at, updated_at, deleted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(habit_id, date) DO UPDATE SET
+      kind = COALESCE(?, habit_checks.kind),
       deleted_at = excluded.deleted_at,
       updated_at = excluded.updated_at
     WHERE excluded.updated_at > habit_checks.updated_at
   `);
 
+  const VALID_KINDS = new Set(['check', 'skip', 'shield']);
   for (const rc of checks) {
-    const info = upsert.run(rc.id, rc.habitId, rc.date, rc.createdAt, rc.updatedAt, rc.deletedAt);
+    const explicitKind = VALID_KINDS.has(rc.kind as string) ? (rc.kind as string) : null;
+    const info = upsert.run(
+      rc.id, rc.habitId, rc.date,
+      explicitKind ?? 'check', // a brand-new row without kind is a plain check
+      rc.createdAt, rc.updatedAt, rc.deletedAt,
+      explicitKind,            // the DO UPDATE only overrides when stated
+    );
     if (info.changes > 0) changed = true;
   }
   return changed;
@@ -508,11 +527,11 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
     step('habits', () => {
       const getHabit = db.prepare('SELECT id, updated_at FROM habits WHERE id = ?');
       const insertHabit = db.prepare(`
-        INSERT INTO habits (id, name, frequency, times_per_week, created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO habits (id, name, frequency, times_per_week, specific_days, shield_count, last_shield_streak, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const updateHabit = db.prepare(`
-        UPDATE habits SET name = ?, frequency = ?, times_per_week = ?, updated_at = ?, deleted_at = ?
+        UPDATE habits SET name = ?, frequency = ?, times_per_week = ?, specific_days = ?, shield_count = ?, last_shield_streak = ?, updated_at = ?, deleted_at = ?
         WHERE id = ?
       `);
 
@@ -524,11 +543,16 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
         const timesPerWeek = weeklyTarget(rh.timesPerWeek);
         const frequency = rh.frequency === 'weekly' || rh.frequency === 'monthly' ? rh.frequency : 'daily';
         const local = getHabit.get(rh.id) as { id: string; updated_at: string } | undefined;
+        // specific_days is a comma list of 1..7 or NULL; shields are clamped so a
+        // corrupt remote cannot mint infinite forgiveness.
+        const specificDays = typeof rh.specificDays === 'string' && /^[1-7](,[1-7])*$/.test(rh.specificDays) ? rh.specificDays : null;
+        const shieldCount = Math.max(0, Math.min(3, Number(rh.shieldCount) || 0));
+        const lastShieldStreak = Math.max(0, Number(rh.lastShieldStreak) || 0);
         if (!local) {
-          insertHabit.run(rh.id, rh.name, frequency, timesPerWeek, rh.createdAt, rh.updatedAt ?? rh.createdAt, rh.deletedAt);
+          insertHabit.run(rh.id, rh.name, frequency, timesPerWeek, specificDays, shieldCount, lastShieldStreak, rh.createdAt, rh.updatedAt ?? rh.createdAt, rh.deletedAt);
           changed = true;
         } else if ((rh.updatedAt ?? rh.createdAt) > local.updated_at) {
-          updateHabit.run(rh.name, frequency, timesPerWeek, rh.updatedAt ?? rh.createdAt, rh.deletedAt, rh.id);
+          updateHabit.run(rh.name, frequency, timesPerWeek, specificDays, shieldCount, lastShieldStreak, rh.updatedAt ?? rh.createdAt, rh.deletedAt, rh.id);
           changed = true;
         }
       }
@@ -693,12 +717,15 @@ export function registerSyncIpcHandlers(): void {
 
     const habits = db.prepare(`
       SELECT id, name, frequency, times_per_week AS timesPerWeek,
+             specific_days AS specificDays,
+             shield_count AS shieldCount,
+             last_shield_streak AS lastShieldStreak,
              created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM habits
     `).all();
 
     const habitChecks = db.prepare(`
-      SELECT id, habit_id AS habitId, date,
+      SELECT id, habit_id AS habitId, date, kind,
              created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM habit_checks
     `).all();
@@ -767,11 +794,11 @@ export function registerSyncIpcHandlers(): void {
         const local = db.prepare('SELECT updated_at FROM nutrition_profile WHERE id = 1').get() as { updated_at: string | null } | undefined;
         const remoteUpdatedAt = p.updated_at ?? '';
         if (!local || remoteUpdatedAt > (local.updated_at || '')) {
-          db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
             p.age, p.sex, p.height_cm, p.initial_weight_kg, p.activity_level,
             p.deficit_target_kcal ?? 500, p.gym_calories ?? 300, p.step_calories_factor ?? 0.04,
             p.date_of_birth ?? null, p.weight_check_day ?? 1, p.weight_popup_enabled ?? 1,
-            p.meal_schedule ?? null, remoteUpdatedAt || null
+            p.meal_schedule ?? null, p.day_cutoff_hour ?? 4, remoteUpdatedAt || null
           );
           changed = true;
         }
@@ -1398,15 +1425,15 @@ export function registerSyncIpcHandlers(): void {
     const presets = data.cauldron_presets as Array<Record<string, unknown>> | undefined;
     if (presets?.length) {
       const getPreset = db.prepare('SELECT id, updated_at FROM cauldron_presets WHERE id = ?');
-      const insertPreset = db.prepare(`INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      const updatePreset = db.prepare(`UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?, long_break_minutes = ?, cycles_before_long = ?, extension_minutes = ?, is_default = ?, updated_at = ?, deleted_at = ? WHERE id = ?`);
+      const insertPreset = db.prepare(`INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, auto_start_break, auto_start_work, is_default, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const updatePreset = db.prepare(`UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?, long_break_minutes = ?, cycles_before_long = ?, extension_minutes = ?, auto_start_break = ?, auto_start_work = ?, is_default = ?, updated_at = ?, deleted_at = ? WHERE id = ?`);
       for (const p of presets) {
         const local = getPreset.get(p.id) as { id: string; updated_at: string } | undefined;
         if (!local) {
-          insertPreset.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.extension_minutes ?? 5, p.is_default, p.created_at, p.updated_at, p.deleted_at);
+          insertPreset.run(p.id, p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.extension_minutes ?? 5, p.auto_start_break ?? 1, p.auto_start_work ?? 0, p.is_default, p.created_at, p.updated_at, p.deleted_at);
           changed = true;
         } else if (p.updated_at && (!local.updated_at || p.updated_at > local.updated_at)) {
-          updatePreset.run(p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.extension_minutes ?? 5, p.is_default, p.updated_at, p.deleted_at, p.id);
+          updatePreset.run(p.name, p.work_minutes, p.break_minutes, p.long_break_minutes, p.cycles_before_long, p.extension_minutes ?? 5, p.auto_start_break ?? 1, p.auto_start_work ?? 0, p.is_default, p.updated_at, p.deleted_at, p.id);
           changed = true;
         }
       }

@@ -4,6 +4,7 @@ import type { RpgEvent } from '../shared/types';
 const api = {
   getRpgStats: () => ipcRenderer.invoke('rpg:getStats'),
   processRpgEvent: (event: RpgEvent) => ipcRenderer.invoke('rpg:processEvent', event),
+  rpgSetInnMode: (on: boolean) => ipcRenderer.invoke('rpg:setInnMode', on),
   getRpgHistory: (limit: number) => ipcRenderer.invoke('rpg:getHistory', limit),
   rpgGetDashboardStats: () => ipcRenderer.invoke('rpg:getDashboardStats'),
   windowMinimize: () => ipcRenderer.send('window:minimize'),
@@ -16,6 +17,7 @@ const api = {
   questsDeleteTasks: (ids: string[]) => ipcRenderer.invoke('quests:deleteTasks', ids),
   questsSetTaskStatus: (taskId: string, status: boolean) => ipcRenderer.invoke('quests:setTaskStatus', taskId, status),
   questsSyncTaskOrders: (orders: Array<{ id: string; order: number }>) => ipcRenderer.invoke('quests:syncTaskOrders', orders),
+  questsPostponeTasks: (ids: string[], target: string) => ipcRenderer.invoke('quests:postponeTasks', ids, target),
   questsGetSubtasks: (taskId: string) => ipcRenderer.invoke('quests:getSubtasks', taskId),
   questsAddSubtask: (taskId: string, subtask: Record<string, unknown>) => ipcRenderer.invoke('quests:addSubtask', taskId, subtask),
   questsUpdateSubtask: (subtaskId: string, changes: Record<string, unknown>) => ipcRenderer.invoke('quests:updateSubtask', subtaskId, changes),
@@ -35,6 +37,7 @@ const api = {
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => ipcRenderer.invoke('quests:updateHabit', id, updates),
   questsDeleteHabit: (id: string) => ipcRenderer.invoke('quests:deleteHabit', id),
   questsCheckHabit: (habitId: string) => ipcRenderer.invoke('quests:checkHabit', habitId),
+  questsSkipHabit: (habitId: string, date?: string) => ipcRenderer.invoke('quests:skipHabit', habitId, date),
   questsCheckHabitForDate: (habitId: string, date: string) => ipcRenderer.invoke('quests:checkHabitForDate', habitId, date),
   questsGetProjects: () => ipcRenderer.invoke('quests:getProjects'),
   questsUpsertProject: (project: Record<string, unknown>) => ipcRenderer.invoke('quests:upsertProject', project),
@@ -119,6 +122,11 @@ const api = {
   notificationsSetLocale: (locale: string) => ipcRenderer.invoke('notifications:setLocale', locale),
   notificationsSetModuleEnabled: (module: string, enabled: boolean) => ipcRenderer.invoke('notifications:setModuleEnabled', module, enabled),
   notificationsSetHabitReminder: (enabled: boolean, time: string) => ipcRenderer.invoke('notifications:setHabitReminder', enabled, time),
+  onRpgPardonUsed: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('rpg:pardonUsed', handler);
+    return () => { ipcRenderer.removeListener('rpg:pardonUsed', handler); };
+  },
   onNotificationsUpdated: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('notifications:updated', handler);
@@ -143,6 +151,7 @@ const api = {
   cauldronGetInterruptedSession: () => ipcRenderer.invoke('cauldron:getInterruptedSession'),
   cauldronResumeInterruptedSession: () => ipcRenderer.invoke('cauldron:resumeInterruptedSession'),
   cauldronDiscardInterruptedSession: () => ipcRenderer.invoke('cauldron:discardInterruptedSession'),
+  cauldronCancelAutoStart: () => ipcRenderer.invoke('cauldron:cancelAutoStart'),
   cauldronSetLabels: (labels: Record<string, string>) => ipcRenderer.invoke('cauldron:setLabels', labels),
   onCauldronTick: (callback: (state: unknown) => void) => {
     const handler = (_e: unknown, state: unknown) => callback(state);

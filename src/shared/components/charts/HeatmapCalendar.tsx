@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import './charts.css';
 
-export type CellLevel = 'l0' | 'l1' | 'l2' | 'l3' | 'l4' | 'miss' | 'today';
+/** 'grace' = dia puenteado por un indulto/dia de gracia: ni logrado ni perdido. */
+export type CellLevel = 'l0' | 'l1' | 'l2' | 'l3' | 'l4' | 'miss' | 'grace' | 'today';
 
 export interface HeatmapCalendarProps {
   data: CellLevel[];
@@ -24,6 +25,7 @@ const LEVEL_CLASSES: Record<CellLevel, string> = {
   l4: 'heatmap-cell--l4',
   miss: 'heatmap-cell--miss',
   today: 'heatmap-cell--l4 heatmap-cell--today',
+  grace: 'heatmap-cell--grace',
 };
 
 /** Monday=0 … Sunday=6 */
