@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import TitleBar from '../shared/components/TitleBar';
 import { useAuthContext } from '../shared/AuthContext';
 
 interface Props {
@@ -44,7 +45,12 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
     }
 
     if (!email.trim() || !password.trim()) return;
-    if (!isLogin && mode !== 'addAccount' && !username.trim()) return;
+    if (!isLogin && mode !== 'addAccount' && !username.trim()) {
+      // Used to be a silent `return` — the user pressed the button and nothing
+      // happened, with the error string already sitting unused in the catalog.
+      setError(t('auth.errors.usernameRequired'));
+      return;
+    }
     setError('');
     setLoading(true);
 
@@ -81,6 +87,9 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
     setUsername('');
   };
 
+  /** Registration is the only flow with password rules of its own. */
+  const isRegistering = !isLogin && !isForgot && mode !== 'addAccount';
+
   const exitForgotMode = () => {
     setIsForgot(false);
     setResetSent(false);
@@ -88,7 +97,12 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
   };
 
   return (
-    <div className="auth-page">
+    // The window is frameless (`frame:false`), and this page renders OUTSIDE
+    // <Layout/>, which is where the custom title bar lives — so without this the
+    // login screen had no minimize/maximize/close and no drag region at all.
+    <div className="auth-shell">
+      <TitleBar />
+      <div className="auth-page">
       <div className="auth-card">
         {/* Decorative top ornament */}
         <div className="auth-card__ornament" />
@@ -148,9 +162,11 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
                   aria-label={t('auth.password')}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setPasswordTooShort(false); }}
-                  onBlur={() => { if (password.length > 0 && password.length < 6) setPasswordTooShort(true); }}
+                  /* Only registration has a 6-char rule. Scolding someone who is
+                     signing in to an existing account is just wrong. */
+                  onBlur={() => { if (isRegistering && password.length > 0 && password.length < 6) setPasswordTooShort(true); }}
                   className="rpg-input auth-card__input"
-                  minLength={6}
+                  minLength={isRegistering ? 6 : undefined}
                 />
                 {passwordTooShort && (
                   <p className="auth-card__error">{t('auth.passwordTooShort', 'La contraseña debe tener al menos 6 caracteres')}</p>
@@ -208,6 +224,7 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
 
         {/* Decorative bottom ornament */}
         <div className="auth-card__ornament" />
+      </div>
       </div>
     </div>
   );

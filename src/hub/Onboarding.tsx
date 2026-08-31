@@ -4,6 +4,7 @@ import Character from './Character';
 import TitleBar from '../shared/components/TitleBar';
 import RpgDatePicker from '../shared/components/RpgDatePicker';
 import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/audio';
+import './styles/shell.css';
 import { getAgeFromDob } from '../../shared/date-utils';
 import { DEFAULT_MEAL_SCHEDULE } from '../../shared/meal-utils';
 
@@ -143,16 +144,19 @@ export default function Onboarding({ onComplete }: Props) {
 
   const animClass = animDir === 'forward' ? 'onboarding-step-forward' : 'onboarding-step-back';
 
-  const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
-    <div className={`onboarding__toggle${on ? ' onboarding__toggle--on' : ''}`} onClick={onToggle} role="switch" aria-checked={on} tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}>
+  // Was a <div role="switch" tabIndex={0}> with a hand-rolled key handler.
+  const Toggle = ({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) => (
+    <button type="button" className={`onboarding__toggle${on ? ' onboarding__toggle--on' : ''}`}
+      onClick={onToggle} role="switch" aria-checked={on} aria-label={label}>
       <div className="onboarding__toggle-knob" />
-    </div>
+    </button>
   );
 
   const BackBtn = ({ target }: { target: number }) => (
-    <button className="rpg-button onboarding__back-btn" onClick={() => goStep(target)}>
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
+    <button className="rpg-button onboarding__back-btn" onClick={() => goStep(target)}
+      aria-label={t('common.back', 'Atrás')}>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M7 1L3 5l4 4"/></svg>
+      <span className="onboarding__back-btn-text">{t('common.back', 'Atrás')}</span>
     </button>
   );
 
@@ -198,20 +202,25 @@ export default function Onboarding({ onComplete }: Props) {
               {/* Toggles */}
               <div className="onboarding__pref-row">
                 <span className="onboarding__pref-label">{t('onboarding.sounds')}</span>
-                <Toggle on={soundEnabled} onToggle={toggleSound} />
+                <Toggle on={soundEnabled} onToggle={toggleSound} label={t('onboarding.sounds')} />
               </div>
               <div className="onboarding__pref-row">
                 <span className="onboarding__pref-label">{t('onboarding.helpBubbles')}</span>
-                <Toggle on={helpBubbles} onToggle={toggleHelpBubbles} />
+                <Toggle on={helpBubbles} onToggle={toggleHelpBubbles} label={t('onboarding.helpBubbles')} />
               </div>
               <div className="onboarding__pref-row">
                 <span className="onboarding__pref-label">{t('onboarding.notifications')}</span>
-                <Toggle on={notifications} onToggle={toggleNotifications} />
+                <Toggle on={notifications} onToggle={toggleNotifications} label={t('onboarding.notifications')} />
               </div>
             </div>
 
-            <button className="rpg-button onboarding__primary-btn" onClick={() => goStep(1)} style={{ marginTop: 20 }}>
-              {t('onboarding.startAdventure')}
+            <div className="onboarding__nav-row" style={{ marginTop: 20 }}>
+              <button className="rpg-button onboarding__primary-btn" onClick={() => goStep(1)}>
+                {t('onboarding.startAdventure')}
+              </button>
+            </div>
+            <button type="button" className="onboarding__skip-all" onClick={finishOnboarding}>
+              {t('onboarding.skipSetup', 'Saltar configuración')}
             </button>
           </div>
         );

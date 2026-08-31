@@ -84,7 +84,7 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
           {activeUser.displayName && (
             <span className="account-dropdown__username">{activeUser.displayName}</span>
           )}
-          <span className="account-dropdown__email">{activeUser.email}</span>
+          <span className="account-dropdown__email" title={activeUser.email ?? undefined}>{activeUser.email}</span>
         </div>
       </div>
 
@@ -105,7 +105,7 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
                 {account.username}
               </span>
             )}
-            <span className="account-dropdown__email">{account.email}</span>
+            <span className="account-dropdown__email" title={account.email}>{account.email}</span>
           </div>
         </button>
       ))}

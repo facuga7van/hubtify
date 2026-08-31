@@ -1,0 +1,376 @@
+/* ══════════════════════════════════════════════════════
+   SHELL FIXES — hub-owned overrides and new shell pieces.
+
+   Loaded AFTER components.css everywhere it matters, and every override here
+   is written with higher specificity than the rule it corrects, so cascade
+   order is not load-bearing.
+   ══════════════════════════════════════════════════════ */
+
+/* ══ AUTH PAGE ════════════════════════════════════════
+   The window is frameless, so the login screen needs the custom title bar. */
+.auth-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* `.auth-page` is `height: 100vh` with no overflow — with the 32px title bar
+   above it that overflows, and at the 1.3 font preset the card itself does. */
+.auth-shell .auth-page {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  overflow-y: auto;
+  align-items: flex-start;
+  padding: 24px 16px;
+  -webkit-app-region: no-drag;
+}
+
+/* ══ ONBOARDING ═══════════════════════════════════════
+   `.onboarding-card { overflow: hidden }` + a page with no `overflow-y` put the
+   "Continue" button off screen at the 1.3 font preset — which is chosen one
+   step earlier, inside the onboarding itself. */
+.onboarding-shell .onboarding-page {
+  overflow-y: auto;
+  align-items: flex-start;
+  padding: 24px 0;
+}
+
+.onboarding-shell .onboarding-card {
+  overflow: visible;
+  margin: auto;
+}
+
+.onboarding__back-btn-text {
+  margin-left: 4px;
+}
+
+.onboarding__skip-all {
+  display: block;
+  margin: 10px auto 0;
+  background: none;
+  border: none;
+  color: var(--ink-faded);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.onboarding__skip-all:hover {
+  color: var(--ink);
+}
+
+/* ══ SETTINGS PAGE ════════════════════════════════════
+   `.settings-page` had no CSS at all anywhere in the project, and
+   `.main-content` is `padding: 0`, so the title and every card started flush
+   against the window edge. */
+.settings-page {
+  padding: 24px 28px 32px;
+  max-width: 860px;
+}
+
+.settings-group {
+  margin-bottom: 28px;
+}
+
+.settings-group__title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-sub);
+  letter-spacing: 0.16em;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(168, 138, 60, 0.35);
+}
+
+.settings-subhead {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  color: var(--ink-faded);
+  border-top: 1px solid rgba(212, 160, 23, 0.15);
+  margin: 8px 0 2px;
+  padding-top: 8px;
+}
+
+/* Rows whose control is a full-width button strip stack instead of splitting. */
+.settings-row--stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.settings-row--stack .settings-row__buttons {
+  width: 100%;
+}
+
+/* ══ PLAYER CARD ══════════════════════════════════════ */
+.player-card__profile {
+  min-width: 0;
+}
+
+/* `.player-card__ident` is `white-space: nowrap` inside `.sidebar { overflow:
+   hidden }` — a 30-char name was sliced mid-word with no ellipsis and no
+   tooltip. */
+.player-card__ident > .player-card__eyebrow,
+.player-card__ident > .player-card__name,
+.player-card__ident > .player-card__email {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-card__email {
+  font-family: 'Fira Code', monospace;
+  font-size: calc(11px * var(--font-scale));
+  color: rgba(245, 231, 192, 0.6);
+  margin-top: 2px;
+}
+
+/* The bell and the account menu used to live inside `__ident`, which collapses
+   to `width: 0; overflow: hidden` — collapsing the sidebar silently removed
+   notifications, account switching and sign-out. */
+.player-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.player-card--collapsed .player-card__profile {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.player-card--collapsed .player-card__actions {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-card__account-btn {
+  background: none;
+  border: none;
+  color: var(--gold);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.player-card__account-btn:hover {
+  color: var(--gold-light);
+  background: rgba(168, 138, 60, 0.2);
+}
+
+.player-card--collapsed .player-card__account-caret {
+  display: none;
+}
+
+/* ══ UPDATE DIALOG ════════════════════════════════════ */
+.update-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 24, 16, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-overlay);
+  padding: 16px;
+}
+
+.update-dialog {
+  position: relative;
+  background: var(--leather);
+  border: 2px solid var(--gold-dark);
+  border-radius: 6px;
+  padding: 24px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  color: var(--parch-0);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.update-dialog__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--gold);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.update-dialog__close:hover {
+  color: var(--gold-light);
+  background: rgba(168, 138, 60, 0.2);
+}
+
+.update-dialog__title {
+  font-family: 'UnifrakturCook', cursive;
+  margin: 0 12px 12px;
+  color: var(--gold-light);
+}
+
+.update-dialog__progress {
+  margin-bottom: 12px;
+}
+
+.update-dialog__track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.update-dialog__fill {
+  height: 100%;
+  background: var(--moss-light);
+  transition: width 0.3s ease;
+}
+
+.update-dialog__percent {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  opacity: 0.75;
+}
+
+.update-dialog__error {
+  color: #f87171;
+  font-size: var(--fs-label);
+  margin-bottom: 8px;
+}
+
+.update-dialog__primary {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.update-dialog__secondary {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  font-size: var(--fs-label);
+  background: transparent;
+  border: 1px solid var(--gold-dark);
+  color: var(--gold);
+}
+
+.update-chip {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: var(--z-floating);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--leather);
+  border: 1px solid var(--gold-dark);
+  border-radius: 999px;
+  color: var(--parch-0);
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.update-chip:hover {
+  border-color: var(--gold);
+}
+
+.update-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+
+/* ══ DASHBOARD BRIEF + EMPTY STATE ════════════════════ */
+.dash-brief__eyebrow {
+  color: var(--ink-faded);
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+}
+
+.dash-brief__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dash-brief__line {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  padding: 3px 0 3px 14px;
+  position: relative;
+}
+
+.dash-brief__line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.75em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rubric);
+}
+
+.dash-empty {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(74, 55, 32, 0.5);
+  background: rgba(245, 231, 192, 0.4);
+}
+
+.dash-empty__text {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-quote);
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.dash-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The onboarding toggle is now a real <button>; keep its box exactly as before. */
+.onboarding-shell .onboarding__toggle {
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* ══ RESPONSIVE PAGE PADDING ══════════════════════════
+   `.main-content` carried two media queries that set `padding: 0` on something
+   already at `padding: 0` — pure no-ops. The page body is what actually needs
+   to breathe, and `.qb-page` had no media query at all. Scoped under
+   `.main-content` so it wins over codex.css regardless of import order. */
+@media (max-width: 900px) {
+  .main-content .qb-page,
+  .main-content .settings-page {
+    padding: 18px 18px 24px;
+  }
+}
+
+@media (max-width: 780px) {
+  .main-content .qb-page,
+  .main-content .settings-page {
+    padding: 14px 12px 20px;
+  }
+}

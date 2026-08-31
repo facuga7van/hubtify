@@ -1,13 +1,13 @@
-import { useLocation } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
-import { syncPush, syncPull } from '../shared/sync';
+import { syncPush, syncPull, SYNC_PUSH_FAILED_EVENT } from '../shared/sync';
 import './styles/layout.css';
 import './styles/components.css';
+import './styles/shell.css';
 import { useKeyboardShortcuts } from '../shared/hooks/useKeyboardShortcuts';
 import ShortcutModal from '../shared/components/ShortcutModal';
 import QuickAdd from '../shared/components/QuickAdd';
@@ -22,6 +22,14 @@ import { gsap } from 'gsap';
 import { levelUp as animateLevelUp } from '../shared/animations/epic';
 import ChangelogModal from '../shared/components/ChangelogModal';
 import { changelog } from '../shared/changelog';
+import { useModalA11y } from '../shared/hooks/useModalA11y';
+import { useToast } from '../shared/components/useToast';
+
+/** Below this window width the sidebar collapses on its own. */
+const AUTO_COLLAPSE_WIDTH = 820;
+/** Never pull+push more often than this on window focus (ms). */
+const FOCUS_SYNC_MIN_INTERVAL_MS = 3 * 60_000;
+const LAST_PULL_KEY = 'hubtify_last_pull_at';
 
 function isNewerVersion(a: string, b: string): boolean {
   const pa = a.split('.').map(Number);
@@ -33,12 +41,106 @@ function isNewerVersion(a: string, b: string): boolean {
   return false;
 }
 
+/**
+ * Sync push failures were completely silent: the data simply never left the
+ * device and nobody was told. useToast() only works under <ToastProvider/>,
+ * which Layout renders inside its own tree, hence the tiny child component.
+ */
+function SyncPushFailedWatcher() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  useEffect(() => {
+    const handler = () => {
+      toast({
+        message: t('auth.syncPushFailed', 'No pudimos guardar tus cambios en la nube. Seguimos intentando.'),
+        type: 'warning',
+      });
+    };
+    window.addEventListener(SYNC_PUSH_FAILED_EVENT, handler);
+    return () => window.removeEventListener(SYNC_PUSH_FAILED_EVENT, handler);
+  }, [t, toast]);
+  return null;
+}
+
+interface UpdateDialogProps {
+  version: string;
+  state: 'idle' | 'downloading';
+  percent: number;
+  error: string | null;
+  onDownload: () => void;
+  onHide: () => void;
+  onDismiss: () => void;
+}
+
+/**
+ * The old markup was `position:fixed; inset:0` with no X, no backdrop click, no
+ * Escape, and both buttons hidden behind `state === 'idle'` — pressing
+ * "Download" locked you into a full-screen modal that also covered the custom
+ * title bar (so not even the window X was reachable).
+ */
+function UpdateDialog({ version, state, percent, error, onDownload, onHide, onDismiss }: UpdateDialogProps) {
+  const { t } = useTranslation();
+  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose: onHide });
+
+  return (
+    <div className="update-dialog-overlay" onClick={onHide}>
+      <div
+        {...dialogProps}
+        className="update-dialog"
+        aria-label={t('settings.updateAvailable', { version })}
+        onClick={stopPropagation}
+      >
+        <button
+          className="update-dialog__close tap-target"
+          onClick={onHide}
+          aria-label={t('common.hide', 'Ocultar')}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
+          </svg>
+        </button>
+
+        <h3 className="update-dialog__title">
+          {t('settings.updateAvailable', { version })}
+        </h3>
+
+        {state === 'downloading' && (
+          <div className="update-dialog__progress">
+            <div className="update-dialog__track">
+              <div className="update-dialog__fill" style={{ width: `${Math.round(percent)}%` }} />
+            </div>
+            {/* Raw percent used to render as "43.216871450%". */}
+            <span className="update-dialog__percent">{Math.round(percent)}%</span>
+          </div>
+        )}
+
+        {error && <p className="update-dialog__error">{error}</p>}
+
+        {state === 'idle' && (
+          <button className="rpg-button update-dialog__primary" onClick={onDownload}>
+            {t('settings.downloadUpdate')}
+          </button>
+        )}
+
+        {/* Always reachable, whatever the state. */}
+        <button className="rpg-button update-dialog__secondary" onClick={onHide}>
+          {t('common.hide', 'Ocultar')}
+        </button>
+        {state === 'idle' && (
+          <button className="rpg-button update-dialog__secondary" onClick={onDismiss}>
+            {t('common.later', 'Más tarde')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Layout() {
   const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const prevLevelRef = useRef<number>(0);
-  const location = useLocation();
 
   const { user: authUser } = useAuthContext();
   const outletHandleRef = useRef<AnimatedOutletHandle>(null);
@@ -68,11 +170,18 @@ export default function Layout() {
   const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  /** Collapses the update dialog to a chip; the download keeps running. */
+  const [updateMinimized, setUpdateMinimized] = useState(false);
 
   useEffect(() => {
     const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
     const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
-    const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
+    const c3 = window.api.onUpdateError((info) => {
+      setUpdateError(info.message);
+      // Without this the dialog stayed in 'downloading' forever — no buttons, no
+      // close, and it covers the custom title bar: the app was unusable.
+      setUpdateState('idle');
+    });
 
     // Also actively check on mount — the passive listener may have missed
     // the message if it was sent before React mounted
@@ -94,10 +203,15 @@ export default function Layout() {
     } catch { setUpdateState('idle'); }
   };
 
-  // Ctrl+Q to open quick add
+  // Ctrl+K to open quick add. It was Ctrl+Q, which is Quit on macOS/Linux, and
+  // it fired while typing — the INPUT/TEXTAREA guard is the same one
+  // useKeyboardShortcuts already has.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if ((e.target as HTMLElement | null)?.isContentEditable) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowQuickAdd(prev => !prev);
       }
@@ -133,8 +247,23 @@ export default function Layout() {
   }, [lastSeenVersion]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('hubtify_sidebar_collapsed') === 'true';
+    if (localStorage.getItem('hubtify_sidebar_collapsed') === 'true') return true;
+    // Below ~820px the expanded rail leaves the content unusable and the 20px
+    // toggle is basically undiscoverable, so start compact.
+    return window.innerWidth < AUTO_COLLAPSE_WIDTH;
   });
+
+  // Collapse automatically when the window shrinks past the threshold; leave the
+  // user's own choice alone once they are back above it.
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth < AUTO_COLLAPSE_WIDTH) {
+        setSidebarCollapsed(prev => (prev ? prev : true));
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => {
       const next = !prev;
@@ -147,9 +276,11 @@ export default function Layout() {
     window.api.getRpgStats().then(setStats).catch(() => { /* Stats refresh is non-critical */ });
   }, []);
 
+  // Was [location.pathname, refreshStats]: every tab change inside Finance
+  // re-read the stats. The 'rpg:statsChanged' listener below covers the real case.
   useEffect(() => {
     refreshStats();
-  }, [location.pathname, refreshStats]);
+  }, [refreshStats]);
 
   // Listen for stats refresh requests from child components
   useEffect(() => {
@@ -219,6 +350,15 @@ export default function Layout() {
     };
     const onFocus = async () => {
       const gen = syncGenRef.current;
+      // Every alt-tab back used to fire a full pull AND a full push — dozens of
+      // round-trips an hour. Throttle on the timestamp syncPull already writes.
+      try {
+        const last = localStorage.getItem(LAST_PULL_KEY);
+        if (last) {
+          const age = Date.now() - new Date(last).getTime();
+          if (Number.isFinite(age) && age >= 0 && age < FOCUS_SYNC_MIN_INTERVAL_MS) return;
+        }
+      } catch { /* storage unavailable — sync anyway */ }
       try {
         if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
         if (syncGenRef.current !== gen) return;
@@ -249,7 +389,7 @@ export default function Layout() {
   useEffect(() => {
     const enabled = localStorage.getItem('hubtify_notifications_system') !== 'false';
     window.api.notificationsSetSystemEnabled?.(enabled);
-    for (const mod of ['quests', 'nutrition', 'finance']) {
+    for (const mod of ['quests', 'nutrition', 'finance', 'cauldron']) {
       const modEnabled = localStorage.getItem(`hubtify_notifications_module_${mod}`) !== 'false';
       window.api.notificationsSetModuleEnabled?.(mod, modEnabled);
     }
@@ -340,13 +480,14 @@ export default function Layout() {
   return (
     <AnimatedNavigateContext.Provider value={animatedNavigate}>
     <ToastProvider>
+    <SyncPushFailedWatcher />
     <TourProvider>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <TitleBar />
       <div className="app-layout" style={{ flex: 1, height: 0 }}>
         <div className={`sidebar-wrapper ${sidebarCollapsed ? 'sidebar-wrapper--collapsed' : ''}`}>
-          <Sidebar stats={stats} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onBellClick={() => setShowNotifications(true)} />
-          <button onClick={toggleSidebar} className={`sidebar-toggle ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
+          <Sidebar stats={stats} collapsed={sidebarCollapsed} onBellClick={() => setShowNotifications(true)} />
+          <button onClick={toggleSidebar} className={`sidebar-toggle tap-target ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
             title={sidebarCollapsed ? t('hub.expand', 'Expandir') : t('hub.collapse', 'Colapsar')}
             aria-expanded={!sidebarCollapsed}
             aria-controls="main-sidebar"
@@ -485,45 +626,30 @@ export default function Layout() {
       />
 
       {/* Update popup */}
-      {updateAvailable && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, var(--leather) 0%, var(--leather) 100%)',
-            border: '2px solid var(--gold-dark)',
-            borderRadius: '6px', padding: '24px', maxWidth: 360,
-            textAlign: 'center', color: 'var(--parch-0)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-          }}>
-            <h3 style={{ fontFamily: "'UnifrakturCook', cursive", marginBottom: 12, color: 'var(--gold-light)' }}>
-              {t('settings.updateAvailable', { version: updateAvailable.version })}
-            </h3>
-            {updateState === 'downloading' && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ height: '100%', background: 'var(--moss)', width: `${downloadPercent}%`, transition: 'width 0.3s ease' }} />
-                </div>
-                <span style={{ fontSize: 'var(--fs-label)', opacity: 0.75 }}>{downloadPercent}%</span>
-              </div>
-            )}
-            {updateError && (
-              <p style={{ color: '#f87171', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{updateError}</p>
-            )}
-            {updateState === 'idle' && (
-              <>
-                <button className="rpg-button" onClick={handleUpdate} style={{ width: '100%', marginBottom: 8 }}>
-                  {t('settings.downloadUpdate')}
-                </button>
-                <button onClick={() => setUpdateAvailable(null)} className="rpg-button"
-                  style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
-                  {t('nutrify.weightCheckin.later')}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+      {updateAvailable && !updateMinimized && (
+        <UpdateDialog
+          version={updateAvailable.version}
+          state={updateState}
+          percent={downloadPercent}
+          error={updateError}
+          onDownload={handleUpdate}
+          onHide={() => setUpdateMinimized(true)}
+          onDismiss={() => { setUpdateAvailable(null); setUpdateMinimized(false); }}
+        />
+      )}
+
+      {/* Collapsed chip — the download carries on in the background */}
+      {updateAvailable && updateMinimized && (
+        <button
+          className="update-chip"
+          onClick={() => setUpdateMinimized(false)}
+          title={t('settings.updateAvailable', { version: updateAvailable.version })}
+        >
+          <span className="update-chip__dot" />
+          {updateState === 'downloading'
+            ? `${t('settings.downloading')} ${Math.round(downloadPercent)}%`
+            : t('settings.updateAvailable', { version: updateAvailable.version })}
+        </button>
       )}
 
     </div>

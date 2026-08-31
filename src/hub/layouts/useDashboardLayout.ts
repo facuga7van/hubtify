@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DEFAULT_LAYOUT, WIDGET_DEFINITIONS } from '../widgets/widget-registry';
 import type { ColSpan, RowSpan, DashboardLayoutState } from '../widgets/widget-registry';
 
@@ -79,5 +79,20 @@ export function useDashboardLayout() {
     });
   }, []);
 
-  return { layout, cycleColSpan, cycleRowSpan, reorder };
+  /** Undo a wrecked layout. Before this the only way back was "Delete all data". */
+  const resetLayout = useCallback(() => {
+    setLayout(DEFAULT_LAYOUT);
+  }, []);
+
+  const isCustomLayout = useMemo(() => {
+    const defaults = DEFAULT_LAYOUT.widgets;
+    if (layout.widgets.length !== defaults.length) return true;
+    return layout.widgets.some((w, i) =>
+      w.id !== defaults[i].id ||
+      w.colSpan !== defaults[i].colSpan ||
+      (w.rowSpan ?? 1) !== (defaults[i].rowSpan ?? 1)
+    );
+  }, [layout]);
+
+  return { layout, cycleColSpan, cycleRowSpan, reorder, resetLayout, isCustomLayout };
 }

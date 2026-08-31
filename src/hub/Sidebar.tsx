@@ -6,13 +6,13 @@ import type { PlayerStats } from '../../shared/types';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
-import { Scroll, Shield, Sword, Bread, Coin, Crown, Tower, Cauldron } from '../shared/components/icons';
+import { Scroll, Shield, Sword, Bread, Coin, Cauldron } from '../shared/components/icons';
 import Tooltip from '../shared/components/Tooltip';
 import './styles/layout.css';
 
 const STREAK_BAR_SCALE = 3.3; // 30 days = ~100% width
 
-interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onToggle?: () => void; onBellClick?: () => void; }
+interface SidebarProps { stats: PlayerStats | null; collapsed: boolean; onBellClick?: () => void; }
 
 /** Badge counts for sidebar nav items */
 interface SidebarBadges {
@@ -39,8 +39,6 @@ const NAV_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement
   bread: Bread,
   coin: Coin,
   cauldron: Cauldron,
-  crown: Crown,
-  tower: Tower,
 };
 
 function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -52,22 +50,25 @@ function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-const navKeys: Array<{ path: string; key: string; icon: string; label: string; comingSoon?: boolean }> = [
-  { path: '/', key: 'nav.home', icon: 'scroll', label: 'TABLA' },
-  { path: '/quests', key: 'nav.questify', icon: 'sword', label: 'MISIONES' },
-  { path: '/nutrition', key: 'nav.nutrify', icon: 'bread', label: 'PROVISIONES' },
-  { path: '/finance', key: 'nav.coinify', icon: 'coin', label: 'TESORO' },
-  { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron', label: 'CALDERO' },
-  { path: '/achievements', key: 'nav.achievements', icon: 'crown', label: 'LOGROS', comingSoon: true },
-  { path: '/village', key: 'nav.village', icon: 'tower', label: 'ALDEA', comingSoon: true },
+/* `label` used to carry hardcoded Spanish strings ('TABLA', 'MISIONES', …) that
+   no render ever read — every item goes through t(item.key). They are gone.
+   'Logros' and 'Aldea' were `comingSoon: true`: rendered at opacity .4 on
+   leather (~2:1 contrast) as focusable <button>s that did nothing on Enter, and
+   they ate 2 of the 7 main-menu slots. Out until they exist. */
+const navKeys: Array<{ path: string; key: string; icon: string }> = [
+  { path: '/', key: 'nav.home', icon: 'scroll' },
+  { path: '/quests', key: 'nav.questify', icon: 'sword' },
+  { path: '/nutrition', key: 'nav.nutrify', icon: 'bread' },
+  { path: '/finance', key: 'nav.coinify', icon: 'coin' },
+  { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron' },
 ];
 
-const bottomNavKeys: Array<{ path: string; key: string; icon: string; label: string }> = [
-  { path: '/character', key: 'nav.character', icon: 'shield', label: 'HÉROE' },
+const bottomNavKeys: Array<{ path: string; key: string; icon: string }> = [
+  { path: '/character', key: 'nav.character', icon: 'shield' },
 ];
 
-export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: SidebarProps) {
-  const { t, i18n } = useTranslation();
+export default function Sidebar({ stats, collapsed, onBellClick }: SidebarProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const animatedNavigate = useAnimatedNavigate();
   const [badges, setBadges] = useState<SidebarBadges>({ questsOverdue: 0, nutritionNoMeals: false });
@@ -133,7 +134,7 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
           <div className="sidebar-bars">
             <div className="sidebar-bar">
               <div className="sidebar-bar__row">
-                <span className="sidebar-bar__label">VITA</span>
+                <span className="sidebar-bar__label">{t('rpg.vita', 'VITA')}</span>
                 <span className="sidebar-bar__val">{stats.hp} / {stats.maxHp}</span>
               </div>
               <div className="sidebar-bar__track">
@@ -187,9 +188,9 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
           const navItem = (
             <button
               key={item.path}
-              className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''} ${item.comingSoon ? 'sidebar-nav-item--disabled' : ''}`}
+              className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''}`}
               aria-current={isActive(item.path) ? 'page' : undefined}
-              onClick={item.comingSoon ? undefined : () => animatedNavigate(item.path)}
+              onClick={() => animatedNavigate(item.path)}
             >
               <span className="sidebar-nav-item__ico">
                 {IconComp && <IconComp width={18} height={18} />}
@@ -203,9 +204,6 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
               <span className="sidebar-nav-item__label">{t(item.key)}</span>
             </button>
           );
-          if (item.comingSoon) {
-            return <Tooltip key={item.path} text={`${t(item.key)} (${t('common.comingSoon')})`}>{navItem}</Tooltip>;
-          }
           if (collapsed) {
             return <Tooltip key={item.path} text={t(item.key)}>{navItem}</Tooltip>;
           }
@@ -283,19 +281,14 @@ export default function Sidebar({ stats, collapsed, onToggle, onBellClick }: Sid
             <span className="sidebar-footer__combo-txt">{t('rpg.todayCombo', 'Combo de Hoy')}</span>
           </div>
         )}
+        {/* The ES/EN toggle that used to live here duplicated Settings > Apariencia
+            and, collapsed, became invisible but still tabbable. Removed. */}
         <div className="sidebar-footer__bottom">
           {!collapsed && (
             <div style={{ fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", opacity: 0.5, color: 'var(--parch-0)' }}>
               v{APP_VERSION}
             </div>
           )}
-          <button onClick={() => {
-            const newLang = i18n.language === 'es' ? 'en' : 'es';
-            i18n.changeLanguage(newLang);
-            localStorage.setItem('hubtify_lang', newLang);
-          }} className="sidebar-footer__lang" aria-label={t('nav.switchLanguage', 'Cambiar idioma')}>
-            {i18n.language === 'es' ? 'ES' : 'EN'}
-          </button>
         </div>
       </div>
 

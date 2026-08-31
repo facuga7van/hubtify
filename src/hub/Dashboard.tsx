@@ -13,6 +13,7 @@ import Tooltip from '../shared/components/Tooltip';
 import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
 import { useDashboardLayout } from './layouts/useDashboardLayout';
 import { useDashboardDrag } from './layouts/useDashboardDrag';
+import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 import { playSealPress } from '../shared/audio';
 import './styles/components.css';
@@ -49,17 +50,24 @@ function eventIcon(moduleId: string): ReactNode {
   }
 }
 
-function formatEventTime(createdAt: string): string {
+/**
+ * Used to return the hardcoded Latin 'nunc' / 'heri', with 'heri' covering
+ * EVERYTHING older than a day — yesterday and last week looked identical.
+ */
+function formatEventTime(createdAt: string, t: TFunction): string {
   const d = new Date(createdAt);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
+  const diffMins = Math.floor((Date.now() - d.getTime()) / 60000);
 
-  if (diffMins < 1) return 'nunc';
-  if (diffMins < 60) return `${diffMins}m`;
+  if (diffMins < 1) return t('dashboard.timeNow', 'ahora');
+  if (diffMins < 60) return t('dashboard.timeMinutes', { n: diffMins, defaultValue: 'hace {{n}} min' });
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h`;
-  return 'heri';
+  if (diffHours < 24) return t('dashboard.timeHours', { n: diffHours, defaultValue: 'hace {{n}} h' });
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return t('dashboard.timeDays', { n: diffDays, defaultValue: 'hace {{n}} d' });
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) return t('dashboard.timeWeeks', { n: diffWeeks, defaultValue: 'hace {{n}} sem' });
+  const diffMonths = Math.floor(diffDays / 30);
+  return t('dashboard.timeMonths', { n: diffMonths, defaultValue: 'hace {{n}} mes' });
 }
 
 /* ── XP Ledger mini chart ─────────────────────────────────── */
@@ -149,8 +157,11 @@ function SealButton({ level }: { level: number }) {
 
 export default function Dashboard() {
   const { t } = useTranslation();
-  const { layout, cycleColSpan, cycleRowSpan, reorder } = useDashboardLayout();
+  const animatedNavigate = useAnimatedNavigate();
+  const { layout, cycleColSpan, cycleRowSpan, reorder, resetLayout, isCustomLayout } = useDashboardLayout();
   const { dragIndex, dropTargetIndex, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd } = useDashboardDrag(reorder);
+  /** Counts the sidebar already computes; reused here to say what needs doing. */
+  const [todo, setTodo] = useState<{ questsOverdue: number; mealsToday: number }>({ questsOverdue: 0, mealsToday: 0 });
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [dashStats, setDashStats] = useState<{
     xpToday: number;
@@ -177,7 +188,21 @@ export default function Dashboard() {
       })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
+
+    Promise.all([
+      window.api.questsGetOverdueCount(),
+      window.api.nutritionGetTodayMealsCount(),
+    ])
+      .then(([questsOverdue, mealsToday]) => setTodo({ questsOverdue, mealsToday }))
+      .catch(() => { /* the brief just stays generic */ });
   }, []);
+
+  /** Ctrl+↑ / Ctrl+↓ move the focused card — the reorder was drag-only. */
+  const onWidgetMove = useCallback((index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0) return;
+    reorder(index, target);
+  }, [reorder]);
 
   useEffect(() => {
     load();
@@ -233,11 +258,45 @@ export default function Dashboard() {
       </div>
     );
 
-  const playerName = stats?.title ?? t('app.welcome');
   const level = stats?.level ?? 1;
   const hp = stats?.hp ?? 100;
   const streak = stats?.streak ?? 0;
   const xpToday = Math.round(dashStats?.xpToday ?? 0);
+  const eventsToday = dashStats?.eventsToday ?? 0;
+
+  /* ── What actually needs doing today ─────────────────────────
+     This block replaces "Salve, noble …" plus a random Latin epigraph: two
+     paragraphs that never once told you there were overdue quests. */
+  const briefLines: string[] = [];
+  if (todo.questsOverdue > 0) {
+    briefLines.push(t('dashboard.briefOverdue', {
+      n: todo.questsOverdue,
+      defaultValue: 'Tenés {{n}} misiones vencidas.',
+    }));
+  }
+  if (todo.mealsToday === 0) {
+    briefLines.push(t('dashboard.briefNoMeals', 'Todavía no registraste ninguna comida hoy.'));
+  }
+  if (streak > 0 && eventsToday === 0) {
+    briefLines.push(t('dashboard.briefStreakAtRisk', {
+      n: streak,
+      defaultValue: 'Tu racha de {{n}} días está en riesgo: registrá algo hoy.',
+    }));
+  }
+  if (briefLines.length === 0) {
+    briefLines.push(
+      eventsToday > 0
+        ? t('dashboard.briefAllGood', { n: eventsToday, defaultValue: 'Todo al día: {{n}} hechos registrados hoy.' })
+        : t('dashboard.briefNothingPending', 'Nada pendiente. Buen momento para sumar algo.')
+    );
+  }
+
+  /** A fresh install used to be a wall of zeroes with no call to action. */
+  const isEmptyState = !!stats
+    && stats.totalTasks === 0
+    && stats.totalMeals === 0
+    && stats.totalExpenses === 0
+    && recentEvents.length === 0;
 
   return (
     <BookPage
@@ -246,25 +305,42 @@ export default function Dashboard() {
       title={t('dashboard.title', 'Tabla del Aventurero')}
       subtitle={t('dashboard.subtitle', 'Primer folio · do se escriben las nuevas del día y se registran los hechos del campeón')}
     >
-      {/* ── row 1: salutation + wax seal ──────────────── */}
+      {/* ── row 1: today's brief + wax seal ──────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, marginBottom: 16 }}>
         <div>
-          <p
-            className="qb-dropcap"
-            style={{
-              fontFamily: "'IM Fell English', serif",
-              fontSize: 'var(--fs-quote)',
-              lineHeight: 1.55,
-              color: 'var(--ink)',
-              textAlign: 'justify',
-            }}
-          >
-            {t('dashboard.salutation1', 'Salve, noble')}{' '}
-            <span style={{ color: 'var(--rubric)', fontWeight: 600 }}>{playerName}</span>.{' '}
-            {t('dashboard.salutation2', 'El alba del')}{' '}
-            <span className="qb-hand">{new Date().toLocaleDateString(t('dashboard.locale', 'es-AR'), { day: 'numeric', month: 'long' })}</span>{' '}
-            {t('dashboard.salutation3', 'ha despuntado sobre el reino;')} {dashStats?.eventsToday ?? 0} {t('dashboard.salutation4', 'hechos registrados al sol, la racha se mantiene en')} {streak} {t('dashboard.salutation5', 'días de gloria. Proseguid con brío \u2014 la fortuna favorece al constante.')}
-          </p>
+          <div className="dash-brief">
+            <div className="qb-small-caps dash-brief__eyebrow">
+              {t('dashboard.briefTitle', 'HOY')} {'·'}{' '}
+              <span className="qb-hand">
+                {new Date().toLocaleDateString(t('dashboard.locale', 'es-AR'), { day: 'numeric', month: 'long' })}
+              </span>
+            </div>
+            <ul className="dash-brief__list">
+              {briefLines.map((line) => (
+                <li key={line} className="dash-brief__line">{line}</li>
+              ))}
+            </ul>
+          </div>
+
+          {isEmptyState && (
+            <div className="dash-empty">
+              <p className="dash-empty__text">
+                {t('dashboard.emptyStateText', 'Todavía no hay nada registrado. Empezá por acá:')}
+              </p>
+              <div className="dash-empty__actions">
+                <button className="rpg-button" onClick={() => animatedNavigate('/quests')}>
+                  {t('dashboard.emptyCtaQuest', 'Creá tu primera misión')}
+                </button>
+                <button className="rpg-button" onClick={() => animatedNavigate('/nutrition')}>
+                  {t('dashboard.emptyCtaMeal', 'Registrá una comida')}
+                </button>
+                <button className="rpg-button" onClick={() => animatedNavigate('/finance')}>
+                  {t('dashboard.emptyCtaExpense', 'Anotá un gasto')}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div
             style={{
               marginTop: 12,
@@ -274,9 +350,9 @@ export default function Dashboard() {
               color: 'var(--ink-soft)',
             }}
           >
-            {'\u00ab'} {epigraph.quote} {'\u00bb'}
+            {'«'} {epigraph.quote} {'»'}
             <span style={{ display: 'block', textAlign: 'right', marginTop: 2, fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>
-              {'\u2014'} {epigraph.author}
+              {'—'} {epigraph.author}
             </span>
           </div>
         </div>
@@ -310,6 +386,13 @@ export default function Dashboard() {
       <QBDividerSection />
 
       {/* ── row 3: customizable module grid ────────────── */}
+      {isCustomLayout && (
+        <div className="dashboard-grid-toolbar">
+          <button className="rpg-btn-sm" onClick={resetLayout}>
+            {t('dashboard.restoreLayout', 'Restaurar disposición')}
+          </button>
+        </div>
+      )}
       <div className="dashboard-grid-4">
         {layout.widgets.map((w, index) => {
           const def = WIDGET_DEFINITIONS[w.id];
@@ -326,6 +409,7 @@ export default function Dashboard() {
               isDropTarget={dropTargetIndex === index}
               onCycleColSpan={cycleColSpan}
               onCycleRowSpan={cycleRowSpan}
+              onMove={onWidgetMove}
               dragHandlers={{
                 onDragStart: onDragStart(index),
                 onDragOver: onDragOver(index),
@@ -387,7 +471,7 @@ export default function Dashboard() {
                       +{Math.round(ev.xpGained)} xp
                     </span>
                     <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>
-                      {formatEventTime(ev.createdAt)}
+                      {formatEventTime(ev.createdAt, t)}
                     </span>
                   </li>
                 );

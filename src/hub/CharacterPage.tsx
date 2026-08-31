@@ -31,28 +31,13 @@ import Tooltip from '../shared/components/Tooltip';
 import HelpBubble from '../shared/components/HelpBubble';
 import Loading from '../shared/components/Loading';
 import Character from './Character';
-import { xpThreshold, getTitle, getTitleKey } from '../../shared/rpg-engine';
+import { xpThreshold, getTitleKey } from '../../shared/rpg-engine';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import type { PlayerStats, RpgEventRecord } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import './styles/character.css';
 
 /* ── helpers ─────────────────────────────────────── */
-
-function toRoman(n: number): string {
-  if (n <= 0 || n > 3999) return String(n);
-  const vals = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
-  const syms = ['M', 'CM', 'D', 'CD', 'C', 'XC', 'L', 'XL', 'X', 'IX', 'V', 'IV', 'I'];
-  let result = '';
-  let remaining = n;
-  for (let i = 0; i < vals.length; i++) {
-    while (remaining >= vals[i]) {
-      result += syms[i];
-      remaining -= vals[i];
-    }
-  }
-  return result;
-}
 
 function formatNumber(n: number, locale = 'es-ES'): string {
   return n.toLocaleString(locale);
@@ -138,6 +123,18 @@ export default function CharacterPage() {
     return () => window.removeEventListener('account:switched', handler);
   }, [load]);
 
+  // ── Hooks MUST run on every render ──────────────────────────
+  // These used to sit below the `!stats` early return, so the first render
+  // (stats === null) ran four fewer hooks than the second one and React threw
+  // "Rendered more hooks than during the previous render" — which the app-wide
+  // ErrorBoundary turned into a full-shell crash.
+  const level = stats?.level ?? 1;
+  const titleTrail = useMemo(() => buildTitleTrail(level, t), [level, t]);
+  const virtues = useMemo(() => (stats ? deriveVirtues(stats, t) : []), [stats, t]);
+  const xpForCurrent = useMemo(() => xpThreshold(level), [level]);
+  const xpForNext = useMemo(() => xpThreshold(level + 1), [level]);
+  const nextTitle = useMemo(() => titleTrail.find((entry) => !entry.done), [titleTrail]);
+
   if (loadError) return (
     <div style={{ padding: 24, textAlign: 'center' }}>
       <p style={{ marginBottom: 12, color: 'var(--rubric)' }}>{t('common.somethingWentWrong')}</p>
@@ -150,15 +147,13 @@ export default function CharacterPage() {
   const translatedTitle = t(getTitleKey(stats.level), stats.title);
   const playerName = characterName || authUser?.displayName || translatedTitle;
   const levelDisplay = stats.level;
-  const titleTrail = useMemo(() => buildTitleTrail(stats.level, t), [stats.level, t]);
-  const virtues = useMemo(() => deriveVirtues(stats, t), [stats, t]);
   const xpNeeded = stats.xpToNextLevel;
   const xpTotal = stats.xp;
-  const xpForNext = useMemo(() => xpThreshold(stats.level + 1), [stats.level]);
-  const xpPct = xpForNext > 0 ? Math.round((xpTotal / xpForNext) * 100) : 0;
-
-  // Find next title info
-  const nextTitle = useMemo(() => titleTrail.find((t) => !t.done), [titleTrail]);
+  // Same formula as the sidebar bar (progress WITHIN the level), so the two
+  // never disagree on the same data.
+  const xpPct = xpForNext > xpForCurrent
+    ? Math.max(0, Math.min(100, Math.round(((xpTotal - xpForCurrent) / (xpForNext - xpForCurrent)) * 100)))
+    : 100;
 
   return (
     <BookPage
@@ -172,7 +167,7 @@ export default function CharacterPage() {
         <div>
           {/* Portrait frame */}
           <div className="hero-portrait-frame">
-            <div className="hero-portrait-banner">
+            <div className="hero-portrait-banner" title={playerName}>
               <Banner>{playerName.toUpperCase()}</Banner>
             </div>
             <Character size={160} canCustomize />
@@ -250,7 +245,7 @@ export default function CharacterPage() {
           <div className="hero-bars">
             <div>
               <div className="hero-bar-header">
-                <span className="qb-small-caps" style={{ color: 'var(--rubric)' }}>VITA</span>
+                <span className="qb-small-caps" style={{ color: 'var(--rubric)' }}>{t('rpg.vita', 'VITA')}</span>
                 <span className="qb-numeral" style={{ fontSize: 'var(--fs-label)' }}>{stats.hp} / {stats.maxHp}</span>
               </div>
               <Gauge value={stats.hp} max={stats.maxHp} tone="rubric" />
@@ -363,7 +358,7 @@ export default function CharacterPage() {
                   return (
                     <div key={event.id} className="hero-chronicle-row">
                       <span className="hero-chronicle-icon"><IconComp width={12} height={12} /></span>
-                      <span className="hero-chronicle-text">{displayLabel}</span>
+                      <span className="hero-chronicle-text" title={displayLabel}>{displayLabel}</span>
                       <span className="qb-numeral hero-chronicle-xp">{xpText}</span>
                     </div>
                   );

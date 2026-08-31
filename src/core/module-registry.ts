@@ -1,6 +1,20 @@
 import type { ComponentType } from 'react';
 import type { Migration } from '../../shared/types';
 
+/**
+ * Type-only module contract.
+ *
+ * NOTE: the runtime `ModuleRegistry` class that used to live here was removed —
+ * it was never wired up. Nothing dispatches through a registry today:
+ *   - migrations run directly from `electron/main.ts`
+ *   - dashboard widgets are imported directly by `src/hub/widgets/widget-registry.ts`
+ *   - routes are hardcoded in `src/App.tsx` JSX
+ *
+ * The interface stays because `src/modules/{quests,nutrition,finance,cauldron}/index.ts`
+ * still use it to shape their `*Module` export. If those exports are ever removed
+ * (they are currently imported but unused in `App.tsx`), this file can go too.
+ */
+
 export interface RouteDefinition {
   path: string;
   component: ComponentType;
@@ -18,40 +32,4 @@ export interface ModuleDefinition {
   rpgEventHandlers: Record<string, RpgEventHandler>;
   onInit?: () => Promise<void>;
   onDestroy?: () => Promise<void>;
-}
-
-export class ModuleRegistry {
-  private modules = new Map<string, ModuleDefinition>();
-
-  register(module: ModuleDefinition): void {
-    if (this.modules.has(module.id)) {
-      throw new Error(`Module "${module.id}" already registered`);
-    }
-    this.modules.set(module.id, module);
-  }
-
-  get(id: string): ModuleDefinition | undefined {
-    return this.modules.get(id);
-  }
-
-  getAll(): ModuleDefinition[] {
-    return Array.from(this.modules.values());
-  }
-
-  getAllRoutes(): RouteDefinition[] {
-    return this.getAll().flatMap((m) => m.routes);
-  }
-
-  getAllMigrations(): Migration[] {
-    return this.getAll().flatMap((m) => m.migrations);
-  }
-
-  getEventHandler(eventType: string): { moduleId: string; handler: RpgEventHandler } | undefined {
-    for (const mod of this.modules.values()) {
-      if (eventType in mod.rpgEventHandlers) {
-        return { moduleId: mod.id, handler: mod.rpgEventHandlers[eventType] };
-      }
-    }
-    return undefined;
-  }
 }

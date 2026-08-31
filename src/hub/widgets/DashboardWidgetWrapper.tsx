@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModuleCard } from '../../shared/components/codex';
 import { ResizeHorizontal, ResizeVertical } from '../../shared/components/icons/CodexIcons';
@@ -13,6 +13,8 @@ interface DashboardWidgetWrapperProps {
   isDropTarget: boolean;
   onCycleColSpan: (id: string) => void;
   onCycleRowSpan: (id: string) => void;
+  /** Keyboard reorder: Ctrl+ArrowUp / Ctrl+ArrowDown on the focused card. */
+  onMove?: (index: number, direction: -1 | 1) => void;
   dragHandlers: {
     onDragStart: (e: React.DragEvent) => void;
     onDragOver: (e: React.DragEvent) => void;
@@ -32,10 +34,12 @@ export default function DashboardWidgetWrapper({
   widgetId,
   colSpan,
   rowSpan,
+  index,
   isDragging,
   isDropTarget,
   onCycleColSpan,
   onCycleRowSpan,
+  onMove,
   dragHandlers,
   title,
   tome,
@@ -45,6 +49,10 @@ export default function DashboardWidgetWrapper({
   children,
 }: DashboardWidgetWrapperProps) {
   const { t } = useTranslation();
+  // `draggable` used to sit on the whole wrapper, so the card moved when you
+  // grabbed it anywhere — including over its own content — while only the
+  // header showed `cursor: grab`. Now only the explicit handle arms the drag.
+  const [dragArmed, setDragArmed] = useState(false);
 
   const className = [
     'widget-wrapper',
@@ -54,20 +62,44 @@ export default function DashboardWidgetWrapper({
     isDropTarget ? 'widget-drop-target' : '',
   ].filter(Boolean).join(' ');
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!onMove || !(e.ctrlKey || e.metaKey)) return;
+    if (e.key === 'ArrowUp') { e.preventDefault(); onMove(index, -1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); onMove(index, 1); }
+  };
+
   return (
     <div
       className={className}
-      draggable
+      draggable={dragArmed}
       onDragStart={dragHandlers.onDragStart}
       onDragOver={dragHandlers.onDragOver}
       onDragLeave={dragHandlers.onDragLeave}
       onDrop={dragHandlers.onDrop}
-      onDragEnd={dragHandlers.onDragEnd}
+      onDragEnd={() => { setDragArmed(false); dragHandlers.onDragEnd(); }}
     >
-      {/* Resize buttons */}
-      <div className="widget-resize-group">
+      {/* Controls — hidden until the card is hovered or something inside it has
+          focus, so the card no longer wears three stacked icons at all times. */}
+      <div className="widget-controls">
         <button
-          className="widget-resize-btn"
+          className="widget-drag-handle tap-target"
+          type="button"
+          onMouseDown={() => setDragArmed(true)}
+          onMouseUp={() => setDragArmed(false)}
+          onBlur={() => setDragArmed(false)}
+          onKeyDown={handleKeyDown}
+          title={t('dashboard.dragWidget', 'Arrastrá para reordenar (Ctrl+↑ / Ctrl+↓)')}
+          aria-label={t('dashboard.dragWidget', 'Arrastrá para reordenar (Ctrl+↑ / Ctrl+↓)')}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <circle cx="4" cy="2" r="1" /><circle cx="8" cy="2" r="1" />
+            <circle cx="4" cy="6" r="1" /><circle cx="8" cy="6" r="1" />
+            <circle cx="4" cy="10" r="1" /><circle cx="8" cy="10" r="1" />
+          </svg>
+        </button>
+        <button
+          className="widget-resize-btn tap-target"
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onCycleColSpan(widgetId);
@@ -78,7 +110,8 @@ export default function DashboardWidgetWrapper({
           <ResizeHorizontal width={14} height={14} />
         </button>
         <button
-          className="widget-resize-btn"
+          className="widget-resize-btn tap-target"
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onCycleRowSpan(widgetId);

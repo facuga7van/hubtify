@@ -48,18 +48,15 @@
   flex: 1;
 }
 
-/* ── Responsive breakpoints ─────────────────── */
+/* ── Responsive breakpoints ─────────────────────────────
+   These are VIEWPORT widths, but the grid only gets what is left after the
+   sidebar (260px expanded / 56px collapsed). The window itself cannot go below
+   700px (electron/main.ts minWidth), so a 600px CONTENT threshold — the point
+   where colSpan 2 and colSpan 4 stop differing in a 2-column grid — is roughly
+   876px of viewport. The old `@media (max-width: 600px)` block could therefore
+   never fire, and between 700 and 900px the width button did nothing at all. */
 
-@media (max-width: 900px) {
-  .dashboard-grid-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .widget-span-4 {
-    grid-column: span 2;
-  }
-}
-
-@media (max-width: 600px) {
+@media (max-width: 880px) {
   .dashboard-grid-4 {
     grid-template-columns: 1fr;
   }
@@ -69,6 +66,28 @@
   }
 }
 
+@media (min-width: 881px) and (max-width: 1080px) {
+  .dashboard-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* span-4 halves to the full 2-column row; span-2 drops to one column so the
+     two sizes stay visibly different. */
+  .widget-span-4 {
+    grid-column: span 2;
+  }
+  .widget-span-2 {
+    grid-column: span 1;
+  }
+}
+
+/* ── Grid toolbar ───────────────────────────── */
+
+.dashboard-grid-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 /* ── Widget Wrapper ─────────────────────────── */
 
 .widget-wrapper {
@@ -76,12 +95,27 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
-.widget-wrapper[draggable="true"] .qb-module-card-header {
-  cursor: grab;
+/* The card body is not clickable, so it must not rise on hover like a button. */
+.widget-wrapper .qb-module-card:hover {
+  transform: none;
 }
 
-.widget-wrapper[draggable="true"]:active .qb-module-card-header {
-  cursor: grabbing;
+/* The "go to module" arrow was a 14px glyph at opacity .35 in the corner — the
+   only actually-clickable affordance on the card. */
+.widget-wrapper .qb-module-card-nav {
+  opacity: 0.7;
+  color: var(--ink-soft);
+  padding: 2px;
+}
+
+.widget-wrapper .qb-module-card-nav svg {
+  width: 18px;
+  height: 18px;
+}
+
+.widget-wrapper .qb-module-card-nav:hover,
+.widget-wrapper .qb-module-card-nav:focus-visible {
+  opacity: 1;
 }
 
 /* ── Drag & Drop States ─────────────────────── */
@@ -98,37 +132,56 @@
   transform: translateY(-2px);
 }
 
-/* ── Resize Buttons ─────────────────────────── */
+/* ── Card controls (drag handle + resize) ───────────────
+   Two 18px resize buttons 2px apart used to sit permanently in the corner next
+   to the nav arrow: three icons stacked on top of each other, always. They now
+   appear on hover / keyboard focus. */
 
-.widget-resize-group {
+.widget-controls {
   position: absolute;
-  top: 8px;
-  right: 30px;
+  top: 4px;
+  right: 34px;
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
+.widget-wrapper:hover .widget-controls,
+.widget-wrapper:focus-within .widget-controls {
+  opacity: 1;
+}
+
+.widget-drag-handle,
 .widget-resize-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: none;
-  color: var(--ink-faded);
-  opacity: 0.9;
+  background: rgba(245, 231, 192, 0.75);
+  border: 1px solid rgba(74, 55, 32, 0.25);
+  color: var(--ink-soft);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
   line-height: 1;
-  transition: opacity 0.2s, color 0.2s, background 0.2s;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
 }
 
+.widget-drag-handle {
+  cursor: grab;
+}
+
+.widget-drag-handle:active {
+  cursor: grabbing;
+}
+
+.widget-drag-handle:hover,
 .widget-resize-btn:hover {
-  opacity: 1;
-  color: var(--gold);
-  background: rgba(168, 138, 60, 0.1);
+  color: var(--gold-dark);
+  border-color: var(--gold-dark);
+  background: rgba(245, 231, 192, 0.95);
 }
 
 /* ── Widget List Auto-Flow Grid ────────────── */
@@ -139,7 +192,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   align-content: start;
-  gap: 0 16px;
+  /* El gap de fila estaba en 0: las tareas quedaban pegadas una encima de otra
+     en dos columnas apretadas, con scroll interno. */
+  gap: 4px 16px;
   max-height: 155px;
   overflow-y: auto;
 }

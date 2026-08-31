@@ -56,6 +56,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
   const [loadingHair, setLoadingHair] = useState(true);
   const [pixiError, setPixiError] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [customizerBaseline, setCustomizerBaseline] = useState<CharacterData | null>(null);
   const [dbLoaded, setDbLoaded] = useState(false);
 
   // Keep ref in sync with state
@@ -246,20 +247,43 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
     }
   }, [charData, loadAllHair]);
 
-  const updateField = (field: keyof CharacterData, delta: number) => {
-    setCharData((prev) => {
-      const max = FIELD_MAX[field];
-      const raw = prev[field] + delta;
-      const wrapped = raw < 1 ? max : raw > max ? 1 : raw;
-      const next = { ...prev, [field]: wrapped };
-      window.api.characterSave(next).catch(() => {
-        toast({ message: t('character.saveFailed', 'No se pudo guardar el personaje'), type: 'warning' });
-      });
-      window.dispatchEvent(new CustomEvent('character:updated', { detail: next }));
-      charChannel.postMessage({ type: 'char-updated', charData: next });
-      return next;
+  const applyCharData = useCallback((next: CharacterData) => {
+    setCharData(next);
+    charDataRef.current = next;
+    window.api.characterSave({ ...next } as unknown as Record<string, unknown>).catch(() => {
+      toast({ message: t('character.saveFailed', 'No se pudo guardar el personaje'), type: 'warning' });
     });
+    window.dispatchEvent(new CustomEvent('character:updated', { detail: next }));
+    charChannel.postMessage({ type: 'char-updated', charData: next });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateField = (field: keyof CharacterData, delta: number) => {
+    const prev = charDataRef.current;
+    const max = FIELD_MAX[field];
+    const raw = prev[field] + delta;
+    const wrapped = raw < 1 ? max : raw > max ? 1 : raw;
+    applyCharData({ ...prev, [field]: wrapped });
   };
+
+  /** Every arrow click writes straight to the DB, so entering the customizer
+   *  snapshots the look you arrived with and "discard" puts it back. */
+  const openCustomizer = () => {
+    setCustomizerBaseline(charDataRef.current);
+    setShowCustomizer(true);
+  };
+
+  const discardCustomizations = () => {
+    if (customizerBaseline) applyCharData(customizerBaseline);
+    setShowCustomizer(false);
+  };
+
+  const hasCustomizerChanges = !!customizerBaseline && (
+    customizerBaseline.frontHairIndex !== charData.frontHairIndex ||
+    customizerBaseline.frontColorIndex !== charData.frontColorIndex ||
+    customizerBaseline.backHairIndex !== charData.backHairIndex ||
+    customizerBaseline.backColorIndex !== charData.backColorIndex
+  );
 
   return (
     <div>
@@ -297,10 +321,16 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
       {/* Customize button */}
       {canCustomize && (
         <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <button className="rpg-button" onClick={() => setShowCustomizer(!showCustomizer)}
+          <button className="rpg-button" onClick={() => (showCustomizer ? setShowCustomizer(false) : openCustomizer())}
             style={{ fontSize: 'var(--fs-label)', padding: '6px 16px' }}>
             {showCustomizer ? t('character.done') : t('character.customize')}
           </button>
+          {showCustomizer && (
+            <button className="rpg-button" onClick={discardCustomizations} disabled={!hasCustomizerChanges}
+              style={{ fontSize: 'var(--fs-label)', padding: '6px 16px', opacity: hasCustomizerChanges ? 1 : 0.45 }}>
+              {t('character.discardChanges', 'Descartar cambios')}
+            </button>
+          )}
           <HelpBubble variant="inline" text={t('character.customizerHelp', 'Personalizá tu avatar. Los cambios se guardan y sincronizan automáticamente.')} />
         </div>
       )}

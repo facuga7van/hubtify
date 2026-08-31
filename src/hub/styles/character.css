@@ -28,6 +28,18 @@
   transform: translateX(-50%);
   white-space: nowrap;
   z-index: 20;
+  /* A 30-char hero name used to render ~356px wide inside a 240px column and
+     spilled out of BOTH sides of the frame into the neighbouring column.
+     Keep the ribbon inside the frame and ellipsise instead. */
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+}
+
+.hero-portrait-banner .qb-banner {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── editable character name ──────────────────── */
@@ -72,7 +84,6 @@
   text-align: center;
   width: 100%;
   max-width: 200px;
-  outline: none;
 }
 
 .hero-name-input:focus {
@@ -318,20 +329,25 @@
 }
 
 /* ── marginalia note ─────────────────────────── */
+/* Was position:absolute; bottom:-58px — 58px BELOW its container, generating no
+   scroll of its own, so it was never on screen. Keep it in normal flow. */
 .hero-marginalia {
-  position: absolute;
-  left: 10px;
-  bottom: -58px;
+  margin-top: 24px;
+  padding-left: 10px;
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-faded);
   transform: rotate(1deg);
+  transform-origin: left center;
 }
 
 
-/* ── responsive: stack hero layout on small screens ── */
-@media (max-width: 768px) {
+/* ── responsive: stack hero layout on small screens ──
+   768px only ever matched the 700-768px sliver of the window's real range
+   (min 700px). The two-column layout runs out of room as soon as the content
+   column drops under ~560px, i.e. around 880px of viewport. */
+@media (max-width: 880px) {
   .hero-layout {
     grid-template-columns: 1fr;
   }

@@ -7,6 +7,8 @@ import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import { getTitleKey } from '../../shared/rpg-engine';
 import NotificationBell from '../shared/components/NotificationBell';
+import { useConfirm } from '../shared/components/ConfirmDialog';
+import { useToast } from '../shared/components/useToast';
 
 interface PlayerCardProps {
   stats: PlayerStats | null;
@@ -16,6 +18,8 @@ interface PlayerCardProps {
 
 export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCardProps) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
+  const { toast } = useToast();
   const { user: authUser, logout, switching, switchAccount, getCachedAccounts } = useAuthContext();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const nameRef = useRef<HTMLButtonElement>(null);
@@ -50,11 +54,43 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
     return () => window.removeEventListener('notifications:settingsChanged', handler);
   }, []);
 
+  /**
+   * `logout()` refuses to wipe the local database when the pre-logout sync push
+   * failed (offline / Firestore down) and answers `{ pushFailed: true }` having
+   * changed nothing. Without this handler, signing out offline did absolutely
+   * nothing and said nothing.
+   */
+  const handleLogout = async () => {
+    const result = await logout();
+    if (result?.pushFailed) {
+      const ok = await confirm({
+        title: t('auth.logoutPushFailedTitle', 'No pudimos guardar en la nube'),
+        message: t('auth.logoutPushFailed', 'No pudimos guardar tus cambios en la nube. ¿Salir igual y perderlos?'),
+        confirmText: t('auth.logoutAnyway', 'Salir igual'),
+        danger: true,
+      });
+      if (ok) await logout(true);
+    }
+  };
+
+  const handleSwitchAccount = async (appName: string) => {
+    const result = await switchAccount(appName) as
+      { success: boolean; expired?: boolean; pushFailed?: boolean } | undefined;
+    if (result?.pushFailed) {
+      // Nothing was cleared — the account switch was aborted, not half-done.
+      toast({ message: t('auth.switchPushFailed', 'No pudimos guardar tus cambios en la nube. No cambiamos de cuenta para no perderlos.'), type: 'warning' });
+    }
+    return result;
+  };
+
   if (!stats) {
     return <Loading />;
   }
 
   const translatedTitle = t(getTitleKey(stats.level), stats.title);
+
+  const displayName = characterName || authUser?.displayName || authUser?.email?.split('@')[0] || translatedTitle;
+  const eyebrow = `${t('common.levelPrefix')}${stats.level} · ${translatedTitle}`;
 
   return (
     <div className={`player-card ${collapsed ? 'player-card--collapsed' : ''}`} style={{ position: 'relative' }}>
@@ -71,42 +107,63 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
 
         {/* Identity text — fades in on expand */}
         <div className="player-card__ident">
-          <div className="player-card__eyebrow">
-            {t('common.levelPrefix')}{stats.level} · {translatedTitle}
+          <div className="player-card__eyebrow" title={eyebrow}>
+            {eyebrow}
           </div>
-          <div className="player-card__name-row">
-            {notifInApp && onBellClick && (
-              <div className="player-card__bell">
-                <NotificationBell onClick={onBellClick} />
-              </div>
-            )}
-            <button
-              ref={nameRef}
-              className="player-card__name player-card__name--clickable"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              aria-expanded={dropdownOpen}
-              aria-haspopup="true"
+          <div className="player-card__name" title={displayName}>
+            {displayName}
+          </div>
+          {authUser?.email && (
+            // Two accounts with the same hero name were indistinguishable
+            // without opening the dropdown.
+            <div className="player-card__email" title={authUser.email}>
+              {authUser.email}
+            </div>
+          )}
+        </div>
+
+        {/* Bell + account menu live OUTSIDE __ident on purpose: __ident collapses
+            to width:0 and they used to disappear with it, so collapsing the
+            sidebar silently removed notifications and account switching. */}
+        <div className="player-card__actions">
+          {notifInApp && onBellClick && (
+            <div className="player-card__bell">
+              <NotificationBell onClick={onBellClick} />
+            </div>
+          )}
+          <button
+            ref={nameRef}
+            className="player-card__account-btn tap-target"
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            aria-expanded={dropdownOpen}
+            aria-haspopup="true"
+            aria-label={t('account.menu', 'Menú de cuenta')}
+            title={authUser?.email || displayName}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="8" cy="5.5" r="2.75" />
+              <path d="M2.75 13.5c0-2.35 2.35-3.85 5.25-3.85s5.25 1.5 5.25 3.85" />
+            </svg>
+            <svg
+              className="player-card__account-caret"
+              width="9" height="9" viewBox="0 0 10 10" fill="none"
+              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              aria-hidden="true"
+              style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
             >
-              {characterName || authUser?.displayName || authUser?.email?.split('@')[0] || translatedTitle}
-              <svg
-                width="10" height="10" viewBox="0 0 10 10" fill="none"
-                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                style={{ marginLeft: 4, transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              >
-                <path d="M3 4l2 2 2-2"/>
-              </svg>
-            </button>
-            {dropdownOpen && authUser && !switching && (
-              <AccountDropdown
-                activeUser={authUser}
-                cachedAccounts={getCachedAccounts()}
-                onSwitch={switchAccount}
-                onLogout={logout}
-                onClose={() => setDropdownOpen(false)}
-                anchorRef={nameRef}
-              />
-            )}
-          </div>
+              <path d="M3 4l2 2 2-2"/>
+            </svg>
+          </button>
+          {dropdownOpen && authUser && !switching && (
+            <AccountDropdown
+              activeUser={authUser}
+              cachedAccounts={getCachedAccounts()}
+              onSwitch={handleSwitchAccount}
+              onLogout={handleLogout}
+              onClose={() => setDropdownOpen(false)}
+              anchorRef={nameRef}
+            />
+          )}
         </div>
       </div>
 

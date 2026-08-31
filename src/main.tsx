@@ -14,7 +14,11 @@ const isFloatingTimer = new URLSearchParams(window.location.search).get('view') 
 
 if (isFloatingTimer) {
   import('./modules/cauldron/components/CauldronFloatingWindow').then(({ default: CauldronFloatingWindow }) => {
-    createRoot(root).render(<CauldronFloatingWindow />);
+    createRoot(root).render(
+      <ConfirmProvider>
+        <CauldronFloatingWindow />
+      </ConfirmProvider>
+    );
   });
 } else {
   createRoot(root).render(
