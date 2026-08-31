@@ -1,4 +1,5 @@
 import type { Migration } from '../../../shared/types';
+import { sqlNormalizeExpr } from './normalize';
 
 export const nutritionMigrations: Migration[] = [
   {
@@ -261,6 +262,82 @@ export const nutritionMigrations: Migration[] = [
            AND json_extract(meal_schedule, '$.dinner.startHour') = 18
            AND json_extract(meal_schedule, '$.dinner.endHour') = 22
          );
+    `,
+  },
+  {
+    namespace: 'nutrition',
+    version: 12,
+    up: `
+      -- ── description_norm: the history IS the database ────────────────────────
+      -- Phase 2 answers "what did you eat?" from your own log instead of from
+      -- Gemini, which means grouping by a normalised description ("Milanesa con
+      -- Puré" == "milanesa con pure") and searching it on every keystroke. Both
+      -- need an indexed column.
+      --
+      -- GENERATED ... VIRTUAL, not a plain column, for one decisive reason:
+      -- NOTHING has to maintain it. food_log and favorite_foods are written by
+      -- the IPC handlers, by copyDay, AND by sync.ipc.ts's merge — which inserts
+      -- with an explicit column list this migration must not have to edit. A
+      -- plain column would arrive NULL on every synced row and the autocomplete
+      -- would go blind on exactly the meals that came from the user's phone.
+      -- SQLite computes a generated column for every writer, forever.
+      --
+      -- VIRTUAL rather than STORED because ALTER TABLE ADD COLUMN cannot add a
+      -- STORED generated column. It costs nothing here: the INDEX below persists
+      -- the computed value, so lookups read the index, never the expression.
+      --
+      -- The expression is emitted by sqlNormalizeExpr() from the same fold table
+      -- normalizeDescription() uses in JS — see normalize.ts for why that parity
+      -- is load-bearing.
+      ALTER TABLE food_log
+        ADD COLUMN description_norm TEXT
+        GENERATED ALWAYS AS (${sqlNormalizeExpr('description')}) VIRTUAL;
+
+      ALTER TABLE favorite_foods
+        ADD COLUMN description_norm TEXT
+        GENERATED ALWAYS AS (${sqlNormalizeExpr('description')}) VIRTUAL;
+
+      -- deleted_at FIRST, description_norm second — the order the search
+      -- actually uses it: an equality on the tombstone (every query filters
+      -- \`deleted_at IS NULL\`) followed by a range on the description. Put the
+      -- description first and the planner prefers idx_food_log_live_date, which
+      -- can at least seek the tombstone, and the prefix search degrades to a
+      -- scan.
+      --
+      -- With this order a prefix search compiles to a SEEK ("mila" <= x <
+      -- "milb"). A contains search still has to walk, but it walks the index —
+      -- a few bytes per description — not every food_log row and its breakdown.
+      CREATE INDEX IF NOT EXISTS idx_food_log_desc_norm
+        ON food_log(deleted_at, description_norm);
+      CREATE INDEX IF NOT EXISTS idx_favorite_foods_desc_norm
+        ON favorite_foods(deleted_at, description_norm);
+
+      -- ── nutrition_ai_cache: the AI does not repeat work ──────────────────────
+      -- Keyed by the SAME description_norm. Second time you type "milanesa con
+      -- puré" there is no network call, no spinner and no cost.
+      --
+      -- LOCAL-ONLY ON PURPOSE — deliberately absent from USER_DATA_TABLES and
+      -- from sync:getAll/mergeNutritionData. This is a network cache, not user
+      -- data: every row is reconstructible for free by asking the model again,
+      -- it holds nothing the user typed that is not already in food_log, and
+      -- syncing it would push a per-device performance artefact through
+      -- Firestore on every pull for zero user-visible gain. Losing it costs one
+      -- API call. The rows the user actually owns (the meals) are in food_log,
+      -- which IS synced.
+      --
+      -- protein_g is plumbing: the estimate Cloud Function returns only calories
+      -- and items today, so it stays NULL until the function grows macros. It is
+      -- here now because adding a column later to a PK-keyed cache is free but
+      -- re-deriving a schema decision is not.
+      CREATE TABLE IF NOT EXISTS nutrition_ai_cache (
+        description_norm TEXT PRIMARY KEY,
+        calories INTEGER NOT NULL,
+        ai_breakdown TEXT,
+        protein_g REAL,
+        hits INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT
+      );
     `,
   },
 ];

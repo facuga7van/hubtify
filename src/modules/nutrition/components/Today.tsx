@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
@@ -9,7 +9,7 @@ import NutritionOnboarding from './NutritionOnboarding';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import Checkbox from '../../../shared/components/Checkbox';
-import { estimateNutrition } from '../estimate-service';
+import { resolveEstimate } from '../estimate-with-cache';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
@@ -17,6 +17,11 @@ import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, Cr
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
+import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { useFoodSuggestions } from '../useFoodSuggestions';
+import { cacheEstimate } from '../history-api';
+import FoodSuggestionList from './FoodSuggestionList';
+import type { HistorySuggestion } from '../history-search';
 import type { TFunction } from 'i18next';
 import type { NutritionProfile } from '../types';
 
@@ -128,6 +133,10 @@ export default function Today() {
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState('');
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
+  // True when the estimate on screen came out of the local cache instead of the
+  // Cloud Function — the UI says so, because "instant" and "the AI thought about
+  // it" are different claims and the user deserves to know which one they got.
+  const [estimationCached, setEstimationCached] = useState(false);
   const [editCalories, setEditCalories] = useState('');
   const [favoriteFoods, setFavoriteFoods] = useState<FavoriteFood[]>([]);
   // Favourites are the fastest path to "log my usual lunch" — open by default,
@@ -150,6 +159,22 @@ export default function Today() {
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>(DEFAULT_MEAL_SCHEDULE);
   const { toast } = useToast();
   const confirm = useConfirm();
+
+  // ── History autocomplete ─────────────────────────
+  // The fast lane: with a few weeks of log behind you, most meals are already in
+  // there, and picking one skips the model entirely — no wait, no cost, works
+  // offline. Only the AI-mode input offers it; Manual already asks for a number.
+  const suggest = useFoodSuggestions(foodInput, !dayClosed && !manualMode);
+  const { anchorRef: suggestAnchorRef, popupRef: suggestPopupRef, pos: suggestPos } =
+    useAnchoredPopup<HTMLDivElement, HTMLDivElement>(suggest.open, 2);
+  const [suggestWidth, setSuggestWidth] = useState(0);
+
+  // Match the dropdown to the input row so the two read as one control.
+  useLayoutEffect(() => {
+    if (!suggest.open) return;
+    const el = suggestAnchorRef.current;
+    if (el) setSuggestWidth(el.getBoundingClientRect().width);
+  }, [suggest.open, suggest.suggestions.length, suggestAnchorRef]);
 
   const loadData = useCallback(async (d: string) => {
     const [foodList, sum, met, prof, tgt, closedDay, favorites, schedule] = await Promise.all([
@@ -243,15 +268,23 @@ export default function Today() {
   };
 
   // ── Unified estimation flow ──────────────────────
-  const handleEstimate = async () => {
+  /**
+   * @param skipCache `true` only for an explicit "estimate again" — the point of
+   *   that button is to get a FRESH opinion, so it goes past the cache and then
+   *   refreshes it.
+   */
+  const handleEstimate = async (skipCache = false) => {
     if (!foodInput.trim() || estimating) return;
+    const description = foodInput.trim();
     setEstimating(true);
     setEstimation(null);
     setEstimateError('');
     try {
-      const result = await estimateNutrition(foodInput.trim());
-      setEstimation({ totalCalories: result.calories, items: result.items });
-      setEditCalories(String(result.calories));
+      // The model does not get asked twice for the same plate of food.
+      const result = await resolveEstimate(description, { skipCache });
+      setEstimation({ totalCalories: result.totalCalories, items: result.items });
+      setEditCalories(String(result.totalCalories));
+      setEstimationCached(result.origin === 'cache');
     } catch (err) {
       // One signal only: an inline message the user can act on. No toast on top of
       // it, and no silent jump to Manual mode — the user decides.
@@ -270,15 +303,30 @@ export default function Today() {
       return;
     }
 
+    const description = foodInput.trim();
+    // Did the human overrule the machine? That decides what the cache keeps.
+    const corrected = calories !== estimation.totalCalories;
+
     try {
       const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
       await window.api.nutritionLogFood({
         date,
-        description: foodInput.trim(),
+        description,
         calories,
         source: 'ai_estimate',
         aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
+      });
+
+      // Confirmation is the only moment we know the number is good enough for
+      // the user, so it is the only moment worth remembering. A corrected value
+      // overwrites the model's — a human who typed 700 over 980 is the better
+      // source, and the breakdown is dropped with it since it no longer adds up.
+      await cacheEstimate({
+        description,
+        calories,
+        aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : null,
+        corrected,
       });
 
       await window.api.processRpgEvent({
@@ -289,6 +337,7 @@ export default function Today() {
       toast({ type: 'nutri', message: `+${calories} kcal` });
       setFoodInput('');
       setEstimation(null);
+      setEstimationCached(false);
       setEditCalories('');
       const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
@@ -366,6 +415,57 @@ export default function Today() {
 
   /** What clicking this pill would log: a staged chip wins, else the pill's own. */
   const portionFor = (id: string): number => nextPortion ?? pillPortions[id] ?? 1;
+
+  /**
+   * Logs a history suggestion as-is — the whole point of phase 2.
+   *
+   * No estimate call, no confirmation step, no network: the calories are the
+   * ones this meal already had the last time it was logged. It still pays the
+   * usual MEAL_LOGGED XP, because the user recorded a meal; the reward is for
+   * keeping the log honest, not for waiting on a model.
+   */
+  const handleLogSuggestion = async (s: HistorySuggestion) => {
+    // The portion chips from phase 1 stage a multiplier for the next thing
+    // logged — a suggestion counts as "the next thing".
+    const portion = nextPortion ?? 1;
+    const calories = Math.round(s.calories * portion);
+    const description = portion === 1 ? s.description : `${s.description} (×${portion})`;
+    try {
+      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
+      await window.api.nutritionLogFood({
+        date,
+        description,
+        calories,
+        // 'history' is mapped to the existing 'frequent' source by the handler;
+        // see normalizeFoodSource in nutrition.ipc.ts.
+        source: s.source === 'favorite' ? 'favorite' : 'history',
+        meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
+      });
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+      });
+      toast({ type: 'nutri', message: `+${calories} kcal` });
+      setFoodInput('');
+      setNextPortion(null);
+      setEstimation(null);
+      setEstimationCached(false);
+      setEstimateError('');
+      suggest.close();
+      const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+      if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
+      loadData(date);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch (err) {
+      console.error('[Nutrition] logSuggestion error:', err);
+      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+    }
+  };
+
+  /** Tab on a suggestion: take the text, leave the logging — they want to edit it. */
+  const handleCompleteSuggestion = (s: HistorySuggestion) => {
+    setFoodInput(s.description);
+  };
 
   const handleLogFavorite = async (food: FavoriteFood) => {
     // Portion chips scale the saved calories, so "half a milanesa" is one click.
@@ -549,6 +649,12 @@ export default function Today() {
       }
       setCloseResult(null);
       setDayClosed(null);
+      // Record-only (xp 0): feeds the 'second_chance' achievement. Reopening is
+      // an honest correction, never a rewarded or punished act.
+      await window.api.processRpgEvent({
+        type: 'NUTRITION_DAY_REOPENED', moduleId: 'nutrition',
+        payload: { xp: 0, hp: 0, date }, timestamp: Date.now(),
+      });
       toast({
         type: 'info',
         message: result.eventFound
@@ -922,20 +1028,46 @@ export default function Today() {
             </div>
           ) : (
             <>
-              <div className="nutri-food-input-row">
+              <div className="nutri-food-input-row" ref={suggestAnchorRef}>
                 <input
                   type="text"
                   placeholder={t('nutrify.foodInputPlaceholder', '¿Qué comiste? ej: milanesa con papas fritas')}
                   value={foodInput}
                   onChange={(e) => setFoodInput(e.target.value)}
                   className="nutri-text-input"
-                  onKeyDown={(e) => e.key === 'Enter' && !estimating && handleEstimate()}
+                  role="combobox"
+                  aria-expanded={suggest.open}
+                  aria-autocomplete="list"
+                  aria-controls="nutri-suggest-popup"
+                  onFocus={() => suggest.setFocused(true)}
+                  onBlur={() => suggest.setFocused(false)}
+                  onKeyDown={(e) => suggest.handleKeyDown(e, {
+                    onChoose: handleLogSuggestion,
+                    onComplete: handleCompleteSuggestion,
+                    // Enter with nothing highlighted keeps meaning what it always
+                    // meant. The list never steals the key by preselecting a row.
+                    onSubmit: () => { if (!estimating) handleEstimate(); },
+                  })}
                 />
-                <button className="nutri-btn" onClick={handleEstimate}
+                <button className="nutri-btn" onClick={() => handleEstimate()}
                   disabled={estimating || !foodInput.trim()}>
                   {estimating ? t('common.loading', 'Cargando...') : t('nutrify.estimate', 'Estimar')}
                 </button>
               </div>
+
+              {suggest.open && (
+                <FoodSuggestionList
+                  suggestions={suggest.suggestions}
+                  activeIndex={suggest.activeIndex}
+                  mode={suggest.mode}
+                  portion={nextPortion ?? 1}
+                  onHover={suggest.setActiveIndex}
+                  onChoose={handleLogSuggestion}
+                  popupRef={suggestPopupRef}
+                  pos={suggestPos}
+                  width={suggestWidth}
+                />
+              )}
 
               {/* Error message */}
               {estimateError && (
@@ -945,6 +1077,14 @@ export default function Today() {
               {/* Estimation result */}
               {estimation && (
                 <div className="nutri-estimation">
+                  {estimationCached && (
+                    // A pergamino, not the AI sparkles: this number came out of
+                    // your own confirmed history, not out of a model just now.
+                    <div className="nutri-est-cached" title={t('nutrify.historyCachedHint', 'Ya habías registrado esto: reusamos el valor que confirmaste, sin llamar a la IA.')}>
+                      <Scroll width={12} height={12} />
+                      {t('nutrify.historyCached', 'Al instante')}
+                    </div>
+                  )}
                   {estimation.items.length > 0 && (
                     <div className="nutri-est-items">
                       {estimation.items.map((item, i) => (
@@ -979,7 +1119,14 @@ export default function Today() {
                     )}>
                       <Heart width={14} height={14} /> {t('nutrify.saveToFavorites', 'Guardar en favoritos')}
                     </button>
-                    <button className="nutri-btn nutri-btn-ghost" onClick={() => { setEstimation(null); setEditCalories(''); }}>
+                    {estimationCached && (
+                      // Escape hatch from the cache: the same "re-estimate" the
+                      // food log offers, skipping the stored value and refreshing it.
+                      <button className="nutri-btn nutri-btn-ghost" onClick={() => handleEstimate(true)} disabled={estimating}>
+                        {t('nutrify.reEstimate', 'Re-estimar con IA')}
+                      </button>
+                    )}
+                    <button className="nutri-btn nutri-btn-ghost" onClick={() => { setEstimation(null); setEstimationCached(false); setEditCalories(''); }}>
                       {t('common.cancel', 'Cancelar')}
                     </button>
                   </div>

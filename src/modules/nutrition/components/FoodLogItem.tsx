@@ -6,6 +6,7 @@ import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart, Chalice } from '.
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
 import { estimateNutrition } from '../estimate-service';
+import { cacheEstimate } from '../history-api';
 
 interface BreakdownItem {
   name: string;
@@ -103,10 +104,25 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
   const handleSave = () => {
     const newCals = parseInt(editCals);
     if (isNaN(newCals) || newCals <= 0) return;
-    onUpdate(entry.id, { description: editDesc.trim() || entry.description, calories: newCals });
+    const desc = editDesc.trim() || entry.description;
+    onUpdate(entry.id, { description: desc, calories: newCals });
+    // A hand-typed correction is the best number this description will ever
+    // have — better than the estimate it replaces — so the cache takes it
+    // instead of being invalidated. The AI breakdown goes, since it no longer
+    // sums to the total the user just chose.
+    if (newCals !== entry.calories || desc !== entry.description) {
+      cacheEstimate({ description: desc, calories: newCals, corrected: true });
+    }
     setEditing(false);
   };
 
+  /**
+   * Deliberately goes STRAIGHT to the model, past the estimate cache — asking
+   * again is the entire purpose of the button, and answering it from the cache
+   * would return the very number the user is rejecting. The fresh answer then
+   * REFRESHES the cache, so the next person to type this description gets the
+   * corrected value instantly instead of the stale one.
+   */
   const handleReEstimate = async () => {
     const desc = editDesc.trim();
     if (!desc) return;
@@ -119,6 +135,11 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
         calories: result.calories,
         aiBreakdown: JSON.stringify(result.items),
         source: 'ai_estimate',
+      });
+      await cacheEstimate({
+        description: desc,
+        calories: result.calories,
+        aiBreakdown: JSON.stringify(result.items),
       });
       setEditing(false);
     } catch {

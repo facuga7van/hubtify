@@ -600,12 +600,115 @@
 }
 
 
+/* ── History suggestions (portalled under the food input) ── */
+
+.nutri-suggest-popup {
+  z-index: var(--z-dropdown-top);
+  min-width: 240px;
+  max-width: min(560px, 92vw);
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--parch-0, #f5e7c0);
+  border: 1.5px solid var(--gold-dark, #8a7030);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(42, 29, 14, 0.28);
+  padding: 4px 0;
+}
+
+.nutri-suggest-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px dashed var(--ink-faded);
+  font-family: 'Cinzel', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-dark, #8a7030);
+}
+
+.nutri-suggest-opt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-quote);
+  color: var(--ink, #2a1d0e);
+}
+
+.nutri-suggest-opt.active,
+.nutri-suggest-opt:hover {
+  background: var(--parch-1, #e8d5a3);
+}
+
+/* The highlighted row is what Enter will log — say so with more than a tint. */
+.nutri-suggest-opt.active {
+  box-shadow: inset 3px 0 0 var(--gold-dark, #8a7030);
+}
+
+.nutri-suggest-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nutri-suggest-meta {
+  flex-shrink: 0;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  white-space: nowrap;
+}
+
+.nutri-suggest-portion {
+  margin-left: 6px;
+  color: var(--gold-dark, #8a7030);
+  font-weight: 600;
+}
+
+.nutri-suggest-hint {
+  padding: 5px 12px 3px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--ink-faded);
+  font-size: var(--fs-label);
+  font-style: italic;
+  color: var(--ink-faded);
+}
+
+
 /* ── Estimation result ── */
 
 .nutri-estimation {
   margin-top: 12px;
   padding: 10px 0 0;
   border-top: 1px dashed var(--ink-faded);
+}
+
+/* Cache hit badge — quieter than the AI sparkles on purpose. */
+.nutri-est-cached {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--gold-dark, #8a7030);
+  border-radius: 10px;
+  font-size: var(--fs-label);
+  letter-spacing: 0.04em;
+  color: var(--gold-dark, #8a7030);
+  background: rgba(168, 138, 60, 0.1);
 }
 
 .nutri-est-items {

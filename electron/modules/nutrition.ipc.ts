@@ -9,9 +9,50 @@ import {
 } from '../../shared/meal-utils';
 import type { MealSchedule, StreakDay } from '../../shared/meal-utils';
 import { getLevel, getTitle, clampHp } from '../../shared/rpg-engine';
+import { normalizeDescription } from '../../src/modules/nutrition/normalize';
+import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
+import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
 
 function genId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * `food_log.source` is guarded by a CHECK that allows exactly
+ * ai_estimate | frequent | manual | favorite.
+ *
+ * Phase 2 introduces a fifth CONCEPT — "picked straight out of your history, no
+ * AI call" — and deliberately does NOT add a fifth VALUE. Rebuilding food_log to
+ * widen a CHECK means dropping and recreating the highest-value table in the app
+ * along with its sync_id unique index, its soft-delete tombstones and now a
+ * generated column, and v8 already showed how much ceremony that costs. The
+ * risk buys nothing, because 'frequent' ALREADY means exactly this: reused,
+ * not re-estimated. `nutrition:copyDay` has been mapping ai_estimate -> frequent
+ * on the same reasoning since phase 1.
+ *
+ * So 'history' is accepted at the API boundary — the renderer, Syl and mobile
+ * can all speak it — and mapped here. Old rows keep the values they always had;
+ * the CHECK never changes.
+ */
+export function normalizeFoodSource(source: string | undefined | null): string {
+  if (source === 'history') return 'frequent';
+  return source ?? 'manual';
+}
+
+/**
+ * Upper bound of the "starts with `prefix`" range.
+ *
+ * SQLite compares TEXT by UTF-8 bytes, so `prefix <= x < prefix + U+10FFFF` is
+ * every string beginning with `prefix` — and, unlike LIKE 'q%', it is a plain
+ * range the query planner will always turn into an index SEEK.
+ */
+function prefixUpperBound(prefix: string): string {
+  return prefix + String.fromCodePoint(0x10ffff);
+}
+
+/** Escapes LIKE metacharacters so a query of "50%" searches for a literal "50%". */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
 /**
@@ -152,7 +193,7 @@ export function registerNutritionIpcHandlers(): void {
       db.prepare(`
         INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, sync_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(date, time, entry.description, entry.calories, entry.source,
+      `).run(date, time, entry.description, entry.calories, normalizeFoodSource(entry.source),
         entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal, syncStamp(), genId());
       recalcSummary(db, date);
     })();
@@ -228,6 +269,199 @@ export function registerNutritionIpcHandlers(): void {
     })();
   });
 
+  // ── History autocomplete (the path that never calls the AI) ────────
+
+  /**
+   * Suggestions for the food input, drawn from the user's OWN history.
+   *
+   * With 30 days of log this is how most meals get recorded: type three letters,
+   * arrow down, Enter — no network, no model, no waiting, and it works on a
+   * plane. `food_log` and `favorite_foods` are unified on `description_norm`
+   * (migration v12's generated column) and ranked by frequency x recency; see
+   * history-search.ts for the formula and why the tiers exist.
+   *
+   * An empty query returns the top of the ranking, which is what the input shows
+   * on focus before a single keystroke.
+   */
+  ipcHandle('nutrition:searchHistory', (_e, query?: string, limit?: number) => {
+    const db = getDb();
+    const cap = Math.max(1, Math.min(50, limit ?? SEARCH_HISTORY_LIMIT));
+    const q = normalizeDescription(query ?? '');
+
+    // The window functions do the grouping in SQL: one row per DISTINCT
+    // normalised description, carrying the count, the most recent stamp, and —
+    // via rn = 1 — the calories of the LATEST log, because the user's most
+    // recent number for a meal is their best one.
+    const foodLogSql = (where: string) => `
+      SELECT norm, description, calories, timesLogged, lastLogged FROM (
+        SELECT description_norm AS norm, description, calories,
+               COUNT(*) OVER (PARTITION BY description_norm) AS timesLogged,
+               MAX(date || ' ' || time) OVER (PARTITION BY description_norm) AS lastLogged,
+               ROW_NUMBER() OVER (
+                 PARTITION BY description_norm ORDER BY date DESC, time DESC, id DESC
+               ) AS rn
+        FROM food_log
+        WHERE deleted_at IS NULL AND description_norm <> '' ${where}
+      ) WHERE rn = 1
+    `;
+    const favoritesSql = (where: string) => `
+      SELECT description_norm AS norm, description, calories, created_at AS createdAt
+      FROM favorite_foods
+      WHERE deleted_at IS NULL AND description_norm <> '' ${where}
+    `;
+
+    type FoodRow = { norm: string; description: string; calories: number; timesLogged: number; lastLogged: string };
+    type FavRow = { norm: string; description: string; calories: number; createdAt: string };
+
+    const byNorm = new Map<string, RankableSuggestion>();
+
+    /** Folds one batch of rows into the map; favourites win the calorie value. */
+    const collect = (foods: FoodRow[], favorites: FavRow[], prefixMatch: boolean) => {
+      for (const r of foods) {
+        if (byNorm.has(r.norm)) continue;
+        byNorm.set(r.norm, {
+          description: r.description,
+          calories: r.calories,
+          timesLogged: r.timesLogged,
+          lastLogged: r.lastLogged,
+          source: 'history',
+          lastSeenDate: r.lastLogged.slice(0, 10),
+          prefixMatch,
+        });
+      }
+      for (const f of favorites) {
+        const existing = byNorm.get(f.norm);
+        if (existing) {
+          // Same meal, saved by hand: keep the history's counts (they are what
+          // rank it) but take the CURATED calories and the favourite badge.
+          existing.source = 'favorite';
+          existing.calories = f.calories;
+          existing.description = f.description;
+          continue;
+        }
+        byNorm.set(f.norm, {
+          description: f.description,
+          calories: f.calories,
+          timesLogged: 0,
+          lastLogged: null,
+          source: 'favorite',
+          // Never logged — the day it was saved is the only recency signal there is.
+          lastSeenDate: (f.createdAt || '').slice(0, 10),
+          prefixMatch,
+        });
+      }
+    };
+
+    if (!q) {
+      // No query: the whole ranking, which the UI shows as "your usuals".
+      collect(
+        db.prepare(foodLogSql('')).all() as FoodRow[],
+        db.prepare(favoritesSql('')).all() as FavRow[],
+        true,
+      );
+    } else {
+      // Tier 1 — starts with the query. A range predicate, so the planner SEEKs
+      // idx_food_log_desc_norm instead of walking the log.
+      const lo = q;
+      const hi = prefixUpperBound(q);
+      const prefixWhere = 'AND description_norm >= ? AND description_norm < ?';
+      collect(
+        db.prepare(foodLogSql(prefixWhere)).all(lo, hi) as FoodRow[],
+        db.prepare(favoritesSql(prefixWhere)).all(lo, hi) as FavRow[],
+        true,
+      );
+
+      // Tier 2 is only worth paying for when tier 1 could not fill the list —
+      // prefix matches outrank contains matches unconditionally, so anything it
+      // could find would be cut by the limit anyway.
+      if (byNorm.size < cap) {
+        const containsWhere =
+          "AND description_norm LIKE ? ESCAPE '\\' AND NOT (description_norm >= ? AND description_norm < ?)";
+        collect(
+          db.prepare(foodLogSql(containsWhere)).all(`%${escapeLike(q)}%`, lo, hi) as FoodRow[],
+          db.prepare(favoritesSql(containsWhere)).all(`%${escapeLike(q)}%`, lo, hi) as FavRow[],
+          false,
+        );
+      }
+    }
+
+    if (byNorm.size === 0) return [];
+
+    // Protein rides along from the AI cache when it happens to know it. The
+    // estimate function returns only calories today, so this is almost always
+    // NULL — it is here so the field exists the day macros land.
+    const norms = [...byNorm.keys()];
+    const proteins = db.prepare(
+      `SELECT description_norm AS norm, protein_g AS proteinG FROM nutrition_ai_cache
+       WHERE protein_g IS NOT NULL AND description_norm IN (${norms.map(() => '?').join(',')})`,
+    ).all(...norms) as Array<{ norm: string; proteinG: number }>;
+    for (const p of proteins) {
+      const row = byNorm.get(p.norm);
+      if (row) row.proteinG = p.proteinG;
+    }
+
+    return rankSuggestions([...byNorm.values()], nutritionToday(db), cap);
+  });
+
+  // ── AI estimate cache (local-only; see migration v12) ──────────────
+
+  /**
+   * The cached estimate for a description, or null.
+   *
+   * A hit is a HIT: `hits` is incremented here, because this is the only place
+   * that knows the cache saved a round trip. The renderer uses the counter to
+   * show "al instante" instead of the AI badge.
+   */
+  ipcHandle('nutrition:getCachedEstimate', (_e, description: string) => {
+    const norm = normalizeDescription(description);
+    if (!norm) return null;
+    const db = getDb();
+    const row = db.prepare(
+      `SELECT calories, ai_breakdown AS aiBreakdown, protein_g AS proteinG, hits
+       FROM nutrition_ai_cache WHERE description_norm = ?`,
+    ).get(norm) as { calories: number; aiBreakdown: string | null; proteinG: number | null; hits: number } | undefined;
+    if (!row) return null;
+    db.prepare('UPDATE nutrition_ai_cache SET hits = hits + 1, updated_at = ? WHERE description_norm = ?')
+      .run(syncStamp(), norm);
+    return { ...row, hits: row.hits + 1 };
+  });
+
+  /**
+   * Writes what the user CONFIRMED for this description — which is not always
+   * what the model said.
+   *
+   * Invalidation policy: a manual correction does not delete the entry, it
+   * REPLACES it. The human looked at "980 kcal", decided it was 700 and pressed
+   * confirm; that number is strictly better evidence than the estimate, and
+   * throwing it away would send the next identical description back to the model
+   * to be told 980 again. The per-item `ai_breakdown` IS dropped on a correction
+   * (`corrected: true`), because a breakdown that no longer adds up to the total
+   * is worse than no breakdown.
+   *
+   * `hits` survives an update: it counts how often the description was reused,
+   * not how often the number changed.
+   */
+  ipcHandle('nutrition:cacheEstimate', (_e, entry: {
+    description: string; calories: number; aiBreakdown?: string | null;
+    proteinG?: number | null; corrected?: boolean;
+  }) => {
+    const norm = normalizeDescription(entry.description);
+    if (!norm) return { cached: false };
+    if (!Number.isFinite(entry.calories) || entry.calories <= 0) return { cached: false };
+    const breakdown = entry.corrected ? null : (entry.aiBreakdown ?? null);
+    const now = syncStamp();
+    getDb().prepare(`
+      INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, hits, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?)
+      ON CONFLICT(description_norm) DO UPDATE SET
+        calories = excluded.calories,
+        ai_breakdown = excluded.ai_breakdown,
+        protein_g = COALESCE(excluded.protein_g, nutrition_ai_cache.protein_g),
+        updated_at = excluded.updated_at
+    `).run(norm, Math.round(entry.calories), breakdown, entry.proteinG ?? null, now, now);
+    return { cached: true };
+  });
+
   ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
@@ -240,7 +474,7 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.meal !== undefined) { sets.push('meal = ?'); vals.push(fields.meal); }
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
-    if (fields.source !== undefined) { sets.push('source = ?'); vals.push(fields.source); }
+    if (fields.source !== undefined) { sets.push('source = ?'); vals.push(normalizeFoodSource(fields.source)); }
     sets.push('updated_at = ?'); vals.push(syncStamp());
     if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
