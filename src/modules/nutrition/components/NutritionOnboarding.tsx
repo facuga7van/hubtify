@@ -2,9 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getAgeFromDob } from '../../../../shared/date-utils';
 import RpgDatePicker from '../../../shared/components/RpgDatePicker';
-import MealScheduleEditor from './shared/MealScheduleEditor';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
-import type { MealSchedule } from '../../../../shared/meal-utils';
 
 const ACTIVITY_MULTIPLIERS: Record<string, number> = {
   sedentary: 1.2,
@@ -13,11 +11,15 @@ const ACTIVITY_MULTIPLIERS: Record<string, number> = {
   active: 1.725,
 };
 
-interface Props { onComplete: () => void; }
+interface Props {
+  onComplete: () => void;
+  /** "Not now" — hand the user back to wherever they came from. */
+  onSkip?: () => void;
+}
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
 
-export default function NutritionOnboarding({ onComplete }: Props) {
+export default function NutritionOnboarding({ onComplete, onSkip }: Props) {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
 
@@ -31,7 +33,6 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   // Goal
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
-  const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -56,7 +57,10 @@ export default function NutritionOnboarding({ onComplete }: Props) {
 
       await window.api.nutritionSaveProfile({
         dateOfBirth, sex, heightCm: height, initialWeightKg: weight,
-        activityLevel: activity, deficitTargetKcal, mealSchedule,
+        activityLevel: activity, deficitTargetKcal,
+        // Meal times are an expert setting a brand-new user cannot judge —
+        // ship sensible defaults and let them tune it later in Settings.
+        mealSchedule: { ...DEFAULT_MEAL_SCHEDULE },
       });
       onComplete();
     } catch (err) {
@@ -83,10 +87,22 @@ export default function NutritionOnboarding({ onComplete }: Props) {
   const labelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--fs-quote)' };
 
   return (
-    <div className="nutri-card" style={{ maxWidth: 450, margin: '40px auto', padding: 24 }}>
+    <div className="nutri-card" style={{ maxWidth: 450, margin: '40px auto', padding: 24, position: 'relative' }}>
+      {onSkip && (
+        <button
+          className="nutri-popup-close tap-target"
+          onClick={onSkip}
+          aria-label={t('nutrify.onboardingSkip', 'Después')}
+          title={t('nutrify.onboardingSkip', 'Después')}
+        >
+          <svg width="12" height="12" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" aria-hidden="true">
+            <line x1="2" y1="2" x2="8" y2="8" /><line x1="8" y1="2" x2="2" y2="8" />
+          </svg>
+        </button>
+      )}
       <h3 style={{ marginBottom: 4, textAlign: 'center' }}>{t('nutrify.nutritionSetup')}</h3>
       <p style={{ textAlign: 'center', fontSize: 'var(--fs-label)', opacity: 0.75, marginBottom: 16 }}>
-        {step === 0 ? t('nutrify.setupStep1') : step === 1 ? t('nutrify.setupStep2') : t('nutrify.onboardingStep3', 'Horario de comidas')}
+        {step === 0 ? t('nutrify.setupStep1') : t('nutrify.setupStep2')}
       </p>
 
       {step === 0 ? (
@@ -146,8 +162,13 @@ export default function NutritionOnboarding({ onComplete }: Props) {
           }} style={{ marginTop: 8 }}>
             {t('onboarding.continue')}
           </button>
+          {onSkip && (
+            <button className="nutri-btn nutri-btn-ghost" onClick={onSkip} style={{ justifyContent: 'center' }}>
+              {t('nutrify.onboardingSkip', 'Después')}
+            </button>
+          )}
         </div>
-      ) : step === 1 ? (
+      ) : (
         /* Step 1: Goal */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={labelStyle}>
@@ -175,42 +196,38 @@ export default function NutritionOnboarding({ onComplete }: Props) {
 
           {tdee > 0 && (
             <div className="nutri-tdee-preview">
-              <p>{t('nutrify.tdeePreview', 'Your estimated TDEE')}: <strong>{tdee} kcal/{t('nutrify.perDay', 'day')}</strong></p>
+              <p>{t('nutrify.tdeeEstimateLabel', 'Estimación inicial (TDEE)')}: <strong>{tdee} kcal/{t('nutrify.perDay', 'day')}</strong></p>
               <p>{t('nutrify.dailyTarget', 'Daily target')}: <strong>{dailyTarget} kcal/{t('nutrify.perDay', 'day')}</strong></p>
+              <p style={{ fontSize: 'var(--fs-label)', opacity: 0.75, margin: '4px 0 0' }}>
+                {t('nutrify.tdeeEstimateNote', 'Es sólo una estimación de arranque: el objetivo real se ajusta con tu actividad de los últimos 14 días.')}
+              </p>
             </div>
           )}
-
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button className="rpg-button" onClick={() => setStep(0)} style={{ opacity: 0.7 }}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
-            </button>
-            <button className="rpg-button" onClick={() => setStep(2)} style={{ flex: 1 }}>
-              {t('onboarding.continue')}
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Step 2: Meal Schedule */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} showDefaults />
 
           {error && (
             <p style={{ color: 'var(--rubric)', fontSize: 'var(--fs-label)', margin: 0 }}>{error}</p>
           )}
+
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button className="rpg-button" onClick={() => setStep(1)} style={{ opacity: 0.7 }}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 1L3 5l4 4"/></svg>
+            <button className="rpg-button" onClick={() => setStep(0)} style={{ opacity: 0.7 }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M7 1L3 5l4 4"/></svg>
+              {' '}{t('common.back', 'Atrás')}
             </button>
             <button className="rpg-button" onClick={handleSubmit} disabled={submitting} style={{ flex: 1 }}>
               {submitting ? t('common.loading') : t('nutrify.startTracking')}
             </button>
           </div>
+          {onSkip && (
+            <button className="nutri-btn nutri-btn-ghost" onClick={onSkip} style={{ justifyContent: 'center' }}>
+              {t('nutrify.onboardingSkip', 'Después')}
+            </button>
+          )}
         </div>
       )}
 
       {/* Step dots */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
-        {[0, 1, 2].map((i) => (
+        {[0, 1].map((i) => (
           <div key={i} style={{
             width: 6, height: 6, borderRadius: '50%',
             background: i === step ? 'var(--gold)' : 'var(--parch-1)',

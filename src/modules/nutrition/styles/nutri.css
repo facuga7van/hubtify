@@ -90,7 +90,11 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(168, 138, 60, 0.25);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  /* Shared control height so buttons line up with text inputs beside them. */
+  min-height: var(--nutri-control-h, 36px);
+  box-sizing: border-box;
   transition: background 150ms ease, color 150ms ease;
 }
 
@@ -149,7 +153,7 @@
   font-size: calc(var(--fs-label) * 0.85) !important;
   padding: 3px 8px !important;
   letter-spacing: 0.04em !important;
-  margin-left: auto;
+  min-height: 26px;
 }
 
 
@@ -532,8 +536,9 @@
   padding: 9px 12px;
   color: var(--ink);
   width: 100%;
+  min-height: var(--nutri-control-h, 36px);
+  box-sizing: border-box;
   box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.08);
-  outline: none;
 }
 
 .nutri-text-input:focus {
@@ -713,7 +718,7 @@
 
 .nutri-meal-row {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto 26px;
+  grid-template-columns: 32px 1fr auto auto minmax(100px, auto);
   align-items: center;
   gap: 10px;
   padding: 7px 4px;
@@ -955,7 +960,9 @@
 
 .nutri-close-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* auto-fit: the target column is hidden before closing (it is already in the
+     hero), so the row must not leave a gap where it used to be. */
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: 12px;
 }
 
@@ -1225,7 +1232,7 @@
 
 .nutri-config-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -1263,7 +1270,6 @@
   padding: 8px 12px;
   color: var(--ink);
   width: 100%;
-  outline: none;
   box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.06);
   appearance: none;
 }
@@ -1739,14 +1745,14 @@
 }
 
 .nutri-meal-schedule-sep {
-  color: var(--ink-faded, #7a6a55);
+  color: var(--ink-faded, #6b5535);
   font-size: var(--fs-label, 13px);
 }
 
 .nutri-meal-schedule-catch {
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label, 13px);
-  color: var(--ink-faded, #7a6a55);
+  color: var(--ink-faded, #6b5535);
   font-style: italic;
 }
 
@@ -1851,7 +1857,7 @@
   cursor: pointer;
   font-family: 'Crimson Text', serif;
   font-size: var(--fs-label, 13px);
-  color: var(--ink-faded, #7a6a55);
+  color: var(--ink-faded, #6b5535);
   text-decoration: underline;
   padding: 4px 6px;
 }
@@ -1906,10 +1912,243 @@
 
   /* Drop time column (col 3): icon | name | calories | actions */
   .nutri-meal-row {
-    grid-template-columns: 32px 1fr auto 26px;
+    grid-template-columns: 32px 1fr auto minmax(100px, auto);
   }
 
   .nutri-meal-time {
     display: none;
   }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   12. UX FIXES — popups, favorites, day lock, overflow menu
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Popup close button (X) ── */
+
+.nutri-popup {
+  position: relative;
+}
+
+.nutri-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.nutri-popup-close:hover {
+  background: rgba(122, 30, 30, 0.12);
+  color: var(--rubric);
+}
+
+/* ── Calorie ring overflow arc (drawn above the full ring) ── */
+
+.nutri-ring-overflow {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* ── Favourite pills: click to log, explicit × to remove ── */
+
+.nutri-fav-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--ink-soft), var(--ink));
+}
+
+.nutri-fav-pill .nutri-pill {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  min-height: 28px;
+}
+
+.nutri-fav-remove {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(168, 138, 60, 0.4);
+  color: var(--gold);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.nutri-fav-remove:hover {
+  background: var(--rubric);
+  color: var(--parch-0);
+}
+
+/* ── Portion multiplier chips ── */
+
+.nutri-portion-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.nutri-portion-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-portion-chip {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 3px;
+  background: rgba(245, 231, 192, 0.5);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.nutri-portion-chip.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: var(--ink);
+  border-color: var(--gold);
+  font-weight: 700;
+}
+
+/* ── Day closed banner + reopen ── */
+
+.nutri-closed-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 4px;
+  background: rgba(168, 138, 60, 0.1);
+}
+
+.nutri-closed-banner-text {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  flex: 1;
+  min-width: 180px;
+}
+
+/* ── Card overflow (kebab) menu ── */
+
+.nutri-card-menu {
+  position: relative;
+  margin-left: 8px;
+}
+
+.nutri-card-menu-btn {
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--ink-faded);
+  cursor: pointer;
+}
+
+.nutri-card-menu-btn:hover {
+  border-color: var(--gold-dark);
+  color: var(--ink);
+}
+
+.nutri-card-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 170px;
+  z-index: var(--z-dropdown, 60);
+  background: linear-gradient(180deg, var(--parch-0), var(--parch-1));
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.nutri-card-menu-item {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  text-align: left;
+  padding: 8px 10px;
+  min-height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--rubric);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.nutri-card-menu-item:hover {
+  background: rgba(122, 30, 30, 0.12);
+}
+
+/* ── Settings sticky save bar ── */
+
+.nutri-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  border: 1.5px solid var(--gold-dark);
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--parch-0), var(--parch-1));
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.nutri-save-bar-status {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  flex: 1;
+}
+
+.nutri-save-bar-status.dirty {
+  color: var(--rubric);
+  font-style: normal;
+}
+
+.nutri-tdee-display + .nutri-tdee-display {
+  margin-top: 8px;
 }

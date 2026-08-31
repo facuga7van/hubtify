@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PlayIcon, PauseIcon, StopIcon, SkipForwardIcon } from '../../../shared/components/icons/CodexIcons';
+import { PlayIcon, PauseIcon, StopIcon, SkipForwardIcon, CrossMark } from '../../../shared/components/icons/CodexIcons';
 import {
   playCauldronPause,
   playCauldronResume,
@@ -14,6 +14,7 @@ import '../styles/cauldron-window.css';
 export default function CauldronFloatingWindow() {
   const { t } = useTranslation();
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
+  const [confirmStop, setConfirmStop] = useState(false);
   const warningFiredRef = useRef(false);
 
   const loadState = useCallback(() => {
@@ -41,20 +42,24 @@ export default function CauldronFloatingWindow() {
     const cleanup = window.api.onCauldronSessionEnd((result: CauldronSessionEndResult) => {
       warningFiredRef.current = false;
 
-      if (result.sessionType === 'work' && result.completed) {
-        if (result.nextType === null) {
-          playCauldronCycleEnd();
-        } else {
-          playCauldronWarning();
-        }
-      } else if (result.sessionType !== 'work' && result.completed) {
-        playCauldronWarning();
+      // The 10 s heads-up already uses playCauldronWarning; a segment ending gets
+      // its own cue so the two events do not sound identical.
+      if (result.completed) {
+        if (result.nextType === null) playCauldronCycleEnd();
+        else playCauldronPause();
       }
 
       loadState();
     });
     return cleanup;
   }, [loadState]);
+
+  // A pending "really stop?" that the user walked away from must not stay armed.
+  useEffect(() => {
+    if (!confirmStop) return;
+    const id = setTimeout(() => setConfirmStop(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirmStop]);
 
   // Auto-close window when timer goes idle
   useEffect(() => {
@@ -114,7 +119,18 @@ export default function CauldronFloatingWindow() {
     await window.api.cauldronExtend(extMin);
   };
 
+  /**
+   * Two-step stop. This window is rendered by its own React root (see main.tsx)
+   * with no ConfirmProvider above it, so `useConfirm()` is not available — the
+   * button turns into an explicit confirm instead of ending the session on one
+   * mis-click next to Pause.
+   */
   const handleStop = async () => {
+    if (!confirmStop) {
+      setConfirmStop(true);
+      return;
+    }
+    setConfirmStop(false);
     await window.api.cauldronStop();
   };
 
@@ -124,7 +140,6 @@ export default function CauldronFloatingWindow() {
 
   return (
     <div className={`cfw ${phaseClass} ${isRunning ? 'cfw--active' : ''} ${isPaused ? 'cfw--paused' : ''} ${isAwaiting ? 'cfw--awaiting' : ''}`}>
-      <div className="cfw__drag" />
       <div className="cfw__info">
         <div className="cfw__top">
           <span className="cfw__label">{isAwaiting ? t('cauldron.segmentDone', '¡Tiempo!') : isPaused ? t('cauldron.paused', 'Pausado') : segmentLabel}</span>
@@ -162,12 +177,14 @@ export default function CauldronFloatingWindow() {
               <span className="cfw__extend-label">+{extMin}</span>
             </button>
             <button
-              className="cfw__btn cfw__btn--stop"
+              className={`cfw__btn cfw__btn--stop${confirmStop ? ' cfw__btn--confirm-stop' : ''}`}
               onClick={handleStop}
-              aria-label={t('cauldron.stop', 'Stop')}
-              title={t('cauldron.stop', 'Stop')}
+              aria-label={confirmStop ? t('cauldron.stopConfirmShort', '¿Detener?') : t('cauldron.stop', 'Stop')}
+              title={confirmStop
+                ? t('cauldron.stopConfirm', '¿Detener la sesión? Se perderá el progreso actual.')
+                : t('cauldron.stop', 'Stop')}
             >
-              <StopIcon width={14} height={14} />
+              {confirmStop ? t('cauldron.stopConfirmShort', '¿Detener?') : <StopIcon width={14} height={14} />}
             </button>
           </>
         ) : (
@@ -189,22 +206,26 @@ export default function CauldronFloatingWindow() {
               <SkipForwardIcon width={14} height={14} />
             </button>
             <button
-              className="cfw__btn cfw__btn--stop"
+              className={`cfw__btn cfw__btn--stop${confirmStop ? ' cfw__btn--confirm-stop' : ''}`}
               onClick={handleStop}
-              aria-label={t('cauldron.stop', 'Stop')}
-              title={t('cauldron.stop', 'Stop')}
+              aria-label={confirmStop ? t('cauldron.stopConfirmShort', '¿Detener?') : t('cauldron.stop', 'Stop')}
+              title={confirmStop
+                ? t('cauldron.stopConfirm', '¿Detener la sesión? Se perderá el progreso actual.')
+                : t('cauldron.stop', 'Stop')}
             >
-              <StopIcon width={14} height={14} />
+              {confirmStop ? t('cauldron.stopConfirmShort', '¿Detener?') : <StopIcon width={14} height={14} />}
             </button>
           </>
         )}
       </div>
       <button
-        className="cfw__close-bar"
+        className="cfw__close-bar tap-target"
         onClick={handleClose}
         aria-label={t('cauldron.closeWindow', 'Close window')}
         title={t('cauldron.closeWindow', 'Close window')}
-      />
+      >
+        <CrossMark width={12} height={12} />
+      </button>
       <div className="cfw__bar">
         <span style={{ width: `${progress.toFixed(1)}%` }} />
       </div>

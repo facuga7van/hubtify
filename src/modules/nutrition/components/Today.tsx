@@ -12,8 +12,9 @@ import Checkbox from '../../../shared/components/Checkbox';
 import { estimateNutrition } from '../estimate-service';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter } from '../../../shared/components/icons';
-import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
+import { useModalA11y } from '../../../shared/hooks/useModalA11y';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark } from '../../../shared/components/icons';
+import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import type { TFunction } from 'i18next';
 import type { NutritionProfile } from '../types';
@@ -70,7 +71,6 @@ interface FoodEntry {
 }
 
 interface FavoriteFood { id: string; description: string; calories: number; source: string; aiBreakdown?: string; createdAt: string; updatedAt?: string; }
-interface FrequentFood { id: number; name: string; calories: number; timesUsed: number; }
 interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; }
 interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
@@ -80,6 +80,9 @@ const MEAL_ICON: Record<MealType, React.ReactNode> = {
   dinner: <MoonCrescent width={18} height={18} />,
   snack: <Herb width={18} height={18} />,
 };
+
+const FAVORITES_OPEN_KEY = 'hubtify_nutri_favorites_open';
+const PORTION_STEPS = [0.5, 1, 1.5, 2];
 
 interface EstimationResult {
   totalCalories: number;
@@ -94,7 +97,6 @@ export default function Today() {
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });
-  const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [target, setTarget] = useState(0);
   const [deficitTargetKcal, setDeficitTargetKcal] = useState(0);
@@ -122,9 +124,14 @@ export default function Today() {
   const [estimation, setEstimation] = useState<EstimationResult | null>(null);
   const [editCalories, setEditCalories] = useState('');
   const [favoriteFoods, setFavoriteFoods] = useState<FavoriteFood[]>([]);
-  const [showFavorites, setShowFavorites] = useState(false);
-  const [frequentSearch, setFrequentSearch] = useState('');
-  const [removingId, setRemovingId] = useState<number | null>(null);
+  // Favourites are the fastest path to "log my usual lunch" — open by default,
+  // and remember whatever the user chose across sessions.
+  const [showFavorites, setShowFavorites] = useState(() => {
+    try { return localStorage.getItem(FAVORITES_OPEN_KEY) !== 'false'; } catch { return true; }
+  });
+  const [portion, setPortion] = useState(1);
+  const [logMenuOpen, setLogMenuOpen] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
@@ -133,11 +140,10 @@ export default function Today() {
   const confirm = useConfirm();
 
   const loadData = useCallback(async (d: string) => {
-    const [foodList, sum, met, freq, prof, tgt, closedDay, favorites, schedule] = await Promise.all([
+    const [foodList, sum, met, prof, tgt, closedDay, favorites, schedule] = await Promise.all([
       window.api.nutritionGetFoodByDate(d),
       window.api.nutritionGetSummary(d),
       window.api.nutritionGetDailyMetrics(d),
-      window.api.nutritionGetFrequentFoods(),
       window.api.nutritionGetProfile(),
       window.api.nutritionGetTodayTarget(),
       window.api.nutritionIsDayClosed(d),
@@ -147,7 +153,6 @@ export default function Today() {
     setFoods(foodList as FoodEntry[]);
     setSummary(sum as DailySummary | null);
     setMetrics(met as DailyMetrics);
-    setFrequentFoods(freq as FrequentFood[]);
     setFavoriteFoods(favorites as FavoriteFood[]);
     setMealSchedule((schedule as MealSchedule) ?? DEFAULT_MEAL_SCHEDULE);
     setHasProfile(!!prof);
@@ -171,6 +176,10 @@ export default function Today() {
   }, []);
 
   useEffect(() => { loadData(date); }, [date, loadData]);
+
+  useEffect(() => {
+    try { localStorage.setItem(FAVORITES_OPEN_KEY, String(showFavorites)); } catch { /* private mode */ }
+  }, [showFavorites]);
 
   useEffect(() => {
     setCloseDayPopup(false);
@@ -218,11 +227,10 @@ export default function Today() {
       setEstimation({ totalCalories: result.calories, items: result.items });
       setEditCalories(String(result.calories));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'AI estimation failed';
-      setEstimateError(msg);
+      // One signal only: an inline message the user can act on. No toast on top of
+      // it, and no silent jump to Manual mode — the user decides.
       console.error('[Nutrition]', err);
-      toast({ type: 'warning', message: t('nutrify.estimateFailed', 'Estimation failed. Try manual entry.') });
-      setManualMode(true);
+      setEstimateError(t('nutrify.estimateUnavailable', 'No se pudo estimar. Revisá tu conexión o cargá las calorías en modo Manual.'));
     } finally {
       setEstimating(false);
     }
@@ -298,44 +306,49 @@ export default function Today() {
     }
   };
 
-  // ── Quick log (frequent food) ────────────────────
-  const handleLogFrequent = async (food: FrequentFood) => {
+  /** Copia las comidas de ayer al dia de hoy, sin retipear ni volver a llamar a la IA. */
+  const handleRepeatYesterday = async () => {
+    const ok = await confirm({
+      message: t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.'),
+    });
+    if (!ok) return;
     try {
-      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
-      await window.api.nutritionLogFood({
-        date, description: food.name, calories: food.calories, source: 'frequent',
-        frequentFoodId: food.id,
-        meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
-      });
-      await window.api.nutritionIncrementFrequentUsage(food.id);
-      await window.api.processRpgEvent({
-        type: 'MEAL_LOGGED', moduleId: 'nutrition',
-        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
-      });
-      toast({ type: 'nutri', message: `+${food.calories} kcal` });
-      const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
-      if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
-      loadData(date);
-      window.dispatchEvent(new Event('rpg:statsChanged'));
+      const res = await window.api.nutritionCopyDay({ to: date });
+      if (!res?.success) {
+        toast({
+          type: 'info',
+          message: res?.reason === 'day_closed'
+            ? t('nutrify.dayClosedBanner', 'Este día está cerrado.')
+            : t('nutrify.repeatYesterdayEmpty', 'Ayer no registraste ninguna comida.'),
+        });
+        return;
+      }
+      toast({ type: 'nutri', message: t('nutrify.repeatYesterdayDone', 'Comidas de ayer copiadas') });
+      await loadData(date);
     } catch (err) {
-      console.error('[Nutrition] logFrequent error:', err);
-      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+      toast({ type: 'warning', message: String(err) });
     }
   };
 
   const handleLogFavorite = async (food: FavoriteFood) => {
+    // Portion chips scale the saved calories, so "half a milanesa" is one click.
+    const calories = Math.round(food.calories * portion);
+    const description = portion === 1
+      ? food.description
+      : `${food.description} (×${portion})`;
     try {
       const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule);
       await window.api.nutritionLogFood({
-        date, description: food.description, calories: food.calories, source: 'favorite',
-        aiBreakdown: food.aiBreakdown || undefined,
+        date, description, calories, source: 'favorite',
+        // The breakdown belongs to the x1 portion — keep it only when it still adds up.
+        aiBreakdown: portion === 1 ? (food.aiBreakdown || undefined) : undefined,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
       await window.api.processRpgEvent({
         type: 'MEAL_LOGGED', moduleId: 'nutrition',
         payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
       });
-      toast({ type: 'nutri', message: `+${food.calories} kcal` });
+      toast({ type: 'nutri', message: `+${calories} kcal` });
       const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
@@ -348,8 +361,13 @@ export default function Today() {
 
   const handleAddFavorite = async (description: string, calories: number, source?: string, aiBreakdown?: string) => {
     try {
-      await window.api.nutritionAddFavoriteFood({ description, calories, source, aiBreakdown });
-      toast({ type: 'nutri', message: t('nutrify.favoriteSaved', 'Guardado en favoritos') });
+      const res = await window.api.nutritionAddFavoriteFood({ description, calories, source, aiBreakdown });
+      toast({
+        type: 'nutri',
+        message: res.created
+          ? t('nutrify.favoriteSaved', 'Guardado en favoritos')
+          : t('nutrify.favoriteUpdated', 'Favorito actualizado'),
+      });
       const favorites = await window.api.nutritionGetFavoriteFoods();
       setFavoriteFoods(favorites as FavoriteFood[]);
     } catch (err) {
@@ -358,7 +376,13 @@ export default function Today() {
     }
   };
 
-  const handleRemoveFavorite = async (id: string) => {
+  const handleRemoveFavorite = async (id: string, description: string) => {
+    const ok = await confirm({
+      message: t('nutrify.favoriteRemoveConfirm', '¿Quitar "{{name}}" de favoritos?', { name: description }),
+      confirmText: t('common.delete', 'Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await window.api.nutritionRemoveFavoriteFood(id);
       toast({ type: 'info', message: t('nutrify.favoriteRemoved', 'Favorito eliminado') });
@@ -380,15 +404,12 @@ export default function Today() {
   };
 
   const handleDelete = (id: number) => {
-    setRemovingId(id);
     setTimeout(async () => {
       try {
         await window.api.nutritionDeleteFood(id);
         loadData(date);
       } catch (err) {
         console.error('[Nutrify] delete failed', err);
-      } finally {
-        setRemovingId(null);
       }
     }, 300);
   };
@@ -408,12 +429,6 @@ export default function Today() {
       console.error('[Nutrition] deleteDay error:', err);
       toast({ type: 'warning', message: t('nutrify.deleteDayError', 'Error al eliminar comidas') });
     }
-  };
-
-  const handleMetrics = async (field: string, value: unknown) => {
-    const updated = { ...metrics, [field]: value, date };
-    await window.api.nutritionSaveDailyMetrics(updated);
-    loadData(date);
   };
 
   // Weight check-in: only when viewing today, re-check after sync restores profile
@@ -447,8 +462,15 @@ export default function Today() {
     }
   };
 
+  /** Explicit "Later": stop asking until tomorrow. Only the button does this. */
   const handleWeightDismiss = () => {
     localStorage.setItem('hubtify_weight_dismiss_date', todayDateString());
+    setWeightPopup({ show: false });
+  };
+
+  /** Backdrop / Escape / X: close without burning today's reminder. */
+  const handleWeightClose = () => {
+    setWeightError('');
     setWeightPopup({ show: false });
   };
 
@@ -461,6 +483,47 @@ export default function Today() {
       loadPendingDays();
     } catch {
       toast({ type: 'warning', message: t('nutrify.closeDayError', 'Error al confirmar el día') });
+    }
+  };
+
+  const handleReopenDay = async () => {
+    if (reopening) return;
+    const ok = await confirm({
+      title: t('nutrify.reopenDay', 'Reabrir día'),
+      message: t(
+        'nutrify.reopenDayConfirm',
+        'Se revierten el XP y el HP que ganaste al cerrar este día. Vas a poder registrar comidas de nuevo y cerrarlo otra vez.',
+      ),
+      confirmText: t('nutrify.reopenDay', 'Reabrir día'),
+      danger: true,
+    });
+    if (!ok) return;
+    setReopening(true);
+    try {
+      const result = await window.api.nutritionReopenDay(date);
+      if (!result.success) {
+        toast({ type: 'warning', message: result.error || t('nutrify.reopenDayError', 'No se pudo reabrir el día') });
+        return;
+      }
+      setCloseResult(null);
+      setDayClosed(null);
+      toast({
+        type: 'info',
+        message: result.eventFound
+          ? t('nutrify.reopenDaySuccess', 'Día reabierto ({{xp}} XP y {{hp}} HP revertidos)', {
+              xp: result.xpReverted ?? 0,
+              hp: result.hpReverted ?? 0,
+            })
+          : t('nutrify.reopenDaySuccessNoEvent', 'Día reabierto'),
+      });
+      await loadData(date);
+      loadPendingDays();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch (err) {
+      console.error('[Nutrition] reopenDay error:', err);
+      toast({ type: 'warning', message: t('nutrify.reopenDayError', 'No se pudo reabrir el día') });
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -485,10 +548,6 @@ export default function Today() {
   };
 
   const consumed = summary?.totalCaloriesIn ?? foods.reduce((s, f) => s + f.calories, 0);
-  const filteredFrequent = useMemo(() =>
-    frequentFoods.filter((f) =>
-      !frequentSearch || f.name.toLowerCase().includes(frequentSearch.toLowerCase())
-    ), [frequentFoods, frequentSearch]);
 
   const mealGroups = useMemo(() => {
     const groups: Record<MealType, { foods: FoodEntry[]; calories: number }> = {
@@ -521,10 +580,20 @@ export default function Today() {
 
   const toleranceLow = Math.round(target * 0.95);
   const toleranceHigh = Math.round(target * 1.05);
-  const inRange = consumed >= toleranceLow && consumed <= toleranceHigh;
+
+  // Single source of truth: the same scoring the backend uses for XP and HP.
+  // The ring is green exactly when the day would pay out, never on a different band.
+  const dayScore = useMemo(
+    () => scoreNutritionDay(consumed, target, deficitTargetKcal),
+    [consumed, target, deficitTargetKcal],
+  );
+  const inRange = dayScore.compliant;
 
   const remaining = target - consumed;
-  const progressPct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0;
+  const over = remaining < 0;
+  // The arc caps at 100 %, so the NUMBER has to tell the truth: 143 % stays 143 %.
+  const progressPct = target > 0 ? Math.round((consumed / target) * 100) : 0;
+  const overflow = target > 0 ? Math.max(0, consumed - target) : 0;
 
   // Day name for date pill
   const dateDayName = useMemo(() => {
@@ -532,6 +601,11 @@ export default function Today() {
     const dateObj = new Date(y, m - 1, d);
     return dateObj.toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'es-AR', { weekday: 'long' });
   }, [date, i18n.language]);
+
+  // Focus trap + window-level Escape for both popups. The weight popup closes
+  // WITHOUT marking the reminder dismissed — only the "Later" button does that.
+  const weightModal = useModalA11y({ onClose: handleWeightClose, active: weightPopup.show });
+  const closeDayModal = useModalA11y({ onClose: () => setCloseDayPopup(false), active: closeDayPopup });
 
   if (loading) return (
     <div className="nutri-page">
@@ -576,7 +650,12 @@ export default function Today() {
     </div>
   );
   if (hasProfile === null) return null;
-  if (!hasProfile) return <NutritionOnboarding onComplete={() => loadData(date)} />;
+  if (!hasProfile) return (
+    <NutritionOnboarding
+      onComplete={() => loadData(date)}
+      onSkip={() => navigate('/')}
+    />
+  );
 
   return (
     <div className="nutri-page" data-tour="nutrition">
@@ -654,22 +733,42 @@ export default function Today() {
                 max={target}
                 radius={58}
                 strokeWidth={10}
-                gradientStart={consumed > toleranceHigh ? '#a43030' : inRange ? '#5a7a3a' : '#c4a84e'}
-                gradientEnd={consumed > toleranceHigh ? '#7a1e1e' : inRange ? '#3a5a2a' : '#8a7030'}
+                gradientStart={inRange ? '#5a7a3a' : over ? '#a43030' : '#c4a84e'}
+                gradientEnd={inRange ? '#3a5a2a' : over ? '#7a1e1e' : '#8a7030'}
               >
                 <div className="nutri-ring-center">
                   <div className="nutri-ring-val"><AnimatedNumber value={consumed} prefix="" locale={i18n.language === 'en' ? 'en-US' : 'es-AR'} duration={400} /></div>
                   <div className="nutri-ring-unit">kcal</div>
-                  <div className="nutri-ring-sub">{toleranceLow} – {toleranceHigh}</div>
+                  <div className={`nutri-ring-sub${progressPct > 100 ? ' nutri-red' : ''}`}>{progressPct}%</div>
                 </div>
               </CircularProgress>
+              {/* Second arc drawn over the full one: how far past target you went. */}
+              {overflow > 0 && (
+                <div
+                  className="nutri-ring-overflow"
+                  aria-hidden="true"
+                  title={t('nutrify.exceededBy', 'Excedido por {{kcal}} kcal', { kcal: overflow })}
+                >
+                  <CircularProgress
+                    value={overflow}
+                    max={target}
+                    radius={48}
+                    strokeWidth={5}
+                    trackColor="transparent"
+                    gradientStart="#c25353"
+                    gradientEnd="#7a1e1e"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="nutri-cal-details">
               <div className="nutri-cal-row">
-                <span className="nutri-cal-label">{t('nutrify.remaining', 'Restantes')}</span>
-                <span className={`nutri-cal-val ${inRange ? 'nutri-green' : remaining >= 0 ? '' : 'nutri-red'}`}>
-                  {remaining >= 0 ? remaining : `+${Math.abs(remaining)}`} kcal
+                <span className="nutri-cal-label">
+                  {over ? t('nutrify.exceeded', 'Excedido') : t('nutrify.remaining', 'Restantes')}
+                </span>
+                <span className={`nutri-cal-val ${inRange ? 'nutri-green' : over ? 'nutri-red' : ''}`}>
+                  {over ? `-${Math.abs(remaining)}` : remaining} kcal
                 </span>
               </div>
               <div className="nutri-cal-row">
@@ -685,7 +784,9 @@ export default function Today() {
               </div>
               <div className="nutri-cal-row">
                 <span className="nutri-cal-label">{t('nutrify.progress', 'Progreso')}</span>
-                <span className="nutri-cal-val nutri-cal-pct">{progressPct}%</span>
+                <span className={`nutri-cal-val nutri-cal-pct${progressPct > 100 ? ' nutri-red' : inRange ? ' nutri-green' : ''}`}>
+                  {progressPct}%
+                </span>
               </div>
             </div>
           </div>
@@ -705,6 +806,20 @@ export default function Today() {
       </div>
 
       {/* ── Food input ──────────────────────────────── */}
+      {dayClosed && (
+        <div className="nutri-closed-banner">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <rect x="3" y="8" width="10" height="7" rx="1"/><path d="M5 8V5a3 3 0 0 1 6 0v3"/>
+          </svg>
+          <span className="nutri-closed-banner-text">
+            {t('nutrify.dayClosedBanner', 'Este día está cerrado: no se pueden agregar ni editar comidas.')}
+          </span>
+          <button className="nutri-btn" onClick={handleReopenDay} disabled={reopening}>
+            {reopening ? t('common.loading', 'Cargando...') : t('nutrify.reopenDay', 'Reabrir día')}
+          </button>
+        </div>
+      )}
+
       {!dayClosed && (
         <div className="nutri-card">
           <HelpBubble text={t('nutrify.logFoodHelp', 'Describí lo que comiste en lenguaje natural y la IA estimará las calorías. Podés editar antes de confirmar.')} />
@@ -843,20 +958,55 @@ export default function Today() {
           </h3>
           {showFavorites && (
             <>
-              <div className="nutri-frequent-pills">
-                {favoriteFoods.map((f) => (
+              <div className="nutri-portion-chips">
+                <button
+                  type="button"
+                  className="nutri-btn nutri-btn-sm"
+                  onClick={handleRepeatYesterday}
+                  disabled={!!dayClosed}
+                  title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
+                >
+                  {t('nutrify.repeatYesterday', 'Repetir ayer')}
+                </button>
+                <span className="nutri-portion-label">{t('nutrify.portion', 'Porción')}</span>
+                {PORTION_STEPS.map((mult) => (
                   <button
-                    key={f.id}
-                    className="nutri-btn nutri-pill"
-                    onClick={() => handleLogFavorite(f)}
-                    onContextMenu={(e) => { e.preventDefault(); handleRemoveFavorite(f.id); }}
+                    key={mult}
+                    type="button"
+                    className={`nutri-portion-chip${portion === mult ? ' active' : ''}`}
+                    onClick={() => setPortion(mult)}
+                    aria-pressed={portion === mult}
                   >
-                    {f.description} ({f.calories})
+                    {'×'}{mult}
                   </button>
                 ))}
               </div>
-              <p className="nutri-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.5, marginTop: 4 }}>
-                {t('nutrify.favoriteClickHint', 'Click para loguear, click derecho para eliminar')}
+              <div className="nutri-frequent-pills">
+                {favoriteFoods.map((f) => (
+                  <span key={f.id} className="nutri-fav-pill">
+                    <button
+                      className="nutri-btn nutri-pill"
+                      onClick={() => handleLogFavorite(f)}
+                      title={t('nutrify.favoriteLogTitle', 'Registrar {{name}} ({{kcal}} kcal)', {
+                        name: f.description,
+                        kcal: Math.round(f.calories * portion),
+                      })}
+                    >
+                      {f.description} ({Math.round(f.calories * portion)})
+                    </button>
+                    <button
+                      className="nutri-fav-remove tap-target"
+                      onClick={() => handleRemoveFavorite(f.id, f.description)}
+                      title={t('nutrify.favoriteRemove', 'Quitar de favoritos')}
+                      aria-label={t('nutrify.favoriteRemove', 'Quitar de favoritos')}
+                    >
+                      <CrossMark width={10} height={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <p className="nutri-hint" style={{ fontSize: 'var(--fs-label)', marginTop: 6 }}>
+                {t('nutrify.favoriteClickHint2', 'Click para registrar. La × quita el favorito.')}
               </p>
             </>
           )}
@@ -875,9 +1025,33 @@ export default function Today() {
             </span>
           )}
           {foods.length > 0 && !dayClosed && (
-            <button className="nutri-btn nutri-btn-danger nutri-btn-sm" onClick={handleDeleteDay}>
-              {t('nutrify.deleteDayButton', 'Eliminar día')}
-            </button>
+            <span className="nutri-card-menu">
+              <button
+                className="nutri-card-menu-btn tap-target"
+                onClick={() => setLogMenuOpen(v => !v)}
+                onBlur={() => setTimeout(() => setLogMenuOpen(false), 120)}
+                aria-haspopup="menu"
+                aria-expanded={logMenuOpen}
+                aria-label={t('nutrify.logActions', 'Acciones del registro')}
+                title={t('nutrify.logActions', 'Acciones del registro')}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+                  <circle cx="7" cy="2.5" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/>
+                </svg>
+              </button>
+              {logMenuOpen && (
+                <div className="nutri-card-menu-list" role="menu">
+                  <button
+                    className="nutri-card-menu-item"
+                    role="menuitem"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { setLogMenuOpen(false); handleDeleteDay(); }}
+                  >
+                    {t('nutrify.deleteDayButton', 'Eliminar día')}
+                  </button>
+                </div>
+              )}
+            </span>
           )}
         </h3>
         {foods.length === 0 && !dayClosed && (
@@ -903,34 +1077,12 @@ export default function Today() {
         ))}
       </div>
 
-      {/* ── Frequent foods ──────────────────────────── */}
-      {!dayClosed && frequentFoods.length > 0 && (
-        <div className="nutri-card">
-          <h3 className="nutri-card-title">
-            {t('nutrify.frequentFoods', 'Comidas Frecuentes')}
-            <HelpBubble variant="inline" text={t('nutrify.frequentFoodsHelp', 'Alimentos que usás seguido, ordenados por frecuencia. Se aprenden de tus registros anteriores.')} />
-          </h3>
-          <input type="text" placeholder={t('common.search', 'Buscar')} value={frequentSearch}
-            onChange={(e) => setFrequentSearch(e.target.value)} className="nutri-text-input" style={{ width: '100%', marginBottom: 8 }} />
-          <div className="nutri-frequent-pills">
-            {filteredFrequent.slice(0, 12).map((f) => (
-              <button key={f.id} className="nutri-btn nutri-pill" onClick={() => handleLogFrequent(f)}>
-                {f.name} ({f.calories})
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── Close Day ───────────────────────────────── */}
       <div className="nutri-card" style={{ marginBottom: 26 }}>
         <HelpBubble text={t('nutrify.closeDayHelp', 'Cerrá el día para calcular XP y HP. Se evalúa precisión calórica, pasos, gym y pesaje semanal.')} />
         <h3 className="nutri-card-title">
           <span className="nutri-t-ico">{'\u25F7'}</span>
           {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDay', 'Cierre del Día')}
-          <span className="nutri-card-subtitle">
-            {t('nutrify.closeDayDesc', 'Cerrá el día para calcular tu XP y HP según precisión calórica, pasos, gym y peso')}
-          </span>
         </h3>
 
         {dayClosed ? (
@@ -951,23 +1103,14 @@ export default function Today() {
           </div>
         ) : (
           <div className="nutri-close-day">
-            <CloseDayStats consumed={consumed} target={target} />
+            <CloseDayStats consumed={consumed} target={target} showTarget={false} />
             <div className="nutri-reward-card">
               <button
                 className="nutri-btn nutri-btn-ghost"
-                style={{ width: '100%', marginBottom: 8 }}
+                style={{ width: '100%' }}
                 onClick={() => setWeightPopup({ show: true, lastWeight: weightPopup.lastWeight })}
               >
                 {t('nutrify.logWeight', 'Registrar peso')}
-              </button>
-              <button className="nutri-btn nutri-btn-primary" onClick={() => {
-                setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
-                setPopupGym(!!metrics.gym);
-                setCloseDayPopup(true);
-              }}
-                disabled={consumed === 0}
-                style={{ width: '100%', justifyContent: 'center' }}>
-                {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
               </button>
             </div>
           </div>
@@ -976,8 +1119,21 @@ export default function Today() {
 
       {/* ── Weight check-in popup ───────────────────── */}
       {weightPopup.show && (
-        <div className="nutri-popup-overlay" onClick={handleWeightDismiss} onKeyDown={(e) => e.key === 'Escape' && handleWeightDismiss()}>
-          <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
+        <div className="nutri-popup-overlay" onClick={handleWeightClose}>
+          <div
+            {...weightModal.dialogProps}
+            className="nutri-popup"
+            aria-label={t('nutrify.weightCheckin.title', 'Registro semanal de peso')}
+            onClick={weightModal.stopPropagation}
+          >
+            <button
+              className="nutri-popup-close tap-target"
+              onClick={handleWeightClose}
+              aria-label={t('common.close', 'Cerrar')}
+              title={t('common.close', 'Cerrar')}
+            >
+              <CrossMark width={12} height={12} />
+            </button>
             <h3 className="nutri-popup-title">
               {t('nutrify.weightCheckin.title', 'Registro semanal de peso')}
             </h3>
@@ -1011,11 +1167,33 @@ export default function Today() {
 
       {/* ── Close day popup ─────────────────────────── */}
       {closeDayPopup && (
-        <div className="nutri-popup-overlay" onClick={() => setCloseDayPopup(false)} onKeyDown={(e) => e.key === 'Escape' && setCloseDayPopup(false)}>
-          <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
+        <div className="nutri-popup-overlay" onClick={() => setCloseDayPopup(false)}>
+          <div
+            {...closeDayModal.dialogProps}
+            className="nutri-popup"
+            aria-label={isPending ? t('nutrify.confirmDaySummary', 'Resumen del día') : t('nutrify.closeDay', 'Cierre del Día')}
+            onClick={closeDayModal.stopPropagation}
+          >
+            <button
+              className="nutri-popup-close tap-target"
+              onClick={() => setCloseDayPopup(false)}
+              aria-label={t('common.close', 'Cerrar')}
+              title={t('common.close', 'Cerrar')}
+            >
+              <CrossMark width={12} height={12} />
+            </button>
             <h3 className="nutri-popup-title">
               {isPending ? t('nutrify.confirmDaySummary', 'Resumen del día') : t('nutrify.closeDay', 'Cierre del Día')}
             </h3>
+            <p className="nutri-popup-hint">
+              {t('nutrify.closeDayLockWarning', 'Al cerrar el día queda bloqueado: no vas a poder agregar ni editar comidas. Podés reabrirlo, pero se revierte el XP y el HP ganados.')}
+            </p>
+            <p className="nutri-popup-hint">
+              {t(
+                'nutrify.scoringBands',
+                'Cómo se puntúa: en déficit contás como logrado si comés hasta tu objetivo; en superávit, si llegás o lo pasás; en mantenimiento, dentro de ±10 %. Fuera de eso, hasta 10 % de desvío = -5 HP, hasta 20 % = -10 HP, más = -20 HP.',
+              )}
+            </p>
 
             {isPending && (
               <div className="nutri-popup-summary">
@@ -1049,10 +1227,10 @@ export default function Today() {
                 autoFocus
               />
             </label>
-            <div className="nutri-popup-checkbox" onClick={() => setPopupGym(!popupGym)}>
-              <Checkbox checked={popupGym} onChange={() => setPopupGym(!popupGym)} />
+            <label className="nutri-popup-checkbox">
+              <Checkbox checked={popupGym} onChange={() => setPopupGym(v => !v)} />
               <span>{t('nutrify.gym', 'Gimnasio')}</span>
-            </div>
+            </label>
             <button className="nutri-btn nutri-btn-primary" onClick={handleCloseDayConfirm} style={{ width: '100%', marginBottom: 8 }}>
               {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
             </button>
@@ -1066,11 +1244,18 @@ export default function Today() {
 
       {!dayClosed && !closeResult && foods.length > 0 && (
         <div className="nutri-sticky-footer">
-          <button className="rpg-button nutri-close-day-btn" onClick={() => {
-            setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
-            setPopupGym(!!metrics.gym);
-            setCloseDayPopup(true);
-          }}>
+          <button
+            className="rpg-button nutri-close-day-btn"
+            disabled={consumed === 0}
+            title={consumed === 0
+              ? t('nutrify.closeDayDisabled', 'Registrá al menos una comida para poder cerrar el día')
+              : t('nutrify.closeDayTitle', 'Calcula tu XP y HP y bloquea el día')}
+            onClick={() => {
+              setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
+              setPopupGym(!!metrics.gym);
+              setCloseDayPopup(true);
+            }}
+          >
             {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
           </button>
         </div>
@@ -1079,10 +1264,11 @@ export default function Today() {
   );
 }
 
-function CloseDayStats({ consumed, target }: { consumed: number; target: number }) {
+function CloseDayStats({ consumed, target, showTarget = true }: { consumed: number; target: number; showTarget?: boolean }) {
   const { t } = useTranslation();
   const diff = target - consumed;
-  const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0;
+  // Never clamp: the number is the only place the overshoot is visible.
+  const pct = target > 0 ? Math.round((consumed / target) * 100) : 0;
 
   return (
     <div className="nutri-close-stats">
@@ -1091,11 +1277,13 @@ function CloseDayStats({ consumed, target }: { consumed: number; target: number 
         <span className="nutri-cs-val">{consumed}</span>
         <span className="nutri-cs-sub">kcal</span>
       </div>
-      <div className="nutri-close-stat">
-        <span className="nutri-cs-label">{t('nutrify.target', 'Objetivo')}</span>
-        <span className="nutri-cs-val">{target}</span>
-        <span className="nutri-cs-sub">kcal</span>
-      </div>
+      {showTarget && (
+        <div className="nutri-close-stat">
+          <span className="nutri-cs-label">{t('nutrify.target', 'Objetivo')}</span>
+          <span className="nutri-cs-val">{target}</span>
+          <span className="nutri-cs-sub">kcal</span>
+        </div>
+      )}
       <div className="nutri-close-stat">
         <span className="nutri-cs-label">{t('nutrify.difference', 'Diferencia')}</span>
         <span className={`nutri-cs-val ${diff >= 0 ? 'nutri-green' : 'nutri-red'}`}>
@@ -1105,7 +1293,7 @@ function CloseDayStats({ consumed, target }: { consumed: number; target: number 
       </div>
       <div className="nutri-close-stat">
         <span className="nutri-cs-label">{t('nutrify.progress', 'Progreso')}</span>
-        <span className="nutri-cs-val nutri-cs-pct">{pct}%</span>
+        <span className={`nutri-cs-val nutri-cs-pct${pct > 100 ? ' nutri-red' : ''}`}>{pct}%</span>
       </div>
     </div>
   );

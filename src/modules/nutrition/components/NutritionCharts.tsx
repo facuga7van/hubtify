@@ -27,11 +27,19 @@ const RANGE_DAYS: Record<Range, number> = {
   year: 365,
 };
 
-const RANGE_LABELS: Record<Range, string> = {
-  '7d': '7d',
-  '30d': '30d',
-  '90d': '90d',
-  year: 'Year',
+/** i18n keys for the range tabs - all four go through t(), no mixed languages. */
+const RANGE_LABEL_KEYS: Record<Range, string> = {
+  '7d': 'nutrify.range7d',
+  '30d': 'nutrify.range30d',
+  '90d': 'nutrify.range90d',
+  year: 'nutrify.range365d',
+};
+
+const RANGE_LABEL_FALLBACKS: Record<Range, string> = {
+  '7d': '7 d',
+  '30d': '30 d',
+  '90d': '90 d',
+  year: '365 d',
 };
 
 /** Day abbreviation from date string (YYYY-MM-DD) */
@@ -264,9 +272,7 @@ export default function NutritionCharts() {
           className={`nutri-range-tab${range === r ? ' active' : ''}`}
           onClick={() => setRange(r)}
         >
-          {r === 'year'
-            ? t('nutrify.year', 'Yr')
-            : RANGE_LABELS[r]}
+          {t(RANGE_LABEL_KEYS[r], RANGE_LABEL_FALLBACKS[r])}
         </button>
       ))}
     </div>

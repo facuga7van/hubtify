@@ -191,7 +191,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
             </div>
           )}
         </div>
-        <div className="nutri-meal-name">
+        <div className="nutri-meal-name" title={entry.description}>
           {entry.description}
           {hasBreakdown && (
             <button

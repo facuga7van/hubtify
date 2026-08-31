@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DawnSun, NoonSun, MoonCrescent, Herb } from '../../../../shared/components/icons';
 import { MEAL_ORDER, DEFAULT_MEAL_SCHEDULE } from '../../../../../shared/meal-utils';
@@ -7,6 +8,12 @@ interface Props {
   schedule: MealSchedule;
   onChange: (schedule: MealSchedule) => void;
   showDefaults?: boolean;
+  /**
+   * Reports whether the schedule is usable. Overlapping ranges make
+   * `resolveMealType` ambiguous, which lands every logged meal with a "?" the
+   * user has to classify by hand — so callers must BLOCK on `false`, not warn.
+   */
+  onValidityChange?: (valid: boolean) => void;
 }
 
 const MEAL_ICONS: Record<MealType, React.ReactNode> = {
@@ -48,9 +55,11 @@ function hasOverlap(schedule: MealSchedule): boolean {
   return false;
 }
 
-export default function MealScheduleEditor({ schedule, onChange, showDefaults }: Props) {
+export default function MealScheduleEditor({ schedule, onChange, showDefaults, onValidityChange }: Props) {
   const { t } = useTranslation();
   const overlap = hasOverlap(schedule);
+
+  useEffect(() => { onValidityChange?.(!overlap); }, [overlap, onValidityChange]);
 
   const updateMeal = (meal: MealType, patch: Partial<typeof schedule.breakfast>) => {
     onChange({ ...schedule, [meal]: { ...schedule[meal], ...patch } });
@@ -108,7 +117,9 @@ export default function MealScheduleEditor({ schedule, onChange, showDefaults }:
         );
       })}
       {overlap && (
-        <p className="nutri-meal-overlap-warn">{t('nutrify.mealOverlap', 'Los horarios se superponen')}</p>
+        <p className="nutri-meal-overlap-warn" role="alert">
+          {t('nutrify.mealOverlapBlocking', 'Los horarios se superponen. Corregilos: si no, cada comida queda sin clasificar.')}
+        </p>
       )}
       {showDefaults && (
         <button

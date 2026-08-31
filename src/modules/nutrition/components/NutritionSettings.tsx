@@ -6,7 +6,9 @@ import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import MealScheduleEditor from './shared/MealScheduleEditor';
 import HelpBubble from '../../../shared/components/HelpBubble';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { Gear, Shield, Compass, Chalice, Scale } from '../../../shared/components/icons';
+import { todayDateString } from '../../../../shared/date-utils';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
 import type { NutritionProfile } from '../types';
@@ -25,6 +27,7 @@ const GOAL_ICONS: Record<Goal, string> = { deficit: '\u2193', maintain: '=', sur
 export default function NutritionSettings() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -45,6 +48,12 @@ export default function NutritionSettings() {
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
+  const [scheduleValid, setScheduleValid] = useState(true);
+  /** TDEE the backend actually uses today (dynamic activity blend), not the static guess. */
+  const [effectiveTdee, setEffectiveTdee] = useState<number | null>(null);
+  const [effectiveTarget, setEffectiveTarget] = useState<number | null>(null);
+  const baselineRef = useRef<string>('');
+  const [dirty, setDirty] = useState(false);
 
   const loadProfile = useCallback(() => {
     setLoading(true);
@@ -52,7 +61,12 @@ export default function NutritionSettings() {
     Promise.all([
       window.api.nutritionGetProfile(),
       window.api.nutritionGetWeights(),
-    ]).then(([prof, weights]) => {
+      window.api.nutritionGetSummary(todayDateString()),
+      window.api.nutritionGetTodayTarget(),
+    ]).then(([prof, weights, summary, todayTarget]) => {
+      const sum = summary as { tdee?: number } | null;
+      setEffectiveTdee(sum?.tdee && sum.tdee > 0 ? Math.round(sum.tdee) : null);
+      setEffectiveTarget(typeof todayTarget === 'number' && todayTarget > 0 ? Math.round(todayTarget) : null);
       if (prof) {
         const p = prof as NutritionProfile;
         setDateOfBirth(p.dateOfBirth || '');
@@ -80,6 +94,37 @@ export default function NutritionSettings() {
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
+  // Snapshot of everything the Save button writes — used to tell the user when
+  // walking away would throw work out.
+  const snapshot = useMemo(() => JSON.stringify({
+    dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule,
+  }), [dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule]);
+
+  const baselineSetRef = useRef(false);
+  useEffect(() => {
+    if (loading) { baselineSetRef.current = false; return; }
+    if (!baselineSetRef.current) {
+      baselineSetRef.current = true;
+      baselineRef.current = snapshot;
+      setDirty(false);
+      return;
+    }
+    setDirty(snapshot !== baselineRef.current);
+  }, [loading, snapshot]);
+
+  const handleBack = async () => {
+    if (dirty) {
+      const ok = await confirm({
+        title: t('nutrify.unsavedTitle', 'Cambios sin guardar'),
+        message: t('nutrify.unsavedChanges', 'Tenés cambios sin guardar. ¿Salir igual y descartarlos?'),
+        confirmText: t('nutrify.discardChanges', 'Descartar'),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    navigate('/nutrition');
+  };
+
   // Reload profile when account is switched
   useEffect(() => {
     const handler = () => loadProfile();
@@ -88,7 +133,7 @@ export default function NutritionSettings() {
   }, [loadProfile]);
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || !scheduleValid) return;
     setSaving(true);
     setSaveError('');
     try {
@@ -100,6 +145,8 @@ export default function NutritionSettings() {
         dateOfBirth, weightCheckDay, weightPopupEnabled, sex, heightCm: height, initialWeightKg: weight,
         activityLevel: activity, deficitTargetKcal, mealSchedule,
       });
+      baselineRef.current = snapshot;
+      setDirty(false);
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
@@ -141,7 +188,7 @@ export default function NutritionSettings() {
           <div className="nutri-page-sub">{t('nutrify.profileSettingsSub', 'Ajustá tus datos corporales y objetivo calórico')}</div>
         </div>
         <div className="nutri-head-actions">
-          <button className="nutri-btn nutri-btn-ghost" onClick={() => navigate('/nutrition')}>
+          <button className="nutri-btn nutri-btn-ghost" onClick={handleBack}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M19 12H5M5 12l6-6M5 12l6 6"/></svg>{' '}
             {t('common.back', 'Volver')}
           </button>
@@ -176,12 +223,12 @@ export default function NutritionSettings() {
           </div>
 
           <div className="nutri-field">
-            <label className="nutri-label">{t('nutrify.height', 'Altura')}</label>
+            <label className="nutri-label">{t('nutrify.heightLabel', 'Altura')}</label>
             <RpgNumberInput value={String(height)} onChange={(v) => setHeight(+v)} step={1} min={100} max={250} suffix="cm" />
           </div>
 
           <div className="nutri-field">
-            <label className="nutri-label">{t('nutrify.weight', 'Peso')}</label>
+            <label className="nutri-label">{t('nutrify.weightLabel', 'Peso')}</label>
             <RpgNumberInput value={String(weight)} onChange={(v) => setWeight(+v)} step={0.1} min={30} max={300} suffix="kg" />
           </div>
 
@@ -196,21 +243,43 @@ export default function NutritionSettings() {
           </div>
         </div>
 
-        {/* TDEE display */}
+        {/* TDEE display - the static estimate AND the number actually in use */}
         {bmr > 0 && (
-          <div className="nutri-tdee-display">
-            <div>
-              <div className="tdee-label">{t('nutrify.tdeeCalculated', 'TDEE calculado')}</div>
-              <span className="nutri-field-hint">{t('nutrify.tdeeDesc', 'Energía total diaria según tu nivel de actividad')}</span>
-            </div>
-            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-              <span className="tdee-val">{tdee.toLocaleString()}</span>{' '}
-              <span className="tdee-unit">kcal/{t('nutrify.perDay', 'día')}</span>
-              <div className="nutri-field-hint">
-                BMR {bmr.toLocaleString()} {'\u00d7'}{multiplier} {t('nutrify.activityLevel', 'actividad').toLowerCase()}
+          <>
+            <div className="nutri-tdee-display">
+              <div>
+                <div className="tdee-label">{t('nutrify.tdeeEstimateLabel', 'Estimación inicial (TDEE)')}</div>
+                <span className="nutri-field-hint">{t('nutrify.tdeeDesc')}</span>
+              </div>
+              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                <span className="tdee-val">{tdee.toLocaleString()}</span>{' '}
+                <span className="tdee-unit">kcal/{t('nutrify.perDay')}</span>
+                <div className="nutri-field-hint">
+                  {t('nutrify.tdeeStaticFormula', 'BMR {{bmr}} × {{mult}} (nivel declarado)', {
+                    bmr: bmr.toLocaleString(),
+                    mult: multiplier,
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+            {effectiveTdee !== null && (
+              <div className="nutri-tdee-display">
+                <div>
+                  <div className="tdee-label">{t('nutrify.tdeeEffective', 'TDEE efectivo (en uso)')}</div>
+                  <span className="nutri-field-hint">{t('nutrify.tdeeEffectiveDesc')}</span>
+                </div>
+                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                  <span className="tdee-val">{effectiveTdee.toLocaleString()}</span>{' '}
+                  <span className="tdee-unit">kcal/{t('nutrify.perDay')}</span>
+                  {effectiveTarget !== null && (
+                    <div className="nutri-field-hint">
+                      {t('nutrify.dailyTarget')}: {effectiveTarget.toLocaleString()} kcal
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -244,11 +313,16 @@ export default function NutritionSettings() {
 
         {tdee > 0 && (
           <div className="nutri-daily-target-preview">
-            {t('nutrify.dailyTarget', 'Daily target')}:{' '}
+            {t('nutrify.dailyTargetEstimate', 'Meta diaria estimada')}:{' '}
             <strong>{Math.round(tdee + (goal === 'deficit' ? -goalAmount : goal === 'surplus' ? goalAmount : 0))} kcal</strong>
             <span className="nutri-target-breakdown">
               (TDEE {tdee} {goal === 'deficit' ? '-' : goal === 'surplus' ? '+' : '\u00b1'} {goal === 'maintain' ? 0 : goalAmount})
             </span>
+            {effectiveTarget !== null && (
+              <span className="nutri-target-breakdown">
+                {' '}{'\u00b7'} {t('nutrify.dailyTargetInUse', 'en uso hoy')}: {effectiveTarget} kcal
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -260,7 +334,7 @@ export default function NutritionSettings() {
           <span className="nutri-t-ico"><Chalice width={14} height={14} /></span> {t('nutrify.mealSchedule', 'Horario de comidas')}
           <span className="nutri-card-subtitle">{t('nutrify.mealScheduleDesc', 'Configurá los horarios de cada comida')}</span>
         </h3>
-        <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} />
+        <MealScheduleEditor schedule={mealSchedule} onChange={setMealSchedule} onValidityChange={setScheduleValid} showDefaults />
       </div>
 
       {/* ── Weight Reminder ── */}
@@ -298,9 +372,20 @@ export default function NutritionSettings() {
       {saveError && (
         <p style={{ color: 'var(--rubric)', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{saveError}</p>
       )}
-      <button className="nutri-action-bar" onClick={handleSave} disabled={saving}>
+      <div className="nutri-save-bar">
+        <span className={`nutri-save-bar-status${dirty ? ' dirty' : ''}`}>
+          {!scheduleValid
+            ? t('nutrify.mealOverlapBlocking')
+            : dirty
+              ? t('nutrify.unsavedChangesShort', 'Cambios sin guardar')
+              : saved
+                ? t('nutrify.saved')
+                : t('nutrify.allSaved', 'Todo guardado')}
+        </span>
+        <button className="nutri-btn nutri-btn-primary" onClick={handleSave} disabled={saving || !scheduleValid}>
         {saving ? t('common.loading') : saved ? <><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M2 6l3 3 5-5"/></svg>{' '}{t('nutrify.saved')}</> : t('nutrify.saveProfile')}
       </button>
+      </div>
     </div>
   );
 }

@@ -8,12 +8,10 @@ html, body {
   font-family: 'Crimson Text', 'IM Fell English', serif;
 }
 
-/* Drag region — invisible overlay for window dragging */
-.cfw__drag {
-  position: absolute;
-  inset: 0;
+/* Drag region — the info column only. A full-bleed overlay meant every click
+   that missed a button dragged the window. */
+.cfw__info {
   -webkit-app-region: drag;
-  z-index: 0;
 }
 
 .cfw {
@@ -24,7 +22,8 @@ html, body {
   width: 100vw;
   height: 100vh;
   box-sizing: border-box;
-  padding: 6px 10px 8px;
+  /* Right padding reserves the close-button lane — it used to overlap Stop. */
+  padding: 6px 40px 8px 10px;
   background: linear-gradient(180deg, rgba(58, 37, 19, 0.96), rgba(42, 29, 14, 0.96));
   border: 2px solid var(--gold-dark, #8a7030);
   color: var(--parch-1, #e8d5a3);
@@ -133,36 +132,30 @@ html, body {
   margin-bottom: 2px;
 }
 
-/* Close bar — minimal line at top-right, like a window minimize */
+/* Close button — a real X in its own lane at the far right. */
 .cfw__close-bar {
   -webkit-app-region: no-drag;
   position: absolute;
-  top: 4px;
-  right: 6px;
-  width: 22px;
-  height: 14px;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   padding: 0;
+  color: var(--parch-1, #e8d5a3);
   cursor: pointer;
   z-index: 2;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-.cfw__close-bar::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 14px;
-  height: 2px;
-  background: #e8d5a3;
-  opacity: 0.5;
-  transition: opacity 150ms ease;
-}
-
-.cfw__close-bar:hover::after {
-  opacity: 1;
+.cfw__close-bar:hover {
+  background: rgba(122, 30, 30, 0.4);
+  border-color: rgba(122, 30, 30, 0.7);
+  color: #fff;
 }
 
 /* Progress bar */
@@ -187,7 +180,7 @@ html, body {
 }
 
 .cfw--break .cfw__bar > span {
-  background: repeating-linear-gradient(90deg, var(--moss, #556b3c) 0 4px, #3d4d2a 4px 8px);
+  background: repeating-linear-gradient(90deg, var(--moss, #40522c) 0 4px, var(--moss-dark, #2e3c20) 4px 8px);
 }
 
 .cfw--long-break .cfw__bar > span {
@@ -264,4 +257,20 @@ html, body {
   .cfw__close-bar::after {
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* Two-step Stop — there is no ConfirmProvider in this window, so the button
+   turns into an explicit confirm instead of killing the session on one click. */
+.cfw__btn--confirm-stop {
+  border-color: rgba(122, 30, 30, 0.8);
+  background: rgba(122, 30, 30, 0.45);
+  color: #fff;
+  width: auto;
+  padding: 0 8px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

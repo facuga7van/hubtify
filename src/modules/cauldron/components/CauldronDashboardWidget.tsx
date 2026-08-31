@@ -7,7 +7,9 @@ import type {
   CauldronPreset,
 } from '../../../../shared/types';
 import { statsShimmer } from '../../../shared/animations/cauldron';
+import { playCauldronStart } from '../../../shared/audio';
 import { formatTime } from '../utils';
+import { shouldPopOutOnStart, usePresetName } from '../hooks';
 
 function getSessionLabel(sessionType: string, t: (key: string, fallback: string) => string): string {
   switch (sessionType) {
@@ -56,8 +58,10 @@ export default function CauldronDashboardWidget() {
   const { t } = useTranslation();
   const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
+  const [firstPreset, setFirstPreset] = useState<CauldronPreset | null>(null);
   const countRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
+  const presetLabel = usePresetName();
 
   const loadStats = useCallback(() => {
     window.api.cauldronGetStats().then((s) => setStats(s));
@@ -67,20 +71,28 @@ export default function CauldronDashboardWidget() {
     window.api.cauldronGetState().then((s) => setTimerState(s));
   }, []);
 
+  const loadFirstPreset = useCallback(() => {
+    window.api.cauldronGetPresets()
+      .then((p) => setFirstPreset(p[0] ?? null))
+      .catch(() => setFirstPreset(null));
+  }, []);
+
   useEffect(() => {
     loadStats();
     loadState();
-  }, [loadStats, loadState]);
+    loadFirstPreset();
+  }, [loadStats, loadState, loadFirstPreset]);
 
   // Reload data when account is switched
   useEffect(() => {
     const handler = () => {
       loadStats();
       loadState();
+      loadFirstPreset();
     };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadStats, loadState]);
+  }, [loadStats, loadState, loadFirstPreset]);
 
   // Subscribe to tick events
   useEffect(() => {
@@ -114,10 +126,14 @@ export default function CauldronDashboardWidget() {
       const presets = (await window.api.cauldronGetPresets()) as CauldronPreset[];
       if (presets.length > 0) {
         await window.api.cauldronStart(presets[0].id);
-        window.api.cauldronOpenWindow();
+        // Same start feedback as the Cauldron page — starting from here used to
+        // feel dead by comparison.
+        playCauldronStart();
+        // Popping the external window open is opt-in, same preference as the page.
+        if (shouldPopOutOnStart()) window.api.cauldronOpenWindow();
       }
     } catch {
-      // Timer already active — just open the window
+      // Timer already active — surface it instead of failing silently.
       window.api.cauldronOpenWindow();
     }
   };
@@ -158,6 +174,9 @@ export default function CauldronDashboardWidget() {
                   className="rpg-button"
                   onClick={(e) => { e.stopPropagation(); handleQuickStart(); }}
                   style={{ fontSize: 'var(--fs-label)', padding: '4px 10px' }}
+                  title={firstPreset
+                    ? t('cauldron.quickStartTitle', 'Inicia "{{name}}"', { name: presetLabel(firstPreset) })
+                    : undefined}
                 >
                   {t('cauldron.startBrew', 'Quick Brew')}
                 </button>

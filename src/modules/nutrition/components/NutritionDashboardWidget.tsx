@@ -4,6 +4,9 @@ import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
 import { useToast } from '../../../shared/components/useToast';
 import { estimateNutrition } from '../estimate-service';
+import { todayDateString } from '../../../../shared/date-utils';
+import { resolveMealType } from '../../../../shared/meal-utils';
+import type { MealSchedule } from '../../../../shared/meal-utils';
 
 export default function NutritionDashboardWidget() {
   const { t } = useTranslation();
@@ -21,27 +24,43 @@ export default function NutritionDashboardWidget() {
   const [estimation, setEstimation] = useState<{ totalCalories: number; items: Array<{ name: string; calories: number }> } | null>(null);
   const [showManualFallback, setShowManualFallback] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
+  const [mealSchedule, setMealSchedule] = useState<MealSchedule | null>(null);
+
+  /** Same meal resolution the full page uses, so widget entries are not orphaned with a "?". */
+  const resolveNowMeal = useCallback(() => {
+    const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const resolved = resolveMealType(now, mealSchedule);
+    return resolved.ambiguous.length === 0 ? resolved.meal : undefined;
+  }, [mealSchedule]);
 
   const loadData = useCallback(() => {
     Promise.all([
       window.api.nutritionGetTodayCalories(),
       window.api.nutritionGetTodayTarget(),
       window.api.nutritionGetWeekCalories(),
-    ]).then(([c, t, wk]) => {
+      window.api.nutritionGetMealSchedule(),
+    ]).then(([c, t, wk, schedule]) => {
       setCalories(c);
       setTarget(t);
       setWeekCalories(wk);
+      setMealSchedule(schedule ?? null);
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Reload data when account is switched
+  // Reload on account switch, settings change and sync - the page does all three.
   useEffect(() => {
     const handler = () => loadData();
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
+    window.addEventListener('nutrition:settingsChanged', handler);
+    window.addEventListener('sync:nutritionUpdated', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener('nutrition:settingsChanged', handler);
+      window.removeEventListener('sync:nutritionUpdated', handler);
+    };
   }, [loadData]);
 
   // ── Quick-estimate handlers ──────────────────────
@@ -52,6 +71,8 @@ export default function NutritionDashboardWidget() {
     try {
       const result = await estimateNutrition(foodInput.trim());
       setEstimation({ totalCalories: result.calories, items: result.items });
+      // A later success has to close the fallback, otherwise it stays open forever.
+      setShowManualFallback(false);
     } catch {
       setEstimation(null);
       setShowManualFallback(true);
@@ -64,11 +85,13 @@ export default function NutritionDashboardWidget() {
     if (!estimation) return;
     try {
       await window.api.nutritionLogFood({
-        date: new Date().toISOString().slice(0, 10),
+        // Local date, never UTC: past 21:00 in UTC-3 the UTC slice is tomorrow.
+        date: todayDateString(),
         description: foodInput.trim(),
         calories: estimation.totalCalories,
         source: 'ai_estimate',
         aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
+        meal: resolveNowMeal(),
       });
       await window.api.processRpgEvent({
         type: 'MEAL_LOGGED',
@@ -256,15 +279,17 @@ export default function NutritionDashboardWidget() {
                 onClick={async () => {
                   const cal = Number(manualCalories);
                   await window.api.nutritionLogFood({
-                    date: new Date().toISOString().slice(0, 10),
+                    date: todayDateString(),
                     description: foodInput.trim() || t('nutrify.manualEntry', 'Entrada manual'),
                     calories: cal,
                     source: 'manual',
+                    meal: resolveNowMeal(),
                   });
                   const rpgResult = await window.api.processRpgEvent({
                     type: 'MEAL_LOGGED',
                     moduleId: 'nutrition',
-                    payload: { xp: 5, hp: 0, calories: cal },
+                    // Same reward as logging from the Nutrify page - the entry is identical.
+                    payload: { xp: 10, hp: 0, calories: cal },
                     timestamp: Date.now(),
                   });
                   toast({ type: 'xp', message: `+${rpgResult.xpGained} XP` });

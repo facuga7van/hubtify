@@ -71,8 +71,9 @@
 }
 
 .cauldron-preset-config {
-  font-family: 'UnifrakturCook', cursive;
+  font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faded);
 }
 
@@ -325,8 +326,9 @@
 }
 
 .cauldron-kv-value {
-  font-family: 'UnifrakturCook', cursive;
+  font-family: 'IM Fell English', serif;
   font-size: var(--fs-quote);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -444,13 +446,15 @@
 
 .cauldron-steam-wrap {
   position: absolute;
-  top: 8%;
+  /* The cauldron rim sits at ~42 % of the stage; start just above it so the
+     plumes read as rising OUT of the pot instead of hovering over it. */
+  top: 38%;
   left: 25%;
   width: 50%;
-  height: 35%;
+  height: 42%;
   pointer-events: none;
   z-index: 2;
-  overflow: hidden;
+  /* No overflow clip - it sliced every plume with a hard horizontal cut. */
 }
 
 .cauldron-steam {
@@ -513,7 +517,7 @@
 }
 
 .cauldron-cycle-segment.break {
-  background: repeating-linear-gradient(135deg, var(--moss) 0 4px, #3d4d2a 4px 8px);
+  background: repeating-linear-gradient(135deg, var(--moss) 0 4px, var(--moss-dark) 4px 8px);
 }
 
 .cauldron-cycle-segment.long-break {
@@ -624,7 +628,6 @@
 
 .cauldron-input:focus,
 .cauldron-select:focus {
-  outline: none;
   border-color: var(--gold);
   box-shadow: inset 0 1px 2px rgba(42, 29, 14, 0.15), 0 0 0 1px rgba(168, 138, 60, 0.3);
 }
@@ -842,7 +845,7 @@
 }
 
 .cauldron-floating-timer.break .cauldron-ft-bar > span {
-  background: repeating-linear-gradient(90deg, var(--moss) 0 4px, #3d4d2a 4px 8px);
+  background: repeating-linear-gradient(90deg, var(--moss) 0 4px, var(--moss-dark) 4px 8px);
 }
 
 .cauldron-floating-timer.long-break .cauldron-ft-bar > span {
@@ -1058,7 +1061,7 @@
 /* -- 18. Utility Classes ------------------------------------- */
 
 .cauldron-mono {
-  font-family: 'UnifrakturCook', cursive;
+  font-family: 'Fira Code', monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1104,4 +1107,74 @@
     animation: none !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* -- 20. UX fixes ------------------------------------------- */
+
+/* Primary start action lives on the cauldron, not buried in the side panel. */
+.cauldron-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.cauldron-stage-actions .cauldron-btn--primary {
+  padding: 10px 26px;
+  font-size: var(--fs-quote);
+}
+
+.cauldron-popout-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Resume banner for a session the app was killed in the middle of. */
+.cauldron-resume-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--gold-dark);
+  background: rgba(168, 138, 60, 0.12);
+}
+
+.cauldron-resume-text {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  color: var(--ink);
+  flex: 1;
+  min-width: 200px;
+}
+
+.cauldron-resume-time {
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--rubric);
+}
+
+/* Clickable section title for the history collapse. */
+.cauldron-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+/* The shared .qb-gauge is 10px tall with `overflow: hidden`, so its 13px inner
+   percentage label gets sliced in half. Give the cauldron gauge room to breathe.
+   (The real fix belongs in codex.css — see the report.) */
+.cauldron-book .qb-gauge {
+  height: 18px;
 }
