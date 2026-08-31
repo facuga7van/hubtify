@@ -6,12 +6,15 @@ import {
   getComboMultiplier,
   rollRandomBonus,
   calculateXpGain,
-  calculateHpPenalty,
+  vigorBonus,
   getStreakMilestoneBonus,
   clampHp,
   xpToNextLevel,
   daysDiff,
   getLocalDateString,
+  monthKey,
+  pardonsRemaining,
+  PARDONS_PER_MONTH,
 } from './rpg-engine';
 
 describe('xpThreshold', () => {
@@ -50,21 +53,42 @@ describe('rollRandomBonus', () => {
 
 describe('calculateXpGain', () => {
   it('calculates base x combo x bonus', () => {
-    expect(calculateXpGain(15, 1.25, 1.0, 50)).toBeCloseTo(18.75);
+    expect(calculateXpGain(15, 1.25, 1.0)).toBeCloseTo(18.75);
   });
-  it('applies hp penalty when hp is 0', () => {
-    expect(calculateXpGain(15, 1.0, 1.0, 0)).toBeCloseTo(7.5);
-  });
-  it('no hp penalty when hp > 0', () => {
-    expect(calculateXpGain(15, 1.0, 1.0, 1)).toBeCloseTo(15);
+  // Replaces the two former hp-penalty cases. `calculateHpPenalty` is GONE: it
+  // halved every reward at hp = 0 with no way to heal, which is accumulated-debt
+  // punishment. HP is now the day's Vigor and never touches XP.
+  it('is unaffected by HP — there is no penalty term left', () => {
+    expect(calculateXpGain(15, 1.0, 1.0)).toBeCloseTo(15);
+    expect(calculateXpGain.length).toBe(3);
   });
 });
 
-describe('calculateHpPenalty', () => {
-  it('returns 0.5 when hp is 0', () => { expect(calculateHpPenalty(0)).toBe(0.5); });
-  it('returns 1.0 when hp > 0', () => {
-    expect(calculateHpPenalty(1)).toBe(1.0);
-    expect(calculateHpPenalty(100)).toBe(1.0);
+describe('vigorBonus', () => {
+  it('never punishes — the floor is 1.0', () => {
+    expect(vigorBonus(0)).toBe(1.0);
+    expect(vigorBonus(69)).toBe(1.0);
+  });
+  it('rewards a healthy day', () => {
+    expect(vigorBonus(70)).toBe(1.05);
+    expect(vigorBonus(89)).toBe(1.05);
+    expect(vigorBonus(90)).toBe(1.1);
+    expect(vigorBonus(100)).toBe(1.1);
+  });
+});
+
+describe('monthKey / pardonsRemaining', () => {
+  it('buckets a date into its YYYY-MM month', () => {
+    expect(monthKey('2026-08-31')).toBe('2026-08');
+  });
+  it('gives a full allowance when the stored month is stale or missing', () => {
+    expect(pardonsRemaining(null, 0, '2026-08')).toBe(PARDONS_PER_MONTH);
+    expect(pardonsRemaining('2026-07', 2, '2026-08')).toBe(PARDONS_PER_MONTH);
+  });
+  it('subtracts the pardons used inside the current month', () => {
+    expect(pardonsRemaining('2026-08', 1, '2026-08')).toBe(1);
+    expect(pardonsRemaining('2026-08', 2, '2026-08')).toBe(0);
+    expect(pardonsRemaining('2026-08', 9, '2026-08')).toBe(0);
   });
 });
 

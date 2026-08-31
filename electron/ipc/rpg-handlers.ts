@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { getDb } from './db';
 import { ipcHandle } from './ipc-handle';
 import crypto from 'crypto';
+import { BrowserWindow } from 'electron';
 import {
   getLevel,
   getTitle,
@@ -12,10 +13,12 @@ import {
   getStreakMilestoneBonus,
   getLocalDateString,
   daysDiff,
+  monthKey,
+  pardonsRemaining,
 } from '../../shared/rpg-engine';
-import type { PlayerStats, RpgEvent, RpgEventRecord } from '../../shared/types';
-import { todayDateString, localTimestamp, daysAgoDateString, nextDateString } from '../../shared/date-utils';
-import { getPlayerStats } from './rpg-stats';
+import type { RpgEvent, RpgEventRecord } from '../../shared/types';
+import { todayDateString, localTimestamp, daysAgoDateString, nextDateString, formatDateString } from '../../shared/date-utils';
+import { getPlayerStats, rolloverVigor, type PlayerStatsV2 } from './rpg-stats';
 
 /**
  * Hard bounds for anything arriving from the renderer (or, via sync, from an
@@ -59,6 +62,79 @@ export interface RpgEventResult {
   milestoneXp: number;
   comboMultiplier: number;
   bonusMultiplier: number;
+  /** True when this event spent one of the month's streak pardons. */
+  pardonUsed: boolean;
+}
+
+/**
+ * Event types that increment `player_stats.total_expenses`.
+ *
+ * The first two are the LEGACY names this branch used to match — no module has
+ * ever emitted them, so the counter was dead. The real handler names declared in
+ * `src/modules/finance/index.ts` are EXPENSE_LOGGED / INCOME_LOGGED /
+ * LOAN_SETTLED / STATEMENT_IMPORTED / RECURRING_UPDATED; the ones that represent
+ * a logged movement are accepted here already, so wiring Coinify to the RPG bus
+ * in phase 2 is purely a renderer-side `processRpgEvent()` call.
+ *
+ * STATEMENT_IMPORTED and RECURRING_UPDATED are deliberately NOT counted: they are
+ * bulk/config actions, not individual movements.
+ */
+const FINANCE_COUNTED_EVENTS = new Set([
+  'EXPENSE_TRACKED', // legacy, never emitted
+  'LOAN_SETTLED',
+  'EXPENSE_LOGGED',
+  'INCOME_LOGGED',
+]);
+
+/** The day BEFORE a YYYY-MM-DD date (noon anchor, so DST can never shift it). */
+function previousDateString(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  return formatDateString(d);
+}
+
+/** Neutral result, returned when the event could not be processed. */
+const EMPTY_RESULT: RpgEventResult = {
+  xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null,
+  milestoneXp: 0, comboMultiplier: 1.0, bonusMultiplier: 1.0, pardonUsed: false,
+};
+
+/**
+ * Checks the player in/out of the Inn (holiday mode).
+ *
+ * Model: `inn_since` — a start date, switched off MANUALLY (not an `inn_until`
+ * deadline). A holiday that ends by itself on a date picked in advance is just
+ * another deadline to miss; this one ends when the player says so.
+ *
+ * While resting, events still pay full XP (using the app on holiday is neither
+ * punished nor blocked) but the streak neither advances nor breaks. On check-out
+ * `streak_last_date` is rewound to YESTERDAY, so the first day back continues the
+ * streak exactly where it was — which also means the rest days never consume a
+ * pardon, and no milestone is re-paid (`last_milestone_streak` is untouched).
+ */
+export function setInnMode(db: Database.Database, on: boolean, today = getLocalDateString()): { innSince: string | null } {
+  const row = db.prepare('SELECT inn_since, streak_last_date FROM player_stats WHERE user_id = ?').get('default') as
+    { inn_since: string | null; streak_last_date: string | null } | undefined;
+  if (!row) return { innSince: null };
+
+  if (on) {
+    // Already resting: keep the original check-in date.
+    if (row.inn_since) return { innSince: row.inn_since };
+    db.prepare("UPDATE player_stats SET inn_since = ? WHERE user_id = 'default'").run(today);
+    return { innSince: today };
+  }
+
+  if (!row.inn_since) return { innSince: null };
+  // Only rewind when the player has not already acted today — otherwise a
+  // check-in/check-out round trip on the same day would let the streak tick twice.
+  const shouldRewind = row.streak_last_date !== today;
+  if (shouldRewind) {
+    db.prepare("UPDATE player_stats SET inn_since = NULL, streak_last_date = ? WHERE user_id = 'default'")
+      .run(previousDateString(today));
+  } else {
+    db.prepare("UPDATE player_stats SET inn_since = NULL WHERE user_id = 'default'").run();
+  }
+  return { innSince: null };
 }
 
 /**
@@ -72,8 +148,12 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
     const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED';
 
     const processTransaction = db.transaction(() => {
-      const stats = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
       const today = getLocalDateString();
+      // Vigor first: a new day always starts at 100 HP, BEFORE this event's delta
+      // is applied. The bad day died with the day.
+      rolloverVigor(db, today);
+
+      const stats = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
 
       const payload = event.payload as Record<string, unknown> | null;
       const baseXp = clampNumber(payload?.xp, -MAX_EVENT_XP, MAX_EVENT_XP);
@@ -88,6 +168,16 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       let lastMilestoneStreak = (stats.last_milestone_streak as number) ?? 0;
       // Only a real, XP-bearing action advances the combo/streak bookkeeping.
       let advancesProgress = false;
+
+      // ── Streak pardons (2 per calendar month, lazily rolled) ──
+      const month = monthKey(today);
+      const storedPardonMonth = (stats.pardons_month as string | null) ?? null;
+      let pardonsUsed = storedPardonMonth === month ? ((stats.pardons_used as number) ?? 0) : 0;
+      let pardonUsed = false;
+
+      let bestStreak = (stats.best_streak as number) ?? 0;
+      // Inn (holiday) mode: XP flows normally, the streak is frozen.
+      const innActive = !!(stats.inn_since as string | null);
 
       if (isUndo) {
         // Find the original completion event and reverse its exact XP.
@@ -134,11 +224,22 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         if ((stats.combo_date as string | null) !== today) combo = 0;
         comboMultiplier = getComboMultiplier(combo);
         bonusMultiplier = rollRandomBonus();
-        xpGained = Math.round(calculateXpGain(baseXp, comboMultiplier, bonusMultiplier, stats.hp as number) * 100) / 100;
+        // No HP term: low Vigor never shrinks a reward (see calculateXpGain).
+        xpGained = Math.round(calculateXpGain(baseXp, comboMultiplier, bonusMultiplier) * 100) / 100;
 
         const lastDate = stats.streak_last_date as string | null;
-        if (lastDate !== today) {
-          if (lastDate && daysDiff(lastDate, today) === 1) {
+        // While resting at the Inn the streak neither advances nor breaks; it is
+        // resumed on check-out by rewinding streak_last_date to yesterday.
+        if (lastDate !== today && !innActive) {
+          const gap = lastDate ? daysDiff(lastDate, today) : Number.POSITIVE_INFINITY;
+          if (gap === 1) {
+            streak = streak + 1;
+          } else if (gap === 2 && pardonsRemaining(storedPardonMonth, pardonsUsed, month) > 0) {
+            // Exactly ONE missed day, and the month still has a pardon: the streak
+            // continues as if the gap never happened — milestones included.
+            // A gap > 2 falls normally; pardons do not stack.
+            pardonsUsed = pardonsUsed + 1;
+            pardonUsed = true;
             streak = streak + 1;
           } else {
             // Streak broken (or first ever action) — restart, and clear the
@@ -146,6 +247,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
             streak = 1;
             lastMilestoneStreak = 0;
           }
+          bestStreak = Math.max(bestStreak, streak);
 
           // Milestone bonuses live INSIDE this block: `streak` is constant for the
           // whole day, so computing them per-event paid 3/7/14/30/60/100-day bonuses
@@ -190,14 +292,26 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?, daily_combo = ?
           WHERE user_id = ?
         `).run(finalLevel, finalXp, newHp, finalTitle, Math.max(0, combo), 'default');
+      } else if (advancesProgress && innActive) {
+        // Resting at the Inn: XP, level and the DAILY combo still move (the combo
+        // belongs to the day, not to the streak). Streak columns stay frozen.
+        db.prepare(`
+          UPDATE player_stats SET
+            level = ?, xp = ?, hp = ?, title = ?, daily_combo = ?, combo_date = ?
+          WHERE user_id = ?
+        `).run(finalLevel, finalXp, newHp, finalTitle, combo + 1, today, 'default');
       } else if (advancesProgress) {
         db.prepare(`
           UPDATE player_stats SET
             level = ?, xp = ?, hp = ?, title = ?,
             streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?,
-            last_milestone_streak = ?
+            last_milestone_streak = ?, best_streak = ?,
+            pardons_month = ?, pardons_used = ?
           WHERE user_id = ?
-        `).run(finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today, lastMilestoneStreak, 'default');
+        `).run(
+          finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today,
+          lastMilestoneStreak, Math.max(bestStreak, streak), month, pardonsUsed, 'default',
+        );
       } else {
         db.prepare(`
           UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?
@@ -211,7 +325,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         db.prepare('UPDATE player_stats SET total_tasks = MAX(0, total_tasks - 1) WHERE user_id = ?').run('default');
       } else if (event.type === 'MEAL_LOGGED') {
         db.prepare('UPDATE player_stats SET total_meals = total_meals + 1 WHERE user_id = ?').run('default');
-      } else if (event.type === 'EXPENSE_TRACKED' || event.type === 'LOAN_SETTLED') {
+      } else if (FINANCE_COUNTED_EVENTS.has(event.type)) {
         db.prepare('UPDATE player_stats SET total_expenses = total_expenses + 1 WHERE user_id = ?').run('default');
       }
 
@@ -223,11 +337,26 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         milestoneXp,
         comboMultiplier,
         bonusMultiplier,
+        pardonUsed,
       };
     });
 
     try {
-      return processTransaction();
+      const result = processTransaction();
+      // Central broadcast: callers of processRpgEvent are scattered across four
+      // modules; one listener in Layout turns this into the single, discreet
+      // "se uso un indulto" toast instead of wiring every call site.
+      if (result.pardonUsed) {
+        // Defensive: under vitest the electron mock has no BrowserWindow, and at
+        // real startup there may be no windows yet. The toast is a nicety — it
+        // must never take the XP transaction down with it.
+        try {
+          for (const win of BrowserWindow?.getAllWindows?.() ?? []) {
+            win.webContents.send('rpg:pardonUsed');
+          }
+        } catch { /* headless or test environment */ }
+      }
+      return result;
     } catch (err) {
       console.error(`[RPG] Error processing event "${event.type}":`, err);
       try {
@@ -239,16 +368,23 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           extractRefId(event.payload as Record<string, unknown> | null), crypto.randomUUID(),
         );
       } catch { /* best effort logging */ }
-      return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0, comboMultiplier: 1.0, bonusMultiplier: 1.0 };
+      return { ...EMPTY_RESULT };
     }
 }
 
 export function registerRpgHandlers(): void {
-  ipcHandle('rpg:getStats', (): PlayerStats => {
-    return getPlayerStats(getDb());
+  ipcHandle('rpg:getStats', (): PlayerStatsV2 => {
+    const db = getDb();
+    // Normalise Vigor on READ too, so the sidebar shows 100 first thing in the
+    // morning instead of yesterday's leftovers waiting for an event.
+    rolloverVigor(db);
+    return getPlayerStats(db);
   });
 
   ipcHandle('rpg:processEvent', (_e, event: RpgEvent) => processRpgEvent(getDb(), event));
+
+  /** Check in/out of the Inn (holiday mode). Returns the resulting state. */
+  ipcHandle('rpg:setInnMode', (_e, on: boolean) => setInnMode(getDb(), !!on));
 
   ipcHandle('rpg:getHistory', (_e, limit: number): RpgEventRecord[] => {
     const db = getDb();
@@ -296,10 +432,18 @@ export function registerRpgHandlers(): void {
     };
   });
 
-  ipcHandle('sync:restoreStats', (_e, stats: Record<string, unknown>) => {
-    try {
-      const db = getDb();
+  ipcHandle('sync:restoreStats', (_e, stats: Record<string, unknown>) => restorePlayerStats(getDb(), stats));
+}
 
+/**
+ * Applies a remote `playerStats` document over the local row.
+ *
+ * Extracted from the `sync:restoreStats` handler so the sanitising rules — most
+ * of all the phase-1 columns, which older payloads simply do not carry — can be
+ * exercised against an in-memory database.
+ */
+export function restorePlayerStats(db: Database.Database, stats: Record<string, unknown>): { success: boolean } {
+    try {
       // Everything here comes off the wire. Level/title are DERIVED from xp rather
       // than trusted, so a corrupt remote can never produce a negative
       // `xpToNextLevel` (xpThreshold(level+1) - xp) that sticks forever.
@@ -314,11 +458,29 @@ export function registerRpgHandlers(): void {
       const totalMeals = Math.max(0, Math.round(clampNumber(stats.totalMeals ?? stats.total_meals ?? 0, 0, Number.MAX_SAFE_INTEGER)));
       const totalExpenses = Math.max(0, Math.round(clampNumber(stats.totalExpenses ?? stats.total_expenses ?? 0, 0, Number.MAX_SAFE_INTEGER)));
 
+      // ── Phase-1 fields. A payload written by an older build (or by Syl) has
+      // none of them; every branch below degrades to a sane default rather than
+      // throwing or writing NULL into a NOT NULL column.
+      const today = getLocalDateString();
+      const asDate = (v: unknown): string | null =>
+        typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+      // The restored HP belongs to whatever day the remote says; with no date it
+      // is treated as today's Vigor (the next local morning resets it anyway).
+      const hpDate = asDate(stats.hpDate ?? stats.hp_date) ?? today;
+      const pardonsMonth = typeof stats.pardonsMonth === 'string' && /^\d{4}-\d{2}$/.test(stats.pardonsMonth)
+        ? stats.pardonsMonth
+        : (typeof stats.pardons_month === 'string' && /^\d{4}-\d{2}$/.test(stats.pardons_month) ? stats.pardons_month : null);
+      const pardonsUsed = Math.max(0, Math.round(clampNumber(stats.pardonsUsed ?? stats.pardons_used ?? 0, 0, 100)));
+      const bestStreak = Math.max(0, Math.round(clampNumber(stats.bestStreak ?? stats.best_streak ?? 0, 0, 100000)));
+      const innSince = asDate(stats.innSince ?? stats.inn_since);
+
       db.prepare(`
         UPDATE player_stats SET level = ?, xp = ?, hp = ?, max_hp = ?, title = ?,
           streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?,
           total_tasks = ?, total_meals = ?, total_expenses = ?,
-          last_milestone_streak = ?
+          last_milestone_streak = ?, hp_date = ?,
+          pardons_month = ?, pardons_used = ?, inn_since = ?,
+          best_streak = MAX(best_streak, ?, ?)
         WHERE user_id = 'default'
       `).run(
         level, xp, hp, maxHp, title,
@@ -329,11 +491,14 @@ export function registerRpgHandlers(): void {
         // The device that earned this streak already paid its milestone bonus (and
         // that XP is part of the restored `xp`), so mark it as collected here too.
         streak,
+        hpDate, pardonsMonth, pardonsUsed, innSince,
+        // The record is the high-water mark across devices — a restore may only
+        // raise it, never lower it.
+        bestStreak, streak,
       );
       return { success: true };
     } catch (err) {
       console.error('[Sync] Restore stats failed:', err);
       return { success: false };
     }
-  });
 }

@@ -49,21 +49,70 @@ export function rollRandomBonus(): number {
   return 1.0;
 }
 
-export function calculateHpPenalty(currentHp: number): number {
-  return currentHp === 0 ? 0.5 : 1.0;
-}
-
+/**
+ * XP is NEVER reduced by low HP.
+ *
+ * `calculateHpPenalty` used to halve every gain at hp = 0, and nothing in the
+ * whole codebase regenerated HP — the only exit was the (nonexistent) one. That
+ * is accumulated debt punishment, the exact mechanic that burns Habitica users
+ * out, and it ran on a single axis (only Nutrify moved HP). HP is now **Vigor**:
+ * the state of TODAY, reset to 100 every local morning (see `rolloverVigor` in
+ * electron/ipc/rpg-stats.ts). A bad day dies with the day.
+ */
 export function calculateXpGain(
   baseXp: number,
   comboMultiplier: number,
   randomBonus: number,
-  currentHp: number,
 ): number {
-  return baseXp * comboMultiplier * randomBonus * calculateHpPenalty(currentHp);
+  return baseXp * comboMultiplier * randomBonus;
+}
+
+/**
+ * Vigor pays a BONUS, never a penalty — the carrot replacing the old stick.
+ *
+ * Proposed mapping (phase 2, "Cierre del Códice"): the day's closing multiplier
+ * applied ONCE to the day's summary, not per event.
+ *   hp >= 90 → 1.10   (day closed in full health)
+ *   hp >= 70 → 1.05
+ *   hp <  70 → 1.00   (never below 1.0 — a bad day costs the bonus, not XP)
+ *
+ * Exported with no callers on purpose: phase 1 only clears the ground.
+ */
+export function vigorBonus(hp: number): number {
+  if (hp >= 90) return 1.1;
+  if (hp >= 70) return 1.05;
+  return 1.0;
 }
 
 export function clampHp(hp: number): number {
   return Math.max(0, Math.min(100, Math.round(hp)));
+}
+
+/** Full Vigor. The day always starts here. */
+export const MAX_VIGOR = 100;
+
+/**
+ * Automatic streak pardons per calendar month.
+ *
+ * Duolingo reported ~+40% streak adoption after decoupling the streak from
+ * perfection (streak freezes). One missed day should not delete months of work;
+ * two missed days in a row still does — pardons do not stack.
+ */
+export const PARDONS_PER_MONTH = 2;
+
+/** The YYYY-MM bucket a YYYY-MM-DD date belongs to. */
+export function monthKey(dateStr: string): string {
+  return dateStr.slice(0, 7);
+}
+
+/** Pardons still available in `month`, given the stored counter and its month. */
+export function pardonsRemaining(
+  storedMonth: string | null,
+  storedUsed: number,
+  month: string,
+): number {
+  const used = storedMonth === month ? Math.max(0, storedUsed || 0) : 0;
+  return Math.max(0, PARDONS_PER_MONTH - used);
 }
 
 export function xpToNextLevel(totalXp: number): number {

@@ -154,6 +154,33 @@ export const coreMigrations: Migration[] = [
       ALTER TABLE player_stats ADD COLUMN last_milestone_streak INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    namespace: 'core',
+    version: 3,
+    up: `
+      -- ── RPG phase 1: stop the bleeding ──────────────────────────────────────
+      -- hp_date: the local day the current HP belongs to. HP is no longer a debt
+      -- carried across days ("Vigor"): the first read or event of a new day resets
+      -- it to 100. Without this column HP only ever went down (nothing in the app
+      -- healed it) while XP was halved at 0.
+      ALTER TABLE player_stats ADD COLUMN hp_date TEXT;
+
+      -- pardons_month / pardons_used: 2 automatic streak pardons per calendar
+      -- month. One missed day no longer wipes the global streak.
+      ALTER TABLE player_stats ADD COLUMN pardons_month TEXT;
+      ALTER TABLE player_stats ADD COLUMN pardons_used INTEGER NOT NULL DEFAULT 0;
+
+      -- best_streak: the record. Never reset, not by a break, not by a restore.
+      ALTER TABLE player_stats ADD COLUMN best_streak INTEGER NOT NULL DEFAULT 0;
+
+      -- inn_since: local date the player checked into the Inn (holiday mode).
+      -- NULL = not resting. While set, the streak neither advances nor breaks.
+      ALTER TABLE player_stats ADD COLUMN inn_since TEXT;
+
+      -- Seed the record from whatever streak this device already had.
+      UPDATE player_stats SET best_streak = streak WHERE best_streak < streak;
+    `,
+  },
 ];
 
 const DUPLICATE_COLUMN = 'duplicate column name';
