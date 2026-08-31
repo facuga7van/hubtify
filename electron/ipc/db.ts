@@ -15,11 +15,12 @@ export function getDb(): Database.Database {
     db.pragma('cache_size = 10000');
     db.pragma('temp_store = MEMORY');
     initCoreTables(db);
+    applyMigrations(db, coreMigrations);
   }
   return db;
 }
 
-function initCoreTables(db: Database.Database): void {
+export function initCoreTables(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations_applied (
       namespace TEXT NOT NULL,
@@ -66,47 +67,149 @@ function initCoreTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_rpg_events_created_at ON rpg_events(created_at);
 
-    CREATE TABLE IF NOT EXISTS sync_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      table_name TEXT NOT NULL,
-      row_id TEXT NOT NULL,
-      operation TEXT NOT NULL,
-      synced INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    -- Key/value store for app-level state and user preferences.
+    -- Created here (not ad-hoc in sync.ipc.ts) so every reader — including
+    -- dollar:getVisibleTypes on a clean install — finds the table already there.
+    CREATE TABLE IF NOT EXISTS app_state (
+      key TEXT PRIMARY KEY,
+      value TEXT
     );
+
+    -- sync_log was never read nor written by any code path. Dropped so it stops
+    -- showing up in schema dumps and account-clearing sweeps.
+    DROP TABLE IF EXISTS sync_log;
 
     INSERT OR IGNORE INTO player_stats (user_id) VALUES ('default');
     INSERT OR IGNORE INTO user_profile (id) VALUES ('default');
   `);
 }
 
-export function runModuleMigrations(migrations: Migration[]): void {
-  const database = getDb();
+/**
+ * Core (namespace-less module) migrations. These touch the tables created in
+ * initCoreTables, which predate the per-module migration system.
+ */
+export const coreMigrations: Migration[] = [
+  {
+    namespace: 'core',
+    version: 1,
+    up: `
+      -- ref_id: the entity this event refers to, extracted from the JSON payload.
+      -- Undo used to locate the original event with payload LIKE '%"<id>"%', which
+      -- matched ANY field holding that UUID (projectId, subtaskId, …) and was a
+      -- full table scan. ref_id + the index below make the lookup exact and cheap.
+      ALTER TABLE rpg_events ADD COLUMN ref_id TEXT;
+
+      -- sync_id: client-generated stable identity for cross-device sync.
+      -- rpg_events.id is AUTOINCREMENT, so two devices mint 1,2,3… for different
+      -- rows; deduplicating on it silently drops and cross-applies data.
+      ALTER TABLE rpg_events ADD COLUMN sync_id TEXT;
+
+      UPDATE rpg_events SET ref_id = COALESCE(
+        json_extract(payload, '$.taskId'),
+        json_extract(payload, '$.subtaskId'),
+        json_extract(payload, '$.habitId')
+      ) WHERE payload IS NOT NULL AND json_valid(payload);
+
+      -- Backfill DETERMINISTICALLY, not with a random UUID: the same logical event
+      -- already exists on every synced device (the old merge copied id + payload
+      -- verbatim), so a random id per device would make them all look distinct and
+      -- duplicate the whole history on the first merge after this migration.
+      UPDATE rpg_events
+        SET sync_id = 'legacy-' || created_at || '-' || event_type || '-'
+                      || COALESCE(ref_id, '') || '-' || xp_gained
+        WHERE sync_id IS NULL;
+
+      -- Disambiguate the rare genuine collision (two identical events in the same
+      -- second) so the UNIQUE index below can be created.
+      UPDATE rpg_events SET sync_id = sync_id || '#' || id
+        WHERE id NOT IN (SELECT MIN(id) FROM rpg_events GROUP BY sync_id);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_rpg_events_sync_id ON rpg_events(sync_id);
+      CREATE INDEX IF NOT EXISTS idx_rpg_events_type_ref ON rpg_events(event_type, ref_id, id DESC);
+    `,
+  },
+  {
+    namespace: 'core',
+    version: 2,
+    up: `
+      -- Streak milestones (3/7/14/30/60/100 days → 25..1000 XP) must be paid once.
+      -- Tracks the highest milestone streak already rewarded so neither a second
+      -- action on the same day nor an undo/redo cycle can re-award it.
+      ALTER TABLE player_stats ADD COLUMN last_milestone_streak INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+];
+
+const DUPLICATE_COLUMN = 'duplicate column name';
+
+function isDuplicateColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : '';
+  return msg.includes(DUPLICATE_COLUMN);
+}
+
+/**
+ * Applies pending migrations. Each migration runs inside ONE transaction that
+ * also writes its `migrations_applied` row, so a failure halfway through leaves
+ * the database exactly as it was — nothing partially applied, nothing re-run
+ * against a half-migrated schema on the next boot. (SQLite DDL is transactional,
+ * so even `DROP TABLE` + `RENAME` pairs are safe.)
+ *
+ * Preferred path executes `migration.up` whole, which keeps triggers and string
+ * literals containing `;` intact.
+ *
+ * Fallback path (statement-by-statement) exists only for databases whose schema
+ * was already partially advanced by the OLD non-transactional runner: there an
+ * `ALTER TABLE … ADD COLUMN` re-runs and raises "duplicate column name". Those
+ * specific errors are skipped so the remaining statements still apply. Its split
+ * on `;` cannot handle a `;` inside a trigger body or literal — no current
+ * migration has one, and new migrations should not rely on this path.
+ */
+function applyMigrations(database: Database.Database, migrations: Migration[]): void {
+  const markApplied = database.prepare(
+    'INSERT OR IGNORE INTO migrations_applied (namespace, version) VALUES (?, ?)'
+  );
+
   for (const migration of migrations) {
     const applied = database.prepare(
       'SELECT 1 FROM migrations_applied WHERE namespace = ? AND version = ?'
     ).get(migration.namespace, migration.version);
-    if (!applied) {
+    if (applied) continue;
+
+    const whole = database.transaction(() => {
+      database.exec(migration.up);
+      markApplied.run(migration.namespace, migration.version);
+    });
+
+    try {
+      whole();
+    } catch (err) {
+      if (!isDuplicateColumnError(err)) throw err;
+
       const statements = migration.up
         .split(';')
         .map((s) => s.trim())
         .filter(Boolean);
-      for (const stmt of statements) {
-        try {
-          database.exec(stmt);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : '';
-          if (!msg.includes('duplicate column name')) {
-            throw err;
+      const perStatement = database.transaction(() => {
+        for (const stmt of statements) {
+          try {
+            database.exec(stmt);
+          } catch (stmtErr: unknown) {
+            if (!isDuplicateColumnError(stmtErr)) throw stmtErr;
           }
         }
-      }
-      database.prepare(
-        'INSERT INTO migrations_applied (namespace, version) VALUES (?, ?)'
-      ).run(migration.namespace, migration.version);
+        markApplied.run(migration.namespace, migration.version);
+      });
+      perStatement();
     }
   }
 }
+
+export function runModuleMigrations(migrations: Migration[]): void {
+  applyMigrations(getDb(), migrations);
+}
+
+/** Test/seam helper: apply migrations to an arbitrary database handle. */
+export { applyMigrations };
 
 export function closeDb(): void {
   if (db) {

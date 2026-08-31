@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { registerAllIpcHandlers } from './ipc/registry';
@@ -10,10 +10,25 @@ import { characterMigrations } from '../src/modules/character/character.schema';
 import { notificationsMigrations } from './modules/notifications.schema';
 import { cauldronMigrations } from '../src/modules/cauldron/cauldron.schema';
 import { startNotificationEngine, stopNotificationEngine } from './modules/notifications.ipc';
+import { generateRecurringForMonth } from './modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 
 // Handle Squirrel events (Windows installer lifecycle)
 if (require('electron-squirrel-startup')) app.quit();
+
+/**
+ * Without these, an exception thrown outside a request/response cycle — a
+ * `setInterval` in the notification engine, a stray promise rejection in the
+ * updater — takes the whole main process down and the window with it.
+ * Log it and keep running; the renderer stays alive and the user keeps working.
+ */
+process.on('uncaughtException', (err, origin) => {
+  console.error(`[main] uncaughtException (${origin}):`, err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] unhandledRejection:', reason);
+});
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -79,6 +94,63 @@ function createTray(): void {
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
 }
 
+/**
+ * True only for URLs the app itself serves: the Vite dev server in development,
+ * or a file:// path inside the packaged renderer output.
+ */
+function isInternalUrl(target: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return false;
+  }
+
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    try {
+      if (url.origin === new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin) return true;
+    } catch { /* malformed dev server URL — fall through */ }
+  }
+
+  if (url.protocol === 'file:') {
+    const appRoot = path.resolve(__dirname, '..');
+    const filePath = path.resolve(decodeURIComponent(url.pathname).replace(/^\/([a-zA-Z]:)/, '$1'));
+    return filePath.toLowerCase().startsWith(appRoot.toLowerCase());
+  }
+
+  return false;
+}
+
+/**
+ * Every window ships the preload bridge, so letting it navigate anywhere would
+ * hand `window.api` (SQLite, filesystem, sync credentials) to a third-party page.
+ * Deny `window.open` outright and refuse any navigation off our own origin;
+ * genuine external links open in the user's browser instead.
+ */
+function hardenWindow(win: BrowserWindow): void {
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url) && !isInternalUrl(url)) {
+      shell.openExternal(url).catch((err) => console.error('[security] openExternal failed:', err));
+    }
+    return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (isInternalUrl(url)) return;
+    event.preventDefault();
+    console.warn('[security] blocked navigation to', url);
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url).catch((err) => console.error('[security] openExternal failed:', err));
+    }
+  });
+
+  win.webContents.on('will-redirect', (event, url) => {
+    if (isInternalUrl(url)) return;
+    event.preventDefault();
+    console.warn('[security] blocked redirect to', url);
+  });
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -96,6 +168,8 @@ function createWindow(): void {
     },
     title: 'Hubtify',
   });
+
+  hardenWindow(mainWindow);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
@@ -190,6 +264,8 @@ function createCauldronWindow(): void {
     },
   });
 
+  hardenWindow(cauldronWindow);
+
   // Save position when moved
   cauldronWindow.on('moved', () => {
     if (cauldronWindow && !cauldronWindow.isDestroyed()) {
@@ -216,6 +292,11 @@ function createCauldronWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Create the window FIRST so the renderer starts loading while the main
+  // process is still busy. Everything below runs in the same synchronous tick,
+  // so no IPC call can be serviced before its handler is registered.
+  createWindow();
+
   registerAllIpcHandlers();
   registerUpdaterIpcHandlers();
 
@@ -235,30 +316,20 @@ app.whenReady().then(() => {
   runModuleMigrations(notificationsMigrations);
   runModuleMigrations(cauldronMigrations);
 
-  // Auto-generate recurring transactions for current month
+  // Auto-generate recurring transactions for current month.
+  // Shares the exact implementation used by `finance:generateRecurringForMonth`,
+  // so billing_day, deterministic ids and soft-delete awareness cannot drift.
   try {
-    const db = getDb();
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const activeRecurrings = db.prepare('SELECT * FROM finance_recurring WHERE active = 1').all() as Array<Record<string, unknown>>;
-    for (const rec of activeRecurrings) {
-      const existing = db.prepare(
-        "SELECT COUNT(*) as count FROM finance_transactions WHERE source = 'recurring' AND recurring_id = ? AND date LIKE ?"
-      ).get(rec.id, `${currentMonth}%`) as { count: number };
-
-      if (existing.count === 0) {
-        const id = require('crypto').randomUUID();
-        db.prepare(`INSERT INTO finance_transactions
-          (id, type, amount, currency, category, description, date, payment_method, source, recurring_id, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', ?, datetime('now'), datetime('now'))`)
-          .run(id, rec.type, rec.amount, rec.currency ?? 'ARS', rec.category ?? 'Otros', rec.name, `${currentMonth}-01`, rec.id);
-      }
+    const generated = generateRecurringForMonth(getDb(), currentMonth);
+    if (generated > 0) {
+      console.log(`[bootstrap] generated ${generated} recurring transaction(s) for ${currentMonth}`);
     }
   } catch (e) {
-    console.error('Failed to generate recurring transactions:', e);
+    console.error(`[bootstrap] failed to generate recurring transactions for ${new Date().toISOString().slice(0, 7)}:`, e);
   }
 
   createTray();
-  createWindow();
 
   if (mainWindow) initAutoUpdater(mainWindow);
 

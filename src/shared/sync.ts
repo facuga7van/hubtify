@@ -1,6 +1,111 @@
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, writeBatch } from 'firebase/firestore';
 import { getActiveFirestore } from './firebase';
 import { mergeQuestData } from './sync-merge';
+import {
+  habitCheckDocId,
+  checkToDoc,
+  docToCheck,
+  migrateArrayToDocs,
+  isNewer,
+  type HabitCheckRow,
+  type HabitCheckDoc,
+} from './habit-checks-sync';
+
+// Additive-first rollout flag (spec §5.3). While true, the legacy
+// `questify.habitChecks[]` array keeps being written as the authoritative path
+// (safety net) and the subcollection is purely additive. Flip to false in a
+// LATER release — once telemetry shows all active clients write the
+// subcollection — to stop writing the legacy array. Do NOT flip yet.
+const HABITCHECKS_DUALWRITE_LEGACY = true;
+
+// Firestore hard-caps a batch at 500 writes; habit checks grow unbounded
+// (one per habit per day), so chunk to stay well under the limit.
+const HABITCHECKS_BATCH_SIZE = 450;
+
+// Push habit checks to the subcollection with an LWW guard. Reads the current
+// remote docs once and only writes the checks where the local row is strictly
+// newer than the remote (or the remote doc doesn't exist) — this avoids
+// clobbering a newer write from Syl. Fully isolated/non-fatal: a subcollection
+// failure must never break the main push (legacy array is the safety net).
+async function pushHabitChecks(
+  db: ReturnType<typeof getActiveFirestore>,
+  uid: string,
+  checks: HabitCheckRow[],
+): Promise<void> {
+  if (!checks.length) return;
+  try {
+    const col = collection(db, 'hubtify_users', uid, 'habitChecks');
+    const remoteSnap = await getDocs(col);
+    const remoteStamp = new Map<string, string | null>();
+    remoteSnap.forEach(d => {
+      const data = d.data() as Partial<HabitCheckDoc>;
+      remoteStamp.set(d.id, data.updatedAt ?? null);
+    });
+
+    // Collect only the checks whose local row wins LWW.
+    const toWrite = checks.filter(row => {
+      const id = habitCheckDocId(row.habitId, row.date);
+      return isNewer(row.updatedAt ?? row.createdAt, remoteStamp.get(id) ?? null);
+    });
+    if (!toWrite.length) return;
+
+    for (let i = 0; i < toWrite.length; i += HABITCHECKS_BATCH_SIZE) {
+      const batch = writeBatch(db);
+      for (const row of toWrite.slice(i, i + HABITCHECKS_BATCH_SIZE)) {
+        const id = habitCheckDocId(row.habitId, row.date);
+        batch.set(doc(col, id), checkToDoc(row), { merge: true });
+      }
+      await batch.commit();
+    }
+  } catch (err) {
+    console.error('[Sync] habitChecks subcollection push failed (non-fatal):', err);
+  }
+}
+
+export interface RpgEventLike {
+  syncId?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+/** Only this much rpg_events history travels in the main document. */
+const RPG_EVENTS_PUSH_DAYS = 90;
+/** Hard cap, in case a single day produced an absurd number of events. */
+const RPG_EVENTS_PUSH_MAX = 3000;
+
+/**
+ * Unions local and remote rpg_events on `syncId` (never on the device-local
+ * AUTOINCREMENT `id`) and trims the result to a bounded, recent window so the main
+ * user document cannot grow past Firestore's 1 MB cap.
+ */
+export function mergeRpgEvents(
+  local: RpgEventLike[] | undefined,
+  remote: RpgEventLike[] | undefined,
+): RpgEventLike[] {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - RPG_EVENTS_PUSH_DAYS);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const bySyncId = new Map<string, RpgEventLike>();
+  for (const e of [...(remote ?? []), ...(local ?? [])]) {
+    // Pre-sync_id rows can't be identified across devices; drop rather than duplicate.
+    if (!e || typeof e.syncId !== 'string' || !e.syncId) continue;
+    if ((e.createdAt ?? '') < cutoffStr) continue;
+    bySyncId.set(e.syncId, e);
+  }
+
+  const all = [...bySyncId.values()].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+  return all.length > RPG_EVENTS_PUSH_MAX ? all.slice(all.length - RPG_EVENTS_PUSH_MAX) : all;
+}
+
+/**
+ * Fired on the window when a push fails. The push used to swallow every error into
+ * a console.error, so a user whose document had grown past 1 MB (or who was simply
+ * offline) had no way of knowing they had stopped syncing.
+ *
+ * detail: { uid, error }
+ */
+export const SYNC_PUSH_FAILED_EVENT = 'sync:pushFailed';
 
 interface SyncSettings {
   language?: string;
@@ -43,7 +148,8 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
 
     // Only include questify if it has real data
     const questValues = Object.values(questData as Record<string, unknown[]>);
-    if (questValues.some(arr => Array.isArray(arr) && arr.length > 0)) {
+    const hasQuestData = questValues.some(arr => Array.isArray(arr) && arr.length > 0);
+    if (hasQuestData) {
       // setDoc(merge:true) replaces each questify array wholesale, so merge
       // per-record against the remote doc first — a record the local SQLite
       // doesn't know yet (external writer, other device) must survive the push
@@ -51,7 +157,31 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       const remoteQuestify = remoteSnap.exists()
         ? (remoteSnap.data().questify as Record<string, unknown> | undefined)
         : undefined;
-      mainPayload.questify = mergeQuestData(questData as Record<string, unknown>, remoteQuestify);
+      const merged = mergeQuestData(questData as Record<string, unknown>, remoteQuestify) as Record<string, unknown>;
+
+      // task_drawings hold base64 image data. Inside the main document they are the
+      // fastest route to Firestore's 1 MB per-document cap — and once a document is
+      // over it EVERY syncPush fails, so the user silently stops syncing entirely.
+      // They move to their own subcollection document below.
+      delete merged.drawings;
+
+      // rpg_events cannot go through mergeQuestData: that merges on `id`, and
+      // rpg_events.id is a device-local AUTOINCREMENT. They are unioned on sync_id
+      // and bounded, for the same 1 MB reason (one row per task, habit, meal and
+      // expense, previously never pruned).
+      merged.rpgEvents = mergeRpgEvents(
+        (questData as { rpgEvents?: RpgEventLike[] }).rpgEvents,
+        remoteQuestify?.rpgEvents as RpgEventLike[] | undefined,
+      );
+
+      // Additive-first: while HABITCHECKS_DUALWRITE_LEGACY the legacy array stays
+      // in the payload untouched. When flipped false (later release), strip it —
+      // the subcollection becomes the sole source of truth for habit checks.
+      if (!HABITCHECKS_DUALWRITE_LEGACY) {
+        delete merged.habitChecks;
+      }
+
+      mainPayload.questify = merged;
     }
 
     // Only include nutrify if profile exists or any array has data
@@ -80,6 +210,13 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
 
     await setDoc(userRef, mainPayload, { merge: true });
 
+    // habitChecks subcollection (Fase 2a.1) — ADDITIVE. The legacy array above
+    // stays authoritative; this is the idempotent, race-free path for Syl.
+    const questHabitChecks = (questData as { habitChecks?: HabitCheckRow[] }).habitChecks;
+    if (questHabitChecks?.length) {
+      await pushHabitChecks(db, uid, questHabitChecks);
+    }
+
     // Finance subcollection document — avoids 1MB Firestore limit
     // Guard: never overwrite Firestore with empty data (prevents data loss on cleared SQLite)
     const hasFinanceData = Object.values(financeData as Record<string, unknown[]>)
@@ -87,6 +224,19 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
     if (hasFinanceData) {
       const financeRef = doc(db, 'hubtify_users', uid, 'finance', 'data');
       await setDoc(financeRef, financeData, { merge: true });
+    }
+
+    // Drawings subcollection document — base64 payloads kept OUT of the main doc
+    // (see the delete above). Isolated try/catch: a drawings failure must never
+    // take the rest of the push down with it.
+    const questDrawings = (questData as { drawings?: unknown[] }).drawings;
+    if (Array.isArray(questDrawings) && questDrawings.length > 0) {
+      try {
+        const drawingsRef = doc(db, 'hubtify_users', uid, 'questify', 'drawings');
+        await setDoc(drawingsRef, { drawings: questDrawings });
+      } catch (err) {
+        console.error('[Sync] drawings subcollection push failed (non-fatal):', err);
+      }
     }
 
     // Cauldron subcollection document
@@ -97,11 +247,32 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       await setDoc(cauldronRef, cauldronData, { merge: true });
     }
 
+    // Syl read-projection snapshot — dedicated, isolated doc the Syl assistant
+    // reads via firebase-admin. Full recompute, no merge: total replacement,
+    // idempotent by construction. Isolated try/catch so a snapshot failure never
+    // breaks the main push. Guard: never write when there's no real data.
+    const statsNonDefault = !!(s && (s.level > 1 || s.xp > 0 || s.hp !== s.maxHp));
+    if (hasQuestData || hasNutritionData || hasFinanceData || statsNonDefault) {
+      try {
+        const snapshot = await window.api.sylBuildSnapshot();
+        const sylRef = doc(db, 'hubtify_users', uid, 'syl', 'snapshot');
+        await setDoc(sylRef, snapshot);
+      } catch (snapErr) {
+        console.error('[Sync] Syl snapshot write failed (non-fatal):', snapErr);
+      }
+    }
+
     return { success: true };
   } catch (err: unknown) {
     const error = err as { message?: string };
+    const message = error.message ?? 'Sync push failed';
     console.error('[Sync] Push failed:', err);
-    return { success: false, error: error.message ?? 'Sync push failed' };
+    // Tell the UI. A silent failure here means the user keeps working believing
+    // their data is in the cloud — and logout/switchAccount then wipe it.
+    try {
+      window.dispatchEvent(new CustomEvent(SYNC_PUSH_FAILED_EVENT, { detail: { uid, error: message } }));
+    } catch { /* non-DOM host (tests) */ }
+    return { success: false, error: message };
   }
 }
 
@@ -139,6 +310,63 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
     if (data.questify) {
       const result = await window.api.syncMergeQuestData(data.questify);
       if (result.changed) changed = true;
+    }
+
+    // habitChecks subcollection (Fase 2a.1) — ADDITIVE read alongside the legacy
+    // array above. mergeHabitChecks UPSERTs by natural key (habit_id, date), so
+    // any check present in both the legacy array and the subcollection collapses
+    // to a single row (last-write-wins by updated_at). Isolated/non-fatal.
+    try {
+      const checksCol = collection(db, 'hubtify_users', uid, 'habitChecks');
+      const checksSnap = await getDocs(checksCol);
+      if (!checksSnap.empty) {
+        const habitChecks = checksSnap.docs.map(d => docToCheck(d.data() as HabitCheckDoc));
+        const checksResult = await window.api.syncMergeQuestData({ habitChecks });
+        if (checksResult.changed) changed = true;
+      }
+    } catch (err) {
+      console.error('[Sync] habitChecks subcollection pull failed (non-fatal):', err);
+    }
+
+    // One-time backfill: migrate the legacy `questify.habitChecks[]` array into
+    // the subcollection, then flag the account as migrated. Idempotent (doc IDs
+    // are deterministic → re-running never duplicates). Runs once. Non-fatal.
+    try {
+      const sylMigrations = data.sylMigrations as { habitChecks?: boolean } | undefined;
+      if (sylMigrations?.habitChecks !== true) {
+        const legacyChecks = (
+          (data.questify as { habitChecks?: HabitCheckRow[] } | undefined)?.habitChecks ?? []
+        );
+        const entries = migrateArrayToDocs(legacyChecks);
+        const migrCol = collection(db, 'hubtify_users', uid, 'habitChecks');
+        for (let i = 0; i < entries.length; i += HABITCHECKS_BATCH_SIZE) {
+          const batch = writeBatch(db);
+          for (const { docId, doc: checkDoc } of entries.slice(i, i + HABITCHECKS_BATCH_SIZE)) {
+            batch.set(doc(migrCol, docId), checkDoc, { merge: true });
+          }
+          await batch.commit();
+        }
+        await setDoc(userRef, { sylMigrations: { habitChecks: true } }, { merge: true });
+      }
+    } catch (err) {
+      console.error('[Sync] habitChecks one-time migration failed (non-fatal):', err);
+    }
+
+    // Drawings subcollection — moved out of the main document to keep it under
+    // Firestore's 1 MB cap. Read AFTER questify so the tasks they reference exist
+    // locally (mergeQuestData drops orphan drawings). Isolated/non-fatal.
+    try {
+      const drawingsRef = doc(db, 'hubtify_users', uid, 'questify', 'drawings');
+      const drawingsSnap = await getDoc(drawingsRef);
+      const remoteDrawings = drawingsSnap.exists()
+        ? (drawingsSnap.data().drawings as unknown[] | undefined)
+        : undefined;
+      if (remoteDrawings?.length) {
+        const drawingsResult = await window.api.syncMergeQuestData({ drawings: remoteDrawings });
+        if (drawingsResult.changed) changed = true;
+      }
+    } catch (err) {
+      console.error('[Sync] drawings subcollection pull failed (non-fatal):', err);
     }
 
     if (data.nutrify) {

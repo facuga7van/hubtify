@@ -285,4 +285,86 @@ export const financeMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_finance_loans_settled ON finance_loans(settled);
     `,
   },
+  {
+    namespace: 'finance',
+    version: 11,
+    up: `
+      -- Persisted instalment number. It used to be derived as a month diff against
+      -- the group start date, which is off-by-one for credit-card plans (those start
+      -- a month later), so gauges showed "2/6" first and "7/6" last.
+      ALTER TABLE finance_transactions ADD COLUMN installment_number INTEGER;
+
+      -- For USD credit-card lines, the amount the card actually charged in ARS.
+      -- Previously discarded by the PDF importer.
+      ALTER TABLE finance_transactions ADD COLUMN billed_amount_ars REAL;
+
+      -- finance_loans was the only finance table without soft-delete support.
+      ALTER TABLE finance_loans ADD COLUMN deleted_at TEXT DEFAULT NULL;
+
+      -- Statements used to collapse ARS + USD purchases into one number.
+      ALTER TABLE finance_credit_card_statements ADD COLUMN calculated_amount_usd REAL NOT NULL DEFAULT 0;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN paid_amount_usd REAL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN transaction_id_usd TEXT;
+
+      -- Backfill instalment numbers by chronological position inside each group.
+      UPDATE finance_transactions
+      SET installment_number = (
+        SELECT ranked.rn FROM (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY installment_group_id
+            ORDER BY date ASC, created_at ASC, id ASC
+          ) AS rn
+          FROM finance_transactions
+          WHERE installment_group_id IS NOT NULL
+        ) AS ranked
+        WHERE ranked.id = finance_transactions.id
+      )
+      WHERE installment_group_id IS NOT NULL AND installment_number IS NULL;
+    `,
+  },
+  {
+    namespace: 'finance',
+    version: 12,
+    up: `
+      -- Composite indexes matching the real query shapes. The old single-column
+      -- idx_finance_tx_date was unusable anyway while month filters used LIKE.
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_live_date  ON finance_transactions(deleted_at, date);
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_type_date  ON finance_transactions(type, impacts_balance, deleted_at, date);
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_rec_date   ON finance_transactions(source, recurring_id, date);
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_card_stmt  ON finance_transactions(credit_card_id, impacts_balance, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_loans_person  ON finance_loans(person_name, settled, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_ccs_card_period       ON finance_credit_card_statements(credit_card_id, period_month, deleted_at);
+    `,
+  },
+  {
+    namespace: 'finance',
+    version: 13,
+    up: `
+      -- Normalise SQLite datetime('now') stamps ("2026-08-31 14:12:01") to ISO
+      -- ("2026-08-31T14:12:01Z"). Last-write-wins compares these as plain strings
+      -- and 'T' > ' ', so a newer space-separated delete used to lose against an
+      -- older ISO insert and resurrect the row. Rows already in ISO have no space,
+      -- so the LIKE '% %' guard leaves them untouched.
+      UPDATE finance_transactions              SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_transactions              SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_categories                SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_categories                SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_credit_cards              SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_credit_cards              SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_credit_card_statements    SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_credit_card_statements    SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_installment_groups        SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_installment_groups        SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_recurring                 SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_recurring                 SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_loans                     SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_loans                     SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+      UPDATE finance_loan_payments             SET updated_at = REPLACE(updated_at, ' ', 'T') || 'Z' WHERE updated_at LIKE '% %';
+      UPDATE finance_loan_payments             SET deleted_at = REPLACE(deleted_at, ' ', 'T') || 'Z' WHERE deleted_at LIKE '% %';
+
+      -- A recurring template that was soft-deleted but left active = 1 kept being
+      -- regenerated every month by the bootstrap job.
+      UPDATE finance_recurring SET active = 0 WHERE deleted_at IS NOT NULL AND active = 1;
+    `,
+  },
 ];

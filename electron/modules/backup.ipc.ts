@@ -19,16 +19,29 @@ export function registerBackupIpcHandlers(): void {
       const dbPath = path.join(app.getPath('userData'), 'hubtify.db');
       if (!fs.existsSync(dbPath)) return { success: false, error: 'Database not found' };
 
-      const zip = new AdmZip();
-      zip.addLocalFile(dbPath);
+      // The connection is open with journal_mode = WAL, so everything written since
+      // the last checkpoint lives in hubtify.db-wal — which is NOT part of the zip.
+      // Copying hubtify.db directly produced a silently stale backup.
+      // db.backup() writes a consistent, fully-checkpointed single-file snapshot.
+      const db = getDb();
+      const snapshotPath = path.join(app.getPath('temp'), `hubtify-backup-${Date.now()}.db`);
+      await db.backup(snapshotPath);
 
-      // Also export character data from localStorage via a temp file
-      const charData = getDb().prepare('SELECT data FROM character_data WHERE id = ?').get('default');
-      if (charData) {
-        zip.addFile('character.json', Buffer.from(JSON.stringify(charData)));
+      try {
+        const zip = new AdmZip();
+        // Keep the entry named hubtify.db — backup:import looks it up by that name.
+        zip.addLocalFile(snapshotPath, '', 'hubtify.db');
+
+        // Also export character data from localStorage via a temp file
+        const charData = db.prepare('SELECT data FROM character_data WHERE id = ?').get('default');
+        if (charData) {
+          zip.addFile('character.json', Buffer.from(JSON.stringify(charData)));
+        }
+
+        zip.writeZip(filePath);
+      } finally {
+        try { fs.unlinkSync(snapshotPath); } catch { /* temp file cleanup is best effort */ }
       }
-
-      zip.writeZip(filePath);
       return { success: true, path: filePath };
     } catch (err: unknown) {
       const error = err as { message?: string };
@@ -36,17 +49,39 @@ export function registerBackupIpcHandlers(): void {
     }
   });
 
-  ipcHandle('backup:import', async () => {
+  /**
+   * Solo abre el selector y devuelve la ruta.
+   *
+   * Antes `backup:import` elegia el archivo Y lo importaba en una sola llamada, asi
+   * que la confirmacion tenia que ir ANTES de elegir: la app te preguntaba si
+   * querias pisar tus datos y recien despues te mostraba el selector. Separado en
+   * dos pasos, el renderer puede confirmar con el nombre del archivo ya a la vista.
+   */
+  ipcHandle('backup:pickImportFile', async () => {
+    const { filePaths, canceled } = await dialog.showOpenDialog({
+      title: 'Import Backup',
+      filters: [{ name: 'Zip Files', extensions: ['zip'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || filePaths.length === 0) return { canceled: true };
+    return { canceled: false, path: filePaths[0], name: path.basename(filePaths[0]) };
+  });
+
+  ipcHandle('backup:import', async (_e, providedPath?: string) => {
     try {
-      const { filePaths, canceled } = await dialog.showOpenDialog({
-        title: 'Import Backup',
-        filters: [{ name: 'Zip Files', extensions: ['zip'] }],
-        properties: ['openFile'],
-      });
+      let zipPath = providedPath;
+      if (!zipPath) {
+        // Compatibilidad: sin ruta, se comporta como antes.
+        const { filePaths, canceled } = await dialog.showOpenDialog({
+          title: 'Import Backup',
+          filters: [{ name: 'Zip Files', extensions: ['zip'] }],
+          properties: ['openFile'],
+        });
+        if (canceled || filePaths.length === 0) return { success: false, canceled: true };
+        zipPath = filePaths[0];
+      }
+      if (!fs.existsSync(zipPath)) return { success: false, error: 'Backup file not found' };
 
-      if (canceled || filePaths.length === 0) return { success: false, canceled: true };
-
-      const zipPath = filePaths[0];
       const zip = new AdmZip(zipPath);
       const entries = zip.getEntries();
 

@@ -4,33 +4,51 @@ import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import fs from 'fs';
 import { todayDateString } from '../../shared/date-utils';
+import {
+  CARD_PAYMENT_CATEGORY,
+  MAX_INSTALLMENTS,
+  addMonthsClamped,
+  addMonthsToMonth,
+  aggregateByCategory,
+  computeExpenseBreakdown,
+  computeMonthlyBalance,
+  generateRecurringForMonth,
+  getStatementPeriod,
+  isValidDateString,
+  isValidMonthString,
+  monthRange,
+  monthRangeBetween,
+  nowIso,
+  parseNonEmptyString,
+  parsePositiveAmount,
+  sumByCurrency,
+  sumIncomeExpenseByCurrency,
+} from './finance.balance';
 
 function genId(): string {
   return crypto.randomUUID();
 }
 
-function nextMonthFirstDay(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+/** Uniform failure envelope for handlers that used to persist garbage or throw raw. */
+function fail(reason: string): { ok: false; reason: string } {
+  return { ok: false, reason };
 }
 
-export function registerFinanceIpcHandlers(): void {
-  /** Given a transaction date and a card's closing day, returns the statement period_month (YYYY-MM).
-   *  Convention: for closingDay=15, the January statement covers Dec 16 – Jan 15.
-   *  So a tx on Jan 10 (d <= closingDay) belongs to January ("2025-01"),
-   *  and a tx on Jan 20 (d > closingDay) belongs to February ("2025-02"). */
-  function getStatementPeriod(txDate: string, closingDay: number): string {
-    const [y, m, d] = txDate.split('-').map(Number);
-    if (d <= closingDay) {
-      // Transaction falls within the current month's statement period
-      return `${y}-${String(m).padStart(2, '0')}`;
-    } else {
-      // Transaction falls after closing day → next month's statement
-      const dt = new Date(y, m, 1); // m is 1-based, Date 0-based, so this gives next month
-      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-    }
-  }
+const TRANSACTION_COLUMNS = `
+  id, type, amount, currency, category, description, date,
+  payment_method AS paymentMethod, source, installments,
+  installment_group_id AS installmentGroupId,
+  installment_number AS installmentNumber,
+  for_third_party AS forThirdParty,
+  recurring_id AS recurringId,
+  import_batch_id AS importBatchId,
+  credit_card_id AS creditCardId,
+  impacts_balance AS impactsBalance,
+  billed_amount_ars AS billedAmountArs,
+  created_at AS createdAt, updated_at AS updatedAt
+`;
 
+export function registerFinanceIpcHandlers(): void {
   // ── Transactions ────────────────────────────────────
 
   ipcHandle('finance:getTransactions', (_e, filters: {
@@ -44,9 +62,10 @@ export function registerFinanceIpcHandlers(): void {
     const conditions: string[] = ['deleted_at IS NULL'];
     const params: unknown[] = [];
 
-    if (filters.month) {
-      conditions.push('date LIKE ?');
-      params.push(`${filters.month}%`);
+    if (filters.month && isValidMonthString(filters.month)) {
+      const { start, end } = monthRange(filters.month);
+      conditions.push('date >= ?', 'date < ?');
+      params.push(start, end);
     }
     if (filters.category) {
       conditions.push('category = ?');
@@ -65,19 +84,10 @@ export function registerFinanceIpcHandlers(): void {
       params.push(filters.installmentGroupId);
     }
 
-    const where = `WHERE ${conditions.join(' AND ')}`;
     return db.prepare(`
-      SELECT id, type, amount, currency, category, description, date,
-             payment_method AS paymentMethod, source, installments,
-             installment_group_id AS installmentGroupId,
-             for_third_party AS forThirdParty,
-             recurring_id AS recurringId,
-             import_batch_id AS importBatchId,
-             credit_card_id AS creditCardId,
-             impacts_balance AS impactsBalance,
-             created_at AS createdAt, updated_at AS updatedAt
+      SELECT ${TRANSACTION_COLUMNS}
       FROM finance_transactions
-      ${where}
+      WHERE ${conditions.join(' AND ')}
       ORDER BY date DESC, created_at DESC
     `).all(...params);
   });
@@ -99,12 +109,16 @@ export function registerFinanceIpcHandlers(): void {
     creditCardId?: string | null;
     impactsBalance?: boolean;
   }) => {
-    if (!Number.isFinite(tx.amount) || tx.amount <= 0) {
+    const amount = parsePositiveAmount(tx.amount);
+    if (amount === null) {
       throw new Error('Amount must be a positive finite number');
+    }
+    if (!isValidDateString(tx.date)) {
+      throw new Error('Date must be a valid YYYY-MM-DD string');
     }
     const db = getDb();
     const id = genId();
-    const now = new Date().toISOString();
+    const now = nowIso();
     db.prepare(`
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
@@ -114,7 +128,7 @@ export function registerFinanceIpcHandlers(): void {
     `).run(
       id,
       tx.type,
-      tx.amount,
+      amount,
       tx.currency ?? 'ARS',
       tx.category ?? 'Otros',
       tx.description ?? '',
@@ -144,8 +158,16 @@ export function registerFinanceIpcHandlers(): void {
   }) => {
     const db = getDb();
     const sets: string[] = ['updated_at = ?'];
-    const vals: unknown[] = [new Date().toISOString()];
-    if (fields.amount !== undefined) { sets.push('amount = ?'); vals.push(fields.amount); }
+    const vals: unknown[] = [nowIso()];
+
+    if (fields.amount !== undefined) {
+      const amount = parsePositiveAmount(fields.amount);
+      if (amount === null) return fail('invalid_amount');
+      sets.push('amount = ?'); vals.push(amount);
+    }
+    if (fields.date !== undefined && !isValidDateString(fields.date)) {
+      return fail('invalid_date');
+    }
     if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
     if (fields.category !== undefined) { sets.push('category = ?'); vals.push(fields.category); }
     if (fields.paymentMethod !== undefined) {
@@ -163,11 +185,12 @@ export function registerFinanceIpcHandlers(): void {
     if (fields.date !== undefined) { sets.push('date = ?'); vals.push(fields.date); }
     vals.push(id);
     db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return { ok: true };
   });
 
   ipcHandle('finance:deleteTransaction', (_e, id: string) => {
     const db = getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
     db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
   });
 
@@ -175,118 +198,104 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getMonthlyBalance', (_e, month?: string) => {
     const db = getDb();
-    const m = month ?? todayDateString().slice(0, 7);
-
-    const rows = db.prepare(`
-      SELECT currency,
-             COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
-             COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
-      FROM finance_transactions
-      WHERE deleted_at IS NULL AND date LIKE ? AND impacts_balance = 1
-      GROUP BY currency
-    `).all(`${m}%`) as Array<{ currency: string; income: number; expenses: number }>;
-
-    const result: Record<string, { income: number; expenses: number; balance: number }> = {
-      ARS: { income: 0, expenses: 0, balance: 0 },
-      USD: { income: 0, expenses: 0, balance: 0 },
-    };
-    for (const row of rows) {
-      if (result[row.currency]) {
-        result[row.currency].income = row.income;
-        result[row.currency].expenses = row.expenses;
-        result[row.currency].balance = row.income - row.expenses;
-      }
-    }
-    return result;
+    const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
+    return computeMonthlyBalance(db, m);
   });
 
+  /**
+   * Category breakdown = "what did I spend on", so every live expense counts,
+   * including card purchases whose statement has not landed yet. The auto-generated
+   * `Pago Tarjeta` transaction is excluded so card spend is not counted twice.
+   * `finance:getCategoryBreakdownForRange` uses the exact same definition —
+   * switching the dashboard from "month" to "quarter" no longer changes it.
+   */
   ipcHandle('finance:getCategoryBreakdown', (_e, month?: string) => {
     const db = getDb();
-    const m = month ?? todayDateString().slice(0, 7);
-
-    const rows = db.prepare(`
-      SELECT category, currency,
-             COALESCE(SUM(amount), 0) AS total
-      FROM finance_transactions
-      WHERE deleted_at IS NULL AND type = 'expense' AND date LIKE ? AND category != 'Pago Tarjeta'
-      GROUP BY category, currency
-      ORDER BY category ASC
-    `).all(`${m}%`) as Array<{ category: string; currency: string; total: number }>;
-
-    const map = new Map<string, { ARS: number; USD: number }>();
-    for (const row of rows) {
-      if (!map.has(row.category)) map.set(row.category, { ARS: 0, USD: 0 });
-      const entry = map.get(row.category)!;
-      if (row.currency === 'ARS' || row.currency === 'USD') {
-        entry[row.currency] += row.total;
-      }
-    }
-    return Array.from(map.entries()).map(([category, amounts]) => ({ category, ...amounts }));
-  });
-
-  ipcHandle('finance:getBalanceForRange', (_e, startMonth: string, endMonth: string) => {
-    const db = getDb();
-    const nextMonth = nextMonthFirstDay(endMonth);
-    const row = db.prepare(`
-      SELECT
-        COALESCE(SUM(CASE WHEN type = 'income' AND currency = 'ARS' THEN amount ELSE 0 END), 0) AS incomeARS,
-        COALESCE(SUM(CASE WHEN type = 'expense' AND currency = 'ARS' THEN amount ELSE 0 END), 0) AS expensesARS,
-        COALESCE(SUM(CASE WHEN type = 'income' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS incomeUSD,
-        COALESCE(SUM(CASE WHEN type = 'expense' AND currency = 'USD' THEN amount ELSE 0 END), 0) AS expensesUSD
-      FROM finance_transactions
-      WHERE deleted_at IS NULL AND impacts_balance = 1 AND date >= ? AND date < ?
-    `).get(`${startMonth}-01`, nextMonth) as {
-      incomeARS: number; expensesARS: number; incomeUSD: number; expensesUSD: number;
-    };
-
-    return {
-      ARS: { income: row.incomeARS, expenses: row.expensesARS, balance: row.incomeARS - row.expensesARS },
-      USD: { income: row.incomeUSD, expenses: row.expensesUSD, balance: row.incomeUSD - row.expensesUSD },
-    };
+    const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
+    const { start, end } = monthRange(m);
+    return aggregateByCategory(db, {
+      start, end,
+      type: 'expense',
+      balanceScope: 'all',
+      excludeCategories: [CARD_PAYMENT_CATEGORY],
+    });
   });
 
   ipcHandle('finance:getCategoryBreakdownForRange', (_e, startMonth: string, endMonth: string) => {
     const db = getDb();
-    const nextMonth = nextMonthFirstDay(endMonth);
-    return db.prepare(`
-      SELECT category,
-        COALESCE(SUM(CASE WHEN currency = 'ARS' THEN amount ELSE 0 END), 0) AS "ARS",
-        COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END), 0) AS "USD"
-      FROM finance_transactions
-      WHERE deleted_at IS NULL AND type = 'expense' AND impacts_balance = 1 AND category != 'Pago Tarjeta'
-        AND date >= ? AND date < ?
-      GROUP BY category
-      ORDER BY "ARS" DESC
-    `).all(`${startMonth}-01`, nextMonth);
+    if (!isValidMonthString(startMonth) || !isValidMonthString(endMonth)) return [];
+    const { start, end } = monthRangeBetween(startMonth, endMonth);
+    return aggregateByCategory(db, {
+      start, end,
+      type: 'expense',
+      balanceScope: 'all',
+      excludeCategories: [CARD_PAYMENT_CATEGORY],
+    }).sort((a, b) => b.ARS - a.ARS);
+  });
+
+  ipcHandle('finance:getBalanceForRange', (_e, startMonth: string, endMonth: string) => {
+    const db = getDb();
+    if (!isValidMonthString(startMonth) || !isValidMonthString(endMonth)) {
+      return {
+        ARS: { income: 0, expenses: 0, balance: 0 },
+        USD: { income: 0, expenses: 0, balance: 0 },
+      };
+    }
+    const { start, end } = monthRangeBetween(startMonth, endMonth);
+    return sumIncomeExpenseByCurrency(db, { start, end, balanceScope: 'impacting' });
+  });
+
+  /** Explicit spend breakdown so the UI never has to guess which definition a number uses. */
+  ipcHandle('finance:getExpenseBreakdown', (_e, month?: string) => {
+    const db = getDb();
+    const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
+    return computeExpenseBreakdown(db, monthRange(m));
+  });
+
+  ipcHandle('finance:getExpenseBreakdownForRange', (_e, startMonth: string, endMonth: string) => {
+    const db = getDb();
+    if (!isValidMonthString(startMonth) || !isValidMonthString(endMonth)) return null;
+    return computeExpenseBreakdown(db, monthRangeBetween(startMonth, endMonth));
   });
 
   ipcHandle('finance:getProjection', (_e, months: number) => {
     const db = getDb();
-    const today = todayDateString(); // YYYY-MM-DD
-    const [year, month] = today.slice(0, 7).split('-').map(Number);
+    const count = Number.isFinite(months) ? Math.max(0, Math.min(Math.trunc(months), 60)) : 0;
+    const currentMonth = todayDateString().slice(0, 7);
 
-    const recurring = db.prepare(
-      "SELECT SUM(amount) AS total FROM finance_recurring WHERE deleted_at IS NULL AND active = 1 AND type = 'expense'"
-    ).get() as { total: number | null };
-    const recurringTotal = recurring.total ?? 0;
+    const recurringRows = db.prepare(`
+      SELECT currency, COALESCE(SUM(amount), 0) AS total
+      FROM finance_recurring
+      WHERE deleted_at IS NULL AND active = 1 AND type = 'expense'
+      GROUP BY currency
+    `).all() as Array<{ currency: string; total: number }>;
+    const recurring = { ARS: 0, USD: 0 };
+    for (const row of recurringRows) {
+      if (row.currency === 'ARS' || row.currency === 'USD') recurring[row.currency] = row.total;
+    }
 
-    const projection: Array<{ month: string; installments: number; recurring: number; total: number }> = [];
+    const projection = [];
+    for (let i = 1; i <= count; i++) {
+      const targetMonth = addMonthsToMonth(currentMonth, i);
+      const { start, end } = monthRange(targetMonth);
+      const installments = sumByCurrency(db, {
+        start, end,
+        balanceScope: 'all',
+        installmentsOnly: true,
+      });
 
-    for (let i = 1; i <= months; i++) {
-      const targetDate = new Date(year, month - 1 + i, 1);
-      const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
-
-      const installmentRow = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) AS total
-        FROM finance_transactions
-        WHERE deleted_at IS NULL AND installment_group_id IS NOT NULL AND date LIKE ?
-      `).get(`${targetMonth}%`) as { total: number };
+      const byCurrency = {
+        ARS: { installments: installments.ARS, recurring: recurring.ARS, total: installments.ARS + recurring.ARS },
+        USD: { installments: installments.USD, recurring: recurring.USD, total: installments.USD + recurring.USD },
+      };
 
       projection.push({
         month: targetMonth,
-        installments: installmentRow.total,
-        recurring: recurringTotal,
-        total: installmentRow.total + recurringTotal,
+        // Legacy flat fields (ARS) kept so existing consumers keep working.
+        installments: byCurrency.ARS.installments,
+        recurring: byCurrency.ARS.recurring,
+        total: byCurrency.ARS.total,
+        ...byCurrency,
       });
     }
 
@@ -302,9 +311,11 @@ export function registerFinanceIpcHandlers(): void {
   });
 
   ipcHandle('finance:addCategory', (_e, name: string) => {
+    const trimmed = parseNonEmptyString(name);
+    if (trimmed === null) return fail('invalid_name');
+
     const db = getDb();
-    const trimmed = name.trim();
-    const now = new Date().toISOString();
+    const now = nowIso();
     // Check if soft-deleted category with same name exists — un-delete it
     const deleted = db.prepare('SELECT name FROM finance_categories WHERE name = ? AND deleted_at IS NOT NULL').get(trimmed);
     if (deleted) {
@@ -312,6 +323,7 @@ export function registerFinanceIpcHandlers(): void {
     } else {
       db.prepare('INSERT OR IGNORE INTO finance_categories (name, updated_at) VALUES (?, ?)').run(trimmed, now);
     }
+    return { ok: true, name: trimmed };
   });
 
   ipcHandle('finance:deleteCategory', (_e, name: string) => {
@@ -322,7 +334,7 @@ export function registerFinanceIpcHandlers(): void {
     if (usage.c > 0) {
       throw new Error(`Cannot delete category in use by ${usage.c} transactions`);
     }
-    const now = new Date().toISOString();
+    const now = nowIso();
     db.prepare('UPDATE finance_categories SET deleted_at = ?, updated_at = ? WHERE name = ?').run(now, now, name);
   });
 
@@ -339,29 +351,60 @@ export function registerFinanceIpcHandlers(): void {
   });
 
   ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number }) => {
+    const name = parseNonEmptyString(card?.name);
+    if (name === null) return fail('invalid_name');
+    const closingDay = Number(card?.closingDay);
+    if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 31) return fail('invalid_closing_day');
+
     const db = getDb();
     const id = genId();
-    const now = new Date().toISOString();
-    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, card.name.trim(), card.closingDay, now, now);
+    const now = nowIso();
+    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, name, closingDay, now, now);
     return id;
   });
 
   ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number }) => {
     const db = getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
     const sets: string[] = ['updated_at = ?'];
     const vals: unknown[] = [now];
-    if (fields.name !== undefined) { sets.push('name = ?'); vals.push(fields.name.trim()); }
-    if (fields.closingDay !== undefined) { sets.push('closing_day = ?'); vals.push(fields.closingDay); }
-    if (sets.length === 1) return; // only updated_at, no real changes
+    if (fields.name !== undefined) {
+      const name = parseNonEmptyString(fields.name);
+      if (name === null) return fail('invalid_name');
+      sets.push('name = ?'); vals.push(name);
+    }
+    if (fields.closingDay !== undefined) {
+      const closingDay = Number(fields.closingDay);
+      if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 31) return fail('invalid_closing_day');
+      sets.push('closing_day = ?'); vals.push(closingDay);
+    }
+    if (sets.length === 1) return { ok: true }; // only updated_at, no real changes
     vals.push(id);
     db.prepare(`UPDATE finance_credit_cards SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return { ok: true };
   });
 
+  /**
+   * Deleting a card releases its purchases back onto the balance
+   * (`impacts_balance = 1`). The statement payment transactions it generated must
+   * go with it, otherwise every purchase would be counted twice — once as itself,
+   * once inside the surviving "Pago Tarjeta" row.
+   */
   ipcHandle('finance:deleteCreditCard', (_e, id: string) => {
     const db = getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
     const trx = db.transaction(() => {
+      db.prepare(`
+        UPDATE finance_transactions
+        SET deleted_at = ?, updated_at = ?
+        WHERE deleted_at IS NULL AND id IN (
+          SELECT transaction_id FROM finance_credit_card_statements
+          WHERE credit_card_id = ? AND transaction_id IS NOT NULL
+          UNION
+          SELECT transaction_id_usd FROM finance_credit_card_statements
+          WHERE credit_card_id = ? AND transaction_id_usd IS NOT NULL
+        )
+      `).run(now, now, id, id);
       db.prepare('UPDATE finance_credit_card_statements SET deleted_at = ?, updated_at = ? WHERE credit_card_id = ?').run(now, now, id);
       db.prepare('UPDATE finance_transactions SET credit_card_id = NULL, impacts_balance = 1, updated_at = ? WHERE credit_card_id = ?').run(now, id);
       db.prepare('UPDATE finance_credit_cards SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
@@ -384,15 +427,17 @@ export function registerFinanceIpcHandlers(): void {
     if (filters.periodMonth) { conditions.push('s.period_month = ?'); params.push(filters.periodMonth); }
     if (filters.status) { conditions.push('s.status = ?'); params.push(filters.status); }
 
-    const where = `WHERE ${conditions.join(' AND ')}`;
     return db.prepare(`
       SELECT s.id, s.credit_card_id AS creditCardId, c.name AS creditCardName,
              s.period_month AS periodMonth, s.calculated_amount AS calculatedAmount,
-             s.paid_amount AS paidAmount, s.status, s.paid_date AS paidDate,
-             s.transaction_id AS transactionId, s.created_at AS createdAt
+             s.calculated_amount_usd AS calculatedAmountUsd,
+             s.paid_amount AS paidAmount, s.paid_amount_usd AS paidAmountUsd,
+             s.status, s.paid_date AS paidDate,
+             s.transaction_id AS transactionId, s.transaction_id_usd AS transactionIdUsd,
+             s.created_at AS createdAt
       FROM finance_credit_card_statements s
       JOIN finance_credit_cards c ON c.id = s.credit_card_id AND c.deleted_at IS NULL
-      ${where}
+      WHERE ${conditions.join(' AND ')}
       ORDER BY s.period_month DESC, c.name ASC
     `).all(...params);
   });
@@ -401,7 +446,9 @@ export function registerFinanceIpcHandlers(): void {
     const db = getDb();
     const statement = db.prepare(`
       SELECT s.id, s.credit_card_id AS creditCardId, s.period_month AS periodMonth,
-             s.calculated_amount AS calculatedAmount, s.paid_amount AS paidAmount,
+             s.calculated_amount AS calculatedAmount,
+             s.calculated_amount_usd AS calculatedAmountUsd,
+             s.paid_amount AS paidAmount, s.paid_amount_usd AS paidAmountUsd,
              s.status, c.closing_day AS closingDay, c.name AS creditCardName
       FROM finance_credit_card_statements s
       JOIN finance_credit_cards c ON c.id = s.credit_card_id
@@ -411,10 +458,7 @@ export function registerFinanceIpcHandlers(): void {
     if (!statement) return null;
 
     const transactions = db.prepare(`
-      SELECT id, type, amount, currency, category, description, date,
-             payment_method AS paymentMethod, source, installments,
-             installment_group_id AS installmentGroupId,
-             created_at AS createdAt
+      SELECT ${TRANSACTION_COLUMNS}
       FROM finance_transactions
       WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
       ORDER BY date DESC, created_at DESC
@@ -427,91 +471,180 @@ export function registerFinanceIpcHandlers(): void {
     return { statement, transactions: filtered };
   });
 
+  /** Sums the purchases that belong to a statement period, keeping currencies apart.
+   *  USD lines imported from a card PDF carry the ARS amount the card actually
+   *  charged (`billed_amount_ars`); those roll into the ARS total. */
+  function computeStatementTotals(
+    db: ReturnType<typeof getDb>,
+    creditCardId: string,
+    closingDay: number,
+    periodMonth: string,
+  ): { ars: number; usd: number } {
+    const rows = db.prepare(`
+      SELECT date, amount, currency, billed_amount_ars AS billedAmountArs
+      FROM finance_transactions
+      WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
+    `).all(creditCardId) as Array<{ date: string; amount: number; currency: string; billedAmountArs: number | null }>;
+
+    let ars = 0;
+    let usd = 0;
+    for (const tx of rows) {
+      if (getStatementPeriod(tx.date, closingDay) !== periodMonth) continue;
+      if (tx.currency === 'USD') {
+        if (tx.billedAmountArs != null) ars += tx.billedAmountArs;
+        else usd += tx.amount;
+      } else {
+        ars += tx.amount;
+      }
+    }
+    return { ars, usd };
+  }
+
+  /**
+   * Creates or REFRESHES the statement for a period.
+   *
+   * The dashboard auto-generates statements on mount, typically on the 1st or 2nd
+   * of the month. The old early-return meant every purchase made after that point
+   * mapped to the already-existing statement and was silently dropped forever.
+   * Now only a `paid` statement is frozen; a `pending` one is recalculated.
+   */
   ipcHandle('finance:generateStatement', (_e, creditCardId: string, periodMonth: string) => {
     const db = getDb();
-    const card = db.prepare('SELECT id, closing_day AS closingDay FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL').get(creditCardId) as { id: string; closingDay: number } | undefined;
+    if (!isValidMonthString(periodMonth)) return null;
+
+    const card = db.prepare(
+      'SELECT id, closing_day AS closingDay FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL'
+    ).get(creditCardId) as { id: string; closingDay: number } | undefined;
     if (!card) return null;
 
-    const statementId = genId();
-    const txId = genId();
-    const now = new Date().toISOString();
+    const now = nowIso();
+    const paymentDate = `${periodMonth}-01`;
 
-    const trx = db.transaction(() => {
-      const existing = db.prepare(
-        'SELECT id FROM finance_credit_card_statements WHERE credit_card_id = ? AND period_month = ? AND deleted_at IS NULL'
-      ).get(creditCardId, periodMonth);
-      if (existing) return (existing as { id: string }).id;
-
-      const allTx = db.prepare(`
-        SELECT date, amount FROM finance_transactions
-        WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
-      `).all(creditCardId) as Array<{ date: string; amount: number }>;
-
-      const total = allTx
-        .filter((tx) => getStatementPeriod(tx.date, card.closingDay) === periodMonth)
-        .reduce((sum, tx) => sum + tx.amount, 0);
-
-      if (total === 0) return null;
-
+    const insertPayment = (txId: string, amount: number, currency: string) => {
       db.prepare(`
         INSERT INTO finance_transactions
           (id, type, amount, currency, category, description, date, payment_method,
            source, installments, installment_group_id, for_third_party, recurring_id,
            import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-        VALUES (?, 'expense', ?, 'ARS', 'Pago Tarjeta', ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?)
-      `).run(txId, total, `Pago tarjeta - ${periodMonth}`, `${periodMonth}-01`, now, now);
+        VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?)
+      `).run(txId, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${periodMonth}`, paymentDate, now, now);
+    };
 
+    /** Keeps the payment transaction for one currency in sync with the recomputed total. */
+    const syncPayment = (currentId: string | null, amount: number, currency: string): string | null => {
+      if (amount > 0) {
+        if (currentId) {
+          const res = db.prepare(
+            'UPDATE finance_transactions SET amount = ?, currency = ?, deleted_at = NULL, updated_at = ? WHERE id = ?'
+          ).run(amount, currency, now, currentId);
+          if (res.changes > 0) return currentId;
+        }
+        const txId = genId();
+        insertPayment(txId, amount, currency);
+        return txId;
+      }
+      if (currentId) {
+        db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
+          .run(now, now, currentId);
+      }
+      return null;
+    };
+
+    const trx = db.transaction(() => {
+      const existing = db.prepare(`
+        SELECT id, status, transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
+        FROM finance_credit_card_statements
+        WHERE credit_card_id = ? AND period_month = ? AND deleted_at IS NULL
+      `).get(creditCardId, periodMonth) as
+        { id: string; status: string; transactionId: string | null; transactionIdUsd: string | null } | undefined;
+
+      // A paid statement is history — never rewrite it.
+      if (existing && existing.status === 'paid') return existing.id;
+
+      const { ars, usd } = computeStatementTotals(db, creditCardId, card.closingDay, periodMonth);
+
+      if (!existing) {
+        if (ars === 0 && usd === 0) return null;
+        const statementId = genId();
+        const arsTxId = syncPayment(null, ars, 'ARS');
+        const usdTxId = syncPayment(null, usd, 'USD');
+        db.prepare(`
+          INSERT INTO finance_credit_card_statements
+            (id, credit_card_id, period_month, calculated_amount, calculated_amount_usd,
+             status, transaction_id, transaction_id_usd, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+        `).run(statementId, creditCardId, periodMonth, ars, usd, arsTxId, usdTxId, now, now);
+        return statementId;
+      }
+
+      // Every purchase that fed this statement is gone — retire it with its payments.
+      if (ars === 0 && usd === 0) {
+        syncPayment(existing.transactionId, 0, 'ARS');
+        syncPayment(existing.transactionIdUsd, 0, 'USD');
+        db.prepare('UPDATE finance_credit_card_statements SET deleted_at = ?, updated_at = ? WHERE id = ?')
+          .run(now, now, existing.id);
+        return null;
+      }
+
+      const arsTxId = syncPayment(existing.transactionId, ars, 'ARS');
+      const usdTxId = syncPayment(existing.transactionIdUsd, usd, 'USD');
       db.prepare(`
-        INSERT INTO finance_credit_card_statements
-          (id, credit_card_id, period_month, calculated_amount, status, transaction_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
-      `).run(statementId, creditCardId, periodMonth, total, txId, now, now);
-
-      return statementId;
+        UPDATE finance_credit_card_statements
+        SET calculated_amount = ?, calculated_amount_usd = ?,
+            transaction_id = ?, transaction_id_usd = ?, updated_at = ?
+        WHERE id = ?
+      `).run(ars, usd, arsTxId, usdTxId, now, existing.id);
+      return existing.id;
     });
 
     return trx();
   });
 
-  ipcHandle('finance:payStatement', (_e, statementId: string, paidAmount: number) => {
-    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
-      throw new Error('Pay amount must be a positive finite number');
-    }
+  ipcHandle('finance:payStatement', (_e, statementId: string, paidAmount: number, paidAmountUsd?: number) => {
+    const ars = Number(paidAmount ?? 0);
+    const usd = Number(paidAmountUsd ?? 0);
+    if (!Number.isFinite(ars) || !Number.isFinite(usd) || ars < 0 || usd < 0) return fail('invalid_amount');
+    if (ars <= 0 && usd <= 0) return fail('invalid_amount');
+
     const db = getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
     const today = now.slice(0, 10);
 
-    const stmt = db.prepare(
-      'SELECT transaction_id AS transactionId FROM finance_credit_card_statements WHERE id = ?'
-    ).get(statementId) as { transactionId: string } | undefined;
+    const stmt = db.prepare(`
+      SELECT transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
+      FROM finance_credit_card_statements WHERE id = ?
+    `).get(statementId) as { transactionId: string | null; transactionIdUsd: string | null } | undefined;
 
-    if (!stmt) return;
+    if (!stmt) return fail('not_found');
 
-    db.prepare(`
-      UPDATE finance_credit_card_statements
-      SET paid_amount = ?, status = 'paid', paid_date = ?, updated_at = ?
-      WHERE id = ?
-    `).run(paidAmount, today, now, statementId);
+    const trx = db.transaction(() => {
+      db.prepare(`
+        UPDATE finance_credit_card_statements
+        SET paid_amount = ?, paid_amount_usd = ?, status = 'paid', paid_date = ?, updated_at = ?
+        WHERE id = ?
+      `).run(ars, usd, today, now, statementId);
 
-    db.prepare(`
-      UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?
-    `).run(paidAmount, now, stmt.transactionId);
+      const updateTx = db.prepare('UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?');
+      if (stmt.transactionId) updateTx.run(ars, now, stmt.transactionId);
+      if (stmt.transactionIdUsd) updateTx.run(usd, now, stmt.transactionIdUsd);
+    });
+    trx();
+    return { ok: true };
   });
 
   // ── Backward compat (dashboard widget) ─────────────
 
   ipcHandle('finance:getMonthlyTotal', () => {
     const db = getDb();
-    const month = todayDateString().slice(0, 7);
-    const result = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1 AND date LIKE ?"
-    ).get(`${month}%`) as { total: number };
-    return result.total;
+    const { start, end } = monthRange(todayDateString().slice(0, 7));
+    return sumByCurrency(db, { start, end, type: 'expense', balanceScope: 'impacting' }).ARS;
   });
 
   ipcHandle('finance:getActiveLoansCount', () => {
     const db = getDb();
-    const result = db.prepare('SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0').get() as { c: number };
+    const result = db.prepare(
+      'SELECT COUNT(*) AS c FROM finance_loans WHERE settled = 0 AND deleted_at IS NULL'
+    ).get() as { c: number };
     return result.c;
   });
 
@@ -541,6 +674,8 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getInstallmentsForMonth', (_e, month: string) => {
     const db = getDb();
+    if (!isValidMonthString(month)) return [];
+    const { start, end } = monthRange(month);
     return db.prepare(`
       SELECT t.id, t.type, t.amount, t.currency, t.category, t.description, t.date,
              t.payment_method AS paymentMethod, t.source, t.installments,
@@ -552,34 +687,32 @@ export function registerFinanceIpcHandlers(): void {
              g.description AS groupDescription,
              g.total_installments AS installmentCount,
              g.total_amount AS groupTotalAmount,
-             (CAST(SUBSTR(t.date, 1, 4) AS INTEGER) - CAST(SUBSTR(g.date, 1, 4) AS INTEGER)) * 12
-               + (CAST(SUBSTR(t.date, 6, 2) AS INTEGER) - CAST(SUBSTR(g.date, 6, 2) AS INTEGER))
-               + 1 AS installmentNumber
+             COALESCE(
+               t.installment_number,
+               (CAST(SUBSTR(t.date, 1, 4) AS INTEGER) - CAST(SUBSTR(g.date, 1, 4) AS INTEGER)) * 12
+                 + (CAST(SUBSTR(t.date, 6, 2) AS INTEGER) - CAST(SUBSTR(g.date, 6, 2) AS INTEGER))
+                 + 1
+             ) AS installmentNumber
       FROM finance_transactions t
       JOIN finance_installment_groups g ON g.id = t.installment_group_id
-      WHERE t.deleted_at IS NULL AND t.installment_group_id IS NOT NULL AND t.date LIKE ?
+      WHERE t.deleted_at IS NULL AND t.installment_group_id IS NOT NULL
+        AND t.date >= ? AND t.date < ?
       ORDER BY t.date DESC, t.created_at DESC
-    `).all(`${month}%`);
+    `).all(start, end);
   });
 
   ipcHandle('finance:getInstallmentProjection', (_e, months: number) => {
     const db = getDb();
-    const today = todayDateString(); // YYYY-MM-DD
-    const [year, month] = today.slice(0, 7).split('-').map(Number);
+    const count = Number.isFinite(months) ? Math.max(0, Math.min(Math.trunc(months), 60)) : 0;
+    const currentMonth = todayDateString().slice(0, 7);
 
-    const projection: Array<{ month: string; total: number }> = [];
-
-    for (let i = 1; i <= months; i++) {
-      const targetDate = new Date(year, month - 1 + i, 1);
-      const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
-
-      const row = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) AS total
-        FROM finance_transactions
-        WHERE deleted_at IS NULL AND installment_group_id IS NOT NULL AND date LIKE ?
-      `).get(`${targetMonth}%`) as { total: number };
-
-      projection.push({ month: targetMonth, total: row.total });
+    const projection = [];
+    for (let i = 1; i <= count; i++) {
+      const targetMonth = addMonthsToMonth(currentMonth, i);
+      const { start, end } = monthRange(targetMonth);
+      const totals = sumByCurrency(db, { start, end, balanceScope: 'all', installmentsOnly: true });
+      // `total` stays the ARS figure for existing consumers.
+      projection.push({ month: targetMonth, total: totals.ARS, ARS: totals.ARS, USD: totals.USD });
     }
 
     return projection;
@@ -598,95 +731,107 @@ export function registerFinanceIpcHandlers(): void {
     paymentMethod?: string;
     creditCardId?: string | null;
   }) => {
+    if (!isValidDateString(group?.startDate)) return fail('invalid_start_date');
+
+    const installmentCount = Number(group.installmentCount);
+    if (!Number.isInteger(installmentCount) || installmentCount < 1) return fail('invalid_installment_count');
+    if (installmentCount > MAX_INSTALLMENTS) return fail('too_many_installments');
+
+    const amounts: number[] = [];
+    for (let i = 0; i < installmentCount; i++) {
+      const raw = group.installmentAmounts?.[i] ?? group.installmentAmount;
+      const parsed = parsePositiveAmount(raw);
+      if (parsed === null) return fail('invalid_amount');
+      amounts.push(parsed);
+    }
+
+    const totalAmount = group.installmentAmounts
+      ? amounts.reduce((a, b) => a + b, 0)
+      : parsePositiveAmount(group.totalAmount) ?? amounts.reduce((a, b) => a + b, 0);
+
     const db = getDb();
     const groupId = genId();
-    const now = new Date().toISOString();
-    const totalAmount = group.installmentAmounts
-      ? group.installmentAmounts.reduce((a, b) => a + b, 0)
-      : group.totalAmount;
+    const now = nowIso();
 
-    db.prepare(`
-      INSERT INTO finance_installment_groups
-        (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      groupId,
-      group.description,
-      totalAmount,
-      group.currency ?? 'ARS',
-      group.installmentCount,
-      group.category ?? 'Otros',
-      group.startDate,
-      now,
-      now,
-    );
-
-    const [yearStr, monthStr, dayStr] = group.startDate.split('-');
-    const startYear = parseInt(yearStr, 10);
-    const startMonth = parseInt(monthStr, 10) - 1; // 0-based
-    const startDay = parseInt(dayStr, 10);
-
-    const isCreditCard = group.paymentMethod === 'credit_card' && group.creditCardId;
+    const isCreditCard = group.paymentMethod === 'credit_card' && !!group.creditCardId;
+    // Card purchases land on next month's statement.
     const monthOffset = isCreditCard ? 1 : 0;
 
-    for (let i = 0; i < group.installmentCount; i++) {
-      const txDate = new Date(startYear, startMonth + i + monthOffset, startDay);
-      const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
-      const txId = genId();
-      const cuotaAmount = group.installmentAmounts?.[i] ?? group.installmentAmount;
+    const insertTx = db.prepare(`
+      INSERT INTO finance_transactions
+        (id, type, amount, currency, category, description, date, payment_method,
+         source, installments, installment_group_id, installment_number, for_third_party,
+         recurring_id, import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+      VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+    `);
 
+    const trx = db.transaction(() => {
       db.prepare(`
-        INSERT INTO finance_transactions
-          (id, type, amount, currency, category, description, date, payment_method,
-           source, installments, installment_group_id, for_third_party, recurring_id,
-           import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO finance_installment_groups
+          (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        txId,
-        'expense',
-        cuotaAmount,
-        group.currency ?? 'ARS',
-        group.category ?? 'Otros',
-        `${group.description} (Cuota ${i + 1}/${group.installmentCount})`,
-        txDateStr,
-        group.paymentMethod ?? 'credit_card',
-        'manual',
-        group.installmentCount,
         groupId,
-        group.forThirdParty ? 1 : 0,
-        null,
-        null,
-        isCreditCard ? group.creditCardId : null,
-        isCreditCard ? 0 : 1,
+        group.description,
+        totalAmount,
+        group.currency ?? 'ARS',
+        installmentCount,
+        group.category ?? 'Otros',
+        group.startDate,
         now,
         now,
       );
-    }
 
+      for (let i = 0; i < installmentCount; i++) {
+        insertTx.run(
+          genId(),
+          amounts[i],
+          group.currency ?? 'ARS',
+          group.category ?? 'Otros',
+          `${group.description} (Cuota ${i + 1}/${installmentCount})`,
+          // Clamped: a plan starting on the 31st must not skip February.
+          addMonthsClamped(group.startDate, i + monthOffset),
+          group.paymentMethod ?? 'credit_card',
+          installmentCount,
+          groupId,
+          i + 1,
+          group.forThirdParty ? 1 : 0,
+          isCreditCard ? group.creditCardId : null,
+          isCreditCard ? 0 : 1,
+          now,
+          now,
+        );
+      }
+    });
+
+    trx();
     return groupId;
   });
 
   ipcHandle('finance:deleteInstallmentGroup', (_e, id: string) => {
     const db = getDb();
-    const now = new Date().toISOString();
-    // Application-level cascade: soft-delete linked transactions first, then the group
-    db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE installment_group_id = ?').run(now, now, id);
-    db.prepare('UPDATE finance_installment_groups SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+    const now = nowIso();
+    // Application-level cascade: soft-delete linked transactions and the group atomically
+    const trx = db.transaction(() => {
+      db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE installment_group_id = ?').run(now, now, id);
+      db.prepare('UPDATE finance_installment_groups SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+    });
+    trx();
   });
 
   ipcHandle('finance:updateInstallmentAmount', (_e, txId: string, newAmount: number) => {
+    const amount = parsePositiveAmount(newAmount);
+    if (amount === null) return fail('invalid_amount');
     const db = getDb();
-    const now = new Date().toISOString();
-    db.prepare(`
-      UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?
-    `).run(newAmount, now, txId);
+    db.prepare('UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?').run(amount, nowIso(), txId);
+    return { ok: true };
   });
 
   // ── Loans ────────────────────────────────────────────
 
   ipcHandle('finance:getLoans', (_e, filter: { direction?: 'lent' | 'borrowed'; settled?: boolean } = {}) => {
     const db = getDb();
-    const conditions: string[] = [];
+    const conditions: string[] = ['deleted_at IS NULL'];
     const params: unknown[] = [];
 
     if (filter.direction !== undefined) {
@@ -698,13 +843,12 @@ export function registerFinanceIpcHandlers(): void {
       params.push(filter.settled ? 1 : 0);
     }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     return db.prepare(`
       SELECT id, person_name AS personName, direction, type, amount, currency,
              date, description, settled, installment_group_id AS installmentGroupId,
              settled_date AS settledDate, created_at AS createdAt
       FROM finance_loans
-      ${where}
+      WHERE ${conditions.join(' AND ')}
       ORDER BY settled ASC, date DESC
     `).all(...params);
   });
@@ -716,7 +860,7 @@ export function registerFinanceIpcHandlers(): void {
              date, description, settled, installment_group_id AS installmentGroupId,
              settled_date AS settledDate, created_at AS createdAt
       FROM finance_loans
-      WHERE person_name = ? AND settled = 0
+      WHERE person_name = ? AND settled = 0 AND deleted_at IS NULL
       ORDER BY date DESC
     `).all(personName);
   });
@@ -731,19 +875,26 @@ export function registerFinanceIpcHandlers(): void {
     description?: string;
     installmentGroupId?: string | null;
   }) => {
+    const personName = parseNonEmptyString(loan?.personName);
+    if (personName === null) return fail('invalid_person_name');
+    const amount = parsePositiveAmount(loan?.amount);
+    if (amount === null) return fail('invalid_amount');
+    if (!isValidDateString(loan?.date)) return fail('invalid_date');
+    if (loan.direction !== 'lent' && loan.direction !== 'borrowed') return fail('invalid_direction');
+
     const db = getDb();
     const id = genId();
-    const now = new Date().toISOString();
+    const now = nowIso();
     db.prepare(`
       INSERT INTO finance_loans
         (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `).run(
       id,
-      loan.personName,
+      personName,
       loan.direction,
       loan.type ?? 'single',
-      loan.amount,
+      amount,
       loan.currency ?? 'ARS',
       loan.date,
       loan.description ?? '',
@@ -756,8 +907,9 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:settleLoan', (_e, id: string) => {
     const db = getDb();
-    const today = new Date().toISOString().slice(0, 10);
-    db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ?, updated_at = datetime('now') WHERE id = ?`).run(today, id);
+    const now = nowIso();
+    db.prepare('UPDATE finance_loans SET settled = 1, settled_date = ?, updated_at = ? WHERE id = ?')
+      .run(now.slice(0, 10), now, id);
   });
 
   ipcHandle('finance:addLoanPayment', (_e, loanId: string, payment: {
@@ -766,22 +918,20 @@ export function registerFinanceIpcHandlers(): void {
     date: string;
     note?: string;
   }) => {
+    const amount = parsePositiveAmount(payment?.amount);
+    if (amount === null) return fail('invalid_amount');
+    if (!isValidDateString(payment?.date)) return fail('invalid_date');
+
     const db = getDb();
+    const loan = db.prepare('SELECT id FROM finance_loans WHERE id = ? AND deleted_at IS NULL').get(loanId);
+    if (!loan) return fail('loan_not_found');
+
     const id = genId();
-    const now = new Date().toISOString();
+    const now = nowIso();
     db.prepare(`
       INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, note, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      loanId,
-      payment.amount,
-      payment.currency ?? 'ARS',
-      payment.date,
-      payment.note ?? '',
-      now,
-      now,
-    );
+    `).run(id, loanId, amount, payment.currency ?? 'ARS', payment.date, payment.note ?? '', now, now);
     return id;
   });
 
@@ -797,7 +947,9 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:deleteLoanPayment', (_e, id: string) => {
     const db = getDb();
-    db.prepare("UPDATE finance_loan_payments SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
+    const now = nowIso();
+    db.prepare('UPDATE finance_loan_payments SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
+      .run(now, now, id);
   });
 
   ipcHandle('finance:createThirdPartyPurchase', (_e, data: {
@@ -811,87 +963,114 @@ export function registerFinanceIpcHandlers(): void {
     direction?: 'lent' | 'borrowed';
     creditCardId?: string | null;
   }) => {
+    if (!isValidDateString(data?.startDate)) return fail('invalid_start_date');
+    const personName = parseNonEmptyString(data?.personName);
+    if (personName === null) return fail('invalid_person_name');
+    const installmentCount = Number(data.installmentCount);
+    if (!Number.isInteger(installmentCount) || installmentCount < 1) return fail('invalid_installment_count');
+    if (installmentCount > MAX_INSTALLMENTS) return fail('too_many_installments');
+    const installmentAmount = parsePositiveAmount(data.installmentAmount);
+    if (installmentAmount === null) return fail('invalid_amount');
+
     const db = getDb();
     const currency = data.currency ?? 'ARS';
     const category = data.category ?? 'Otros';
-    const totalAmount = data.installmentCount * data.installmentAmount;
+    const totalAmount = installmentCount * installmentAmount;
     const groupId = genId();
     const loanId = genId();
-    const now = new Date().toISOString();
+    const now = nowIso();
+
+    // Same rule as createInstallmentGroup: only a real card defers to next month
+    // and keeps the purchase off the balance until the statement is paid.
+    const isCreditCard = !!data.creditCardId;
+    const monthOffset = isCreditCard ? 1 : 0;
+
+    const insertTx = db.prepare(`
+      INSERT INTO finance_transactions
+        (id, type, amount, currency, category, description, date, payment_method,
+         source, installments, installment_group_id, installment_number, for_third_party,
+         recurring_id, import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
+      VALUES (?, 'expense', ?, ?, ?, ?, ?, 'credit_card', 'manual', ?, ?, ?, 1, NULL, NULL, ?, ?, ?, ?)
+    `);
 
     const trx = db.transaction(() => {
-      // 1. Create installment group
       db.prepare(`
         INSERT INTO finance_installment_groups
           (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(groupId, data.description, totalAmount, currency, data.installmentCount, category, data.startDate, now, now);
+      `).run(groupId, data.description, totalAmount, currency, installmentCount, category, data.startDate, now, now);
 
-      // 2. Generate monthly transactions
-      const [yearStr, monthStr, dayStr] = data.startDate.split('-');
-      const startYear = parseInt(yearStr, 10);
-      const startMonth = parseInt(monthStr, 10) - 1;
-      const startDay = parseInt(dayStr, 10);
-
-      for (let i = 0; i < data.installmentCount; i++) {
-        const txDate = new Date(startYear, startMonth + i, startDay);
-        const txDateStr = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
-        const txId = genId();
-
-        db.prepare(`
-          INSERT INTO finance_transactions
-            (id, type, amount, currency, category, description, date, payment_method,
-             source, installments, installment_group_id, for_third_party, recurring_id,
-             import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          txId,
-          'expense',
-          data.installmentAmount,
+      for (let i = 0; i < installmentCount; i++) {
+        insertTx.run(
+          genId(),
+          installmentAmount,
           currency,
           category,
-          `${data.description} (Cuota ${i + 1}/${data.installmentCount})`,
-          txDateStr,
-          'credit_card',
-          'manual',
-          data.installmentCount,
+          `${data.description} (Cuota ${i + 1}/${installmentCount})`,
+          addMonthsClamped(data.startDate, i + monthOffset),
+          installmentCount,
           groupId,
-          1,
-          null,
-          null,
+          i + 1,
           data.creditCardId ?? null,
-          0,
+          isCreditCard ? 0 : 1,
           now,
           now,
         );
       }
 
-      // 3. Create loan linked to group
       db.prepare(`
         INSERT INTO finance_loans
-          (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at)
-        VALUES (?, ?, ?, 'installments', ?, ?, ?, ?, 0, ?, ?)
-      `).run(loanId, data.personName, data.direction ?? 'lent', totalAmount, currency, data.startDate, data.description, groupId, now);
+          (id, person_name, direction, type, amount, currency, date, description, settled, installment_group_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'installments', ?, ?, ?, ?, 0, ?, ?, ?)
+      `).run(loanId, personName, data.direction ?? 'lent', totalAmount, currency, data.startDate, data.description, groupId, now, now);
     });
 
     trx();
     return { groupId, loanId };
   });
 
+  /**
+   * Outstanding loans per currency (never mix ARS with USD) and net of the
+   * repayments already registered in `finance_loan_payments`.
+   */
   ipcHandle('finance:getActiveLoanSummary', () => {
     const db = getDb();
     const rows = db.prepare(`
-      SELECT direction, COALESCE(SUM(amount), 0) AS total
-      FROM finance_loans
-      WHERE settled = 0
-      GROUP BY direction
-    `).all() as Array<{ direction: string; total: number }>;
+      SELECT l.direction, l.currency,
+             COALESCE(SUM(l.amount), 0) AS total,
+             COALESCE(SUM(MAX(l.amount - COALESCE(p.paid, 0), 0)), 0) AS pending
+      FROM finance_loans l
+      LEFT JOIN (
+        SELECT loan_id, SUM(amount) AS paid
+        FROM finance_loan_payments
+        WHERE deleted_at IS NULL
+        GROUP BY loan_id
+      ) p ON p.loan_id = l.id
+      WHERE l.settled = 0 AND l.deleted_at IS NULL
+      GROUP BY l.direction, l.currency
+    `).all() as Array<{ direction: string; currency: string; total: number; pending: number }>;
 
-    const summary = { lent: 0, borrowed: 0 };
+    const summary = {
+      ARS: { lent: 0, borrowed: 0, lentPending: 0, borrowedPending: 0 },
+      USD: { lent: 0, borrowed: 0, lentPending: 0, borrowedPending: 0 },
+      // Legacy flat ARS fields kept so existing consumers keep working.
+      lent: 0,
+      borrowed: 0,
+    };
+
     for (const row of rows) {
-      if (row.direction === 'lent') summary.lent = row.total;
-      if (row.direction === 'borrowed') summary.borrowed = row.total;
+      if (row.currency !== 'ARS' && row.currency !== 'USD') continue;
+      const bucket = summary[row.currency];
+      if (row.direction === 'lent') {
+        bucket.lent = row.total;
+        bucket.lentPending = row.pending;
+      } else if (row.direction === 'borrowed') {
+        bucket.borrowed = row.total;
+        bucket.borrowedPending = row.pending;
+      }
     }
+    summary.lent = summary.ARS.lent;
+    summary.borrowed = summary.ARS.borrowed;
     return summary;
   });
 
@@ -918,18 +1097,23 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
     billingDay?: number;
   }) => {
+    const name = parseNonEmptyString(rec?.name);
+    if (name === null) return fail('invalid_name');
+    const amount = parsePositiveAmount(rec?.amount);
+    if (amount === null) return fail('invalid_amount');
+
     const db = getDb();
     const id = rec.id ?? genId();
-    const now = new Date().toISOString();
+    const now = nowIso();
     db.prepare(`
       INSERT OR IGNORE INTO finance_recurring
         (id, name, type, amount, currency, category, billing_day, active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(
       id,
-      rec.name,
+      name,
       rec.type,
-      rec.amount,
+      amount,
       rec.currency ?? 'ARS',
       rec.category ?? 'Otros',
       rec.billingDay ?? 1,
@@ -940,20 +1124,28 @@ export function registerFinanceIpcHandlers(): void {
   });
 
   ipcHandle('finance:updateRecurringAmount', (_e, id: string, newAmount: number) => {
+    const amount = parsePositiveAmount(newAmount);
+    if (amount === null) return fail('invalid_amount');
+
     const db = getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
     const today = now.slice(0, 10);
     const historyId = genId();
     const current = db.prepare('SELECT amount FROM finance_recurring WHERE id = ?').get(id) as { amount: number } | undefined;
-    const previousAmount = current?.amount ?? 0;
-    db.prepare(`
-      INSERT INTO finance_recurring_amount_history
-        (id, recurring_id, previous_amount, amount, currency, effective_date, created_at)
-      SELECT ?, id, ?, ?, currency, ?, ?
-      FROM finance_recurring
-      WHERE id = ?
-    `).run(historyId, previousAmount, newAmount, today, now, id);
-    db.prepare(`UPDATE finance_recurring SET amount = ?, updated_at = ? WHERE id = ?`).run(newAmount, now, id);
+    if (!current) return fail('not_found');
+
+    const trx = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO finance_recurring_amount_history
+          (id, recurring_id, previous_amount, amount, currency, effective_date, created_at)
+        SELECT ?, id, ?, ?, currency, ?, ?
+        FROM finance_recurring
+        WHERE id = ?
+      `).run(historyId, current.amount, amount, today, now, id);
+      db.prepare('UPDATE finance_recurring SET amount = ?, updated_at = ? WHERE id = ?').run(amount, now, id);
+    });
+    trx();
+    return { ok: true };
   });
 
   ipcHandle('finance:updateRecurring', (_e, id: string, fields: {
@@ -966,95 +1158,53 @@ export function registerFinanceIpcHandlers(): void {
     const safe = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.has(k))) as typeof fields;
 
     const db = getDb();
-    const now = new Date().toISOString();
+    const now = nowIso();
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [now];
 
-    if (safe.name !== undefined) { sets.push('name = ?'); params.push(safe.name); }
+    if (safe.name !== undefined) {
+      const name = parseNonEmptyString(safe.name);
+      if (name === null) return fail('invalid_name');
+      sets.push('name = ?'); params.push(name);
+    }
     if (safe.type !== undefined) { sets.push('type = ?'); params.push(safe.type); }
     if (safe.category !== undefined) { sets.push('category = ?'); params.push(safe.category); }
-    if (safe.billingDay !== undefined) { sets.push('billing_day = ?'); params.push(safe.billingDay); }
+    if (safe.billingDay !== undefined) {
+      const billingDay = Number(safe.billingDay);
+      if (!Number.isInteger(billingDay) || billingDay < 1 || billingDay > 31) return fail('invalid_billing_day');
+      sets.push('billing_day = ?'); params.push(billingDay);
+    }
 
-    if (sets.length === 1) return; // only updated_at, no real changes
+    if (sets.length === 1) return { ok: true }; // only updated_at, no real changes
     params.push(id);
     db.prepare(`UPDATE finance_recurring SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    return { ok: true };
   });
 
   ipcHandle('finance:toggleRecurring', (_e, id: string) => {
     const db = getDb();
-    const now = new Date().toISOString();
     db.prepare(`
       UPDATE finance_recurring
       SET active = CASE WHEN active = 1 THEN 0 ELSE 1 END,
           updated_at = ?
       WHERE id = ?
-    `).run(now, id);
+    `).run(nowIso(), id);
   });
 
+  /** Soft-delete AND deactivate: an active-but-deleted template used to be
+   *  invisible in the UI while the bootstrap job kept regenerating it forever. */
   ipcHandle('finance:deleteRecurring', (_e, id: string) => {
     const db = getDb();
-    const now = new Date().toISOString();
-    db.prepare('UPDATE finance_transactions SET recurring_id = NULL, updated_at = ? WHERE recurring_id = ?').run(now, id);
-    db.prepare('UPDATE finance_recurring SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+    const now = nowIso();
+    const trx = db.transaction(() => {
+      db.prepare('UPDATE finance_transactions SET recurring_id = NULL, updated_at = ? WHERE recurring_id = ?').run(now, id);
+      db.prepare('UPDATE finance_recurring SET deleted_at = ?, active = 0, updated_at = ? WHERE id = ?').run(now, now, id);
+    });
+    trx();
   });
 
   ipcHandle('finance:generateRecurringForMonth', (_e, month: string) => {
-    const db = getDb();
-    const actives = db.prepare(`
-      SELECT id, name, type, amount, currency, category, billing_day AS billingDay
-      FROM finance_recurring
-      WHERE deleted_at IS NULL AND active = 1
-    `).all() as Array<{
-      id: string;
-      name: string;
-      type: 'expense' | 'income';
-      amount: number;
-      currency: string;
-      category: string;
-      billingDay: number;
-    }>;
-
-    const now = new Date().toISOString();
-    let generated = 0;
-
-    for (const rec of actives) {
-      const existing = db.prepare(`
-        SELECT COUNT(*) AS c
-        FROM finance_transactions
-        WHERE deleted_at IS NULL AND source = 'recurring' AND recurring_id = ? AND date LIKE ?
-      `).get(rec.id, `${month}%`) as { c: number };
-
-      if (existing.c > 0) continue;
-
-      const txId = genId();
-      db.prepare(`
-        INSERT INTO finance_transactions
-          (id, type, amount, currency, category, description, date, payment_method,
-           source, installments, installment_group_id, for_third_party, recurring_id,
-           import_batch_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        txId,
-        rec.type,
-        rec.amount,
-        rec.currency,
-        rec.category,
-        rec.name,
-        `${month}-${String(rec.billingDay ?? 1).padStart(2, '0')}`,
-        'cash',
-        'recurring',
-        1,
-        null,
-        0,
-        rec.id,
-        null,
-        now,
-        now,
-      );
-      generated++;
-    }
-
-    return generated;
+    return generateRecurringForMonth(getDb(), month);
   });
 
   ipcHandle('finance:getRecurringAmountHistory', (_e, recurringId: string) => {
@@ -1073,20 +1223,12 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getMonthlyExpenses', () => {
     const db = getDb();
-    const today = todayDateString();
-    const [year, month] = today.slice(0, 7).split('-').map(Number);
+    const currentMonth = todayDateString().slice(0, 7);
 
     const result: number[] = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(year, month - 1 - i, 1);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const row = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) AS total
-        FROM finance_transactions
-        WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
-          AND date LIKE ?
-      `).get(`${m}%`) as { total: number };
-      result.push(row.total);
+      const { start, end } = monthRange(addMonthsToMonth(currentMonth, -i));
+      result.push(sumByCurrency(db, { start, end, type: 'expense', currency: 'ARS', balanceScope: 'impacting' }).ARS);
     }
     return result;
   });
@@ -1095,29 +1237,34 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getCategoryAverages', () => {
     const db = getDb();
-    const today = todayDateString();
-    const [year, month] = today.slice(0, 7).split('-').map(Number);
-
-    const months: string[] = [];
-    for (let i = 1; i <= 3; i++) {
-      const d = new Date(year, month - 1 - i, 1);
-      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
-
-    const likeConditions = months.map((m) => `date LIKE '${m}%'`).join(' OR ');
+    const currentMonth = todayDateString().slice(0, 7);
+    // Window: the three complete months before the current one.
+    const start = monthRange(addMonthsToMonth(currentMonth, -3)).start;
+    const end = monthRange(addMonthsToMonth(currentMonth, -1)).end;
 
     const rows = db.prepare(`
       SELECT category, COALESCE(SUM(amount), 0) AS total
       FROM finance_transactions
       WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
-        AND category != 'Pago Tarjeta'
-        AND (${likeConditions})
+        AND category != ?
+        AND date >= ? AND date < ?
       GROUP BY category
-    `).all() as Array<{ category: string; total: number }>;
+    `).all(CARD_PAYMENT_CATEGORY, start, end) as Array<{ category: string; total: number }>;
+
+    // Divide by the months that actually have data, not a hard-coded 3 —
+    // otherwise a user with one month of history sees a third of reality.
+    const monthsWithData = db.prepare(`
+      SELECT COUNT(DISTINCT SUBSTR(date, 1, 7)) AS c
+      FROM finance_transactions
+      WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
+        AND category != ?
+        AND date >= ? AND date < ?
+    `).get(CARD_PAYMENT_CATEGORY, start, end) as { c: number };
+    const divisor = Math.max(monthsWithData.c, 1);
 
     const averages: Record<string, number> = {};
     for (const row of rows) {
-      averages[row.category] = row.total / 3;
+      averages[row.category] = row.total / divisor;
     }
     return averages;
   });
@@ -1126,35 +1273,30 @@ export function registerFinanceIpcHandlers(): void {
 
   ipcHandle('finance:getPreviousMonthSummary', () => {
     const db = getDb();
-    const today = todayDateString();
-    const [year, month] = today.slice(0, 7).split('-').map(Number);
-    const d = new Date(year, month - 2, 1);
-    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const prevMonth = addMonthsToMonth(todayDateString().slice(0, 7), -1);
+    const { start, end } = monthRange(prevMonth);
 
-    const row = db.prepare(`
-      SELECT
-        COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS income,
-        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expenses
-      FROM finance_transactions
-      WHERE deleted_at IS NULL AND currency = 'ARS' AND impacts_balance = 1 AND date LIKE ?
-    `).get(`${prevMonth}%`) as { income: number; expenses: number };
+    const balance = sumIncomeExpenseByCurrency(db, {
+      start, end, currency: 'ARS', balanceScope: 'impacting',
+    });
 
-    return { income: row.income, expenses: row.expenses, month: prevMonth };
+    return { income: balance.ARS.income, expenses: balance.ARS.expenses, month: prevMonth };
   });
 
   // ── C5: Export CSV ──────────────────────────────────────────
 
   ipcHandle('finance:exportCsv', async (_e, month?: string) => {
     const db = getDb();
-    const m = month ?? todayDateString().slice(0, 7);
+    const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
+    const { start, end } = monthRange(m);
 
     const rows = db.prepare(`
       SELECT date, description, amount, currency, category, type,
              payment_method AS paymentMethod
       FROM finance_transactions
-      WHERE deleted_at IS NULL AND date LIKE ?
+      WHERE deleted_at IS NULL AND date >= ? AND date < ?
       ORDER BY date ASC, created_at ASC
-    `).all(`${m}%`) as Array<{
+    `).all(start, end) as Array<{
       date: string;
       description: string;
       amount: number;

@@ -59,4 +59,25 @@ export const cauldronMigrations: Migration[] = [
       ALTER TABLE cauldron_presets ADD COLUMN extension_minutes INTEGER NOT NULL DEFAULT 5;
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 4,
+    up: `
+      -- The running timer lived only in a module-level 'let'. Closing the app mid
+      -- pomodoro lost it, and startup then marked EVERY incomplete session deleted —
+      -- 20 minutes of a 25-minute cycle silently thrown away, no XP, no warning.
+      -- target_end_time (epoch ms) makes the running session recoverable across a
+      -- restart: cauldron:getInterruptedSession reads it to compute the time left.
+      ALTER TABLE cauldron_sessions ADD COLUMN target_end_time INTEGER;
+
+      -- cauldron:extend inserted a plain type='work' row, so finishing a 5-minute
+      -- extension of an already-paid cycle counted as a WHOLE extra pomodoro:
+      -- +8 XP, +1 in "Today", +5 min on the weekly chart. Extensions are now
+      -- flagged and excluded from every stat.
+      ALTER TABLE cauldron_sessions ADD COLUMN is_extension INTEGER NOT NULL DEFAULT 0;
+
+      CREATE INDEX IF NOT EXISTS idx_cauldron_work_done
+        ON cauldron_sessions(type, completed, deleted_at, started_at);
+    `,
+  },
 ];

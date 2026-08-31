@@ -7,6 +7,9 @@ import { spawn } from 'child_process';
 const REPO = 'facuga7van/hubtify-releases';
 const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
+/** Abort the installer download if no bytes arrive for this long. */
+const STALL_TIMEOUT_MS = 60_000;
+
 let mainWindow: BrowserWindow | null = null;
 
 interface ReleaseInfo {
@@ -104,11 +107,39 @@ export function registerUpdaterIpcHandlers(): void {
 
     const installerPath = path.join(app.getPath('temp'), `Hubtify-${release.version}-Setup.exe`);
 
-    // Download the setup exe
-    const res = await fetch(release.setupUrl, {
-      signal: AbortSignal.timeout(30000),
-    });
+    // AbortSignal.timeout() only covers the response HEADERS. The body was then read
+    // in an unbounded `while (true) { await reader.read() }`: a socket that stalled
+    // mid-download left that promise pending forever, so the catch that resets the
+    // UI to idle never ran and the user was stuck on a modal with no buttons.
+    // This controller aborts on INACTIVITY — no bytes for STALL_TIMEOUT_MS.
+    const controller = new AbortController();
+    let stallTimer: NodeJS.Timeout | null = null;
+    let stalled = false;
+    const armStallTimer = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        stalled = true;
+        controller.abort();
+      }, STALL_TIMEOUT_MS);
+    };
+    const disarmStallTimer = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = null;
+    };
+
+    armStallTimer();
+    let res: Response;
+    try {
+      res = await fetch(release.setupUrl, { signal: controller.signal });
+    } catch (err) {
+      disarmStallTimer();
+      const msg = stalled ? 'Download timed out' : `Download failed: ${(err as Error).message}`;
+      sendError(msg);
+      throw new Error(msg);
+    }
+
     if (!res.ok) {
+      disarmStallTimer();
       const msg = `Download failed (HTTP ${res.status})`;
       sendError(msg);
       throw new Error(msg);
@@ -117,26 +148,50 @@ export function registerUpdaterIpcHandlers(): void {
     const total = Number(res.headers.get('content-length')) || 0;
     const reader = res.body?.getReader();
     if (!reader) {
+      disarmStallTimer();
       const msg = 'No response body';
       sendError(msg);
       throw new Error(msg);
     }
 
-    const chunks: Uint8Array[] = [];
+    // Stream to disk instead of accumulating the whole installer in memory
+    // (`chunks: Uint8Array[]` + Buffer.concat held ~2x the .exe in RAM).
+    const out = fs.createWriteStream(installerPath);
     let downloaded = 0;
+    let lastPercent = -1;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      downloaded += value.length;
-      if (total > 0) {
-        const percent = Math.round((downloaded / total) * 100);
-        mainWindow?.webContents.send('updater:download-progress', { percent });
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        armStallTimer();
+        if (!out.write(Buffer.from(value))) {
+          await new Promise<void>((resolve) => out.once('drain', resolve));
+        }
+        downloaded += value.length;
+        if (total > 0) {
+          const percent = Math.round((downloaded / total) * 100);
+          if (percent !== lastPercent) {
+            lastPercent = percent;
+            mainWindow?.webContents.send('updater:download-progress', { percent });
+          }
+        }
       }
+      await new Promise<void>((resolve, reject) => {
+        out.end(() => resolve());
+        out.on('error', reject);
+      });
+    } catch (err) {
+      out.destroy();
+      try { fs.unlinkSync(installerPath); } catch { /* nothing to clean */ }
+      const msg = stalled
+        ? `Download stalled (no data for ${STALL_TIMEOUT_MS / 1000}s)`
+        : `Download failed: ${(err as Error).message}`;
+      sendError(msg);
+      throw new Error(msg);
+    } finally {
+      disarmStallTimer();
     }
-
-    fs.writeFileSync(installerPath, Buffer.concat(chunks));
 
     // Validate downloaded file
     if (!fs.existsSync(installerPath)) {

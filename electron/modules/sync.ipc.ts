@@ -2,6 +2,29 @@ import type Database from 'better-sqlite3';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import { recalcSummary } from './nutrition.ipc';
+import { weeklyTarget } from './quests.habits';
+
+/**
+ * Guards a remote row before it reaches SQLite: rejects non-objects and any row
+ * missing a column the schema declares NOT NULL. Without this a single bad record
+ * (a task with no `name`, a null entry in the array) raised a constraint error
+ * that rolled back the entire pull.
+ */
+function isUsableRow(row: unknown, table: string, required: string[]): boolean {
+  if (!row || typeof row !== 'object') {
+    console.warn(`[Sync] ${table}: skipping non-object row`);
+    return false;
+  }
+  const r = row as Record<string, unknown>;
+  for (const field of required) {
+    const v = r[field];
+    if (v === undefined || v === null || v === '') {
+      console.warn(`[Sync] ${table}: skipping row missing "${field}"`, r.id ?? '(no id)');
+      return false;
+    }
+  }
+  return true;
+}
 
 interface SyncTask {
   id: string;
@@ -82,7 +105,10 @@ interface SyncDrawing {
 }
 
 interface SyncRpgEvent {
-  id: number;
+  /** Cross-device identity. `id` (AUTOINCREMENT) is local-only and no longer sent. */
+  syncId?: string;
+  id?: number;
+  refId?: string | null;
   moduleId: string;
   eventType: string;
   xpGained: number;
@@ -139,7 +165,50 @@ const USER_DATA_TABLES = [
   'notifications',
   'cauldron_presets',
   'cauldron_sessions',
+  // Holds the real imported-statement metadata, and finance_transactions.import_batch_id
+  // points at it — leaving it out leaked one account's imports into the next.
+  'finance_import_batches',
+  // Legacy but still carries user rows on older installs.
+  'finance_income_sources',
 ];
+
+/**
+ * app_state is NOT in USER_DATA_TABLES: it also stores `last_uid`, which must
+ * survive an account switch. These keys are per-user preferences and must not.
+ */
+const USER_PREFERENCE_STATE_KEYS = [
+  'dollar_visible_types',
+  'crypto_visible_types',
+];
+
+/**
+ * How much rpg_events history is pushed to Firestore. The whole log used to go
+ * into the `questify` field of the main user document — one event per task,
+ * habit, meal and expense, never pruned — so an active account eventually
+ * crossed Firestore's 1 MB per-document cap and EVERY push started failing.
+ */
+const RPG_EVENTS_PUSH_DAYS = 90;
+
+/** Local rpg_events older than this are deleted on startup. */
+const RPG_EVENTS_RETENTION_DAYS = 365;
+
+function daysAgoStamp(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Drops rpg_events older than the retention window so the log stops growing forever. */
+export function pruneRpgEvents(db: Database.Database): number {
+  try {
+    const info = db.prepare('DELETE FROM rpg_events WHERE created_at < ?')
+      .run(daysAgoStamp(RPG_EVENTS_RETENTION_DAYS));
+    return info.changes;
+  } catch (err) {
+    console.error('[Sync] rpg_events prune failed (non-fatal):', err);
+    return 0;
+  }
+}
 
 // Merges remote habit checks into local with last-write-wins.
 // The natural key is (habit_id, date) — enforced by UNIQUE in the schema — NOT the
@@ -167,15 +236,398 @@ export function mergeHabitChecks(db: Database.Database, checks: SyncHabitCheck[]
   return changed;
 }
 
+/**
+ * Merges the two AUTOINCREMENT-keyed nutrition tables (frequent_foods, then
+ * food_log, which references them) and recalculates every affected day's summary.
+ *
+ * Exported — like mergeHabitChecks — so the cross-device identity rules can be
+ * tested directly against an in-memory database.
+ */
+export function mergeNutritionFoods(
+  db: Database.Database,
+  d: { frequentFoods?: Array<Record<string, any>>; foodLog?: Array<Record<string, any>> },
+): { changed: boolean; affectedDates: Set<string> } {
+  const affectedDates = new Set<string>();
+  let changed = false;
+
+  // ── Frequent foods ──
+  // Merged BEFORE food_log, which references them, and keyed by sync_id rather
+  // than the AUTOINCREMENT id (two devices mint the same numbers for different
+  // foods, so the old id-keyed merge dropped rows and cross-applied deletes).
+  if (Array.isArray(d.frequentFoods)) {
+    const getFreqBySync = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE sync_id = ?');
+    const getFreqByName = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE name = ? COLLATE NOCASE');
+    const insertFreq = db.prepare('INSERT INTO frequent_foods (sync_id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
+    const adoptFreqSync = db.prepare('UPDATE frequent_foods SET sync_id = ? WHERE id = ? AND sync_id IS NULL AND NOT EXISTS (SELECT 1 FROM frequent_foods WHERE sync_id = ?)');
+
+    for (const f of d.frequentFoods) {
+      if (!isUsableRow(f, 'frequentFoods', ['name'])) continue;
+      // Same deterministic shape the nutrition v10 backfill used, so a payload
+      // from a device that has not upgraded yet still lines up.
+      const syncId: string = (typeof f.sync_id === 'string' && f.sync_id)
+        ? f.sync_id
+        : `legacy-${String(f.name).toLowerCase()}`;
+
+      let local = getFreqBySync.get(syncId) as { id: number; updated_at: string | null } | undefined;
+      if (!local) {
+        // name is UNIQUE COLLATE NOCASE — adopt the existing row instead of
+        // colliding with it.
+        const byName = getFreqByName.get(f.name) as { id: number; updated_at: string | null } | undefined;
+        if (byName) {
+          adoptFreqSync.run(syncId, byName.id, syncId);
+          local = byName;
+        }
+      }
+
+      if (!local) {
+        insertFreq.run(syncId, f.name, f.calories, f.ai_breakdown ?? null, f.times_used ?? 0, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
+        changed = true;
+      } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
+        updateFreq.run(f.calories, f.ai_breakdown ?? null, f.times_used ?? 0, f.updated_at, f.deleted_at ?? null, local.id);
+        changed = true;
+      }
+    }
+  }
+
+  // ── Food log ──
+  // Keyed by sync_id. Verified failure of the old id-keyed merge: 2 own meals on
+  // each device merged to 2 rows instead of 4, and the LWW pass then wrote the
+  // remote's deleted_at onto whichever unrelated local row shared the number.
+  if (Array.isArray(d.foodLog)) {
+    const getFoodBySync = db.prepare('SELECT id, date, updated_at FROM food_log WHERE sync_id = ?');
+    const getFoodByNatural = db.prepare('SELECT id, date, updated_at FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?');
+    const insertFood = db.prepare('INSERT INTO food_log (sync_id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const updateFood = db.prepare('UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ?');
+    const adoptFoodSync = db.prepare('UPDATE food_log SET sync_id = ? WHERE id = ? AND sync_id IS NULL AND NOT EXISTS (SELECT 1 FROM food_log WHERE sync_id = ?)');
+    const freqBySync = db.prepare('SELECT id FROM frequent_foods WHERE sync_id = ?');
+
+    for (const f of d.foodLog) {
+      if (!isUsableRow(f, 'foodLog', ['date', 'time', 'description', 'calories'])) continue;
+
+      // food_log.frequent_food_id points at the LOCAL frequent_foods.id, which
+      // identifies a different food on every device — re-resolve it by sync_id.
+      let frequentFoodId: number | null = null;
+      if (f.frequent_food_sync_id) {
+        const ff = freqBySync.get(f.frequent_food_sync_id) as { id: number } | undefined;
+        frequentFoodId = ff?.id ?? null;
+      }
+
+      const syncId: string = (typeof f.sync_id === 'string' && f.sync_id)
+        ? f.sync_id
+        : `legacy-${f.date}|${f.time}|${f.calories}|${String(f.description).slice(0, 60)}`;
+
+      let local = getFoodBySync.get(syncId) as { id: number; date: string; updated_at: string | null } | undefined;
+      if (!local) {
+        const byNatural = getFoodByNatural.get(f.date, f.time, f.description, f.calories) as { id: number; date: string; updated_at: string | null } | undefined;
+        if (byNatural) {
+          adoptFoodSync.run(syncId, byNatural.id, syncId);
+          local = byNatural;
+        }
+      }
+
+      if (!local) {
+        insertFood.run(syncId, f.date, f.time, f.description, f.calories, f.source ?? 'manual', frequentFoodId, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null);
+        affectedDates.add(f.date);
+        changed = true;
+      } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
+        updateFood.run(f.deleted_at ?? null, f.updated_at ?? null, local.id);
+        // A row that merely flipped deleted_at changes that day's totals too.
+        // Only freshly INSERTED rows used to trigger a recalc, so a delete synced
+        // from another device left the two devices showing different daily totals.
+        affectedDates.add(local.date);
+        if (f.date) affectedDates.add(f.date);
+        changed = true;
+      }
+    }
+  }
+
+  for (const date of affectedDates) {
+    recalcSummary(db, date);
+  }
+
+  return { changed, affectedDates };
+
+}
+
+/**
+ * Merges a remote questify payload into the local database with last-write-wins.
+ *
+ * Exported so the failure modes that used to abort an entire pull — an orphan
+ * subtask or habit check, a null payload, a task with no name — can be tested
+ * directly against an in-memory database.
+ */
+export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData): { changed: boolean } {
+  let changed = false;
+
+  // A null payload, or one missing the expected arrays, used to throw
+  // "Cannot read properties of null" and abort the whole pull.
+  if (!remote || typeof remote !== 'object') {
+    console.warn('[Sync] mergeQuestData: ignoring non-object payload');
+    return { changed: false };
+  }
+  const rows = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+  const tx = db.transaction(() => {
+    // Every table runs inside its OWN savepoint. One corrupt record used to
+    // abort the ENTIRE transaction — a single subtask whose taskId doesn't exist
+    // locally raised FOREIGN KEY constraint failed and the whole pull (tasks,
+    // habits, projects, drawings) was rolled back and lost. Now the bad table's
+    // work is discarded and the rest of the pull still lands.
+    const step = (label: string, fn: () => void) => {
+      const sp = db.transaction(fn);
+      try {
+        sp();
+      } catch (err) {
+        console.error(`[Sync] mergeQuestData: "${label}" failed, skipping that table:`, err);
+      }
+    };
+
+    // ── Merge projects first (tasks reference them) ──
+    step('projects', () => {
+      const getProject = db.prepare('SELECT id, updated_at FROM projects WHERE id = ?');
+      const insertProject = db.prepare(`
+        INSERT INTO projects (id, name, color, project_order, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      const updateProject = db.prepare(`
+        UPDATE projects SET name = ?, color = ?, project_order = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+
+      for (const rp of rows<SyncProject>(remote.projects)) {
+        if (!isUsableRow(rp, 'projects', ['id', 'name'])) continue;
+        const local = getProject.get(rp.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          insertProject.run(rp.id, rp.name, rp.color ?? '#8b7355', rp.order ?? 0, rp.createdAt, rp.updatedAt, rp.deletedAt);
+          changed = true;
+        } else if (rp.updatedAt > local.updated_at) {
+          updateProject.run(rp.name, rp.color ?? '#8b7355', rp.order ?? 0, rp.updatedAt, rp.deletedAt, rp.id);
+          changed = true;
+        }
+      }
+    });
+
+    // ── Merge tasks ──
+    step('tasks', () => {
+      const getTask = db.prepare('SELECT id, updated_at FROM tasks WHERE id = ?');
+      const insertTask = db.prepare(`
+        INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const updateTask = db.prepare(`
+        UPDATE tasks SET name = ?, description = ?, status = ?, tier = ?, category = ?,
+               project_id = ?, due_date = ?, task_order = ?, completed_at = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+      // tasks.project_id REFERENCES projects(id): a task pointing at a project this
+      // device has never seen would fail the FK. Keep the task, drop the dangling link.
+      const projectExists = db.prepare('SELECT 1 FROM projects WHERE id = ?');
+
+      for (const rt of rows<SyncTask>(remote.tasks)) {
+        // name is NOT NULL — a nameless task raised NOT NULL constraint failed and
+        // took the whole pull down with it.
+        if (!isUsableRow(rt, 'tasks', ['id', 'name'])) continue;
+        const projectId = rt.projectId && projectExists.get(rt.projectId) ? rt.projectId : null;
+        const local = getTask.get(rt.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          insertTask.run(rt.id, rt.name, rt.description ?? '', rt.status ?? 0, rt.tier ?? 2, rt.category ?? '',
+            projectId, rt.dueDate ?? null, rt.order ?? 0, rt.completedAt ?? null, rt.createdAt, rt.updatedAt, rt.deletedAt);
+          changed = true;
+        } else if (rt.updatedAt > local.updated_at) {
+          updateTask.run(rt.name, rt.description ?? '', rt.status ?? 0, rt.tier ?? 2, rt.category ?? '',
+            projectId, rt.dueDate ?? null, rt.order ?? 0, rt.completedAt ?? null, rt.updatedAt, rt.deletedAt, rt.id);
+          changed = true;
+        }
+      }
+    });
+
+    // ── Merge subtasks ──
+    step('subtasks', () => {
+      const getSubtask = db.prepare('SELECT id, updated_at FROM subtasks WHERE id = ?');
+      const insertSubtask = db.prepare(`
+        INSERT INTO subtasks (id, task_id, name, description, tier, status, subtask_order, completed_at, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const updateSubtask = db.prepare(`
+        UPDATE subtasks SET name = ?, description = ?, tier = ?, status = ?,
+               subtask_order = ?, completed_at = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+      // subtasks.task_id is a NOT NULL foreign key: there is no way to keep an
+      // orphan, so it is dropped (logged) instead of aborting the pull.
+      const taskExists = db.prepare('SELECT 1 FROM tasks WHERE id = ?');
+
+      for (const rs of rows<SyncSubtask>(remote.subtasks)) {
+        if (!isUsableRow(rs, 'subtasks', ['id', 'taskId', 'name'])) continue;
+        const local = getSubtask.get(rs.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          if (!taskExists.get(rs.taskId)) {
+            console.warn(`[Sync] mergeQuestData: dropping orphan subtask ${rs.id} (task ${rs.taskId} not found)`);
+            continue;
+          }
+          insertSubtask.run(rs.id, rs.taskId, rs.name, rs.description ?? '', rs.tier ?? 2, rs.status ?? 0,
+            rs.order ?? 0, rs.completedAt ?? null, rs.createdAt, rs.updatedAt, rs.deletedAt);
+          changed = true;
+        } else if (rs.updatedAt > local.updated_at) {
+          updateSubtask.run(rs.name, rs.description ?? '', rs.tier ?? 2, rs.status ?? 0,
+            rs.order ?? 0, rs.completedAt ?? null, rs.updatedAt, rs.deletedAt, rs.id);
+          changed = true;
+        }
+      }
+    });
+
+    // ── Merge categories (keyed by id) ──
+    step('categories', () => {
+      const getCategory = db.prepare('SELECT id, updated_at FROM task_categories WHERE id = ?');
+      const insertCategory = db.prepare(`
+        INSERT OR IGNORE INTO task_categories (id, name, project_id, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const updateCategory = db.prepare(`
+        UPDATE task_categories SET name = ?, project_id = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+      const projectExists = db.prepare('SELECT 1 FROM projects WHERE id = ?');
+
+      for (const rc of rows<SyncCategory>(remote.categories)) {
+        if (!isUsableRow(rc, 'categories', ['id', 'name'])) continue;
+        const projectId = rc.projectId && projectExists.get(rc.projectId) ? rc.projectId : null;
+        const local = getCategory.get(rc.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          insertCategory.run(rc.id, rc.name, projectId, rc.createdAt, rc.updatedAt, rc.deletedAt);
+          changed = true;
+        } else if (rc.updatedAt > local.updated_at) {
+          updateCategory.run(rc.name, projectId, rc.updatedAt, rc.deletedAt, rc.id);
+          changed = true;
+        }
+      }
+    });
+
+    // ── Merge habits ──
+    step('habits', () => {
+      const getHabit = db.prepare('SELECT id, updated_at FROM habits WHERE id = ?');
+      const insertHabit = db.prepare(`
+        INSERT INTO habits (id, name, frequency, times_per_week, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      const updateHabit = db.prepare(`
+        UPDATE habits SET name = ?, frequency = ?, times_per_week = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+
+      for (const rh of rows<SyncHabit>(remote.habits)) {
+        if (!isUsableRow(rh, 'habits', ['id', 'name'])) continue;
+        // times_per_week is clamped to 1..7 here, NOT trusted: a 0 arriving from
+        // sync (or from Syl via firebase-admin) makes computeHabits' weekly-streak
+        // loop non-terminating and hangs the whole main process.
+        const timesPerWeek = weeklyTarget(rh.timesPerWeek);
+        const frequency = rh.frequency === 'weekly' || rh.frequency === 'monthly' ? rh.frequency : 'daily';
+        const local = getHabit.get(rh.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          insertHabit.run(rh.id, rh.name, frequency, timesPerWeek, rh.createdAt, rh.updatedAt ?? rh.createdAt, rh.deletedAt);
+          changed = true;
+        } else if ((rh.updatedAt ?? rh.createdAt) > local.updated_at) {
+          updateHabit.run(rh.name, frequency, timesPerWeek, rh.updatedAt ?? rh.createdAt, rh.deletedAt, rh.id);
+          changed = true;
+        }
+      }
+    });
+
+    // ── Merge drawings ──
+    step('drawings', () => {
+      const getDrawing = db.prepare('SELECT id, updated_at FROM task_drawings WHERE id = ?');
+      const insertDrawing = db.prepare(`
+        INSERT INTO task_drawings (id, task_id, data, draw_order, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      const updateDrawing = db.prepare(`
+        UPDATE task_drawings SET data = ?, draw_order = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+      const taskExists = db.prepare('SELECT 1 FROM tasks WHERE id = ?');
+
+      for (const rd of rows<SyncDrawing>(remote.drawings)) {
+        if (!isUsableRow(rd, 'drawings', ['id', 'taskId', 'data'])) continue;
+        const local = getDrawing.get(rd.id) as { id: string; updated_at: string } | undefined;
+        if (!local) {
+          if (!taskExists.get(rd.taskId)) {
+            console.warn(`[Sync] mergeQuestData: dropping orphan drawing ${rd.id} (task ${rd.taskId} not found)`);
+            continue;
+          }
+          insertDrawing.run(rd.id, rd.taskId, rd.data, rd.order ?? 0, rd.createdAt, rd.updatedAt ?? rd.createdAt, rd.deletedAt ?? null);
+          changed = true;
+        } else if ((rd.updatedAt ?? rd.createdAt) > local.updated_at) {
+          updateDrawing.run(rd.data, rd.order ?? 0, rd.updatedAt ?? rd.createdAt, rd.deletedAt ?? null, rd.id);
+          changed = true;
+        }
+      }
+    });
+
+    // ── Merge habit checks (keyed by natural key habit_id+date, see mergeHabitChecks) ──
+    step('habitChecks', () => {
+      // habit_checks.habit_id is a NOT NULL foreign key — same orphan class of
+      // failure as subtasks (see commit a4a408a).
+      const habitExists = db.prepare('SELECT 1 FROM habits WHERE id = ?');
+      const usable = rows<SyncHabitCheck>(remote.habitChecks).filter((rc) => {
+        if (!isUsableRow(rc, 'habitChecks', ['id', 'habitId', 'date'])) return false;
+        if (!habitExists.get(rc.habitId)) {
+          console.warn(`[Sync] mergeQuestData: dropping orphan habit check ${rc.id} (habit ${rc.habitId} not found)`);
+          return false;
+        }
+        return true;
+      });
+      if (usable.length && mergeHabitChecks(db, usable)) changed = true;
+    });
+
+    // ── Merge RPG events (deduplicated by sync_id) ──
+    step('rpgEvents', () => {
+      // NOT by `id`: rpg_events.id is AUTOINCREMENT, so both devices mint 1, 2, 3…
+      // for different events and the old `WHERE id = ?` check silently dropped
+      // half of them. `id` is now left to the local sequence entirely.
+      const getEvent = db.prepare('SELECT 1 FROM rpg_events WHERE sync_id = ?');
+      const insertEvent = db.prepare(`
+        INSERT OR IGNORE INTO rpg_events (sync_id, module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, ref_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const re of rows<SyncRpgEvent>(remote.rpgEvents)) {
+        // Pre-sync_id payloads carried only the numeric id; there is no way to
+        // identify them across devices, so they are skipped rather than duplicated.
+        if (!re || typeof re.syncId !== 'string' || !re.syncId) continue;
+        if (getEvent.get(re.syncId)) continue;
+        const result = insertEvent.run(
+          re.syncId, re.moduleId, re.eventType, re.xpGained ?? 0, re.hpChange ?? 0,
+          re.comboMultiplier ?? 1, re.bonusMultiplier ?? 1, re.payload ?? null,
+          re.refId ?? null, re.createdAt,
+        );
+        if (result.changes > 0) changed = true;
+      }
+    });
+  });
+
+  tx();
+  return { changed };
+}
+
 export function registerSyncIpcHandlers(): void {
+  pruneRpgEvents(getDb());
+
   ipcHandle('sync:clearUserData', () => {
     const db = getDb();
     db.pragma('foreign_keys = OFF');
     try {
       const tx = db.transaction(() => {
         for (const table of USER_DATA_TABLES) {
+          // A table listed here may not exist yet on a very old install.
+          const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+          if (!exists) continue;
           db.prepare(`DELETE FROM ${table}`).run();
         }
+        // app_state is keyed, not wholesale: `last_uid` must survive the switch,
+        // the user's dollar/crypto visibility preferences must not.
+        const clearPref = db.prepare('DELETE FROM app_state WHERE key = ?');
+        for (const key of USER_PREFERENCE_STATE_KEYS) clearPref.run(key);
         db.prepare(`INSERT OR IGNORE INTO player_stats (user_id) VALUES ('default')`).run();
         db.prepare(`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`).run();
         // Re-seed default cauldron presets after clearing
@@ -194,25 +646,16 @@ export function registerSyncIpcHandlers(): void {
     }
   });
 
+  // app_state is created by initCoreTables (electron/ipc/db.ts), not ad-hoc here:
+  // dollar:getVisibleTypes reads it without creating it, so on a clean install
+  // where neither of these handlers had run yet it threw "no such table".
   ipcHandle('sync:setCurrentUser', (_e, uid: string) => {
     const db = getDb();
-    db.prepare(`
-      CREATE TABLE IF NOT EXISTS app_state (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      )
-    `).run();
     db.prepare(`INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_uid', ?)`).run(uid);
   });
 
   ipcHandle('sync:getCurrentUser', () => {
     const db = getDb();
-    db.prepare(`
-      CREATE TABLE IF NOT EXISTS app_state (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      )
-    `).run();
     const row = db.prepare(`SELECT value FROM app_state WHERE key = 'last_uid'`).get() as { value: string } | undefined;
     return row?.value ?? null;
   });
@@ -266,208 +709,42 @@ export function registerSyncIpcHandlers(): void {
       FROM task_drawings
     `).all();
 
+    // Only the recent window is pushed — see RPG_EVENTS_PUSH_DAYS. sync_id (not the
+    // local AUTOINCREMENT id) is the cross-device identity.
     const rpgEvents = db.prepare(`
-      SELECT id, module_id AS moduleId, event_type AS eventType,
+      SELECT sync_id AS syncId, module_id AS moduleId, event_type AS eventType,
              xp_gained AS xpGained, hp_change AS hpChange,
              combo_multiplier AS comboMultiplier, bonus_multiplier AS bonusMultiplier,
-             payload, created_at AS createdAt
-      FROM rpg_events ORDER BY id ASC
-    `).all();
+             payload, ref_id AS refId, created_at AS createdAt
+      FROM rpg_events WHERE created_at >= ? ORDER BY id ASC
+    `).all(daysAgoStamp(RPG_EVENTS_PUSH_DAYS));
 
     return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents };
   });
 
   // Merges remote quest data with local using last-write-wins
-  ipcHandle('sync:mergeQuestData', (_e, remote: SyncQuestData) => {
-    const db = getDb();
-    let changed = false;
+  ipcHandle('sync:mergeQuestData', (_e, remote: SyncQuestData) => mergeQuestDataInto(getDb(), remote));
 
-    const tx = db.transaction(() => {
-      // ── Merge projects first (tasks reference them) ──
-      if (remote.projects?.length) {
-        const getProject = db.prepare('SELECT id, updated_at FROM projects WHERE id = ?');
-        const insertProject = db.prepare(`
-          INSERT INTO projects (id, name, color, project_order, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        const updateProject = db.prepare(`
-          UPDATE projects SET name = ?, color = ?, project_order = ?, updated_at = ?, deleted_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rp of remote.projects) {
-          const local = getProject.get(rp.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertProject.run(rp.id, rp.name, rp.color, rp.order, rp.createdAt, rp.updatedAt, rp.deletedAt);
-            changed = true;
-          } else if (rp.updatedAt > local.updated_at) {
-            updateProject.run(rp.name, rp.color, rp.order, rp.updatedAt, rp.deletedAt, rp.id);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Merge tasks ──
-      if (remote.tasks?.length) {
-        const getTask = db.prepare('SELECT id, updated_at FROM tasks WHERE id = ?');
-        const insertTask = db.prepare(`
-          INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        const updateTask = db.prepare(`
-          UPDATE tasks SET name = ?, description = ?, status = ?, tier = ?, category = ?,
-                 project_id = ?, due_date = ?, task_order = ?, completed_at = ?, updated_at = ?, deleted_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rt of remote.tasks) {
-          const local = getTask.get(rt.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertTask.run(rt.id, rt.name, rt.description, rt.status, rt.tier, rt.category,
-              rt.projectId, rt.dueDate, rt.order, rt.completedAt ?? null, rt.createdAt, rt.updatedAt, rt.deletedAt);
-            changed = true;
-          } else if (rt.updatedAt > local.updated_at) {
-            updateTask.run(rt.name, rt.description, rt.status, rt.tier, rt.category,
-              rt.projectId, rt.dueDate, rt.order, rt.completedAt ?? null, rt.updatedAt, rt.deletedAt, rt.id);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Merge subtasks ──
-      if (remote.subtasks?.length) {
-        const getSubtask = db.prepare('SELECT id, updated_at FROM subtasks WHERE id = ?');
-        const insertSubtask = db.prepare(`
-          INSERT INTO subtasks (id, task_id, name, description, tier, status, subtask_order, completed_at, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        const updateSubtask = db.prepare(`
-          UPDATE subtasks SET name = ?, description = ?, tier = ?, status = ?,
-                 subtask_order = ?, completed_at = ?, updated_at = ?, deleted_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rs of remote.subtasks) {
-          const local = getSubtask.get(rs.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertSubtask.run(rs.id, rs.taskId, rs.name, rs.description, rs.tier, rs.status,
-              rs.order, rs.completedAt, rs.createdAt, rs.updatedAt, rs.deletedAt);
-            changed = true;
-          } else if (rs.updatedAt > local.updated_at) {
-            updateSubtask.run(rs.name, rs.description, rs.tier, rs.status,
-              rs.order, rs.completedAt, rs.updatedAt, rs.deletedAt, rs.id);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Merge categories (keyed by id) ──
-      if (remote.categories?.length) {
-        const getCategory = db.prepare('SELECT id, updated_at FROM task_categories WHERE id = ?');
-        const insertCategory = db.prepare(`
-          INSERT OR IGNORE INTO task_categories (id, name, project_id, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        const updateCategory = db.prepare(`
-          UPDATE task_categories SET name = ?, project_id = ?, updated_at = ?, deleted_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rc of remote.categories) {
-          const local = getCategory.get(rc.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertCategory.run(rc.id, rc.name, rc.projectId, rc.createdAt, rc.updatedAt, rc.deletedAt);
-            changed = true;
-          } else if (rc.updatedAt > local.updated_at) {
-            updateCategory.run(rc.name, rc.projectId, rc.updatedAt, rc.deletedAt, rc.id);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Merge habits ──
-      if (remote.habits?.length) {
-        const getHabit = db.prepare('SELECT id, updated_at FROM habits WHERE id = ?');
-        const insertHabit = db.prepare(`
-          INSERT INTO habits (id, name, frequency, times_per_week, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        const updateHabit = db.prepare(`
-          UPDATE habits SET name = ?, frequency = ?, times_per_week = ?, updated_at = ?, deleted_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rh of remote.habits) {
-          const local = getHabit.get(rh.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertHabit.run(rh.id, rh.name, rh.frequency, rh.timesPerWeek, rh.createdAt, rh.updatedAt ?? rh.createdAt, rh.deletedAt);
-            changed = true;
-          } else if ((rh.updatedAt ?? rh.createdAt) > local.updated_at) {
-            updateHabit.run(rh.name, rh.frequency, rh.timesPerWeek, rh.updatedAt ?? rh.createdAt, rh.deletedAt, rh.id);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Merge drawings ──
-      if (remote.drawings?.length) {
-        const getDrawing = db.prepare('SELECT id, updated_at FROM task_drawings WHERE id = ?');
-        const insertDrawing = db.prepare(`
-          INSERT INTO task_drawings (id, task_id, data, draw_order, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        const updateDrawing = db.prepare(`
-          UPDATE task_drawings SET data = ?, draw_order = ?, updated_at = ?, deleted_at = ?
-          WHERE id = ?
-        `);
-
-        for (const rd of remote.drawings) {
-          const local = getDrawing.get(rd.id) as { id: string; updated_at: string } | undefined;
-          if (!local) {
-            insertDrawing.run(rd.id, rd.taskId, rd.data, rd.order, rd.createdAt, rd.updatedAt ?? rd.createdAt, rd.deletedAt ?? null);
-            changed = true;
-          } else if ((rd.updatedAt ?? rd.createdAt) > local.updated_at) {
-            updateDrawing.run(rd.data, rd.order, rd.updatedAt ?? rd.createdAt, rd.deletedAt ?? null, rd.id);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Merge habit checks (keyed by natural key habit_id+date, see mergeHabitChecks) ──
-      if (remote.habitChecks?.length) {
-        if (mergeHabitChecks(db, remote.habitChecks)) changed = true;
-      }
-
-      // ── Merge RPG events (insert if not exists by id) ──
-      if (remote.rpgEvents?.length) {
-        const getEvent = db.prepare('SELECT id FROM rpg_events WHERE id = ?');
-        const insertEvent = db.prepare(`
-          INSERT INTO rpg_events (id, module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        for (const re of remote.rpgEvents) {
-          const exists = getEvent.get(re.id);
-          if (!exists) {
-            insertEvent.run(re.id, re.moduleId, re.eventType, re.xpGained, re.hpChange,
-              re.comboMultiplier, re.bonusMultiplier, re.payload, re.createdAt);
-            changed = true;
-          }
-        }
-      }
-    });
-
-    tx();
-    return { changed };
-  });
 
   // ── Nutrition bulk export ──
   ipcHandle('sync:getAllNutritionData', () => {
     const db = getDb();
 
     const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() || null;
-    const foodLog = db.prepare('SELECT id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at FROM food_log ORDER BY date DESC, time DESC').all();
-    const frequentFoods = db.prepare('SELECT id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
+    // sync_id is the cross-device identity for these two AUTOINCREMENT tables.
+    // `id` is still exported for backward compatibility with older clients, but the
+    // merge no longer keys on it.
+    // frequent_food_sync_id resolves food_log.frequent_food_id, which points at the
+    // LOCAL frequent_foods.id and means something different on every device.
+    const foodLog = db.prepare(`
+      SELECT f.id, f.sync_id, f.date, f.time, f.description, f.calories, f.source,
+             f.frequent_food_id, ff.sync_id AS frequent_food_sync_id,
+             f.ai_breakdown, f.meal, f.updated_at, f.deleted_at
+      FROM food_log f
+      LEFT JOIN frequent_foods ff ON ff.id = f.frequent_food_id
+      ORDER BY f.date DESC, f.time DESC
+    `).all();
+    const frequentFoods = db.prepare('SELECT id, sync_id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
     const dailyMetrics = db.prepare('SELECT date, steps, gym, updated_at FROM nutrition_daily_metrics ORDER BY date DESC').all();
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
@@ -500,68 +777,8 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
-      // Food log — merge by id instead of composite key (Issue #11)
-      const affectedDates = new Set<string>();
-      if (Array.isArray(d.foodLog)) {
-        const getFoodById = db.prepare('SELECT id FROM food_log WHERE id = ?');
-        const insertFood = db.prepare('INSERT OR IGNORE INTO food_log (id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        for (const f of d.foodLog) {
-          if (f.id != null) {
-            const exists = getFoodById.get(f.id);
-            if (!exists) {
-              insertFood.run(f.id, f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null);
-              affectedDates.add(f.date);
-              changed = true;
-            }
-            if (f.deleted_at || f.updated_at) {
-              db.prepare(
-                "UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ? AND (updated_at IS NULL OR updated_at < ?)"
-              ).run(f.deleted_at ?? null, f.updated_at ?? null, f.id, f.updated_at);
-            }
-          } else {
-            // Legacy entries without id — fallback to composite key
-            const exists = db.prepare('SELECT 1 FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?').get(f.date, f.time, f.description, f.calories);
-            if (!exists) {
-              db.prepare('INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-                f.date, f.time, f.description, f.calories, f.source, f.frequent_food_id, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null
-              );
-              affectedDates.add(f.date);
-              changed = true;
-            }
-          }
-        }
-      }
-
-      for (const date of affectedDates) {
-        recalcSummary(db, date);
-      }
-
-      // Frequent foods — merge by id with timestamp update (Issue #10)
-      if (Array.isArray(d.frequentFoods)) {
-        const getFreq = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE id = ?');
-        const getFreqByName = db.prepare('SELECT id FROM frequent_foods WHERE name = ?');
-        const insertFreq = db.prepare('INSERT INTO frequent_foods (name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
-        for (const f of d.frequentFoods) {
-          if (f.id != null) {
-            const local = getFreq.get(f.id) as { id: number; updated_at: string | null } | undefined;
-            if (!local) {
-              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
-              changed = true;
-            } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
-              updateFreq.run(f.calories, f.ai_breakdown ?? null, f.times_used, f.updated_at, f.deleted_at ?? null, f.id);
-              changed = true;
-            }
-          } else {
-            // Legacy entries without id — fallback to name check
-            const exists = getFreqByName.get(f.name);
-            if (!exists) {
-              insertFreq.run(f.name, f.calories, f.ai_breakdown ?? null, f.times_used, f.created_at, f.updated_at ?? null, f.deleted_at ?? null);
-              changed = true;
-            }
-          }
-        }
-      }
+      const foodsResult = mergeNutritionFoods(db, d);
+      if (foodsResult.changed) changed = true;
 
       // Daily metrics — check timestamp before replacing (Issue #6)
       if (Array.isArray(d.dailyMetrics)) {
@@ -614,13 +831,28 @@ export function registerSyncIpcHandlers(): void {
         }
       }
 
-      // Daily closed - merge by date
+      // Daily closed — merge by date, last-write-wins on updated_at.
+      // nutrition:reopenDay soft-deletes; an insert-if-missing merge would have
+      // resurrected the closure on the next pull and re-locked the day.
       if (Array.isArray(d.dailyClosed)) {
+        const getDC = db.prepare('SELECT date, updated_at FROM nutrition_daily_closed WHERE date = ?');
+        const insertDC = db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, closed_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        const updateDC = db.prepare('UPDATE nutrition_daily_closed SET xp_precision = ?, xp_steps = ?, xp_gym = ?, xp_weight = ?, xp_bonus = ?, xp_total = ?, hp_change = ?, consumed = ?, target = ?, closed_at = ?, updated_at = ?, deleted_at = ? WHERE date = ?');
         for (const c of d.dailyClosed) {
-          const exists = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(c.date);
-          if (!exists) {
-            db.prepare('INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0, c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0
+          if (!isUsableRow(c, 'dailyClosed', ['date'])) continue;
+          const local = getDC.get(c.date) as { date: string; updated_at: string | null } | undefined;
+          if (!local) {
+            insertDC.run(
+              c.date, c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0,
+              c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0,
+              c.closed_at ?? null, c.updated_at ?? null, c.deleted_at ?? null,
+            );
+            changed = true;
+          } else if ((c.updated_at ?? '') > (local.updated_at || '')) {
+            updateDC.run(
+              c.xp_precision ?? 0, c.xp_steps ?? 0, c.xp_gym ?? 0, c.xp_weight ?? 0, c.xp_bonus ?? 0,
+              c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0,
+              c.closed_at ?? null, c.updated_at ?? null, c.deleted_at ?? null, c.date,
             );
             changed = true;
           }
@@ -667,7 +899,8 @@ export function registerSyncIpcHandlers(): void {
     const loans = db.prepare(`
       SELECT id, person_name AS personName, direction, type, amount, currency,
              date, description, settled, installment_group_id AS installmentGroupId,
-             settled_date AS settledDate, created_at AS createdAt, updated_at AS updatedAt
+             settled_date AS settledDate, created_at AS createdAt, updated_at AS updatedAt,
+             deleted_at AS deletedAt
       FROM finance_loans ORDER BY date DESC
     `).all();
 
@@ -685,9 +918,11 @@ export function registerSyncIpcHandlers(): void {
       FROM finance_recurring ORDER BY created_at ASC
     `).all();
 
+    // previous_amount was neither selected here nor inserted on merge, so the
+    // "was X, now Y" history collapsed to NULL on every replicated device.
     const recurringHistory = db.prepare(`
-      SELECT id, recurring_id AS recurringId, amount, currency,
-             effective_date AS effectiveDate, created_at AS createdAt
+      SELECT id, recurring_id AS recurringId, amount, previous_amount AS previousAmount,
+             currency, effective_date AS effectiveDate, created_at AS createdAt
       FROM finance_recurring_amount_history ORDER BY effective_date ASC
     `).all();
 
@@ -722,10 +957,26 @@ export function registerSyncIpcHandlers(): void {
       FROM finance_credit_card_statements
     `).all();
 
+    // finance_transactions.import_batch_id references this table, and it holds real
+    // user data. It was in neither USER_DATA_TABLES nor this export, so it leaked
+    // across account switches and never replicated.
+    const importBatches = db.prepare(`
+      SELECT id, source, filename, row_count AS rowCount, created_at AS createdAt
+      FROM finance_import_batches
+    `).all();
+
+    // Legacy table, superseded by finance_recurring, but older installs still hold
+    // rows in it — same leak.
+    const incomeSources = db.prepare(`
+      SELECT id, name, estimated_amount AS estimatedAmount, frequency,
+             is_variable AS isVariable, active, created_at AS createdAt
+      FROM finance_income_sources
+    `).all();
+
     return {
       transactions, loans, loanPayments, recurring, recurringHistory,
       installmentGroups, categoryMappings, categories, creditCards,
-      creditCardStatements,
+      creditCardStatements, importBatches, incomeSources,
     };
   });
 
@@ -782,11 +1033,20 @@ export function registerSyncIpcHandlers(): void {
       if (data.recurringHistory && Array.isArray(data.recurringHistory)) {
         const stmt = db.prepare(`
           INSERT OR IGNORE INTO finance_recurring_amount_history
-            (id, recurring_id, amount, currency, effective_date, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+            (id, recurring_id, amount, previous_amount, currency, effective_date, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        // Backfills previous_amount on rows that were replicated before it was
+        // carried over — those all have it NULL today.
+        const backfill = db.prepare(`
+          UPDATE finance_recurring_amount_history SET previous_amount = ?
+          WHERE id = ? AND previous_amount IS NULL
         `);
         for (const h of data.recurringHistory as Array<Record<string, unknown>>) {
-          stmt.run(h.id, h.recurringId, h.amount, h.currency ?? 'ARS', h.effectiveDate, h.createdAt ?? now);
+          const previousAmount = (h.previousAmount ?? h.previous_amount ?? null) as number | null;
+          const result = stmt.run(h.id, h.recurringId, h.amount, previousAmount, h.currency ?? 'ARS', h.effectiveDate, h.createdAt ?? now);
+          if (result.changes > 0) changed = true;
+          else if (previousAmount != null && backfill.run(previousAmount, h.id).changes > 0) changed = true;
         }
       }
 
@@ -864,26 +1124,50 @@ export function registerSyncIpcHandlers(): void {
       }
 
       if (data.loans && Array.isArray(data.loans)) {
-        const getLoan = db.prepare('SELECT id, settled FROM finance_loans WHERE id = ?');
+        const getLoan = db.prepare('SELECT id, settled, updated_at, deleted_at FROM finance_loans WHERE id = ?');
         const insertLoan = db.prepare(`
           INSERT OR IGNORE INTO finance_loans
             (id, person_name, direction, type, amount, currency, date, description,
-             settled, installment_group_id, settled_date, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             settled, installment_group_id, settled_date, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-        const settleLoan = db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ? WHERE id = ?`);
+        // Full last-write-wins. The merge used to propagate ONLY the settled 0→1
+        // transition, so editing a loan's amount, person, date or description never
+        // reached the other device — and a soft delete never did either.
+        const updateLoan = db.prepare(`
+          UPDATE finance_loans SET person_name = ?, direction = ?, type = ?, amount = ?,
+            currency = ?, date = ?, description = ?, settled = ?, installment_group_id = ?,
+            settled_date = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
+        `);
+        const settleLoan = db.prepare(`UPDATE finance_loans SET settled = 1, settled_date = ?, updated_at = ? WHERE id = ?`);
         for (const l of data.loans as Array<Record<string, unknown>>) {
-          const local = getLoan.get(l.id) as { id: string; settled: number } | undefined;
+          const local = getLoan.get(l.id) as { id: string; settled: number; updated_at: string | null; deleted_at: string | null } | undefined;
+          const remoteUpdatedAt = (l.updatedAt as string) ?? (l.createdAt as string) ?? now;
+          // A payload written by a client that predates deletedAt in the loans export
+          // simply omits the key. Treating that as "not deleted" would resurrect a
+          // local tombstone, so an absent key preserves whatever is already local.
+          const remoteDeletedAt = 'deletedAt' in l
+            ? ((l.deletedAt as string) ?? null)
+            : (local?.deleted_at ?? null);
           if (!local) {
             const result = insertLoan.run(
               l.id, l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
               l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
-              l.settledDate ?? null, l.createdAt ?? now, l.updatedAt ?? null,
+              l.settledDate ?? null, l.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt,
             );
             if (result.changes > 0) changed = true;
+          } else if (remoteUpdatedAt > (local.updated_at || '')) {
+            updateLoan.run(
+              l.personName, l.direction, l.type, l.amount, l.currency ?? 'ARS',
+              l.date, l.description ?? '', l.settled ?? 0, l.installmentGroupId ?? null,
+              l.settledDate ?? null, remoteUpdatedAt, remoteDeletedAt, l.id,
+            );
+            changed = true;
           } else if (l.settled === 1 && local.settled === 0) {
-            // Settle is a one-way transition — remote settled wins
-            settleLoan.run(l.settledDate ?? now, l.id);
+            // Settling stays a one-way transition even against a stale timestamp:
+            // older clients settle without bumping updated_at.
+            settleLoan.run(l.settledDate ?? now, remoteUpdatedAt, l.id);
             changed = true;
           }
         }
@@ -919,6 +1203,40 @@ export function registerSyncIpcHandlers(): void {
         `);
         for (const m of data.categoryMappings as Array<Record<string, unknown>>) {
           stmt.run(m.id, m.keyword, m.category, m.createdAt ?? now);
+        }
+      }
+
+      // Import batches — referenced by finance_transactions.import_batch_id, so they
+      // must be merged BEFORE nothing in particular (no FK), but they do have to be
+      // merged at all: they were previously dropped entirely.
+      if (data.importBatches && Array.isArray(data.importBatches)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_import_batches (id, source, filename, row_count, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        for (const b of data.importBatches as Array<Record<string, unknown>>) {
+          if (!isUsableRow(b, 'importBatches', ['id', 'source'])) continue;
+          const result = stmt.run(b.id, b.source, b.filename ?? '', b.rowCount ?? b.row_count ?? 0, b.createdAt ?? now);
+          if (result.changes > 0) changed = true;
+        }
+      }
+
+      // Legacy income sources — no longer written by the UI, but older installs
+      // still hold rows and they were leaking between accounts.
+      if (data.incomeSources && Array.isArray(data.incomeSources)) {
+        const stmt = db.prepare(`
+          INSERT OR IGNORE INTO finance_income_sources
+            (id, name, estimated_amount, frequency, is_variable, active, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const s of data.incomeSources as Array<Record<string, unknown>>) {
+          if (!isUsableRow(s, 'incomeSources', ['id', 'name'])) continue;
+          const result = stmt.run(
+            s.id, s.name, s.estimatedAmount ?? s.estimated_amount ?? 0,
+            s.frequency ?? 'monthly', s.isVariable ?? s.is_variable ?? 0,
+            s.active ?? 1, s.createdAt ?? now,
+          );
+          if (result.changes > 0) changed = true;
         }
       }
 
@@ -1053,6 +1371,11 @@ export function registerSyncIpcHandlers(): void {
     const db = getDb();
     let changed = false;
 
+    if (!data || typeof data !== 'object') return { changed: false };
+
+    // This was the only merge running its loops OUTSIDE a transaction: a failure
+    // partway through left presets applied and sessions not, with no rollback.
+    const tx = db.transaction(() => {
     const presets = data.cauldron_presets as Array<Record<string, unknown>> | undefined;
     if (presets?.length) {
       const getPreset = db.prepare('SELECT id, updated_at FROM cauldron_presets WHERE id = ?');
@@ -1075,10 +1398,16 @@ export function registerSyncIpcHandlers(): void {
       const getSession = db.prepare('SELECT id, completed FROM cauldron_sessions WHERE id = ?');
       const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const completeSession = db.prepare(`UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ? WHERE id = ?`);
+      // preset_id is a FOREIGN KEY: a session whose preset this device has never
+      // seen would fail the constraint and (now that this runs in a transaction)
+      // roll the whole cauldron merge back. Drop the dangling link, keep the session.
+      const presetExists = db.prepare('SELECT 1 FROM cauldron_presets WHERE id = ?');
       for (const s of sessions) {
+        if (!isUsableRow(s, 'cauldronSessions', ['id', 'type', 'started_at'])) continue;
         const local = getSession.get(s.id) as { id: string; completed: number } | undefined;
         if (!local) {
-          const result = insertSession.run(s.id, s.preset_id, s.type, s.duration_minutes, s.completed, s.started_at, s.completed_at, s.created_at, s.updated_at, s.deleted_at);
+          const presetId = s.preset_id && presetExists.get(s.preset_id) ? s.preset_id : null;
+          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null);
           if (result.changes > 0) changed = true;
         } else if (s.completed === 1 && local.completed === 0) {
           completeSession.run(s.completed_at, s.updated_at, s.id);
@@ -1086,7 +1415,9 @@ export function registerSyncIpcHandlers(): void {
         }
       }
     }
+    });
 
+    tx();
     return { changed };
   });
 }

@@ -11,6 +11,7 @@ import { registerCryptoIpcHandlers } from '../modules/crypto.ipc';
 import { registerSyncIpcHandlers } from '../modules/sync.ipc';
 import { registerCauldronIpcHandlers } from '../modules/cauldron.ipc';
 import { registerFeedbackIpcHandlers } from '../modules/feedback.ipc';
+import { registerSylIpcHandlers } from '../modules/syl.ipc';
 
 export function registerAllIpcHandlers(): void {
   registerRpgHandlers();
@@ -26,4 +27,5 @@ export function registerAllIpcHandlers(): void {
   registerSyncIpcHandlers();
   registerCauldronIpcHandlers();
   registerFeedbackIpcHandlers();
+  registerSylIpcHandlers();
 }

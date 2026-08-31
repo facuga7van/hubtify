@@ -2,11 +2,24 @@ import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 
 import { todayDateString, formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
-import { resolveMealType, DEFAULT_MEAL_SCHEDULE } from '../../shared/meal-utils';
+import { resolveMealType, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../shared/meal-utils';
 import type { MealSchedule } from '../../shared/meal-utils';
+import { getLevel, getTitle, clampHp } from '../../shared/rpg-engine';
 
 function genId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * Timestamp format for every nutrition updated_at / deleted_at.
+ *
+ * These columns are compared as STRINGS by the last-write-wins merge, so the
+ * whole module must use one format. It used to mix ISO on insert with
+ * datetime('now') on delete, and since 'T' > ' ' a soft-delete could never beat
+ * the row's own insert timestamp. Migration nutrition v10 normalised the history.
+ */
+function syncStamp(): string {
+  return new Date().toISOString();
 }
 
 export function registerNutritionIpcHandlers(): void {
@@ -78,8 +91,7 @@ export function registerNutritionIpcHandlers(): void {
     if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
     const db = getDb();
     const date = entry.date ?? todayDateString();
-    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
-    if (closed) throw new Error('Cannot modify a closed day');
+    if (isDayClosed(db, date)) throw new Error('Cannot modify a closed day');
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     // Resolve meal type if not provided
     let meal = entry.meal ?? null;
@@ -96,13 +108,64 @@ export function registerNutritionIpcHandlers(): void {
       // If ambiguous, leave meal null — frontend will handle picker
     }
     db.transaction(() => {
+      // sync_id is the cross-device identity (food_log.id is a local AUTOINCREMENT
+      // surrogate that collides between devices). updated_at is set on INSERT too —
+      // a NULL there loses every last-write-wins comparison later.
       db.prepare(`
-        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, sync_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(date, time, entry.description, entry.calories, entry.source,
-        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal);
+        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal, syncStamp(), genId());
       recalcSummary(db, date);
     })();
+  });
+
+
+  /**
+   * Copia las comidas de `from` a `to` (por defecto, ayer -> hoy).
+   *
+   * "Repetir el almuerzo de siempre" costaba retipear la descripcion y pagar otra
+   * llamada a la IA, cuando el modulo se vende como registro rapido. Copia
+   * descripcion y calorias, re-sella la hora y genera sync_id nuevos: son comidas
+   * nuevas, no las mismas filas.
+   */
+  ipcHandle('nutrition:copyDay', (_e, opts?: { from?: string; to?: string }) => {
+    const db = getDb();
+    const to = opts?.to ?? todayDateString();
+    const from = opts?.from ?? (() => {
+      const d = new Date(`${to}T12:00:00`);
+      d.setDate(d.getDate() - 1);
+      return formatDateString(d);
+    })();
+
+    if (isDayClosed(db, to)) return { success: false, reason: 'day_closed', copied: 0 };
+
+    const rows = db.prepare(
+      `SELECT description, calories, source, frequent_food_id AS frequentFoodId, meal, time
+       FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC`,
+    ).all(from) as Array<{
+      description: string; calories: number; source: string;
+      frequentFoodId: number | null; meal: string | null; time: string;
+    }>;
+
+    if (rows.length === 0) return { success: false, reason: 'source_empty', copied: 0 };
+
+    const insert = db.prepare(`
+      INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, sync_id)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+    `);
+
+    db.transaction(() => {
+      for (const r of rows) {
+        // La comida original pudo venir de la IA; la copia no vuelve a estimar, asi
+        // que su origen es 'frequent' (reutilizada), no 'ai_estimate'.
+        const source = r.source === 'ai_estimate' ? 'frequent' : r.source;
+        insert.run(to, r.time, r.description, r.calories, source, r.frequentFoodId, r.meal, syncStamp(), genId());
+      }
+      recalcSummary(db, to);
+    })();
+
+    return { success: true, copied: rows.length, from, to };
   });
 
   ipcHandle('nutrition:getFoodByDate', (_e, date: string) => {
@@ -119,12 +182,10 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:deleteFood', (_e, id: number) => {
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
-    if (entry) {
-      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
-      if (closed) throw new Error('Cannot modify a closed day');
-    }
+    if (entry && isDayClosed(db, entry.date)) throw new Error('Cannot modify a closed day');
+    const now = syncStamp();
     db.transaction(() => {
-      db.prepare("UPDATE food_log SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
+      db.prepare('UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(now, now, id);
       if (entry) recalcSummary(db, entry.date);
     })();
   });
@@ -133,10 +194,7 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
-    if (entry) {
-      const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(entry.date);
-      if (closed) throw new Error('Cannot modify a closed day');
-    }
+    if (entry && isDayClosed(db, entry.date)) throw new Error('Cannot modify a closed day');
     const sets: string[] = [];
     const vals: unknown[] = [];
     if (fields.description !== undefined) { sets.push('description = ?'); vals.push(fields.description); }
@@ -145,7 +203,7 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
     if (fields.source !== undefined) { sets.push('source = ?'); vals.push(fields.source); }
-    sets.push("updated_at = datetime('now')");
+    sets.push('updated_at = ?'); vals.push(syncStamp());
     if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
     db.transaction(() => {
@@ -156,10 +214,10 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:deleteByDate', (_e, date: string) => {
     const db = getDb();
-    const closed = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
-    if (closed) throw new Error('Cannot modify a closed day');
+    if (isDayClosed(db, date)) throw new Error('Cannot modify a closed day');
+    const now = syncStamp();
     db.transaction(() => {
-      db.prepare("UPDATE food_log SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND deleted_at IS NULL").run(date);
+      db.prepare('UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE date = ? AND deleted_at IS NULL').run(now, now, date);
       recalcSummary(db, date);
     })();
   });
@@ -180,19 +238,33 @@ export function registerNutritionIpcHandlers(): void {
     if (!trimmedName) throw new Error('Invalid name: must be a non-empty string');
     if (!Number.isFinite(food.calories) || food.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     const db = getDb();
-    const now = new Date().toISOString();
-    db.prepare('INSERT OR IGNORE INTO frequent_foods (name, calories, times_used, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
-      .run(trimmedName, food.calories, now, now);
+    const now = syncStamp();
+    // Upsert on the UNIQUE name index instead of INSERT OR IGNORE: saving a name
+    // that already exists used to be a silent no-op (and left a resurrected
+    // soft-deleted row invisible). Returns the row that actually exists.
+    const existing = db.prepare('SELECT id FROM frequent_foods WHERE name = ? COLLATE NOCASE')
+      .get(trimmedName) as { id: number } | undefined;
+
+    if (existing) {
+      db.prepare('UPDATE frequent_foods SET calories = ?, updated_at = ?, deleted_at = NULL WHERE id = ?')
+        .run(food.calories, now, existing.id);
+      return { id: existing.id, created: false };
+    }
+    const info = db.prepare(
+      'INSERT INTO frequent_foods (name, calories, times_used, created_at, updated_at, sync_id) VALUES (?, ?, 1, ?, ?, ?)'
+    ).run(trimmedName, food.calories, now, now, genId());
+    return { id: Number(info.lastInsertRowid), created: true };
   });
 
   ipcHandle('nutrition:deleteFrequentFood', (_e, id: number) => {
     const db = getDb();
-    db.prepare("UPDATE frequent_foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
+    const now = syncStamp();
+    db.prepare('UPDATE frequent_foods SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(now, now, id);
   });
 
   ipcHandle('nutrition:incrementFrequentUsage', (_e, id: number) => {
     const db = getDb();
-    db.prepare("UPDATE frequent_foods SET times_used = times_used + 1, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
+    db.prepare('UPDATE frequent_foods SET times_used = times_used + 1, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(syncStamp(), id);
   });
 
   // ── Metrics ────────────────────────────────────────
@@ -349,8 +421,7 @@ export function registerNutritionIpcHandlers(): void {
 
     return db.transaction(() => {
       // Check if day already closed
-      const existing = db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ?').get(date);
-      if (existing) return { success: false, alreadyClosed: true };
+      if (isDayClosed(db, date)) return { success: false, alreadyClosed: true };
 
       // Get summary
       const summary = db.prepare('SELECT * FROM nutrition_daily_summary WHERE date = ?').get(date) as Record<string, unknown> | undefined;
@@ -375,92 +446,96 @@ export function registerNutritionIpcHandlers(): void {
 
       const consumed = summary.total_calories_in as number;
       const tdee = summary.tdee as number;
-      const target = tdee - (profile.deficit_target_kcal as number);
+      const deficitTarget = profile.deficit_target_kcal as number;
+      const target = tdee - deficitTarget;
       const steps = (metrics?.steps as number) ?? 0;
       const gym = !!(metrics?.gym);
 
-      // Calculate XP based on deficit compliance (balanced: max ~60 XP)
-      let xpPrecision = 0;
-      let xpBonus = 0;
-      if (consumed === 0) {
-        xpPrecision = 0;
-      } else if (target <= 0) {
-        xpPrecision = 5;
-      } else if (consumed <= target) {
-        const deficitPct = (target - consumed) / target;
-        if (deficitPct <= 0.05) {
-          xpPrecision = 30; // perfect precision
-          xpBonus = 15;
-        } else if (deficitPct <= 0.15) {
-          xpPrecision = 30;
-          xpBonus = 10;
-        } else if (deficitPct <= 0.30) {
-          xpPrecision = 30;
-          xpBonus = 5;
-        } else {
-          xpPrecision = 20; // undereating
-          xpBonus = 0;
-        }
-      } else {
-        const overPct = (consumed - target) / target;
-        if (overPct <= 0.10) xpPrecision = 15;
-        else if (overPct <= 0.20) xpPrecision = 8;
-        else xpPrecision = 2;
-      }
+      // XP *and* HP now come from the same goal-aware bands (see scoreNutritionDay).
+      // XP used to only ever check `consumed <= target`, so on a surplus goal
+      // failing the target paid MORE XP than hitting it while HP said the opposite.
+      const score = scoreNutritionDay(consumed, target, deficitTarget);
+      const { xpPrecision, xpBonus, hpChange } = score;
 
       const xpSteps = steps > 0 ? 5 : 0;
       const xpGym = gym ? 5 : 0;
       const xpWeight = weightLogged ? 5 : 0;
       const xpTotal = xpPrecision + xpBonus + xpSteps + xpGym + xpWeight;
 
-      // Calculate HP change based on nutritional goal
-      const deficitTarget = profile.deficit_target_kcal as number;
-      let hpChange = 0;
-      if (target > 0 && consumed > 0) {
-        if (deficitTarget > 0) {
-          // Deficit goal: eating at/below target = healing, above = damage
-          if (consumed <= target) {
-            hpChange = 10;
-          } else {
-            const overPct = (consumed - target) / target;
-            if (overPct <= 0.10) hpChange = -5;
-            else if (overPct <= 0.20) hpChange = -10;
-            else hpChange = -20;
-          }
-        } else if (deficitTarget < 0) {
-          // Surplus goal: eating at/above target = healing, below = damage
-          if (consumed >= target) {
-            hpChange = 10;
-          } else {
-            const underPct = (target - consumed) / target;
-            if (underPct <= 0.10) hpChange = -5;
-            else if (underPct <= 0.20) hpChange = -10;
-            else hpChange = -20;
-          }
-        } else {
-          // Maintenance: staying close = healing, deviating = damage
-          const deviationPct = Math.abs(consumed - target) / target;
-          if (deviationPct <= 0.10) hpChange = 10;
-          else if (deviationPct <= 0.20) hpChange = -5;
-          else if (deviationPct <= 0.30) hpChange = -10;
-          else hpChange = -20;
-        }
-      }
-
-      // Save close record
+      const closedAt = syncStamp();
+      // OR REPLACE: a day that was reopened leaves a soft-deleted row behind, and
+      // date is the primary key.
       db.prepare(`
-        INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange, consumed, Math.round(target));
+        INSERT OR REPLACE INTO nutrition_daily_closed
+          (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, closed_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange, consumed, Math.round(target), closedAt, closedAt);
 
       return {
         success: true,
         breakdown: {
           xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange,
           consumed, target: Math.round(target),
+          compliant: score.compliant,
           precisionPct: target > 0 ? Math.round(Math.abs(consumed - target) / target * 100) : 0,
         },
       };
+    })();
+  });
+
+  /**
+   * Reopens a closed day so the user can keep logging (they closed at 20:00 and
+   * then had dinner). Reverses the XP and HP the closure granted, then soft-deletes
+   * the closure record.
+   *
+   * The DAY_SUMMARY rpg_event is emitted by the renderer right after closeDay
+   * returns, so it is located by (module, type, payload xp/hp, created after
+   * closed_at) and its EXACT xp_gained is reversed — that value includes the combo
+   * and random-bonus multipliers, which the stored xp_total does not. If the event
+   * can't be found (pre-v10 closures with no closed_at, or a purged log) the stored
+   * base values are reversed as a best effort.
+   */
+  ipcHandle('nutrition:reopenDay', (_e, date: string) => {
+    const db = getDb();
+    return db.transaction(() => {
+      const closed = db.prepare(
+        'SELECT * FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL'
+      ).get(date) as Record<string, unknown> | undefined;
+      if (!closed) return { success: false, error: 'Day is not closed' };
+
+      const xpTotal = (closed.xp_total as number) ?? 0;
+      const hpChange = (closed.hp_change as number) ?? 0;
+      const since = (closed.closed_at as string | null) ?? date;
+
+      const event = db.prepare(`
+        SELECT id, xp_gained, hp_change FROM rpg_events
+        WHERE module_id = 'nutrition' AND event_type = 'DAY_SUMMARY'
+          AND json_extract(payload, '$.xp') = ?
+          AND json_extract(payload, '$.hp') = ?
+          AND created_at >= ?
+        ORDER BY id DESC LIMIT 1
+      `).get(xpTotal, hpChange, since) as { id: number; xp_gained: number; hp_change: number } | undefined;
+
+      const xpToRevert = event ? event.xp_gained : xpTotal;
+      const hpToRevert = event ? event.hp_change : hpChange;
+      if (event) db.prepare('DELETE FROM rpg_events WHERE id = ?').run(event.id);
+
+      const stats = db.prepare('SELECT xp, hp, title FROM player_stats WHERE user_id = ?')
+        .get('default') as { xp: number; hp: number; title: string };
+      const newXp = Math.max(0, stats.xp - xpToRevert);
+      const newLevel = getLevel(newXp);
+      db.prepare('UPDATE player_stats SET xp = ?, level = ?, title = ?, hp = ? WHERE user_id = ?')
+        .run(newXp, newLevel, getTitle(newLevel), clampHp(stats.hp - hpToRevert), 'default');
+
+      // Soft delete, not DELETE: a hard delete is resurrected by the next pull,
+      // because mergeNutritionData re-inserts any closure row it doesn't find locally.
+      const now = syncStamp();
+      db.prepare('UPDATE nutrition_daily_closed SET deleted_at = ?, updated_at = ? WHERE date = ?')
+        .run(now, now, date);
+
+      recalcSummary(db, date);
+
+      return { success: true, xpReverted: xpToRevert, hpReverted: hpToRevert, eventFound: !!event };
     })();
   });
 
@@ -496,7 +571,7 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:isDayClosed', (_e, date: string) => {
     try {
       const db = getDb();
-      const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+      const row = db.prepare('SELECT * FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date) as Record<string, unknown> | undefined;
       if (!row) return null;
       return {
         xpPrecision: row.xp_precision, xpSteps: row.xp_steps,
@@ -521,16 +596,32 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:addFavoriteFood', (_e, food: { description: string; calories: number; source?: string; aiBreakdown?: string }) => {
     const db = getDb();
+    const now = syncStamp();
+    // favorite_foods.description is UNIQUE. The old INSERT OR IGNORE silently did
+    // nothing on a repeat and still returned a BRAND NEW uuid that existed nowhere
+    // in the database, while the UI toasted "saved". Upsert on the description and
+    // return the row that really exists, plus whether it was an insert.
+    const existing = db.prepare('SELECT id FROM favorite_foods WHERE description = ?')
+      .get(food.description) as { id: string } | undefined;
+
+    if (existing) {
+      db.prepare(
+        'UPDATE favorite_foods SET calories = ?, source = ?, ai_breakdown = ?, updated_at = ?, deleted_at = NULL WHERE id = ?'
+      ).run(food.calories, food.source || 'manual', food.aiBreakdown || null, now, existing.id);
+      return { id: existing.id, created: false };
+    }
+
     const id = genId();
     db.prepare(
-      'INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null);
-    return { id };
+      'INSERT INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null, now, now);
+    return { id, created: true };
   });
 
   ipcHandle('nutrition:removeFavoriteFood', (_e, id: string) => {
     const db = getDb();
-    db.prepare("UPDATE favorite_foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL").run(id);
+    const now = syncStamp();
+    db.prepare('UPDATE favorite_foods SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(now, now, id);
   });
 
   ipcHandle('nutrition:getPendingDays', () => {
@@ -541,7 +632,7 @@ export function registerNutritionIpcHandlers(): void {
     const rows = db.prepare(`
       SELECT DISTINCT f.date
       FROM food_log f
-      LEFT JOIN nutrition_daily_closed c ON c.date = f.date
+      LEFT JOIN nutrition_daily_closed c ON c.date = f.date AND c.deleted_at IS NULL
       WHERE c.date IS NULL
         AND f.date >= ? AND f.date < ?
         AND f.deleted_at IS NULL
@@ -553,6 +644,15 @@ export function registerNutritionIpcHandlers(): void {
 }
 
 // ── Helpers ────────────────────────────────────────
+
+/**
+ * A day counts as closed only while its record is live. `nutrition:reopenDay`
+ * soft-deletes (a hard delete would be resurrected by the next pull), so every
+ * "is this day locked?" check must exclude tombstones.
+ */
+export function isDayClosed(db: ReturnType<typeof getDb>, date: string): boolean {
+  return !!db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date);
+}
 
 export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;

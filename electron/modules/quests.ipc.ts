@@ -1,10 +1,24 @@
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
-import { todayDateString, formatDateString, yesterdayDateString } from '../../shared/date-utils';
+import { todayDateString, formatDateString, yesterdayDateString, localTimestamp, nextDateString } from '../../shared/date-utils';
+import { computeHabits } from './quests.habits';
 
 function genId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * SQLite caps a statement at 999 bound parameters (SQLITE_MAX_VARIABLE_NUMBER on
+ * the builds we ship), and `IN ()` with zero ids is a syntax error. Chunk well
+ * under the cap so a bulk delete of any size is safe.
+ */
+const IN_CHUNK_SIZE = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
 }
 
 export function registerQuestsIpcHandlers(): void {
@@ -16,6 +30,7 @@ export function registerQuestsIpcHandlers(): void {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
+               completed_at AS completedAt,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL ORDER BY task_order ASC
       `).all();
@@ -23,6 +38,7 @@ export function registerQuestsIpcHandlers(): void {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
+               completed_at AS completedAt,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL AND project_id IS ? ORDER BY task_order ASC
       `).all(projectId);
@@ -59,12 +75,15 @@ export function registerQuestsIpcHandlers(): void {
   });
 
   ipcHandle('quests:deleteTasks', (_e, ids: string[]) => {
+    if (!Array.isArray(ids) || ids.length === 0) return;
     const db = getDb();
     const now = new Date().toISOString();
     const deleteTx = db.transaction((taskIds: string[], timestamp: string) => {
-      const placeholders = taskIds.map(() => '?').join(',');
-      db.prepare(`UPDATE subtasks SET deleted_at = ?, updated_at = ? WHERE task_id IN (${placeholders}) AND deleted_at IS NULL`).run(timestamp, timestamp, ...taskIds);
-      db.prepare(`UPDATE tasks SET deleted_at = ?, updated_at = ? WHERE id IN (${placeholders})`).run(timestamp, timestamp, ...taskIds);
+      for (const batch of chunk(taskIds, IN_CHUNK_SIZE)) {
+        const placeholders = batch.map(() => '?').join(',');
+        db.prepare(`UPDATE subtasks SET deleted_at = ?, updated_at = ? WHERE task_id IN (${placeholders}) AND deleted_at IS NULL`).run(timestamp, timestamp, ...batch);
+        db.prepare(`UPDATE tasks SET deleted_at = ?, updated_at = ? WHERE id IN (${placeholders})`).run(timestamp, timestamp, ...batch);
+      }
     });
     deleteTx(ids, now);
   });
@@ -72,8 +91,11 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:setTaskStatus', (_e, taskId: string, status: boolean) => {
     const db = getDb();
     const now = new Date().toISOString();
+    // completed_at is a LOCAL timestamp (see quests migration v11): it is read back
+    // against todayDateString(), which is local. Writing UTC here dropped everything
+    // completed after 21:00 (UTC-3) out of today's counters.
     db.prepare('UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
-      .run(status ? 1 : 0, status ? now : null, now, taskId);
+      .run(status ? 1 : 0, status ? localTimestamp() : null, now, taskId);
   });
 
   ipcHandle('quests:syncTaskOrders', (_e, orders: Array<{ id: string; order: number }>) => {
@@ -141,8 +163,10 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:setSubtaskStatus', (_e, subtaskId: string, status: boolean, completedAt?: string) => {
     const db = getDb();
     const now = new Date().toISOString();
+    // completed_at: LOCAL timestamp (or a caller-supplied 'YYYY-MM-DD' for
+    // retroactive checks). See quests migration v11.
     db.prepare('UPDATE subtasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
-      .run(status ? 1 : 0, status ? (completedAt ?? now) : null, now, subtaskId);
+      .run(status ? 1 : 0, status ? (completedAt ?? localTimestamp()) : null, now, subtaskId);
   });
 
   ipcHandle('quests:syncSubtaskOrders', (_e, taskId: string, orderedIds: string[]) => {
@@ -187,13 +211,18 @@ export function registerQuestsIpcHandlers(): void {
 
   ipcHandle('quests:countCompletedToday', () => {
     const db = getDb();
-    const today = todayDateString(); // YYYY-MM-DD
+    // Half-open [today, tomorrow) on the raw column: DATE(completed_at) = ? wraps
+    // the column in a function, which makes idx_tasks_completed_status unusable.
+    // Both stored shapes ('YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS') start with the
+    // date, so plain string comparison selects exactly that local day.
+    const today = todayDateString(); // YYYY-MM-DD, local
+    const tomorrow = nextDateString(today);
     const taskCount = db.prepare(
-      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
-    ).get(today) as { c: number };
+      'SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND completed_at >= ? AND completed_at < ?'
+    ).get(today, tomorrow) as { c: number };
     const subtaskCount = db.prepare(
-      "SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
-    ).get(today) as { c: number };
+      'SELECT COUNT(*) AS c FROM subtasks WHERE status = 1 AND deleted_at IS NULL AND completed_at >= ? AND completed_at < ?'
+    ).get(today, tomorrow) as { c: number };
     return taskCount.c + subtaskCount.c;
   });
 
@@ -207,8 +236,8 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const today = todayDateString();
     const result = db.prepare(
-      "SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND DATE(completed_at) = ?"
-    ).get(today) as { c: number };
+      'SELECT COUNT(*) AS c FROM tasks WHERE status = 1 AND deleted_at IS NULL AND completed_at >= ? AND completed_at < ?'
+    ).get(today, nextDateString(today)) as { c: number };
     return result.c;
   });
 
@@ -252,8 +281,15 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:deleteProject', (_e, id: string) => {
     const db = getDb();
     const now = new Date().toISOString();
-    db.prepare('UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
-    db.prepare('UPDATE tasks SET project_id = NULL, updated_at = ? WHERE project_id = ?').run(now, id);
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+      db.prepare('UPDATE tasks SET project_id = NULL, updated_at = ? WHERE project_id = ?').run(now, id);
+      // Categories belong to the project. Without this they survive as orphans
+      // pointing at a dead project and keep showing up in getCategories().
+      db.prepare('UPDATE task_categories SET deleted_at = ?, updated_at = ? WHERE project_id = ? AND deleted_at IS NULL')
+        .run(now, now, id);
+    });
+    tx();
   });
 
   ipcHandle('quests:syncProjectOrders', (_e, orders: Array<{ id: string; order: number }>) => {
@@ -315,122 +351,7 @@ export function registerQuestsIpcHandlers(): void {
   // ── Habits ───────────────────────────────────────
 
   ipcHandle('quests:getHabits', () => {
-    const db = getDb();
-    const today = new Date();
-    const todayStr = formatDateString(today);
-
-    const habits = db.prepare(`
-      SELECT id, name, frequency, times_per_week AS timesPerWeek, created_at AS createdAt
-      FROM habits WHERE deleted_at IS NULL ORDER BY created_at ASC
-    `).all() as Array<{ id: string; name: string; frequency: string; timesPerWeek: number; createdAt: string }>;
-
-    // Batch-load ALL checks in one query, group by habit_id
-    const allChecks = db.prepare(
-      'SELECT habit_id, date FROM habit_checks WHERE deleted_at IS NULL ORDER BY date DESC'
-    ).all() as Array<{ habit_id: string; date: string }>;
-
-    const checksByHabit = new Map<string, Set<string>>();
-    for (const check of allChecks) {
-      let set = checksByHabit.get(check.habit_id);
-      if (!set) { set = new Set(); checksByHabit.set(check.habit_id, set); }
-      set.add(check.date);
-    }
-
-    return habits.map((h) => {
-      const dates = checksByHabit.get(h.id) ?? new Set<string>();
-      const checkedToday = dates.has(todayStr);
-      const yesterdayStr = yesterdayDateString();
-      const checkedYesterday = dates.has(yesterdayStr);
-
-      // Checks this period
-      let checksThisPeriod = 0;
-      let targetThisPeriod = 1;
-
-      if (h.frequency === 'daily') {
-        checksThisPeriod = checkedToday ? 1 : 0;
-        targetThisPeriod = 1;
-      } else if (h.frequency === 'weekly') {
-        // Count checks this week (Monday-Sunday)
-        const dayOfWeek = today.getDay() || 7; // 1=Mon..7=Sun
-        const monday = new Date(today);
-        monday.setDate(today.getDate() - dayOfWeek + 1);
-        const mondayStr = formatDateString(monday);
-        checksThisPeriod = 0;
-        for (const d of dates) {
-          if (d >= mondayStr && d <= todayStr) checksThisPeriod++;
-        }
-        targetThisPeriod = h.timesPerWeek;
-      } else if (h.frequency === 'monthly') {
-        const monthStart = todayStr.slice(0, 7) + '-01';
-        checksThisPeriod = 0;
-        for (const d of dates) {
-          if (d >= monthStart && d <= todayStr) checksThisPeriod++;
-        }
-        targetThisPeriod = 1;
-      }
-
-      // Streak: consecutive completed periods backwards
-      let streak = 0;
-      if (h.frequency === 'daily') {
-        // Count consecutive days backwards
-        const startDate = checkedToday ? todayStr : (() => {
-          const d = new Date(); d.setDate(d.getDate() - 1); return formatDateString(d);
-        })();
-        if (!checkedToday) {
-          const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-          if (!dates.has(formatDateString(yesterday))) {
-            return { ...h, streak: 0, checkedToday, checkedYesterday, checksThisPeriod, targetThisPeriod };
-          }
-        }
-        const d = new Date(startDate + 'T00:00:00');
-        while (true) {
-          if (!dates.has(formatDateString(d))) break;
-          streak++;
-          d.setDate(d.getDate() - 1);
-        }
-      } else if (h.frequency === 'weekly') {
-        // Count consecutive weeks where target was met, backwards from last week (or current if met)
-        const currentMet = checksThisPeriod >= h.timesPerWeek;
-        const dayOfWeek = today.getDay() || 7;
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - dayOfWeek + 1);
-        if (!currentMet) weekStart.setDate(weekStart.getDate() - 7); // start from last week
-
-        const d = new Date(weekStart);
-        while (true) {
-          const wStart = formatDateString(d);
-          const wEnd = new Date(d); wEnd.setDate(d.getDate() + 6);
-          const wEndStr = formatDateString(wEnd);
-          let count = 0;
-          for (const dt of dates) {
-            if (dt >= wStart && dt <= wEndStr) count++;
-          }
-          if (count < h.timesPerWeek) break;
-          streak++;
-          d.setDate(d.getDate() - 7);
-        }
-      } else if (h.frequency === 'monthly') {
-        // Count consecutive months with at least 1 check
-        const currentMet = checksThisPeriod >= 1;
-        let year = today.getFullYear();
-        let month = today.getMonth(); // 0-indexed
-        if (!currentMet) { month--; if (month < 0) { month = 11; year--; } }
-
-        while (true) {
-          const mStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-          const mEnd = `${year}-${String(month + 1).padStart(2, '0')}-31`;
-          let count = 0;
-          for (const d of dates) {
-            if (d >= mStart && d <= mEnd) count++;
-          }
-          if (count < 1) break;
-          streak++;
-          month--; if (month < 0) { month = 11; year--; }
-        }
-      }
-
-      return { ...h, streak, checkedToday, checkedYesterday, checksThisPeriod, targetThisPeriod };
-    });
+    return computeHabits(getDb(), new Date());
   });
 
   ipcHandle('quests:getHabitHeatmap', (_e, days: number = 91) => {
@@ -490,8 +411,14 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:deleteHabit', (_e, id: string) => {
     const db = getDb();
     const now = new Date().toISOString();
-    db.prepare('UPDATE habits SET deleted_at = ? WHERE id = ?').run(now, id);
-    db.prepare('UPDATE habit_checks SET deleted_at = ? WHERE habit_id = ?').run(now, id);
+    // updated_at MUST move with deleted_at: the merge is last-write-wins on
+    // updated_at, so a tombstone that leaves it stale is rejected on the other
+    // device and the habit (and every check) resurrects on the next pull.
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+      db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE habit_id = ?').run(now, now, id);
+    });
+    tx();
   });
 
   ipcHandle('quests:checkHabit', (_e, habitId: string) => {

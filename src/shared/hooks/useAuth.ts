@@ -151,13 +151,39 @@ export function useAuth() {
     }
   }, []);
 
-  const logout = useCallback(async () => {
+  /**
+   * Signs the active account out and wipes its local data.
+   *
+   * The wipe is only safe once the local data is actually in the cloud, so the
+   * push result is CHECKED (syncPush resolves `{success:false}` instead of
+   * throwing — the old `try/catch` around it could never fire). Offline, or with
+   * Firestore down, this returns `{ success: false, pushFailed: true }` having
+   * changed NOTHING: still signed in, database intact.
+   *
+   * @param force pass `true` only after the user has confirmed they accept losing
+   *              the unsynced changes; it skips the push guard.
+   * @returns `{ success: true }` when the logout completed, or
+   *          `{ success: false, pushFailed: true, error }` when the pre-logout push
+   *          failed and `force` was not set — the UI should ask for confirmation
+   *          and, if granted, call `logout(true)`.
+   */
+  const logout = useCallback(async (force = false): Promise<{ success: boolean; pushFailed?: boolean; error?: string }> => {
     const currentUser = user;
 
     // Push local data to cloud BEFORE signing out — prevents data loss
     if (currentUser) {
       window.dispatchEvent(new Event('sync:cancelPush'));
-      try { await syncPush(currentUser.uid); } catch { /* best effort */ }
+      let pushError: string | undefined;
+      try {
+        const result = await syncPush(currentUser.uid);
+        if (!result.success) pushError = result.error ?? 'Sync push failed';
+      } catch (err) {
+        pushError = (err as Error)?.message ?? 'Sync push failed';
+      }
+      if (pushError && !force) {
+        console.error('[logout] Aborted: push failed, local data NOT cleared:', pushError);
+        return { success: false, pushFailed: true, error: pushError };
+      }
     }
 
     await signOut(getActiveAuth());
@@ -189,7 +215,7 @@ export function useAuth() {
           // Pull failed — go to logged out state instead of leaving empty DB
           console.error('[logout] Pull for next account failed, going to logged out state');
           setUser(null);
-          return;
+          return { success: true };
         }
         setUser({
           uid: nextUser.uid,
@@ -209,6 +235,8 @@ export function useAuth() {
     } else {
       setUser(null);
     }
+
+    return { success: true };
   }, [user]);
 
   const switchAccount = useCallback(async (appName: string) => {
@@ -227,9 +255,16 @@ export function useAuth() {
         return { success: false, expired: true };
       }
 
-      // Target is valid — now safe to push and clear current data
+      // Target is valid — now safe to push and clear current data.
+      // Same guard as logout(): syncPush RESOLVES with success:false rather than
+      // throwing, so clearing without checking destroys data that never left the
+      // device.
       window.dispatchEvent(new Event('sync:cancelPush'));
-      await syncPush(user.uid);
+      const pushResult = await syncPush(user.uid);
+      if (!pushResult.success) {
+        console.error('[switchAccount] Aborted: push failed, local data NOT cleared:', pushResult.error);
+        return { success: false, pushFailed: true, error: 'auth.errors.switchFailed' };
+      }
       await window.api.syncClearUserData();
 
       // Switch to target app
@@ -301,8 +336,13 @@ export function useAuth() {
       const previousUid = user?.uid;
       const previousAppName = user ? getActiveAppName() : null;
       if (user) {
+        // See switchAccount: never clear on an unverified push.
         window.dispatchEvent(new Event('sync:cancelPush'));
-        await syncPush(user.uid);
+        const pushResult = await syncPush(user.uid);
+        if (!pushResult.success) {
+          console.error('[addAccount] Aborted: push failed, local data NOT cleared:', pushResult.error);
+          return { success: false, pushFailed: true, error: 'auth.errors.switchFailed' };
+        }
         await window.api.syncClearUserData();
       }
 

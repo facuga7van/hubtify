@@ -3,6 +3,7 @@ import { getDb } from '../ipc/db';
 import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import fs from 'fs';
+import { nowIso } from './finance.balance';
 
 // ── Types ───────────────────────────────────────────
 
@@ -11,6 +12,7 @@ export interface ParsedRow {
   merchant: string;
   installmentCurrent?: number;
   installmentTotal?: number;
+  /** For a USD line this is the amount the card actually charged in pesos. */
   amountARS?: number;
   amountUSD?: number;
   isExcluded: boolean;
@@ -149,8 +151,9 @@ export function parseGaliciaLine(
   }
 
   if (amountUSD !== undefined) {
+    // Keep amountARS too: it is the real peso amount the card billed, which the
+    // statement total needs. The UI displays amountUSD when it is present.
     row.amountUSD = amountUSD;
-    delete row.amountARS; // USD lines: store USD amount only
   }
 
   return row;
@@ -237,56 +240,104 @@ export function registerFinanceImportIpcHandlers(): void {
     (_e, rows: ParsedRow[], statementMonth: string, fileName: string) => {
       const db = getDb();
       const batchId = crypto.randomUUID();
+      const now = nowIso();
 
-      db.prepare(
+      const insertBatch = db.prepare(
         `INSERT INTO finance_import_batches (id, source, filename, row_count, created_at)
-         VALUES (?, 'galicia_visa', ?, ?, datetime('now'))`,
-      ).run(batchId, fileName, rows.length);
+         VALUES (?, 'galicia_visa', ?, ?, ?)`,
+      );
 
       const dupCheck = db.prepare(
         `SELECT COUNT(*) as cnt FROM finance_transactions
          WHERE deleted_at IS NULL AND date = ? AND description = ? AND amount = ? AND source = 'import'`,
       );
 
-      let duplicateCount = 0;
+      const insertTx = db.prepare(
+        `INSERT INTO finance_transactions
+         (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
+          installments, billed_amount_ars, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'credit_card', 'import', ?, ?, ?, ?, ?)`,
+      );
 
-      for (const row of rows) {
-        if (row.isExcluded) continue;
-        const amount = row.amountARS ?? row.amountUSD ?? 0;
-        const currency = row.amountUSD ? 'USD' : 'ARS';
+      // One transaction: a failure halfway used to leave a partial import with a
+      // batch row that no longer matched what was actually written.
+      const run = db.transaction(() => {
+        insertBatch.run(batchId, fileName, rows.length, now);
 
-        // Check for duplicate
-        const existing = dupCheck.get(row.date, row.merchant, Math.abs(amount)) as { cnt: number };
-        if (existing.cnt > 0) {
-          duplicateCount++;
-          continue;
+        let duplicateCount = 0;
+        let inserted = 0;
+
+        for (const row of rows) {
+          if (row.isExcluded) continue;
+
+          const isUsd = row.amountUSD !== undefined;
+          const signed = isUsd ? row.amountUSD! : (row.amountARS ?? 0);
+          // A negative line is a refund/credit, not a bigger expense.
+          const type = signed < 0 ? 'income' : 'expense';
+          const amount = Math.abs(signed);
+          const currency = isUsd ? 'USD' : 'ARS';
+          // USD lines: keep the peso amount the card actually billed.
+          const billedArs = isUsd && row.amountARS != null ? Math.abs(row.amountARS) : null;
+
+          const existing = dupCheck.get(row.date, row.merchant, amount) as { cnt: number };
+          if (existing.cnt > 0) {
+            duplicateCount++;
+            continue;
+          }
+
+          insertTx.run(
+            crypto.randomUUID(),
+            type,
+            amount,
+            currency,
+            row.suggestedCategory,
+            row.merchant,
+            row.date,
+            batchId,
+            row.installmentTotal ?? 1,
+            billedArs,
+            now,
+            now,
+          );
+          inserted++;
         }
 
-        const txId = crypto.randomUUID();
+        return { batchId, count: inserted, duplicateCount };
+      });
 
-        db.prepare(
-          `INSERT INTO finance_transactions
-           (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
-            installments, created_at, updated_at)
-           VALUES (?, 'expense', ?, ?, ?, ?, ?, 'credit_card', 'import', ?, ?, datetime('now'), datetime('now'))`,
-        ).run(
-          txId,
-          Math.abs(amount),
-          currency,
-          row.suggestedCategory,
-          row.merchant,
-          row.date,
-          batchId,
-          row.installmentTotal ?? 1,
-        );
-
-        // Installment group matching — handled in a later task
-      }
-
-      const inserted = rows.filter(r => !r.isExcluded).length - duplicateCount;
-      return { batchId, count: inserted, duplicateCount };
+      return run();
     },
   );
+
+  /** Undo a whole import batch — `import_batch_id` was written but never read. */
+  ipcHandle('finance:undoImportBatch', (_e, batchId: string) => {
+    if (typeof batchId !== 'string' || batchId.trim() === '') {
+      return { ok: false, reason: 'invalid_batch_id' };
+    }
+    const db = getDb();
+    const now = nowIso();
+    const result = db
+      .prepare(
+        `UPDATE finance_transactions
+         SET deleted_at = ?, updated_at = ?
+         WHERE import_batch_id = ? AND deleted_at IS NULL`,
+      )
+      .run(now, now, batchId);
+    return { ok: true, deleted: result.changes };
+  });
+
+  ipcHandle('finance:getImportBatches', () => {
+    const db = getDb();
+    return db
+      .prepare(
+        `SELECT b.id, b.source, b.filename, b.row_count AS rowCount, b.created_at AS createdAt,
+                (SELECT COUNT(*) FROM finance_transactions t
+                  WHERE t.import_batch_id = b.id AND t.deleted_at IS NULL) AS liveCount
+         FROM finance_import_batches b
+         ORDER BY b.created_at DESC`,
+      )
+      .all();
+  });
 
   ipcHandle('finance:getCategoryMappings', () => {
     const db = getDb();
@@ -311,8 +362,8 @@ export function registerFinanceImportIpcHandlers(): void {
       } else {
         db.prepare(
           `INSERT INTO finance_category_mappings (id, keyword, category, created_at)
-           VALUES (?, ?, ?, datetime('now'))`,
-        ).run(crypto.randomUUID(), merchantPattern, category);
+           VALUES (?, ?, ?, ?)`,
+        ).run(crypto.randomUUID(), merchantPattern, category, nowIso());
       }
     },
   );

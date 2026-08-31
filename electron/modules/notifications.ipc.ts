@@ -17,7 +17,17 @@ import type { AppNotification } from '../../shared/types';
 let pollingInterval: NodeJS.Timeout | null = null;
 let lastNativeNotificationTime = 0;
 let systemNotificationsEnabled = true;
-const enabledModules: Record<string, boolean> = { quests: true, nutrition: true, finance: true };
+const enabledModules: Record<string, boolean> = { quests: true, nutrition: true, finance: true, cauldron: true };
+
+/**
+ * El Caldero no pasa por el motor de notificaciones (dispara las suyas al terminar
+ * un segmento), asi que necesita consultar el toggle a mano. Sin la clave
+ * 'cauldron' arriba, `notifications:setModuleEnabled` la descartaba en silencio y
+ * el switch de Ajustes no hacia absolutamente nada.
+ */
+export function isModuleNotificationEnabled(module: string): boolean {
+  return enabledModules[module] !== false;
+}
 
 const POLLING_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const NATIVE_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
@@ -82,7 +92,16 @@ function runNotificationCheck(): number {
 }
 
 export function startNotificationEngine(): void {
-  pollingInterval = setInterval(() => runNotificationCheck(), POLLING_INTERVAL_MS);
+  // The callback MUST NOT be allowed to throw: an unhandled throw inside a
+  // setInterval callback has no catch frame above it and takes the whole main
+  // process down (there is no uncaughtException handler registered).
+  pollingInterval = setInterval(() => {
+    try {
+      runNotificationCheck();
+    } catch (err) {
+      console.error('[notifications] scheduled check failed:', err);
+    }
+  }, POLLING_INTERVAL_MS);
 }
 
 export function stopNotificationEngine(): void {

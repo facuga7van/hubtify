@@ -75,6 +75,37 @@ export interface ParsedRow {
   suggestedCategory: string;
 }
 
+/** One confirmed PDF/CSV import, so the user can review and undo it. */
+export interface FinanceImportBatch {
+  id: string;
+  source: string;
+  filename: string;
+  rowCount: number;
+  createdAt: string;
+  /** Rows from this batch that are still live (not soft-deleted). */
+  liveCount: number;
+}
+
+/**
+ * Named answer to "how much did I spend?", so the UI never has to guess which
+ * of the three historical definitions a number came from.
+ * Mirrors `ExpenseBreakdown` in `electron/modules/finance.balance.ts`.
+ */
+export interface ExpenseBreakdown {
+  /** Every live expense in the range except the card-statement payment. */
+  total: number;
+  /** Cash/debit/transfer: hits the balance now, not part of an instalment plan. */
+  direct: number;
+  /** Instalment plan rows that hit the balance in this range. */
+  installments: number;
+  /** Card purchases still waiting for their statement (`impacts_balance = 0`). */
+  pendingCard: number;
+  /** Auto-generated "Pago Tarjeta" transactions (excluded from `total`). */
+  cardPayments: number;
+}
+
+export type ExpenseBreakdownByCurrency = Record<'ARS' | 'USD', ExpenseBreakdown>;
+
 // ── Cauldron Types ────────────────────────────────────────
 
 export type CauldronTimerStatus = 'idle' | 'work' | 'work_paused' | 'on_break' | 'break_paused' | 'awaiting_next';
@@ -125,6 +156,24 @@ export interface CauldronSessionEndResult {
   sessionType: 'work' | 'break' | 'long_break';
   completed: boolean;
   nextType: 'work' | 'break' | 'long_break' | null;
+  /**
+   * True when the segment that just ended was an `cauldron:extend` extension of an
+   * already-rewarded cycle. The renderer MUST NOT award pomodoro XP for these —
+   * they are excluded from every backend statistic for the same reason.
+   */
+  isExtension?: boolean;
+}
+
+/** A session that was running when the app closed and can be resumed. */
+export interface CauldronInterruptedSession {
+  id: string;
+  presetId: string | null;
+  presetName: string | null;
+  type: string;
+  durationMinutes: number;
+  startedAt: string;
+  remainingMs: number;
+  totalMs: number;
 }
 
 export interface CauldronSessionsPage {
@@ -139,12 +188,103 @@ export interface CauldronWeeklyFocusDay {
 
 // ── API Types ──────────────────────────────────────────────
 
+// ── Syl read-projection snapshot (docs/syl-integration-contract.md) ─────────
+
+export interface SylSnapshotHabit {
+  id: string;
+  name: string;
+  frequency: string;          // 'daily' | 'weekly' | 'monthly'
+  timesPerWeek: number;
+  checkedToday: boolean;
+  checksThisPeriod: number;
+  targetThisPeriod: number;
+  streak: number;
+  pendingToday: boolean;      // checksThisPeriod < targetThisPeriod
+}
+
+export interface SylSnapshotSubtask {
+  id: string;
+  name: string;
+  tier: number;
+  status: boolean;
+}
+
+export interface SylSnapshotTask {
+  id: string;
+  name: string;
+  tier: number;
+  category: string;
+  projectId: string | null;
+  dueDate: string | null;
+  createdAt: string;
+  subtaskProgress: { done: number; total: number };
+  subtasks: SylSnapshotSubtask[];
+}
+
+export interface SylSnapshotOverdueQuest {
+  id: string;
+  name: string;
+  tier: number;
+  dueDate: string;
+  daysOverdue: number;
+}
+
+export interface SylSnapshot {
+  schemaVersion: 1;
+  computedAt: string;         // ISO-8601 UTC
+  computedForDate: string;    // YYYY-MM-DD (local day used for "today")
+  appVersion: string;
+
+  player: {
+    level: number;
+    xp: number;
+    xpToNextLevel: number;
+    hp: number;
+    maxHp: number;
+    title: string;
+    streak: number;
+    totalTasks: number;
+    totalMeals: number;
+    totalExpenses: number;
+  };
+
+  questify: {
+    habits: SylSnapshotHabit[];
+    habitsPendingToday: Array<{ id: string; name: string; frequency: string; remaining: number }>;
+    tasksActive: SylSnapshotTask[];
+    questsOverdue: SylSnapshotOverdueQuest[];
+    counts: {
+      habitsTotal: number;
+      habitsPending: number;
+      tasksActive: number;
+      tasksOverdue: number;
+    };
+  };
+
+  nutrify: {
+    todayCalories: number;
+    todayTarget: number | null;   // tdee - deficitTargetKcal
+    todayBalance: number | null;  // negative = deficit
+    recentFoodLog: Array<{ date: string; time: string; description: string; calories: number; meal: string | null }>;
+    profileSummary: { sex: string; activityLevel: string; deficitTargetKcal: number } | null;
+  };
+
+  coinify: {
+    todaySpend: { ARS: number; USD: number };
+    monthSpend: { ARS: number; USD: number };
+    monthBalance: { ARS: number; USD: number };  // income - expense for the current month (matches finance:getMonthlyBalance)
+    recentTransactions: Array<{
+      id: string; type: string; amount: number; currency: string;
+      category: string; description: string; date: string;
+    }>;
+  };
+}
+
 export interface HubtifyApi {
   getRpgStats: () => Promise<PlayerStats>;
   processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number }>;
   getRpgHistory: (limit: number) => Promise<RpgEventRecord[]>;
   rpgGetDashboardStats: () => Promise<{ xpToday: number; xpHistory: Array<{ date: string; xp: number }>; eventsToday: number }>;
-  runMigrations: (migrations: Migration[]) => Promise<void>;
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;
@@ -189,11 +329,12 @@ export interface HubtifyApi {
   nutritionSaveProfile: (profile: Record<string, unknown>) => Promise<void>;
   nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
+  nutritionCopyDay: (opts?: { from?: string; to?: string }) => Promise<{ success: boolean; reason?: string; copied: number; from?: string; to?: string }>;
   nutritionDeleteFood: (id: number) => Promise<void>;
   nutritionDeleteByDate: (date: string) => Promise<void>;
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => Promise<void>;
   nutritionGetFrequentFoods: () => Promise<unknown[]>;
-  nutritionCreateFrequentFood: (food: Record<string, unknown>) => Promise<void>;
+  nutritionCreateFrequentFood: (food: Record<string, unknown>) => Promise<{ id: number; created: boolean }>;
   nutritionDeleteFrequentFood: (id: number) => Promise<void>;
   nutritionIncrementFrequentUsage: (id: number) => Promise<void>;
   nutritionGetDailyMetrics: (date: string) => Promise<unknown>;
@@ -210,9 +351,10 @@ export interface HubtifyApi {
   nutritionGetTodayTarget: () => Promise<number | null>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
+  nutritionReopenDay: (date: string) => Promise<{ success: boolean; error?: string; xpReverted?: number; hpReverted?: number; eventFound?: boolean }>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
   nutritionGetFavoriteFoods: () => Promise<FavoriteFood[]>;
-  nutritionAddFavoriteFood: (food: Record<string, unknown>) => Promise<{ id: string }>;
+  nutritionAddFavoriteFood: (food: Record<string, unknown>) => Promise<{ id: string; created: boolean }>;
   nutritionRemoveFavoriteFood: (id: string) => Promise<void>;
   nutritionGetPendingDays: () => Promise<string[]>;
   nutritionGetMealSchedule: () => Promise<import('./meal-utils').MealSchedule>;
@@ -235,7 +377,8 @@ export interface HubtifyApi {
 
   // Backup
   backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
-  backupImport: () => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
+  backupPickImportFile: () => Promise<{ canceled: boolean; path?: string; name?: string }>;
+  backupImport: (filePath?: string) => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
 
   // Character
   characterSave: (data: Record<string, unknown>) => Promise<void>;
@@ -306,6 +449,8 @@ export interface HubtifyApi {
   // Finance - Import
   financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => Promise<{ batchId: string; count: number; duplicateCount: number }>;
+  financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;
+  financeGetImportBatches: () => Promise<FinanceImportBatch[]>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
 
@@ -340,7 +485,9 @@ export interface HubtifyApi {
   financeGetCreditCardStatements: (filters?: Record<string, unknown>) => Promise<unknown[]>;
   financeGetStatementDetail: (id: string) => Promise<unknown>;
   financeGenerateStatement: (cardId: string, periodMonth: string) => Promise<string | null>;
-  financePayStatement: (id: string, paidAmount: number) => Promise<void>;
+  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number) => Promise<void>;
+  financeGetExpenseBreakdown: (month?: string) => Promise<ExpenseBreakdownByCurrency>;
+  financeGetExpenseBreakdownForRange: (startMonth: string, endMonth: string) => Promise<ExpenseBreakdownByCurrency | null>;
 
   // Cauldron
   cauldronGetPresets: () => Promise<CauldronPreset[]>;
@@ -357,6 +504,12 @@ export interface HubtifyApi {
   cauldronGetStats: () => Promise<CauldronStats>;
   cauldronGetSessions: (offset?: number, limit?: number) => Promise<CauldronSessionsPage>;
   cauldronGetWeeklyFocusTime: () => Promise<CauldronWeeklyFocusDay[]>;
+  /** The session that was running when the app last closed, or null. */
+  cauldronGetInterruptedSession: () => Promise<CauldronInterruptedSession | null>;
+  cauldronResumeInterruptedSession: () => Promise<{ success: boolean; reason?: string; state?: CauldronTimerState }>;
+  cauldronDiscardInterruptedSession: () => Promise<{ success: boolean }>;
+  /** Pushes already-translated OS-notification texts to the main process. */
+  cauldronSetLabels: (labels: Record<string, string>) => Promise<void>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
   onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
   cauldronOpenWindow: () => Promise<void>;
@@ -366,6 +519,9 @@ export interface HubtifyApi {
 
   // Feedback
   feedbackSend: (data: { type: string; description: string; email?: string }) => Promise<{ success: boolean }>;
+
+  // Syl (read-projection snapshot)
+  sylBuildSnapshot: () => Promise<SylSnapshot>;
 
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;

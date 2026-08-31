@@ -2,6 +2,8 @@ import { BrowserWindow, Notification } from 'electron';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
+import { getMondayOfWeek, formatDateString } from '../../shared/date-utils';
+import { isModuleNotificationEnabled } from './notifications.ipc';
 import type {
   CauldronTimerState,
   CauldronPreset,
@@ -11,6 +13,43 @@ import type {
 function genId(): string {
   return crypto.randomUUID();
 }
+
+/**
+ * OS-notification texts, supplied by the renderer (which owns i18n) via
+ * `cauldron:setLabels`. Defaults keep the previous Spanish strings so nothing
+ * breaks if the renderer hasn't pushed translations yet.
+ */
+interface CauldronLabels {
+  cycleComplete: string;   // title, whole cycle finished
+  cycleCompleteBody: string;
+  potionDone: string;      // title, work segment finished
+  breakDone: string;       // title, break finished
+  focus: string;
+  longBreak: string;
+  shortBreak: string;
+  cycle: string;           // "Ciclo" / "Cycle"
+  next: string;            // "Siguiente" / "Next"
+  minutesShort: string;    // "min"
+}
+
+let labels: CauldronLabels = {
+  cycleComplete: 'Caldero — ¡Ciclo completo!',
+  cycleCompleteBody: 'Ciclo de pociones terminado.',
+  potionDone: '¡Poción completada!',
+  breakDone: '¡Descanso terminado!',
+  focus: 'Enfoque',
+  longBreak: 'Descanso largo',
+  shortBreak: 'Descanso',
+  cycle: 'Ciclo',
+  next: 'Siguiente',
+  minutesShort: 'min',
+};
+
+/**
+ * How long an interrupted session stays offerable before startup cleans it up.
+ * Anything that should have ended more than this ago is stale, not resumable.
+ */
+const INTERRUPTED_SESSION_GRACE_MS = 12 * 60 * 60 * 1000;
 
 function broadcast(channel: string, data: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -42,6 +81,8 @@ let activePreset: {
   extensionMinutes: number;
 } | null = null;
 let currentSessionDbId: string | null = null;
+/** True while the running segment is an extension (see cauldron:extend). */
+let currentSessionIsExtension = false;
 let pendingNextSegment: NextSegment | null = null;
 
 function clearTimer(): void {
@@ -72,14 +113,16 @@ function onTimeUp(): void {
   const db = getDb();
   const now = new Date().toISOString();
   const wasWork = timerState.sessionType === 'work';
+  const wasExtension = currentSessionIsExtension;
 
   // Mark session as completed in DB
   if (currentSessionDbId) {
     db.prepare(
-      'UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ? WHERE id = ?',
+      'UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ?, target_end_time = NULL WHERE id = ?',
     ).run(now, now, currentSessionDbId);
     currentSessionDbId = null;
   }
+  currentSessionIsExtension = false;
 
   // Determine next segment before changing state
   const nextSegment = getNextSegment();
@@ -88,24 +131,26 @@ function onTimeUp(): void {
     sessionType: timerState.sessionType,
     completed: true,
     nextType: nextSegment ? nextSegment.type : null,
+    isExtension: wasExtension,
   };
 
   broadcast('cauldron:sessionEnd', sessionEndResult);
 
-  // OS Notification
-  if (Notification.isSupported()) {
+  // OS Notification — texts come from the renderer (cauldron:setLabels); they used
+  // to be hardcoded Spanish regardless of the user's language.
+  if (Notification.isSupported() && isModuleNotificationEnabled('cauldron')) {
     const presetLabel = timerState.presetName ? ` (${timerState.presetName})` : '';
-    const cycleInfo = `Ciclo ${timerState.currentCycle}/${timerState.totalCycles}`;
+    const cycleInfo = `${labels.cycle} ${timerState.currentCycle}/${timerState.totalCycles}`;
     if (nextSegment === null) {
       new Notification({
-        title: 'Caldero — ¡Ciclo completo!',
-        body: `Ciclo de pociones terminado.${presetLabel}`,
+        title: labels.cycleComplete,
+        body: `${labels.cycleCompleteBody}${presetLabel}`,
       }).show();
     } else {
-      const nextLabel = nextSegment.type === 'work' ? 'Enfoque' : nextSegment.type === 'long_break' ? 'Descanso largo' : 'Descanso';
+      const nextLabel = nextSegment.type === 'work' ? labels.focus : nextSegment.type === 'long_break' ? labels.longBreak : labels.shortBreak;
       const nextMin = Math.round(nextSegment.durationMs / 60000);
-      const title = wasWork ? '¡Poción completada!' : '¡Descanso terminado!';
-      const body = `${cycleInfo} — Siguiente: ${nextLabel} (${nextMin} min)${presetLabel}`;
+      const title = wasWork ? labels.potionDone : labels.breakDone;
+      const body = `${cycleInfo} — ${labels.next}: ${nextLabel} (${nextMin} ${labels.minutesShort})${presetLabel}`;
       new Notification({ title, body }).show();
     }
   }
@@ -185,11 +230,14 @@ function startSegment(
     }
   }
 
-  // Create session DB row
+  // Create session DB row. target_end_time is persisted so the session survives an
+  // app restart and can be offered back (cauldron:getInterruptedSession) instead of
+  // being silently deleted on the next boot.
+  targetEndTime = Date.now() + durationMs;
   const sessionId = genId();
   db.prepare(
-    `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
+    `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at, target_end_time, is_extension)
+     VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0)`,
   ).run(
     sessionId,
     timerState.presetId,
@@ -198,10 +246,11 @@ function startSegment(
     now,
     now,
     now,
+    targetEndTime,
   );
   currentSessionDbId = sessionId;
+  currentSessionIsExtension = false;
 
-  targetEndTime = Date.now() + durationMs;
   timerState = {
     ...timerState,
     status: type === 'work' ? 'work' : 'on_break',
@@ -218,18 +267,60 @@ function startSegment(
 
 // ─── Startup Cleanup ────────────────────────────────────────
 
-/** Mark orphaned sessions (started but never completed) as abandoned on startup */
+/**
+ * Cleans up only STALE incomplete sessions on startup.
+ *
+ * This used to soft-delete EVERY incomplete session unconditionally: closing the
+ * app 20 minutes into a 25-minute pomodoro threw the session away with no XP and
+ * no warning. A session whose target_end_time is still within the grace window is
+ * left alone so `cauldron:getInterruptedSession` can offer to resume it.
+ */
 function cleanupOrphanedSessions(): void {
   try {
     const db = getDb();
     const now = new Date().toISOString();
+    const staleBefore = Date.now() - INTERRUPTED_SESSION_GRACE_MS;
     db.prepare(
       `UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?
-       WHERE completed = 0 AND deleted_at IS NULL`,
-    ).run(now, now);
+       WHERE completed = 0 AND deleted_at IS NULL
+         AND (target_end_time IS NULL OR target_end_time < ?)`,
+    ).run(now, now, staleBefore);
   } catch {
     // Non-critical — silently ignore
   }
+}
+
+/** The most recent resumable session, or null. */
+function readInterruptedSession(): {
+  id: string; presetId: string | null; presetName: string | null;
+  type: string; durationMinutes: number; startedAt: string;
+  remainingMs: number; totalMs: number;
+} | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT s.id, s.preset_id AS presetId, s.type, s.duration_minutes AS durationMinutes,
+            s.started_at AS startedAt, s.target_end_time AS targetEndTime,
+            p.name AS presetName
+     FROM cauldron_sessions s
+     LEFT JOIN cauldron_presets p ON p.id = s.preset_id
+     WHERE s.completed = 0 AND s.deleted_at IS NULL AND s.target_end_time IS NOT NULL
+     ORDER BY s.started_at DESC LIMIT 1`,
+  ).get() as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const targetEnd = row.targetEndTime as number;
+  if (targetEnd < Date.now() - INTERRUPTED_SESSION_GRACE_MS) return null;
+
+  return {
+    id: row.id as string,
+    presetId: (row.presetId as string) ?? null,
+    presetName: (row.presetName as string) ?? null,
+    type: row.type as string,
+    durationMinutes: row.durationMinutes as number,
+    startedAt: row.startedAt as string,
+    remainingMs: Math.max(0, targetEnd - Date.now()),
+    totalMs: (row.durationMinutes as number) * 60 * 1000,
+  };
 }
 
 // ─── IPC Handlers ──────────────────────────────────────────
@@ -366,6 +457,13 @@ export function registerCauldronIpcHandlers(): void {
     timerState.status =
       timerState.status === 'work' ? 'work_paused' : 'break_paused';
     clearTimer();
+    // A paused session has no wall-clock deadline; clearing target_end_time keeps
+    // it out of the "resume this?" offer until it is resumed again.
+    if (currentSessionDbId) {
+      const nowIso = new Date().toISOString();
+      getDb().prepare('UPDATE cauldron_sessions SET target_end_time = NULL, updated_at = ? WHERE id = ?')
+        .run(nowIso, currentSessionDbId);
+    }
     broadcast('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -380,6 +478,11 @@ export function registerCauldronIpcHandlers(): void {
     targetEndTime = Date.now() + timerState.remainingMs;
     timerState.status =
       timerState.status === 'work_paused' ? 'work' : 'on_break';
+    if (currentSessionDbId) {
+      const nowIso = new Date().toISOString();
+      getDb().prepare('UPDATE cauldron_sessions SET target_end_time = ?, updated_at = ? WHERE id = ?')
+        .run(targetEndTime, nowIso, currentSessionDbId);
+    }
     timerInterval = setInterval(tick, 1000);
     broadcast('cauldron:tick', getSnapshotState());
     return getSnapshotState();
@@ -393,10 +496,11 @@ export function registerCauldronIpcHandlers(): void {
       const db = getDb();
       const now = new Date().toISOString();
       db.prepare(
-        'UPDATE cauldron_sessions SET updated_at = ? WHERE id = ?',
+        'UPDATE cauldron_sessions SET updated_at = ?, target_end_time = NULL WHERE id = ?',
       ).run(now, currentSessionDbId);
       currentSessionDbId = null;
     }
+    currentSessionIsExtension = false;
 
     clearTimer();
     pendingNextSegment = null;
@@ -441,17 +545,21 @@ export function registerCauldronIpcHandlers(): void {
     const extMin = minutes ?? activePreset?.extensionMinutes ?? 5;
     const durationMs = extMin * 60 * 1000;
 
-    // Create a DB row for the extension so it's tracked
+    // Create a DB row for the extension so it's tracked, flagged is_extension = 1.
+    // Without the flag this row was an ordinary type='work' session and completing
+    // it paid a FULL second pomodoro (+8 XP, +1 today, +5 min on the chart) for a
+    // cycle that had already been rewarded.
     const db = getDb();
     const now = new Date().toISOString();
     const sessionId = genId();
-    db.prepare(
-      `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
-    ).run(sessionId, timerState.presetId, timerState.sessionType, extMin, now, now, now);
-    currentSessionDbId = sessionId;
-
     targetEndTime = Date.now() + durationMs;
+    db.prepare(
+      `INSERT INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, created_at, updated_at, target_end_time, is_extension)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 1)`,
+    ).run(sessionId, timerState.presetId, timerState.sessionType, extMin, now, now, now, targetEndTime);
+    currentSessionDbId = sessionId;
+    currentSessionIsExtension = true;
+
     timerState = {
       ...timerState,
       status: timerState.sessionType === 'work' ? 'work' : 'on_break',
@@ -473,10 +581,11 @@ export function registerCauldronIpcHandlers(): void {
       const db = getDb();
       const now = new Date().toISOString();
       db.prepare(
-        'UPDATE cauldron_sessions SET updated_at = ? WHERE id = ?',
+        'UPDATE cauldron_sessions SET updated_at = ?, target_end_time = NULL WHERE id = ?',
       ).run(now, currentSessionDbId);
       currentSessionDbId = null;
     }
+    currentSessionIsExtension = false;
 
     clearTimer();
     pendingNextSegment = null;
@@ -511,6 +620,7 @@ export function registerCauldronIpcHandlers(): void {
          FROM cauldron_sessions s
          LEFT JOIN cauldron_presets p ON s.preset_id = p.id
          WHERE s.type = 'work' AND s.completed = 1 AND s.deleted_at IS NULL
+           AND s.is_extension = 0
          ORDER BY s.started_at DESC
          LIMIT ? OFFSET ?`,
       )
@@ -533,12 +643,15 @@ export function registerCauldronIpcHandlers(): void {
 
   ipcHandle('cauldron:getWeeklyFocusTime', () => {
     const db = getDb();
-    // Get Monday of current week
-    // SQLite: date('now', 'weekday 0', '-6 days') gives Monday
+    // Monday is computed in JS, not with SQLite's date('now','weekday 1','-7 days'):
+    // 'weekday 1' is a NO-OP when the date is already a Monday, so every Monday the
+    // chart showed LAST week and hid the day you were looking at.
+    // Both this and cauldron:getStats' "week" now mean the same calendar week.
+    const monday = getMondayOfWeek();
     const rows = db
       .prepare(
         `WITH RECURSIVE dates(d, idx) AS (
-           SELECT date('now', 'weekday 1', '-7 days'), 0
+           SELECT ?, 0
            UNION ALL
            SELECT date(d, '+1 day'), idx + 1
            FROM dates WHERE idx < 6
@@ -548,14 +661,17 @@ export function registerCauldronIpcHandlers(): void {
            COALESCE(SUM(s.duration_minutes), 0) AS totalMinutes
          FROM dates
          LEFT JOIN cauldron_sessions s
-           ON date(s.started_at) = dates.d
+           -- 'localtime': started_at is stored as a UTC ISO instant, so a bare
+           -- date(started_at) rolls over at 21:00 in UTC-3.
+           ON date(s.started_at, 'localtime') = dates.d
            AND s.type = 'work'
            AND s.completed = 1
            AND s.deleted_at IS NULL
+           AND s.is_extension = 0
          GROUP BY dates.d
          ORDER BY dates.d ASC`,
       )
-      .all() as Array<{ day: string; totalMinutes: number }>;
+      .all(monday) as Array<{ day: string; totalMinutes: number }>;
 
     const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     return rows.map((r) => {
@@ -570,40 +686,51 @@ export function registerCauldronIpcHandlers(): void {
   ipcHandle('cauldron:getStats', () => {
     const db = getDb();
 
+    // ── "today"/"this week" convention ────────────────────────────────────────
+    // started_at is a UTC ISO instant. Reads must convert it with
+    // date(started_at, 'localtime') and compare against a LOCAL day computed in JS;
+    // the old date('now') / toISOString().slice(0,10) pair evaluated in UTC, so in
+    // UTC-3 "today" and the streak both rolled over at 21:00.
+    // "This week" is the Monday-based CALENDAR week, matching getWeeklyFocusTime
+    // (it used to be a rolling 7 days here — two different weeks in one UI).
+    // is_extension = 0 everywhere: an extension is extra time on an already-counted
+    // cycle, not another pomodoro.
+    const todayStr = formatDateString(new Date());
+    const monday = getMondayOfWeek();
+
     const today = db
       .prepare(
         `SELECT COUNT(*) AS count FROM cauldron_sessions
-       WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL
-       AND date(started_at) = date('now')`,
+       WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL AND is_extension = 0
+       AND date(started_at, 'localtime') = ?`,
       )
-      .get() as { count: number };
+      .get(todayStr) as { count: number };
 
     const week = db
       .prepare(
         `SELECT COUNT(*) AS count FROM cauldron_sessions
-       WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL
-       AND started_at >= date('now', '-7 days')`,
+       WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL AND is_extension = 0
+       AND date(started_at, 'localtime') >= ?`,
       )
-      .get() as { count: number };
+      .get(monday) as { count: number };
 
     const total = db
       .prepare(
         `SELECT COUNT(*) AS count FROM cauldron_sessions
-       WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL`,
+       WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL AND is_extension = 0`,
       )
       .get() as { count: number };
 
     // Streak: consecutive days (including today) with at least one completed work session
     const streakRows = db
       .prepare(
-        `SELECT DISTINCT date(started_at) AS d FROM cauldron_sessions
-         WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL
+        `SELECT DISTINCT date(started_at, 'localtime') AS d FROM cauldron_sessions
+         WHERE completed = 1 AND type = 'work' AND deleted_at IS NULL AND is_extension = 0
          ORDER BY d DESC`,
       )
       .all() as Array<{ d: string }>;
 
     let streak = 0;
-    const todayStr = new Date().toISOString().slice(0, 10);
     let expectedDate = todayStr;
     for (const row of streakRows) {
       if (row.d === expectedDate) {
@@ -611,7 +738,7 @@ export function registerCauldronIpcHandlers(): void {
         // Move to previous day
         const prev = new Date(expectedDate + 'T12:00:00');
         prev.setDate(prev.getDate() - 1);
-        expectedDate = prev.toISOString().slice(0, 10);
+        expectedDate = formatDateString(prev);
       } else if (row.d < expectedDate) {
         // Gap found — streak broken
         break;
@@ -619,5 +746,98 @@ export function registerCauldronIpcHandlers(): void {
     }
 
     return { today: today.count, week: week.count, total: total.count, streak };
+  });
+
+  // ─── Interrupted session recovery ───
+
+  /**
+   * The session that was running when the app closed, with its remaining time, or
+   * null. Startup used to soft-delete every incomplete session instead: quit 20
+   * minutes into a 25-minute pomodoro and it vanished, no XP, no notice.
+   */
+  ipcHandle('cauldron:getInterruptedSession', () => {
+    // A live timer takes precedence — nothing was interrupted.
+    if (timerState.status !== 'idle') return null;
+    return readInterruptedSession();
+  });
+
+
+  /**
+   * Retoma la sesion interrumpida *donde quedo*, reusando la fila existente en vez
+   * de arrancar la receta de cero. Sin esto, "Retomar" descartaba la sesion y
+   * empezaba un pomodoro nuevo: el usuario perdia los minutos ya cumplidos.
+   */
+  ipcHandle('cauldron:resumeInterruptedSession', () => {
+    if (timerState.status !== 'idle') return { success: false, reason: 'timer_active' };
+
+    const session = readInterruptedSession();
+    if (!session) return { success: false, reason: 'not_found' };
+
+    const db = getDb();
+    const preset = session.presetId
+      ? (db
+          .prepare(
+            `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
+                    long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
+                    extension_minutes AS extensionMinutes
+             FROM cauldron_presets WHERE id = ? AND deleted_at IS NULL`,
+          )
+          .get(session.presetId) as CauldronPreset | undefined)
+      : undefined;
+    if (!preset) return { success: false, reason: 'preset_missing' };
+
+    activePreset = {
+      workMinutes: preset.workMinutes,
+      breakMinutes: preset.breakMinutes,
+      longBreakMinutes: preset.longBreakMinutes,
+      cyclesBeforeLong: preset.cyclesBeforeLong,
+      extensionMinutes: preset.extensionMinutes ?? 5,
+    };
+
+    const type = session.type as 'work' | 'break' | 'long_break';
+    targetEndTime = Date.now() + session.remainingMs;
+    currentSessionDbId = session.id;
+    currentSessionIsExtension = false;
+
+    timerState = {
+      status: type === 'work' ? 'work' : 'on_break',
+      remainingMs: session.remainingMs,
+      totalMs: session.totalMs,
+      currentCycle: 1,
+      totalCycles: preset.cyclesBeforeLong,
+      sessionType: type,
+      presetId: preset.id,
+      presetName: preset.name,
+      extensionMinutes: preset.extensionMinutes ?? 5,
+    };
+
+    const nowIso = new Date().toISOString();
+    db.prepare('UPDATE cauldron_sessions SET target_end_time = ?, updated_at = ? WHERE id = ?')
+      .run(targetEndTime, nowIso, session.id);
+
+    if (!timerInterval) timerInterval = setInterval(tick, 1000);
+    broadcast('cauldron:tick', getSnapshotState());
+    return { success: true, state: getSnapshotState() };
+  });
+
+  /** Discards the offered interrupted session (soft delete). */
+  ipcHandle('cauldron:discardInterruptedSession', () => {
+    const db = getDb();
+    const session = readInterruptedSession();
+    if (!session) return { success: false };
+    const now = new Date().toISOString();
+    db.prepare('UPDATE cauldron_sessions SET deleted_at = ?, updated_at = ?, target_end_time = NULL WHERE id = ?')
+      .run(now, now, session.id);
+    return { success: true };
+  });
+
+  /**
+   * Receives the OS-notification texts already translated by the renderer. They
+   * were hardcoded Spanish regardless of the user's language.
+   */
+  ipcHandle('cauldron:setLabels', (_e, next: Partial<CauldronLabels>) => {
+    if (next && typeof next === 'object') {
+      labels = { ...labels, ...next };
+    }
   });
 }

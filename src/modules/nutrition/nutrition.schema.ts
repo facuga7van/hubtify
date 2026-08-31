@@ -169,4 +169,64 @@ export const nutritionMigrations: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_frequent_foods_name ON frequent_foods(name COLLATE NOCASE);
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 10,
+    up: `
+      -- ── sync_id: cross-device identity for AUTOINCREMENT tables ─────────────
+      -- food_log.id and frequent_foods.id are INTEGER PRIMARY KEY AUTOINCREMENT,
+      -- so two devices independently mint 1, 2, 3… for DIFFERENT rows. The merge
+      -- deduplicated on that id: with 2 meals on each device you ended up with 2
+      -- instead of 4, and the LWW pass then applied the remote's deleted_at to
+      -- whichever unrelated local row happened to share the number.
+      -- sync_id is the real identity; the integer id stays a purely local surrogate.
+      ALTER TABLE food_log ADD COLUMN sync_id TEXT;
+      ALTER TABLE frequent_foods ADD COLUMN sync_id TEXT;
+
+      -- Backfill is DETERMINISTIC (derived from the natural key), never random:
+      -- rows already replicated across devices must land on the SAME sync_id or
+      -- this migration would duplicate the entire history on the next merge.
+      UPDATE food_log
+        SET sync_id = 'legacy-' || date || '|' || time || '|' || calories || '|' || substr(description, 1, 60)
+        WHERE sync_id IS NULL;
+      UPDATE food_log SET sync_id = sync_id || '#' || id
+        WHERE id NOT IN (SELECT MIN(id) FROM food_log GROUP BY sync_id);
+
+      UPDATE frequent_foods SET sync_id = 'legacy-' || lower(name) WHERE sync_id IS NULL;
+      UPDATE frequent_foods SET sync_id = sync_id || '#' || id
+        WHERE id NOT IN (SELECT MIN(id) FROM frequent_foods GROUP BY sync_id);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_food_log_sync_id ON food_log(sync_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_frequent_foods_sync_id ON frequent_foods(sync_id);
+
+      CREATE INDEX IF NOT EXISTS idx_food_log_live_date ON food_log(deleted_at, date, time);
+
+      -- ── One timestamp format ────────────────────────────────────────────────
+      -- Inserts wrote ISO ('2026-08-31T14:00:00.000Z') while deletes wrote
+      -- datetime('now') ('2026-08-31 14:00:00'). Both are UTC, but as STRINGS the
+      -- ISO form always sorts higher ('T' > ' '), so a soft-delete could never win
+      -- last-write-wins against the row's own insert. Normalise the legacy values
+      -- to ISO — the format every writer uses from now on.
+      UPDATE food_log SET updated_at = replace(updated_at, ' ', 'T') || '.000Z'
+        WHERE updated_at LIKE '____-__-__ __:__:__';
+      UPDATE food_log SET deleted_at = replace(deleted_at, ' ', 'T') || '.000Z'
+        WHERE deleted_at LIKE '____-__-__ __:__:__';
+      UPDATE frequent_foods SET updated_at = replace(updated_at, ' ', 'T') || '.000Z'
+        WHERE updated_at LIKE '____-__-__ __:__:__';
+      UPDATE frequent_foods SET deleted_at = replace(deleted_at, ' ', 'T') || '.000Z'
+        WHERE deleted_at LIKE '____-__-__ __:__:__';
+      UPDATE favorite_foods SET updated_at = replace(updated_at, ' ', 'T') || '.000Z'
+        WHERE updated_at LIKE '____-__-__ __:__:__';
+      UPDATE favorite_foods SET deleted_at = replace(deleted_at, ' ', 'T') || '.000Z'
+        WHERE deleted_at LIKE '____-__-__ __:__:__';
+
+      -- ── Reopening a closed day ──────────────────────────────────────────────
+      -- closed_at narrows the search for the DAY_SUMMARY rpg_event whose XP/HP the
+      -- reopen has to reverse. deleted_at makes the reopen a soft delete so a pull
+      -- from another device cannot resurrect the closure.
+      ALTER TABLE nutrition_daily_closed ADD COLUMN closed_at TEXT;
+      ALTER TABLE nutrition_daily_closed ADD COLUMN updated_at TEXT;
+      ALTER TABLE nutrition_daily_closed ADD COLUMN deleted_at TEXT DEFAULT NULL;
+    `,
+  },
 ];

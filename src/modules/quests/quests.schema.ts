@@ -190,4 +190,31 @@ export const questsMigrations: Migration[] = [
       UPDATE habits SET updated_at = created_at WHERE updated_at = '';
     `,
   },
+  {
+    namespace: 'quests',
+    version: 11,
+    up: `
+      -- ── "today" convention ────────────────────────────────────────────────
+      -- tasks.completed_at and subtasks.completed_at are LOCAL timestamps
+      -- ('YYYY-MM-DD HH:MM:SS' via localTimestamp(), or a bare 'YYYY-MM-DD' for
+      -- retroactive subtask checks). They used to be written as UTC ISO strings
+      -- while every reader compared them against a LOCAL todayDateString(), so in
+      -- UTC-3 anything completed after 21:00 fell out of "today".
+      -- Backfill converts the old UTC ISO rows (the ones containing a 'T') to the
+      -- same local format; bare dates are left alone.
+      UPDATE tasks SET completed_at = datetime(completed_at, 'localtime')
+        WHERE completed_at IS NOT NULL AND completed_at LIKE '%T%';
+      UPDATE subtasks SET completed_at = datetime(completed_at, 'localtime')
+        WHERE completed_at IS NOT NULL AND completed_at LIKE '%T%';
+
+      -- Indexes for the hot dashboard/list queries. Readers use half-open ranges
+      -- (col >= day AND col < nextDay) instead of DATE(col) = ? so these are usable.
+      CREATE INDEX IF NOT EXISTS idx_tasks_due_open     ON tasks(due_date, status, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_status_order ON tasks(status, deleted_at, task_order);
+      CREATE INDEX IF NOT EXISTS idx_tasks_updated      ON tasks(updated_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_completed_status ON tasks(completed_at, status, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_subtasks_completed ON subtasks(completed_at, status, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_habit_checks_live  ON habit_checks(deleted_at, habit_id, date);
+    `,
+  },
 ];

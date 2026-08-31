@@ -1,7 +1,8 @@
-import { getDb, runModuleMigrations } from './db';
+import type Database from 'better-sqlite3';
+import { getDb } from './db';
 import { ipcHandle } from './ipc-handle';
+import crypto from 'crypto';
 import {
-  xpThreshold,
   getLevel,
   getTitle,
   getComboMultiplier,
@@ -13,46 +14,61 @@ import {
   daysDiff,
 } from '../../shared/rpg-engine';
 import type { PlayerStats, RpgEvent, RpgEventRecord } from '../../shared/types';
-import { todayDateString, localTimestamp, daysAgoDateString } from '../../shared/date-utils';
+import { todayDateString, localTimestamp, daysAgoDateString, nextDateString } from '../../shared/date-utils';
+import { getPlayerStats } from './rpg-stats';
 
-function defaultStats(): PlayerStats {
-  return {
-    userId: 'default', level: 1, xp: 0, xpToNextLevel: xpThreshold(2),
-    hp: 100, maxHp: 100, title: 'Campesino', streak: 0, dailyCombo: 0,
-    comboDate: null, streakLastDate: null, totalTasks: 0, totalMeals: 0, totalExpenses: 0,
-  };
+/**
+ * Hard bounds for anything arriving from the renderer (or, via sync, from an
+ * external writer). Without them a single `{xp: -99999}` event permanently
+ * poisons `rpg:getDashboardStats` with a negative `xpToday`.
+ */
+const MAX_EVENT_XP = 500;
+const MAX_EVENT_HP = 100;
+
+function clampNumber(value: unknown, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(min, Math.min(max, value));
 }
 
-function rowToStats(row: Record<string, unknown>): PlayerStats {
-  const xp = row.xp as number;
-  const level = row.level as number;
-  return {
-    userId: row.user_id as string,
-    level,
-    xp,
-    xpToNextLevel: xpThreshold(level + 1) - xp,
-    hp: row.hp as number,
-    maxHp: row.max_hp as number,
-    title: row.title as string,
-    streak: row.streak as number,
-    dailyCombo: row.daily_combo as number,
-    comboDate: row.combo_date as string | null,
-    streakLastDate: row.streak_last_date as string | null,
-    totalTasks: row.total_tasks as number,
-    totalMeals: row.total_meals as number,
-    totalExpenses: row.total_expenses as number,
-  };
+/**
+ * Which payload field identifies the entity, per completion event type.
+ * Values are fixed literals (never interpolated from user input) so they are
+ * safe to inline into SQL.
+ */
+const REF_FIELD_BY_TYPE: Record<string, string> = {
+  TASK_COMPLETED: '$.taskId',
+  SUBTASK_COMPLETED: '$.subtaskId',
+  HABIT_CHECKED: '$.habitId',
+  TASK_UNCOMPLETED: '$.taskId',
+  SUBTASK_UNCOMPLETED: '$.subtaskId',
+  HABIT_UNCHECKED: '$.habitId',
+};
+
+/** The entity id an event refers to — persisted to rpg_events.ref_id on insert. */
+function extractRefId(payload: Record<string, unknown> | null): string | null {
+  if (!payload) return null;
+  const candidate = payload.taskId ?? payload.subtaskId ?? payload.habitId;
+  return typeof candidate === 'string' ? candidate : null;
 }
 
-export function registerRpgHandlers(): void {
-  ipcHandle('rpg:getStats', (): PlayerStats => {
-    const db = getDb();
-    const row = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown>;
-    return row ? rowToStats(row) : defaultStats();
-  });
+export interface RpgEventResult {
+  xpGained: number;
+  hpChange: number;
+  leveledUp: boolean;
+  newTitle: string | null;
+  milestoneXp: number;
+  comboMultiplier: number;
+  bonusMultiplier: number;
+}
 
-  ipcHandle('rpg:processEvent', (_e, event: RpgEvent) => {
-    const db = getDb();
+/**
+ * Applies one RPG event to `player_stats` and appends it to `rpg_events`.
+ *
+ * Extracted from the `rpg:processEvent` handler (same reasoning as rpg-stats.ts)
+ * so the XP/streak/undo rules can be tested against an in-memory database without
+ * an Electron main process.
+ */
+export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEventResult {
     const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED';
 
     const processTransaction = db.transaction(() => {
@@ -60,8 +76,8 @@ export function registerRpgHandlers(): void {
       const today = getLocalDateString();
 
       const payload = event.payload as Record<string, unknown> | null;
-      const baseXp = (payload && typeof payload.xp === 'number') ? payload.xp : 0;
-      const hpChange = (payload && typeof payload.hp === 'number') ? payload.hp : 0;
+      const baseXp = clampNumber(payload?.xp, -MAX_EVENT_XP, MAX_EVENT_XP);
+      const hpChange = clampNumber(payload?.hp, -MAX_EVENT_HP, MAX_EVENT_HP);
 
       let xpGained: number;
       let comboMultiplier = 1.0;
@@ -69,25 +85,34 @@ export function registerRpgHandlers(): void {
       let streak = stats.streak as number;
       let combo = (stats.daily_combo as number) || 0;
       let milestoneXp = 0;
+      let lastMilestoneStreak = (stats.last_milestone_streak as number) ?? 0;
+      // Only a real, XP-bearing action advances the combo/streak bookkeeping.
+      let advancesProgress = false;
 
       if (isUndo) {
-        // Find the original completion event and reverse its exact XP
+        // Find the original completion event and reverse its exact XP.
         const undoMap: Record<string, string> = {
           'TASK_UNCOMPLETED': 'TASK_COMPLETED',
           'SUBTASK_UNCOMPLETED': 'SUBTASK_COMPLETED',
           'HABIT_UNCHECKED': 'HABIT_CHECKED',
         };
         const originalType = undoMap[event.type];
-        const itemId = (payload?.taskId ?? payload?.habitId ?? payload?.subtaskId) as string | undefined;
+        const itemId = extractRefId(payload);
 
         let originalEvent: { id: number; xp_gained: number; created_at: string } | undefined;
         if (itemId && originalType) {
-          // Find the most recent matching event
+          // Match on ref_id (indexed, backfilled by the `core` v1 migration), with a
+          // json_extract fallback for rows whose payload was not valid JSON.
+          // The old `payload LIKE '%"<id>"%'` matched the id ANYWHERE in the JSON, so
+          // un-completing task `abc` could revert (and delete) the event of a different
+          // task that merely carried `projectId: "abc"`.
+          const refField = REF_FIELD_BY_TYPE[originalType];
           originalEvent = db.prepare(`
             SELECT id, xp_gained, created_at FROM rpg_events
-            WHERE event_type = ? AND payload LIKE ?
+            WHERE event_type = ?
+              AND (ref_id = ? OR (ref_id IS NULL AND json_extract(payload, '${refField}') = ?))
             ORDER BY id DESC LIMIT 1
-          `).get(originalType, `%"${itemId}"%`) as typeof originalEvent;
+          `).get(originalType, itemId, itemId) as typeof originalEvent;
         }
 
         if (originalEvent) {
@@ -100,9 +125,12 @@ export function registerRpgHandlers(): void {
             combo = combo - 1;
           }
         } else {
-          xpGained = baseXp; // fallback to base XP if original not found
+          // Nothing to reverse. Callers pass an ALREADY-NEGATIVE baseXp, so falling
+          // back to it here would deduct the XP a second time.
+          xpGained = 0;
         }
-      } else {
+      } else if (baseXp > 0) {
+        advancesProgress = true;
         if ((stats.combo_date as string | null) !== today) combo = 0;
         comboMultiplier = getComboMultiplier(combo);
         bonusMultiplier = rollRandomBonus();
@@ -110,14 +138,32 @@ export function registerRpgHandlers(): void {
 
         const lastDate = stats.streak_last_date as string | null;
         if (lastDate !== today) {
-          if (lastDate) {
-            const diff = daysDiff(lastDate, today);
-            streak = diff === 1 ? streak + 1 : 1;
+          if (lastDate && daysDiff(lastDate, today) === 1) {
+            streak = streak + 1;
           } else {
+            // Streak broken (or first ever action) — restart, and clear the
+            // milestone watermark so future milestones can be earned again.
             streak = 1;
+            lastMilestoneStreak = 0;
+          }
+
+          // Milestone bonuses live INSIDE this block: `streak` is constant for the
+          // whole day, so computing them per-event paid 3/7/14/30/60/100-day bonuses
+          // again on every task, habit, meal and expense of that day.
+          // `last_milestone_streak` makes it once-ever-per-streak, which also blocks
+          // the complete/uncomplete loop (undo refunds the bonus but never rewinds
+          // the streak, so the same milestone could be farmed indefinitely).
+          const bonus = getStreakMilestoneBonus(streak);
+          if (bonus > 0 && streak > lastMilestoneStreak) {
+            milestoneXp = bonus;
+            lastMilestoneStreak = streak;
           }
         }
-        milestoneXp = getStreakMilestoneBonus(streak);
+      } else {
+        // Zero/negative-XP event (e.g. TASK_CREATED). It is logged, and its HP
+        // delta still applies, but it must not inflate the daily combo multiplier
+        // nor keep a streak alive.
+        xpGained = 0;
       }
 
       const totalXpGained = xpGained + milestoneXp;
@@ -132,22 +178,31 @@ export function registerRpgHandlers(): void {
       // so storing negative XP here would double-count the reversal in SUM queries)
       const loggedXp = isUndo ? 0 : totalXpGained;
       db.prepare(`
-        INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(event.moduleId, event.type, loggedXp, hpChange, comboMultiplier, bonusMultiplier, JSON.stringify(event.payload), now);
+        INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at, ref_id, sync_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        event.moduleId, event.type, loggedXp, hpChange, comboMultiplier, bonusMultiplier,
+        JSON.stringify(event.payload), now, extractRefId(payload), crypto.randomUUID(),
+      );
 
       if (isUndo) {
         db.prepare(`
           UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?, daily_combo = ?
           WHERE user_id = ?
         `).run(finalLevel, finalXp, newHp, finalTitle, Math.max(0, combo), 'default');
-      } else {
+      } else if (advancesProgress) {
         db.prepare(`
           UPDATE player_stats SET
             level = ?, xp = ?, hp = ?, title = ?,
-            streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?
+            streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?,
+            last_milestone_streak = ?
           WHERE user_id = ?
-        `).run(finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today, 'default');
+        `).run(finalLevel, finalXp, newHp, finalTitle, streak, combo + 1, today, today, lastMilestoneStreak, 'default');
+      } else {
+        db.prepare(`
+          UPDATE player_stats SET level = ?, xp = ?, hp = ?, title = ?
+          WHERE user_id = ?
+        `).run(finalLevel, finalXp, newHp, finalTitle, 'default');
       }
 
       if (event.type === 'TASK_COMPLETED' || event.type === 'SUBTASK_COMPLETED') {
@@ -177,13 +232,23 @@ export function registerRpgHandlers(): void {
       console.error(`[RPG] Error processing event "${event.type}":`, err);
       try {
         db.prepare(`
-          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at)
-          VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?)
-        `).run(event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp());
+          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at, ref_id, sync_id)
+          VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?, ?, ?)
+        `).run(
+          event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp(),
+          extractRefId(event.payload as Record<string, unknown> | null), crypto.randomUUID(),
+        );
       } catch { /* best effort logging */ }
       return { xpGained: 0, hpChange: 0, leveledUp: false, newTitle: null, milestoneXp: 0, comboMultiplier: 1.0, bonusMultiplier: 1.0 };
     }
+}
+
+export function registerRpgHandlers(): void {
+  ipcHandle('rpg:getStats', (): PlayerStats => {
+    return getPlayerStats(getDb());
   });
+
+  ipcHandle('rpg:processEvent', (_e, event: RpgEvent) => processRpgEvent(getDb(), event));
 
   ipcHandle('rpg:getHistory', (_e, limit: number): RpgEventRecord[] => {
     const db = getDb();
@@ -199,26 +264,30 @@ export function registerRpgHandlers(): void {
   ipcHandle('rpg:getDashboardStats', () => {
     const db = getDb();
     const today = todayDateString();
+    // Half-open [today, tomorrow) range instead of DATE(created_at) = ?: wrapping the
+    // column in a function makes idx_rpg_events_created_at unusable. created_at is a
+    // sortable 'YYYY-MM-DD HH:MM:SS' local timestamp, so plain string comparison works.
+    const tomorrow = nextDateString(today);
 
     // XP gained today
     const xpToday = db.prepare(
-      "SELECT COALESCE(SUM(xp_gained), 0) AS total FROM rpg_events WHERE DATE(created_at) = ?"
-    ).get(today) as { total: number };
+      'SELECT COALESCE(SUM(xp_gained), 0) AS total FROM rpg_events WHERE created_at >= ? AND created_at < ?'
+    ).get(today, tomorrow) as { total: number };
 
     // XP per day for last 7 days
     const sixDaysAgo = daysAgoDateString(6);
     const xpHistory = db.prepare(`
-      SELECT DATE(created_at) AS date, COALESCE(SUM(xp_gained), 0) AS xp
+      SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(xp_gained), 0) AS xp
       FROM rpg_events
-      WHERE DATE(created_at) >= ?
-      GROUP BY DATE(created_at)
+      WHERE created_at >= ?
+      GROUP BY substr(created_at, 1, 10)
       ORDER BY date ASC
     `).all(sixDaysAgo) as Array<{ date: string; xp: number }>;
 
     // Events today count
     const eventsToday = db.prepare(
-      "SELECT COUNT(*) AS count FROM rpg_events WHERE DATE(created_at) = ?"
-    ).get(today) as { count: number };
+      'SELECT COUNT(*) AS count FROM rpg_events WHERE created_at >= ? AND created_at < ?'
+    ).get(today, tomorrow) as { count: number };
 
     return {
       xpToday: xpToday.total,
@@ -230,30 +299,41 @@ export function registerRpgHandlers(): void {
   ipcHandle('sync:restoreStats', (_e, stats: Record<string, unknown>) => {
     try {
       const db = getDb();
+
+      // Everything here comes off the wire. Level/title are DERIVED from xp rather
+      // than trusted, so a corrupt remote can never produce a negative
+      // `xpToNextLevel` (xpThreshold(level+1) - xp) that sticks forever.
+      const maxHp = Math.max(1, Math.round(clampNumber(stats.maxHp ?? stats.max_hp ?? 100, 1, 1000)) || 100);
+      const xp = Math.max(0, Math.round(clampNumber(stats.xp ?? 0, 0, Number.MAX_SAFE_INTEGER)));
+      const hp = Math.max(0, Math.min(maxHp, Math.round(clampNumber(stats.hp ?? 100, 0, maxHp))));
+      const level = getLevel(xp);
+      const title = typeof stats.title === 'string' && stats.title ? stats.title : getTitle(level);
+      const streak = Math.max(0, Math.round(clampNumber(stats.streak ?? 0, 0, 100000)));
+      const dailyCombo = Math.max(0, Math.round(clampNumber(stats.dailyCombo ?? stats.daily_combo ?? 0, 0, 10000)));
+      const totalTasks = Math.max(0, Math.round(clampNumber(stats.totalTasks ?? stats.total_tasks ?? 0, 0, Number.MAX_SAFE_INTEGER)));
+      const totalMeals = Math.max(0, Math.round(clampNumber(stats.totalMeals ?? stats.total_meals ?? 0, 0, Number.MAX_SAFE_INTEGER)));
+      const totalExpenses = Math.max(0, Math.round(clampNumber(stats.totalExpenses ?? stats.total_expenses ?? 0, 0, Number.MAX_SAFE_INTEGER)));
+
       db.prepare(`
         UPDATE player_stats SET level = ?, xp = ?, hp = ?, max_hp = ?, title = ?,
           streak = ?, daily_combo = ?, combo_date = ?, streak_last_date = ?,
-          total_tasks = ?, total_meals = ?, total_expenses = ?
+          total_tasks = ?, total_meals = ?, total_expenses = ?,
+          last_milestone_streak = ?
         WHERE user_id = 'default'
       `).run(
-        stats.level ?? 1, stats.xp ?? 0, stats.hp ?? 100,
-        stats.maxHp ?? stats.max_hp ?? 100,
-        stats.title ?? 'Campesino',
-        stats.streak ?? 0, stats.dailyCombo ?? stats.daily_combo ?? 0,
-        stats.comboDate ?? stats.combo_date ?? null,
-        stats.streakLastDate ?? stats.streak_last_date ?? null,
-        stats.totalTasks ?? stats.total_tasks ?? 0,
-        stats.totalMeals ?? stats.total_meals ?? 0,
-        stats.totalExpenses ?? stats.total_expenses ?? 0
+        level, xp, hp, maxHp, title,
+        streak, dailyCombo,
+        (stats.comboDate ?? stats.combo_date ?? null) as string | null,
+        (stats.streakLastDate ?? stats.streak_last_date ?? null) as string | null,
+        totalTasks, totalMeals, totalExpenses,
+        // The device that earned this streak already paid its milestone bonus (and
+        // that XP is part of the restored `xp`), so mark it as collected here too.
+        streak,
       );
       return { success: true };
     } catch (err) {
       console.error('[Sync] Restore stats failed:', err);
       return { success: false };
     }
-  });
-
-  ipcHandle('db:runMigrations', (_e, migrations) => {
-    runModuleMigrations(migrations);
   });
 }

@@ -1,12 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { RpgEvent, Migration } from '../shared/types';
+import type { RpgEvent } from '../shared/types';
 
 const api = {
   getRpgStats: () => ipcRenderer.invoke('rpg:getStats'),
   processRpgEvent: (event: RpgEvent) => ipcRenderer.invoke('rpg:processEvent', event),
   getRpgHistory: (limit: number) => ipcRenderer.invoke('rpg:getHistory', limit),
   rpgGetDashboardStats: () => ipcRenderer.invoke('rpg:getDashboardStats'),
-  runMigrations: (migrations: Migration[]) => ipcRenderer.invoke('db:runMigrations', migrations),
   windowMinimize: () => ipcRenderer.send('window:minimize'),
   windowMaximize: () => ipcRenderer.send('window:maximize'),
   windowClose: () => ipcRenderer.send('window:close'),
@@ -51,6 +50,7 @@ const api = {
   nutritionSaveProfile: (profile: Record<string, unknown>) => ipcRenderer.invoke('nutrition:saveProfile', profile),
   nutritionLogFood: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:logFood', entry),
   nutritionGetFoodByDate: (date: string) => ipcRenderer.invoke('nutrition:getFoodByDate', date),
+  nutritionCopyDay: (opts?: { from?: string; to?: string }) => ipcRenderer.invoke('nutrition:copyDay', opts),
   nutritionDeleteFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFood', id),
   nutritionDeleteByDate: (date: string) => ipcRenderer.invoke('nutrition:deleteByDate', date),
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => ipcRenderer.invoke('nutrition:updateFood', id, fields),
@@ -72,6 +72,7 @@ const api = {
   nutritionGetTodayTarget: () => ipcRenderer.invoke('nutrition:getTodayTarget'),
   nutritionCloseDay: (date: string) => ipcRenderer.invoke('nutrition:closeDay', date),
   nutritionIsDayClosed: (date: string) => ipcRenderer.invoke('nutrition:isDayClosed', date),
+  nutritionReopenDay: (date: string) => ipcRenderer.invoke('nutrition:reopenDay', date),
   nutritionShouldAskWeight: () => ipcRenderer.invoke('nutrition:shouldAskWeight'),
   nutritionGetFavoriteFoods: () => ipcRenderer.invoke('nutrition:getFavoriteFoods'),
   nutritionAddFavoriteFood: (food: Record<string, unknown>) => ipcRenderer.invoke('nutrition:addFavoriteFood', food),
@@ -104,7 +105,8 @@ const api = {
 
   // Backup
   backupExport: () => ipcRenderer.invoke('backup:export'),
-  backupImport: () => ipcRenderer.invoke('backup:import'),
+  backupPickImportFile: () => ipcRenderer.invoke('backup:pickImportFile'),
+  backupImport: (filePath?: string) => ipcRenderer.invoke('backup:import', filePath),
 
   // Notifications
   notificationsSend: (title: string, body: string) => ipcRenderer.invoke('notifications:send', title, body),
@@ -138,6 +140,10 @@ const api = {
   cauldronGetStats: () => ipcRenderer.invoke('cauldron:getStats'),
   cauldronGetSessions: (offset?: number, limit?: number) => ipcRenderer.invoke('cauldron:getSessions', offset, limit),
   cauldronGetWeeklyFocusTime: () => ipcRenderer.invoke('cauldron:getWeeklyFocusTime'),
+  cauldronGetInterruptedSession: () => ipcRenderer.invoke('cauldron:getInterruptedSession'),
+  cauldronResumeInterruptedSession: () => ipcRenderer.invoke('cauldron:resumeInterruptedSession'),
+  cauldronDiscardInterruptedSession: () => ipcRenderer.invoke('cauldron:discardInterruptedSession'),
+  cauldronSetLabels: (labels: Record<string, string>) => ipcRenderer.invoke('cauldron:setLabels', labels),
   onCauldronTick: (callback: (state: unknown) => void) => {
     const handler = (_e: unknown, state: unknown) => callback(state);
     ipcRenderer.on('cauldron:tick', handler);
@@ -209,6 +215,8 @@ const api = {
   // Finance - Import
   financeImportSelectAndParsePDF: () => ipcRenderer.invoke('finance:importSelectAndParsePDF'),
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName),
+  financeUndoImportBatch: (batchId: string) => ipcRenderer.invoke('finance:undoImportBatch', batchId),
+  financeGetImportBatches: () => ipcRenderer.invoke('finance:getImportBatches'),
   financeGetCategoryMappings: () => ipcRenderer.invoke('finance:getCategoryMappings'),
   financeUpdateCategoryMapping: (pattern: string, category: string) => ipcRenderer.invoke('finance:updateCategoryMapping', pattern, category),
 
@@ -243,10 +251,15 @@ const api = {
   financeGetCreditCardStatements: (filters?: Record<string, unknown>) => ipcRenderer.invoke('finance:getCreditCardStatements', filters),
   financeGetStatementDetail: (id: string) => ipcRenderer.invoke('finance:getStatementDetail', id),
   financeGenerateStatement: (cardId: string, periodMonth: string) => ipcRenderer.invoke('finance:generateStatement', cardId, periodMonth),
-  financePayStatement: (id: string, paidAmount: number) => ipcRenderer.invoke('finance:payStatement', id, paidAmount),
+  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number) => ipcRenderer.invoke('finance:payStatement', id, paidAmount, paidAmountUsd),
+  financeGetExpenseBreakdown: (month?: string) => ipcRenderer.invoke('finance:getExpenseBreakdown', month),
+  financeGetExpenseBreakdownForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getExpenseBreakdownForRange', startMonth, endMonth),
 
   // Feedback
   feedbackSend: (data: { type: string; description: string; email?: string }) => ipcRenderer.invoke('feedback:send', data),
+
+  // Syl (read-projection snapshot)
+  sylBuildSnapshot: () => ipcRenderer.invoke('syl:buildSnapshot') as Promise<Record<string, unknown>>,
 
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),

@@ -17,6 +17,18 @@ export function daysAgoDateString(n: number): string {
   return d.toLocaleDateString('en-CA');
 }
 
+/**
+ * Returns the day AFTER the given YYYY-MM-DD date, as YYYY-MM-DD.
+ *
+ * Used to turn `DATE(col) = ?` predicates — which discard any index on `col` —
+ * into a half-open `col >= today AND col < tomorrow` range.
+ */
+export function nextDateString(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  return formatDateString(d);
+}
+
 /** Returns yesterday's date as YYYY-MM-DD string */
 export function yesterdayDateString(): string {
   return daysAgoDateString(1);
