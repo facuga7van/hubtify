@@ -76,6 +76,23 @@ export interface RecurringAmountHistory {
   changedAt: string;
 }
 
+/**
+ * A row parsed out of a card PDF. Extends the bridge's `ParsedRow` with the
+ * importer's tax flag, which `shared/types.ts` does not declare yet.
+ */
+export interface ImportParsedRow {
+  date: string;
+  merchant: string;
+  installmentCurrent?: number;
+  installmentTotal?: number;
+  amountARS?: number;
+  amountUSD?: number;
+  isExcluded: boolean;
+  suggestedCategory: string;
+  /** Tax / perception / financing-interest line — included, but flagged. */
+  isTax?: boolean;
+}
+
 export interface CategoryMapping {
   id: string;
   merchantPattern: string;
@@ -106,6 +123,27 @@ export interface CreditCardStatement {
   transactionIdUsd?: string | null;
   createdAt: string;
 }
+
+/**
+ * Category the auto-generated "pay the card statement" transaction is filed
+ * under. Mirrors `CARD_PAYMENT_CATEGORY` in `electron/modules/finance.balance.ts`.
+ */
+export const CARD_PAYMENT_CATEGORY = 'Pago Tarjeta';
+
+/**
+ * Category the PDF importer files card taxes, perceptions and financing
+ * interest under. Mirrors `CARD_TAX_CATEGORY` in
+ * `electron/modules/finance.balance.ts` — `finance.tax-category.test.ts` fails
+ * if the two drift apart.
+ */
+export const CARD_TAX_CATEGORY = 'Impuestos de tarjeta';
+
+/**
+ * Categories the app writes on its own. They show up in reports and in the
+ * category wheel, but a manual transaction must never be filed under one, so
+ * every category picker hides them.
+ */
+export const RESERVED_CATEGORIES: readonly string[] = [CARD_PAYMENT_CATEGORY, CARD_TAX_CATEGORY];
 
 export const CATEGORIES = [
   'Entretenimiento',

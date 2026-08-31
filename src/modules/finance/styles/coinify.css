@@ -728,7 +728,9 @@ button.coin-sort-header--amount {
 }
 
 .coin-quick-add-form--open {
-  max-height: 600px;
+  /* Payment method and card moved out of the accordion into the body, so the
+     open form is taller than the old 600px clamp allowed. */
+  max-height: 760px;
   opacity: 1;
 }
 
@@ -778,6 +780,47 @@ button.coin-sort-header--amount {
 .coin-quick-add-form__field {
   width: 100%;
   margin-bottom: 8px;
+}
+
+/* Payment method — and, only for a card, which card and how many instalments.
+   Promoted out of "Más opciones" so the most consequential field on the form
+   is not the one hidden behind a toggle. */
+.coin-quick-add-form__payment-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.coin-quick-add-form__payment {
+  flex: 1;
+  min-width: 120px;
+}
+
+.coin-quick-add-form__installments-label {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  white-space: nowrap;
+}
+
+.coin-quick-add-form__repeat {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(122, 30, 30, 0.35);
+  color: var(--ink-faded);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  padding: 1px 8px;
+  border-radius: 2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.coin-quick-add-form__repeat:hover {
+  color: var(--gold);
+  border-color: var(--gold);
 }
 
 .coin-quick-add-form__installment-row {
@@ -997,6 +1040,26 @@ button.coin-sort-header--amount {
 
 .coin-import-row--excluded td {
   text-decoration: line-through;
+}
+
+/* Taxes, perceptions and financing interest: included by default — they are
+   what makes the imported total match the bank's paper — but tinted so they
+   never read as one of the user's own purchases. */
+.coin-import-row--tax td {
+  background: rgba(122, 30, 30, 0.06);
+}
+
+.coin-import-row__tax-badge {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid rgba(122, 30, 30, 0.4);
+  border-radius: 2px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+  color: var(--rubric);
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .coin-import-row__merchant {
@@ -2040,4 +2103,57 @@ button.coin-sort-header--amount {
 }
 .coin-action-btn--danger:hover {
   opacity: 1;
+}
+
+/* ── Statement detail: grouped card charges ─────────────────── */
+
+/* A statement carries a dozen tiny tax lines. Listed one by one they bury the
+   purchases; one line keeps the total honest without the noise. */
+.coin-statement-taxes {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0 2px;
+  margin-top: 4px;
+  border-top: 1px dashed rgba(122, 30, 30, 0.35);
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.04em;
+}
+
+.coin-statement-taxes__amount {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.coin-statement-taxes__usd {
+  margin-left: 8px;
+  opacity: 0.85;
+}
+
+/* ── Loan payment: the loan's own currency, shown but not editable ── */
+
+.coin-loan-payment__currency {
+  padding: 3px 8px;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  background: rgba(217, 195, 138, 0.45);
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* Categories the wheel cannot draw because everything in them was spent in
+   dollars. Deliberately quiet: it is a footnote, not a second chart. */
+.coin-category-legend__usd-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(74, 55, 32, 0.25);
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  font-style: italic;
+  cursor: help;
 }

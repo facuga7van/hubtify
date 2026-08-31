@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import CategoryManager from './CategoryManager';
+import { RESERVED_CATEGORIES } from '../../types';
 
 interface CategorySelectProps {
   value: string;
@@ -17,9 +18,21 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Reserved categories are dropped from the list.
+   *
+   * "Pago Tarjeta" and "Impuestos de tarjeta" are written by the app itself —
+   * the statement generator and the PDF importer. Filing a manual expense under
+   * one of them corrupts a number the user reads elsewhere: card spend would be
+   * counted twice, or a purchase would be reported as a bank charge. They still
+   * show up in the category wheel and in reports, which is where they belong.
+   *
+   * The current value is kept even when reserved, so editing an imported tax row
+   * shows its real category instead of an empty field.
+   */
   const loadCategories = useCallback(() => {
     window.api.financeGetCategories().then((cats: string[]) => {
-      setCategories(cats);
+      setCategories(cats.filter((c) => !RESERVED_CATEGORIES.includes(c)));
     });
   }, []);
 

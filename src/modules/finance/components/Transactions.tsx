@@ -18,6 +18,7 @@ import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark, Coin } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
+import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 
 interface TransactionRow {
@@ -32,7 +33,10 @@ interface TransactionRow {
   source: string;
   installments?: number;
   installmentGroupId?: string;
-  forThirdParty?: string;
+  /** 0/1 flag straight out of SQLite — never a name. */
+  forThirdParty?: number | string;
+  /** Resolved from the loan that shares the instalment group. */
+  thirdPartyName?: string | null;
   impactsBalance?: number;
 }
 
@@ -379,6 +383,22 @@ export default function Transactions() {
       toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
       return;
     }
+
+    /**
+     * Re-categorising an imported row is the user correcting the importer. Teach
+     * it, so the same merchant lands in the right place on the next statement
+     * instead of being fixed by hand every month.
+     */
+    const original = transactions.find((tx) => tx.id === editingId);
+    if (
+      original &&
+      original.source === 'import' &&
+      editFields.category !== original.category &&
+      editFields.description
+    ) {
+      void rememberCategoryForMerchant(editFields.description, editFields.category);
+    }
+
     const result = await unwrap(window.api.financeUpdateTransaction(editingId, {
       amount,
       description: editFields.description,
@@ -468,7 +488,8 @@ export default function Transactions() {
               {tx.description || tx.category}
               {!!tx.forThirdParty && (
                 <span className="coin-ledger-row__third-party">
-                  {' '}<ArrowRight style={{ width: '0.75em', height: '0.75em' }} />{' '}{tx.forThirdParty}
+                  {' '}<ArrowRight style={{ width: '0.75em', height: '0.75em' }} />{' '}
+                  {tx.thirdPartyName || t('coinify.thirdPartyUnknown', 'tercero')}
                 </span>
               )}
             </span>

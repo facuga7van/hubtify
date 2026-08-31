@@ -23,7 +23,10 @@ interface InstallmentRow {
   installmentCount?: number;
   installmentNumber?: number;
   installmentGroupId: string;
-  forThirdParty?: string;
+  /** 0/1 flag straight out of SQLite — never a name. */
+  forThirdParty?: number | string;
+  /** Resolved from the loan that shares the instalment group. */
+  thirdPartyName?: string | null;
   date: string;
 }
 
@@ -247,8 +250,11 @@ export default function Installments() {
                         {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
                       </span>
                       <div className="coin-installment-row__right">
-                        {row.forThirdParty && (
-                          <Rune tone="gold"><ArrowRight style={{ width: '0.75em', height: '0.75em' }} /> {row.forThirdParty}</Rune>
+                        {!!row.forThirdParty && (
+                          <Rune tone="gold">
+                            <ArrowRight style={{ width: '0.75em', height: '0.75em' }} />
+                            {' '}{row.thirdPartyName || t('coinify.thirdPartyUnknown', 'tercero')}
+                          </Rune>
                         )}
                         <Gauge value={current} max={total} tone={isComplete ? 'sage' : 'gold'} showPips={false} />
                         {editingId === row.id ? (

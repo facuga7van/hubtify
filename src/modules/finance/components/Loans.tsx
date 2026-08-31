@@ -31,6 +31,7 @@ interface LoanPaymentRow {
   id: string;
   loanId: string;
   amount: number;
+  currency?: Currency;
   date: string;
   note?: string;
 }
@@ -200,13 +201,25 @@ export default function Loans() {
     }
   };
 
+  /** The loan a payment is being registered against, active or settled. */
+  const payingLoan = payingLoanId
+    ? [...activeLoans, ...settledLoans].find((l) => l.id === payingLoanId)
+    : undefined;
+  const payingLoanCurrency: Currency = payingLoan?.currency ?? 'ARS';
+
   const handleAddPayment = async (loanId: string) => {
     const parsed = parseFloat(paymentAmount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast({ type: 'warning', message: t('coinify.validationAmount', 'Ingresá un monto válido') });
       return;
     }
-    const result = await unwrap(window.api.financeAddLoanPayment(loanId, { amount: parsed, date: paymentDate }));
+    // A repayment is always in the loan's own currency. The form used to send
+    // none at all, so 100 pesos wiped out 100 dollars of a USD debt.
+    const result = await unwrap(window.api.financeAddLoanPayment(loanId, {
+      amount: parsed,
+      currency: payingLoanCurrency,
+      date: paymentDate,
+    }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
       return;
@@ -443,9 +456,18 @@ export default function Loans() {
           <div className="coin-codex-form__title">
             {t('coinify.markPayment')}
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             <RpgNumberInput value={paymentAmount} onChange={setPaymentAmount}
               placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} />
+            {/* Fixed, not a picker: a partial repayment in another currency is
+                not something this app models, and pretending otherwise is how a
+                USD debt used to be paid off with pesos. */}
+            <span
+              className="coin-loan-payment__currency"
+              title={t('coinify.loanPaymentCurrencyHint', 'El pago se registra en la moneda del préstamo')}
+            >
+              {payingLoanCurrency}
+            </span>
             <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="rpg-input" />
             <button className="rpg-button" style={{ flex: 'none' }} onClick={() => handleAddPayment(payingLoanId)}>
               {t('coinify.saveTransaction')}

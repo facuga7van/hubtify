@@ -34,19 +34,42 @@ function fail(reason: string): { ok: false; reason: string } {
   return { ok: false, reason };
 }
 
-const TRANSACTION_COLUMNS = `
-  id, type, amount, currency, category, description, date,
-  payment_method AS paymentMethod, source, installments,
-  installment_group_id AS installmentGroupId,
-  installment_number AS installmentNumber,
-  for_third_party AS forThirdParty,
-  recurring_id AS recurringId,
-  import_batch_id AS importBatchId,
-  credit_card_id AS creditCardId,
-  impacts_balance AS impactsBalance,
-  billed_amount_ars AS billedAmountArs,
-  created_at AS createdAt, updated_at AS updatedAt
+/**
+ * `for_third_party` is a 0/1 flag; the person's name lives on the loan that
+ * shares the instalment group. The UI used to print the flag, so every
+ * third-party row read "→ 1".
+ *
+ * A correlated subquery rather than a LEFT JOIN on purpose: two loans pointing
+ * at the same group would fan a JOIN out into duplicate transactions (and break
+ * the COUNT in `finance:getInstallmentGroups`).
+ */
+function thirdPartyNameColumn(alias: string): string {
+  return `
+  (SELECT l.person_name FROM finance_loans l
+    WHERE l.installment_group_id = ${alias}.installment_group_id
+      AND l.deleted_at IS NULL
+    ORDER BY l.created_at ASC LIMIT 1) AS thirdPartyName`;
+}
+
+/** Transaction columns, optionally prefixed with a table alias. */
+function transactionColumns(alias = ''): string {
+  const p = alias ? `${alias}.` : '';
+  return `
+  ${p}id, ${p}type, ${p}amount, ${p}currency, ${p}category, ${p}description, ${p}date,
+  ${p}payment_method AS paymentMethod, ${p}source, ${p}installments,
+  ${p}installment_group_id AS installmentGroupId,
+  ${p}installment_number AS installmentNumber,
+  ${p}for_third_party AS forThirdParty,
+  ${p}recurring_id AS recurringId,
+  ${p}import_batch_id AS importBatchId,
+  ${p}credit_card_id AS creditCardId,
+  ${p}impacts_balance AS impactsBalance,
+  ${p}billed_amount_ars AS billedAmountArs,
+  ${p}created_at AS createdAt, ${p}updated_at AS updatedAt
 `;
+}
+
+const TRANSACTION_COLUMNS = transactionColumns();
 
 export function registerFinanceIpcHandlers(): void {
   // ── Transactions ────────────────────────────────────
@@ -57,38 +80,52 @@ export function registerFinanceIpcHandlers(): void {
     type?: string;
     paymentMethod?: string;
     installmentGroupId?: string;
+    /** `manual` | `recurring` | `import`. */
+    source?: string;
+    /** Cap the result set — "give me the last N" without pulling the ledger. */
+    limit?: number;
   } = {}) => {
     const db = getDb();
-    const conditions: string[] = ['deleted_at IS NULL'];
+    const conditions: string[] = ['t.deleted_at IS NULL'];
     const params: unknown[] = [];
 
     if (filters.month && isValidMonthString(filters.month)) {
       const { start, end } = monthRange(filters.month);
-      conditions.push('date >= ?', 'date < ?');
+      conditions.push('t.date >= ?', 't.date < ?');
       params.push(start, end);
     }
     if (filters.category) {
-      conditions.push('category = ?');
+      conditions.push('t.category = ?');
       params.push(filters.category);
     }
     if (filters.type) {
-      conditions.push('type = ?');
+      conditions.push('t.type = ?');
       params.push(filters.type);
     }
     if (filters.paymentMethod) {
-      conditions.push('payment_method = ?');
+      conditions.push('t.payment_method = ?');
       params.push(filters.paymentMethod);
     }
     if (filters.installmentGroupId !== undefined) {
-      conditions.push('installment_group_id = ?');
+      conditions.push('t.installment_group_id = ?');
       params.push(filters.installmentGroupId);
     }
+    if (filters.source) {
+      conditions.push('t.source = ?');
+      params.push(filters.source);
+    }
+
+    const rawLimit = Number(filters.limit);
+    const limitClause = Number.isInteger(rawLimit) && rawLimit > 0
+      ? ` LIMIT ${Math.min(rawLimit, 1000)}`
+      : '';
 
     return db.prepare(`
-      SELECT ${TRANSACTION_COLUMNS}
-      FROM finance_transactions
+      SELECT ${transactionColumns('t')},
+             ${thirdPartyNameColumn('t')}
+      FROM finance_transactions t
       WHERE ${conditions.join(' AND ')}
-      ORDER BY date DESC, created_at DESC
+      ORDER BY t.date DESC, t.created_at DESC${limitClause}
     `).all(...params);
   });
 
@@ -488,23 +525,28 @@ export function registerFinanceIpcHandlers(): void {
     periodMonth: string,
   ): { ars: number; usd: number } {
     const rows = db.prepare(`
-      SELECT date, amount, currency, billed_amount_ars AS billedAmountArs
+      SELECT date, type, amount, currency, billed_amount_ars AS billedAmountArs
       FROM finance_transactions
       WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
-    `).all(creditCardId) as Array<{ date: string; amount: number; currency: string; billedAmountArs: number | null }>;
+    `).all(creditCardId) as Array<{ date: string; type: string; amount: number; currency: string; billedAmountArs: number | null }>;
 
     let ars = 0;
     let usd = 0;
     for (const tx of rows) {
       if (getStatementPeriod(tx.date, closingDay) !== periodMonth) continue;
+      // A refund (a reversed purchase, a `DEV.IMP` tax credit) is stored as an
+      // `income` row with a positive amount. Summing it blind used to make the
+      // statement bigger than the paper by twice the refund.
+      const sign = tx.type === 'income' ? -1 : 1;
       if (tx.currency === 'USD') {
-        if (tx.billedAmountArs != null) ars += tx.billedAmountArs;
-        else usd += tx.amount;
+        if (tx.billedAmountArs != null) ars += sign * tx.billedAmountArs;
+        else usd += sign * tx.amount;
       } else {
-        ars += tx.amount;
+        ars += sign * tx.amount;
       }
     }
-    return { ars, usd };
+    // A period that nets out negative owes nothing — never invent a credit.
+    return { ars: Math.max(ars, 0), usd: Math.max(usd, 0) };
   }
 
   /**
@@ -688,6 +730,9 @@ export function registerFinanceIpcHandlers(): void {
       SELECT g.id, g.description, g.total_amount AS totalAmount, g.currency,
              g.total_installments AS totalInstallments, g.category, g.date,
              g.created_at AS createdAt,
+             (SELECT l.person_name FROM finance_loans l
+               WHERE l.installment_group_id = g.id AND l.deleted_at IS NULL
+               ORDER BY l.created_at ASC LIMIT 1) AS thirdPartyName,
              COUNT(t.id) AS transactionCount
       FROM finance_installment_groups g
       LEFT JOIN finance_transactions t ON t.installment_group_id = g.id AND t.deleted_at IS NULL
@@ -709,6 +754,9 @@ export function registerFinanceIpcHandlers(): void {
              t.recurring_id AS recurringId,
              t.import_batch_id AS importBatchId,
              t.created_at AS createdAt, t.updated_at AS updatedAt,
+             (SELECT l.person_name FROM finance_loans l
+               WHERE l.installment_group_id = t.installment_group_id AND l.deleted_at IS NULL
+               ORDER BY l.created_at ASC LIMIT 1) AS thirdPartyName,
              g.description AS groupDescription,
              g.total_installments AS installmentCount,
              g.total_amount AS groupTotalAmount,
@@ -937,6 +985,15 @@ export function registerFinanceIpcHandlers(): void {
       .run(now.slice(0, 10), now, id);
   });
 
+  /**
+   * A repayment is always in the loan's own currency.
+   *
+   * The form used to send nothing, so every payment was written as ARS and
+   * subtracted raw from a loan denominated in USD — 100 pesos wiped out 100
+   * dollars of debt. The loan is now the single source of truth for the
+   * currency, and a payload that disagrees (only sync can produce one, since
+   * the UI shows the currency fixed) is refused instead of silently coerced.
+   */
   ipcHandle('finance:addLoanPayment', (_e, loanId: string, payment: {
     amount: number;
     currency?: string;
@@ -948,22 +1005,30 @@ export function registerFinanceIpcHandlers(): void {
     if (!isValidDateString(payment?.date)) return fail('invalid_date');
 
     const db = getDb();
-    const loan = db.prepare('SELECT id FROM finance_loans WHERE id = ? AND deleted_at IS NULL').get(loanId);
+    const loan = db.prepare(
+      'SELECT id, currency FROM finance_loans WHERE id = ? AND deleted_at IS NULL'
+    ).get(loanId) as { id: string; currency: string } | undefined;
     if (!loan) return fail('loan_not_found');
+
+    const loanCurrency = loan.currency || 'ARS';
+    if (payment.currency != null && payment.currency !== loanCurrency) {
+      return fail('currency_mismatch');
+    }
 
     const id = genId();
     const now = nowIso();
     db.prepare(`
       INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, note, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, loanId, amount, payment.currency ?? 'ARS', payment.date, payment.note ?? '', now, now);
+    `).run(id, loanId, amount, loanCurrency, payment.date, payment.note ?? '', now, now);
     return id;
   });
 
   ipcHandle('finance:getLoanPayments', (_e, loanId: string) => {
     const db = getDb();
     return db.prepare(`
-      SELECT id, loan_id AS loanId, amount, currency, date, note, created_at AS createdAt
+      SELECT id, loan_id AS loanId, amount, currency, date, note,
+             created_at AS createdAt, updated_at AS updatedAt
       FROM finance_loan_payments
       WHERE loan_id = ? AND deleted_at IS NULL
       ORDER BY date ASC

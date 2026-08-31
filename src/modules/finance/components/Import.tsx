@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
-import type { ParsedRow } from '../../../../shared/types';
-import { CATEGORIES, type CreditCard } from '../types';
+import { CARD_TAX_CATEGORY, CATEGORIES, type CreditCard, type ImportParsedRow } from '../types';
+import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import CreditCardManager from './shared/CreditCardManager';
 import { ChevronDown, ChevronRight } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
@@ -15,7 +15,7 @@ import {
   type ImportBatch,
 } from '../utils/api-ext';
 
-interface RowState extends ParsedRow {
+interface RowState extends ImportParsedRow {
   included: boolean;
   category: string;
 }
@@ -154,7 +154,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
       setFileName(result.fileName);
       setSkippedLines(result.skippedLines ?? []);
       setSkippedExpanded(false);
-      const rowStates: RowState[] = result.rows.map((r) => ({
+      const rowStates: RowState[] = (result.rows as ImportParsedRow[]).map((r) => ({
         ...r,
         included: !r.isExcluded,
         category: r.suggestedCategory,
@@ -174,10 +174,18 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
     );
   };
 
+  /**
+   * Correcting a category here is the one moment the user tells the app what a
+   * merchant means. `finance_category_mappings` has always had a writer and a
+   * reader; nobody ever called the writer, so the table stayed empty and every
+   * statement had to be re-categorised from scratch. Now the correction sticks.
+   */
   const setCategory = (idx: number, category: string) => {
-    setRows((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, category } : r))
-    );
+    const row = rows[idx];
+    if (row && category !== row.suggestedCategory && !row.isTax) {
+      void rememberCategoryForMerchant(row.merchant, category);
+    }
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, category } : r)));
   };
 
   const includedCount = rows.filter((r) => r.included).length;
@@ -209,7 +217,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   };
 
   const handleConfirm = async () => {
-    const toImport: ParsedRow[] = rows
+    const toImport: ImportParsedRow[] = rows
       .filter((r) => r.included)
       .map(({ included: _included, ...rest }) => ({ ...rest, suggestedCategory: rest.category }));
 
@@ -367,7 +375,13 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
                 {rows.map((row, idx) => (
                   <tr
                     key={idx}
-                    className={`coin-import-row ${!row.included ? 'coin-import-row--excluded' : ''}`}
+                    className={[
+                      'coin-import-row',
+                      !row.included ? 'coin-import-row--excluded' : '',
+                      // Included by default — they are what makes the total match
+                      // the paper — but visibly not one of the user's purchases.
+                      row.isTax ? 'coin-import-row--tax' : '',
+                    ].filter(Boolean).join(' ')}
                   >
                     <td>
                       <input type="checkbox" checked={row.included} onChange={() => toggleRow(idx)}
@@ -376,6 +390,14 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
                     <td style={{ whiteSpace: 'nowrap', opacity: 0.7 }}>{row.date}</td>
                     <td className="coin-import-row__merchant" title={row.merchant}>
                       {row.merchant}
+                      {row.isTax && (
+                        <span
+                          className="coin-import-row__tax-badge"
+                          title={t('coinify.importTaxHint', 'Impuesto o cargo del resumen. Se importa para que el total coincida con el del banco.')}
+                        >
+                          {t('coinify.importTaxBadge', 'impuesto')}
+                        </span>
+                      )}
                     </td>
                     <td className="coin-import-row__installment">{formatInstallment(row)}</td>
                     <td className="coin-import-row__amount">{formatRowAmount(row)}</td>
@@ -389,6 +411,14 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
                         disabled={!row.included}
                         aria-label={`${t('coinify.importColCategory')}: ${row.merchant}`}
                       >
+                        {/* A tax row's reserved category is not in CATEGORIES —
+                            without this option the select would render blank and
+                            the first change would silently re-file the charge.
+                            Offered for the whole life of the row, so a change of
+                            mind can put it back. */}
+                        {(row.isTax || row.category === CARD_TAX_CATEGORY) && (
+                          <option value={CARD_TAX_CATEGORY}>{CARD_TAX_CATEGORY}</option>
+                        )}
                         {CATEGORIES.map((cat) => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}

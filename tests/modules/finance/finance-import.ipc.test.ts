@@ -48,23 +48,49 @@ describe('Galicia VISA PDF parser', () => {
     expect(result!.suggestedCategory).toBe('Suscripciones');
   });
 
-  it('excludes tax lines', () => {
-    const taxes = [
-      '27-11-25 IMP DE SELLOS P/INT.FIN.  $ 3,75',
-      '27-11-25 INTERESES FINANCIACION    $ 341,67',
-      '27-11-25 DB IVA $ 21%                               341,67 71,75',
-      '27-11-25 IIBB PERCEP-CABA 2,00%(   14171,62) 283,43',
-      '27-11-25 IVA RG 4240 21%(   14171,62) 2.976,04',
-      '27-11-25 DB.RG 5617  30% (    53183,56 ) 15.955,06',
+  /**
+   * These lines used to be thrown away (`isExcluded: true`), which is exactly why
+   * the imported total never matched the paper the bank sends. They are real
+   * charges: they are parsed like any other row, under the reserved category.
+   *
+   * The amount is always the LAST money-shaped token — every one of these formats
+   * prints the taxable base first and the charge last.
+   */
+  it('parses tax lines as ordinary rows under the reserved category', () => {
+    const taxes: Array<[string, number]> = [
+      ['27-11-25 IMP DE SELLOS P/INT.FIN.  $ 3,75', 3.75],
+      ['27-11-25 INTERESES FINANCIACION    $ 341,67', 341.67],
+      ['27-11-25 DB IVA $ 21%                               341,67 71,75', 71.75],
+      ['27-11-25 IIBB PERCEP-CABA 2,00%(   14171,62) 283,43', 283.43],
+      ['27-11-25 IVA RG 4240 21%(   14171,62) 2.976,04', 2976.04],
+      ['27-11-25 DB.RG 5617  30% (    53183,56 ) 15.955,06', 15955.06],
     ];
-    for (const line of taxes) {
+    for (const [line, expected] of taxes) {
       const result = parseGaliciaLine(line, defaultMappings);
-      // Tax lines should either return null (unparseable) or be marked as excluded
-      if (result) {
-        expect(result.isExcluded).toBe(true);
-      }
-      // If null, that's also acceptable — they're being filtered
+      expect(result, line).not.toBeNull();
+      expect(result!.isExcluded).toBe(false);
+      expect(result!.isTax).toBe(true);
+      expect(result!.suggestedCategory).toBe('Impuestos de tarjeta');
+      expect(result!.amountARS).toBeCloseTo(expected);
+      expect(result!.merchant.length).toBeGreaterThan(0);
     }
+  });
+
+  it('reports a DEV.IMP refund as a negative amount', () => {
+    const result = parseGaliciaLine('10-11-25 DEV.IMP DE SELLOS  $ 3,75', defaultMappings);
+    expect(result).not.toBeNull();
+    expect(result!.isTax).toBe(true);
+    expect(result!.amountARS).toBeCloseTo(-3.75);
+  });
+
+  /** The old unanchored `/IVA RG/i` would have eaten this merchant whole. */
+  it('does not mistake a merchant name for a tax line', () => {
+    const result = parseGaliciaLine('02-11-25 * IVA RGB STORE 299493 7.999,00', defaultMappings);
+    expect(result).not.toBeNull();
+    expect(result!.isTax).toBeUndefined();
+    expect(result!.suggestedCategory).not.toBe('Impuestos de tarjeta');
+    expect(result!.merchant.startsWith('IVA RGB')).toBe(true);
+    expect(result!.amountARS).toBeCloseTo(7999);
   });
 
   it('parses negative amounts (refunds)', () => {

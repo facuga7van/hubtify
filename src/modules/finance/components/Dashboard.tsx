@@ -492,7 +492,8 @@ export default function Dashboard() {
     return Math.round(((currExpenses - prevExpenses) / prevExpenses) * 100);
   })();
 
-  // Donut data
+  // Donut data. The wheel is a single-currency picture on purpose — slicing a
+  // circle by "pesos plus dollars" would be inventing an exchange rate.
   const donutData = categories
     .filter((c) => c.ARS > 0)
     .map((c, i) => ({
@@ -502,6 +503,15 @@ export default function Dashboard() {
     }));
 
   const donutTotal = donutData.reduce((sum, d) => sum + d.value, 0);
+
+  /**
+   * Categories the wheel cannot show: everything spent there was in dollars.
+   * They used to vanish without a trace, so a month whose biggest expense was a
+   * USD subscription looked like a month with no such category at all. One
+   * discreet line names them without pretending the two currencies add up.
+   */
+  const usdOnlyCategories = categories.filter((c) => !(c.ARS > 0) && c.USD > 0);
+  const usdOnlyTotal = usdOnlyCategories.reduce((sum, c) => sum + c.USD, 0);
 
   // Projection months
   const projMonthLabels = projection.map((p) => {
@@ -788,8 +798,21 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-            {donutData.length === 0 && (
+            {donutData.length === 0 && usdOnlyCategories.length === 0 && (
               <div className="coin-empty-codex">{t('coinify.noExpensesThisMonth')}</div>
+            )}
+            {usdOnlyCategories.length > 0 && (
+              <div
+                className="coin-category-legend__usd-note"
+                title={usdOnlyCategories
+                  .map((c) => `${c.category}: ${formatCurrency(c.USD, { currency: 'USD' })}`)
+                  .join(' · ')}
+              >
+                {t('coinify.usdOnlyCategories', '+ {{amount}} en {{count}} categorías sin gasto en pesos', {
+                  amount: formatCurrency(usdOnlyTotal, { currency: 'USD' }),
+                  count: usdOnlyCategories.length,
+                })}
+              </div>
             )}
           </Section>
         </div>

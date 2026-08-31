@@ -3,7 +3,7 @@ import { getDb } from '../ipc/db';
 import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import fs from 'fs';
-import { nowIso } from './finance.balance';
+import { CARD_TAX_CATEGORY, nowIso } from './finance.balance';
 
 // ── Types ───────────────────────────────────────────
 
@@ -17,19 +17,94 @@ export interface ParsedRow {
   amountUSD?: number;
   isExcluded: boolean;
   suggestedCategory: string;
+  /**
+   * Tax, perception or financing-interest line (or the refund of one). These
+   * are included in the import like any other row — they are what makes the
+   * imported total match the paper — but the preview marks them so the user can
+   * tell them apart from their own purchases.
+   */
+  isTax?: boolean;
 }
 
-// ── Tax/excluded patterns ───────────────────────────
+// ── Tax patterns ────────────────────────────────────
 
-const EXCLUDED_PATTERNS = [
-  /IMP DE SELLOS/i,
-  /INTERESES FINANCIACION/i,
-  /DB IVA/i,
-  /IIBB PERCEP/i,
-  /IVA RG/i,
-  /DB\.?RG 5617/i,
-  /DEV\.IMP/i,
+/**
+ * Lines the statement charges on top of the purchases: stamp tax, VAT debits,
+ * gross-income perceptions, the AFIP RG perception, financing interest — and
+ * the `DEV.*` refunds of any of them.
+ *
+ * These used to be dropped on the floor (`isExcluded: true`), which is why the
+ * imported total never matched the bank's paper. They are now parsed as ordinary
+ * rows under the reserved `CARD_TAX_CATEGORY`.
+ *
+ * Order matters: `DEV.IMP DE SELLOS` contains `IMP DE SELLOS`, so the refund
+ * patterns have to be tested first.
+ *
+ * Anchored and word-bounded on purpose, and matched against the line body (the
+ * date and any `*`/`K` marker already stripped). The old unanchored `/IVA RG/i`
+ * would have swallowed a merchant called `IVA RGB STORE`.
+ */
+const TAX_PATTERNS: Array<{ pattern: RegExp; label: string; refund?: boolean }> = [
+  { pattern: /^DEV\.\s*IMP\b/i, label: 'Devolución de impuestos', refund: true },
+  { pattern: /^IMP DE SELLOS\b/i, label: 'Impuesto de sellos' },
+  { pattern: /^INTERESES FINANCIACION\b/i, label: 'Intereses de financiación' },
+  { pattern: /^DB IVA\b/i, label: 'IVA débito' },
+  { pattern: /^IIBB PERCEP\b/i, label: 'Percepción IIBB' },
+  { pattern: /^IVA RG\b/i, label: 'IVA RG' },
+  { pattern: /^DB\.?RG 5617\b/i, label: 'Percepción RG 5617' },
 ];
+
+/** Argentine money format: `-1.234,56`. */
+const AMOUNT_PATTERN = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;
+
+/**
+ * A readable name for a tax line: the leading words, stopping before the base
+ * amount, the `$` sign or the parenthesised taxable base.
+ *
+ * `IIBB PERCEP-CABA 2,00%(   14171,62) 283,43` → `IIBB PERCEP-CABA`
+ */
+function taxLabel(rest: string, fallback: string): string {
+  const match = rest.match(/^([A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ./-]*(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ./-]*)*)/);
+  const label = match ? match[1].replace(/\s+/g, ' ').trim() : '';
+  return label || fallback;
+}
+
+/**
+ * Parses a tax/perception/interest line into a normal row.
+ *
+ * The amount is the LAST money-shaped token on the line: every one of these
+ * formats prints the taxable base first and the charge last.
+ *
+ *   `27-11-25 DB IVA $ 21%   341,67 71,75`            → 71,75
+ *   `27-11-25 IVA RG 4240 21%(  14171,62) 2.976,04`   → 2.976,04
+ *
+ * A `DEV.*` line is a refund, so the amount comes back negative — exactly how
+ * the parser already reports a `-22.590,00` purchase reversal, and what
+ * `finance:importConfirm` turns into an `income` row.
+ */
+function parseTaxLine(
+  body: string,
+  date: string,
+  entry: { label: string; refund?: boolean },
+): ParsedRow | null {
+  const amounts = [...body.matchAll(AMOUNT_PATTERN)];
+  if (amounts.length === 0) return null;
+
+  const raw = parseArgentineAmount(amounts[amounts.length - 1][0]);
+  if (!Number.isFinite(raw)) return null;
+
+  // A refund never adds to what the statement owes, whichever sign the PDF used.
+  const amountARS = entry.refund ? -Math.abs(raw) : raw;
+
+  return {
+    date,
+    merchant: taxLabel(body, entry.label),
+    amountARS,
+    isExcluded: false,
+    isTax: true,
+    suggestedCategory: CARD_TAX_CATEGORY,
+  };
+}
 
 // ── Parser ──────────────────────────────────────────
 
@@ -54,31 +129,28 @@ export function parseGaliciaLine(
   const [, dd, mm, yy] = dateMatch;
   const date = `20${yy}-${mm}-${dd}`;
 
-  // Check excluded tax patterns before the marker check so lines
-  // like "27-11-25 IMP DE SELLOS …" (no * or K) are still caught.
-  for (const pattern of EXCLUDED_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return {
-        date,
-        merchant: '',
-        isExcluded: true,
-        suggestedCategory: '',
-      };
+  const afterDate = trimmed.slice(dateMatch[0].length);
+
+  // After the date there may be a marker: * or K
+  const markerMatch = afterDate.match(/^([*K])\s+/);
+  const body = markerMatch ? afterDate.slice(markerMatch[0].length) : afterDate;
+
+  // Tax lines are recognised before the marker is required: they carry no
+  // `*`/`K`, so "27-11-25 IMP DE SELLOS …" would otherwise be unparseable.
+  for (const entry of TAX_PATTERNS) {
+    if (entry.pattern.test(body)) {
+      return parseTaxLine(body, date, entry);
     }
   }
 
-  // After the date there must be a marker: * or K
-  const afterDate = trimmed.slice(dateMatch[0].length);
-  const markerMatch = afterDate.match(/^([*K])\s+/);
   if (!markerMatch) return null;
 
-  const rest = afterDate.slice(markerMatch[0].length);
+  const rest = body;
 
   // ── Amount parsing ───────────────────────────────
   // Argentine format: -?\d{1,3}(\.\d{3})*,\d{2}
   // The LAST occurrence on the line is the ARS amount.
-  const amountPattern = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;
-  const allAmounts = [...rest.matchAll(amountPattern)];
+  const allAmounts = [...rest.matchAll(AMOUNT_PATTERN)];
   if (allAmounts.length === 0) return null;
 
   const lastAmountMatch = allAmounts[allAmounts.length - 1];

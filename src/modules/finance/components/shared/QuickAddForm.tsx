@@ -5,11 +5,25 @@ import { CreditCardSelect } from './CreditCardSelect';
 import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
+import { RESERVED_CATEGORIES } from '../../types';
 import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
 
 interface CategoryMapping {
   merchantPattern: string;
   category: string;
+}
+
+/** The last manual movement, as the ledger returns it. */
+interface LastTransaction {
+  type: TransactionType;
+  amount: number;
+  currency: Currency;
+  category: string;
+  description: string;
+  paymentMethod: PaymentMethod;
+  creditCardId?: string | null;
+  source: string;
+  installments?: number;
 }
 
 interface QuickAddFormProps {
@@ -27,6 +41,9 @@ interface QuickAddFormProps {
   defaultType?: TransactionType;
 }
 
+/** The amount field, so "Repetir último" can hand the caret straight to it. */
+const AMOUNT_INPUT_ID = 'coin-quick-add-amount';
+
 export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddFormProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -42,6 +59,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const [installments, setInstallments] = useState(1);
   const [creditCardId, setCreditCardId] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [lastTx, setLastTx] = useState<LastTransaction | null>(null);
 
   // Category mappings for auto-suggestion
   const [mappings, setMappings] = useState<CategoryMapping[]>([]);
@@ -53,13 +71,34 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     });
   }, []);
 
-  useEffect(() => { loadMappings(); }, [loadMappings]);
+  /**
+   * The last movement the user typed by hand, for "Repetir último".
+   *
+   * `limit` keeps this off the ledger-sized query the page already runs, and the
+   * reserved categories are dropped here rather than in SQL: the newest `manual`
+   * row is very often the statement payment the app wrote itself, and offering
+   * to repeat *that* would be actively harmful.
+   */
+  const loadLastTransaction = useCallback(() => {
+    window.api
+      .financeGetTransactions({ source: 'manual', limit: 10 })
+      .then((data) => {
+        const rows = data as LastTransaction[];
+        const candidate = rows.find(
+          (r) => r.type === 'expense' && !RESERVED_CATEGORIES.includes(r.category),
+        );
+        setLastTx(candidate ?? null);
+      })
+      .catch((err) => console.error('[QuickAddForm] financeGetTransactions failed:', err));
+  }, []);
+
+  useEffect(() => { loadMappings(); loadLastTransaction(); }, [loadMappings, loadLastTransaction]);
 
   useEffect(() => {
-    const handler = () => loadMappings();
+    const handler = () => { loadMappings(); loadLastTransaction(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadMappings]);
+  }, [loadMappings, loadLastTransaction]);
 
   // Auto-suggest category when description changes
   const suggestCategory = useCallback(
@@ -94,6 +133,32 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     userOverrode.current = true;
   };
 
+  /**
+   * Loads the whole shape of the last expense — category, payment method, card,
+   * description — and puts the caret in the amount field with the old number
+   * selected, so the actual gesture is one click, type the price, Enter.
+   */
+  const handleRepeatLast = () => {
+    if (!lastTx) return;
+    setType(lastTx.type);
+    setCategory(lastTx.category);
+    setDescription(lastTx.description ?? '');
+    setCurrency(lastTx.currency === 'USD' ? 'USD' : 'ARS');
+    setPaymentMethod(lastTx.paymentMethod);
+    setCreditCardId(lastTx.paymentMethod === 'credit_card' ? (lastTx.creditCardId ?? '') : '');
+    setInstallments(1);
+    setDate(today);
+    setAmount(String(lastTx.amount));
+    // The category came from history, not from the description matcher.
+    userOverrode.current = true;
+
+    requestAnimationFrame(() => {
+      const el = document.getElementById(AMOUNT_INPUT_ID) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(amount);
@@ -123,7 +188,13 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setInstallments(1);
     setCreditCardId('');
     userOverrode.current = false;
+    // What was just written is the new "last one".
+    loadLastTransaction();
   };
+
+  const repeatTitle = lastTx
+    ? `${lastTx.description || lastTx.category} · ${lastTx.category}`
+    : '';
 
   return (
     <form onSubmit={handleSubmit} className="rpg-card coin-quick-add-form coin-quick-add-form--open">
@@ -132,6 +203,18 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
           <circle cx="12" cy="12" r="10" /><path d="M12 6v12M8 10h8M8 14h8" />
         </svg>
         {t('coinify.quickAdd')}
+        {/* One click loads the shape of the last expense; only the amount is
+            usually different, and it comes pre-selected to be typed over. */}
+        {lastTx && (
+          <button
+            type="button"
+            className="coin-quick-add-form__repeat"
+            onClick={handleRepeatLast}
+            title={`${t('coinify.repeatLastHint', 'Repetir el último gasto cargado a mano')}: ${repeatTitle}`}
+          >
+            {t('coinify.repeatLast', 'Repetir último')}
+          </button>
+        )}
       </div>
 
       {/* Type toggle */}
@@ -150,7 +233,8 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
       {/* Primary: Amount + Category + Description */}
       <div className="coin-quick-add-form__amount-row">
-        <RpgNumberInput value={amount} onChange={setAmount}
+        <RpgNumberInput id={AMOUNT_INPUT_ID} value={amount} onChange={setAmount}
+          aria-label={t('coinify.amount')}
           placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
         <CategorySelect value={category} onChange={handleCategoryChange} />
       </div>
@@ -158,6 +242,32 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       <div className="coin-quick-add-form__row">
         <input type="text" value={description} onChange={handleDescriptionChange}
           placeholder={t('coinify.description')} className="rpg-input" style={{ flex: 1 }} />
+      </div>
+
+      {/* How it was paid. This used to live behind "Más opciones", so the
+          default — cash — was silently applied to card purchases and the
+          statement never saw them. */}
+      <div className="coin-quick-add-form__payment-row">
+        <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+          className="rpg-select coin-quick-add-form__payment"
+          aria-label={t('coinify.paymentMethod', 'Medio de pago')}>
+          <option value="cash">{t('coinify.cash')}</option>
+          <option value="debit">{t('coinify.debit')}</option>
+          <option value="transfer">{t('coinify.transfer')}</option>
+          <option value="credit_card">{t('coinify.creditCard')}</option>
+        </select>
+        {paymentMethod === 'credit_card' && (
+          <>
+            <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />
+            <label className="coin-quick-add-form__installments-label" htmlFor="coin-quick-add-installments">
+              {t('coinify.installments')}
+            </label>
+            <RpgNumberInput id="coin-quick-add-installments" value={String(installments)}
+              onChange={(v) => setInstallments(Math.max(1, parseInt(v) || 1))}
+              aria-label={t('coinify.installments')}
+              style={{ width: 64 }} min={1} />
+          </>
+        )}
       </div>
 
       {/* Advanced toggle */}
@@ -172,32 +282,19 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
         <span style={{ marginLeft: 4, fontSize: '0.8em' }}>{showAdvanced ? <ChevronUp /> : <ChevronDown />}</span>
       </button>
 
-      {/* Advanced fields */}
+      {/* Advanced fields — date and currency, which almost always keep their
+          defaults of "today, in pesos". */}
       {showAdvanced && (
         <div className="coin-quick-add-form__advanced">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+            aria-label={t('coinify.colDate', 'Fecha')}
             className="rpg-input" style={{ flex: 1 }} />
           <select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}
+            aria-label="ARS / USD"
             className="rpg-select" style={{ width: 80 }}>
             <option value="ARS">ARS</option>
             <option value="USD">USD</option>
           </select>
-          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-            className="rpg-select" style={{ flex: 1 }}>
-            <option value="cash">{t('coinify.cash')}</option>
-            <option value="debit">{t('coinify.debit')}</option>
-            <option value="transfer">{t('coinify.transfer')}</option>
-            <option value="credit_card">{t('coinify.creditCard')}</option>
-          </select>
-          {paymentMethod === 'credit_card' && (
-            <>
-              <label style={{ fontSize: 'var(--fs-label)', whiteSpace: 'nowrap' }}>{t('coinify.installments')}</label>
-              <RpgNumberInput value={String(installments)}
-                onChange={(v) => setInstallments(Math.max(1, parseInt(v) || 1))}
-                style={{ width: 60 }} min={1} />
-              <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />
-            </>
-          )}
         </div>
       )}
 

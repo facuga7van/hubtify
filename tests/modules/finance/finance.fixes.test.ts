@@ -28,6 +28,17 @@ function setupDb(): Database.Database {
   return db;
 }
 
+/**
+ * A migration by version, never "the last one in the array" — these tests are
+ * about what a specific migration does, and every new migration used to break
+ * them by moving what `length - 1` points at.
+ */
+function migration(version: number) {
+  const found = financeMigrations.find((m) => m.version === version);
+  if (!found) throw new Error(`no finance migration v${version}`);
+  return found;
+}
+
 function addTx(db: Database.Database, tx: {
   id: string;
   type?: 'expense' | 'income';
@@ -219,7 +230,7 @@ describe('finance migrations v11–v13', () => {
       VALUES ('p1', 'l1', 100, 'ARS', '2026-01-01', '2026-01-01 10:00:00', '2026-01-01 10:00:00', '2026-01-02 11:00:00')`).run();
     fresh.prepare(`INSERT INTO finance_loan_payments (id, loan_id, amount, currency, date, created_at, updated_at)
       VALUES ('p2', 'l1', 100, 'ARS', '2026-01-01', '2026-01-01T10:00:00.000Z', '2026-01-01T10:00:00.000Z')`).run();
-    fresh.exec(financeMigrations[financeMigrations.length - 1].up);
+    fresh.exec(migration(13).up);
 
     const p1 = fresh.prepare("SELECT updated_at AS u, deleted_at AS d FROM finance_loan_payments WHERE id = 'p1'").get() as { u: string; d: string };
     const p2 = fresh.prepare("SELECT updated_at AS u FROM finance_loan_payments WHERE id = 'p2'").get() as { u: string };
@@ -238,7 +249,7 @@ describe('finance migrations v11–v13', () => {
     }
     fresh.prepare(`INSERT INTO finance_recurring (id, name, type, amount, currency, category, active, created_at, updated_at, deleted_at)
       VALUES ('r1', 'Netflix', 'expense', 5000, 'ARS', 'Suscripciones', 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z')`).run();
-    fresh.exec(financeMigrations[financeMigrations.length - 1].up);
+    fresh.exec(migration(13).up);
     const row = fresh.prepare("SELECT active FROM finance_recurring WHERE id = 'r1'").get() as { active: number };
     expect(row.active).toBe(0);
   });

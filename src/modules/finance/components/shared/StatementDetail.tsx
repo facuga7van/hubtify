@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CreditCardStatement } from '../../types';
+import { CARD_TAX_CATEGORY, type CreditCardStatement } from '../../types';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import { useModalA11y } from '../../../../shared/hooks/useModalA11y';
 import { useToast } from '../../../../shared/components/useToast';
@@ -10,11 +10,17 @@ import { unwrap, failureMessage, payStatement } from '../../utils/api-ext';
 
 interface StatementDetailRow {
   id: string;
+  type: 'expense' | 'income';
   amount: number;
   currency: 'ARS' | 'USD';
   category: string;
   description: string;
   date: string;
+}
+
+/** Signed contribution of a row to what the statement owes: a refund subtracts. */
+function signedAmount(tx: StatementDetailRow): number {
+  return tx.type === 'income' ? -tx.amount : tx.amount;
 }
 
 interface Props {
@@ -46,6 +52,28 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
   }, [statement.id]);
 
   const hasUsd = (statement.calculatedAmountUsd ?? 0) > 0 || payAmountUsd > 0;
+
+  /**
+   * Card taxes are a dozen tiny lines the user did not choose to spend — stamp
+   * tax, VAT debits, perceptions, financing interest and their refunds. Listing
+   * them one by one buries the purchases they are meant to sit beside, so they
+   * collapse into a single figure per currency.
+   */
+  const { purchases, taxTotals, taxCount } = useMemo(() => {
+    const all = detail?.transactions ?? [];
+    const kept: StatementDetailRow[] = [];
+    const totals = { ARS: 0, USD: 0 };
+    let count = 0;
+    for (const tx of all) {
+      if (tx.category === CARD_TAX_CATEGORY) {
+        totals[tx.currency === 'USD' ? 'USD' : 'ARS'] += signedAmount(tx);
+        count++;
+      } else {
+        kept.push(tx);
+      }
+    }
+    return { purchases: kept, taxTotals: totals, taxCount: count };
+  }, [detail]);
 
   const handlePay = async () => {
     setPaying(true);
@@ -112,17 +140,34 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
         </div>
 
         <div style={{ borderTop: '1px solid var(--parch-1)', paddingTop: 8 }}>
-          {detail?.transactions.map((tx) => (
+          {purchases.map((tx) => (
             <div key={tx.id} style={{
               display: 'flex', justifyContent: 'space-between', gap: 8, padding: '4px 0',
               fontSize: 'var(--fs-label)', borderBottom: '1px solid var(--parch-1)',
             }}>
               <span title={tx.description || tx.category}>{tx.date} — {tx.description || tx.category}</span>
               <span style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                {formatCurrency(tx.amount, { currency: tx.currency === 'USD' ? 'USD' : 'ARS' })}
+                {formatCurrency(signedAmount(tx), { currency: tx.currency === 'USD' ? 'USD' : 'ARS' })}
               </span>
             </div>
           ))}
+
+          {taxCount > 0 && (
+            <div
+              className="coin-statement-taxes"
+              title={t('coinify.statementTaxesHint', '{{count}} líneas de impuestos, percepciones e intereses del resumen', { count: taxCount })}
+            >
+              <span>{t('coinify.statementTaxes', 'Impuestos y cargos')}</span>
+              <span className="coin-statement-taxes__amount">
+                {formatCurrency(taxTotals.ARS, { currency: 'ARS' })}
+                {taxTotals.USD !== 0 && (
+                  <span className="coin-statement-taxes__usd">
+                    {formatCurrency(taxTotals.USD, { currency: 'USD' })}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {statement.status === 'pending' && (

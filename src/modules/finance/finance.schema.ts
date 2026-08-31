@@ -367,4 +367,33 @@ export const financeMigrations: Migration[] = [
       UPDATE finance_recurring SET active = 0 WHERE deleted_at IS NOT NULL AND active = 1;
     `,
   },
+  {
+    namespace: 'finance',
+    version: 14,
+    up: `
+      -- Reserved category for the taxes, perceptions and financing interest a
+      -- card statement charges. The PDF importer used to throw those lines away,
+      -- so the imported total never matched the paper the bank sends.
+      -- ISO stamp on purpose: last-write-wins compares updated_at as a plain
+      -- string, and datetime('now') writes a space where the rest of the app
+      -- writes a 'T' (see the v13 normalisation above).
+      INSERT OR IGNORE INTO finance_categories (name, updated_at)
+        VALUES ('Impuestos de tarjeta', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));
+
+      -- The loan payment form never offered a currency, so every repayment was
+      -- stamped 'ARS' — including the ones registered against a USD loan, whose
+      -- amount finance:getActiveLoanSummary has always subtracted raw. The
+      -- label was the only thing lying; align it with the loan so reads and the
+      -- outstanding figure finally agree.
+      UPDATE finance_loan_payments
+      SET currency = (SELECT l.currency FROM finance_loans l WHERE l.id = finance_loan_payments.loan_id),
+          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE EXISTS (
+        SELECT 1 FROM finance_loans l
+        WHERE l.id = finance_loan_payments.loan_id
+          AND l.currency IS NOT NULL
+          AND l.currency <> finance_loan_payments.currency
+      );
+    `,
+  },
 ];

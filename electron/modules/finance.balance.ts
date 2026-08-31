@@ -18,6 +18,22 @@ export type { ExpenseBreakdown, ExpenseBreakdownByCurrency };
  *  (once as the purchase, once as the statement payment). */
 export const CARD_PAYMENT_CATEGORY = 'Pago Tarjeta';
 
+/** Category used for the taxes, perceptions and financing interest a card
+ *  statement charges (IMP DE SELLOS, DB IVA, IIBB PERCEP, IVA RG, DB.RG 5617,
+ *  INTERESES FINANCIACION and their DEV.IMP refunds).
+ *
+ *  These lines used to be dropped by the PDF importer, so the imported total
+ *  never matched the paper. They are real charges: they belong to the statement
+ *  and to the expense breakdown, just under their own reserved name.
+ *
+ *  Mirrored in `src/modules/finance/types.ts` for the renderer — the guard test
+ *  `finance.tax-category.test.ts` fails if the two ever drift apart. */
+export const CARD_TAX_CATEGORY = 'Impuestos de tarjeta';
+
+/** Categories the app writes on its own. The user may see them in reports but
+ *  must never be able to file a manual transaction under one. */
+export const RESERVED_CATEGORIES = [CARD_PAYMENT_CATEGORY, CARD_TAX_CATEGORY] as const;
+
 /** Hard cap for `finance:createInstallmentGroup` so a typo cannot create
  *  thousands of rows. 120 months = 10 years, well beyond any real plan. */
 export const MAX_INSTALLMENTS = 120;
