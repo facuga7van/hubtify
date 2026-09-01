@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Gauge, Rune } from '../../../shared/components/codex';
 import { AnimatedNumber } from './shared/AnimatedNumber';
 import { CategorySelect } from './shared/CategorySelect';
+import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
 import { currencyPrefix, formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
 import { useToast } from '../../../shared/components/useToast';
@@ -26,6 +27,9 @@ export default function DashboardWidget() {
   // breakdown the dashboard shows two panels away.
   const [quickCategory, setQuickCategory] = useState('Otros');
   const [quickPayment, setQuickPayment] = useState<'cash' | 'debit' | 'transfer' | 'credit_card'>('cash');
+  // '' = unresolved; the AccountSelect picks the default (last used / Efectivo).
+  const [quickAccount, setQuickAccount] = useState('');
+  const [accountsSupported, setAccountsSupported] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const loadData = useCallback(() => {
@@ -83,6 +87,12 @@ export default function DashboardWidget() {
         category: quickCategory || 'Otros',
         currency: 'ARS',
         paymentMethod: quickPayment,
+        // Absent while the accounts bridge is not wired — the backend then
+        // applies its own cash→«Efectivo» default. Card purchases never belong
+        // to an account (the statement payment will).
+        ...(accountsSupported
+          ? { accountId: quickPayment === 'credit_card' ? null : accountIdForSubmit(quickAccount) }
+          : {}),
       }));
       if (!result.ok) {
         toast({ type: 'warning', message: failureMessage(result.reason, t) });
@@ -111,6 +121,7 @@ export default function DashboardWidget() {
       }
 
       // Reset
+      if (accountsSupported) rememberLastAccountId(quickAccount === '' ? NO_ACCOUNT : quickAccount);
       setQuickAmount('');
       setQuickDesc('');
       setShowQuickAdd(false);
@@ -253,6 +264,14 @@ export default function DashboardWidget() {
               <option value="credit_card">{t('coinify.creditCard', 'Tarjeta de crédito')}</option>
             </select>
           </div>
+
+          {/* Which pocket the money leaves / enters. Renders nothing while the
+              accounts bridge is not wired. */}
+          {quickPayment !== 'credit_card' && (
+            <div className="coin-dash-quick__meta-row">
+              <AccountSelect value={quickAccount} onChange={setQuickAccount} onSupported={setAccountsSupported} />
+            </div>
+          )}
 
           {/* Submit button */}
           <button

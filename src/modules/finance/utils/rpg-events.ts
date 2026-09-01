@@ -25,6 +25,13 @@
  *    out of its way to avoid.
  *  · **Edits and deletes.** Fixing a typo is not an act of tracking. Paying for
  *    it would turn "edit, undo, edit" into an XP faucet.
+ *  · **Transfers between own accounts.** `finance:transferBetweenAccounts`
+ *    writes two rows (expense + income under the reserved `Transferencia`
+ *    category), but moving your own money from Mercado Pago to the bank is not
+ *    an economic movement — nothing was earned, nothing was spent. Paying XP
+ *    here would make "transfer back and forth" the cheapest farm in the app,
+ *    twice over (two rows per gesture). The transfer UI simply never calls
+ *    `emitMovementLogged`; keep it that way.
  *  · **The instalment-plan form on the Installments screen.** Same reasoning as
  *    the ledger add would suggest the opposite, but that screen is plan
  *    *management* (a plan created there is usually a purchase already logged

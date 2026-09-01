@@ -2397,3 +2397,153 @@ button.coin-sort-header--amount {
   border-top: 1.5px solid var(--gold-dark);
   color: var(--ink);
 }
+
+/* ── Accounts: the chest opened into rows ──────────────────────────────── */
+
+.coin-account-list {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(168, 138, 60, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coin-account-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-bottom: 1px dashed rgba(168, 138, 60, 0.25);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.coin-account-row:hover,
+.coin-account-row:focus-visible {
+  background: rgba(168, 138, 60, 0.12);
+  border-left-color: var(--gold);
+}
+
+.coin-account-row__icon {
+  display: inline-flex;
+  color: var(--gold-dark);
+  flex-shrink: 0;
+}
+
+.coin-account-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-body);
+}
+
+.coin-account-row__balance {
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  color: var(--moss);
+}
+
+.coin-account-row__balance--negative {
+  color: var(--rubric);
+}
+
+.coin-account-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 6px 0;
+  border-top: 1.5px solid var(--gold-dark);
+  color: var(--ink);
+}
+
+.coin-account-manage-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: var(--fs-label);
+  padding: 2px 10px;
+}
+
+/* Closed chest: one quiet line with the real total, click to open. */
+.coin-account-peek {
+  margin-top: 6px;
+  padding: 2px 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.coin-account-peek:hover,
+.coin-account-peek:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* ── Account manager modal ─────────────────────────────────────────────── */
+
+.coin-account-manager__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--parch-1);
+}
+
+.coin-account-manager__icon {
+  display: inline-flex;
+  color: var(--gold-dark);
+  flex-shrink: 0;
+}
+
+.coin-account-manager__create {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.coin-account-manager__transfer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(168, 138, 60, 0.4);
+}
+
+.coin-transfer-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.coin-transfer-form .rpg-select {
+  flex: 1;
+  min-width: 110px;
+}
+
+.coin-transfer-form__hint {
+  flex-basis: 100%;
+  font-size: var(--fs-label);
+  opacity: 0.6;
+  margin: 2px 0 0;
+}
+
+/* Account picker inside the add-transaction forms. */
+.coin-account-select {
+  min-width: 0;
+  max-width: 160px;
+  text-overflow: ellipsis;
+}

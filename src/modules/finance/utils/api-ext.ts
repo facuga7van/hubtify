@@ -16,6 +16,8 @@
  *    ships now and lights up the moment the bridge catches up.
  */
 
+import type { FinanceAccount } from '../types';
+
 export interface FinanceFailure {
   ok: false;
   reason: string;
@@ -246,4 +248,114 @@ export async function getBudgetStatus(month?: string): Promise<BudgetStatus | nu
 /** True once the budget handlers are reachable. */
 export function hasBudgetSupport(): boolean {
   return bridge('financeGetBudgetStatus') !== null && bridge('financeSetBudget') !== null;
+}
+
+// ── Accounts (cuentas y billeteras) ────────────────────────────────────────
+//
+// `finance:getAccounts` / `finance:getAccountsOverview` / `finance:saveAccount`
+// / `finance:deleteAccount` / `finance:transferBetweenAccounts` exist in the
+// main process but are not on the context bridge yet (this module may not edit
+// `electron/preload.ts` or `shared/types.ts`). Same degrade-to-null contract as
+// everything above: the chest keeps showing the plain monthly number, the
+// account selector and the manager simply do not appear, and everything lights
+// up the moment the bridge catches up.
+
+export interface AccountsOverview {
+  accounts: FinanceAccount[];
+  totalArs: number;
+  totalUsd: number;
+}
+
+/** True once the account read/write handlers are reachable. */
+export function hasAccountsSupport(): boolean {
+  return bridge('financeGetAccounts') !== null && bridge('financeSaveAccount') !== null;
+}
+
+/** True once transfers can be registered. */
+export function hasTransferSupport(): boolean {
+  return bridge('financeTransferBetweenAccounts') !== null;
+}
+
+/** Live accounts with computed balance. `null` when the bridge is not there yet. */
+export async function getAccounts(): Promise<FinanceAccount[] | null> {
+  const fn = bridge('financeGetAccounts');
+  if (!fn) return null;
+  try {
+    return (await fn()) as FinanceAccount[];
+  } catch (err) {
+    console.error('[finance] getAccounts failed:', err);
+    return null;
+  }
+}
+
+/** The opened chest: rows + totals per currency. `null` when the bridge is missing. */
+export async function getAccountsOverview(): Promise<AccountsOverview | null> {
+  const fn = bridge('financeGetAccountsOverview');
+  if (!fn) return null;
+  try {
+    return (await fn()) as AccountsOverview;
+  } catch (err) {
+    console.error('[finance] getAccountsOverview failed:', err);
+    return null;
+  }
+}
+
+/** Upsert an account. `null` when the bridge is not there yet. */
+export async function saveAccount(account: {
+  id?: string;
+  name: string;
+  kind: 'cash' | 'bank' | 'wallet';
+  currency?: 'ARS' | 'USD';
+  initialBalance?: number;
+  order?: number;
+}): Promise<{ ok: true; id: string } | FinanceFailure | null> {
+  const fn = bridge('financeSaveAccount');
+  if (!fn) return null;
+  try {
+    const res = await fn(account);
+    if (isFailure(res)) return res;
+    return res as { ok: true; id: string };
+  } catch (err) {
+    console.error('[finance] saveAccount failed:', err);
+    return { ok: false, reason: 'ipc_error' };
+  }
+}
+
+/** Soft-deletes an account (its transactions keep their history). */
+export async function deleteAccount(
+  id: string,
+): Promise<{ ok: true } | FinanceFailure | null> {
+  const fn = bridge('financeDeleteAccount');
+  if (!fn) return null;
+  try {
+    const res = await fn(id);
+    if (isFailure(res)) return res;
+    return { ok: true };
+  } catch (err) {
+    console.error('[finance] deleteAccount failed:', err);
+    return { ok: false, reason: 'ipc_error' };
+  }
+}
+
+/**
+ * Registers a transfer between two accounts: two live rows under the reserved
+ * `Transferencia` category sharing a transfer_group_id. Balances move, monthly
+ * totals do not, and no XP is emitted (see `rpg-events.ts`).
+ */
+export async function transferBetweenAccounts(input: {
+  fromId: string;
+  toId: string;
+  amount: number;
+  date?: string;
+}): Promise<{ ok: true; transferGroupId: string } | FinanceFailure | null> {
+  const fn = bridge('financeTransferBetweenAccounts');
+  if (!fn) return null;
+  try {
+    const res = await fn(input);
+    if (isFailure(res)) return res;
+    return res as { ok: true; transferGroupId: string };
+  } catch (err) {
+    console.error('[finance] transferBetweenAccounts failed:', err);
+    return { ok: false, reason: 'ipc_error' };
+  }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
+import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
@@ -22,6 +23,7 @@ interface LastTransaction {
   description: string;
   paymentMethod: PaymentMethod;
   creditCardId?: string | null;
+  accountId?: string | null;
   source: string;
   installments?: number;
 }
@@ -37,6 +39,8 @@ interface QuickAddFormProps {
     paymentMethod: PaymentMethod;
     installments: number;
     creditCardId?: string;
+    /** Omitted while the accounts bridge is not wired (backend maps cash→Efectivo). */
+    accountId?: string | null;
   }) => void;
   defaultType?: TransactionType;
 }
@@ -58,6 +62,9 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [installments, setInstallments] = useState(1);
   const [creditCardId, setCreditCardId] = useState('');
+  // '' = unresolved; the AccountSelect picks the default (last used / Efectivo).
+  const [accountValue, setAccountValue] = useState('');
+  const [accountsSupported, setAccountsSupported] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [lastTx, setLastTx] = useState<LastTransaction | null>(null);
 
@@ -146,6 +153,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setCurrency(lastTx.currency === 'USD' ? 'USD' : 'ARS');
     setPaymentMethod(lastTx.paymentMethod);
     setCreditCardId(lastTx.paymentMethod === 'credit_card' ? (lastTx.creditCardId ?? '') : '');
+    if (accountsSupported) setAccountValue(lastTx.accountId ?? NO_ACCOUNT);
     setInstallments(1);
     setDate(today);
     setAmount(String(lastTx.amount));
@@ -171,6 +179,8 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       return;
     }
 
+    if (accountsSupported) rememberLastAccountId(accountValue === '' ? NO_ACCOUNT : accountValue);
+
     onSubmit({
       type,
       amount: parsed,
@@ -181,6 +191,12 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       paymentMethod,
       installments: paymentMethod === 'credit_card' ? installments : 1,
       creditCardId: paymentMethod === 'credit_card' ? creditCardId : undefined,
+      // Only when the selector is actually usable: absent, the backend applies
+      // its own default mapping (cash → «Efectivo»). A card purchase never
+      // belongs to an account — the statement payment will.
+      ...(accountsSupported
+        ? { accountId: paymentMethod === 'credit_card' ? null : accountIdForSubmit(accountValue) }
+        : {}),
     });
 
     setAmount('');
@@ -256,6 +272,12 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
           <option value="transfer">{t('coinify.transfer')}</option>
           <option value="credit_card">{t('coinify.creditCard')}</option>
         </select>
+        {/* Which pocket the money leaves / enters. Hidden (and harmless) while
+            the accounts bridge is not wired. Card purchases do not touch any
+            account until the statement is paid, so the picker steps aside. */}
+        {paymentMethod !== 'credit_card' && (
+          <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+        )}
         {paymentMethod === 'credit_card' && (
           <>
             <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />

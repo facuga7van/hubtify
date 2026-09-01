@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import type { ExpenseBreakdown, ExpenseBreakdownByCurrency } from '../../shared/types';
 import {
@@ -39,9 +40,21 @@ export const CARD_PAYMENT_CATEGORY = 'Pago Tarjeta';
  *  `finance.tax-category.test.ts` fails if the two ever drift apart. */
 export const CARD_TAX_CATEGORY = 'Impuestos de tarjeta';
 
+/** Category shared by the two legs of an inter-account transfer.
+ *
+ *  A transfer moves money between the user's own pockets, so it must count for
+ *  each account's balance (`impacts_balance = 1`) while staying OUT of every
+ *  income/expense aggregation — the month totals, the wheel, budgets, the
+ *  sparkline and the valued view. Otherwise moving $100k from Mercado Pago to
+ *  the bank would print as $100k spent AND $100k earned in the same month.
+ *
+ *  Mirrored in `src/modules/finance/types.ts`; the guard test
+ *  `finance.tax-category.test.ts` fails if the copies drift. */
+export const TRANSFER_CATEGORY = 'Transferencia';
+
 /** Categories the app writes on its own. The user may see them in reports but
  *  must never be able to file a manual transaction under one. */
-export const RESERVED_CATEGORIES = [CARD_PAYMENT_CATEGORY, CARD_TAX_CATEGORY] as const;
+export const RESERVED_CATEGORIES = [CARD_PAYMENT_CATEGORY, CARD_TAX_CATEGORY, TRANSFER_CATEGORY] as const;
 
 /** Hard cap for `finance:createInstallmentGroup` so a typo cannot create
  *  thousands of rows. 120 months = 10 years, well beyond any real plan. */
@@ -310,7 +323,10 @@ export function aggregateByCategory(db: Database.Database, f: TransactionFilter)
  */
 export function computeMonthlyBalance(db: Database.Database, month: string): MonthlyBalanceByCurrency {
   const { start, end } = monthRange(month);
-  return sumIncomeExpenseByCurrency(db, { start, end, balanceScope: 'impacting' });
+  // Transfers between own accounts are not income nor expense — see TRANSFER_CATEGORY.
+  return sumIncomeExpenseByCurrency(db, {
+    start, end, balanceScope: 'impacting', excludeCategories: [TRANSFER_CATEGORY],
+  });
 }
 
 /**
@@ -331,7 +347,8 @@ export function categorySpendFilter(range: { start: string; end: string }): Tran
     ...range,
     type: 'expense',
     balanceScope: 'all',
-    excludeCategories: [CARD_PAYMENT_CATEGORY],
+    // Card payments would double-count card spend; transfers are not spend at all.
+    excludeCategories: [CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY],
   };
 }
 
@@ -351,7 +368,7 @@ export function computeExpenseBreakdown(
   db: Database.Database,
   range: { start: string; end: string },
 ): ExpenseBreakdownByCurrency {
-  const base = { ...range, type: 'expense' as const, excludeCategories: [CARD_PAYMENT_CATEGORY] };
+  const base = { ...range, type: 'expense' as const, excludeCategories: [CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY] };
 
   const total = sumByCurrency(db, { ...base, balanceScope: 'all' });
   const pendingCard = sumByCurrency(db, { ...base, balanceScope: 'pending' });
@@ -957,21 +974,22 @@ export function computeValuedView(
   const { start, end } = monthRange(month);
   const coefs = buildIpcCoefficients(ctx.series);
 
-  // One row-level query per aggregate the dashboard shows.
+  // One row-level query per aggregate the dashboard shows. Transfers between
+  // own accounts are excluded exactly like in the nominal handlers.
   const balanceRows = db.prepare(`
     SELECT type, amount, fx_rate AS fxRate
     FROM finance_transactions
     WHERE deleted_at IS NULL AND date >= ? AND date < ?
-      AND impacts_balance = 1 AND currency = 'ARS'
-  `).all(start, end) as Array<{ type: string; amount: number; fxRate: number | null }>;
+      AND impacts_balance = 1 AND currency = 'ARS' AND category <> ?
+  `).all(start, end, TRANSFER_CATEGORY) as Array<{ type: string; amount: number; fxRate: number | null }>;
 
   const sparkStart = monthRange(addMonthsToMonth(month, -5)).start;
   const sparkRows = db.prepare(`
     SELECT amount, fx_rate AS fxRate, SUBSTR(date, 1, 7) AS m
     FROM finance_transactions
     WHERE deleted_at IS NULL AND date >= ? AND date < ?
-      AND type = 'expense' AND impacts_balance = 1 AND currency = 'ARS'
-  `).all(sparkStart, end) as Array<{ amount: number; fxRate: number | null; m: string }>;
+      AND type = 'expense' AND impacts_balance = 1 AND currency = 'ARS' AND category <> ?
+  `).all(sparkStart, end, TRANSFER_CATEGORY) as Array<{ amount: number; fxRate: number | null; m: string }>;
 
   const catWhere = buildTransactionWhere({ ...categorySpendFilter({ start, end }), currency: 'ARS' });
   const catRows = db.prepare(`
@@ -1056,6 +1074,7 @@ export function computeValuedView(
     type: 'expense',
     currency: 'ARS',
     balanceScope: 'impacting',
+    excludeCategories: [TRANSFER_CATEGORY],
   }).ARS;
   const trend = nominalAndRealTrend(
     currExpenses,
@@ -1224,4 +1243,239 @@ export function computeUpcomingTimeline(
   for (const item of items) totals[item.currency] += item.amount;
 
   return { from: fromDate, to, items, totals };
+}
+
+// ── Accounts (cuentas y billeteras) ────────────────────────────────────────
+
+export type AccountKind = 'cash' | 'bank' | 'wallet';
+
+export const ACCOUNT_KINDS: readonly AccountKind[] = ['cash', 'bank', 'wallet'];
+
+/**
+ * Deterministic id of the seeded «Efectivo» account. Fixed on purpose: two
+ * devices that run the v17 migration in parallel create the very same row, so
+ * last-write-wins sync collapses them instead of shipping a duplicate wallet
+ * to every machine.
+ */
+export const DEFAULT_CASH_ACCOUNT_ID = 'account-cash-default';
+
+export interface FinanceAccount {
+  id: string;
+  name: string;
+  kind: AccountKind;
+  currency: string;
+  initialBalance: number;
+  accountOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountWithBalance extends FinanceAccount {
+  /** `initial_balance` + income − expenses of its live, balance-impacting rows. */
+  balance: number;
+}
+
+export interface AccountsOverview {
+  accounts: AccountWithBalance[];
+  /** Sum of balances of live ARS accounts — what the chest should print. */
+  totalArs: number;
+  totalUsd: number;
+}
+
+/** Live accounts, user order first, then creation order. */
+export function listAccounts(db: Database.Database): FinanceAccount[] {
+  return db.prepare(`
+    SELECT id, name, kind, currency, initial_balance AS initialBalance,
+           account_order AS accountOrder,
+           created_at AS createdAt, updated_at AS updatedAt
+    FROM finance_accounts
+    WHERE deleted_at IS NULL
+    ORDER BY account_order ASC, created_at ASC
+  `).all() as FinanceAccount[];
+}
+
+/**
+ * Net movement per account: income − expenses of live, balance-impacting rows,
+ * in the account's OWN currency (a USD row filed under an ARS account cannot
+ * honestly be added to pesos, so it simply does not count).
+ *
+ * Transfers DO count here — that is the whole point of `impacts_balance = 1`
+ * on their legs: money left one account and landed in another. They are only
+ * excluded from income/expense *aggregations* (see TRANSFER_CATEGORY).
+ *
+ * The JOIN also resolves dangling links on read: a transaction whose account
+ * has not synced in yet (or was soft-deleted) belongs to no visible account.
+ */
+export function computeAccountDeltas(db: Database.Database): Map<string, number> {
+  const rows = db.prepare(`
+    SELECT t.account_id AS accountId,
+           COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE -t.amount END), 0) AS delta
+    FROM finance_transactions t
+    JOIN finance_accounts a ON a.id = t.account_id AND a.deleted_at IS NULL
+    WHERE t.deleted_at IS NULL AND t.impacts_balance = 1 AND t.currency = a.currency
+    GROUP BY t.account_id
+  `).all() as Array<{ accountId: string; delta: number }>;
+  return new Map(rows.map((r) => [r.accountId, r.delta]));
+}
+
+/** The chest, opened: every live account with its real balance, plus totals per currency. */
+export function computeAccountsOverview(db: Database.Database): AccountsOverview {
+  const deltas = computeAccountDeltas(db);
+  const accounts: AccountWithBalance[] = listAccounts(db).map((a) => ({
+    ...a,
+    balance: a.initialBalance + (deltas.get(a.id) ?? 0),
+  }));
+  let totalArs = 0;
+  let totalUsd = 0;
+  for (const a of accounts) {
+    if (a.currency === 'ARS') totalArs += a.balance;
+    else if (a.currency === 'USD') totalUsd += a.balance;
+  }
+  return { accounts, totalArs, totalUsd };
+}
+
+export interface SaveAccountInput {
+  id?: string;
+  name: unknown;
+  kind: unknown;
+  currency?: unknown;
+  initialBalance?: unknown;
+  order?: unknown;
+}
+
+function isAccountKind(value: unknown): value is AccountKind {
+  return typeof value === 'string' && (ACCOUNT_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * Creates or updates an account. `id` present and existing → update (reviving a
+ * soft-deleted row instead of duplicating it); otherwise insert. `INSERT OR
+ * IGNORE` so a deterministic id arriving twice (seed + sync) stays one row.
+ */
+export function saveAccount(
+  db: Database.Database,
+  input: SaveAccountInput,
+): { ok: true; id: string } | { ok: false; reason: string } {
+  const name = parseNonEmptyString(input?.name);
+  if (name === null) return { ok: false, reason: 'invalid_name' };
+  if (!isAccountKind(input?.kind)) return { ok: false, reason: 'invalid_kind' };
+  const currency = input?.currency === undefined ? 'ARS' : input.currency;
+  if (currency !== 'ARS' && currency !== 'USD') return { ok: false, reason: 'invalid_currency' };
+  const initialBalance = input?.initialBalance === undefined ? 0 : Number(input.initialBalance);
+  if (!Number.isFinite(initialBalance)) return { ok: false, reason: 'invalid_amount' };
+  const order = input?.order === undefined ? 0 : Number(input.order);
+  if (!Number.isInteger(order)) return { ok: false, reason: 'invalid_order' };
+
+  const now = nowIso();
+  const id = input.id ?? crypto.randomUUID();
+
+  const existing = db.prepare('SELECT id FROM finance_accounts WHERE id = ?').get(id) as { id: string } | undefined;
+  if (existing) {
+    db.prepare(`
+      UPDATE finance_accounts
+      SET name = ?, kind = ?, currency = ?, initial_balance = ?, account_order = ?,
+          deleted_at = NULL, updated_at = ?
+      WHERE id = ?
+    `).run(name, input.kind, currency, initialBalance, order, now, id);
+  } else {
+    db.prepare(`
+      INSERT OR IGNORE INTO finance_accounts
+        (id, name, kind, currency, initial_balance, account_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, input.kind, currency, initialBalance, order, now, now);
+  }
+  return { ok: true, id };
+}
+
+/**
+ * Soft delete. The account's transactions keep their `account_id` untouched —
+ * they are history, and the read-side JOIN already leaves them out of every
+ * balance the moment the account is gone.
+ */
+export function softDeleteAccount(
+  db: Database.Database,
+  id: string,
+): { ok: true } | { ok: false; reason: string } {
+  const now = nowIso();
+  const res = db.prepare(
+    'UPDATE finance_accounts SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL'
+  ).run(now, now, id);
+  if (res.changes === 0) return { ok: false, reason: 'account_not_found' };
+  return { ok: true };
+}
+
+export interface TransferInput {
+  fromId: unknown;
+  toId: unknown;
+  amount: unknown;
+  /** `YYYY-MM-DD`; required — the IPC handler defaults it to today. */
+  date: unknown;
+  /** Frozen venta rate for the two legs; `null` when none is available. */
+  fxRate?: number | null;
+}
+
+/**
+ * Moves money between two of the user's own accounts by writing TWO live
+ * transactions (an expense on the source, an income on the destination) that
+ * share a `transfer_group_id` and the reserved `Transferencia` category.
+ *
+ * Semantics, spelled out:
+ *  - `impacts_balance = 1` on both legs → each account's balance moves;
+ *  - `TRANSFER_CATEGORY` → excluded from month income/expense totals, the
+ *    wheel, budgets and the valued view — a transfer is not an economic event;
+ *  - both accounts must share a currency: converting between ARS and USD would
+ *    mean inventing an exchange rate inside a bookkeeping move;
+ *  - no XP: nobody earned anything by moving their own money around (see
+ *    `src/modules/finance/utils/rpg-events.ts`).
+ */
+export function transferBetweenAccounts(
+  db: Database.Database,
+  input: TransferInput,
+): { ok: true; transferGroupId: string; expenseId: string; incomeId: string } | { ok: false; reason: string } {
+  const amount = parsePositiveAmount(input?.amount);
+  if (amount === null) return { ok: false, reason: 'invalid_amount' };
+  if (!isValidDateString(input?.date)) return { ok: false, reason: 'invalid_date' };
+  const fromId = parseNonEmptyString(input?.fromId);
+  const toId = parseNonEmptyString(input?.toId);
+  if (fromId === null || toId === null) return { ok: false, reason: 'account_not_found' };
+  if (fromId === toId) return { ok: false, reason: 'same_account' };
+
+  const getAccount = db.prepare(
+    'SELECT id, name, currency FROM finance_accounts WHERE id = ? AND deleted_at IS NULL'
+  );
+  const from = getAccount.get(fromId) as { id: string; name: string; currency: string } | undefined;
+  const to = getAccount.get(toId) as { id: string; name: string; currency: string } | undefined;
+  if (!from || !to) return { ok: false, reason: 'account_not_found' };
+  if (from.currency !== to.currency) return { ok: false, reason: 'transfer_currency_mismatch' };
+
+  const now = nowIso();
+  const transferGroupId = crypto.randomUUID();
+  const expenseId = crypto.randomUUID();
+  const incomeId = crypto.randomUUID();
+  const fxRate = typeof input.fxRate === 'number' && Number.isFinite(input.fxRate) && input.fxRate > 0
+    ? input.fxRate
+    : null;
+
+  const insert = db.prepare(`
+    INSERT INTO finance_transactions
+      (id, type, amount, currency, category, description, date, payment_method,
+       source, installments, installment_group_id, for_third_party, recurring_id,
+       import_batch_id, credit_card_id, impacts_balance, fx_rate, account_id,
+       transfer_group_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'transfer', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?, ?)
+  `);
+
+  const trx = db.transaction(() => {
+    insert.run(
+      expenseId, 'expense', amount, from.currency, TRANSFER_CATEGORY,
+      `Transferencia a ${to.name}`, input.date, fxRate, from.id, transferGroupId, now, now,
+    );
+    insert.run(
+      incomeId, 'income', amount, to.currency, TRANSFER_CATEGORY,
+      `Transferencia desde ${from.name}`, input.date, fxRate, to.id, transferGroupId, now, now,
+    );
+  });
+  trx();
+
+  return { ok: true, transferGroupId, expenseId, incomeId };
 }

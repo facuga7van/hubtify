@@ -17,7 +17,8 @@ import { CategorySelect } from './shared/CategorySelect';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark, Coin } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
-import { unwrap, failureMessage } from '../utils/api-ext';
+import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../utils/api-ext';
+import type { FinanceAccount } from '../types';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { emitMovementLogged } from '../utils/rpg-events';
@@ -43,7 +44,12 @@ interface TransactionRow {
   impactsBalance?: number;
   /** Venta rate frozen the day the movement was recorded. NULL = none available. */
   fxRate?: number | null;
+  /** Cuenta a la que impacta. NULL = sin cuenta asignada. */
+  accountId?: string | null;
 }
+
+/** Filter value for "sin cuenta asignada" (distinct from '' = every account). */
+const FILTER_NO_ACCOUNT = '__none__';
 
 // Source badge icons
 const SourceIcon = ({ source }: { source: string }) => {
@@ -118,6 +124,9 @@ export default function Transactions() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
+  /** Account drill-down — seeded from `?account=<id>` (the chest's row click). */
+  const [filterAccount, setFilterAccount] = useState(() => searchParams.get('account') ?? '');
+  const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(50);
@@ -130,12 +139,13 @@ export default function Transactions() {
     return () => clearTimeout(id);
   }, [searchInput]);
 
-  const hasAnyFilter = !!(filterCategory || filterType || filterPayment || searchQuery);
+  const hasAnyFilter = !!(filterCategory || filterType || filterPayment || filterAccount || searchQuery);
 
   const clearFilters = () => {
     setFilterCategory('');
     setFilterType('');
     setFilterPayment('');
+    setFilterAccount('');
     setSearchInput('');
     setSearchQuery('');
   };
@@ -190,7 +200,25 @@ export default function Transactions() {
   // Reset pagination when filters change
   useEffect(() => {
     setVisibleCount(50);
-  }, [filterCategory, filterType, filterPayment, searchQuery]);
+  }, [filterCategory, filterType, filterPayment, filterAccount, searchQuery]);
+
+  /** Live accounts for the drill-down filter. Empty while the bridge is not wired. */
+  const loadAccounts = useCallback(() => {
+    if (!hasAccountsSupport()) { setAccounts([]); return; }
+    getAccounts().then((rows) => setAccounts(rows ?? []));
+  }, []);
+
+  useEffect(() => { loadAccounts(); }, [loadAccounts]);
+
+  useEffect(() => {
+    const handler = () => loadAccounts();
+    window.addEventListener('account:switched', handler);
+    window.addEventListener('finance:accountsChanged', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener('finance:accountsChanged', handler);
+    };
+  }, [loadAccounts]);
 
   // C7: Category averages for anomaly detection
   const [categoryAverages, setCategoryAverages] = useState<Record<string, number>>({});
@@ -216,6 +244,11 @@ export default function Transactions() {
       if (filterCategory && tx.category !== filterCategory) return false;
       if (filterType && tx.type !== filterType) return false;
       if (filterPayment && tx.paymentMethod !== filterPayment) return false;
+      if (filterAccount === FILTER_NO_ACCOUNT) {
+        if (tx.accountId) return false;
+      } else if (filterAccount && tx.accountId !== filterAccount) {
+        return false;
+      }
       if (q && !(tx.description?.toLowerCase().includes(q) || tx.category?.toLowerCase().includes(q))) return false;
       return true;
     };
@@ -226,7 +259,7 @@ export default function Transactions() {
       (tx.source === 'recurring' ? recurring : normal).push(tx);
     }
     return { filteredNormalTx: normal, filteredRecurringTx: recurring };
-  }, [transactions, filterCategory, filterType, filterPayment, searchQuery]);
+  }, [transactions, filterCategory, filterType, filterPayment, filterAccount, searchQuery]);
 
   // Sorted transactions
   const sortedTx = useMemo(() => {
@@ -306,6 +339,7 @@ export default function Transactions() {
     type: TransactionType; amount: number; category: string; description: string;
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
     creditCardId?: string;
+    accountId?: string | null;
   }) => {
     try {
       // These handlers now answer `{ ok: false, reason }` for bad input instead
@@ -330,6 +364,9 @@ export default function Transactions() {
           date: data.date,
           paymentMethod: data.paymentMethod,
           creditCardId: data.creditCardId,
+          // Absent while the accounts bridge is not wired — the backend then
+          // applies its own cash→«Efectivo» default.
+          ...(data.accountId !== undefined ? { accountId: data.accountId } : {}),
         }));
 
       if (!result.ok) {
@@ -710,6 +747,18 @@ export default function Transactions() {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
+            {/* Account drill-down: only once the accounts bridge is wired and
+                there is something to drill into. */}
+            {accounts.length > 0 && (
+              <select value={filterAccount} onChange={(e) => setFilterAccount(e.target.value)} className="rpg-select"
+                aria-label={t('coinify.accountLabel', 'Cuenta')}>
+                <option value="">{t('coinify.allAccounts', 'Todas las cuentas')}</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+                <option value={FILTER_NO_ACCOUNT}>{t('coinify.accountNone', 'Sin cuenta')}</option>
+              </select>
+            )}
             {hasAnyFilter && (
               <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }} onClick={clearFilters}>
                 {t('coinify.clearFilters', 'Limpiar filtros')}

@@ -6,8 +6,10 @@ import fs from 'fs';
 import { todayDateString } from '../../shared/date-utils';
 import {
   CARD_PAYMENT_CATEGORY,
+  DEFAULT_CASH_ACCOUNT_ID,
   MAX_INSTALLMENTS,
   RECURRING_FREQUENCY_MONTHS,
+  TRANSFER_CATEGORY,
   addMonthsClamped,
   addMonthsToMonth,
   backfillFxRates,
@@ -33,6 +35,10 @@ import {
   parsePositiveAmount,
   sumByCurrency,
   sumIncomeExpenseByCurrency,
+  computeAccountsOverview,
+  saveAccount,
+  softDeleteAccount,
+  transferBetweenAccounts,
 } from './finance.balance';
 
 function genId(): string {
@@ -85,6 +91,8 @@ function transactionColumns(alias = ''): string {
   ${p}impacts_balance AS impactsBalance,
   ${p}billed_amount_ars AS billedAmountArs,
   ${p}fx_rate AS fxRate,
+  ${p}account_id AS accountId,
+  ${p}transfer_group_id AS transferGroupId,
   ${p}created_at AS createdAt, ${p}updated_at AS updatedAt
 `;
 }
@@ -102,6 +110,8 @@ export function registerFinanceIpcHandlers(): void {
     installmentGroupId?: string;
     /** `manual` | `recurring` | `import`. */
     source?: string;
+    /** Account drill-down: an id, or `null` for "sin cuenta asignada". */
+    accountId?: string | null;
     /** Cap the result set — "give me the last N" without pulling the ledger. */
     limit?: number;
   } = {}) => {
@@ -134,6 +144,10 @@ export function registerFinanceIpcHandlers(): void {
       conditions.push('t.source = ?');
       params.push(filters.source);
     }
+    if (filters.accountId !== undefined) {
+      if (filters.accountId === null) conditions.push('t.account_id IS NULL');
+      else { conditions.push('t.account_id = ?'); params.push(filters.accountId); }
+    }
 
     const rawLimit = Number(filters.limit);
     const limitClause = Number.isInteger(rawLimit) && rawLimit > 0
@@ -165,6 +179,9 @@ export function registerFinanceIpcHandlers(): void {
     importBatchId?: string | null;
     creditCardId?: string | null;
     impactsBalance?: boolean;
+    /** `undefined` = not chosen (cash maps to the default «Efectivo»);
+     *  `null` = explicitly "sin cuenta"; a string = that account. */
+    accountId?: string | null;
   }) => {
     const amount = parsePositiveAmount(tx.amount);
     if (amount === null) {
@@ -174,6 +191,18 @@ export function registerFinanceIpcHandlers(): void {
       throw new Error('Date must be a valid YYYY-MM-DD string');
     }
     const db = getDb();
+
+    // Default mapping when no account was chosen at all: cash goes to the
+    // seeded «Efectivo» account (if it is still alive); every other payment
+    // method stays unassigned. NEVER invent accounts from payment_method.
+    let accountId = tx.accountId ?? null;
+    if (tx.accountId === undefined && (tx.paymentMethod ?? 'cash') === 'cash') {
+      const def = db.prepare(
+        'SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL'
+      ).get(DEFAULT_CASH_ACCOUNT_ID) as { id: string } | undefined;
+      if (def) accountId = DEFAULT_CASH_ACCOUNT_ID;
+    }
+
     // Freeze today's venta rate on the row. Offline with no cache → NULL, and
     // the write goes through regardless — a missing rate never blocks the alta.
     const fxRate = await captureFxRate(db);
@@ -183,8 +212,8 @@ export function registerFinanceIpcHandlers(): void {
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, for_third_party, recurring_id,
-         import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         import_batch_id, credit_card_id, impacts_balance, fx_rate, account_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       tx.type,
@@ -203,6 +232,7 @@ export function registerFinanceIpcHandlers(): void {
       tx.creditCardId ?? null,
       (tx.impactsBalance === false || tx.paymentMethod === 'credit_card') ? 0 : 1,
       fxRate,
+      accountId,
       now,
       now,
     );
@@ -216,6 +246,8 @@ export function registerFinanceIpcHandlers(): void {
     paymentMethod?: string;
     date?: string;
     creditCardId?: string | null;
+    /** `null` clears the account ("sin cuenta"); `undefined` leaves it alone. */
+    accountId?: string | null;
   }) => {
     const db = getDb();
     const sets: string[] = ['updated_at = ?'];
@@ -243,6 +275,7 @@ export function registerFinanceIpcHandlers(): void {
     } else if (fields.creditCardId !== undefined) {
       sets.push('credit_card_id = ?'); vals.push(fields.creditCardId);
     }
+    if (fields.accountId !== undefined) { sets.push('account_id = ?'); vals.push(fields.accountId); }
     if (fields.date !== undefined) { sets.push('date = ?'); vals.push(fields.date); }
     vals.push(id);
     db.prepare(`UPDATE finance_transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
@@ -292,7 +325,9 @@ export function registerFinanceIpcHandlers(): void {
       };
     }
     const { start, end } = monthRangeBetween(startMonth, endMonth);
-    return sumIncomeExpenseByCurrency(db, { start, end, balanceScope: 'impacting' });
+    return sumIncomeExpenseByCurrency(db, {
+      start, end, balanceScope: 'impacting', excludeCategories: [TRANSFER_CATEGORY],
+    });
   });
 
   /** Explicit spend breakdown so the UI never has to guess which definition a number uses. */
@@ -415,6 +450,54 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getBudgetStatus', (_e, month?: string) => {
     const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
     return computeBudgetStatus(getDb(), m);
+  });
+
+  // ── Accounts (cuentas y billeteras) ────────────────
+  //
+  // The chest opened into rows: each live account with its computed balance
+  // (initial_balance + income − expenses of its live, balance-impacting rows,
+  // in the account's own currency). All the arithmetic lives in
+  // finance.balance.ts so the Syl snapshot and the tests share it.
+
+  /** Live accounts with computed balance. */
+  ipcHandle('finance:getAccounts', () => computeAccountsOverview(getDb()).accounts);
+
+  /** `{ accounts, totalArs, totalUsd }` — the chest's row view plus its totals. */
+  ipcHandle('finance:getAccountsOverview', () => computeAccountsOverview(getDb()));
+
+  /** Upsert: `id` present → update (revives a soft-deleted row); absent → create. */
+  ipcHandle('finance:saveAccount', (_e, account: {
+    id?: string;
+    name: string;
+    kind: 'cash' | 'bank' | 'wallet';
+    currency?: string;
+    initialBalance?: number;
+    order?: number;
+  }) => saveAccount(getDb(), account));
+
+  /** Soft delete. Its transactions keep account_id untouched — history stays. */
+  ipcHandle('finance:deleteAccount', (_e, id: string) => softDeleteAccount(getDb(), id));
+
+  /**
+   * Two live legs (expense on origin, income on destination) sharing a
+   * transfer_group_id under the reserved `Transferencia` category — balances
+   * move, monthly totals and the wheel do not, and no XP is paid.
+   */
+  ipcHandle('finance:transferBetweenAccounts', async (_e, input: {
+    fromId: string;
+    toId: string;
+    amount: number;
+    date?: string;
+  }) => {
+    const db = getDb();
+    const fxRate = await captureFxRate(db);
+    return transferBetweenAccounts(db, {
+      fromId: input?.fromId,
+      toId: input?.toId,
+      amount: input?.amount,
+      date: input?.date ?? todayDateString(),
+      fxRate,
+    });
   });
 
   // ── Credit Cards ──────────────────────────────────
@@ -739,7 +822,10 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getMonthlyTotal', () => {
     const db = getDb();
     const { start, end } = monthRange(todayDateString().slice(0, 7));
-    return sumByCurrency(db, { start, end, type: 'expense', balanceScope: 'impacting' }).ARS;
+    return sumByCurrency(db, {
+      start, end, type: 'expense', balanceScope: 'impacting',
+      excludeCategories: [TRANSFER_CATEGORY],
+    }).ARS;
   });
 
   ipcHandle('finance:getActiveLoansCount', () => {
@@ -1460,7 +1546,10 @@ export function registerFinanceIpcHandlers(): void {
     const result: number[] = [];
     for (let i = 5; i >= 0; i--) {
       const { start, end } = monthRange(addMonthsToMonth(currentMonth, -i));
-      result.push(sumByCurrency(db, { start, end, type: 'expense', currency: 'ARS', balanceScope: 'impacting' }).ARS);
+      result.push(sumByCurrency(db, {
+        start, end, type: 'expense', currency: 'ARS', balanceScope: 'impacting',
+        excludeCategories: [TRANSFER_CATEGORY],
+      }).ARS);
     }
     return result;
   });
@@ -1478,10 +1567,10 @@ export function registerFinanceIpcHandlers(): void {
       SELECT category, COALESCE(SUM(amount), 0) AS total
       FROM finance_transactions
       WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
-        AND category != ?
+        AND category NOT IN (?, ?)
         AND date >= ? AND date < ?
       GROUP BY category
-    `).all(CARD_PAYMENT_CATEGORY, start, end) as Array<{ category: string; total: number }>;
+    `).all(CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY, start, end) as Array<{ category: string; total: number }>;
 
     // Divide by the months that actually have data, not a hard-coded 3 —
     // otherwise a user with one month of history sees a third of reality.
@@ -1489,9 +1578,9 @@ export function registerFinanceIpcHandlers(): void {
       SELECT COUNT(DISTINCT SUBSTR(date, 1, 7)) AS c
       FROM finance_transactions
       WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
-        AND category != ?
+        AND category NOT IN (?, ?)
         AND date >= ? AND date < ?
-    `).get(CARD_PAYMENT_CATEGORY, start, end) as { c: number };
+    `).get(CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY, start, end) as { c: number };
     const divisor = Math.max(monthsWithData.c, 1);
 
     const averages: Record<string, number> = {};
@@ -1510,6 +1599,7 @@ export function registerFinanceIpcHandlers(): void {
 
     const balance = sumIncomeExpenseByCurrency(db, {
       start, end, currency: 'ARS', balanceScope: 'impacting',
+      excludeCategories: [TRANSFER_CATEGORY],
     });
 
     return { income: balance.ARS.income, expenses: balance.ARS.expenses, month: prevMonth };

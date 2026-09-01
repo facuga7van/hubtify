@@ -24,8 +24,31 @@ export interface Transaction {
   importBatchId?: string;
   creditCardId?: string;
   impactsBalance?: number;
+  /** Cuenta a la que impacta el movimiento. `null` = sin cuenta asignada. */
+  accountId?: string | null;
+  /** Las dos patas de una transferencia entre cuentas comparten este id. */
+  transferGroupId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AccountKind = 'cash' | 'bank' | 'wallet';
+
+/**
+ * Id determinístico de la cuenta «Efectivo» sembrada por la migración v17.
+ * Mirrors `DEFAULT_CASH_ACCOUNT_ID` en `electron/modules/finance.balance.ts`.
+ */
+export const DEFAULT_CASH_ACCOUNT_ID = 'account-cash-default';
+
+export interface FinanceAccount {
+  id: string;
+  name: string;
+  kind: AccountKind;
+  currency: Currency;
+  initialBalance: number;
+  accountOrder: number;
+  /** initial_balance + ingresos − egresos vivos que impactan balance. */
+  balance: number;
 }
 
 export interface InstallmentGroup {
@@ -141,11 +164,19 @@ export const CARD_PAYMENT_CATEGORY = 'Pago Tarjeta';
 export const CARD_TAX_CATEGORY = 'Impuestos de tarjeta';
 
 /**
+ * Category shared by the two legs of an inter-account transfer. Excluded from
+ * every income/expense aggregation (a transfer is not an economic event) while
+ * still moving each account's balance. Mirrors `TRANSFER_CATEGORY` in
+ * `electron/modules/finance.balance.ts` — the guard test fails on drift.
+ */
+export const TRANSFER_CATEGORY = 'Transferencia';
+
+/**
  * Categories the app writes on its own. They show up in reports and in the
  * category wheel, but a manual transaction must never be filed under one, so
  * every category picker hides them.
  */
-export const RESERVED_CATEGORIES: readonly string[] = [CARD_PAYMENT_CATEGORY, CARD_TAX_CATEGORY];
+export const RESERVED_CATEGORIES: readonly string[] = [CARD_PAYMENT_CATEGORY, CARD_TAX_CATEGORY, TRANSFER_CATEGORY];
 
 export const CATEGORIES = [
   'Entretenimiento',

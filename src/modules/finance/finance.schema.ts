@@ -437,4 +437,54 @@ export const financeMigrations: Migration[] = [
       ALTER TABLE finance_credit_cards ADD COLUMN due_day INTEGER DEFAULT NULL;
     `,
   },
+  {
+    namespace: 'finance',
+    version: 17,
+    up: `
+      -- Cuentas y billeteras: el cofre deja de ser un único número y pasa a ser
+      -- la suma de saldos reales (efectivo / banco / billetera virtual).
+      --
+      -- Timestamps en ISO via strftime, nunca datetime('now') — LWW compara
+      -- updated_at como string y 'T' > ' ' (ver la normalización de v13).
+      CREATE TABLE IF NOT EXISTS finance_accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'cash' CHECK (kind IN ('cash', 'bank', 'wallet')),
+        currency TEXT NOT NULL DEFAULT 'ARS',
+        initial_balance REAL NOT NULL DEFAULT 0,
+        account_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        deleted_at TEXT DEFAULT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_finance_accounts_deleted ON finance_accounts(deleted_at);
+
+      -- Sin FK dura A PROPÓSITO: una transacción sincronizada puede llegar antes
+      -- que su cuenta (mismo patrón que project_id en quests). Un account_id
+      -- colgante se resuelve en LECTURA (la cuenta simplemente no aparece hasta
+      -- que llega), nunca rechazando la escritura.
+      ALTER TABLE finance_transactions ADD COLUMN account_id TEXT DEFAULT NULL;
+
+      -- Las dos patas de una transferencia entre cuentas comparten este id, así
+      -- se pueden reconocer (y algún día deshacer) como un único acto.
+      ALTER TABLE finance_transactions ADD COLUMN transfer_group_id TEXT DEFAULT NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_account ON finance_transactions(account_id, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_transfer_group ON finance_transactions(transfer_group_id);
+
+      -- Seed determinístico: dos devices que migran en paralelo generan LA MISMA
+      -- cuenta «Efectivo» (id fijo), así el sync la colapsa solo en vez de
+      -- duplicarla. Solo si no existe ninguna cuenta todavía.
+      INSERT OR IGNORE INTO finance_accounts (id, name, kind, currency, initial_balance, account_order)
+        SELECT 'account-cash-default', 'Efectivo', 'cash', 'ARS', 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM finance_accounts);
+
+      -- Categoría reservada de las patas de una transferencia. Existe en la
+      -- tabla para que reportes y filtros puedan nombrarla, pero está excluida
+      -- de los totales de gasto/ingreso y de la rueda (mover plata de MP al
+      -- banco no es un gasto) y ningún picker la ofrece a mano.
+      INSERT OR IGNORE INTO finance_categories (name, updated_at)
+        VALUES ('Transferencia', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));
+    `,
+  },
 ];

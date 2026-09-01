@@ -16,9 +16,14 @@ import {
   getBudgetStatus,
   setBudget,
   hasBudgetSupport,
+  getAccountsOverview,
+  hasAccountsSupport,
+  type AccountsOverview,
   type ExpenseBreakdownByCurrency,
   type BudgetStatus,
 } from '../utils/api-ext';
+import AccountManager from './shared/AccountManager';
+import { AccountKindGlyph } from './shared/AccountGlyphs';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { checkBudgetMonthClose, resetBudgetGuards } from '../utils/budget-guards';
 import { playCoinClink } from '../../../shared/audio';
@@ -270,13 +275,15 @@ function ChestGlyph() {
   );
 }
 
-function ChestClickable() {
+function ChestClickable({ onToggle }: { onToggle?: () => void }) {
   const [bounce, setBounce] = useState(false);
 
   const handleClick = () => {
     playCoinClink();
     setBounce(true);
     setTimeout(() => setBounce(false), 500);
+    // Opens the chest into its account rows once the accounts bridge is wired.
+    onToggle?.();
   };
 
   return (
@@ -466,6 +473,13 @@ export default function Dashboard() {
   const [valued, setValued] = useState<ValuedView | null>(null);
   /** 30-day money-out timeline. `null` = bridge not wired (old chart shows). */
   const [upcoming, setUpcoming] = useState<UpcomingTimeline | null>(null);
+  /** The chest, opened: per-account balances. `null` = bridge not wired. */
+  const [accountsOverview, setAccountsOverview] = useState<AccountsOverview | null>(null);
+  /** Whether the chest shows its rows. Sticky per machine, like the sections. */
+  const [chestOpen, setChestOpen] = useState(() => {
+    try { return localStorage.getItem('coinify_chest_open') === '1'; } catch { return false; }
+  });
+  const [showAccountManager, setShowAccountManager] = useState(false);
   /** Category whose limit is being typed inline in the legend. */
   const [editingBudget, setEditingBudget] = useState<string | null>(null);
   const [budgetDraft, setBudgetDraft] = useState('');
@@ -574,6 +588,35 @@ export default function Dashboard() {
     getUpcoming(30).then((data) => { if (!cancelled) setUpcoming(data); });
     return () => { cancelled = true; };
   }, [refreshKey]);
+
+  /**
+   * The chest's real content: every live account with its balance. Refreshes
+   * with the rest of the dashboard and whenever the account manager writes.
+   */
+  const loadAccountsOverview = useCallback(() => {
+    if (!hasAccountsSupport()) { setAccountsOverview(null); return; }
+    getAccountsOverview().then(setAccountsOverview);
+  }, []);
+
+  useEffect(() => { loadAccountsOverview(); }, [loadAccountsOverview, refreshKey]);
+
+  useEffect(() => {
+    const handler = () => loadAccountsOverview();
+    window.addEventListener('finance:accountsChanged', handler);
+    window.addEventListener('finance:dataChanged', handler);
+    return () => {
+      window.removeEventListener('finance:accountsChanged', handler);
+      window.removeEventListener('finance:dataChanged', handler);
+    };
+  }, [loadAccountsOverview]);
+
+  const toggleChest = useCallback(() => {
+    setChestOpen((open) => {
+      const next = !open;
+      try { localStorage.setItem('coinify_chest_open', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   /**
    * Budgets are a monthly promise, so they only speak in the monthly view — a
@@ -885,8 +928,10 @@ export default function Dashboard() {
           <div className="coin-top-grid">
             {/* Treasure chest panel */}
             <div className="coin-chest-panel">
-              <HelpBubble text={t('coinify.chestHelp', 'Balance neto del mes: ingresos menos gastos. El porcentaje compara con el mes anterior y la línea muestra la tendencia de los últimos 6 meses.')} />
-              <ChestClickable />
+              <HelpBubble text={accountsOverview
+                ? t('coinify.chestHelpAccounts', 'Balance neto del mes arriba. Click en el cofre: tus cuentas con su saldo real (saldo inicial + movimientos). Click en una cuenta: sus movimientos.')
+                : t('coinify.chestHelp', 'Balance neto del mes: ingresos menos gastos. El porcentaje compara con el mes anterior y la línea muestra la tendencia de los últimos 6 meses.')} />
+              <ChestClickable onToggle={accountsOverview ? toggleChest : undefined} />
               <div className="coin-chest-panel__info">
                 <div className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
                   {t('coinify.treasureChest', 'COFRE DEL TESORO')} · {periodLabel}
@@ -940,6 +985,56 @@ export default function Dashboard() {
                       {t('coinify.last6Months', '6 meses')}{valuedData ? ` · ${approxMark}${displayCurrency === 'USD' ? 'USD' : t('coinify.modeArsToday', 'ARS hoy')}` : ''}
                     </span>
                   </div>
+                )}
+
+                {/* ── The chest, opened: one row per account, real balances ── */}
+                {accountsOverview && (
+                  chestOpen ? (
+                    <div className="coin-account-list">
+                      {accountsOverview.accounts.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className="coin-account-row"
+                          onClick={() => navigate(`/finance/transactions?account=${a.id}`)}
+                          title={t('coinify.accountRowHint', 'Ver los movimientos de {{name}}', { name: a.name })}
+                        >
+                          <span className="coin-account-row__icon"><AccountKindGlyph kind={a.kind} /></span>
+                          <span className="coin-account-row__name qb-hand">{a.name}</span>
+                          <span className={`coin-account-row__balance qb-numeral${a.balance < 0 ? ' coin-account-row__balance--negative' : ''}`}>
+                            {formatCurrency(a.balance, { currency: a.currency })}
+                          </span>
+                        </button>
+                      ))}
+                      {/* The number that finally has to match MP + homebanking. */}
+                      <div className="coin-account-total">
+                        <span className="qb-small-caps">{t('coinify.accountsTotal', 'Total en cuentas')}</span>
+                        <span className="qb-numeral">
+                          {formatCurrency(accountsOverview.totalArs, { currency: 'ARS' })}
+                          {accountsOverview.totalUsd !== 0 && (
+                            <> · {formatCurrency(accountsOverview.totalUsd, { currency: 'USD' })}</>
+                          )}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="rpg-button coin-account-manage-btn"
+                        onClick={() => setShowAccountManager(true)}
+                      >
+                        {t('coinify.manageAccounts', 'Gestionar cuentas')}
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="coin-account-peek" onClick={toggleChest}>
+                      <span className="qb-small-caps">
+                        {t('coinify.accountsTotal', 'Total en cuentas')}{' '}
+                        <span className="qb-numeral">{formatCurrency(accountsOverview.totalArs, { currency: 'ARS' })}</span>
+                        {accountsOverview.totalUsd !== 0 && (
+                          <span className="qb-numeral"> · {formatCurrency(accountsOverview.totalUsd, { currency: 'USD' })}</span>
+                        )}
+                      </span>
+                    </button>
+                  )
                 )}
               </div>
               <div className="coin-chest-panel__vertical">TESORO</div>
@@ -1309,6 +1404,13 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {showAccountManager && (
+        <AccountManager
+          onClose={() => setShowAccountManager(false)}
+          onSaved={loadAccountsOverview}
+        />
+      )}
     </div>
   );
 }
