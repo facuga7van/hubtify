@@ -94,6 +94,10 @@ async function makePreset(opts: {
 beforeEach(async () => {
   harness.db = setupDb();
   vi.useFakeTimers();
+  // Anchored at noon: this suite advances the clock by tens of minutes, and
+  // starting from the real time makes a run near midnight cross the day
+  // mid-test. Its sibling phase2 suite failed in CI exactly that way.
+  vi.setSystemTime(new Date(2026, 8, 1, 12, 0, 0));
   // Module-level timer state survives between tests — start each one from idle.
   await invoke('cauldron:stop');
 });

@@ -178,6 +178,17 @@ beforeEach(async () => {
   harness.db = setupDb();
   harness.broadcasts = [];
   vi.useFakeTimers();
+  /*
+   * Reloj anclado al mediodía, no a la hora real.
+   *
+   * Los tests arrancan sesiones y adelantan el reloj decenas de minutos. Con la
+   * hora real de arranque, correr la suite cerca de la medianoche cruzaba de
+   * día en el medio: la sesión completada quedaba contada en el día anterior y
+   * `stats().today` daba 0. Pasó en CI a las 23:29 y en la máquina de nadie,
+   * que es la peor forma de fallar. El mediodía deja horas de margen para
+   * adelantar sin cambiar de fecha.
+   */
+  vi.setSystemTime(new Date(2026, 8, 1, 12, 0, 0));
   // El estado del timer es de módulo y sobrevive entre tests.
   await invoke('cauldron:stop');
   harness.broadcasts = [];
