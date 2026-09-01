@@ -49,6 +49,12 @@ export interface FinanceAccount {
   accountOrder: number;
   /** initial_balance + ingresos − egresos vivos que impactan balance. */
   balance: number;
+  /**
+   * Movimientos vivos que apuntan a esta cuenta. Cero = nunca se usó, que no es
+   * lo mismo que una cuenta usada que quedó en cero: el cofre esconde la
+   * primera. Opcional porque un main viejo no la manda.
+   */
+  movements?: number;
 }
 
 export interface InstallmentGroup {

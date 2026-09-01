@@ -382,6 +382,7 @@
     "accountNone": "No account",
     "accountPaidFrom": "Pay from",
     "accountRowHint": "See the movements of {{name}}",
+    "accountsEmpty": "Split your money by where it lives — cash, bank, wallet — and the chest shows you how much is in each.",
     "accountsTotal": "Total across accounts",
     "activate": "Activate",
     "activeInstallments": "Active installments",

@@ -1514,6 +1514,12 @@ export interface FinanceAccount {
 export interface AccountWithBalance extends FinanceAccount {
   /** `initial_balance` + income − expenses of its live, balance-impacting rows. */
   balance: number;
+  /**
+   * How many live, balance-impacting rows point at this account. Zero means the
+   * account has never been used — which is a different thing from an account
+   * that was used and happens to sit at zero, and the chest hides the former.
+   */
+  movements: number;
 }
 
 export interface AccountsOverview {
@@ -1560,11 +1566,25 @@ export function computeAccountDeltas(db: Database.Database): Map<string, number>
 }
 
 /** The chest, opened: every live account with its real balance, plus totals per currency. */
+/** Live, balance-impacting rows per account. Same filter as the deltas. */
+export function computeAccountMovements(db: Database.Database): Map<string, number> {
+  const rows = db.prepare(`
+    SELECT t.account_id AS accountId, COUNT(*) AS n
+    FROM finance_transactions t
+    JOIN finance_accounts a ON a.id = t.account_id AND a.deleted_at IS NULL
+    WHERE t.deleted_at IS NULL AND t.impacts_balance = 1 AND t.currency = a.currency
+    GROUP BY t.account_id
+  `).all() as Array<{ accountId: string; n: number }>;
+  return new Map(rows.map((r) => [r.accountId, r.n]));
+}
+
 export function computeAccountsOverview(db: Database.Database): AccountsOverview {
   const deltas = computeAccountDeltas(db);
+  const movements = computeAccountMovements(db);
   const accounts: AccountWithBalance[] = listAccounts(db).map((a) => ({
     ...a,
     balance: a.initialBalance + (deltas.get(a.id) ?? 0),
+    movements: movements.get(a.id) ?? 0,
   }));
   let totalArs = 0;
   let totalUsd = 0;

@@ -2400,13 +2400,41 @@ button.coin-sort-header--amount {
 
 /* ── Accounts: the chest opened into rows ──────────────────────────────── */
 
+/* El cofre abierto FLOTA sobre el contenido en vez de empujarlo: antes crecía
+   la celda del grid y toda la columna de abajo se corría de golpe al tocar lo
+   que parece un dibujo. Se ancla al panel (que ya es position: relative). */
 .coin-account-list {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px dashed rgba(168, 138, 60, 0.4);
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -1.5px;
+  right: -1.5px;
+  z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 8px 10px 10px;
+  /* Opaco: flota sobre gráficos, no puede dejar pasar nada por detrás. */
+  background: var(--parch-0);
+  border: 1.5px solid rgba(74, 55, 32, 0.5);
+  border-top-color: rgba(168, 138, 60, 0.55);
+  box-shadow: 0 6px 14px rgba(30, 19, 9, 0.28);
+  animation: coin-chest-drop 140ms ease-out;
+}
+@keyframes coin-chest-drop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coin-account-list { animation: none; }
+}
+/* Sin cuentas que valga la pena mostrar: se explica para qué sirve y ofrece
+   la puerta, en vez de un «Total en cuentas $0» que no dice nada. */
+.coin-account-empty {
+  margin: 2px 0 8px;
+  font-family: var(--ff-body);
+  font-size: var(--fs-label);
+  line-height: 1.4;
+  color: var(--ink-soft);
 }
 
 .coin-account-row {

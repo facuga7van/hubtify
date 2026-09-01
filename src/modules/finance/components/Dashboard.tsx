@@ -476,10 +476,14 @@ export default function Dashboard() {
   const [upcoming, setUpcoming] = useState<UpcomingTimeline | null>(null);
   /** The chest, opened: per-account balances. `null` = bridge not wired. */
   const [accountsOverview, setAccountsOverview] = useState<AccountsOverview | null>(null);
-  /** Whether the chest shows its rows. Sticky per machine, like the sections. */
-  const [chestOpen, setChestOpen] = useState(() => {
-    try { return localStorage.getItem('coinify_chest_open') === '1'; } catch { return false; }
-  });
+  /**
+   * Whether the chest shows its rows. NOT sticky: the list floats over the
+   * content instead of pushing it (clicking the chest used to shove the whole
+   * column down), and a remembered floating panel would sit on top of the
+   * wheel forever. The collapsed strip already carries the total at a glance.
+   */
+  const [chestOpen, setChestOpen] = useState(false);
+  const chestPanelRef = useRef<HTMLDivElement | null>(null);
   const [showAccountManager, setShowAccountManager] = useState(false);
   /** Category whose limit is being typed inline in the legend. */
   const [editingBudget, setEditingBudget] = useState<string | null>(null);
@@ -609,6 +613,26 @@ export default function Dashboard() {
 
   useEffect(() => { loadAccountsOverview(); }, [loadAccountsOverview, refreshKey]);
 
+  /**
+   * Una cuenta que nunca se usó y está en cero no dice nada: es la semilla que
+   * crea la migración, y verla ahí sin explicación era justamente lo que hacía
+   * imposible entender para qué sirve el cofre. Una cuenta USADA que quedó en
+   * cero sí se muestra — ese cero es información. `movements` puede no venir de
+   * un main viejo: en ese caso no escondemos nada.
+   */
+  const visibleAccounts = useMemo(
+    () => (accountsOverview?.accounts ?? []).filter((a) => (a.movements ?? 1) > 0 || a.balance !== 0),
+    [accountsOverview],
+  );
+  /** El total es siempre la suma de las filas que ves, nunca de filas ocultas. */
+  const visibleTotals = useMemo(() => {
+    let ars = 0, usd = 0;
+    for (const a of visibleAccounts) {
+      if (a.currency === 'USD') usd += a.balance; else ars += a.balance;
+    }
+    return { ars, usd };
+  }, [visibleAccounts]);
+
   useEffect(() => {
     const handler = () => loadAccountsOverview();
     window.addEventListener('finance:accountsChanged', handler);
@@ -619,13 +643,23 @@ export default function Dashboard() {
     };
   }, [loadAccountsOverview]);
 
-  const toggleChest = useCallback(() => {
-    setChestOpen((open) => {
-      const next = !open;
-      try { localStorage.setItem('coinify_chest_open', next ? '1' : '0'); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
+  const toggleChest = useCallback(() => setChestOpen((open) => !open), []);
+
+  // Se cierra como cualquier desplegable: click afuera o Escape. Sin esto un
+  // panel flotante te tapa el contenido y no hay forma obvia de sacarlo.
+  useEffect(() => {
+    if (!chestOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!chestPanelRef.current?.contains(e.target as Node)) setChestOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setChestOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [chestOpen]);
 
   /**
    * Budgets are a monthly promise, so they only speak in the monthly view — a
@@ -941,7 +975,7 @@ export default function Dashboard() {
         {balance && shownBalance && (
           <div className="coin-top-grid">
             {/* Treasure chest panel */}
-            <div className="coin-chest-panel">
+            <div className="coin-chest-panel" ref={chestPanelRef}>
               <HelpBubble text={accountsOverview
                 ? t('coinify.chestHelpAccounts', 'Balance neto del mes arriba. Click en el cofre: tus cuentas con su saldo real (saldo inicial + movimientos). Click en una cuenta: sus movimientos.')
                 : t('coinify.chestHelp', 'Balance neto del mes: ingresos menos gastos. El porcentaje compara con el mes anterior y la línea muestra la tendencia de los últimos 6 meses.')} />
@@ -1014,7 +1048,7 @@ export default function Dashboard() {
                 {accountsOverview && (
                   chestOpen ? (
                     <div className="coin-account-list">
-                      {accountsOverview.accounts.map((a) => (
+                      {visibleAccounts.map((a) => (
                         <button
                           key={a.id}
                           type="button"
@@ -1030,15 +1064,21 @@ export default function Dashboard() {
                         </button>
                       ))}
                       {/* The number that finally has to match MP + homebanking. */}
-                      <div className="coin-account-total">
-                        <span className="qb-small-caps">{t('coinify.accountsTotal', 'Total en cuentas')}</span>
-                        <span className="qb-numeral">
-                          {formatCurrency(accountsOverview.totalArs, { currency: 'ARS' })}
-                          {accountsOverview.totalUsd !== 0 && (
-                            <> · {formatCurrency(accountsOverview.totalUsd, { currency: 'USD' })}</>
-                          )}
-                        </span>
-                      </div>
+                      {visibleAccounts.length > 0 ? (
+                        <div className="coin-account-total">
+                          <span className="qb-small-caps">{t('coinify.accountsTotal', 'Total en cuentas')}</span>
+                          <span className="qb-numeral">
+                            {formatCurrency(visibleTotals.ars, { currency: 'ARS' })}
+                            {visibleTotals.usd !== 0 && (
+                              <> · {formatCurrency(visibleTotals.usd, { currency: 'USD' })}</>
+                            )}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="coin-account-empty">
+                          {t('coinify.accountsEmpty', 'Separá tu plata por dónde está —efectivo, banco, billetera— y el cofre te muestra cuánto hay en cada una.')}
+                        </p>
+                      )}
                       <button
                         type="button"
                         className="rpg-button coin-account-manage-btn"
@@ -1048,15 +1088,17 @@ export default function Dashboard() {
                       </button>
                     </div>
                   ) : (
-                    <button type="button" className="coin-account-peek" onClick={toggleChest}>
-                      <span className="qb-small-caps">
-                        {t('coinify.accountsTotal', 'Total en cuentas')}{' '}
-                        <span className="qb-numeral">{formatCurrency(accountsOverview.totalArs, { currency: 'ARS' })}</span>
-                        {accountsOverview.totalUsd !== 0 && (
-                          <span className="qb-numeral"> · {formatCurrency(accountsOverview.totalUsd, { currency: 'USD' })}</span>
-                        )}
-                      </span>
-                    </button>
+                    visibleAccounts.length > 0 && (
+                      <button type="button" className="coin-account-peek" onClick={toggleChest}>
+                        <span className="qb-small-caps">
+                          {t('coinify.accountsTotal', 'Total en cuentas')}{' '}
+                          <span className="qb-numeral">{formatCurrency(visibleTotals.ars, { currency: 'ARS' })}</span>
+                          {visibleTotals.usd !== 0 && (
+                            <span className="qb-numeral"> · {formatCurrency(visibleTotals.usd, { currency: 'USD' })}</span>
+                          )}
+                        </span>
+                      </button>
+                    )
                   )
                 )}
               </div>

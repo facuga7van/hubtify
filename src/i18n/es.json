@@ -382,6 +382,7 @@
     "accountNone": "Sin cuenta",
     "accountPaidFrom": "Pagar desde",
     "accountRowHint": "Ver los movimientos de {{name}}",
+    "accountsEmpty": "Separá tu plata por dónde está —efectivo, banco, billetera— y el cofre te muestra cuánto hay en cada una.",
     "accountsTotal": "Total en cuentas",
     "activate": "Activar",
     "activeInstallments": "Cuotas activas",
