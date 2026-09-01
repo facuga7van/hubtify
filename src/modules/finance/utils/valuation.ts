@@ -153,6 +153,65 @@ export function convertArsToUsd(
 }
 
 /**
+ * USD → ARS with the row's own frozen rate, falling back to the current rate.
+ * The exact mirror of {@link convertArsToUsd}: same source of truth (the rate
+ * frozen the day the row was written), same fallback, same `approx` rule — the
+ * only difference is that it multiplies instead of dividing.
+ *
+ * The asymmetry it kills: a dollar income used to be EXCLUDED from every peso
+ * aggregate instead of converted, so someone paid in dollars saw none of that
+ * money on the peso side of the app.
+ */
+export function convertUsdToArs(
+  amount: number,
+  fxRate: number | null | undefined,
+  currentRate: number | null | undefined,
+  fxRateSource?: string | null,
+): { value: number; approx: boolean } | null {
+  const own = typeof fxRate === 'number' && Number.isFinite(fxRate) && fxRate > 0 ? fxRate : null;
+  const fallback = typeof currentRate === 'number' && Number.isFinite(currentRate) && currentRate > 0 ? currentRate : null;
+  const rate = own ?? fallback;
+  if (rate === null) return null;
+  return { value: amount * rate, approx: own === null || !isExactFxSource(fxRateSource) };
+}
+
+/** The two currencies every finance figure can be expressed in. */
+export type ValuationCurrency = 'ARS' | 'USD';
+
+/** The minimum a row must carry to be re-expressed in the other currency. */
+export interface FxConvertibleRow {
+  amount: number;
+  currency: string;
+  fxRate?: number | null;
+  fxRateSource?: string | null;
+}
+
+/**
+ * One row re-expressed in `target`, whichever way it has to travel.
+ *
+ * The single entry point for currency conversion so ARS→USD and USD→ARS can
+ * never drift apart: a row already in the target currency passes through exact
+ * (no rate is involved, so nothing can be approximate), and anything else goes
+ * through {@link convertArsToUsd} / {@link convertUsdToArs}. `null` means the
+ * amount cannot be expressed in `target` at all — no frozen rate, no current
+ * rate — and the caller must say so rather than invent a number.
+ *
+ * Anything other than `'USD'` is treated as pesos, matching the rest of the
+ * module (`currency` is a free TEXT column; only 'ARS' and 'USD' are written).
+ */
+export function convertRowToCurrency(
+  row: FxConvertibleRow,
+  target: ValuationCurrency,
+  currentRate: number | null | undefined,
+): { value: number; approx: boolean } | null {
+  const from: ValuationCurrency = row.currency === 'USD' ? 'USD' : 'ARS';
+  if (from === target) return { value: row.amount, approx: false };
+  return from === 'ARS'
+    ? convertArsToUsd(row.amount, row.fxRate, currentRate, row.fxRateSource)
+    : convertUsdToArs(row.amount, row.fxRate, currentRate, row.fxRateSource);
+}
+
+/**
  * ARS of `month` → pesos of the latest IPC month. A month older than the series
  * stays nominal and is flagged approximate; so is a month NEWER than the latest
  * published index (its coefficient of 1 is an assumption, not INDEC data).
@@ -170,23 +229,40 @@ export function convertArsToToday(
 
 /**
  * How one transaction amount reads under a display mode.
- * USD rows are never touched: they are already hard currency.
+ *
+ *  `ars`       — nominal, in the currency it was recorded in. A dollar row
+ *                stays `US$ 50`: this mode promises no conversion at all, and
+ *                the ledger prints the figure the user typed.
+ *  `usd`       — everything in dollars: a peso row divided by its frozen rate,
+ *                a dollar row untouched.
+ *  `ars-today` — everything in today's pesos: a dollar row is FIRST brought to
+ *                the pesos of its own date (× its frozen rate) and only then
+ *                inflated by the IPC coefficient of its month. Doing it the
+ *                other way round would inflate dollars, which have no IPC.
+ *
+ * Symmetry is the point: whatever `usd` does to a peso row, `ars-today` does
+ * to a dollar row with the very same frozen rate.
  */
 export function convertTransactionAmount(
   tx: { amount: number; currency: string; fxRate?: number | null; fxRateSource?: string | null; date: string },
   mode: DisplayMode,
   ctx: { currentRate: number | null; coefs: IpcCoefficients | null },
 ): ConvertedAmount {
-  if (tx.currency === 'USD' || mode === 'ars') {
-    return { value: tx.amount, currency: tx.currency === 'USD' ? 'USD' : 'ARS', approx: false };
+  const isUsdRow = tx.currency === 'USD';
+  if (mode === 'ars') {
+    return { value: tx.amount, currency: isUsdRow ? 'USD' : 'ARS', approx: false };
   }
   if (mode === 'usd') {
-    const usd = convertArsToUsd(tx.amount, tx.fxRate ?? null, ctx.currentRate, tx.fxRateSource ?? null);
+    const usd = convertRowToCurrency(tx, 'USD', ctx.currentRate);
     if (usd === null) return { value: tx.amount, currency: 'ARS', approx: true };
     return { value: usd.value, currency: 'USD', approx: usd.approx };
   }
-  const today = convertArsToToday(tx.amount, tx.date.slice(0, 7), ctx.coefs);
-  return { value: today.value, currency: 'ARS', approx: today.approx };
+  const ars = convertRowToCurrency(tx, 'ARS', ctx.currentRate);
+  // No rate anywhere: the dollars cannot become pesos, so they stay dollars
+  // rather than being printed as a peso figure they are not.
+  if (ars === null) return { value: tx.amount, currency: 'USD', approx: true };
+  const today = convertArsToToday(ars.value, tx.date.slice(0, 7), ctx.coefs);
+  return { value: today.value, currency: 'ARS', approx: ars.approx || today.approx };
 }
 
 // ── Trend ──────────────────────────────────────────────────────────────────

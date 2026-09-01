@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
+import { AmountWithCurrency } from './AmountWithCurrency';
 import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
@@ -257,6 +258,13 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
           placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
         <CategorySelect value={category} onChange={handleCategoryChange} />
       </div>
+
+      {/* What this amount is worth in the other currency, with the house that
+          will be frozen on the row. Deliberately OUTSIDE «Más opciones»: the
+          currency picker lives in there, so once USD is chosen and the panel is
+          collapsed this line is the only thing still saying the amount is in
+          dollars — and what they are worth today. */}
+      <AmountWithCurrency amount={amount} currency={currency} />
 
       <div className="coin-quick-add-form__row">
         <input type="text" value={description} onChange={handleDescriptionChange}

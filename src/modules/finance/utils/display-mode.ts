@@ -236,20 +236,71 @@ interface RatesResponse {
   rates?: Array<{ casa: string; venta: number }>;
 }
 
-async function loadCurrentRate(): Promise<number | null> {
+/** The venta rate in force AND the house it came from — the house is not
+ *  decoration: a form that freezes a rate must be able to name it. */
+export interface CurrentFxRate {
+  rate: number | null;
+  house: string;
+}
+
+/**
+ * Venta rate of the preferred house, from the very same `dollar:getRates`
+ * payload the DollarChip shows (and that the main process caches), so the
+ * number a form previews is the number `captureFxRate` will freeze.
+ *
+ * Falls back to `blue` and then to the first house exactly like
+ * `rateFromRates` in the main process — the two must not disagree.
+ */
+export async function loadCurrentFxRate(): Promise<CurrentFxRate> {
+  const house = await getFxHouse();
   try {
-    const house = await getFxHouse();
     const res = await window.api.dollarGetRates() as RatesResponse;
-    if (!res.success || !res.rates) return null;
+    if (!res.success || !res.rates) return { rate: null, house };
     const pick = res.rates.find((r) => r.casa === house)
       ?? res.rates.find((r) => r.casa === DEFAULT_FX_HOUSE)
       ?? res.rates[0];
     const venta = pick?.venta;
-    return typeof venta === 'number' && Number.isFinite(venta) && venta > 0 ? venta : null;
+    return {
+      rate: typeof venta === 'number' && Number.isFinite(venta) && venta > 0 ? venta : null,
+      house,
+    };
   } catch (err) {
-    console.warn('[finance] loadCurrentRate failed:', err);
-    return null;
+    console.warn('[finance] loadCurrentFxRate failed:', err);
+    return { rate: null, house };
   }
+}
+
+async function loadCurrentRate(): Promise<number | null> {
+  return (await loadCurrentFxRate()).rate;
+}
+
+/**
+ * Reactive `{ rate, house }` for the forms that preview a conversion before
+ * saving. Reloads on account switch and whenever the preferred house changes —
+ * picking «cripto» in the chip must change the equivalent the form is showing.
+ */
+export function useCurrentFxRate(): CurrentFxRate {
+  const [state, setState] = useState<CurrentFxRate>({ rate: null, house: DEFAULT_FX_HOUSE });
+
+  const load = useCallback(() => {
+    let cancelled = false;
+    loadCurrentFxRate().then((next) => { if (!cancelled) setState(next); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => load(), [load]);
+
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('account:switched', handler);
+    window.addEventListener(FX_HOUSE_EVENT, handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener(FX_HOUSE_EVENT, handler);
+    };
+  }, [load]);
+
+  return state;
 }
 
 /**

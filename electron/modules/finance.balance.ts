@@ -5,15 +5,16 @@ import { todayDateString } from '../../shared/date-utils';
 import {
   buildIpcCoefficients,
   coefficientDetail,
-  convertArsToUsd,
+  convertRowToCurrency,
   nominalAndRealTrend,
   type FxRateSource,
   type IpcCoefficients,
   type IpcSeriesPoint,
+  type ValuationCurrency,
 } from '../../src/modules/finance/utils/valuation';
 
 export type { ExpenseBreakdown, ExpenseBreakdownByCurrency };
-export type { FxRateSource, IpcCoefficients, IpcSeriesPoint };
+export type { FxRateSource, IpcCoefficients, IpcSeriesPoint, ValuationCurrency };
 
 /**
  * Shared, electron-free finance helpers.
@@ -1159,7 +1160,8 @@ export interface ValuedView {
   /** `null` when the IPC series is unreachable and uncached. */
   arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null;
   /**
-   * Expenses vs previous month, ARS impacting — nominal and inflation-adjusted.
+   * Expenses vs previous month, valued in pesos (dollar rows converted at
+   * their own frozen rate) — nominal and inflation-adjusted.
    * `realPct` is `null` whenever either month's IPC index is not published yet;
    * `realPending` then says so (as opposed to "no series at all"), so the UI
    * can print "sin dato del INDEC todavía" instead of a number that is just the
@@ -1168,19 +1170,34 @@ export interface ValuedView {
   trend: { nominalPct: number | null; realPct: number | null; realPending: boolean };
 }
 
-interface FxRow { amount: number; fxRate: number | null; fxRateSource?: string | null }
+interface FxRow { amount: number; currency: string; fxRate: number | null; fxRateSource?: string | null }
 
-/** Sum of ARS rows in dollars, each with its own frozen rate. */
-function sumUsd(rows: FxRow[], currentRate: number): { total: number; approx: boolean } {
+/**
+ * Sum of rows re-expressed in ONE currency, each with its own frozen rate.
+ *
+ * Symmetric by construction (see `convertRowToCurrency`): a peso row counts in
+ * the dollar total divided by its rate, a dollar row counts in the peso total
+ * multiplied by the same rate. A row that cannot be converted at all (no frozen
+ * rate, no current rate) is left out and flips `approx` — a total that silently
+ * dropped rows without saying so is exactly the bug this replaces.
+ *
+ * `round2` because these totals are compared (against budgets, against the
+ * previous month) and `+=` over hundreds of rows leaves binary noise.
+ */
+function sumIn(
+  rows: FxRow[],
+  target: ValuationCurrency,
+  currentRate: number | null,
+): { total: number; approx: boolean } {
   let total = 0;
   let approx = false;
   for (const row of rows) {
-    const usd = convertArsToUsd(row.amount, row.fxRate, currentRate, row.fxRateSource ?? null);
-    if (usd === null) { approx = true; continue; }
-    total += usd.value;
-    if (usd.approx) approx = true;
+    const converted = convertRowToCurrency(row, target, currentRate);
+    if (converted === null) { approx = true; continue; }
+    total += converted.value;
+    if (converted.approx) approx = true;
   }
-  return { total, approx };
+  return { total: round2(total), approx };
 }
 
 /**
@@ -1189,9 +1206,19 @@ function sumUsd(rows: FxRow[], currentRate: number): { total: number; approx: bo
  * {@link categorySpendFilter} for the wheel) so switching mode changes the
  * unit, never which transactions count.
  *
- * USD: each ARS amount uses ITS OWN frozen `fx_rate`; a row without one uses
- * `currentRate` and flips `approx`. ARS de hoy: nominal per-month totals times
- * the cumulative IPC coefficient of their month (all rows of a month share it).
+ * BOTH currencies count in BOTH views — that is the whole point of a "valued"
+ * view, and the asymmetry it fixes: these aggregates used to filter
+ * `currency = 'ARS'`, so a salary collected in dollars was not converted, it
+ * was EXCLUDED, and someone paid in dollars saw that money nowhere on the peso
+ * side. Now every row is re-expressed with ITS OWN frozen `fx_rate`
+ * (`amount / rate` going to dollars, `amount * rate` coming back to pesos); a
+ * row without a frozen rate falls back to `currentRate` and flips `approx`,
+ * identically in both directions.
+ *
+ * USD: every amount in dollars. ARS de hoy: every amount first in the pesos of
+ * its own date, then times the cumulative IPC coefficient of its month (all
+ * rows of a month share it) — dollars have no IPC, so the conversion has to
+ * happen before the inflation, never after.
  */
 export function computeValuedView(
   db: Database.Database,
@@ -1202,25 +1229,26 @@ export function computeValuedView(
   const coefs = buildIpcCoefficients(ctx.series);
 
   // One row-level query per aggregate the dashboard shows. Transfers between
-  // own accounts are excluded exactly like in the nominal handlers.
+  // own accounts are excluded exactly like in the nominal handlers. NO currency
+  // filter: `currency` travels with each row and the conversion happens per row.
   const balanceRows = db.prepare(`
-    SELECT type, amount, fx_rate AS fxRate, fx_rate_source AS fxRateSource
+    SELECT type, amount, currency, fx_rate AS fxRate, fx_rate_source AS fxRateSource
     FROM finance_transactions
     WHERE deleted_at IS NULL AND date >= ? AND date < ?
-      AND impacts_balance = 1 AND currency = 'ARS' AND category <> ?
+      AND impacts_balance = 1 AND category <> ?
   `).all(start, end, TRANSFER_CATEGORY) as Array<{ type: string } & FxRow>;
 
   const sparkStart = monthRange(addMonthsToMonth(month, -5)).start;
   const sparkRows = db.prepare(`
-    SELECT amount, fx_rate AS fxRate, fx_rate_source AS fxRateSource, SUBSTR(date, 1, 7) AS m
+    SELECT amount, currency, fx_rate AS fxRate, fx_rate_source AS fxRateSource, SUBSTR(date, 1, 7) AS m
     FROM finance_transactions
     WHERE deleted_at IS NULL AND date >= ? AND date < ?
-      AND type = 'expense' AND impacts_balance = 1 AND currency = 'ARS' AND category <> ?
+      AND type = 'expense' AND impacts_balance = 1 AND category <> ?
   `).all(sparkStart, end, TRANSFER_CATEGORY) as Array<{ m: string } & FxRow>;
 
-  const catWhere = buildTransactionWhere({ ...categorySpendFilter({ start, end }), currency: 'ARS' });
+  const catWhere = buildTransactionWhere(categorySpendFilter({ start, end }));
   const catRows = db.prepare(`
-    SELECT category, amount, fx_rate AS fxRate, fx_rate_source AS fxRateSource
+    SELECT category, amount, currency, fx_rate AS fxRate, fx_rate_source AS fxRateSource
     FROM finance_transactions
     WHERE ${catWhere.where}
   `).all(...catWhere.params) as Array<{ category: string } & FxRow>;
@@ -1228,21 +1256,24 @@ export function computeValuedView(
   const sparkMonths: string[] = [];
   for (let i = 5; i >= 0; i--) sparkMonths.push(addMonthsToMonth(month, -i));
 
+  const incomeRows = balanceRows.filter((r) => r.type === 'income');
+  const expenseRows = balanceRows.filter((r) => r.type === 'expense');
+  const catMap = new Map<string, FxRow[]>();
+  for (const r of catRows) {
+    const list = catMap.get(r.category) ?? [];
+    list.push(r);
+    catMap.set(r.category, list);
+  }
+
   // ── USD ──
   let usd: ValuedAggregates | null = null;
   if (ctx.currentRate !== null && ctx.currentRate > 0) {
-    const income = sumUsd(balanceRows.filter((r) => r.type === 'income'), ctx.currentRate);
-    const expenses = sumUsd(balanceRows.filter((r) => r.type === 'expense'), ctx.currentRate);
-    const spark = sparkMonths.map((m) => sumUsd(sparkRows.filter((r) => r.m === m), ctx.currentRate!));
-    const catMap = new Map<string, FxRow[]>();
-    for (const r of catRows) {
-      const list = catMap.get(r.category) ?? [];
-      list.push(r);
-      catMap.set(r.category, list);
-    }
+    const income = sumIn(incomeRows, 'USD', ctx.currentRate);
+    const expenses = sumIn(expenseRows, 'USD', ctx.currentRate);
+    const spark = sparkMonths.map((m) => sumIn(sparkRows.filter((r) => r.m === m), 'USD', ctx.currentRate));
     let approx = income.approx || expenses.approx || spark.some((s) => s.approx);
     const categories = Array.from(catMap.entries()).map(([category, rows]) => {
-      const sum = sumUsd(rows, ctx.currentRate!);
+      const sum = sumIn(rows, 'USD', ctx.currentRate);
       if (sum.approx) approx = true;
       return { category, value: sum.total };
     }).sort((a, b) => b.value - a.value);
@@ -1251,7 +1282,7 @@ export function computeValuedView(
       balance: {
         income: income.total,
         expenses: expenses.total,
-        balance: income.total - expenses.total,
+        balance: round2(income.total - expenses.total),
       },
       monthlyExpenses: spark.map((s) => s.total),
       categories,
@@ -1259,37 +1290,47 @@ export function computeValuedView(
     };
   }
 
+  // ── Pesos of each row's own date ──
+  // Shared by "ARS de hoy" and by the trend: a dollar row becomes the pesos it
+  // was worth the day it was written (× its frozen rate), which is precisely
+  // the figure the IPC coefficient of that month knows how to inflate.
+  const arsIncome = sumIn(incomeRows, 'ARS', ctx.currentRate);
+  const arsExpenses = sumIn(expenseRows, 'ARS', ctx.currentRate);
+  const arsSpark = sparkMonths.map((m) => sumIn(sparkRows.filter((r) => r.m === m), 'ARS', ctx.currentRate));
+
   // ── ARS de hoy ──
   let arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null = null;
   if (coefs) {
     const monthDetail = coefficientDetail(coefs, month);
     const monthCoef = monthDetail?.coef ?? null;
-    const applyCoef = (nominal: number, coef: number | null) => coef === null ? nominal : nominal * coef;
+    const applyCoef = (nominal: number, coef: number | null) =>
+      round2(coef === null ? nominal : nominal * coef);
     // Approximate when the month predates the series AND when its index is
     // not published yet: the current month's "today's pesos" are nominal pesos
-    // wearing a coefficient of 1 that INDEC has not confirmed.
-    let approx = monthDetail === null || monthDetail.assumed;
+    // wearing a coefficient of 1 that INDEC has not confirmed. A dollar row
+    // converted with a fallback (or non-`day`) rate is approximate too.
+    let approx = monthDetail === null || monthDetail.assumed
+      || arsIncome.approx || arsExpenses.approx;
 
-    const nominalIncome = balanceRows.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const nominalExpenses = balanceRows.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const income = applyCoef(nominalIncome, monthCoef);
-    const expenses = applyCoef(nominalExpenses, monthCoef);
+    const income = applyCoef(arsIncome.total, monthCoef);
+    const expenses = applyCoef(arsExpenses.total, monthCoef);
 
-    const monthlyExpenses = sparkMonths.map((m) => {
+    const monthlyExpenses = sparkMonths.map((m, i) => {
       const detail = coefficientDetail(coefs, m);
-      if (detail === null || detail.assumed) approx = true;
-      const nominal = sparkRows.filter((r) => r.m === m).reduce((s, r) => s + r.amount, 0);
-      return applyCoef(nominal, detail?.coef ?? null);
+      if (detail === null || detail.assumed || arsSpark[i].approx) approx = true;
+      return applyCoef(arsSpark[i].total, detail?.coef ?? null);
     });
 
-    const catTotals = new Map<string, number>();
-    for (const r of catRows) catTotals.set(r.category, (catTotals.get(r.category) ?? 0) + r.amount);
-    const categories = Array.from(catTotals.entries())
-      .map(([category, nominal]) => ({ category, value: applyCoef(nominal, monthCoef) }))
+    const categories = Array.from(catMap.entries())
+      .map(([category, rows]) => {
+        const sum = sumIn(rows, 'ARS', ctx.currentRate);
+        if (sum.approx) approx = true;
+        return { category, value: applyCoef(sum.total, monthCoef) };
+      })
       .sort((a, b) => b.value - a.value);
 
     arsToday = {
-      balance: { income, expenses, balance: income - expenses },
+      balance: { income, expenses, balance: round2(income - expenses) },
       monthlyExpenses,
       categories,
       approx,
@@ -1298,15 +1339,19 @@ export function computeValuedView(
   }
 
   // ── Trend (nominal + real) ──
+  // Both months in pesos, dollar rows included at their own frozen rate: the
+  // comparison has to be between two totals built the same way, and the current
+  // month's total now counts the dollars.
   const prevMonth = addMonthsToMonth(month, -1);
-  const currExpenses = balanceRows.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-  const prevExpenses = sumByCurrency(db, {
-    ...monthRange(prevMonth),
-    type: 'expense',
-    currency: 'ARS',
-    balanceScope: 'impacting',
-    excludeCategories: [TRANSFER_CATEGORY],
-  }).ARS;
+  const prevRange = monthRange(prevMonth);
+  const currExpenses = arsExpenses.total;
+  const prevRows = db.prepare(`
+    SELECT amount, currency, fx_rate AS fxRate, fx_rate_source AS fxRateSource
+    FROM finance_transactions
+    WHERE deleted_at IS NULL AND date >= ? AND date < ?
+      AND type = 'expense' AND impacts_balance = 1 AND category <> ?
+  `).all(prevRange.start, prevRange.end, TRANSFER_CATEGORY) as FxRow[];
+  const prevExpenses = sumIn(prevRows, 'ARS', ctx.currentRate).total;
   // An ASSUMED coefficient (index not published yet) is passed as null: with
   // both months at 1 the "real" figure was the nominal one, every month,
   // because the current month never has an index when it is on screen.
