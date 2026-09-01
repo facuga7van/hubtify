@@ -96,6 +96,52 @@ export function clampHp(hp: number): number {
 //   - it refuses to seal a day with no events, because the seal certifies a day
 //     that was LIVED, not a button that was pressed.
 
+/**
+ * Event types that are bookkeeping, not living: the undo family, the
+ * zero-impact registrations and the engine's own output. They stay in the log
+ * (the Códice timeline shows them) but they are never "an event of the day".
+ *
+ * Belt AND braces: `isMeaningfulEvent` also demands xp > 0 and a real module,
+ * so a future type that pays nothing is excluded even before it lands here.
+ */
+export const NON_MEANINGFUL_EVENT_TYPES: readonly string[] = [
+  'TASK_UNCOMPLETED',
+  'SUBTASK_UNCOMPLETED',
+  'HABIT_UNCHECKED',
+  'TASK_CREATED',
+  'HABIT_SKIPPED',
+  'NUTRITION_DAY_REOPENED',
+  'STATEMENT_IMPORTED',
+  'POMODORO_ABANDONED',
+  'DAY_SEALED',
+  'ACHIEVEMENT_UNLOCKED',
+];
+
+/** The module id the engine writes its own rows under (seal, achievements). */
+export const ENGINE_MODULE_ID = 'rpg';
+
+/**
+ * THE single rule for "did something happen today".
+ *
+ * Used by the seal (`eventsCount`, `empty_day`, the sealed modules) and by
+ * every achievement that counts events or event kinds (`polymath`,
+ * `sunday_guardian`, `chronicler_*`, `perfect_day`). A row is meaningful when
+ * it is a REAL action that PAID: positive XP, emitted by a module (never by
+ * the engine itself), and not an undo / registration / zero-impact type.
+ *
+ * Before this rule existed, a retro seal written today counted as "today's
+ * event" and let tomorrow's seal pay for it — a streak that fed itself.
+ */
+export function isMeaningfulEvent(row: {
+  moduleId: string;
+  eventType: string;
+  xpGained: number;
+}): boolean {
+  if (!row.moduleId || row.moduleId === ENGINE_MODULE_ID) return false;
+  if (!(row.xpGained > 0)) return false;
+  return !NON_MEANINGFUL_EVENT_TYPES.includes(row.eventType);
+}
+
 /** Floor paid by any seal. */
 export const SEAL_BASE_XP = 10;
 /** XP per event of the sealed day. */

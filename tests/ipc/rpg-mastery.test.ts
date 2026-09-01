@@ -108,7 +108,10 @@ describe('mastery accumulator', () => {
     expect(masteryRow(db, 'quests')).toBe(Math.round(first.xpGained) + Math.round(second.xpGained));
   });
 
-  it('never decreases: an undo refunds the XP but keeps the mastery', () => {
+  // Audit 2026-08 (#6): "monotonic" used to mean an undo refunded the XP but
+  // kept the mastery, which made complete/uncomplete a free mastery pump. The
+  // bar mirrors the log: when the original row is deleted, its entry goes too.
+  it('an undo takes back exactly what the original event added', () => {
     processRpgEvent(db, {
       type: 'TASK_COMPLETED', moduleId: 'quests',
       payload: { xp: 10, hp: 0, taskId: 't1' }, timestamp: Date.now(),
@@ -120,10 +123,19 @@ describe('mastery accumulator', () => {
       type: 'TASK_UNCOMPLETED', moduleId: 'quests',
       payload: { xp: -10, hp: 0, taskId: 't1' }, timestamp: Date.now(),
     });
-    expect(masteryRow(db, 'quests')).toBe(before);
+    expect(masteryRow(db, 'quests')).toBe(0);
   });
 
-  it('ignores zero, negative and garbage deltas', () => {
+  it('a negative-XP EVENT still never erodes the accumulator', () => {
+    bumpMasteryXp(db, 'nutrition', 40);
+    processRpgEvent(db, {
+      type: 'DAY_SUMMARY', moduleId: 'nutrition',
+      payload: { xp: -20, hp: -10 }, timestamp: Date.now(),
+    });
+    expect(masteryRow(db, 'nutrition')).toBe(40);
+  });
+
+  it('ignores zero and garbage deltas, and never creates a row from a negative one', () => {
     bumpMasteryXp(db, 'quests', 0);
     bumpMasteryXp(db, 'quests', -50);
     bumpMasteryXp(db, 'quests', Number.NaN);
@@ -198,8 +210,10 @@ describe('rpg:getMasteries', () => {
     expect(quests.levelKey).toBe('rpg.mastery.ranks.journeyman');
     expect(quests.nextLevelXp).toBe(700);
     expect(quests.progress).toBeCloseTo((350 - 300) / (700 - 300));
-    // The 'rpg' pseudo-module (seals, achievements) accumulates but is not a bar.
+    // The 'rpg' pseudo-module (seals, achievements) is not a bar — and since
+    // the 2026-08 audit it does not even get a row.
     bumpMasteryXp(db, 'rpg', 999);
     expect(getMasteries(db).map((m) => m.moduleId)).toEqual([...MASTERY_MODULES]);
+    expect(db.prepare("SELECT COUNT(*) AS c FROM mastery_xp WHERE module_id = 'rpg'").get()).toEqual({ c: 0 });
   });
 });

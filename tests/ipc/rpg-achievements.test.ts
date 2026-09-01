@@ -74,11 +74,27 @@ describe('achievement backfill', () => {
     expect(stats(db).xp).toBe(xpAfterFirst);
   });
 
-  it('pays a flat +25 XP per unlock, with no combo and no bonus', () => {
+  // Audit 2026-08 (UI #9): the sweep used to pay +25 XP and +15 óbolos per
+  // historical unlock, so the first boot after an update minted a level-up out
+  // of years-old rows. The backfill now RECORDS without paying; only a live
+  // unlock pays.
+  it('records historical unlocks without paying for them', () => {
     seedEvent(db, 'quests', 'TASK_COMPLETED', 1);
     const unlocked = backfillAchievements(db).unlocked;
+    expect(unlocked.length).toBeGreaterThan(0);
 
-    expect(stats(db).xp).toBe(ACHIEVEMENT_XP * unlocked.length);
+    expect(stats(db).xp).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) AS c FROM rpg_events WHERE event_type = 'ACHIEVEMENT_UNLOCKED'").get())
+      .toEqual({ c: 0 });
+    expect(db.prepare('SELECT COUNT(*) AS c FROM achievements_unlocked').get()).toEqual({ c: unlocked.length });
+  });
+
+  it('a live unlock pays a flat +25 XP, with no combo and no bonus', () => {
+    const result = task(db, 't1');
+    const unlocked = result.achievementIds;
+    expect(unlocked.length).toBeGreaterThan(0);
+
+    expect(stats(db).xp as number).toBeCloseTo(result.xpGained + ACHIEVEMENT_XP * unlocked.length, 5);
     const rows = db.prepare(
       "SELECT xp_gained AS xp, combo_multiplier AS combo, bonus_multiplier AS bonus, ref_id AS refId, hp_change AS hp FROM rpg_events WHERE event_type = 'ACHIEVEMENT_UNLOCKED'"
     ).all() as Array<{ xp: number; combo: number; bonus: number; refId: string; hp: number }>;

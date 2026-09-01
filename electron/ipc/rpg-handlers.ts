@@ -19,6 +19,9 @@ import {
   sealWindowStatus,
   MAX_VIGOR,
   masteryInfo,
+  isMeaningfulEvent,
+  NON_MEANINGFUL_EVENT_TYPES,
+  ENGINE_MODULE_ID,
 } from '../../shared/rpg-engine';
 import {
   SHOP_CATALOG,
@@ -69,6 +72,9 @@ const REF_FIELD_BY_TYPE: Record<string, string> = {
   TASK_UNCOMPLETED: '$.taskId',
   SUBTASK_UNCOMPLETED: '$.subtaskId',
   HABIT_UNCHECKED: '$.habitId',
+  EXPENSE_LOGGED: '$.transactionId',
+  INCOME_LOGGED: '$.transactionId',
+  MOVEMENT_DELETED: '$.transactionId',
 };
 
 /**
@@ -89,8 +95,28 @@ const FLAT_XP_EVENTS = new Set(['DAY_SEALED', 'ACHIEVEMENT_UNLOCKED']);
  * is DERIVED from an action that was already counted, so it must not advance
  * anything; otherwise the streak could be kept alive by a reward it generated
  * itself. Neither of them ever touches the DAILY combo counter.
+ *
+ * ONLY when the sealed day is TODAY. A retro seal (`payload.retro === true`)
+ * is a memory of yesterday, and yesterday's events already moved the streak
+ * — if there were any. Letting it advance the streak with today's date made
+ * "seal yesterday" a daily button that kept a streak alive with zero activity.
  */
 const FLAT_STREAK_EVENTS = new Set(['DAY_SEALED']);
+
+/**
+ * SQL twin of `isMeaningfulEvent` (shared/rpg-engine.ts), for the counting
+ * queries. Built from the same list so the two rules can never drift.
+ * Types are fixed literals from the catalogue, never user input.
+ */
+const MEANINGFUL_EVENT_SQL =
+  `xp_gained > 0 AND module_id <> '${ENGINE_MODULE_ID}' AND event_type NOT IN (`
+  + NON_MEANINGFUL_EVENT_TYPES.map((t) => `'${t}'`).join(', ')
+  + ')';
+
+/** A YYYY-MM-DD string, or null. Anything else (garbage from the wire) is null. */
+function asDateString(value: unknown): string | null {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
 
 /**
  * Events forced to XP 0 / HP 0, whatever the payload claims.
@@ -118,6 +144,11 @@ const REF_PAYLOAD_KEY_BY_TYPE: Record<string, string> = {
   BUDGET_MONTH_MET: 'month',
   DAY_SEALED: 'date',
   ACHIEVEMENT_UNLOCKED: 'id',
+  // Coinify: a manual movement pays on alta and refunds on delete. Without a
+  // ref the delete could not find its alta, and add/delete was an infinite tap.
+  EXPENSE_LOGGED: 'transactionId',
+  INCOME_LOGGED: 'transactionId',
+  MOVEMENT_DELETED: 'transactionId',
 };
 
 /** The entity id an event refers to — persisted to rpg_events.ref_id on insert. */
@@ -191,10 +222,10 @@ const FINANCE_COUNTED_EVENTS = new Set([
   'INCOME_LOGGED',
 ]);
 
-/** The day BEFORE a YYYY-MM-DD date (noon anchor, so DST can never shift it). */
-function previousDateString(dateStr: string): string {
+/** `days` days before a YYYY-MM-DD date (noon anchor, so DST can never shift it). */
+function daysAgoFrom(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
-  d.setDate(d.getDate() - 1);
+  d.setDate(d.getDate() - days);
   return formatDateString(d);
 }
 
@@ -205,6 +236,29 @@ const EMPTY_RESULT: RpgEventResult = {
   achievementIds: [],
 };
 
+interface InnStatsRow {
+  inn_since: string | null;
+  streak_last_date: string | null;
+  streak: number;
+  pardons_month: string | null;
+  pardons_used: number;
+}
+
+/**
+ * Whether the streak is still ALIVE on `today`, i.e. the next real action
+ * would continue it rather than restart it: last acted today or yesterday, or
+ * exactly one day missed with a pardon left to cover it. Mirrors the gap rule
+ * in processRpgEvent (gap 1 → continues; gap 2 + pardon → continues; else dies).
+ */
+function streakIsAlive(db: Database.Database, row: InnStatsRow, today: string): boolean {
+  if (!row.streak_last_date || row.streak <= 0) return false;
+  const gap = daysDiff(row.streak_last_date, today);
+  if (gap <= 1) return true;
+  if (gap !== 2) return false;
+  const month = monthKey(today);
+  return pardonsRemaining(row.pardons_month, row.pardons_used ?? 0, month, purchasedPardonExtras(db, month)) > 0;
+}
+
 /**
  * Checks the player in/out of the Inn (holiday mode).
  *
@@ -213,30 +267,58 @@ const EMPTY_RESULT: RpgEventResult = {
  * another deadline to miss; this one ends when the player says so.
  *
  * While resting, events still pay full XP (using the app on holiday is neither
- * punished nor blocked) but the streak neither advances nor breaks. On check-out
- * `streak_last_date` is rewound to YESTERDAY, so the first day back continues the
- * streak exactly where it was — which also means the rest days never consume a
- * pardon, and no milestone is re-paid (`last_milestone_streak` is untouched).
+ * punished nor blocked) but the streak neither advances nor breaks.
+ *
+ * The Inn FREEZES a streak; it cannot resurrect one:
+ *   - check-in: if the streak is already dead on the check-in date (see
+ *     `streakIsAlive`) it is reset to 0 right there, so the sidebar stops
+ *     showing a number the next action would wipe anyway. `best_streak`
+ *     is never touched.
+ *   - check-out: the days spent at the Inn are removed from the calendar, but
+ *     the gap that already existed BEFORE check-in is preserved. The last
+ *     activity date is moved to `today - max(1, preGap)`, where preGap is the
+ *     distance between the last action and the check-in. Acted the day before
+ *     (or on) check-in → yesterday, the first day back continues the streak;
+ *     one missed day before check-in → the return still needs a pardon; more
+ *     → the streak dies exactly as it would have without the holiday.
+ *
+ * Before this, check-out rewound to YESTERDAY unconditionally, so "Posada →
+ * Volver" turned any ten-day silence into a one-day gap for free.
  */
 export function setInnMode(db: Database.Database, on: boolean, today = getLocalDateString()): { innSince: string | null } {
-  const row = db.prepare('SELECT inn_since, streak_last_date FROM player_stats WHERE user_id = ?').get('default') as
-    { inn_since: string | null; streak_last_date: string | null } | undefined;
+  const row = db.prepare(
+    'SELECT inn_since, streak_last_date, streak, pardons_month, pardons_used FROM player_stats WHERE user_id = ?'
+  ).get('default') as InnStatsRow | undefined;
   if (!row) return { innSince: null };
 
   if (on) {
     // Already resting: keep the original check-in date.
     if (row.inn_since) return { innSince: row.inn_since };
-    db.prepare("UPDATE player_stats SET inn_since = ? WHERE user_id = 'default'").run(today);
+    if (row.streak > 0 && !streakIsAlive(db, row, today)) {
+      // Nothing to freeze: the streak had already fallen. Make the state honest
+      // now instead of letting the Inn carry a corpse back to life.
+      db.prepare("UPDATE player_stats SET inn_since = ?, streak = 0, last_milestone_streak = 0 WHERE user_id = 'default'")
+        .run(today);
+    } else {
+      db.prepare("UPDATE player_stats SET inn_since = ? WHERE user_id = 'default'").run(today);
+    }
     return { innSince: today };
   }
 
   if (!row.inn_since) return { innSince: null };
   // Only rewind when the player has not already acted today — otherwise a
   // check-in/check-out round trip on the same day would let the streak tick twice.
-  const shouldRewind = row.streak_last_date !== today;
+  // With no last activity at all there is nothing to rewind either.
+  const lastDate = row.streak_last_date;
+  const shouldRewind = lastDate !== null && lastDate !== today;
   if (shouldRewind) {
+    const preGap = Math.max(1, daysDiff(lastDate, row.inn_since));
+    const rewound = daysAgoFrom(today, preGap);
+    // Never move the date backwards: the pre-Inn gap can only be preserved, not
+    // enlarged (relevant when the check-in date is later than the last action).
+    const restored = rewound > lastDate ? rewound : lastDate;
     db.prepare("UPDATE player_stats SET inn_since = NULL, streak_last_date = ? WHERE user_id = 'default'")
-      .run(previousDateString(today));
+      .run(restored);
   } else {
     db.prepare("UPDATE player_stats SET inn_since = NULL WHERE user_id = 'default'").run();
   }
@@ -251,7 +333,9 @@ export function setInnMode(db: Database.Database, on: boolean, today = getLocalD
  * an Electron main process.
  */
 export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEventResult {
-    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED' || event.type === 'HABIT_UNCHECKED';
+    const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED'
+      || event.type === 'HABIT_UNCHECKED' || event.type === 'MOVEMENT_DELETED';
+    let undoReversedMovement = false;
 
     const processTransaction = db.transaction(() => {
       const today = getLocalDateString();
@@ -307,6 +391,8 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       let bestStreak = (stats.best_streak as number) ?? 0;
       // Inn (holiday) mode: XP flows normally, the streak is frozen.
       const innActive = !!(stats.inn_since as string | null);
+      // Set by the undo branch: the mastery entry the reversed event had added.
+      let masteryRefund: { moduleId: string; xp: number } | null = null;
 
       if (isUndo) {
         // Find the original completion event and reverse its exact XP.
@@ -315,10 +401,17 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           'SUBTASK_UNCOMPLETED': 'SUBTASK_COMPLETED',
           'HABIT_UNCHECKED': 'HABIT_CHECKED',
         };
-        const originalType = undoMap[event.type];
+        // A deleted movement names which alta it annuls via movementType.
+        const originalType = event.type === 'MOVEMENT_DELETED'
+          ? (payload?.movementType === 'income' ? 'INCOME_LOGGED' : 'EXPENSE_LOGGED')
+          : undoMap[event.type];
         const itemId = extractRefId(event.type, payload);
+        // When the undo names the day it belongs to (a retro habit check carries
+        // `payload.date`), only an original of THAT day qualifies. An original
+        // without an explicit date belongs to the day it was written.
+        const undoDate = asDateString(payload?.date);
 
-        let originalEvent: { id: number; xp_gained: number; created_at: string } | undefined;
+        let originalEvent: { id: number; xp_gained: number; created_at: string; module_id: string } | undefined;
         if (itemId && originalType) {
           // Match on ref_id (indexed, backfilled by the `core` v1 migration), with a
           // json_extract fallback for rows whose payload was not valid JSON.
@@ -326,18 +419,28 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           // un-completing task `abc` could revert (and delete) the event of a different
           // task that merely carried `projectId: "abc"`.
           const refField = REF_FIELD_BY_TYPE[originalType];
+          const dateClause = undoDate
+            ? "AND COALESCE(json_extract(payload, '$.date'), substr(created_at, 1, 10)) = ?"
+            : '';
+          const params: unknown[] = [originalType, itemId, itemId];
+          if (undoDate) params.push(undoDate);
           originalEvent = db.prepare(`
-            SELECT id, xp_gained, created_at FROM rpg_events
+            SELECT id, xp_gained, created_at, module_id FROM rpg_events
             WHERE event_type = ?
               AND (ref_id = ? OR (ref_id IS NULL AND json_extract(payload, '${refField}') = ?))
+              ${dateClause}
             ORDER BY id DESC LIMIT 1
-          `).get(originalType, itemId, itemId) as typeof originalEvent;
+          `).get(...params as never[]) as typeof originalEvent;
         }
 
         if (originalEvent) {
           xpGained = -originalEvent.xp_gained;
+          if (event.type === 'MOVEMENT_DELETED') undoReversedMovement = true;
           // Delete the original event from the log
           db.prepare('DELETE FROM rpg_events WHERE id = ?').run(originalEvent.id);
+          // The mastery bar mirrors the log: the entry it added is taken back
+          // too (floored at 0). Not "negative XP" — the annulment of an entry.
+          masteryRefund = { moduleId: originalEvent.module_id, xp: originalEvent.xp_gained };
           // Decrement combo if it was from today
           const eventDate = originalEvent.created_at.slice(0, 10);
           if (eventDate === today && combo > 0) {
@@ -352,9 +455,10 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         // The reward is exactly what was declared — no dice, no multiplier.
         xpGained = baseXp;
         comboIncrement = 0;
-        // DAY_SEALED counts as showing up (streak yes, combo no);
+        // DAY_SEALED counts as showing up (streak yes, combo no) — but only the
+        // seal of TODAY. A retro seal is a memory, and memories do not show up.
         // ACHIEVEMENT_UNLOCKED is derived and advances nothing at all.
-        advancesProgress = FLAT_STREAK_EVENTS.has(event.type);
+        advancesProgress = FLAT_STREAK_EVENTS.has(event.type) && payload?.retro !== true;
       } else if (baseXp > 0) {
         advancesProgress = true;
         if ((stats.combo_date as string | null) !== today) combo = 0;
@@ -441,10 +545,16 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       );
 
       // Mastery accumulator: same transaction as the event, so the bar can
-      // never drift from the log it mirrors. Only positive XP counts (undo
-      // logs 0; a negative nutrition close must not erode a mastery) — the
-      // accumulator is monotonic by design.
-      bumpMasteryXp(db, event.moduleId, loggedXp, now);
+      // never drift from the log it mirrors. Only positive XP feeds it (a
+      // negative nutrition close must not erode a mastery); an UNDO takes back
+      // exactly the entry its original added, because the original row is gone
+      // from the log the bar mirrors. Without that, complete/uncomplete was a
+      // free mastery pump.
+      if (masteryRefund) {
+        bumpMasteryXp(db, masteryRefund.moduleId, -masteryRefund.xp, now);
+      } else {
+        bumpMasteryXp(db, event.moduleId, loggedXp, now);
+      }
 
       if (isUndo) {
         db.prepare(`
@@ -507,6 +617,8 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         db.prepare('UPDATE player_stats SET total_meals = total_meals + 1 WHERE user_id = ?').run('default');
       } else if (FINANCE_COUNTED_EVENTS.has(event.type)) {
         db.prepare('UPDATE player_stats SET total_expenses = total_expenses + 1 WHERE user_id = ?').run('default');
+      } else if (undoReversedMovement) {
+        db.prepare('UPDATE player_stats SET total_expenses = MAX(0, total_expenses - 1) WHERE user_id = ?').run('default');
       }
 
       return {
@@ -539,8 +651,30 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       };
     });
 
+    // The catch covers ONLY the transaction. Once it has committed, nothing
+    // below may write to rpg_events again: the old shape wrapped the reward
+    // layer too, so a matcher hiccup after the commit logged a SECOND row of
+    // the same event with 0 XP and the same ref_id — the row a later undo
+    // would pick, leaving the real XP paid on an open task.
+    let committed: ReturnType<typeof processTransaction>;
     try {
-      const { result, seed, previousEventAt, today } = processTransaction();
+      committed = processTransaction();
+    } catch (err) {
+      console.error(`[RPG] Error processing event "${event.type}":`, err);
+      try {
+        db.prepare(`
+          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at, ref_id, sync_id)
+          VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?, ?, ?)
+        `).run(
+          event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp(),
+          extractRefId(event.type, event.payload as Record<string, unknown> | null), crypto.randomUUID(),
+        );
+      } catch { /* best effort logging */ }
+      return { ...EMPTY_RESULT };
+    }
+
+    const { result, seed, previousEventAt, today } = committed;
+    try {
       // Central broadcast: callers of processRpgEvent are scattered across four
       // modules; one listener in Layout turns this into the single, discreet
       // "se uso un indulto" toast instead of wiring every call site.
@@ -558,21 +692,12 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       // re-enter the matcher that produced it.
       result.achievementIds = evaluateAchievements(db, seed, today, previousEventAt);
       for (const id of result.achievementIds) broadcast('rpg:achievementUnlocked', { id });
-
-      return result;
     } catch (err) {
-      console.error(`[RPG] Error processing event "${event.type}":`, err);
-      try {
-        db.prepare(`
-          INSERT INTO rpg_events (module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, created_at, ref_id, sync_id)
-          VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?, ?, ?)
-        `).run(
-          event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp(),
-          extractRefId(event.type, event.payload as Record<string, unknown> | null), crypto.randomUUID(),
-        );
-      } catch { /* best effort logging */ }
-      return { ...EMPTY_RESULT };
+      // The XP is paid and logged; only the decoration failed.
+      console.error(`[RPG] reward layer failed after "${event.type}" committed:`, err);
+      result.achievementIds = [];
     }
+    return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -643,21 +768,31 @@ export function buildAchievementContext(
     innSince: (row?.innSince as string | null) ?? null,
   };
 
+  // `byType` / `byModule` stay RAW: the first_* / day_off / second_chance
+  // entries look for the existence of a specific kind of row, zero-XP ones
+  // included. `total` (the Cronista ladder, first_step) counts only
+  // MEANINGFUL rows — 100 empty QuickAdds are not a chronicle.
   const lifetime = memo(() => {
     const rows = db.prepare(
-      'SELECT module_id AS m, event_type AS t, COUNT(*) AS c FROM rpg_events GROUP BY module_id, event_type'
-    ).all() as Array<{ m: string; t: string; c: number }>;
+      `SELECT module_id AS m, event_type AS t, COUNT(*) AS c,
+              SUM(CASE WHEN ${MEANINGFUL_EVENT_SQL} THEN 1 ELSE 0 END) AS meaningful
+       FROM rpg_events GROUP BY module_id, event_type`
+    ).all() as Array<{ m: string; t: string; c: number; meaningful: number }>;
     const byType: Record<string, number> = {};
     const byModule: Record<string, number> = {};
     let total = 0;
     for (const r of rows) {
       byType[r.t] = (byType[r.t] ?? 0) + r.c;
       byModule[r.m] = (byModule[r.m] ?? 0) + r.c;
-      total += r.c;
+      total += r.meaningful ?? 0;
     }
     return { total, byType, byModule };
   });
 
+  // Same split for the day: `count` / `modules` / `types` (polymath,
+  // sunday_guardian, perfect_day) see only meaningful rows, so an undo, a
+  // QuickAdd or the engine's own ACHIEVEMENT_UNLOCKED can never pass as
+  // "variety". `byType`, `xp`, `epics` and `maxCombo` stay raw.
   const day = memo(() => {
     const rows = db.prepare(
       `SELECT module_id AS m, event_type AS t, xp_gained AS xp,
@@ -667,19 +802,23 @@ export function buildAchievementContext(
     const byType: Record<string, number> = {};
     const modules = new Set<string>();
     const types = new Set<string>();
+    let count = 0;
     let xp = 0;
     let epics = 0;
     let maxCombo = 0;
     for (const r of rows) {
       byType[r.t] = (byType[r.t] ?? 0) + 1;
-      modules.add(r.m);
-      types.add(r.t);
       xp += r.xp;
       if (r.bonus >= 3.0) epics++;
       if (r.combo > maxCombo) maxCombo = r.combo;
+      if (isMeaningfulEvent({ moduleId: r.m, eventType: r.t, xpGained: r.xp })) {
+        count++;
+        modules.add(r.m);
+        types.add(r.t);
+      }
     }
     return {
-      count: rows.length, byType, xp, epics, maxCombo,
+      count, byType, xp, epics, maxCombo,
       modules: [...modules], types: [...types],
     };
   });
@@ -724,12 +863,24 @@ export function buildAchievementContext(
 }
 
 /**
+ * How an unlock is paid.
+ *   - 'live': the event that just landed earned it → flat +25 XP, its own
+ *     ACHIEVEMENT_UNLOCKED row, +15 óbolos, one broadcast per id.
+ *   - 'backfill': the catalogue sweep found history that already satisfies it
+ *     → the unlock is RECORDED (shelf, unlocked_at) and nothing is paid. The
+ *     economy is born at zero for old history — the same call as unsealed past
+ *     days. Without this, the first boot after an update fired N toasts, N XP
+ *     payouts and a level-up out of years-old rows.
+ */
+export type UnlockMode = 'live' | 'backfill';
+
+/**
  * Evaluates every STILL-LOCKED achievement and awards the ones that fire.
  *
  * An unlocked achievement is never re-checked and never revoked — the filter
  * below is both the cheap path and the guarantee.
  *
- * Each unlock pays a flat +25 XP, logged as its own ACHIEVEMENT_UNLOCKED row so
+ * A LIVE unlock pays a flat +25 XP, logged as its own ACHIEVEMENT_UNLOCKED row so
  * the Códice can show it. The row is written DIRECTLY rather than through
  * processRpgEvent: routing it back would recurse into the matcher that produced
  * it, and would let a reward carry a combo/bonus roll of its own.
@@ -739,6 +890,7 @@ export function evaluateAchievements(
   event: AchievementEventContext | null,
   today: string = getLocalDateString(),
   previousEventAt: string | null = null,
+  mode: UnlockMode = 'live',
 ): string[] {
   let alreadyUnlocked: Set<string>;
   try {
@@ -776,8 +928,11 @@ export function evaluateAchievements(
     `);
     for (const id of newly) {
       insertUnlock.run(id, now, now);
-      insertEvent.run(ACHIEVEMENT_XP, JSON.stringify({ id, xp: ACHIEVEMENT_XP }), now, id, crypto.randomUUID());
+      if (mode === 'live') {
+        insertEvent.run(ACHIEVEMENT_XP, JSON.stringify({ id, xp: ACHIEVEMENT_XP }), now, id, crypto.randomUUID());
+      }
     }
+    if (mode !== 'live') return;
     db.prepare('UPDATE player_stats SET xp = xp + ? WHERE user_id = ?')
       .run(ACHIEVEMENT_XP * newly.length, 'default');
     const after = db.prepare('SELECT xp FROM player_stats WHERE user_id = ?').get('default') as { xp: number };
@@ -795,10 +950,11 @@ export function evaluateAchievements(
 
   // Óbolos ride OUTSIDE the award transaction and behind their own guards:
   // a ledger problem must never roll back the unlock it decorates. Idempotent
-  // per achievement id, so the backfill sweep can never pay one twice — and the
-  // same helper serves both the live unlock and the backfill path, which both
-  // arrive here.
-  for (const id of newly) grantObolos(db, 'achievement', id, ACHIEVEMENT_OBOLOS);
+  // per achievement id, so a re-unlock can never pay one twice. The backfill
+  // records without paying (see UnlockMode).
+  if (mode === 'live') {
+    for (const id of newly) grantObolos(db, 'achievement', id, ACHIEVEMENT_OBOLOS);
+  }
 
   return newly;
 }
@@ -837,13 +993,18 @@ export function getAchievements(db: Database.Database): AchievementState[] {
  * "already true on every existing install" entries (`first_step`,
  * `awakening`) make the shelf read 2/40 instead of 0/40 the first time an
  * upgraded account opens it.
+ *
+ * Records without paying (UnlockMode 'backfill'): no XP, no óbolos, no
+ * ACHIEVEMENT_UNLOCKED rows. And ONE aggregated `rpg:achievementsBackfilled
+ * { ids }` broadcast instead of a per-id `rpg:achievementUnlocked` — the
+ * renderer shows a single "N logros reconocidos" note, not N toasts.
  */
 export function backfillAchievements(
   db: Database.Database,
   today: string = getLocalDateString(),
 ): { unlocked: string[]; total: number } {
-  const unlocked = evaluateAchievements(db, null, today, null);
-  for (const id of unlocked) broadcast('rpg:achievementUnlocked', { id });
+  const unlocked = evaluateAchievements(db, null, today, null, 'backfill');
+  if (unlocked.length > 0) broadcast('rpg:achievementsBackfilled', { ids: unlocked });
   return { unlocked, total: ACHIEVEMENTS_TOTAL };
 }
 
@@ -958,30 +1119,41 @@ function readSeal(db: Database.Database, date: string): DaySeal | null {
 }
 
 /**
- * The Vigor a seal for `date` is worth.
+ * The Vigor a seal for `date` is worth — the Vigor that day really CLOSED at.
  *
- * TODAY uses the live Vigor (`player_stats.hp`, which only describes the day
- * named by `hp_date`).
+ *   1. If `player_stats.hp` still belongs to `date` (`hp_date === date`, i.e.
+ *      the rollover has not fired yet), that is the exact value.
+ *   2. Otherwise, for TODAY, the day is fresh: MAX_VIGOR.
+ *   3. Otherwise (a past day whose live value the rollover wiped) the closing
+ *      Vigor is REPLAYED from the day's own rows: the day started at 100 and
+ *      every event applied `clampHp(hp + hp_change)` in order — the exact
+ *      arithmetic the live path ran, so the number is the same one the sidebar
+ *      showed that night.
  *
- * DECISION — ANY OTHER DAY USES MAX_VIGOR (100 → vigorBonus 1.10). We do not
- * store historical Vigor, so yesterday's closing value is simply not available
- * once the lazy rollover has fired, and reading `hp` in that window would make
- * the payout depend on whether the summary happened to be opened first. Given a
- * choice between charging the player for data we failed to keep and being
- * generous, the design rule ("the ritual never punishes") picks generous —
- * and, just as importantly, deterministic.
+ * Why not the old "any other day → 100": a night closed at Vigor 40 paid 1.00x
+ * when sealed that night and 1.10x when sealed the morning after, so the
+ * ritual "close the day" became "close yesterday". Replaying makes sealing
+ * tomorrow worth exactly what sealing tonight was worth — never more.
  */
 export function sealVigorFor(
   db: Database.Database,
   date: string,
   today: string = getLocalDateString(),
 ): number {
-  if (date !== today) return MAX_VIGOR;
   const row = db.prepare(
     'SELECT hp, hp_date AS hpDate FROM player_stats WHERE user_id = ?'
   ).get('default') as { hp: number; hpDate: string | null } | undefined;
-  if (row && row.hpDate === today) return clampHp(row.hp);
-  return MAX_VIGOR;
+  if (row && row.hpDate === date) return clampHp(row.hp);
+  if (date === today) return MAX_VIGOR;
+
+  const deltas = db.prepare(
+    `SELECT hp_change AS hp FROM rpg_events
+     WHERE created_at >= ? AND created_at < ?
+     ORDER BY created_at ASC, id ASC`
+  ).all(date, nextDateString(date)) as Array<{ hp: number }>;
+  let vigor = MAX_VIGOR;
+  for (const d of deltas) vigor = clampHp(vigor + (d.hp || 0));
+  return vigor;
 }
 
 /** Everything the Códice page renders for one local day. Read-only. */
@@ -1003,12 +1175,23 @@ export function getDaySummary(
 
   const events: DaySummaryEvent[] = rows.map((r) => ({ ...r, time: r.createdAt.slice(11, 16) }));
 
+  // The timeline (`events`, `byModule`) shows EVERYTHING that was written that
+  // day. What the seal certifies — `eventsCount`, `modules`, `empty_day` — is
+  // only the meaningful rows (see isMeaningfulEvent): the same numbers
+  // `sealDay` will pay for, so the invitation never promises what the seal
+  // then refuses.
   const grouped = new Map<string, DaySummaryModule>();
+  const meaningfulModules = new Set<string>();
+  let meaningfulCount = 0;
   let totalXp = 0;
   let maxCombo = 1.0;
   for (const e of events) {
     totalXp += e.xpGained;
     if (e.comboMultiplier > maxCombo) maxCombo = e.comboMultiplier;
+    if (isMeaningfulEvent(e)) {
+      meaningfulCount++;
+      meaningfulModules.add(e.moduleId);
+    }
     let bucket = grouped.get(e.moduleId);
     if (!bucket) {
       bucket = { moduleId: e.moduleId, count: 0, xp: 0, events: [] };
@@ -1029,7 +1212,7 @@ export function getDaySummary(
   else {
     const window = sealWindowStatus(date, today);
     if (window !== 'ok') sealBlockedReason = window;
-    else if (events.length === 0) sealBlockedReason = 'empty_day';
+    else if (meaningfulCount === 0) sealBlockedReason = 'empty_day';
   }
 
   return {
@@ -1037,10 +1220,10 @@ export function getDaySummary(
     isToday: date === today,
     events,
     byModule,
-    eventsCount: events.length,
+    eventsCount: meaningfulCount,
     totalXp: Math.round(totalXp * 100) / 100,
     maxCombo,
-    modules: byModule.map((m) => m.moduleId),
+    modules: byModule.map((m) => m.moduleId).filter((m) => meaningfulModules.has(m)),
     vigor: sealVigorFor(db, date, today),
     streak: stats?.streak ?? 0,
     sealed: seal !== null,
@@ -1057,12 +1240,18 @@ export function getDaySummary(
  *   - today or yesterday only. The grace window exists precisely so a forgotten
  *     night is recoverable; anything older is 'too_old' and simply stays unsealed,
  *     which costs nothing — there is no seal streak and no decay.
- *   - a day with zero events cannot be sealed ('empty_day'): the seal certifies a
- *     day that was lived, not a button that was pressed.
+ *   - a day with zero MEANINGFUL events cannot be sealed ('empty_day'): the seal
+ *     certifies a day that was lived, not a button that was pressed. Engine rows
+ *     (a previous seal, an achievement), undos and zero-XP registrations are not
+ *     living (see isMeaningfulEvent) — and they never raise the event cap either.
  *   - XP = round((10 + 2 * min(events, 20)) * vigorBonus(vigor)) — 12..55 XP.
  *
- * The reward is emitted as a flat DAY_SEALED event, so it advances the global
- * streak (sealing IS showing up) while taking no combo and no random bonus.
+ * The reward is emitted as a flat DAY_SEALED event: no combo, no random bonus.
+ * Sealing TODAY advances the global streak (sealing IS showing up); sealing
+ * yesterday inside the grace window pays but leaves the streak alone.
+ *
+ * Seal row + DAY_SEALED event + óbolos are ONE transaction: either the day is
+ * sealed and paid, or nothing happened and it can be retried.
  */
 export function sealDay(
   db: Database.Database,
@@ -1075,11 +1264,12 @@ export function sealDay(
 
   const dayEnd = nextDateString(date);
   const rows = db.prepare(
-    'SELECT DISTINCT module_id AS moduleId FROM rpg_events WHERE created_at >= ? AND created_at < ?'
+    `SELECT DISTINCT module_id AS moduleId FROM rpg_events
+     WHERE created_at >= ? AND created_at < ? AND ${MEANINGFUL_EVENT_SQL}`
   ).all(date, dayEnd) as Array<{ moduleId: string }>;
   const eventsCount = safeCount(
     db,
-    'SELECT COUNT(*) AS c FROM rpg_events WHERE created_at >= ? AND created_at < ?',
+    `SELECT COUNT(*) AS c FROM rpg_events WHERE created_at >= ? AND created_at < ? AND ${MEANINGFUL_EVENT_SQL}`,
     date, dayEnd,
   );
   if (eventsCount === 0) return { ok: false, reason: 'empty_day' };
@@ -1089,42 +1279,53 @@ export function sealDay(
   const xpAwarded = sealXp(eventsCount, vigor);
   const now = localTimestamp();
 
-  try {
-    db.prepare(`
-      INSERT INTO day_seals (date, sealed_at, xp_awarded, vigor, events_count, modules, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(date, now, xpAwarded, vigor, eventsCount, JSON.stringify(modules), now);
-  } catch (err) {
-    // UNIQUE violation = someone sealed it between the check and here.
-    console.error('[RPG] sealDay insert failed:', err);
-    return { ok: false, reason: 'already_sealed' };
-  }
+  const seal = db.transaction((): SealResult => {
+    try {
+      db.prepare(`
+        INSERT INTO day_seals (date, sealed_at, xp_awarded, vigor, events_count, modules, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(date, now, xpAwarded, vigor, eventsCount, JSON.stringify(modules), now);
+    } catch (err) {
+      // UNIQUE violation = someone sealed it between the check and here.
+      console.error('[RPG] sealDay insert failed:', err);
+      return { ok: false, reason: 'already_sealed' };
+    }
 
-  // Written after the seal row exists, so `first_seal` / `sealed_week` /
-  // `steady_hand` see the new count in the very same pass.
-  const result = processRpgEvent(db, {
-    type: 'DAY_SEALED',
-    moduleId: 'rpg',
-    payload: {
-      xp: xpAwarded, hp: 0, date, vigor, eventsCount, modules,
-      /** Retro-sealed yesterday inside the grace window. */
-      retro: date !== today,
-    },
-    timestamp: Date.now(),
+    // Written after the seal row exists, so `first_seal` / `sealed_week` /
+    // `steady_hand` see the new count in the very same pass. Nested inside
+    // this transaction (better-sqlite3 turns it into a savepoint).
+    const result = processRpgEvent(db, {
+      type: 'DAY_SEALED',
+      moduleId: ENGINE_MODULE_ID,
+      payload: {
+        xp: xpAwarded, hp: 0, date, vigor, eventsCount, modules,
+        /** Retro-sealed yesterday inside the grace window. */
+        retro: date !== today,
+      },
+      timestamp: Date.now(),
+    });
+    // processRpgEvent swallows its own failure (EMPTY_RESULT, 0 XP). A seal
+    // whose XP never landed must not exist: throw, and the transaction takes
+    // the seal row (and the 0-XP failure row) back with it.
+    if (result.xpGained <= 0) {
+      throw new Error(`[RPG] sealDay: DAY_SEALED for ${date} paid nothing — seal rolled back`);
+    }
+
+    // The seal's óbolos: keyed by the sealed date, so even if two devices race
+    // (the day_seals PK already makes the seal first-wins) the ledger entry is
+    // minted exactly once. A ledger failure degrades to obolosGranted = 0
+    // rather than failing the seal.
+    const obolosGranted = grantObolos(db, 'day_sealed', date, sealObolos(xpAwarded));
+
+    return {
+      ok: true, date, xpAwarded, vigor, eventsCount, modules,
+      achievementIds: result.achievementIds, obolosGranted,
+    };
   });
 
-  // The seal's óbolos: keyed by the sealed date, so even if two devices race
-  // (the day_seals PK already makes the seal first-wins) the ledger entry is
-  // minted exactly once. A failure here degrades to obolosGranted = 0 — the
-  // reward layer never takes the ritual down.
-  const obolosGranted = grantObolos(db, 'day_sealed', date, sealObolos(xpAwarded));
-
-  broadcast('rpg:daySealed', { date, xpAwarded });
-
-  return {
-    ok: true, date, xpAwarded, vigor, eventsCount, modules,
-    achievementIds: result.achievementIds, obolosGranted,
-  };
+  const outcome = seal();
+  if (outcome.ok) broadcast('rpg:daySealed', { date, xpAwarded });
+  return outcome;
 }
 
 /** Seals in [fromDate, toDate], inclusive, ascending — the seal calendar. */
@@ -1397,11 +1598,13 @@ function readAppState(db: Database.Database, key: string): string | null {
 /** The per-device equipment, validated against the catalogue. */
 export function getShopEquipped(db: Database.Database): ShopEquipped {
   const equipped: ShopEquipped = { sealStyle: null, frame: null, background: null };
+  const ownsItem = db.prepare('SELECT 1 FROM shop_purchases WHERE item_id = ?');
   for (const kind of EQUIPPABLE_KINDS) {
     const raw = readAppState(db, EQUIP_STATE_KEYS[kind]);
-    // Only a real catalogue id of the right kind survives the read; anything
-    // else (stale key, hand-edited value) degrades to the default look.
-    if (raw && SHOP_CATALOG_BY_ID.get(raw)?.kind === kind) {
+    // Only a real catalogue id of the right kind that this account actually
+    // OWNS survives the read; anything else (stale key, hand-edited value, a
+    // purchase that lived on another account) degrades to the default look.
+    if (raw && SHOP_CATALOG_BY_ID.get(raw)?.kind === kind && ownsItem.get(raw)) {
       equipped[EQUIPPED_FIELD[kind]] = raw;
     }
   }
@@ -1575,10 +1778,21 @@ export function equipShopItem(
 /** The four modules that get a mastery bar (same set as "Día Perfecto"). */
 export const MASTERY_MODULES = ['quests', 'nutrition', 'finance', 'cauldron'] as const;
 
+/** SQL list of the mastery modules — fixed literals, safe to inline. */
+const MASTERY_MODULES_SQL = MASTERY_MODULES.map((m) => `'${m}'`).join(', ');
+
 /**
- * Adds one event's positive XP to its module's accumulator. Same transaction
- * as the event insert — but wrapped, because a pre-v6 handle mid-migration
- * must degrade to "no mastery this time", never take the XP down with it.
+ * Moves one module's accumulator by `xpDelta`. Same transaction as the event
+ * insert — but wrapped, because a pre-v6 handle mid-migration must degrade to
+ * "no mastery this time", never take the XP down with it.
+ *
+ *   - positive delta: an event paid → added.
+ *   - negative delta: an UNDO took its original back → subtracted, floored at
+ *     0, and never creates a row. (A negative-XP EVENT never reaches here: the
+ *     engine passes its logged XP, which is 0 for anything that did not pay.)
+ *   - only the four bar modules: the engine's own 'rpg' rows (seal,
+ *     achievements) used to grow a phantom `mastery_xp('rpg')` row that
+ *     nothing reads but everything syncs.
  */
 export function bumpMasteryXp(
   db: Database.Database,
@@ -1586,21 +1800,31 @@ export function bumpMasteryXp(
   xpDelta: number,
   now: string = localTimestamp(),
 ): void {
-  const delta = Math.round(xpDelta);
-  if (!Number.isFinite(delta) || delta <= 0 || !moduleId) return;
+  // Symmetric rounding: Math.round(-7.5) is -7 in JS while Math.round(7.5) is
+  // 8, so an add/refund pair on a x1.5 bonus leaked +1 mastery per cycle.
+  const delta = Math.sign(xpDelta) * Math.round(Math.abs(xpDelta));
+  if (!Number.isFinite(delta) || delta === 0 || !moduleId) return;
+  if (!(MASTERY_MODULES as readonly string[]).includes(moduleId)) return;
   try {
-    db.prepare(`
-      INSERT INTO mastery_xp (module_id, xp, updated_at) VALUES (?, ?, ?)
-      ON CONFLICT(module_id) DO UPDATE SET xp = xp + excluded.xp, updated_at = excluded.updated_at
-    `).run(moduleId, delta, now);
+    if (delta > 0) {
+      db.prepare(`
+        INSERT INTO mastery_xp (module_id, xp, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(module_id) DO UPDATE SET xp = xp + excluded.xp, updated_at = excluded.updated_at
+      `).run(moduleId, delta, now);
+    } else {
+      db.prepare(
+        'UPDATE mastery_xp SET xp = MAX(0, xp + ?), updated_at = ? WHERE module_id = ?'
+      ).run(delta, now, moduleId);
+    }
   } catch { /* pre-v6 handle: the accumulator can wait, the event cannot */ }
 }
 
 /**
  * Idempotent backfill: seeds the accumulator from the surviving event log for
  * modules that have NO row yet, and never touches a module that already has
- * one (its accumulator is ahead of the pruned log by definition). Same
- * statement the v6 migration runs — exported for tests and self-heal.
+ * one (its accumulator is ahead of the pruned log by definition). Same shape
+ * as the v6 migration, restricted to the bar modules — exported for tests and
+ * self-heal.
  */
 export function backfillMasteryXp(db: Database.Database): void {
   try {
@@ -1608,6 +1832,7 @@ export function backfillMasteryXp(db: Database.Database): void {
       INSERT OR IGNORE INTO mastery_xp (module_id, xp, updated_at)
         SELECT module_id, CAST(ROUND(SUM(MAX(xp_gained, 0))) AS INTEGER), ?
         FROM rpg_events
+        WHERE module_id IN (${MASTERY_MODULES_SQL})
         GROUP BY module_id
     `).run(localTimestamp());
   } catch { /* pre-v6 handle */ }

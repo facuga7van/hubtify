@@ -214,14 +214,18 @@ describe('Inn mode (phase 1, task 3)', () => {
   });
 
   it('pays XP but freezes the streak while resting', () => {
-    primeStreak(db, 25, 3, { bestStreak: 25 });
+    // Audit 2026-08 (#2): the Inn freezes a LIVING streak. This used to check
+    // in with a three-day gap — a streak that was already dead — and expect it
+    // frozen at 25; now check-in with a dead streak resets it, so the fixture
+    // acts the day before check-in.
+    primeStreak(db, 25, 1, { bestStreak: 25 });
     setInnMode(db, true);
 
     const result = task(db, 't1', 10);
 
     expect(result.xpGained).toBeGreaterThanOrEqual(10); // XP flows normally
     expect(stats(db).streak).toBe(25);                  // frozen, neither +1 nor reset
-    expect(stats(db).streak_last_date).toBe(dateNDaysAgo(3));
+    expect(stats(db).streak_last_date).toBe(dateNDaysAgo(1));
     expect(result.pardonUsed).toBe(false);
     expect(stats(db).pardons_used).toBe(0);
   });

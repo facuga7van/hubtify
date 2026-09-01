@@ -164,16 +164,28 @@ describe('rpg:sealDay', () => {
     expect(sealDay(db, TODAY, TODAY)).toEqual({ ok: false, reason: 'already_sealed' });
   });
 
-  it('allows the grace window (yesterday) at a neutral, generous vigor', () => {
+  // Audit 2026-08 (#8): a retro seal used to assume vigor 100, so sealing
+  // "yesterday" beat sealing "tonight" whenever the day closed battered. It now
+  // uses the vigor that day really closed at (the live row while it still
+  // belongs to that day, otherwise a replay of the day's hp deltas).
+  it('allows the grace window (yesterday) at the vigor that day closed at', () => {
     seedEvent(db, 'quests', 'TASK_COMPLETED', YESTERDAY);
     db.prepare('UPDATE player_stats SET hp = 40, hp_date = ? WHERE user_id = ?').run(YESTERDAY, 'default');
 
     const result = sealDay(db, YESTERDAY, TODAY);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // Historical vigor is not stored, and the ritual never punishes: 100.
+    expect(result.vigor).toBe(40);
+    expect(result.xpAwarded).toBe(sealXp(result.eventsCount, 40));
+  });
+
+  it('a past day with no hp movement is sealed at full vigor', () => {
+    seedEvent(db, 'quests', 'TASK_COMPLETED', YESTERDAY);
+    db.prepare('UPDATE player_stats SET hp = 100, hp_date = ? WHERE user_id = ?').run(TODAY, 'default');
+    const result = sealDay(db, YESTERDAY, TODAY);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
     expect(result.vigor).toBe(MAX_VIGOR);
-    expect(result.xpAwarded).toBe(sealXp(result.eventsCount, MAX_VIGOR));
   });
 
   it('flags a retro seal in the payload', () => {
