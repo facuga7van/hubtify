@@ -48,6 +48,8 @@ export default function NutritionSettings() {
   const [activity, setActivity] = useState('moderate');
   const [goal, setGoal] = useState<Goal>('deficit');
   const [goalAmount, setGoalAmount] = useState(500);
+  // '' = auto (peso × 1.6 g/kg); un número = objetivo fijado a mano.
+  const [proteinTarget, setProteinTarget] = useState('');
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>({ ...DEFAULT_MEAL_SCHEDULE });
   const [dayCutoffHour, setDayCutoffHour] = useState(DEFAULT_DAY_CUTOFF_HOUR);
   const [scheduleValid, setScheduleValid] = useState(true);
@@ -89,6 +91,8 @@ export default function NutritionSettings() {
         else if (deficit < 0) { setGoal('surplus'); setGoalAmount(Math.abs(deficit)); }
         else { setGoal('maintain'); setGoalAmount(0); }
 
+        setProteinTarget(p.proteinTargetG != null ? String(p.proteinTargetG) : '');
+
         if (p.mealSchedule) setMealSchedule(p.mealSchedule);
         setDayCutoffHour(p.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR);
       }
@@ -100,8 +104,8 @@ export default function NutritionSettings() {
   // Snapshot of everything the Save button writes — used to tell the user when
   // walking away would throw work out.
   const snapshot = useMemo(() => JSON.stringify({
-    dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule, dayCutoffHour,
-  }), [dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule, dayCutoffHour]);
+    dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule, dayCutoffHour, proteinTarget,
+  }), [dateOfBirth, weightCheckDay, weightPopupEnabled, sex, height, weight, activity, goal, goalAmount, mealSchedule, dayCutoffHour, proteinTarget]);
 
   const baselineSetRef = useRef(false);
   useEffect(() => {
@@ -144,9 +148,12 @@ export default function NutritionSettings() {
         : goal === 'surplus' ? -goalAmount
         : 0;
 
+      const proteinParsed = parseFloat(proteinTarget);
       await window.api.nutritionSaveProfile({
         dateOfBirth, weightCheckDay, weightPopupEnabled, sex, heightCm: height, initialWeightKg: weight,
         activityLevel: activity, deficitTargetKcal, mealSchedule, dayCutoffHour,
+        // '' o 0 = volver al auto (peso × 1.6): null explícito, no undefined.
+        proteinTargetG: isFinite(proteinParsed) && proteinParsed > 0 ? proteinParsed : null,
       });
       baselineRef.current = snapshot;
       setDirty(false);
@@ -313,6 +320,21 @@ export default function NutritionSettings() {
             </div>
           </div>
         )}
+
+        {/* Proteína — y solo proteína (decisión de producto: sin carbos ni grasas) */}
+        <div className="nutri-field" style={{ marginTop: 14 }}>
+          <label className="nutri-label">{t('nutrify.proteinTargetLabel', 'Objetivo de proteína')}</label>
+          <RpgNumberInput
+            value={proteinTarget}
+            onChange={setProteinTarget}
+            step={5} min={0} max={500}
+            suffix="g"
+            placeholder={t('nutrify.proteinAuto', 'Auto: {{grams}} g', { grams: Math.round(weight * 1.6) })}
+          />
+          <span className="nutri-field-hint">
+            {t('nutrify.proteinTargetHint', 'Vacío = automático: tu peso × 1,6 g/kg, una referencia sólida para conservar músculo. Ajustalo si tu nutricionista te dio otro número.')}
+          </span>
+        </div>
 
         {tdee > 0 && (
           <div className="nutri-daily-target-preview">

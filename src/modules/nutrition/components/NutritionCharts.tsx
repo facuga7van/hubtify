@@ -12,6 +12,7 @@ import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal } from '../../../shared/components/icons';
 import { normalizeStreak, nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
+import { getEventDays } from '../event-api';
 import type { StreakInfo } from '../nutrition-day';
 import type { NutritionProfile, DailySummary } from '../types';
 
@@ -75,6 +76,9 @@ export default function NutritionCharts() {
   const [summaries, setSummaries] = useState<DailySummary[]>([]);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [streakInfo, setStreakInfo] = useState<StreakInfo>({ streak: 0, todayPending: false });
+  // Días con evento (asado, cumple): el heatmap los marca como presentes.
+  // Feature-detect: sin bridge llega [] y el calendario simplemente no distingue.
+  const [eventDays, setEventDays] = useState<string[]>([]);
   const [profile, setProfile] = useState<NutritionProfile | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -92,12 +96,14 @@ export default function NutritionCharts() {
       window.api.nutritionGetWeights(),
       window.api.nutritionGetStreak(),
       window.api.nutritionGetProfile(),
+      getEventDays(startStr, end),
     ])
-      .then(([sums, wts, str, prof]) => {
+      .then(([sums, wts, str, prof, events]) => {
         setSummaries(sums as DailySummary[]);
         setWeights(wts as WeightEntry[]);
         setStreakInfo(normalizeStreak(str));
         setProfile(prof as NutritionProfile | null);
+        setEventDays(events);
         setLoading(false);
       })
       .catch(() => {
@@ -233,12 +239,17 @@ export default function NutritionCharts() {
     const allDates = dateRange(heatmapStart, today);
 
     const summaryMap = new Map(summaries.map((s) => [s.date, s]));
+    const eventSet = new Set(eventDays);
 
     return allDates.map((date) => {
       if (date === today) return 'today';
       // The bridged day gets its own first-class tone (dashed gold): neither
       // achieved nor missed — 'miss' would punish exactly what the grace forgave.
       if (date === streakInfo.graceUsedOn) return 'grace';
+      // Día con evento: registrar el asado ES presentarse, así que el domingo
+      // pinta con intensidad plena (l4, con su ornamento) en vez de quedar como
+      // el hueco de siempre. El tooltip cuenta el porqué.
+      if (eventSet.has(date)) return 'l4';
       const s = summaryMap.get(date);
       if (!s || s.totalCaloriesIn === 0) return 'miss';
 
@@ -252,11 +263,12 @@ export default function NutritionCharts() {
       if (pct < 80) return 'l3';
       return 'l4';
     });
-  }, [summaries, dailyTarget, heatmapStart, today, streakInfo.graceUsedOn]);
+  }, [summaries, dailyTarget, heatmapStart, today, streakInfo.graceUsedOn, eventDays]);
 
   const heatmapTooltips = useMemo(() => {
     const allDates = dateRange(heatmapStart, today);
     const summaryMap = new Map(summaries.map((s) => [s.date, s]));
+    const eventSet = new Set(eventDays);
     const target = dailyTarget ? Math.round(dailyTarget) : null;
 
     return allDates.map((date) => {
@@ -268,12 +280,15 @@ export default function NutritionCharts() {
       const grace = date === streakInfo.graceUsedOn
         ? `\n${t('nutrify.streakGraceCell', 'Día de gracia: no cortó la racha')}`
         : '';
-      if (!cal) return `${label}\n${t('nutrify.noRecord', 'Sin registro')}${grace}`;
+      const event = eventSet.has(date)
+        ? `\n${t('nutrify.eventHeatmapCell', 'Día de evento: registrarlo contó como presentarse')}`
+        : '';
+      if (!cal) return `${label}\n${t('nutrify.noRecord', 'Sin registro')}${grace}${event}`;
       return (target
         ? `${label}\n${cal.toLocaleString()} / ${target.toLocaleString()} kcal`
-        : `${label}\n${cal.toLocaleString()} kcal`) + grace;
+        : `${label}\n${cal.toLocaleString()} kcal`) + grace + event;
     });
-  }, [summaries, dailyTarget, heatmapStart, today, t, streakInfo.graceUsedOn]);
+  }, [summaries, dailyTarget, heatmapStart, today, t, streakInfo.graceUsedOn, eventDays]);
 
   // ── Render ─────────────────────────────────────────────────
 

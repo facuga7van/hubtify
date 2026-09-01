@@ -90,6 +90,35 @@ export function nutritionToday(db: ReturnType<typeof getDb>): string {
   return nutritionDayString(new Date(), getDayCutoffHour(db));
 }
 
+/**
+ * Objetivo diario de proteína en gramos.
+ *
+ * `nutrition_profile.protein_target_g` NULL significa "auto": el peso más
+ * reciente (o el inicial) × 1.6 g/kg — la referencia estándar para conservar
+ * masa magra en déficit y un piso razonable en cualquier objetivo. Exportado
+ * para que los tests fijen el contrato del default.
+ */
+export function getProteinTargetG(db: ReturnType<typeof getDb>): number | null {
+  const row = db.prepare(
+    'SELECT protein_target_g AS target, initial_weight_kg AS initialWeight FROM nutrition_profile WHERE id = 1',
+  ).get() as { target: number | null; initialWeight: number } | undefined;
+  if (!row) return null;
+  if (row.target != null && Number.isFinite(row.target) && row.target > 0) return Math.round(row.target);
+  const latest = db.prepare(
+    'SELECT weight_kg AS weightKg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1',
+  ).get() as { weightKg: number } | undefined;
+  const weight = latest?.weightKg ?? row.initialWeight;
+  if (!Number.isFinite(weight) || weight <= 0) return null;
+  return Math.round(weight * 1.6);
+}
+
+/** True si el día tiene al menos un evento vivo (asado, cumpleaños…). */
+export function dayHasEvent(db: ReturnType<typeof getDb>, date: string): boolean {
+  return !!db.prepare(
+    'SELECT 1 FROM food_log WHERE date = ? AND is_event = 1 AND deleted_at IS NULL LIMIT 1',
+  ).get(date);
+}
+
 /** The stored meal schedule, always with a `merienda` entry (see ensureMerienda). */
 function readMealSchedule(db: ReturnType<typeof getDb>): MealSchedule {
   const row = db.prepare('SELECT meal_schedule FROM nutrition_profile WHERE id = 1')
@@ -119,6 +148,10 @@ export function registerNutritionIpcHandlers(): void {
       sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal,
+      // NULL = auto (peso × 1.6). El efectivo ya viene resuelto para que la UI
+      // nunca tenga que conocer la fórmula ni el peso más reciente.
+      proteinTargetG: row.protein_target_g ?? null,
+      proteinTargetEffectiveG: getProteinTargetG(db),
       mealSchedule,
       // The renderer needs the cutoff to agree with the backend on which day
       // "today" is; it caches it alongside the profile it already loads.
@@ -131,6 +164,8 @@ export function registerNutritionIpcHandlers(): void {
     activityLevel: string; deficitTargetKcal?: number;
     weightCheckDay?: number; weightPopupEnabled?: boolean;
     mealSchedule?: MealSchedule; dayCutoffHour?: number;
+    /** null = volver al auto (peso × 1.6); undefined = no tocar lo guardado. */
+    proteinTargetG?: number | null;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
     const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
@@ -138,23 +173,28 @@ export function registerNutritionIpcHandlers(): void {
     if (!Number.isFinite(profile.heightCm) || profile.heightCm < 100 || profile.heightCm > 250) throw new Error('Invalid height: must be between 100 and 250 cm');
     if (!Number.isFinite(profile.initialWeightKg) || profile.initialWeightKg < 10 || profile.initialWeightKg > 500) throw new Error('Invalid weight: must be between 10 and 500 kg');
     if (profile.deficitTargetKcal !== undefined && (!Number.isFinite(profile.deficitTargetKcal) || Math.abs(profile.deficitTargetKcal) > 2000)) throw new Error('Invalid deficit/surplus target: must be between -2000 and 2000 kcal');
+    if (profile.proteinTargetG != null && (!Number.isFinite(profile.proteinTargetG) || profile.proteinTargetG <= 0 || profile.proteinTargetG > 500)) throw new Error('Invalid protein target: must be between 1 and 500 g');
     const age = getAgeFromDob(profile.dateOfBirth);
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const weightPopupEnabled = profile.weightPopupEnabled !== false ? 1 : 0;
     const mealScheduleJson = profile.mealSchedule ? JSON.stringify(ensureMerienda(profile.mealSchedule)) : null;
     const db = getDb();
-    // Read existing meal_schedule / cutoff to preserve them when not provided
-    const existing = db.prepare('SELECT meal_schedule, day_cutoff_hour FROM nutrition_profile WHERE id = 1')
-      .get() as { meal_schedule: string | null; day_cutoff_hour: number | null } | undefined;
+    // Read existing meal_schedule / cutoff / protein target to preserve them when not provided
+    const existing = db.prepare('SELECT meal_schedule, day_cutoff_hour, protein_target_g FROM nutrition_profile WHERE id = 1')
+      .get() as { meal_schedule: string | null; day_cutoff_hour: number | null; protein_target_g: number | null } | undefined;
     const finalMealSchedule = mealScheduleJson ?? existing?.meal_schedule ?? null;
     const dayCutoffHour = profile.dayCutoffHour !== undefined
       ? clampCutoffHour(profile.dayCutoffHour)
       : (existing?.day_cutoff_hour ?? DEFAULT_DAY_CUTOFF_HOUR);
+    // undefined = untouched; null = explicit "back to auto" (peso × 1.6).
+    const proteinTargetG = profile.proteinTargetG !== undefined
+      ? profile.proteinTargetG
+      : (existing?.protein_target_g ?? null);
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule, dayCutoffHour);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule, dayCutoffHour, proteinTargetG);
 
     // Recalc today's summary with new profile
     recalcSummary(db, nutritionToday(db));
@@ -167,9 +207,28 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:logFood', (_e, entry: {
     date?: string; description: string; calories: number; source: string;
     frequentFoodId?: number; aiBreakdown?: string; meal?: string;
+    /** Gramos de proteína, si se conocen (IA, cache o carga manual). */
+    proteinG?: number | null;
+    /** Modo evento: una sola entrada con banda honesta; calories = punto medio. */
+    isEvent?: boolean; eventKcalMin?: number | null; eventKcalMax?: number | null;
   }) => {
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) throw new Error('Invalid calories: must be a positive number');
     if (!entry.description || !entry.description.trim()) throw new Error('Invalid description: must be a non-empty string');
+    if (entry.proteinG != null && (!Number.isFinite(entry.proteinG) || entry.proteinG < 0)) throw new Error('Invalid protein: must be >= 0 grams');
+    const isEvent = entry.isEvent ? 1 : 0;
+    let eventMin: number | null = null;
+    let eventMax: number | null = null;
+    if (isEvent) {
+      // La banda es opcional (se puede registrar un evento con un solo número),
+      // pero si viene tiene que ser coherente: 0 < min <= max.
+      if (entry.eventKcalMin != null || entry.eventKcalMax != null) {
+        eventMin = Number(entry.eventKcalMin);
+        eventMax = Number(entry.eventKcalMax);
+        if (!Number.isFinite(eventMin) || !Number.isFinite(eventMax) || eventMin <= 0 || eventMax < eventMin) {
+          throw new Error('Invalid event band: need 0 < min <= max kcal');
+        }
+      }
+    }
     const db = getDb();
     const cutoffHour = getDayCutoffHour(db);
     const date = entry.date ?? nutritionDayString(new Date(), cutoffHour);
@@ -191,10 +250,11 @@ export function registerNutritionIpcHandlers(): void {
       // surrogate that collides between devices). updated_at is set on INSERT too —
       // a NULL there loses every last-write-wins comparison later.
       db.prepare(`
-        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, sync_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, is_event, event_kcal_min, event_kcal_max, updated_at, sync_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(date, time, entry.description, entry.calories, normalizeFoodSource(entry.source),
-        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal, syncStamp(), genId());
+        entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal,
+        entry.proteinG ?? null, isEvent, eventMin, eventMax, syncStamp(), genId());
       recalcSummary(db, date);
     })();
   });
@@ -253,7 +313,11 @@ export function registerNutritionIpcHandlers(): void {
       SELECT id, date, time, description, calories, source,
              frequent_food_id AS frequentFoodId,
              ai_breakdown AS aiBreakdown,
-             meal
+             meal,
+             protein_g AS proteinG,
+             is_event AS isEvent,
+             event_kcal_min AS eventKcalMin,
+             event_kcal_max AS eventKcalMax
       FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC
     `).all(date);
   });
@@ -462,8 +526,9 @@ export function registerNutritionIpcHandlers(): void {
     return { cached: true };
   });
 
-  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string }) => {
+  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string; proteinG?: number | null }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
+    if (fields.proteinG != null && (!Number.isFinite(fields.proteinG) || fields.proteinG < 0)) throw new Error('Invalid protein: must be >= 0 grams');
     const db = getDb();
     const entry = db.prepare('SELECT date FROM food_log WHERE id = ? AND deleted_at IS NULL').get(id) as { date: string } | undefined;
     if (entry && isDayClosed(db, entry.date)) throw new Error('Cannot modify a closed day');
@@ -475,6 +540,7 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
     if (fields.source !== undefined) { sets.push('source = ?'); vals.push(normalizeFoodSource(fields.source)); }
+    if (fields.proteinG !== undefined) { sets.push('protein_g = ?'); vals.push(fields.proteinG); }
     sets.push('updated_at = ?'); vals.push(syncStamp());
     if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
@@ -625,7 +691,38 @@ export function registerNutritionIpcHandlers(): void {
        ORDER BY date DESC LIMIT 366`
     ).all(today) as StreakDay[];
 
-    return computeNutritionStreak(rows, today, profile.deficit_target_kcal ?? 0);
+    const deficit = profile.deficit_target_kcal ?? 0;
+
+    // ── Día con evento = presentarse ──────────────────────────────────────
+    // Registrar el asado ES cumplir con la racha, sin gastar el día de gracia
+    // semanal en algo que la app misma invitó a registrar. En vez de tocar el
+    // motor compartido, el día se presenta al scorer con el consumo EN el
+    // objetivo (tdee - deficit), que es "compliant" bajo los tres objetivos.
+    // Solo afecta a la racha: el heatmap y los cierres siguen viendo las
+    // calorías reales.
+    const eventDates = new Set(
+      (db.prepare(
+        `SELECT DISTINCT date FROM food_log WHERE is_event = 1 AND deleted_at IS NULL`,
+      ).all() as Array<{ date: string }>).map(r => r.date),
+    );
+    const streakRows = rows.map(r =>
+      eventDates.has(r.date) ? { ...r, totalCaloriesIn: r.tdee - deficit } : r,
+    );
+
+    return computeNutritionStreak(streakRows, today, deficit);
+  });
+
+  /**
+   * Fechas (YYYY-MM-DD) con al menos un evento vivo en el rango, para que el
+   * heatmap y el histórico distingan "el domingo del asado" de un hueco.
+   */
+  ipcHandle('nutrition:getEventDays', (_e, start: string, end: string) => {
+    const db = getDb();
+    return (db.prepare(
+      `SELECT DISTINCT date FROM food_log
+       WHERE is_event = 1 AND deleted_at IS NULL AND date BETWEEN ? AND ?
+       ORDER BY date ASC`,
+    ).all(start, end) as Array<{ date: string }>).map(r => r.date);
   });
 
   ipcHandle('nutrition:getWeekCalories', () => {
@@ -717,7 +814,17 @@ export function registerNutritionIpcHandlers(): void {
       // XP used to only ever check `consumed <= target`, so on a surplus goal
       // failing the target paid MORE XP than hitting it while HP said the opposite.
       const score = scoreNutritionDay(consumed, target, deficitTarget);
-      const { xpPrecision, xpBonus, hpChange } = score;
+      const { xpPrecision, xpBonus } = score;
+
+      // ── Día con evento: neutro-o-cura, jamás daño ─────────────────────────
+      // El asado del domingo es la causa documentada #2/#3 de abandono. La regla
+      // de oro del RPG es que la racha mide PRESENTARSE, y registrar el evento ES
+      // presentarse — así que pasarse del objetivo un día con evento no puede
+      // costar vigor. Si el día igual cumplió el objetivo, la curación se paga
+      // completa; si no, el HP queda en 0 en vez de negativo. El XP de precisión
+      // no se toca: sigue midiendo precisión, que es otra cosa.
+      const eventDay = dayHasEvent(db, date);
+      const hpChange = eventDay ? Math.max(0, score.hpChange) : score.hpChange;
 
       const xpSteps = steps > 0 ? 5 : 0;
       const xpGym = gym ? 5 : 0;
@@ -739,6 +846,7 @@ export function registerNutritionIpcHandlers(): void {
           xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange,
           consumed, target: Math.round(target),
           compliant: score.compliant,
+          eventDay,
           precisionPct: target > 0 ? Math.round(Math.abs(consumed - target) / target * 100) : 0,
         },
       };

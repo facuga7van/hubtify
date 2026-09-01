@@ -2286,3 +2286,168 @@
 .nutri-tdee-display + .nutri-tdee-display {
   margin-top: 8px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   13. FASE 3 — Modo evento (el asado) + proteína
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Toggle de modos + botón Evento en una misma fila ── */
+
+.nutri-input-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nutri-event-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 2px 10px;
+  font-size: var(--fs-label);
+  color: var(--gold-dark);
+  border-color: var(--gold-dark);
+}
+
+.nutri-event-btn:hover {
+  color: var(--ink);
+  background: rgba(168, 138, 60, 0.1);
+}
+
+/* ── Anillo chico de proteína (junto al principal, más discreto) ── */
+
+.nutri-cal-main:has(.nutri-protein-ring) {
+  grid-template-columns: 160px auto 1fr;
+  gap: 16px;
+}
+
+.nutri-protein-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.nutri-protein-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.nutri-protein-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.nutri-protein-unit {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  margin-top: 2px;
+}
+
+.nutri-protein-label {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+/* ── Proteína en la estimación y en cada comida ── */
+
+.nutri-est-protein {
+  margin-left: 8px;
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--moss);
+  white-space: nowrap;
+}
+
+.nutri-meal-prot {
+  display: block;
+  font-size: var(--fs-label);
+  font-weight: 400;
+  color: var(--ink-faded);
+  line-height: 1.3;
+}
+
+/* ── Registro de evento en la lista del día ── */
+
+/* box-shadow inset, no border-left: el filete dorado no corre la grilla. */
+.nutri-meal-row--event {
+  background: rgba(168, 138, 60, 0.07);
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+
+.nutri-meal-row--event:hover {
+  background: rgba(168, 138, 60, 0.12);
+}
+
+.nutri-event-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  vertical-align: middle;
+  border: 1px solid var(--gold-dark);
+  border-radius: 10px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.05em;
+  color: var(--gold-dark);
+  background: rgba(168, 138, 60, 0.12);
+}
+
+/* ── Mini-form de evento ── */
+
+.nutri-event-name-field {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nutri-event-name-field .nutri-text-input {
+  width: 100%;
+}
+
+.nutri-event-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.nutri-event-band-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.nutri-event-midpoint {
+  color: var(--gold-dark);
+  font-style: italic;
+}
+
+.nutri-event-close-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gold-dark);
+}
+
+/* :has() gana en especificidad al breakpoint de 768px de arriba — reapilar. */
+@media (max-width: 768px) {
+  .nutri-cal-main:has(.nutri-protein-ring) {
+    grid-template-columns: 1fr;
+  }
+}

@@ -340,4 +340,26 @@ export const nutritionMigrations: Migration[] = [
       );
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 13,
+    up: `
+      -- ── Modo evento: el asado del domingo ────────────────────────────────────
+      -- La causa documentada #2 y #3 de abandono es el evento social que "rompe"
+      -- el registro. Un evento se guarda como UNA entrada de food_log marcada,
+      -- con una banda honesta (min-max) de la que calories lleva el punto medio.
+      -- La regla de oro: la racha mide PRESENTARSE; registrar el asado ES
+      -- presentarse, y el dia con evento nunca DANA el vigor por pasarse.
+      ALTER TABLE food_log ADD COLUMN is_event INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE food_log ADD COLUMN event_kcal_min REAL DEFAULT NULL;
+      ALTER TABLE food_log ADD COLUMN event_kcal_max REAL DEFAULT NULL;
+
+      -- ── Proteina — y solo proteina ───────────────────────────────────────────
+      -- Decision de producto explicita: calorias + proteina, sin carbohidratos ni
+      -- grasas. protein_g por comida (nutrition_ai_cache ya lo tenia desde v12);
+      -- protein_target_g NULL significa "auto": peso mas reciente x 1.6 g/kg.
+      ALTER TABLE food_log ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN protein_target_g REAL DEFAULT NULL;
+    `,
+  },
 ];

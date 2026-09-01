@@ -2,15 +2,16 @@ import * as functions from 'firebase-functions/v1';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
-const SYSTEM_PROMPT = `Sos un nutricionista que estima calorías de comida argentina con precisión. Pensá en GRAMOS primero, después calculá calorías.
+const SYSTEM_PROMPT = `Sos un nutricionista que estima calorías y proteína de comida argentina con precisión. Pensá en GRAMOS primero, después calculá calorías y proteína.
 
-MÉTODO: Para cada ingrediente → estimá gramos → aplicá kcal/100g → resultado.
+MÉTODO: Para cada ingrediente → estimá gramos → aplicá kcal/100g y proteína/100g → resultado.
 
 Reglas:
-- Cada ingrediente SEPARADO con su peso en gramos y calorías
+- Cada ingrediente SEPARADO con su peso en gramos, calorías y proteína en gramos (protein_g)
 - Si hay cantidad (ej: "2 milanesas"), reflejar TODAS las unidades
 - Sé CONSERVADOR: ante duda, estimá porciones normales, NO exageres
 - Si no reconocés la comida, estimá lo más cercano
+- protein_g de referencia por 100g: carne vacuna 26, pollo 31, milanesa 18, huevo 13, queso cremoso 18, queso rallado 33, leche 3, pan 8, arroz/fideos cocidos 4-5, papa/puré 2, verduras 1-2, dulces/galletitas 4-6
 
 Modificadores de tamaño (OBLIGATORIO respetar):
 - "pequeño/chico/mini/pedacito" → 50-70% del peso estándar
@@ -58,10 +59,10 @@ Límites de sanidad (si tu estimación excede esto, REVISÁ):
 
 Ejemplos:
 Input: "milanesa con puré"
-→ {"items": [{"name": "milanesa", "grams": 150, "calories": 330}, {"name": "puré de papas", "grams": 200, "calories": 200}]}
+→ {"items": [{"name": "milanesa", "grams": 150, "calories": 330, "protein_g": 27}, {"name": "puré de papas", "grams": 200, "calories": 200, "protein_g": 4}]}
 
 Input: "3 empanadas de carne"
-→ {"items": [{"name": "empanada de carne x3", "grams": 360, "calories": 900}]}
+→ {"items": [{"name": "empanada de carne x3", "grams": 360, "calories": 900, "protein_g": 32}]}
 
 Input: "sanguche chico de queso y tomate"
 → {"items": [{"name": "pan de molde x2 rebanadas (chico)", "grams": 40, "calories": 106}, {"name": "queso cremoso (1 feta)", "grams": 20, "calories": 60}, {"name": "tomate (2 rodajas)", "grams": 40, "calories": 7}]}
@@ -111,8 +112,9 @@ export const estimateNutrition = functions
                       name: { type: 'STRING', description: 'Ingredient name with portion context' },
                       grams: { type: 'INTEGER', description: 'Estimated weight in grams' },
                       calories: { type: 'INTEGER', description: 'Calories calculated from grams × kcal/100g' },
+                      protein_g: { type: 'NUMBER', description: 'Protein grams calculated from grams × protein/100g' },
                     },
-                    required: ['name', 'grams', 'calories'],
+                    required: ['name', 'grams', 'calories', 'protein_g'],
                   },
                 },
               },
@@ -138,22 +140,29 @@ export const estimateNutrition = functions
         throw new functions.https.HttpsError('internal', 'No response from AI');
       }
 
-      const parsed = JSON.parse(text) as { items?: Array<{ name: string; calories: number }> };
+      const parsed = JSON.parse(text) as { items?: Array<{ name: string; calories: number; protein_g?: number }> };
       if (!parsed.items || !Array.isArray(parsed.items) || parsed.items.length === 0) {
         throw new functions.https.HttpsError('internal', 'Could not parse AI response');
       }
 
+      // protein_g es tolerante: un item sin proteína válida no invalida la
+      // estimación de calorías, sólo deja proteinG incompleto para ese item.
       const items = parsed.items
         .filter(it => typeof it.name === 'string' && typeof it.calories === 'number' && it.calories > 0)
-        .map(it => ({ name: it.name.trim(), calories: Math.round(it.calories) }));
+        .map(it => ({
+          name: it.name.trim(),
+          calories: Math.round(it.calories),
+          proteinG: typeof it.protein_g === 'number' && it.protein_g >= 0 ? Math.round(it.protein_g * 10) / 10 : null,
+        }));
 
       if (items.length === 0) {
         throw new functions.https.HttpsError('internal', 'No valid items in AI response');
       }
 
       const calories = items.reduce((sum, it) => sum + it.calories, 0);
+      const proteinG = Math.round(items.reduce((sum, it) => sum + (it.proteinG ?? 0), 0));
 
-      return { calories, items };
+      return { calories, proteinG, items };
     } catch (err) {
       if (err instanceof functions.https.HttpsError) throw err;
       if ((err as Error).name === 'AbortError') {

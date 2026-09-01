@@ -2,7 +2,7 @@ import { useState, memo, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import { registerFood } from '../../../shared/animations/feedback';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart, Chalice } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart, Chalice, Meat } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
 import { estimateNutrition } from '../estimate-service';
@@ -17,6 +17,11 @@ interface FoodEntry {
   id: number; time: string; description: string; calories: number;
   source: string; aiBreakdown?: string | null;
   meal?: string | null;
+  proteinG?: number | null;
+  /** 1 = evento (asado): calories es el punto medio de la banda min-max. */
+  isEvent?: number;
+  eventKcalMin?: number | null;
+  eventKcalMax?: number | null;
 }
 
 interface Props {
@@ -179,9 +184,12 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
     );
   }
 
+  const isEvent = !!entry.isEvent;
+  const hasBand = isEvent && entry.eventKcalMin != null && entry.eventKcalMax != null;
+
   return (
     <div ref={rowRef} className={`nutri-meal-item-wrap ${className || ''}`} style={mealDropdown ? { position: 'relative', zIndex: 'var(--z-dropdown-top)' } : undefined}>
-      <div className="nutri-meal-row">
+      <div className={`nutri-meal-row${isEvent ? ' nutri-meal-row--event' : ''}`}>
         <div className="nutri-meal-ico" ref={dropdownRef} style={{ position: 'relative' }}>
           <span
             onClick={() => { if (!readOnly && onMealChange) setMealDropdown(v => !v); }}
@@ -217,6 +225,18 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
         </div>
         <div className="nutri-meal-name" title={entry.description}>
           {entry.description}
+          {isEvent && (
+            <span
+              className="nutri-event-badge"
+              title={hasBand
+                ? t('nutrify.eventBadgeBand', 'Evento: banda estimada {{min}}–{{max}} kcal, se registró el punto medio.', {
+                    min: Math.round(entry.eventKcalMin as number), max: Math.round(entry.eventKcalMax as number),
+                  })
+                : t('nutrify.eventBadgeHint', 'Evento: registrado como una sola entrada. No daña tu vigor.')}
+            >
+              <Meat width={10} height={10} /> {t('nutrify.eventBadge', 'Evento')}
+            </span>
+          )}
           {hasBreakdown && (
             <button
               className="nutri-breakdown-toggle"
@@ -232,7 +252,16 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
           )}
         </div>
         <div className="nutri-meal-time">{entry.time}</div>
-        <div className="nutri-meal-kcal">{entry.calories} {t('nutrify.kcalUnit', 'kcal')}</div>
+        <div className="nutri-meal-kcal">
+          {hasBand
+            ? `${Math.round(entry.eventKcalMin as number)}–${Math.round(entry.eventKcalMax as number)} ${t('nutrify.kcalUnit', 'kcal')}`
+            : `${entry.calories} ${t('nutrify.kcalUnit', 'kcal')}`}
+          {entry.proteinG != null && entry.proteinG > 0 && (
+            <span className="nutri-meal-prot">
+              {t('nutrify.proteinPerMeal', '{{grams}} g prot.', { grams: Math.round(entry.proteinG) })}
+            </span>
+          )}
+        </div>
         {!readOnly ? (
           confirmDelete ? (
             <div style={{

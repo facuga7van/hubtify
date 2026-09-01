@@ -13,7 +13,7 @@ import { resolveEstimate } from '../estimate-with-cache';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark, Chalice } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark, Chalice, Meat } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
@@ -74,6 +74,11 @@ interface FoodEntry {
   calories: number; source: string; frequentFoodId: number | null;
   aiBreakdown?: string | null;
   meal?: string | null;
+  proteinG?: number | null;
+  /** 1 = registro de evento (asado): calories es el punto medio de la banda. */
+  isEvent?: number;
+  eventKcalMin?: number | null;
+  eventKcalMax?: number | null;
 }
 
 interface FavoriteFood { id: string; description: string; calories: number; source: string; aiBreakdown?: string; createdAt: string; updatedAt?: string; }
@@ -93,9 +98,18 @@ const PORTION_STEPS = [0.5, 1, 1.5, 2];
 
 interface EstimationResult {
   totalCalories: number;
+  /** Proteína total estimada en gramos, o null si la fuente no la conoce. */
+  proteinG?: number | null;
   items: Array<{ name: string; calories: number }>;
   aiError?: string;
 }
+
+/** Bandas predefinidas para el modo evento, en kcal. */
+const EVENT_BANDS: Array<{ key: string; min: number; max: number }> = [
+  { key: 'light', min: 800, max: 1200 },
+  { key: 'classic', min: 1200, max: 1600 },
+  { key: 'feast', min: 1600, max: 2200 },
+];
 
 export default function Today() {
   const navigate = useNavigate();
@@ -156,6 +170,18 @@ export default function Today() {
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
+  const [manualProtein, setManualProtein] = useState('');
+  // Objetivo de proteína ya resuelto por el backend (guardado o peso × 1.6).
+  const [proteinTarget, setProteinTarget] = useState<number | null>(null);
+  // ── Modo evento (el asado) ───────────────────────
+  // Un mini-form: nombre + banda honesta en kcal; se registra el punto medio
+  // como UNA sola comida marcada. Registrar el evento ES presentarse.
+  const [eventOpen, setEventOpen] = useState(false);
+  const [eventName, setEventName] = useState('');
+  const [eventMin, setEventMin] = useState('1200');
+  const [eventMax, setEventMax] = useState('1600');
+  const [eventEstimating, setEventEstimating] = useState(false);
+  const [eventSaving, setEventSaving] = useState(false);
   const [mealSchedule, setMealSchedule] = useState<MealSchedule>(DEFAULT_MEAL_SCHEDULE);
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -194,6 +220,7 @@ export default function Today() {
     setMealSchedule((schedule as MealSchedule) ?? DEFAULT_MEAL_SCHEDULE);
     setHasProfile(!!prof);
     setDeficitTargetKcal((prof as NutritionProfile | null)?.deficitTargetKcal ?? 0);
+    setProteinTarget((prof as NutritionProfile | null)?.proteinTargetEffectiveG ?? null);
     setCloseResult(null);
 
     const closed = closedDay as typeof dayClosed;
@@ -282,7 +309,7 @@ export default function Today() {
     try {
       // The model does not get asked twice for the same plate of food.
       const result = await resolveEstimate(description, { skipCache });
-      setEstimation({ totalCalories: result.totalCalories, items: result.items });
+      setEstimation({ totalCalories: result.totalCalories, proteinG: result.proteinG, items: result.items });
       setEditCalories(String(result.totalCalories));
       setEstimationCached(result.origin === 'cache');
     } catch (err) {
@@ -315,6 +342,10 @@ export default function Today() {
         calories,
         source: 'ai_estimate',
         aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
+        // La proteína sobrevive una corrección de calorías: el usuario corrigió
+        // el total, no los gramos de proteína, y descartarla sería volver a
+        // tirar el dato que la fase 3 vino a rescatar.
+        proteinG: estimation.proteinG ?? undefined,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
 
@@ -326,6 +357,7 @@ export default function Today() {
         description,
         calories,
         aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : null,
+        proteinG: estimation.proteinG ?? null,
         corrected,
       });
 
@@ -353,6 +385,8 @@ export default function Today() {
   const handleManualAdd = async () => {
     const cal = parseInt(manualCalories);
     if (!foodInput.trim() || isNaN(cal) || cal <= 0) return;
+    // Proteína opcional en la carga manual: vacío = sin dato, nunca 0 implícito.
+    const prot = parseFloat(manualProtein);
     try {
       const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
       await window.api.nutritionLogFood({
@@ -360,6 +394,7 @@ export default function Today() {
         description: foodInput.trim(),
         calories: cal,
         source: 'manual',
+        proteinG: isFinite(prot) && prot > 0 ? prot : undefined,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
 
@@ -371,6 +406,7 @@ export default function Today() {
       toast({ type: 'nutri', message: `+${cal} kcal` });
       setFoodInput('');
       setManualCalories('');
+      setManualProtein('');
       const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
@@ -378,6 +414,77 @@ export default function Today() {
     } catch (err) {
       console.error('[Nutrition] manualAdd error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+    }
+  };
+
+  // ── Modo evento ──────────────────────────────────
+  /**
+   * Pide a la IA una estimación del evento y la convierte en banda honesta:
+   * ±15 % alrededor del número. Un asado no se estima al gramo — la banda dice
+   * la verdad sobre la incertidumbre y el punto medio es lo que se registra.
+   */
+  const handleEventEstimate = async () => {
+    const name = eventName.trim() || t('nutrify.eventDefaultName', 'Asado familiar');
+    if (eventEstimating) return;
+    setEventEstimating(true);
+    try {
+      const result = await resolveEstimate(name);
+      setEventMin(String(Math.max(1, Math.round(result.totalCalories * 0.85))));
+      setEventMax(String(Math.round(result.totalCalories * 1.15)));
+    } catch (err) {
+      console.error('[Nutrition] event estimate error:', err);
+      toast({ type: 'info', message: t('nutrify.estimateUnavailable', 'No se pudo estimar. Revisá tu conexión o cargá las calorías en modo Manual.') });
+    } finally {
+      setEventEstimating(false);
+    }
+  };
+
+  /**
+   * Registra el evento como UNA sola comida marcada, con el punto medio de la
+   * banda. Paga el MEAL_LOGGED de siempre — el XP premia REGISTRAR, y registrar
+   * el asado es exactamente eso: presentarse.
+   */
+  const handleLogEvent = async () => {
+    if (eventSaving) return;
+    const name = eventName.trim() || t('nutrify.eventDefaultName', 'Asado familiar');
+    const min = parseInt(eventMin);
+    const max = parseInt(eventMax);
+    if (!isFinite(min) || !isFinite(max) || min <= 0 || max < min) {
+      toast({ type: 'warning', message: t('nutrify.eventInvalidBand', 'La banda tiene que ser mín > 0 y máx ≥ mín.') });
+      return;
+    }
+    const midpoint = Math.round((min + max) / 2);
+    setEventSaving(true);
+    try {
+      const resolved = resolveMealType(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), mealSchedule, dayCutoffHour);
+      await window.api.nutritionLogFood({
+        date,
+        description: name,
+        calories: midpoint,
+        source: 'manual',
+        isEvent: true,
+        eventKcalMin: min,
+        eventKcalMax: max,
+        meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
+      });
+      // El mismo evento RPG que cualquier registro: ni más ni menos. No se
+      // inventa un tipo nuevo ni se paga dos veces.
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+      });
+      toast({ type: 'nutri', message: t('nutrify.eventLogged', 'Evento registrado: {{name}} (~{{kcal}} kcal)', { name, kcal: midpoint }) });
+      setEventOpen(false);
+      setEventName('');
+      const updatedFoods = await window.api.nutritionGetFoodByDate(date) as FoodEntry[];
+      if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
+      loadData(date);
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch (err) {
+      console.error('[Nutrition] logEvent error:', err);
+      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
+    } finally {
+      setEventSaving(false);
     }
   };
 
@@ -439,6 +546,8 @@ export default function Today() {
         // 'history' is mapped to the existing 'frequent' source by the handler;
         // see normalizeFoodSource in nutrition.ipc.ts.
         source: s.source === 'favorite' ? 'favorite' : 'history',
+        // La proteína del cache escala con la porción igual que las calorías.
+        proteinG: s.proteinG != null ? Math.round(s.proteinG * portion * 10) / 10 : undefined,
         meal: resolved.ambiguous.length === 0 ? resolved.meal : undefined,
       });
       await window.api.processRpgEvent({
@@ -696,6 +805,10 @@ export default function Today() {
   };
 
   const consumed = summary?.totalCaloriesIn ?? foods.reduce((s, f) => s + f.calories, 0);
+  // La proteína no vive en el summary: se suma de las comidas que la conocen.
+  const consumedProtein = Math.round(foods.reduce((s, f) => s + (f.proteinG ?? 0), 0));
+  /** El día tiene un evento registrado: pasarse del objetivo no daña el vigor. */
+  const dayHasEvent = foods.some(f => !!f.isEvent);
 
   const mealGroups = useMemo(() => {
     const groups: Record<MealType, { foods: FoodEntry[]; calories: number }> = {
@@ -761,6 +874,7 @@ export default function Today() {
   // WITHOUT marking the reminder dismissed — only the "Later" button does that.
   const weightModal = useModalA11y({ onClose: handleWeightClose, active: weightPopup.show });
   const closeDayModal = useModalA11y({ onClose: () => setCloseDayPopup(false), active: closeDayPopup });
+  const eventModal = useModalA11y({ onClose: () => setEventOpen(false), active: eventOpen });
 
   if (loading) return (
     <div className="nutri-page">
@@ -917,6 +1031,32 @@ export default function Today() {
               )}
             </div>
 
+            {/* Anillo chico de proteína: mismo lenguaje visual, más discreto.
+                Calorías + proteína — nada de carbohidratos ni grasas. */}
+            {proteinTarget != null && proteinTarget > 0 && (
+              <div
+                className="nutri-protein-ring"
+                title={t('nutrify.proteinOfTarget', '{{consumed}} de {{target}} g de proteína', {
+                  consumed: consumedProtein, target: proteinTarget,
+                })}
+              >
+                <CircularProgress
+                  value={consumedProtein}
+                  max={proteinTarget}
+                  radius={34}
+                  strokeWidth={6}
+                  gradientStart={consumedProtein >= proteinTarget ? '#5a7a3a' : '#c4a84e'}
+                  gradientEnd={consumedProtein >= proteinTarget ? '#3a5a2a' : '#8a7030'}
+                >
+                  <div className="nutri-protein-center">
+                    <div className="nutri-protein-val">{consumedProtein}</div>
+                    <div className="nutri-protein-unit">/ {proteinTarget} g</div>
+                  </div>
+                </CircularProgress>
+                <div className="nutri-protein-label">{t('nutrify.proteinLabel', 'Proteína')}</div>
+              </div>
+            )}
+
             <div className="nutri-cal-details">
               <div className="nutri-cal-row">
                 <span className="nutri-cal-label">
@@ -950,7 +1090,13 @@ export default function Today() {
           {(() => {
             const goal = getGoal(deficitTargetKcal);
             const tdee = summary?.tdee ?? 0;
-            const status = getStatusMessage(t, goal, consumed, target, tdee);
+            let status = getStatusMessage(t, goal, consumed, target, tdee);
+            // Día con evento: la app acompaña, no juzga. Si el tono iba a ser
+            // "bad" por pasarse, lo reemplaza el mensaje de evento — el vigor
+            // no sufre y el registro ya cuenta como presentarse.
+            if (dayHasEvent && status.tone === 'bad') {
+              status = { text: t('nutrify.eventDayStatus', 'Día de evento: te presentaste igual y tu vigor no sufre.'), tone: 'muted' };
+            }
             return (
               <p className={`nutri-status-message nutri-status--${status.tone}`}>
                 {status.text}
@@ -983,20 +1129,32 @@ export default function Today() {
             {t('nutrify.logFood', 'Registrar Comida')}
           </h3>
 
-          <div className="nutri-input-mode-toggle">
+          <div className="nutri-input-mode-row">
+            <div className="nutri-input-mode-toggle">
+              <button
+                type="button"
+                className={`nutri-mode-btn ${!manualMode ? 'active' : ''}`}
+                onClick={() => setManualMode(false)}
+              >
+                {t('nutrify.aiMode', 'Estimación IA')}
+              </button>
+              <button
+                type="button"
+                className={`nutri-mode-btn ${manualMode ? 'active' : ''}`}
+                onClick={() => setManualMode(true)}
+              >
+                {t('nutrify.manualMode', 'Manual')}
+              </button>
+            </div>
+            {/* El asado del domingo entra por acá: una sola entrada con banda
+                honesta, sin culpa y sin romper la racha. */}
             <button
               type="button"
-              className={`nutri-mode-btn ${!manualMode ? 'active' : ''}`}
-              onClick={() => setManualMode(false)}
+              className="nutri-btn nutri-btn-ghost nutri-event-btn"
+              onClick={() => setEventOpen(true)}
+              title={t('nutrify.eventButtonHint', 'Registrá un asado, cumple o salida como una sola entrada con banda estimada.')}
             >
-              {t('nutrify.aiMode', 'Estimación IA')}
-            </button>
-            <button
-              type="button"
-              className={`nutri-mode-btn ${manualMode ? 'active' : ''}`}
-              onClick={() => setManualMode(true)}
-            >
-              {t('nutrify.manualMode', 'Manual')}
+              <Meat width={14} height={14} /> {t('nutrify.eventButton', 'Evento')}
             </button>
           </div>
 
@@ -1017,6 +1175,14 @@ export default function Today() {
                 placeholder={t('nutrify.calories', 'Calorías')}
                 onKeyDown={(e) => e.key === 'Enter' && foodInput.trim() && manualCalories && handleManualAdd()}
                 style={{ width: 130, flexShrink: 0 }}
+              />
+              <RpgNumberInput
+                value={manualProtein}
+                onChange={setManualProtein}
+                step={1} min={0} max={500}
+                placeholder={t('nutrify.proteinManualPlaceholder', 'Prot. (g)')}
+                onKeyDown={(e) => e.key === 'Enter' && foodInput.trim() && manualCalories && handleManualAdd()}
+                style={{ width: 100, flexShrink: 0 }}
               />
               <button
                 className="nutri-btn"
@@ -1106,6 +1272,11 @@ export default function Today() {
                       />
                       <span className="nutri-est-unit">kcal</span>
                     </div>
+                    {estimation.proteinG != null && (
+                      <span className="nutri-est-protein">
+                        {'·'} {t('nutrify.proteinPerMeal', '{{grams}} g prot.', { grams: Math.round(estimation.proteinG) })}
+                      </span>
+                    )}
                   </div>
                   <div className="nutri-est-actions">
                     <button className="nutri-btn nutri-btn-primary" onClick={handleConfirmEstimation}>
@@ -1367,6 +1538,102 @@ export default function Today() {
         </div>
       )}
 
+      {/* ── Event popup (el asado) ──────────────────── */}
+      {eventOpen && (
+        <div className="nutri-popup-overlay" onClick={() => setEventOpen(false)}>
+          <div
+            {...eventModal.dialogProps}
+            className="nutri-popup"
+            aria-label={t('nutrify.eventFormTitle', 'Registrar evento')}
+            onClick={eventModal.stopPropagation}
+          >
+            <button
+              className="nutri-popup-close tap-target"
+              onClick={() => setEventOpen(false)}
+              aria-label={t('common.close', 'Cerrar')}
+              title={t('common.close', 'Cerrar')}
+            >
+              <CrossMark width={12} height={12} />
+            </button>
+            <h3 className="nutri-popup-title">
+              <Meat width={16} height={16} /> {t('nutrify.eventFormTitle', 'Registrar evento')}
+            </h3>
+            <p className="nutri-popup-hint">
+              {t('nutrify.eventFormHint', 'Un asado no se cuenta al gramo. Elegí una banda honesta: se registra el punto medio como una sola comida, la racha sigue y tu vigor no sufre.')}
+            </p>
+            <label className="nutri-popup-field nutri-event-name-field">
+              <span>{t('nutrify.eventNameLabel', 'Nombre')}</span>
+              <input
+                className="nutri-text-input"
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder={t('nutrify.eventDefaultName', 'Asado familiar')}
+                autoFocus
+              />
+            </label>
+            <div className="nutri-event-presets">
+              {EVENT_BANDS.map((band) => {
+                const active = eventMin === String(band.min) && eventMax === String(band.max);
+                return (
+                  <button
+                    key={band.key}
+                    type="button"
+                    className={`nutri-portion-chip${active ? ' active' : ''}`}
+                    aria-pressed={active}
+                    onClick={() => { setEventMin(String(band.min)); setEventMax(String(band.max)); }}
+                  >
+                    {t(`nutrify.eventBand_${band.key}`, `${band.min}–${band.max}`)}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="nutri-event-band-row">
+              <label className="nutri-popup-field">
+                <span>{t('nutrify.eventKcalMin', 'Mín')}</span>
+                <RpgNumberInput value={eventMin} onChange={setEventMin} step={100} min={1} max={9999} style={{ width: 110 }} />
+              </label>
+              <label className="nutri-popup-field">
+                <span>{t('nutrify.eventKcalMax', 'Máx')}</span>
+                <RpgNumberInput value={eventMax} onChange={setEventMax} step={100} min={1} max={9999} style={{ width: 110 }} />
+              </label>
+            </div>
+            {(() => {
+              const min = parseInt(eventMin); const max = parseInt(eventMax);
+              const valid = isFinite(min) && isFinite(max) && min > 0 && max >= min;
+              return valid ? (
+                <p className="nutri-popup-hint nutri-event-midpoint">
+                  {t('nutrify.eventMidpoint', 'Se registran ~{{kcal}} kcal (punto medio de {{min}}–{{max}}).', {
+                    kcal: Math.round((min + max) / 2), min, max,
+                  })}
+                </p>
+              ) : (
+                <p className="nutri-popup-error">{t('nutrify.eventInvalidBand', 'La banda tiene que ser mín > 0 y máx ≥ mín.')}</p>
+              );
+            })()}
+            <button
+              className="nutri-btn nutri-btn-ghost"
+              onClick={handleEventEstimate}
+              disabled={eventEstimating}
+              style={{ width: '100%', marginBottom: 8 }}
+            >
+              {eventEstimating ? t('common.loading', 'Cargando...') : t('nutrify.eventEstimateBand', 'Estimar banda con IA')}
+            </button>
+            <button
+              className="nutri-btn nutri-btn-primary"
+              onClick={handleLogEvent}
+              disabled={eventSaving}
+              style={{ width: '100%', marginBottom: 8 }}
+            >
+              {eventSaving ? t('common.loading', 'Cargando...') : t('nutrify.eventLogButton', 'Registrar evento')}
+            </button>
+            <button onClick={() => setEventOpen(false)} className="nutri-btn nutri-btn-ghost" style={{ width: '100%' }}>
+              {t('common.cancel', 'Cancelar')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Close day popup ─────────────────────────── */}
       {closeDayPopup && (
         <div className="nutri-popup-overlay" onClick={() => setCloseDayPopup(false)}>
@@ -1396,6 +1663,12 @@ export default function Today() {
                 'Cómo se puntúa: en déficit contás como logrado si comés hasta tu objetivo; en superávit, si llegás o lo pasás; en mantenimiento, dentro de ±10 %. Fuera de eso, hasta 10 % de desvío = -5 HP, hasta 20 % = -10 HP, más = -20 HP.',
               )}
             </p>
+            {dayHasEvent && (
+              <p className="nutri-popup-hint nutri-event-close-hint">
+                <Meat width={12} height={12} />{' '}
+                {t('nutrify.eventDayCloseHint', 'Día con evento: pasarte del objetivo no descuenta vigor. Registrarlo ya contó.')}
+              </p>
+            )}
 
             {isPending && (
               <div className="nutri-popup-summary">

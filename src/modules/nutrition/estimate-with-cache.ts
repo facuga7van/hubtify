@@ -5,6 +5,8 @@ export interface ResolvedEstimate {
   /** `cache` means no network call was made — the UI says so. */
   origin: 'cache' | 'ai';
   totalCalories: number;
+  /** Proteína total en gramos, o null cuando ni la IA ni el cache la conocen. */
+  proteinG: number | null;
   items: Array<{ name: string; calories: number }>;
 }
 
@@ -29,12 +31,22 @@ export async function resolveEstimate(
   if (!skipCache) {
     const cached = await getCachedEstimate(desc);
     if (cached) {
-      return { origin: 'cache', totalCalories: cached.calories, items: parseItems(cached.aiBreakdown) };
+      return {
+        origin: 'cache',
+        totalCalories: cached.calories,
+        proteinG: cached.proteinG ?? null,
+        items: parseItems(cached.aiBreakdown),
+      };
     }
   }
 
   const result = await estimateNutrition(desc);
-  return { origin: 'ai', totalCalories: result.calories, items: result.items ?? [] };
+  return {
+    origin: 'ai',
+    totalCalories: result.calories,
+    proteinG: result.proteinG ?? null,
+    items: result.items ?? [],
+  };
 }
 
 /** A corrupt breakdown costs us the item list, never the cache hit itself. */

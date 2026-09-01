@@ -155,7 +155,7 @@ describe('a cache hit never reaches the Cloud Function', () => {
     const result = await resolveEstimate('tarta de verdura');
 
     expect(estimateNutrition).toHaveBeenCalledWith('tarta de verdura');
-    expect(result).toEqual({ origin: 'ai', totalCalories: 640, items: [{ name: 'tarta', calories: 640 }] });
+    expect(result).toEqual({ origin: 'ai', totalCalories: 640, proteinG: null, items: [{ name: 'tarta', calories: 640 }] });
   });
 
   it('skips the cache entirely for an explicit re-estimate', async () => {
@@ -178,6 +178,6 @@ describe('a cache hit never reaches the Cloud Function', () => {
     const result = await resolveEstimate('algo');
 
     expect(estimateNutrition).not.toHaveBeenCalled();
-    expect(result).toEqual({ origin: 'cache', totalCalories: 500, items: [] });
+    expect(result).toEqual({ origin: 'cache', totalCalories: 500, proteinG: null, items: [] });
   });
 });
