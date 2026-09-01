@@ -28,6 +28,7 @@ import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from 
 import { checkBudgetMonthClose, resetBudgetGuards } from '../utils/budget-guards';
 import { playCoinClink } from '../../../shared/audio';
 import {
+  FX_HOUSE_EVENT,
   getUpcoming,
   getValuedView,
   hasUpcomingSupport,
@@ -581,6 +582,14 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, [month, rangeMode, refreshKey]);
 
+  // A new preferred house means every converted figure is stale: the chip
+  // showed the new rate while the dashboard kept the old conversion.
+  useEffect(() => {
+    const handler = () => setRefreshKey((k) => k + 1);
+    window.addEventListener(FX_HOUSE_EVENT, handler);
+    return () => window.removeEventListener(FX_HOUSE_EVENT, handler);
+  }, []);
+
   /** «Próximas batallas» as a 30-day timeline (falls back to the old chart). */
   useEffect(() => {
     if (!hasUpcomingSupport()) { setUpcoming(null); return; }
@@ -903,11 +912,16 @@ export default function Dashboard() {
       <div className="coin-dashboard__header">
         {periodNav}
         {rangeModeSelect}
+        {/* The export handler takes ONE month; outside the monthly view the
+            toast used to say "N records" of a file that only held the month. */}
         <button
           className="rpg-button coin-export-btn"
           onClick={handleExportCsv}
+          disabled={rangeMode !== 'month'}
           aria-label={t('coinify.exportCsv', 'Exportar CSV')}
-          title={t('coinify.exportCsv', 'Exportar CSV')}
+          title={rangeMode === 'month'
+            ? t('coinify.exportCsv', 'Exportar CSV')
+            : t('coinify.exportCsvMonthOnly', 'El CSV exporta el mes navegado: elegí «Mes» en el período')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -962,15 +976,24 @@ export default function Dashboard() {
                       </span>{' '}
                       {trendPct <= 0 ? t('coinify.lessThanLastMonth') : t('coinify.moreThanLastMonth')}
                       {/* Inflation-adjusted twin: a month that only kept pace
-                          with the IPC reads ~0% real, not the inflation. */}
-                      {rangeMode === 'month' && valued?.trend.realPct != null && (
+                          with the IPC reads ~0% real, not the inflation. When
+                          the month's index is not published yet there is NO
+                          real figure \u2014 the old code printed the nominal one
+                          twice and called the second "real". */}
+                      {rangeMode === 'month' && valued && (valued.trend.realPct != null || valued.trend.realPending) && (
                         <span
                           title={t('coinify.realTrendHint', 'Ajustado por inflaci\u00f3n (IPC INDEC): ambos meses expresados en pesos de hoy')}
                         >
                           {' '}({t('coinify.nominalLabel', 'nominal')} {trendPct > 0 ? '+' : ''}{trendPct}%{' \u00b7 '}
-                          <span style={{ color: valued.trend.realPct <= 0 ? 'var(--moss)' : 'var(--rubric)' }}>
-                            {t('coinify.realLabel', 'real')} {valued.trend.realPct > 0 ? '+' : ''}{valued.trend.realPct}%
-                          </span>)
+                          {valued.trend.realPct != null ? (
+                            <span style={{ color: valued.trend.realPct <= 0 ? 'var(--moss)' : 'var(--rubric)' }}>
+                              {t('coinify.realLabel', 'real')} {valued.trend.realPct > 0 ? '+' : ''}{valued.trend.realPct}%
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--ink-faded)' }}>
+                              {t('coinify.realLabel', 'real')}: {t('coinify.realPendingIpc', 'sin dato del INDEC todav\u00eda')}
+                            </span>
+                          )})
                         </span>
                       )}
                     </span>

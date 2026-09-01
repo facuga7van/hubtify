@@ -23,8 +23,14 @@
  *    happened; the `Pago Tarjeta` row is bookkeeping, and rewarding it would pay
  *    twice for one act — exactly the double-count the expense aggregation goes
  *    out of its way to avoid.
- *  · **Edits and deletes.** Fixing a typo is not an act of tracking. Paying for
- *    it would turn "edit, undo, edit" into an XP faucet.
+ *  · **Edits.** Fixing a typo is not an act of tracking. Paying for it would
+ *    turn "edit, undo, edit" into an XP faucet.
+ *  · **Deletes** do not PAY — they take back. Deleting a movement that earned
+ *    XP emits `MOVEMENT_DELETED` with the same `transactionId` the alta
+ *    carried, so the engine can find the original event by `ref_id` and
+ *    reverse it, exactly like `TASK_UNCOMPLETED` reverses `TASK_COMPLETED`.
+ *    Without it, "add $1, delete, repeat" was an unlimited faucet of XP, daily
+ *    combo and finance mastery.
  *  · **Transfers between own accounts.** `finance:transferBetweenAccounts`
  *    writes two rows (expense + income under the reserved `Transferencia`
  *    category), but moving your own money from Mercado Pago to the bank is not
@@ -54,6 +60,10 @@ export interface FinanceRpgResult {
  * and returns the XP the engine actually granted (combo + bonus applied), so the
  * caller can put the real number in its toast instead of the base 5.
  *
+ * `transactionId` is the row (or instalment-plan group) that was written; it
+ * travels in the payload so the engine can persist it as `ref_id` and a later
+ * {@link emitMovementDeleted} can reverse exactly this event.
+ *
  * Also fires `rpg:statsChanged` so the player card updates, exactly like the
  * quests and nutrition modules do.
  *
@@ -62,18 +72,51 @@ export interface FinanceRpgResult {
  */
 export async function emitMovementLogged(
   type: 'expense' | 'income',
+  transactionId?: string,
 ): Promise<FinanceRpgResult | null> {
   try {
     const result = await window.api.processRpgEvent({
       type: type === 'income' ? 'INCOME_LOGGED' : 'EXPENSE_LOGGED',
       moduleId: 'finance',
-      payload: { xp: MANUAL_MOVEMENT_XP, hp: 0, movementType: type },
+      payload: {
+        xp: MANUAL_MOVEMENT_XP, hp: 0, movementType: type,
+        ...(transactionId ? { transactionId } : {}),
+      },
       timestamp: Date.now(),
     });
     window.dispatchEvent(new Event('rpg:statsChanged'));
     return { xpGained: result.xpGained };
   } catch (err) {
     console.error('[finance] processRpgEvent failed:', err);
+    return null;
+  }
+}
+
+/**
+ * The undo of {@link emitMovementLogged}: the movement (or plan) `transactionId`
+ * was deleted, so whatever XP its alta paid must come back — same contract as
+ * `TASK_UNCOMPLETED` (`xp` already negative, the entity id in the payload, the
+ * engine looks the original event up by `ref_id` and reverses its exact XP).
+ *
+ * `movementType` tells the engine which of the two alta types to look for.
+ * Never throws; the delete already happened and must not fail on a bookkeeping
+ * hiccup.
+ */
+export async function emitMovementDeleted(
+  transactionId: string,
+  movementType: 'expense' | 'income',
+): Promise<FinanceRpgResult | null> {
+  try {
+    const result = await window.api.processRpgEvent({
+      type: 'MOVEMENT_DELETED',
+      moduleId: 'finance',
+      payload: { xp: -MANUAL_MOVEMENT_XP, hp: 0, movementType, transactionId },
+      timestamp: Date.now(),
+    });
+    window.dispatchEvent(new Event('rpg:statsChanged'));
+    return { xpGained: result.xpGained };
+  } catch (err) {
+    console.error('[finance] processRpgEvent(MOVEMENT_DELETED) failed:', err);
     return null;
   }
 }

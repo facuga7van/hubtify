@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CategorySelect } from './shared/CategorySelect';
+import { AccountSelect, NO_ACCOUNT, accountIdForSubmit } from './shared/AccountSelect';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
-import type { Currency, TransactionType } from '../types';
+import type { Currency, FinanceAccount, TransactionType } from '../types';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { PlayIcon, PauseIcon, Pencil, CrossMark, Checkmark, Scroll } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
-import { unwrap, failureMessage } from '../utils/api-ext';
+import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../utils/api-ext';
+import { todayDateString } from '../../../../shared/date-utils';
 
 interface RecurringRow {
   id: string;
@@ -22,6 +24,10 @@ interface RecurringRow {
   billingDay: number;
   /** monthly | bimonthly | quarterly | four_monthly | semiannual | annual. */
   frequency?: string;
+  /** Pocket every generated instance leaves / enters. `null` = none. */
+  accountId?: string | null;
+  /** `YYYY-MM` the cadence counts from (non-monthly). `null` = creation month. */
+  anchorMonth?: string | null;
   active: boolean | number;
 }
 
@@ -69,10 +75,11 @@ export default function Recurring() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // Local month: a template created 31/08 22:00 ART is an August template.
+  const currentMonth = todayDateString().slice(0, 7);
 
   const [items, setItems] = useState<RecurringRow[]>([]);
+  const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showCoinDrop, setShowCoinDrop] = useState(false);
@@ -85,6 +92,11 @@ export default function Recurring() {
   const [formCategory, setFormCategory] = useState('Otros');
   const [formBillingDay, setFormBillingDay] = useState(1);
   const [formFrequency, setFormFrequency] = useState<string>('monthly');
+  // '' = unresolved: the AccountSelect picks the default (last used / Efectivo).
+  const [formAccount, setFormAccount] = useState('');
+  const [accountsSupported, setAccountsSupported] = useState(false);
+  // Month the cadence counts from; only meaningful for non-monthly frequencies.
+  const [formAnchorMonth, setFormAnchorMonth] = useState(currentMonth);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
   // Inline edit state (amount)
@@ -93,7 +105,10 @@ export default function Recurring() {
 
   // Inline edit state (fields)
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
-  const [editRecurringFields, setEditRecurringFields] = useState({ name: '', type: '' as TransactionType, category: '', billingDay: 1, frequency: 'monthly' });
+  const [editRecurringFields, setEditRecurringFields] = useState({
+    name: '', type: '' as TransactionType, category: '', billingDay: 1, frequency: 'monthly',
+    account: NO_ACCOUNT, anchorMonth: currentMonth,
+  });
 
   // History state
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
@@ -103,13 +118,26 @@ export default function Recurring() {
     window.api.financeGetRecurring().then((rows) => setItems(rows as RecurringRow[]));
   };
 
-  useEffect(() => { load(); }, []);
+  /** Live accounts, to print the name next to each template. Empty while unwired. */
+  const loadAccounts = useCallback(() => {
+    if (!hasAccountsSupport()) { setAccounts([]); return; }
+    getAccounts().then((rows) => setAccounts(rows ?? []));
+  }, []);
+
+  useEffect(() => { load(); loadAccounts(); }, [loadAccounts]);
 
   useEffect(() => {
-    const handler = () => load();
+    const handler = () => { load(); loadAccounts(); };
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
-  }, []);
+    window.addEventListener('finance:accountsChanged', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener('finance:accountsChanged', handler);
+    };
+  }, [loadAccounts]);
+
+  const accountName = (id: string | null | undefined): string | null =>
+    id ? (accounts.find((a) => a.id === id)?.name ?? null) : null;
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,13 +151,19 @@ export default function Recurring() {
       const result = await unwrap(window.api.financeAddRecurring({
         name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory, billingDay: formBillingDay,
         frequency: formFrequency,
+        // Every generated instance inherits the account, so the chest sees
+        // the rent leave. Omitted while the accounts bridge is not wired.
+        ...(accountsSupported ? { accountId: accountIdForSubmit(formAccount) } : {}),
+        // Monthly templates bill every month; the anchor only steers the others.
+        ...(formFrequency !== 'monthly' && /^\d{4}-\d{2}$/.test(formAnchorMonth) ? { anchorMonth: formAnchorMonth } : {}),
       }));
       if (!result.ok) {
         toast({ type: 'warning', message: failureMessage(result.reason, t) });
         return;
       }
       setFormName(''); setFormAmount(''); setFormType('expense');
-      setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setFormFrequency('monthly'); setShowForm(false);
+      setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setFormFrequency('monthly');
+      setFormAnchorMonth(currentMonth); setShowForm(false);
       load();
       window.dispatchEvent(new Event('finance:dataChanged'));
     } finally {
@@ -178,6 +212,8 @@ export default function Recurring() {
       category: item.category,
       billingDay: item.billingDay,
       frequency: item.frequency ?? 'monthly',
+      account: item.accountId ?? NO_ACCOUNT,
+      anchorMonth: item.anchorMonth ?? currentMonth,
     });
   };
 
@@ -192,6 +228,10 @@ export default function Recurring() {
       category: editRecurringFields.category,
       billingDay: editRecurringFields.billingDay,
       frequency: editRecurringFields.frequency,
+      ...(accountsSupported ? { accountId: accountIdForSubmit(editRecurringFields.account) } : {}),
+      ...(editRecurringFields.frequency !== 'monthly' && /^\d{4}-\d{2}$/.test(editRecurringFields.anchorMonth)
+        ? { anchorMonth: editRecurringFields.anchorMonth }
+        : {}),
     }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
@@ -311,6 +351,25 @@ export default function Recurring() {
             </select>
           </div>
 
+          {/* Which pocket the generated rows leave, and — for non-monthly
+              cadences — the month the cadence counts from: an annual insurance
+              due in March, loaded in September, must anchor on March. */}
+          <div className="coin-quick-add-form__row">
+            <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.accountLabel', 'Cuenta')}</label>
+            <AccountSelect value={formAccount} onChange={setFormAccount} onSupported={setAccountsSupported} />
+            {formFrequency !== 'monthly' && (
+              <>
+                <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}
+                  htmlFor="coin-recurring-anchor"
+                  title={t('coinify.anchorMonthHint', 'Mes desde el que cuenta la cadencia: la primera cuota cae en ese mes y después cada N meses.')}>
+                  {t('coinify.anchorMonthLabel', 'Mes ancla')}
+                </label>
+                <input id="coin-recurring-anchor" type="month" className="rpg-input" value={formAnchorMonth}
+                  onChange={(e) => setFormAnchorMonth(e.target.value)} style={{ fontSize: 'var(--fs-label)' }} />
+              </>
+            )}
+          </div>
+
           <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={formSubmitting}>
             {formSubmitting ? t('coinify.saving') : t('coinify.save')}
           </button>
@@ -391,6 +450,16 @@ export default function Recurring() {
                         <option key={f} value={f}>{t(`coinify.freq_${f}`, FREQUENCY_FALLBACKS[f])}</option>
                       ))}
                     </select>
+                    <AccountSelect value={editRecurringFields.account}
+                      onChange={(v) => setEditRecurringFields((f) => ({ ...f, account: v }))}
+                      onSupported={setAccountsSupported} />
+                    {editRecurringFields.frequency !== 'monthly' && (
+                      <input type="month" className="rpg-input" value={editRecurringFields.anchorMonth}
+                        aria-label={t('coinify.anchorMonthLabel', 'Mes ancla')}
+                        title={t('coinify.anchorMonthHint', 'Mes desde el que cuenta la cadencia: la primera cuota cae en ese mes y después cada N meses.')}
+                        onChange={(e) => setEditRecurringFields((f) => ({ ...f, anchorMonth: e.target.value }))}
+                        style={{ fontSize: 'var(--fs-label)', width: 120 }} />
+                    )}
                     <button className="rpg-button coin-action-btn coin-action-btn--confirm"
                       aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}
                       onClick={() => saveRecurringEdit(item.id)}><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
@@ -408,9 +477,16 @@ export default function Recurring() {
                     <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.5 }}>
                       {t('coinify.billingDay')}: {item.billingDay}
                     </span>
+                    {accountName(item.accountId) && (
+                      <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.5 }}
+                        title={t('coinify.accountLabel', 'Cuenta')}>
+                        {accountName(item.accountId)}
+                      </span>
+                    )}
                     {(item.frequency ?? 'monthly') !== 'monthly' && (
                       <Rune tone="gold">
                         {t(`coinify.freq_${item.frequency}`, FREQUENCY_FALLBACKS[item.frequency ?? 'monthly'] ?? item.frequency)}
+                        {item.anchorMonth ? ` · ${item.anchorMonth}` : ''}
                       </Rune>
                     )}
                     {/* The day counter assumes a monthly cadence; for the other

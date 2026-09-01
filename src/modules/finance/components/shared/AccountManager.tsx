@@ -174,8 +174,13 @@ export default function AccountManager({ onClose, onSaved }: Props) {
 
   const canTransfer = hasTransferSupport() && accounts.length >= 2;
 
+  // Portal clicks bubble up the React tree: stop them here so a host overlay
+  // (the importer's) never sees the click that closed this manager.
   return createPortal(
-    <div className="coin-modal-overlay" onClick={onClose}>
+    <div
+      className="coin-modal-overlay"
+      onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) onClose(); }}
+    >
       <div
         {...dialogProps}
         className="rpg-card coin-modal coin-modal--narrow"

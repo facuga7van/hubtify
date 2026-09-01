@@ -1,17 +1,19 @@
 import crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import type { ExpenseBreakdown, ExpenseBreakdownByCurrency } from '../../shared/types';
+import { todayDateString } from '../../shared/date-utils';
 import {
   buildIpcCoefficients,
-  coefficientForMonth,
+  coefficientDetail,
   convertArsToUsd,
   nominalAndRealTrend,
+  type FxRateSource,
   type IpcCoefficients,
   type IpcSeriesPoint,
 } from '../../src/modules/finance/utils/valuation';
 
 export type { ExpenseBreakdown, ExpenseBreakdownByCurrency };
-export type { IpcCoefficients, IpcSeriesPoint };
+export type { FxRateSource, IpcCoefficients, IpcSeriesPoint };
 
 /**
  * Shared, electron-free finance helpers.
@@ -70,6 +72,30 @@ export const MAX_INSTALLMENTS = 120;
  */
 export function nowIso(): string {
   return new Date().toISOString();
+}
+
+// ── Money rounding ─────────────────────────────────────────────────────────
+
+/**
+ * Two-decimal rounding for any sum accumulated in JS that gets PERSISTED or
+ * COMPARED. `1000.1 + 2000.2 + …` leaves binary noise (`15016.619999999999`)
+ * that then lands in `calculated_amount`, and ten charges of $0.10 add up to
+ * `0.9999999999999999` — which is "under $1" when a budget is checked. SQLite's
+ * own SUM() is Kahan-compensated and needs no help; JS `+=` does.
+ */
+export function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+// ── Frozen-rate provenance ─────────────────────────────────────────────────
+
+/**
+ * What to write in `fx_rate_source` for a row being written NOW with the rate
+ * of TODAY: exact (`day`) only when the row is dated today; a past-dated row
+ * carries the rate of the process that wrote it, not of its own day.
+ */
+export function fxRateSourceFor(rowDate: string, today: string = todayDateString()): FxRateSource {
+  return rowDate === today ? 'day' : 'process';
 }
 
 // ── Date helpers ───────────────────────────────────────────────────────────
@@ -158,6 +184,21 @@ export function getStatementPeriod(txDate: string, closingDay: number): string {
   if (d <= closingDay) return `${y}-${pad2(m)}`;
   const next = shiftMonth(y, m - 1, 1);
   return `${next.year}-${pad2(next.month0 + 1)}`;
+}
+
+/**
+ * The statement period a card purchase belongs to: the EXPLICIT one the row
+ * carries (`statement_period`, written by the importer from the month the user
+ * chose) wins over the one derived from its date. A `04/12` instalment printed
+ * with its original purchase date belongs to the statement it was billed on,
+ * not to the month the fridge was bought.
+ */
+export function statementPeriodFor(
+  tx: { date: string; statementPeriod?: string | null },
+  closingDay: number,
+): string {
+  if (isValidMonthString(tx.statementPeriod)) return tx.statementPeriod;
+  return getStatementPeriod(tx.date, closingDay);
 }
 
 // ── Validation ─────────────────────────────────────────────────────────────
@@ -413,6 +454,19 @@ export interface RecurringTemplate {
   /** One of {@link RECURRING_FREQUENCIES}; anything else behaves as `monthly`. */
   frequency: string;
   createdAt: string;
+  /** Account every generated instance inherits. `null` = none. */
+  accountId?: string | null;
+  /** `YYYY-MM` the cadence is anchored on; `null` = month of `createdAt`. */
+  anchorMonth?: string | null;
+}
+
+/**
+ * The month a template's cadence counts from: the explicit `anchor_month` the
+ * user chose, else the (UTC) month of `created_at` — the pre-column behaviour.
+ */
+export function recurringAnchorMonth(rec: { createdAt?: string | null; anchorMonth?: string | null }): string {
+  if (isValidMonthString(rec.anchorMonth)) return rec.anchorMonth;
+  return (rec.createdAt ?? '').slice(0, 7);
 }
 
 /** Every cadence the `frequency` TEXT column supports, with its month interval. */
@@ -485,7 +539,8 @@ export function generateRecurringForMonth(
 
   const actives = db.prepare(`
     SELECT id, name, type, amount, currency, category, billing_day AS billingDay,
-           frequency, created_at AS createdAt
+           frequency, created_at AS createdAt,
+           account_id AS accountId, anchor_month AS anchorMonth
     FROM finance_recurring
     WHERE deleted_at IS NULL AND active = 1
   `).all() as RecurringTemplate[];
@@ -500,15 +555,20 @@ export function generateRecurringForMonth(
     WHERE source = 'recurring' AND recurring_id = ? AND date >= ? AND date < ?
   `);
 
+  // account_id is inherited from the template: a generated rent that belongs
+  // to no account never moved the chest, so "Total en cuentas" stayed at the
+  // starting balance while the month said −$200.000.
   const insertStmt = db.prepare(`
     INSERT OR IGNORE INTO finance_transactions
       (id, type, amount, currency, category, description, date, payment_method,
        source, installments, installment_group_id, for_third_party, recurring_id,
-       import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', 1, NULL, 0, ?, NULL, NULL, 1, ?, ?, ?)
+       import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source,
+       account_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', 1, NULL, 0, ?, NULL, NULL, 1, ?, ?, ?, ?, ?)
   `);
 
   const now = nowIso();
+  const today = todayDateString();
   const fxRate = typeof opts.fxRate === 'number' && Number.isFinite(opts.fxRate) && opts.fxRate > 0
     ? opts.fxRate
     : null;
@@ -517,14 +577,15 @@ export function generateRecurringForMonth(
     let generated = 0;
     for (const rec of actives) {
       // Non-monthly cadences only bill on their own months, anchored on the
-      // month the template was created (see isRecurringDueInMonth).
-      if (!isRecurringDueInMonth(rec.frequency, (rec.createdAt ?? '').slice(0, 7), month)) continue;
+      // user's anchor month (else the month the template was created).
+      if (!isRecurringDueInMonth(rec.frequency, recurringAnchorMonth(rec), month)) continue;
 
       // Guard includes soft-deleted rows on purpose: if the user deleted this
       // month's instance by hand, do not bring it back next launch.
       const existing = existsStmt.get(rec.id, start, end) as { c: number };
       if (existing.c > 0) continue;
 
+      const date = dateInMonthClamped(month, rec.billingDay ?? 1);
       const result = insertStmt.run(
         recurringTransactionId(rec.id, month),
         rec.type,
@@ -532,9 +593,11 @@ export function generateRecurringForMonth(
         rec.currency ?? 'ARS',
         rec.category ?? 'Otros',
         rec.name,
-        dateInMonthClamped(month, rec.billingDay ?? 1),
+        date,
         rec.id,
         fxRate,
+        fxRate === null ? null : fxRateSourceFor(date, today),
+        rec.accountId ?? null,
         now,
         now,
       );
@@ -656,7 +719,8 @@ export function computeBudgetStatus(db: Database.Database, month: string): Budge
   );
 
   const categories: BudgetCategoryStatus[] = budgets.map((b) => {
-    const spent = spendByCategory.get(b.category) ?? 0;
+    // round2: the wheel's SUM is clean, but a budget is COMPARED against it.
+    const spent = round2(spendByCategory.get(b.category) ?? 0);
     return {
       category: b.category,
       limit: b.monthlyLimit,
@@ -668,8 +732,8 @@ export function computeBudgetStatus(db: Database.Database, month: string): Budge
   return {
     month,
     categories,
-    totalLimit: categories.reduce((sum, c) => sum + c.limit, 0),
-    totalSpent: categories.reduce((sum, c) => sum + c.spent, 0),
+    totalLimit: round2(categories.reduce((sum, c) => sum + c.limit, 0)),
+    totalSpent: round2(categories.reduce((sum, c) => sum + c.spent, 0)),
   };
 }
 
@@ -682,7 +746,7 @@ export function computeBudgetStatus(db: Database.Database, month: string): Budge
  */
 export function isBudgetMonthMet(status: BudgetStatus): boolean {
   if (status.categories.length === 0) return false;
-  return status.categories.every((c) => c.spent <= c.limit);
+  return status.categories.every((c) => round2(c.spent) <= round2(c.limit));
 }
 
 // ── Dollar rate (frozen fx_rate) ───────────────────────────────────────────
@@ -817,18 +881,175 @@ export async function getCurrentRate(
  * available today. One pass, idempotent: rows that already carry a frozen rate
  * are never touched, so running it twice changes nothing.
  *
+ * The rows are stamped `fx_rate_source = 'backfill'` (or `'day'` when the row
+ * is dated today — then today's rate IS its rate): before the column existed
+ * this pass turned an honest `~US$ 74` into a false-precision `US$ 74` on a
+ * two-year-old row. Prefer {@link backfillFxRatesHistorical}, which asks the
+ * historical series first and only falls back to this.
+ *
  * `updated_at` is bumped on purpose — without it, last-write-wins sync would
  * never carry the backfilled value to the other devices.
  */
-export function backfillFxRates(db: Database.Database, rate: number): number {
+export function backfillFxRates(db: Database.Database, rate: number, today: string = todayDateString()): number {
   const parsed = parsePositiveAmount(rate);
   if (parsed === null) return 0;
   const result = db.prepare(`
     UPDATE finance_transactions
-    SET fx_rate = ?, updated_at = ?
+    SET fx_rate = ?, fx_rate_source = CASE WHEN date = ? THEN 'day' ELSE 'backfill' END, updated_at = ?
     WHERE fx_rate IS NULL AND deleted_at IS NULL
-  `).run(parsed, nowIso());
+  `).run(parsed, today, nowIso());
   return result.changes;
+}
+
+// ── Historical rates (argentinadatos) ──────────────────────────────────────
+
+export const HISTORICAL_RATE_API_BASE = 'https://api.argentinadatos.com/v1/cotizaciones/dolares';
+
+/** `…/dolares/{casa}/{YYYY/MM/DD}` — one quote per house per day. */
+export function historicalRateUrl(house: string, date: string): string {
+  return `${HISTORICAL_RATE_API_BASE}/${encodeURIComponent(house)}/${date.replace(/-/g, '/')}`;
+}
+
+/** Cache row id in `dollar_cache` for one house/day. Historical data never changes: no TTL. */
+function historicalCacheId(house: string, date: string): string {
+  return `fxhist:${house}:${date}`;
+}
+
+export function readHistoricalRateCache(db: Database.Database, house: string, date: string): number | null {
+  try {
+    const row = db.prepare('SELECT data FROM dollar_cache WHERE id = ?').get(historicalCacheId(house, date)) as
+      { data: string } | undefined;
+    if (!row) return null;
+    const value = Number(JSON.parse(row.data));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeHistoricalRateCache(db: Database.Database, house: string, date: string, rate: number): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO dollar_cache (id, data, updated_at)
+    VALUES (?, ?, datetime('now'))
+  `).run(historicalCacheId(house, date), JSON.stringify(rate));
+}
+
+/** The API answers `{ casa, compra, venta, fecha }` (or a list of them). */
+export function parseHistoricalRateResponse(json: unknown): number | null {
+  const pick = Array.isArray(json) ? json[json.length - 1] : json;
+  const venta = (pick as { venta?: unknown } | null)?.venta;
+  return typeof venta === 'number' && Number.isFinite(venta) && venta > 0 ? venta : null;
+}
+
+/**
+ * Venta rate of `house` on `date` (`YYYY-MM-DD`), cache-first, network second
+ * (bounded by `timeoutMs`, 3 s by default), never throws.
+ *
+ * Weekends and holidays have no quote, so up to `lookback` previous days are
+ * tried — a Saturday purchase was priced at Friday's close. The result is
+ * cached under the ORIGINAL date.
+ *
+ * `offline: true` means the network itself failed (timeout, DNS, no fetch):
+ * the caller should stop asking for other dates in this run. A clean "no data"
+ * (404, empty body) is not offline.
+ */
+export async function getHistoricalRate(
+  db: Database.Database,
+  house: string,
+  date: string,
+  opts: RateFetchOptions & { lookback?: number } = {},
+): Promise<{ rate: number | null; offline: boolean }> {
+  const cached = readHistoricalRateCache(db, house, date);
+  if (cached !== null) return { rate: cached, offline: false };
+
+  const fetchFn = opts.fetchFn ?? (typeof fetch === 'function' ? fetch : null);
+  if (!fetchFn) return { rate: null, offline: true };
+  const lookback = Math.max(0, Math.min(opts.lookback ?? 3, 7));
+
+  for (let back = 0; back <= lookback; back++) {
+    const probe = addDaysToDate(date, -back);
+    try {
+      const response = await fetchFn(historicalRateUrl(house, probe), {
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 3000),
+      });
+      if (!response.ok) continue; // no quote that day — try the day before
+      const rate = parseHistoricalRateResponse(await response.json());
+      if (rate === null) continue;
+      try { writeHistoricalRateCache(db, house, date, rate); } catch { /* best-effort */ }
+      return { rate, offline: false };
+    } catch {
+      return { rate: null, offline: true };
+    }
+  }
+  return { rate: null, offline: false };
+}
+
+export interface HistoricalBackfillResult {
+  /** Rows that got a rate, by any means. */
+  updated: number;
+  /** Rows stamped `'day'` (rate of their own date). */
+  exact: number;
+  /** Rows stamped `'backfill'` (today's rate pasted over an old row). */
+  approx: number;
+}
+
+/**
+ * Backfill that respects the calendar: every live row without a frozen rate
+ * gets the rate of ITS OWN DATE from the historical series (stamped `'day'`),
+ * and only the dates the series could not answer fall back to today's rate
+ * (stamped `'backfill'`, which keeps the `~` on screen).
+ *
+ * Bounded: at most `maxDates` distinct dates per run (newest first), and the
+ * first network failure ends the historical pass — offline means offline for
+ * every date, no point in 60 timeouts in a row. Never throws.
+ */
+export async function backfillFxRatesHistorical(
+  db: Database.Database,
+  opts: RateFetchOptions & {
+    house: string;
+    /** Today's rate for the fallback pass; `null` = no fallback (rows stay NULL). */
+    currentRate: number | null;
+    maxDates?: number;
+    today?: string;
+  },
+): Promise<HistoricalBackfillResult> {
+  const today = opts.today ?? todayDateString();
+  const maxDates = Math.max(1, Math.min(opts.maxDates ?? 60, 365));
+  const now = nowIso();
+
+  const dates = db.prepare(`
+    SELECT DISTINCT date FROM finance_transactions
+    WHERE fx_rate IS NULL AND deleted_at IS NULL AND date < ?
+    ORDER BY date DESC
+    LIMIT ?
+  `).all(today, maxDates) as Array<{ date: string }>;
+
+  const stampDay = db.prepare(`
+    UPDATE finance_transactions
+    SET fx_rate = ?, fx_rate_source = 'day', updated_at = ?
+    WHERE fx_rate IS NULL AND deleted_at IS NULL AND date = ?
+  `);
+
+  let exact = 0;
+  for (const { date } of dates) {
+    const { rate, offline } = await getHistoricalRate(db, opts.house, date, opts);
+    if (offline) break;
+    if (rate === null) continue;
+    exact += stampDay.run(rate, now, date).changes;
+  }
+
+  let approx = 0;
+  if (opts.currentRate !== null) {
+    // Rows dated today are stamped 'day' inside backfillFxRates itself.
+    const before = (db.prepare(
+      "SELECT COUNT(*) AS c FROM finance_transactions WHERE fx_rate IS NULL AND deleted_at IS NULL AND date = ?",
+    ).get(today) as { c: number }).c;
+    const changed = backfillFxRates(db, opts.currentRate, today);
+    exact += Math.min(before, changed);
+    approx = Math.max(0, changed - before);
+  }
+
+  return { updated: exact + approx, exact, approx };
 }
 
 // ── Inflation (INDEC IPC) ──────────────────────────────────────────────────
@@ -937,18 +1158,24 @@ export interface ValuedView {
   usd: ValuedAggregates | null;
   /** `null` when the IPC series is unreachable and uncached. */
   arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null;
-  /** Expenses vs previous month, ARS impacting — nominal and inflation-adjusted. */
-  trend: { nominalPct: number | null; realPct: number | null };
+  /**
+   * Expenses vs previous month, ARS impacting — nominal and inflation-adjusted.
+   * `realPct` is `null` whenever either month's IPC index is not published yet;
+   * `realPending` then says so (as opposed to "no series at all"), so the UI
+   * can print "sin dato del INDEC todavía" instead of a number that is just the
+   * nominal figure wearing a different label.
+   */
+  trend: { nominalPct: number | null; realPct: number | null; realPending: boolean };
 }
 
-interface FxRow { amount: number; fxRate: number | null }
+interface FxRow { amount: number; fxRate: number | null; fxRateSource?: string | null }
 
 /** Sum of ARS rows in dollars, each with its own frozen rate. */
 function sumUsd(rows: FxRow[], currentRate: number): { total: number; approx: boolean } {
   let total = 0;
   let approx = false;
   for (const row of rows) {
-    const usd = convertArsToUsd(row.amount, row.fxRate, currentRate);
+    const usd = convertArsToUsd(row.amount, row.fxRate, currentRate, row.fxRateSource ?? null);
     if (usd === null) { approx = true; continue; }
     total += usd.value;
     if (usd.approx) approx = true;
@@ -977,26 +1204,26 @@ export function computeValuedView(
   // One row-level query per aggregate the dashboard shows. Transfers between
   // own accounts are excluded exactly like in the nominal handlers.
   const balanceRows = db.prepare(`
-    SELECT type, amount, fx_rate AS fxRate
+    SELECT type, amount, fx_rate AS fxRate, fx_rate_source AS fxRateSource
     FROM finance_transactions
     WHERE deleted_at IS NULL AND date >= ? AND date < ?
       AND impacts_balance = 1 AND currency = 'ARS' AND category <> ?
-  `).all(start, end, TRANSFER_CATEGORY) as Array<{ type: string; amount: number; fxRate: number | null }>;
+  `).all(start, end, TRANSFER_CATEGORY) as Array<{ type: string } & FxRow>;
 
   const sparkStart = monthRange(addMonthsToMonth(month, -5)).start;
   const sparkRows = db.prepare(`
-    SELECT amount, fx_rate AS fxRate, SUBSTR(date, 1, 7) AS m
+    SELECT amount, fx_rate AS fxRate, fx_rate_source AS fxRateSource, SUBSTR(date, 1, 7) AS m
     FROM finance_transactions
     WHERE deleted_at IS NULL AND date >= ? AND date < ?
       AND type = 'expense' AND impacts_balance = 1 AND currency = 'ARS' AND category <> ?
-  `).all(sparkStart, end, TRANSFER_CATEGORY) as Array<{ amount: number; fxRate: number | null; m: string }>;
+  `).all(sparkStart, end, TRANSFER_CATEGORY) as Array<{ m: string } & FxRow>;
 
   const catWhere = buildTransactionWhere({ ...categorySpendFilter({ start, end }), currency: 'ARS' });
   const catRows = db.prepare(`
-    SELECT category, amount, fx_rate AS fxRate
+    SELECT category, amount, fx_rate AS fxRate, fx_rate_source AS fxRateSource
     FROM finance_transactions
     WHERE ${catWhere.where}
-  `).all(...catWhere.params) as Array<{ category: string; amount: number; fxRate: number | null }>;
+  `).all(...catWhere.params) as Array<{ category: string } & FxRow>;
 
   const sparkMonths: string[] = [];
   for (let i = 5; i >= 0; i--) sparkMonths.push(addMonthsToMonth(month, -i));
@@ -1035,9 +1262,13 @@ export function computeValuedView(
   // ── ARS de hoy ──
   let arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null = null;
   if (coefs) {
-    const monthCoef = coefficientForMonth(coefs, month);
+    const monthDetail = coefficientDetail(coefs, month);
+    const monthCoef = monthDetail?.coef ?? null;
     const applyCoef = (nominal: number, coef: number | null) => coef === null ? nominal : nominal * coef;
-    let approx = monthCoef === null;
+    // Approximate when the month predates the series AND when its index is
+    // not published yet: the current month's "today's pesos" are nominal pesos
+    // wearing a coefficient of 1 that INDEC has not confirmed.
+    let approx = monthDetail === null || monthDetail.assumed;
 
     const nominalIncome = balanceRows.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
     const nominalExpenses = balanceRows.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
@@ -1045,10 +1276,10 @@ export function computeValuedView(
     const expenses = applyCoef(nominalExpenses, monthCoef);
 
     const monthlyExpenses = sparkMonths.map((m) => {
-      const coef = coefficientForMonth(coefs, m);
-      if (coef === null) approx = true;
+      const detail = coefficientDetail(coefs, m);
+      if (detail === null || detail.assumed) approx = true;
       const nominal = sparkRows.filter((r) => r.m === m).reduce((s, r) => s + r.amount, 0);
-      return applyCoef(nominal, coef);
+      return applyCoef(nominal, detail?.coef ?? null);
     });
 
     const catTotals = new Map<string, number>();
@@ -1076,14 +1307,24 @@ export function computeValuedView(
     balanceScope: 'impacting',
     excludeCategories: [TRANSFER_CATEGORY],
   }).ARS;
-  const trend = nominalAndRealTrend(
+  // An ASSUMED coefficient (index not published yet) is passed as null: with
+  // both months at 1 the "real" figure was the nominal one, every month,
+  // because the current month never has an index when it is on screen.
+  const currDetail = coefs ? coefficientDetail(coefs, month) : null;
+  const prevDetail = coefs ? coefficientDetail(coefs, prevMonth) : null;
+  const exactCoef = (d: { coef: number; assumed: boolean } | null) => (d && !d.assumed ? d.coef : null);
+  const realPending = !!coefs && !!(currDetail?.assumed || prevDetail?.assumed);
+  const { nominalPct, realPct } = nominalAndRealTrend(
     currExpenses,
     prevExpenses,
-    coefs ? coefficientForMonth(coefs, month) : null,
-    coefs ? coefficientForMonth(coefs, prevMonth) : null,
+    exactCoef(currDetail),
+    exactCoef(prevDetail),
   );
 
-  return { month, house: ctx.house, currentRate: ctx.currentRate, usd, arsToday, trend };
+  return {
+    month, house: ctx.house, currentRate: ctx.currentRate, usd, arsToday,
+    trend: { nominalPct, realPct, realPending },
+  };
 }
 
 // ── Upcoming timeline ("Próximas batallas", 30 días) ───────────────────────
@@ -1172,12 +1413,12 @@ export function computeUpcomingTimeline(
   // 2. Recurring expenses projected onto the window's months.
   const templates = db.prepare(`
     SELECT id, name, amount, currency, billing_day AS billingDay,
-           frequency, created_at AS createdAt
+           frequency, created_at AS createdAt, anchor_month AS anchorMonth
     FROM finance_recurring
     WHERE deleted_at IS NULL AND active = 1 AND type = 'expense'
   `).all() as Array<{
     id: string; name: string; amount: number; currency: string;
-    billingDay: number; frequency: string; createdAt: string;
+    billingDay: number; frequency: string; createdAt: string; anchorMonth: string | null;
   }>;
 
   if (templates.length > 0) {
@@ -1193,7 +1434,7 @@ export function computeUpcomingTimeline(
 
     for (const rec of templates) {
       for (const m of months) {
-        if (!isRecurringDueInMonth(rec.frequency, (rec.createdAt ?? '').slice(0, 7), m)) continue;
+        if (!isRecurringDueInMonth(rec.frequency, recurringAnchorMonth(rec), m)) continue;
         const range = monthRange(m);
         const existing = existsStmt.get(rec.id, range.start, range.end) as
           { id: string; date: string; amount: number; currency: string; deletedAt: string | null } | undefined;
@@ -1456,23 +1697,25 @@ export function transferBetweenAccounts(
     ? input.fxRate
     : null;
 
+  const fxRateSource = fxRate === null ? null : fxRateSourceFor(input.date);
+
   const insert = db.prepare(`
     INSERT INTO finance_transactions
       (id, type, amount, currency, category, description, date, payment_method,
        source, installments, installment_group_id, for_third_party, recurring_id,
-       import_batch_id, credit_card_id, impacts_balance, fx_rate, account_id,
+       import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, account_id,
        transfer_group_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'transfer', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'transfer', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?, ?, ?)
   `);
 
   const trx = db.transaction(() => {
     insert.run(
       expenseId, 'expense', amount, from.currency, TRANSFER_CATEGORY,
-      `Transferencia a ${to.name}`, input.date, fxRate, from.id, transferGroupId, now, now,
+      `Transferencia a ${to.name}`, input.date, fxRate, fxRateSource, from.id, transferGroupId, now, now,
     );
     insert.run(
       incomeId, 'income', amount, to.currency, TRANSFER_CATEGORY,
-      `Transferencia desde ${from.name}`, input.date, fxRate, to.id, transferGroupId, now, now,
+      `Transferencia desde ${from.name}`, input.date, fxRate, fxRateSource, to.id, transferGroupId, now, now,
     );
   });
   trx();

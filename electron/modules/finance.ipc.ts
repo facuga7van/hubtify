@@ -12,20 +12,26 @@ import {
   TRANSFER_CATEGORY,
   addMonthsClamped,
   addMonthsToMonth,
-  backfillFxRates,
+  backfillFxRatesHistorical,
+  categorySpendFilter,
+  buildTransactionWhere,
   computeBudgetStatus,
   computeCategorySpend,
   computeExpenseBreakdown,
   computeMonthlyBalance,
   computeUpcomingTimeline,
   computeValuedView,
+  fxRateSourceFor,
   generateRecurringForMonth,
   getCurrentRate,
   getFxHouse,
   getIpcSeries,
+  isRecurringDueInMonth,
   listBudgets,
+  recurringAnchorMonth,
+  round2,
   setBudget,
-  getStatementPeriod,
+  statementPeriodFor,
   isValidDateString,
   isValidMonthString,
   monthRange,
@@ -91,10 +97,33 @@ function transactionColumns(alias = ''): string {
   ${p}impacts_balance AS impactsBalance,
   ${p}billed_amount_ars AS billedAmountArs,
   ${p}fx_rate AS fxRate,
+  ${p}fx_rate_source AS fxRateSource,
+  ${p}statement_period AS statementPeriod,
   ${p}account_id AS accountId,
   ${p}transfer_group_id AS transferGroupId,
   ${p}created_at AS createdAt, ${p}updated_at AS updatedAt
 `;
+}
+
+/**
+ * Resolves the account a write should land on, mirroring `finance:addTransaction`:
+ * `undefined` = not chosen (cash → the seeded «Efectivo» if it is still alive,
+ * anything else → none); `null` = explicitly "sin cuenta"; a string = that
+ * account, but only if it is alive (a dangling id would be invisible anyway).
+ */
+function resolveAccountId(
+  db: ReturnType<typeof getDb>,
+  accountId: string | null | undefined,
+  paymentMethod: string,
+): string | null {
+  if (accountId === null) return null;
+  if (typeof accountId === 'string' && accountId.trim() !== '') {
+    const alive = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(accountId.trim());
+    return alive ? accountId.trim() : null;
+  }
+  if (paymentMethod !== 'cash') return null;
+  const def = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(DEFAULT_CASH_ACCOUNT_ID);
+  return def ? DEFAULT_CASH_ACCOUNT_ID : null;
 }
 
 const TRANSACTION_COLUMNS = transactionColumns();
@@ -195,16 +224,14 @@ export function registerFinanceIpcHandlers(): void {
     // Default mapping when no account was chosen at all: cash goes to the
     // seeded «Efectivo» account (if it is still alive); every other payment
     // method stays unassigned. NEVER invent accounts from payment_method.
+    // An explicit account id is kept as given (the read-side JOIN resolves a
+    // dangling one), matching the previous behaviour of this handler.
     let accountId = tx.accountId ?? null;
-    if (tx.accountId === undefined && (tx.paymentMethod ?? 'cash') === 'cash') {
-      const def = db.prepare(
-        'SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL'
-      ).get(DEFAULT_CASH_ACCOUNT_ID) as { id: string } | undefined;
-      if (def) accountId = DEFAULT_CASH_ACCOUNT_ID;
-    }
+    if (tx.accountId === undefined) accountId = resolveAccountId(db, undefined, tx.paymentMethod ?? 'cash');
 
     // Freeze today's venta rate on the row. Offline with no cache → NULL, and
     // the write goes through regardless — a missing rate never blocks the alta.
+    // Today's rate is the row's own rate only when the row is dated today.
     const fxRate = await captureFxRate(db);
     const id = genId();
     const now = nowIso();
@@ -212,8 +239,8 @@ export function registerFinanceIpcHandlers(): void {
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, for_third_party, recurring_id,
-         import_batch_id, credit_card_id, impacts_balance, fx_rate, account_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, account_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       tx.type,
@@ -232,6 +259,7 @@ export function registerFinanceIpcHandlers(): void {
       tx.creditCardId ?? null,
       (tx.impactsBalance === false || tx.paymentMethod === 'credit_card') ? 0 : 1,
       fxRate,
+      fxRate === null ? null : fxRateSourceFor(tx.date),
       accountId,
       now,
       now,
@@ -355,16 +383,23 @@ export function registerFinanceIpcHandlers(): void {
     const count = Number.isFinite(months) ? Math.max(0, Math.min(Math.trunc(months), 60)) : 0;
     const currentMonth = isValidMonthString(fromMonth) ? fromMonth : todayDateString().slice(0, 7);
 
-    const recurringRows = db.prepare(`
-      SELECT currency, COALESCE(SUM(amount), 0) AS total
+    // Per template, not a global SUM: a $600.000 annual insurance used to be
+    // added to every projected month alongside the rent.
+    const templates = db.prepare(`
+      SELECT amount, currency, frequency, created_at AS createdAt, anchor_month AS anchorMonth
       FROM finance_recurring
       WHERE deleted_at IS NULL AND active = 1 AND type = 'expense'
-      GROUP BY currency
-    `).all() as Array<{ currency: string; total: number }>;
-    const recurring = { ARS: 0, USD: 0 };
-    for (const row of recurringRows) {
-      if (row.currency === 'ARS' || row.currency === 'USD') recurring[row.currency] = row.total;
-    }
+    `).all() as Array<{ amount: number; currency: string; frequency: string | null; createdAt: string; anchorMonth: string | null }>;
+
+    const recurringFor = (targetMonth: string) => {
+      const totals = { ARS: 0, USD: 0 };
+      for (const rec of templates) {
+        if (rec.currency !== 'ARS' && rec.currency !== 'USD') continue;
+        if (!isRecurringDueInMonth(rec.frequency, recurringAnchorMonth(rec), targetMonth)) continue;
+        totals[rec.currency] += rec.amount;
+      }
+      return { ARS: round2(totals.ARS), USD: round2(totals.USD) };
+    };
 
     const projection = [];
     for (let i = 1; i <= count; i++) {
@@ -375,6 +410,7 @@ export function registerFinanceIpcHandlers(): void {
         balanceScope: 'all',
         installmentsOnly: true,
       });
+      const recurring = recurringFor(targetMonth);
 
       const byCurrency = {
         ARS: { installments: installments.ARS, recurring: recurring.ARS, total: installments.ARS + recurring.ARS },
@@ -584,7 +620,7 @@ export function registerFinanceIpcHandlers(): void {
         )
       `).run(now, now, id, id);
       db.prepare('UPDATE finance_credit_card_statements SET deleted_at = ?, updated_at = ? WHERE credit_card_id = ?').run(now, now, id);
-      db.prepare('UPDATE finance_transactions SET credit_card_id = NULL, impacts_balance = 1, updated_at = ? WHERE credit_card_id = ?').run(now, id);
+      db.prepare('UPDATE finance_transactions SET credit_card_id = NULL, statement_period = NULL, impacts_balance = 1, updated_at = ? WHERE credit_card_id = ?').run(now, id);
       db.prepare('UPDATE finance_credit_cards SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
     });
     trx();
@@ -642,8 +678,9 @@ export function registerFinanceIpcHandlers(): void {
       ORDER BY date DESC, created_at DESC
     `).all(statement.creditCardId);
 
-    const filtered = (transactions as Array<{ date: string; [key: string]: unknown }>).filter((tx) => {
-      return getStatementPeriod(tx.date, statement.closingDay) === statement.periodMonth;
+    // The explicit statement_period (imports) wins over the closing-day math.
+    const filtered = (transactions as Array<{ date: string; statementPeriod?: string | null; [key: string]: unknown }>).filter((tx) => {
+      return statementPeriodFor(tx, statement.closingDay) === statement.periodMonth;
     });
 
     return { statement, transactions: filtered };
@@ -659,15 +696,21 @@ export function registerFinanceIpcHandlers(): void {
     periodMonth: string,
   ): { ars: number; usd: number } {
     const rows = db.prepare(`
-      SELECT date, type, amount, currency, billed_amount_ars AS billedAmountArs
+      SELECT date, type, amount, currency, billed_amount_ars AS billedAmountArs,
+             statement_period AS statementPeriod
       FROM finance_transactions
       WHERE deleted_at IS NULL AND credit_card_id = ? AND impacts_balance = 0
-    `).all(creditCardId) as Array<{ date: string; type: string; amount: number; currency: string; billedAmountArs: number | null }>;
+    `).all(creditCardId) as Array<{
+      date: string; type: string; amount: number; currency: string;
+      billedAmountArs: number | null; statementPeriod: string | null;
+    }>;
 
     let ars = 0;
     let usd = 0;
     for (const tx of rows) {
-      if (getStatementPeriod(tx.date, closingDay) !== periodMonth) continue;
+      // An imported row carries the period the user chose for the PDF; a manual
+      // card purchase falls into the period its date implies.
+      if (statementPeriodFor(tx, closingDay) !== periodMonth) continue;
       // A refund (a reversed purchase, a `DEV.IMP` tax credit) is stored as an
       // `income` row with a positive amount. Summing it blind used to make the
       // statement bigger than the paper by twice the refund.
@@ -680,7 +723,9 @@ export function registerFinanceIpcHandlers(): void {
       }
     }
     // A period that nets out negative owes nothing — never invent a credit.
-    return { ars: Math.max(ars, 0), usd: Math.max(usd, 0) };
+    // round2: this sum is persisted (calculated_amount, the Pago Tarjeta row)
+    // and compared (`ars > 0`), and JS `+=` leaves binary noise behind.
+    return { ars: round2(Math.max(ars, 0)), usd: round2(Math.max(usd, 0)) };
   }
 
   /**
@@ -705,14 +750,18 @@ export function registerFinanceIpcHandlers(): void {
     const now = nowIso();
     const paymentDate = `${periodMonth}-01`;
 
+    // The payment row is written by a process on a date that is rarely the
+    // statement's: its frozen rate is a process rate. account_id stays NULL
+    // until `finance:payStatement` says which pocket paid.
+    const fxRateSource = fxRate === null ? null : fxRateSourceFor(paymentDate);
     const insertPayment = (txId: string, amount: number, currency: string) => {
       db.prepare(`
         INSERT INTO finance_transactions
           (id, type, amount, currency, category, description, date, payment_method,
            source, installments, installment_group_id, for_third_party, recurring_id,
-           import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
-        VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?)
-      `).run(txId, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${periodMonth}`, paymentDate, fxRate, now, now);
+           import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, created_at, updated_at)
+        VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?)
+      `).run(txId, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${periodMonth}`, paymentDate, fxRate, fxRateSource, now, now);
     };
 
     /** Keeps the payment transaction for one currency in sync with the recomputed total. */
@@ -785,7 +834,22 @@ export function registerFinanceIpcHandlers(): void {
     return trx();
   });
 
-  ipcHandle('finance:payStatement', (_e, statementId: string, paidAmount: number, paidAmountUsd?: number) => {
+  /**
+   * Marks a statement paid and settles its `Pago Tarjeta` row(s).
+   *
+   * `accountId` (optional) is the pocket the money left: it lands on the
+   * payment row whose currency matches the account (an ARS bank cannot pay the
+   * USD leg), so the chest finally sees card payments. Omitted or `null` = no
+   * account, exactly as before. A dead/unknown account is refused rather than
+   * silently dropped.
+   */
+  ipcHandle('finance:payStatement', (
+    _e,
+    statementId: string,
+    paidAmount: number,
+    paidAmountUsd?: number,
+    accountId?: string | null,
+  ) => {
     const ars = Number(paidAmount ?? 0);
     const usd = Number(paidAmountUsd ?? 0);
     if (!Number.isFinite(ars) || !Number.isFinite(usd) || ars < 0 || usd < 0) return fail('invalid_amount');
@@ -793,7 +857,7 @@ export function registerFinanceIpcHandlers(): void {
 
     const db = getDb();
     const now = nowIso();
-    const today = now.slice(0, 10);
+    const today = todayDateString();
 
     const stmt = db.prepare(`
       SELECT transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
@@ -802,16 +866,34 @@ export function registerFinanceIpcHandlers(): void {
 
     if (!stmt) return fail('not_found');
 
+    const wantedAccount = typeof accountId === 'string' && accountId.trim() !== '' ? accountId.trim() : null;
+    const account = wantedAccount
+      ? db.prepare('SELECT id, currency FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(wantedAccount) as
+        { id: string; currency: string } | undefined
+      : undefined;
+    if (wantedAccount && !account) return fail('account_not_found');
+
     const trx = db.transaction(() => {
       db.prepare(`
         UPDATE finance_credit_card_statements
         SET paid_amount = ?, paid_amount_usd = ?, status = 'paid', paid_date = ?, updated_at = ?
         WHERE id = ?
-      `).run(ars, usd, today, now, statementId);
+      `).run(round2(ars), round2(usd), today, now, statementId);
 
-      const updateTx = db.prepare('UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?');
-      if (stmt.transactionId) updateTx.run(ars, now, stmt.transactionId);
-      if (stmt.transactionIdUsd) updateTx.run(usd, now, stmt.transactionIdUsd);
+      const updateTx = db.prepare(`
+        UPDATE finance_transactions
+        SET amount = ?, account_id = CASE WHEN ? THEN ? ELSE account_id END, updated_at = ?
+        WHERE id = ?
+      `);
+      const accountFor = (currency: 'ARS' | 'USD') => (account && account.currency === currency ? account.id : null);
+      if (stmt.transactionId) {
+        const acc = accountFor('ARS');
+        updateTx.run(round2(ars), acc !== null ? 1 : 0, acc, now, stmt.transactionId);
+      }
+      if (stmt.transactionIdUsd) {
+        const acc = accountFor('USD');
+        updateTx.run(round2(usd), acc !== null ? 1 : 0, acc, now, stmt.transactionIdUsd);
+      }
     });
     trx();
     return { ok: true };
@@ -942,6 +1024,9 @@ export function registerFinanceIpcHandlers(): void {
     forThirdParty?: boolean;
     paymentMethod?: string;
     creditCardId?: string | null;
+    /** Account every instalment lands on (non-card plans only). Same
+     *  semantics as `finance:addTransaction`: `undefined` = default mapping. */
+    accountId?: string | null;
   }) => {
     if (!isValidDateString(group?.startDate)) return fail('invalid_start_date');
 
@@ -957,27 +1042,36 @@ export function registerFinanceIpcHandlers(): void {
       amounts.push(parsed);
     }
 
-    const totalAmount = group.installmentAmounts
+    const totalAmount = round2(group.installmentAmounts
       ? amounts.reduce((a, b) => a + b, 0)
-      : parsePositiveAmount(group.totalAmount) ?? amounts.reduce((a, b) => a + b, 0);
+      : parsePositiveAmount(group.totalAmount) ?? amounts.reduce((a, b) => a + b, 0));
 
     const db = getDb();
     const groupId = genId();
     // One purchase, one rate: every instalment freezes the rate of the day the
-    // plan was registered — that is when the price was agreed in pesos.
+    // plan was registered — that is when the price was agreed in pesos. Exact
+    // only when the plan starts today; a back-dated plan gets a process rate.
     const fxRate = await captureFxRate(db);
+    const fxRateSource = fxRate === null ? null : fxRateSourceFor(group.startDate);
     const now = nowIso();
 
     const isCreditCard = group.paymentMethod === 'credit_card' && !!group.creditCardId;
     // Card purchases land on next month's statement.
     const monthOffset = isCreditCard ? 1 : 0;
+    // A card plan touches no account until its statements are paid; a debit /
+    // cash / transfer plan takes money out of a pocket on every instalment.
+    const paymentMethod = group.paymentMethod ?? 'credit_card';
+    const accountId = isCreditCard || paymentMethod === 'credit_card'
+      ? null
+      : resolveAccountId(db, group.accountId, paymentMethod);
 
     const insertTx = db.prepare(`
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, installment_number, for_third_party,
-         recurring_id, import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
-      VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)
+         recurring_id, import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source,
+         account_id, created_at, updated_at)
+      VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const trx = db.transaction(() => {
@@ -1006,7 +1100,7 @@ export function registerFinanceIpcHandlers(): void {
           `${group.description} (Cuota ${i + 1}/${installmentCount})`,
           // Clamped: a plan starting on the 31st must not skip February.
           addMonthsClamped(group.startDate, i + monthOffset),
-          group.paymentMethod ?? 'credit_card',
+          paymentMethod,
           installmentCount,
           groupId,
           i + 1,
@@ -1014,6 +1108,8 @@ export function registerFinanceIpcHandlers(): void {
           isCreditCard ? group.creditCardId : null,
           isCreditCard ? 0 : 1,
           fxRate,
+          fxRateSource,
+          accountId,
           now,
           now,
         );
@@ -1212,6 +1308,7 @@ export function registerFinanceIpcHandlers(): void {
     const groupId = genId();
     const loanId = genId();
     const fxRate = await captureFxRate(db);
+    const fxRateSource = fxRate === null ? null : fxRateSourceFor(data.startDate);
     const now = nowIso();
 
     // Same rule as createInstallmentGroup: only a real card defers to next month
@@ -1223,8 +1320,8 @@ export function registerFinanceIpcHandlers(): void {
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, installment_number, for_third_party,
-         recurring_id, import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
-      VALUES (?, 'expense', ?, ?, ?, ?, ?, 'credit_card', 'manual', ?, ?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?)
+         recurring_id, import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, created_at, updated_at)
+      VALUES (?, 'expense', ?, ?, ?, ?, ?, 'credit_card', 'manual', ?, ?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?)
     `);
 
     const trx = db.transaction(() => {
@@ -1248,6 +1345,7 @@ export function registerFinanceIpcHandlers(): void {
           data.creditCardId ?? null,
           isCreditCard ? 0 : 1,
           fxRate,
+          fxRateSource,
           now,
           now,
         );
@@ -1332,6 +1430,8 @@ export function registerFinanceIpcHandlers(): void {
       SELECT id, name, type, amount, currency, category, active,
              billing_day AS billingDay,
              frequency,
+             account_id AS accountId,
+             anchor_month AS anchorMonth,
              created_at AS createdAt
       FROM finance_recurring
       WHERE deleted_at IS NULL
@@ -1346,6 +1446,21 @@ export function registerFinanceIpcHandlers(): void {
     return value;
   }
 
+  /** `YYYY-MM` or null/undefined/'' (= not set); anything else is invalid. */
+  function parseAnchorMonth(value: unknown): string | null | 'invalid' {
+    if (value === undefined || value === null || value === '') return null;
+    return isValidMonthString(value) ? value : 'invalid';
+  }
+
+  /** `null` = "sin cuenta"; a string must be a live account; undefined = not given. */
+  function parseAccountId(db: ReturnType<typeof getDb>, value: unknown): string | null | undefined | 'invalid' {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    if (typeof value !== 'string') return 'invalid';
+    const alive = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(value);
+    return alive ? value : 'invalid';
+  }
+
   ipcHandle('finance:addRecurring', (_e, rec: {
     id?: string;
     name: string;
@@ -1355,6 +1470,10 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
     billingDay?: number;
     frequency?: string;
+    /** Account every generated instance inherits. Omitted/null = none. */
+    accountId?: string | null;
+    /** `YYYY-MM` the cadence counts from. Omitted = the current LOCAL month. */
+    anchorMonth?: string | null;
   }) => {
     const name = parseNonEmptyString(rec?.name);
     if (name === null) return fail('invalid_name');
@@ -1362,14 +1481,20 @@ export function registerFinanceIpcHandlers(): void {
     if (amount === null) return fail('invalid_amount');
     const frequency = parseFrequency(rec?.frequency);
     if (frequency === 'invalid') return fail('invalid_frequency');
+    const anchor = parseAnchorMonth(rec?.anchorMonth);
+    if (anchor === 'invalid') return fail('invalid_anchor_month');
 
     const db = getDb();
+    const accountId = parseAccountId(db, rec?.accountId);
+    if (accountId === 'invalid') return fail('account_not_found');
+
     const id = rec.id ?? genId();
     const now = nowIso();
     db.prepare(`
       INSERT OR IGNORE INTO finance_recurring
-        (id, name, type, amount, currency, category, billing_day, frequency, active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        (id, name, type, amount, currency, category, billing_day, frequency, active,
+         account_id, anchor_month, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
     `).run(
       id,
       name,
@@ -1379,6 +1504,10 @@ export function registerFinanceIpcHandlers(): void {
       rec.category ?? 'Otros',
       rec.billingDay ?? 1,
       frequency,
+      accountId ?? null,
+      // Local month, never UTC: a template created 31/08 22:00 ART is an
+      // August template, and the first charge lands in August.
+      anchor ?? todayDateString().slice(0, 7),
       now,
       now,
     );
@@ -1416,14 +1545,29 @@ export function registerFinanceIpcHandlers(): void {
     category?: string;
     billingDay?: number;
     frequency?: string;
+    /** `null` clears the account; `undefined` leaves it alone. */
+    accountId?: string | null;
+    /** `null` falls back to the creation month; `undefined` leaves it alone. */
+    anchorMonth?: string | null;
   }) => {
-    const allowed = new Set(['name', 'type', 'category', 'billingDay', 'frequency']);
+    const allowed = new Set(['name', 'type', 'category', 'billingDay', 'frequency', 'accountId', 'anchorMonth']);
     const safe = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.has(k))) as typeof fields;
 
     const db = getDb();
     const now = nowIso();
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [now];
+
+    if (safe.accountId !== undefined) {
+      const accountId = parseAccountId(db, safe.accountId);
+      if (accountId === 'invalid') return fail('account_not_found');
+      sets.push('account_id = ?'); params.push(accountId ?? null);
+    }
+    if (safe.anchorMonth !== undefined) {
+      const anchor = parseAnchorMonth(safe.anchorMonth);
+      if (anchor === 'invalid') return fail('invalid_anchor_month');
+      sets.push('anchor_month = ?'); params.push(anchor);
+    }
 
     if (safe.name !== undefined) {
       const name = parseNonEmptyString(safe.name);
@@ -1493,15 +1637,18 @@ export function registerFinanceIpcHandlers(): void {
   // ── FX / inflation (cotización congelada, ARS·USD·ARS de hoy) ─────────────
 
   /**
-   * Fills `fx_rate` on every live transaction that has none, with the best rate
-   * available right now. One pass, idempotent — safe to press twice.
+   * Fills `fx_rate` on every live transaction that has none: the rate of each
+   * row's OWN date from the historical series where it answers (exact, no `~`),
+   * today's rate for the rest (stamped `backfill`, keeps the `~`). One pass,
+   * idempotent — safe to press twice.
    */
   ipcHandle('finance:backfillFxRates', async () => {
     const db = getDb();
-    const rate = await captureFxRate(db);
-    if (rate === null) return fail('no_rate_available');
-    const updated = backfillFxRates(db, rate);
-    return { ok: true, updated, rate };
+    const house = getFxHouse(db);
+    const rate = await getCurrentRate(db, house);
+    const result = await backfillFxRatesHistorical(db, { house, currentRate: rate });
+    if (rate === null && result.updated === 0) return fail('no_rate_available');
+    return { ok: true, updated: result.updated, exact: result.exact, approx: result.approx, rate };
   });
 
   /**
@@ -1556,31 +1703,36 @@ export function registerFinanceIpcHandlers(): void {
 
   // ── C7: Category averages (last 3 months) ─────────────────
 
+  /**
+   * Per-category average of the three complete months before the current one,
+   * using THE wheel definition (`categorySpendFilter`: every live expense, card
+   * purchases included, `Pago Tarjeta` and transfers out). The ledger compares
+   * the current month against this with the same filter — the old
+   * `impacts_balance = 1` here made every card-paid category "anomalous" every
+   * month, since its average only saw the cash part.
+   */
   ipcHandle('finance:getCategoryAverages', () => {
     const db = getDb();
     const currentMonth = todayDateString().slice(0, 7);
     // Window: the three complete months before the current one.
     const start = monthRange(addMonthsToMonth(currentMonth, -3)).start;
     const end = monthRange(addMonthsToMonth(currentMonth, -1)).end;
+    const { where, params } = buildTransactionWhere({ ...categorySpendFilter({ start, end }), currency: 'ARS' });
 
     const rows = db.prepare(`
       SELECT category, COALESCE(SUM(amount), 0) AS total
       FROM finance_transactions
-      WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
-        AND category NOT IN (?, ?)
-        AND date >= ? AND date < ?
+      WHERE ${where}
       GROUP BY category
-    `).all(CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY, start, end) as Array<{ category: string; total: number }>;
+    `).all(...params) as Array<{ category: string; total: number }>;
 
     // Divide by the months that actually have data, not a hard-coded 3 —
     // otherwise a user with one month of history sees a third of reality.
     const monthsWithData = db.prepare(`
       SELECT COUNT(DISTINCT SUBSTR(date, 1, 7)) AS c
       FROM finance_transactions
-      WHERE deleted_at IS NULL AND type = 'expense' AND currency = 'ARS' AND impacts_balance = 1
-        AND category NOT IN (?, ?)
-        AND date >= ? AND date < ?
-    `).get(CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY, start, end) as { c: number };
+      WHERE ${where}
+    `).get(...params) as { c: number };
     const divisor = Math.max(monthsWithData.c, 1);
 
     const averages: Record<string, number> = {};

@@ -3,7 +3,14 @@ import { getDb } from '../ipc/db';
 import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import fs from 'fs';
-import { CARD_TAX_CATEGORY, getCurrentRate, getFxHouse, nowIso } from './finance.balance';
+import {
+  CARD_TAX_CATEGORY,
+  DEFAULT_CASH_ACCOUNT_ID,
+  getCurrentRate,
+  getFxHouse,
+  isValidMonthString,
+  nowIso,
+} from './finance.balance';
 
 // ── Types ───────────────────────────────────────────
 
@@ -307,13 +314,35 @@ export function registerFinanceImportIpcHandlers(): void {
     return { rows, fileName, skippedLines };
   });
 
+  /**
+   * Writes a parsed statement.
+   *
+   * `statementMonth` (`YYYY-MM`, the month the user picked for the PDF) is the
+   * period every card row is filed under — persisted as `statement_period`, and
+   * preferred over the closing-day math by `computeStatementTotals` /
+   * `getStatementDetail`. Galicia prints the ORIGINAL purchase date on every
+   * instalment line, so deriving the period from the line date sent a `04/12`
+   * paid in September into May's (paid, frozen) statement, where it never
+   * reached any `Pago Tarjeta` and never left the balance.
+   *
+   * `accountId` (optional, card-less imports only) is the pocket the rows come
+   * out of; with a card they belong to no account until the statement is paid.
+   */
   ipcHandle(
     'finance:importConfirm',
-    async (_e, rows: ParsedRow[], statementMonth: string, fileName: string, creditCardId?: string | null) => {
+    async (
+      _e,
+      rows: ParsedRow[],
+      statementMonth: string,
+      fileName: string,
+      creditCardId?: string | null,
+      accountId?: string | null,
+    ) => {
       const db = getDb();
       const batchId = crypto.randomUUID();
       // Imported rows freeze the rate of the day they are IMPORTED (best data
-      // available); offline with no cache leaves NULL for the backfill.
+      // available) — a PROCESS rate, never the line's own day, hence the `~`;
+      // offline with no cache leaves NULL for the backfill.
       const fxRate = await getCurrentRate(db, getFxHouse(db));
       const now = nowIso();
 
@@ -330,25 +359,53 @@ export function registerFinanceImportIpcHandlers(): void {
         ? db.prepare('SELECT id FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL').get(cardId)
         : undefined;
       if (cardId && !card) return { ok: false, reason: 'credit_card_not_found' };
+      if (cardId && !isValidMonthString(statementMonth)) return { ok: false, reason: 'invalid_statement_month' };
 
       const paymentMethod = cardId ? 'credit_card' : 'cash';
       const impactsBalance = cardId ? 0 : 1;
+      const statementPeriod = cardId ? statementMonth : null;
+
+      // Card-less rows leave a pocket. Explicit id (must be alive), `null` =
+      // "sin cuenta", omitted = the seeded «Efectivo» if it still exists — the
+      // same default mapping as a manual cash entry.
+      let rowAccountId: string | null = null;
+      if (!cardId) {
+        if (typeof accountId === 'string' && accountId.trim() !== '') {
+          const alive = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(accountId.trim());
+          if (!alive) return { ok: false, reason: 'account_not_found' };
+          rowAccountId = accountId.trim();
+        } else if (accountId === undefined) {
+          const def = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(DEFAULT_CASH_ACCOUNT_ID);
+          rowAccountId = def ? DEFAULT_CASH_ACCOUNT_ID : null;
+        }
+      }
 
       const insertBatch = db.prepare(
         `INSERT INTO finance_import_batches (id, source, filename, row_count, created_at)
          VALUES (?, 'galicia_visa', ?, ?, ?)`,
       );
 
+      // Duplicate = the same line already imported by a PREVIOUS batch. The
+      // key carries the instalment number: the parser strips `04/12` from the
+      // merchant, so without it every instalment 2..N of a plan collided with
+      // instalment 1 (same purchase date, same merchant, same amount) and was
+      // silently dropped — $275.000 of a 12-instalment fridge never entered.
+      // The current batch is excluded so two identical lines in ONE PDF (two
+      // `DB IVA 21%` of 71,75 the same day) both land.
       const dupCheck = db.prepare(
         `SELECT COUNT(*) as cnt FROM finance_transactions
-         WHERE deleted_at IS NULL AND date = ? AND description = ? AND amount = ? AND source = 'import'`,
+         WHERE deleted_at IS NULL AND source = 'import'
+           AND date = ? AND description = ? AND amount = ? AND currency = ?
+           AND installment_number IS ?
+           AND (import_batch_id IS NULL OR import_batch_id <> ?)`,
       );
 
       const insertTx = db.prepare(
         `INSERT INTO finance_transactions
          (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
-          installments, billed_amount_ars, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          installments, installment_number, billed_amount_ars, credit_card_id, impacts_balance,
+          statement_period, fx_rate, fx_rate_source, account_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
 
       // One transaction: a failure halfway used to leave a partial import with a
@@ -370,8 +427,9 @@ export function registerFinanceImportIpcHandlers(): void {
           const currency = isUsd ? 'USD' : 'ARS';
           // USD lines: keep the peso amount the card actually billed.
           const billedArs = isUsd && row.amountARS != null ? Math.abs(row.amountARS) : null;
+          const installmentNumber = Number.isInteger(row.installmentCurrent) ? row.installmentCurrent! : null;
 
-          const existing = dupCheck.get(row.date, row.merchant, amount) as { cnt: number };
+          const existing = dupCheck.get(row.date, row.merchant, amount, currency, installmentNumber, batchId) as { cnt: number };
           if (existing.cnt > 0) {
             duplicateCount++;
             continue;
@@ -388,10 +446,14 @@ export function registerFinanceImportIpcHandlers(): void {
             paymentMethod,
             batchId,
             row.installmentTotal ?? 1,
+            installmentNumber,
             billedArs,
             cardId,
             impactsBalance,
+            statementPeriod,
             fxRate,
+            fxRate === null ? null : 'process',
+            rowAccountId,
             now,
             now,
           );

@@ -12,6 +12,7 @@ import { Compass, CrossMark, ArrowRight, Checkmark, Pencil } from '../../../shar
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
+import { emitMovementDeleted } from '../utils/rpg-events';
 
 interface InstallmentRow {
   id: string;
@@ -120,6 +121,10 @@ export default function Installments() {
     if (!ok) return;
     try {
       await window.api.financeDeleteInstallmentGroup(groupId);
+      // A plan created from the ledger paid ONE EXPENSE_LOGGED with the group
+      // id as its ref; deleting the plan hands that XP back. Plans created on
+      // this screen never paid, so the engine finds nothing and refunds 0.
+      await emitMovementDeleted(groupId, 'expense');
       loadRows(month);
       loadProjection();
       window.dispatchEvent(new Event('finance:dataChanged'));

@@ -7,6 +7,7 @@ import { useToast } from '../../../../shared/components/useToast';
 import { CrossMark } from '../../../../shared/components/icons';
 import { formatCurrency } from '../../utils/format';
 import { unwrap, failureMessage, payStatement } from '../../utils/api-ext';
+import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 
 interface StatementDetailRow {
   id: string;
@@ -36,6 +37,11 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
   const [payAmount, setPayAmount] = useState(statement.calculatedAmount);
   const [payAmountUsd, setPayAmountUsd] = useState(statement.calculatedAmountUsd ?? 0);
   const [paying, setPaying] = useState(false);
+  // Which pocket pays the statement. '' = unresolved: the AccountSelect picks
+  // the default (last account used, else «Efectivo»). Hidden while the
+  // accounts bridge is not wired, in which case no account is sent at all.
+  const [accountValue, setAccountValue] = useState('');
+  const [accountsSupported, setAccountsSupported] = useState(false);
 
   const { dialogProps, stopPropagation } = useModalA11y({ onClose });
 
@@ -77,9 +83,17 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
 
   const handlePay = async () => {
     setPaying(true);
+    if (accountsSupported) rememberLastAccountId(accountValue === '' ? NO_ACCOUNT : accountValue);
     // The handler rejects a zero/negative pair with `{ ok: false, reason }`.
+    // The account makes the `Pago Tarjeta` row move a real balance — until now
+    // the chest only ever saw manual entries.
     const result = await unwrap(
-      payStatement(statement.id, payAmount, hasUsd ? payAmountUsd : undefined),
+      payStatement(
+        statement.id,
+        payAmount,
+        hasUsd ? payAmountUsd : undefined,
+        accountsSupported ? accountIdForSubmit(accountValue) : undefined,
+      ),
     );
     setPaying(false);
     if (!result.ok) {
@@ -184,6 +198,9 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
                   style={{ width: 110 }} step={0.01} min={0} />
               </>
             )}
+            {/* Renders nothing while the accounts bridge is not wired. */}
+            <span style={{ fontSize: 'var(--fs-label)' }}>{t('coinify.accountPaidFrom', 'Pagar desde')}:</span>
+            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
             <button className="rpg-button" onClick={handlePay} disabled={paying}>
               {t('coinify.payStatement')}
             </button>

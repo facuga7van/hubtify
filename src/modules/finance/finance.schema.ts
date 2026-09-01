@@ -475,8 +475,15 @@ export const financeMigrations: Migration[] = [
       -- Seed determinístico: dos devices que migran en paralelo generan LA MISMA
       -- cuenta «Efectivo» (id fijo), así el sync la colapsa solo en vez de
       -- duplicarla. Solo si no existe ninguna cuenta todavía.
-      INSERT OR IGNORE INTO finance_accounts (id, name, kind, currency, initial_balance, account_order)
-        SELECT 'account-cash-default', 'Efectivo', 'cash', 'ARS', 0, 0
+      --
+      -- Stamps FIJOS en el epoch, nunca 'now': las migraciones corren ANTES del
+      -- primer pull, y con updated_at = now un device que migra el miércoles le
+      -- ganaba por LWW al tombstone del lunes de otro device — la cuenta borrada
+      -- resucitaba en la nube y en todos lados. Con 1970 cualquier borrado o
+      -- edición real es más nuevo y gana.
+      INSERT OR IGNORE INTO finance_accounts (id, name, kind, currency, initial_balance, account_order, created_at, updated_at)
+        SELECT 'account-cash-default', 'Efectivo', 'cash', 'ARS', 0, 0,
+               '1970-01-01T00:00:00.000Z', '1970-01-01T00:00:00.000Z'
         WHERE NOT EXISTS (SELECT 1 FROM finance_accounts);
 
       -- Categoría reservada de las patas de una transferencia. Existe en la
@@ -485,6 +492,43 @@ export const financeMigrations: Migration[] = [
       -- banco no es un gasto) y ningún picker la ofrece a mano.
       INSERT OR IGNORE INTO finance_categories (name, updated_at)
         VALUES ('Transferencia', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));
+    `,
+  },
+  {
+    namespace: 'finance',
+    version: 18,
+    up: `
+      -- Período de resumen EXPLÍCITO de una compra con tarjeta (YYYY-MM).
+      -- El importador recibía el mes que el usuario eligió y lo ignoraba: cada
+      -- fila caía en el resumen que salía de closing_day + la fecha de la LÍNEA,
+      -- y una cuota 4/12 con fecha de compra de mayo aterrizaba en el resumen de
+      -- mayo (ya pagado, congelado) → nunca entraba a ningún «Pago Tarjeta».
+      -- NULL = calcular por fecha como siempre (altas manuales).
+      ALTER TABLE finance_transactions ADD COLUMN statement_period TEXT DEFAULT NULL;
+      CREATE INDEX IF NOT EXISTS idx_finance_tx_card_period ON finance_transactions(credit_card_id, statement_period);
+
+      -- De dónde salió fx_rate:
+      --   'day'      cotización del día de la transacción (alta del mismo día,
+      --              o backfill con la serie histórica) — la única exacta;
+      --   'process'  cotización del día en que un PROCESO escribió la fila
+      --              (import, recurrentes generados, pago de resumen, alta con
+      --              fecha pasada);
+      --   'backfill' la cotización actual pisada sobre una fila vieja porque la
+      --              serie histórica no estaba disponible.
+      -- Solo 'day' pierde la marca «~» en la lectura en USD. NULL = legado
+      -- (se lee como exacta para no marcar todo el historial de golpe).
+      ALTER TABLE finance_transactions ADD COLUMN fx_rate_source TEXT DEFAULT NULL;
+
+      -- Cuenta de la que sale (o a la que entra) cada instancia generada de un
+      -- recurrente. NULL = sin cuenta: las generadas no tocan ningún saldo.
+      ALTER TABLE finance_recurring ADD COLUMN account_id TEXT DEFAULT NULL;
+
+      -- Mes ancla de las cadencias no mensuales (YYYY-MM), elegible por el
+      -- usuario. Antes el ancla era el mes UTC de created_at: un bimestral
+      -- creado el 31/08 a las 22:00 ART anclaba en septiembre y un seguro anual
+      -- que vence en marzo, cargado en septiembre, se cobraba cada septiembre.
+      -- NULL = mes de created_at (comportamiento anterior).
+      ALTER TABLE finance_recurring ADD COLUMN anchor_month TEXT DEFAULT NULL;
     `,
   },
 ];

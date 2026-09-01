@@ -73,12 +73,51 @@ export function buildIpcCoefficients(series: IpcSeriesPoint[] | null | undefined
  *  - month within the series → its cumulative coefficient;
  *  - month after the latest index (the IPC lags) → 1 (already today's pesos);
  *  - month before the series starts → `null` (no honest number exists).
+ *
+ * The `1` of an unpublished month is an ASSUMPTION, not data — use
+ * {@link coefficientDetail} wherever the difference matters (the "real" trend,
+ * the `~` mark).
  */
 export function coefficientForMonth(coefs: IpcCoefficients, month: string): number | null {
+  return coefficientDetail(coefs, month)?.coef ?? null;
+}
+
+/**
+ * Same as {@link coefficientForMonth}, but says whether the number is an index
+ * INDEC actually published (`assumed: false`) or the placeholder `1` of a month
+ * the IPC has not reached yet (`assumed: true`).
+ *
+ * The current month never has an index (INDEC publishes mid next month), and
+ * the previous one only after the ~12th. Treating that placeholder as data made
+ * "real +X%" ALWAYS equal the nominal figure for the month on screen.
+ */
+export function coefficientDetail(
+  coefs: IpcCoefficients,
+  month: string,
+): { coef: number; assumed: boolean } | null {
   const exact = coefs.byMonth.get(month);
-  if (exact !== undefined) return exact;
-  if (month > coefs.latestMonth) return 1;
+  if (exact !== undefined) return { coef: exact, assumed: false };
+  if (month > coefs.latestMonth) return { coef: 1, assumed: true };
   return null;
+}
+
+// ── Frozen-rate provenance ─────────────────────────────────────────────────
+
+/**
+ * Where a row's `fx_rate` came from (`finance_transactions.fx_rate_source`):
+ *  `day`      — the rate of the transaction's own date. The only exact one.
+ *  `process`  — the rate of the day a PROCESS wrote the row (import, recurring
+ *               generation, statement payment, a manual entry with a past date).
+ *  `backfill` — today's rate pasted over an old row because the historical
+ *               series was not reachable.
+ * `null` is legacy data (pre-column) and reads as exact so the whole history is
+ * not flagged at once.
+ */
+export type FxRateSource = 'day' | 'process' | 'backfill';
+
+/** Does this provenance deserve to be shown WITHOUT the `~` mark? */
+export function isExactFxSource(source: string | null | undefined): boolean {
+  return source == null || source === 'day';
 }
 
 // ── Conversions ────────────────────────────────────────────────────────────
@@ -94,22 +133,29 @@ export interface ConvertedAmount {
  * ARS → USD with the row's own frozen rate, falling back to the current rate.
  * Returns `null` when neither rate exists (the amount cannot be expressed in
  * dollars at all — show it nominal instead of inventing a number).
+ *
+ * `approx` is true when the current rate had to stand in, AND when the frozen
+ * rate is not the rate of the transaction's own day (see {@link FxRateSource}):
+ * a backfill that pasted today's rate over a two-year-old row is a frozen
+ * number, not a frozen truth, and must keep its `~`.
  */
 export function convertArsToUsd(
   amount: number,
   fxRate: number | null | undefined,
   currentRate: number | null | undefined,
+  fxRateSource?: string | null,
 ): { value: number; approx: boolean } | null {
   const own = typeof fxRate === 'number' && Number.isFinite(fxRate) && fxRate > 0 ? fxRate : null;
   const fallback = typeof currentRate === 'number' && Number.isFinite(currentRate) && currentRate > 0 ? currentRate : null;
   const rate = own ?? fallback;
   if (rate === null) return null;
-  return { value: amount / rate, approx: own === null };
+  return { value: amount / rate, approx: own === null || !isExactFxSource(fxRateSource) };
 }
 
 /**
  * ARS of `month` → pesos of the latest IPC month. A month older than the series
- * stays nominal and is flagged approximate.
+ * stays nominal and is flagged approximate; so is a month NEWER than the latest
+ * published index (its coefficient of 1 is an assumption, not INDEC data).
  */
 export function convertArsToToday(
   amount: number,
@@ -117,9 +163,9 @@ export function convertArsToToday(
   coefs: IpcCoefficients | null,
 ): { value: number; approx: boolean } {
   if (!coefs) return { value: amount, approx: true };
-  const coef = coefficientForMonth(coefs, month);
-  if (coef === null) return { value: amount, approx: true };
-  return { value: amount * coef, approx: false };
+  const detail = coefficientDetail(coefs, month);
+  if (detail === null) return { value: amount, approx: true };
+  return { value: amount * detail.coef, approx: detail.assumed };
 }
 
 /**
@@ -127,7 +173,7 @@ export function convertArsToToday(
  * USD rows are never touched: they are already hard currency.
  */
 export function convertTransactionAmount(
-  tx: { amount: number; currency: string; fxRate?: number | null; date: string },
+  tx: { amount: number; currency: string; fxRate?: number | null; fxRateSource?: string | null; date: string },
   mode: DisplayMode,
   ctx: { currentRate: number | null; coefs: IpcCoefficients | null },
 ): ConvertedAmount {
@@ -135,7 +181,7 @@ export function convertTransactionAmount(
     return { value: tx.amount, currency: tx.currency === 'USD' ? 'USD' : 'ARS', approx: false };
   }
   if (mode === 'usd') {
-    const usd = convertArsToUsd(tx.amount, tx.fxRate ?? null, ctx.currentRate);
+    const usd = convertArsToUsd(tx.amount, tx.fxRate ?? null, ctx.currentRate, tx.fxRateSource ?? null);
     if (usd === null) return { value: tx.amount, currency: 'ARS', approx: true };
     return { value: usd.value, currency: 'USD', approx: usd.approx };
   }
@@ -151,7 +197,9 @@ export function convertTransactionAmount(
  * Real: both months are re-expressed in the same (latest) pesos before
  * comparing, so a month whose spending only kept pace with inflation shows
  * ~0% real, not the inflation itself. `realPct` is `null` when either month
- * lacks a coefficient.
+ * lacks a coefficient — callers must pass `null` for an ASSUMED coefficient
+ * too (see {@link coefficientDetail}); an assumed 1 would print the nominal
+ * figure twice and call one of them "real".
  */
 export function nominalAndRealTrend(
   currExpenses: number,

@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import {
   addDaysToDate,
+  addMonthsToMonth,
   computeUpcomingTimeline,
 } from '../../../electron/modules/finance.balance';
 import { evaluateFinanceNotifications } from '../../../electron/modules/notification-engine';
@@ -54,11 +55,11 @@ function addRecurring(id: string, opts: {
   );
 }
 
-function addCard(id: string, closingDay: number, dueDay: number | null): void {
+function addCard(id: string, closingDay: number, dueDay: number | null, deletedAt: string | null = null): void {
   db.prepare(`
-    INSERT INTO finance_credit_cards (id, name, closing_day, due_day, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, `Card ${id}`, closingDay, dueDay, NOW, NOW);
+    INSERT INTO finance_credit_cards (id, name, closing_day, due_day, created_at, updated_at, deleted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, `Card ${id}`, closingDay, dueDay, NOW, NOW, deletedAt);
 }
 
 function addStatement(id: string, cardId: string, periodMonth: string, ars: number, usd = 0, status = 'pending'): void {
@@ -165,24 +166,50 @@ describe('computeUpcomingTimeline', () => {
 // ── Notifications: «vence en 3 días» + frequency-aware missing rule ────────
 
 describe('finance notifications', () => {
-  function dayOfMonthInDays(days: number): number {
-    return new Date(Date.now() + days * 86400000).getDate();
+  const today = () => new Date().toLocaleDateString('en-CA');
+
+  /**
+   * A card + pending statement whose due date (same `due_day > closing_day → M,
+   * else M+1` convention as the agenda) lands exactly `days` days from today.
+   */
+  function statementDueIn(cardId: string, days: number, opts: { status?: string; deletedCard?: boolean; amount?: number } = {}): void {
+    const target = addDaysToDate(today(), days);
+    const [y, m, d] = target.split('-');
+    const dueDay = Number(d);
+    // Due after closing → the period is the due month; a due day of 1 cannot
+    // follow any closing day, so it belongs to the previous period instead.
+    const closingDay = dueDay > 1 ? 1 : 28;
+    const periodMonth = dueDay > 1 ? `${y}-${m}` : addMonthsToMonth(`${y}-${m}`, -1);
+    addCard(cardId, closingDay, dueDay, opts.deletedCard ? NOW : null);
+    addStatement(`s-${cardId}`, cardId, periodMonth, opts.amount ?? 50000, 0, opts.status ?? 'pending');
   }
 
-  it('fires finance_card_due when the due day is within 3 days', () => {
-    addCard('due-soon', 1, dayOfMonthInDays(2));
+  it('fires finance_card_due for a PENDING statement due within 3 days, keyed by statement', () => {
+    statementDueIn('due-soon', 2);
     const results = evaluateFinanceNotifications(db);
     const due = results.filter((r) => r.type === 'finance_card_due');
     expect(due).toHaveLength(1);
-    expect(due[0].refId).toBe('due-soon');
+    expect(due[0].refId).toBe('s-due-soon');
     expect(due[0].title).toContain('Card due-soon');
   });
 
-  it('stays quiet for far due days and for cards without one', () => {
-    addCard('far', 1, dayOfMonthInDays(10));
+  it('a due day alone is not enough: no pending statement, no bell (finding #8)', () => {
+    // Card with a due day within 3 days but nothing to pay.
+    const target = addDaysToDate(today(), 2);
+    addCard('empty', 1, Number(target.slice(8, 10)));
+    expect(evaluateFinanceNotifications(db).filter((r) => r.type === 'finance_card_due')).toHaveLength(0);
+  });
+
+  it('stays quiet for paid statements, deleted cards, far due dates and cards without a due day', () => {
+    statementDueIn('paid', 2, { status: 'paid' });
+    statementDueIn('gone', 2, { deletedCard: true });
+    statementDueIn('far', 10);
     addCard('none', 1, null);
+    addStatement('s-none', 'none', today().slice(0, 7), 1000);
     const results = evaluateFinanceNotifications(db);
     expect(results.filter((r) => r.type === 'finance_card_due')).toHaveLength(0);
+    // And a deleted card never announces its closing day either.
+    expect(results.filter((r) => r.type === 'finance_card_closing' && r.refId === 'gone')).toHaveLength(0);
   });
 
   it('finance_recurring_missing respects the frequency: an off month never warns', () => {

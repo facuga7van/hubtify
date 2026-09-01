@@ -9,6 +9,7 @@ import { MonthNavigator } from './shared/MonthNavigator';
 import { QuickAddForm } from './shared/QuickAddForm';
 import { useToast } from '../../../shared/components/useToast';
 import type { TransactionType, PaymentMethod, Currency } from '../types';
+import { CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY } from '../types';
 import { addTransaction } from '../../../shared/animations/feedback';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
@@ -21,7 +22,7 @@ import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../util
 import type { FinanceAccount } from '../types';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
-import { emitMovementLogged } from '../utils/rpg-events';
+import { emitMovementLogged, emitMovementDeleted } from '../utils/rpg-events';
 import { checkBudgetOverflow } from '../utils/budget-guards';
 import { useValuationContext } from '../utils/display-mode';
 
@@ -44,6 +45,8 @@ interface TransactionRow {
   impactsBalance?: number;
   /** Venta rate frozen the day the movement was recorded. NULL = none available. */
   fxRate?: number | null;
+  /** `day` | `process` | `backfill` — only `day` reads without the `~`. */
+  fxRateSource?: string | null;
   /** Cuenta a la que impacta. NULL = sin cuenta asignada. */
   accountId?: string | null;
 }
@@ -282,9 +285,16 @@ export default function Transactions() {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (month !== currentMonth || Object.keys(categoryAverages).length === 0) return new Set<string>();
 
+    // Same definition as `finance:getCategoryAverages` (the wheel's): every
+    // live expense, card purchases included, `Pago Tarjeta` and transfers out.
+    // Comparing a "with card" month against a "cash only" average flagged
+    // every card-paid category as anomalous, every month.
     const totals: Record<string, number> = {};
     for (const tx of transactions) {
-      if (tx.type === 'expense' && tx.currency === 'ARS') {
+      if (
+        tx.type === 'expense' && tx.currency === 'ARS'
+        && tx.category !== CARD_PAYMENT_CATEGORY && tx.category !== TRANSFER_CATEGORY
+      ) {
         totals[tx.category] = (totals[tx.category] || 0) + tx.amount;
       }
     }
@@ -304,9 +314,11 @@ export default function Transactions() {
     loadCategoryAverages();
   }, [loadTransactions, loadCategoryAverages]);
 
-  useEffect(() => {
+  const loadCategories = useCallback(() => {
     window.api.financeGetCategories().then(setCategories).catch(() => setCategories([]));
   }, []);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
 
   /**
    * Recurring generation is no longer a per-mount database write. It runs once
@@ -322,10 +334,18 @@ export default function Transactions() {
   }, [loadTransactions]);
 
   useEffect(() => {
-    const handler = () => { resetRecurringGuard(); loadTransactions(); loadCategoryAverages(); };
+    const handler = () => {
+      resetRecurringGuard();
+      loadTransactions();
+      loadCategoryAverages();
+      // The other account has its own categories, and an account filter seeded
+      // from `?account=` points at a wallet that no longer exists here.
+      loadCategories();
+      setFilterAccount('');
+    };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadTransactions, loadCategoryAverages]);
+  }, [loadTransactions, loadCategoryAverages, loadCategories]);
 
   useEffect(() => {
     if (!enteringId) return;
@@ -384,7 +404,8 @@ export default function Transactions() {
       // instalment plan (six instalments are one purchase, not six). See
       // `utils/rpg-events.ts` for the full list of paths that deliberately stay
       // silent (import, recurring generation, statement payments, edits).
-      const rpg = await emitMovementLogged(data.type);
+      // The row / group id rides along as ref_id so a delete can reverse it.
+      const rpg = await emitMovementLogged(data.type, newId);
 
       // One toast, not two: the success message and the XP are the same event.
       const formatted = formatCurrency(data.amount, { currency: data.currency });
@@ -414,10 +435,21 @@ export default function Transactions() {
   const handleDelete = async (id: string) => {
     const ok = await confirm({ message: t('coinify.deleteTransactionConfirm'), danger: true, confirmText: t('coinify.delete') });
     if (!ok) return;
+    const target = transactions.find((tx) => tx.id === id);
     setExitingId(id);
     setTimeout(async () => {
       try {
         await window.api.financeDeleteTransaction(id);
+        // Only a manual, non-bookkeeping row ever paid XP (see rpg-events.ts):
+        // give it back, so "add, delete, repeat" stops being a faucet. An
+        // instalment row is part of a plan whose XP rides on the group id and
+        // is refunded when the plan is deleted, not per instalment.
+        if (
+          target && target.source === 'manual' && !target.installmentGroupId
+          && target.category !== CARD_PAYMENT_CATEGORY && target.category !== TRANSFER_CATEGORY
+        ) {
+          await emitMovementDeleted(id, target.type);
+        }
         setExitingId(null);
         loadTransactions();
         window.dispatchEvent(new Event('finance:dataChanged'));

@@ -45,7 +45,12 @@ export interface ValuedView {
   currentRate: number | null;
   usd: ValuedAggregates | null;
   arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null;
-  trend: { nominalPct: number | null; realPct: number | null };
+  /**
+   * `realPct` is null while either month's IPC index is unpublished;
+   * `realPending` distinguishes that ("sin dato del INDEC todavía") from "no
+   * series at all". Older main processes omit the flag → treated as false.
+   */
+  trend: { nominalPct: number | null; realPct: number | null; realPending?: boolean };
 }
 
 export interface UpcomingItem {
@@ -140,6 +145,8 @@ export async function backfillFxRates(): Promise<
 
 const HOUSE_KEY = 'coinify_fx_house';
 export const DEFAULT_FX_HOUSE = 'blue';
+/** Fired after the preferred house changes, so every converted view reloads. */
+export const FX_HOUSE_EVENT = 'coinify:fxHouseChanged';
 
 /** Preferred house. Bridge if wired, localStorage echo otherwise. */
 export async function getFxHouse(): Promise<string> {
@@ -159,18 +166,25 @@ export async function getFxHouse(): Promise<string> {
   }
 }
 
-/** Persists the house (bridge + local echo). Returns false when nothing stuck. */
+/**
+ * Persists the house (bridge + local echo) and announces the change: the chip
+ * used to show the new rate while the ledger and the dashboard kept converting
+ * with the old house until the next navigation. Returns false when nothing stuck.
+ */
 export async function setFxHouse(house: string): Promise<boolean> {
   try { localStorage.setItem(HOUSE_KEY, house); } catch { /* ignore */ }
   const fn = bridge('dollarSetFxHouse');
-  if (!fn) return false;
-  try {
-    await fn(house);
-    return true;
-  } catch (err) {
-    console.error('[finance] setFxHouse failed:', err);
-    return false;
+  let stuck = false;
+  if (fn) {
+    try {
+      await fn(house);
+      stuck = true;
+    } catch (err) {
+      console.error('[finance] setFxHouse failed:', err);
+    }
   }
+  window.dispatchEvent(new Event(FX_HOUSE_EVENT));
+  return stuck;
 }
 
 // ── Mode state ─────────────────────────────────────────────────────────────
@@ -214,7 +228,7 @@ export interface ValuationContext {
   coefs: IpcCoefficients | null;
   /** True once the IPC series is loaded — gates the ars-today leg of the cycle. */
   inflationAvailable: boolean;
-  convert: (tx: { amount: number; currency: string; fxRate?: number | null; date: string }) => ConvertedAmount;
+  convert: (tx: { amount: number; currency: string; fxRate?: number | null; fxRateSource?: string | null; date: string }) => ConvertedAmount;
 }
 
 interface RatesResponse {
@@ -258,11 +272,15 @@ export function useValuationContext(): ValuationContext {
   useEffect(() => {
     const handler = () => load();
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
+    window.addEventListener(FX_HOUSE_EVENT, handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener(FX_HOUSE_EVENT, handler);
+    };
   }, [load]);
 
   const convert = useCallback(
-    (tx: { amount: number; currency: string; fxRate?: number | null; date: string }) =>
+    (tx: { amount: number; currency: string; fxRate?: number | null; fxRateSource?: string | null; date: string }) =>
       convertTransactionAmount(tx, mode, { currentRate, coefs }),
     [mode, currentRate, coefs],
   );

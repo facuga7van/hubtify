@@ -4,7 +4,9 @@ import { useToast } from '../../../../shared/components/useToast';
 import type { Currency, PaymentMethod } from '../../types';
 import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
+import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
+import { todayDateString } from '../../../../../shared/date-utils';
 
 interface Props {
   onCreated: () => void;
@@ -21,13 +23,18 @@ function computeLinearAmounts(first: number, last: number, count: number): numbe
 export default function InstallmentAddForm({ onCreated }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  // Local date, not UTC: a plan created at 22:00 ART used to start tomorrow.
+  const today = todayDateString();
 
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Otros');
   const [currency, setCurrency] = useState<Currency>('ARS');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('debit');
   const [creditCardId, setCreditCardId] = useState('');
+  // Pocket every instalment leaves (non-card plans). '' = unresolved default;
+  // hidden and unsent while the accounts bridge is not wired.
+  const [accountValue, setAccountValue] = useState('');
+  const [accountsSupported, setAccountsSupported] = useState(false);
   const [startDate, setStartDate] = useState(today);
   const [installmentCount, setInstallmentCount] = useState('');
   const [firstAmount, setFirstAmount] = useState('');
@@ -56,6 +63,9 @@ export default function InstallmentAddForm({ onCreated }: Props) {
         ? undefined
         : computeLinearAmounts(first, last, count);
 
+      const useAccount = accountsSupported && paymentMethod !== 'credit_card';
+      if (useAccount) rememberLastAccountId(accountValue === '' ? NO_ACCOUNT : accountValue);
+
       await window.api.financeCreateInstallmentGroup({
         description,
         totalAmount: amounts ? amounts.reduce((a, b) => a + b, 0) : first * count,
@@ -67,6 +77,9 @@ export default function InstallmentAddForm({ onCreated }: Props) {
         startDate,
         paymentMethod,
         creditCardId: paymentMethod === 'credit_card' ? creditCardId : undefined,
+        // A card plan touches no account until its statements are paid; any
+        // other plan takes money out of this pocket on every instalment.
+        ...(useAccount ? { accountId: accountIdForSubmit(accountValue) } : {}),
       });
 
       setDescription('');
@@ -121,8 +134,12 @@ export default function InstallmentAddForm({ onCreated }: Props) {
           />
         </div>
 
-        {paymentMethod === 'credit_card' && (
+        {paymentMethod === 'credit_card' ? (
           <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />
+        ) : (
+          <div className="coin-quick-add-form__row">
+            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+          </div>
         )}
 
         <div className="coin-quick-add-form__row">

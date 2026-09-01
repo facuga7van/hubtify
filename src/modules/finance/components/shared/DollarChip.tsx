@@ -120,13 +120,15 @@ export function DollarChip() {
 
   const visibleRates = allRates.filter((r) => visibleTypes.includes(r.casa));
 
-  if (allRates.length === 0) return null;
-
   const featured = allRates.find((r) => r.casa === fxHouse)
     || visibleRates.find((r) => r.casa === 'blue')
     || visibleRates[0]
-    || allRates[0];
-  if (!featured) return null;
+    || allRates[0]
+    || null;
+  // Offline with an empty cache: no rates to show, but the mode button is the
+  // ONLY way back from USD / ARS de hoy (the mode persists in localStorage and
+  // the ledger keeps converting rows with a frozen rate). It must stay.
+  const hasRates = featured !== null;
 
   const toggleType = async (casa: string) => {
     let next: string[];
@@ -180,20 +182,24 @@ export function DollarChip() {
           aria-label={t('coinify.modeToggleTitle', 'Cambiar moneda de lectura: ARS → USD → ARS de hoy')}
         >
           <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
-            {MODE_LABELS[mode]} · ${featured.venta.toLocaleString('es-AR')}
+            {MODE_LABELS[mode]} · {hasRates
+              ? `$${featured.venta.toLocaleString('es-AR')}`
+              : t('coinify.rateUnavailable', 'sin cotización')}
           </span>
         </button>
-        <button
-          className="rpg-button coin-mode-chip__menu-btn"
-          onClick={() => { setOpen(!open); if (open) setConfigMode(false); }}
-          aria-expanded={open}
-          aria-label={t('coinify.dollarRatesTitle', 'Cotizaciones')}
-          title={t('coinify.dollarRatesTitle', 'Cotizaciones')}
-        >
-          {open ? <ChevronUp style={{ width: 8, height: 8 }} /> : <ChevronDown style={{ width: 8, height: 8 }} />}
-        </button>
+        {hasRates && (
+          <button
+            className="rpg-button coin-mode-chip__menu-btn"
+            onClick={() => { setOpen(!open); if (open) setConfigMode(false); }}
+            aria-expanded={open}
+            aria-label={t('coinify.dollarRatesTitle', 'Cotizaciones')}
+            title={t('coinify.dollarRatesTitle', 'Cotizaciones')}
+          >
+            {open ? <ChevronUp style={{ width: 8, height: 8 }} /> : <ChevronDown style={{ width: 8, height: 8 }} />}
+          </button>
+        )}
       </div>
-      {open && (
+      {open && hasRates && (
         <div className="coin-dollar-menu">
           {/* Header with gear toggle */}
           <div className="coin-dollar-menu__header">

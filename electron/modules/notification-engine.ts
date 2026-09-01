@@ -1,6 +1,12 @@
 import type Database from 'better-sqlite3';
 import crypto from 'crypto';
-import { isRecurringDueInMonth } from './finance.balance';
+import {
+  addDaysToDate,
+  addMonthsToMonth,
+  dateInMonthClamped,
+  isRecurringDueInMonth,
+  recurringAnchorMonth,
+} from './finance.balance';
 
 const genId = (): string => crypto.randomUUID();
 
@@ -319,8 +325,9 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
 
   // 2. Credit card closing within 2 days / statement due within 3 days
   const currentDay = new Date().getDate();
+  // Live cards only: a deleted card kept ringing "cierra pronto" every month.
   const creditCards = db
-    .prepare(`SELECT id, name, closing_day, due_day FROM finance_credit_cards`)
+    .prepare(`SELECT id, name, closing_day, due_day FROM finance_credit_cards WHERE deleted_at IS NULL`)
     .all() as { id: string; name: string; closing_day: number; due_day: number | null }[];
 
   /** Days until the next occurrence of a day-of-month, from now. */
@@ -343,20 +350,38 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
         refId: cc.id,
       });
     }
+  }
 
-    // Same style as the closing rule, against the (optional) due day.
-    if (cc.due_day != null) {
-      const daysUntilDue = daysUntilDayOfMonth(cc.due_day);
-      if (daysUntilDue > 0 && daysUntilDue <= 3) {
-        candidates.push({
-          type: 'finance_card_due',
-          module: 'finance',
-          ...msg('finance_card_due', cc.name),
-          actionRoute: '/finance/cards',
-          refId: cc.id,
-        });
-      }
-    }
+  // A due-date notice needs something to pay: a PENDING statement whose due
+  // date (same `due_day > closing_day → M, else M+1` convention as the 30-day
+  // agenda) falls in [today, today + 3]. The old rule only looked at the
+  // day-of-month, so it rang every month for cards with no consumption at all,
+  // and for cards that had been deleted. ref_id is the statement, so the bell
+  // rings once per statement, not once per card per month.
+  const todayStr = localDate();
+  const dueHorizon = addDaysToDate(todayStr, 3);
+  const pendingStatements = db
+    .prepare(
+      `SELECT s.id, s.period_month AS periodMonth, c.name AS cardName,
+              c.closing_day AS closingDay, c.due_day AS dueDay
+       FROM finance_credit_card_statements s
+       JOIN finance_credit_cards c ON c.id = s.credit_card_id AND c.deleted_at IS NULL
+       WHERE s.deleted_at IS NULL AND s.status = 'pending' AND c.due_day IS NOT NULL
+         AND (s.calculated_amount > 0 OR s.calculated_amount_usd > 0)`
+    )
+    .all() as { id: string; periodMonth: string; cardName: string; closingDay: number; dueDay: number }[];
+
+  for (const s of pendingStatements) {
+    const dueMonth = s.dueDay > s.closingDay ? s.periodMonth : addMonthsToMonth(s.periodMonth, 1);
+    const dueDate = dateInMonthClamped(dueMonth, s.dueDay);
+    if (dueDate < todayStr || dueDate > dueHorizon) continue;
+    candidates.push({
+      type: 'finance_card_due',
+      module: 'finance',
+      ...msg('finance_card_due', s.cardName),
+      actionRoute: '/finance/cards',
+      refId: s.id,
+    });
   }
 
   // 3. Loans pending for over 30 days
@@ -386,16 +411,16 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
 
   const recurringItems = db
     .prepare(
-      `SELECT id, name, billing_day, frequency, created_at
+      `SELECT id, name, billing_day, frequency, created_at, anchor_month AS anchorMonth
        FROM finance_recurring
-       WHERE active = 1`
+       WHERE active = 1 AND deleted_at IS NULL`
     )
-    .all() as { id: string; name: string; billing_day: number; frequency: string | null; created_at: string }[];
+    .all() as { id: string; name: string; billing_day: number; frequency: string | null; created_at: string; anchorMonth: string | null }[];
 
   for (const rec of recurringItems) {
     // A bimonthly/quarterly/… template only "misses" on the months it actually
     // bills — warning about an off month would train the user to ignore the bell.
-    if (!isRecurringDueInMonth(rec.frequency, (rec.created_at ?? '').slice(0, 7), currentMonth)) continue;
+    if (!isRecurringDueInMonth(rec.frequency, recurringAnchorMonth({ createdAt: rec.created_at, anchorMonth: rec.anchorMonth }), currentMonth)) continue;
     if (currentDay >= rec.billing_day) {
       const txExists = db
         .prepare(
@@ -533,8 +558,13 @@ export function autoResolve(db: Database.Database): number {
       }
 
       // Fires 3 days ahead of the due day, so after 4 days the date has passed
-      // either way (same time-based retirement as finance_card_closing).
+      // either way (same time-based retirement as finance_card_closing). And
+      // the moment the statement it points at is paid (or gone), it is done.
       if (n.type === 'finance_card_due') {
+        const statement = db
+          .prepare(`SELECT status, deleted_at FROM finance_credit_card_statements WHERE id = ?`)
+          .get(n.ref_id) as { status: string; deleted_at: string | null } | undefined;
+        if (statement && (statement.status !== 'pending' || statement.deleted_at !== null)) shouldResolve = true;
         const notif = db
           .prepare(`SELECT created_at FROM notifications WHERE id = ?`)
           .get(n.id) as { created_at: string };

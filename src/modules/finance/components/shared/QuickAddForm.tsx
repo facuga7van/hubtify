@@ -8,6 +8,7 @@ import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
 import { RESERVED_CATEGORIES } from '../../types';
 import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
+import { todayDateString } from '../../../../../shared/date-utils';
 
 interface CategoryMapping {
   merchantPattern: string;
@@ -51,7 +52,9 @@ const AMOUNT_INPUT_ID = 'coin-quick-add-amount';
 export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddFormProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const today = new Date().toISOString().split('T')[0];
+  // Local date, not UTC: everything logged after 21:00 in Argentina used to be
+  // filed under tomorrow — and on the 31st, under next month's budget.
+  const today = todayDateString();
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState('');

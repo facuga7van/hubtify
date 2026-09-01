@@ -86,8 +86,15 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
     onSaved();
   };
 
+  // React synthetic events bubble through portals up the REACT tree: without
+  // stopPropagation, a click on this backdrop also reached the importer's
+  // overlay behind it and asked "¿Descartar la importación?" for closing the
+  // card manager the importer itself opened.
   return createPortal(
-    <div className="coin-modal-overlay" onClick={onClose}>
+    <div
+      className="coin-modal-overlay"
+      onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) onClose(); }}
+    >
       <div
         {...dialogProps}
         className="rpg-card coin-modal coin-modal--narrow"

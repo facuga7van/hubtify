@@ -6,10 +6,12 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { CARD_TAX_CATEGORY, CATEGORIES, type CreditCard, type ImportParsedRow } from '../types';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import CreditCardManager from './shared/CreditCardManager';
+import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
 import { ChevronDown, ChevronRight } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 import {
   getImportBatches,
+  importConfirm,
   undoImportBatch,
   hasImportBatchSupport,
   type ImportBatch,
@@ -82,6 +84,10 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   /** The user explicitly picked "none"; stop re-guessing a card for them. */
   const [cardTouched, setCardTouched] = useState(false);
   const [showCardManager, setShowCardManager] = useState(false);
+  // Card-less imports leave a pocket. '' = unresolved (the selector picks the
+  // default); hidden and unsent while the accounts bridge is not wired.
+  const [importAccount, setImportAccount] = useState('');
+  const [accountsSupported, setAccountsSupported] = useState(false);
 
   const batchSupport = hasImportBatchSupport();
 
@@ -226,13 +232,28 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
     setSuccessCount(null);
 
     try {
-      const result = await window.api.financeImportConfirm(toImport, statementMonth, fileName, creditCardId || null);
+      // With a card the rows belong to the statement, not to a pocket; without
+      // one they leave the chosen account right away.
+      const useAccount = accountsSupported && !creditCardId;
+      if (useAccount) rememberLastAccountId(importAccount === '' ? NO_ACCOUNT : importAccount);
+      const result = await importConfirm(
+        toImport, statementMonth, fileName, creditCardId || null,
+        useAccount ? accountIdForSubmit(importAccount) : undefined,
+      );
       if ('ok' in result) {
-        // The chosen card vanished (deleted in another window / another account).
-        setImportError(t('coinify.importErrorCardMissing', 'La tarjeta elegida ya no existe. Elegí otra y volvé a intentar.'));
-        toast({ type: 'warning', message: t('coinify.importErrorCardMissing', 'La tarjeta elegida ya no existe. Elegí otra y volvé a intentar.') });
-        setCreditCardId('');
-        loadCards();
+        const reason = (result as { reason?: string }).reason;
+        const message = reason === 'invalid_statement_month'
+          ? t('coinify.importErrorStatementMonth', 'Elegí el mes del resumen antes de importar.')
+          : reason === 'account_not_found'
+            ? t('coinify.importErrorAccountMissing', 'La cuenta elegida ya no existe. Elegí otra y volvé a intentar.')
+            // The chosen card vanished (deleted in another window / another account).
+            : t('coinify.importErrorCardMissing', 'La tarjeta elegida ya no existe. Elegí otra y volvé a intentar.');
+        setImportError(message);
+        toast({ type: 'warning', message });
+        if (reason === 'credit_card_not_found' || reason === undefined) {
+          setCreditCardId('');
+          loadCards();
+        }
         return;
       }
       // Record-only (xp 0): imports are deliberately excluded from paying XP
@@ -285,6 +306,8 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         return;
       }
       toast({ type: 'coin', message: t('coinify.importUndone', '{{count}} movimientos revertidos', { count: res.deleted }) });
+      // The green "N imported" banner must not outlive the batch it announced.
+      setSuccessCount(null);
       loadBatches();
       onImported?.(0);
       window.dispatchEvent(new Event('finance:dataChanged'));
@@ -532,6 +555,16 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
                     'Sin tarjeta, los movimientos descuentan del saldo en el acto y no forman parte de ningún resumen. Si además pagás el resumen de la tarjeta, el gasto se cuenta dos veces.',
                   )}
             </p>
+            {/* No card → the rows leave a pocket right away: which one? The
+                selector renders nothing while the accounts bridge is not wired. */}
+            {!creditCardId && (
+              <div className="coin-import-card" style={{ marginTop: 8 }}>
+                <label className="coin-import-card__label">
+                  {t('coinify.importAccount', 'Cuenta de los movimientos')}
+                </label>
+                <AccountSelect value={importAccount} onChange={setImportAccount} onSupported={setAccountsSupported} />
+              </div>
+            )}
           </div>
 
           {/* Month selector + confirm */}
