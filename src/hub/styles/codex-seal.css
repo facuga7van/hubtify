@@ -302,6 +302,52 @@
   color: var(--ink-faded);
 }
 
+/* ── óbolos minted by the seal ────────────────────── */
+/* Lives inside [data-seal="result"], so the GSAP ceremony fades the block in;
+   these coins then take one small drop of their own — same quiet register as
+   the wax, never a jackpot. */
+
+.codex-obolos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.codex-obolos__coins {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  color: var(--gold-dark);
+}
+
+.codex-obolos__coin {
+  display: inline-flex;
+  animation: codex-obolo-drop 0.5s cubic-bezier(0.3, 0.9, 0.4, 1.1) backwards;
+}
+
+.codex-obolos__coin:nth-child(1) { animation-delay: 1.0s; }
+.codex-obolos__coin:nth-child(2) { animation-delay: 1.15s; }
+.codex-obolos__coin:nth-child(3) { animation-delay: 1.3s; }
+
+@keyframes codex-obolo-drop {
+  from { transform: translateY(-14px) rotate(-18deg); opacity: 0; }
+  60%  { opacity: 1; }
+  to   { transform: none; opacity: 1; }
+}
+
+.codex-obolos__text {
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  letter-spacing: 0.05em;
+  color: var(--gold-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codex-obolos__coin { animation: none; }
+}
+
 .codex-unlocks {
   margin-top: 12px;
   padding: 8px 14px;

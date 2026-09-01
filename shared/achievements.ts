@@ -126,6 +126,13 @@ export interface AchievementDef {
 export const ACHIEVEMENT_XP = 25;
 
 /**
+ * Óbolos paid once per achievement (phase 3). Flat and idempotent — the ledger
+ * entry is keyed by (reason='achievement', ref_id=achievementId), so neither a
+ * re-unlock nor the backfill can pay it twice.
+ */
+export const ACHIEVEMENT_OBOLOS = 15;
+
+/**
  * The four modules that emit RPG events. Character has no event surface, so
  * "Día Perfecto" is Questify + Nutrify + Coinify + Caldero.
  */

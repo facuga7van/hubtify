@@ -46,7 +46,14 @@ export interface DaySummary {
 export type SealFailReason = 'too_old' | 'already_sealed' | 'empty_day';
 
 export type SealResult =
-  | { ok: true; xpAwarded: number; vigor: number; achievementIds: string[] }
+  | {
+      ok: true;
+      xpAwarded: number;
+      vigor: number;
+      achievementIds: string[];
+      /** Óbolos minted by this seal. Absent/0 on builds without the ledger. */
+      obolosGranted?: number;
+    }
   | { ok: false; reason: SealFailReason };
 
 export interface DaySeal {
@@ -62,12 +69,47 @@ export interface AchievementState {
   unlockedAt?: string;
 }
 
+/* ── óbolos + recompensas (phase 3) ───────────────── */
+
+export interface ObolosBalance {
+  balance: number;
+  earned: number;
+  spent: number;
+}
+
+export interface Reward {
+  id: string;
+  name: string;
+  cost: number;
+  /** Name of an icon from the app's own SVG set — never an emoji. */
+  icon: string | null;
+  createdAt: string;
+  updatedAt: string;
+  redeemedCount: number;
+}
+
+export interface RewardInput {
+  id?: string;
+  name: string;
+  cost: number;
+  icon?: string | null;
+}
+
+export type RedeemResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'not_found' };
+
 interface CodexApiShape {
   rpgGetDaySummary?: (date?: string) => Promise<DaySummary>;
   rpgSealDay?: (date?: string) => Promise<SealResult>;
   rpgGetSeals?: (from: string, to: string) => Promise<DaySeal[]>;
   rpgGetAchievements?: () => Promise<AchievementState[]>;
   onRpgAchievementUnlocked?: (cb: (id: string) => void) => () => void;
+  rpgGetObolosBalance?: () => Promise<ObolosBalance>;
+  rpgGetRewards?: () => Promise<Reward[]>;
+  rpgSaveReward?: (input: Record<string, unknown>) => Promise<Reward | null>;
+  rpgDeleteReward?: (id: string) => Promise<{ ok: boolean }>;
+  rpgRedeemReward?: (id: string) => Promise<RedeemResult>;
 }
 
 function api(): CodexApiShape {
@@ -121,6 +163,65 @@ export async function getAchievements(): Promise<AchievementState[] | null> {
     return null;
   }
 }
+
+/** True once the main process exposes the óbolos/rewards handlers. */
+export function rewardsApiReady(): boolean {
+  return typeof api().rpgGetRewards === 'function'
+    && typeof api().rpgGetObolosBalance === 'function';
+}
+
+export async function getObolosBalance(): Promise<ObolosBalance | null> {
+  const fn = api().rpgGetObolosBalance;
+  if (!fn) return null;
+  try {
+    return (await fn()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getRewards(): Promise<Reward[]> {
+  const fn = api().rpgGetRewards;
+  if (!fn) return [];
+  try {
+    return (await fn()) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveReward(input: RewardInput): Promise<Reward | null> {
+  const fn = api().rpgSaveReward;
+  if (!fn) return null;
+  try {
+    return (await fn(input as unknown as Record<string, unknown>)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteReward(id: string): Promise<boolean> {
+  const fn = api().rpgDeleteReward;
+  if (!fn) return false;
+  try {
+    return (await fn(id))?.ok ?? false;
+  } catch {
+    return false;
+  }
+}
+
+export async function redeemReward(id: string): Promise<RedeemResult | null> {
+  const fn = api().rpgRedeemReward;
+  if (!fn) return null;
+  try {
+    return (await fn(id)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fired after a redeem/save/delete so purses elsewhere re-read the balance. */
+export const OBOLOS_CHANGED_EVENT = 'obolos:changed';
 
 /** Returns an unsubscribe; a no-op one while the broadcast is not wired. */
 export function onAchievementUnlocked(cb: (id: string) => void): () => void {

@@ -19,6 +19,7 @@ import {
   Sword,
 } from '../../shared/components/icons';
 import { SealRosette } from './CodexSealIcons';
+import { Obolus } from '../rewards/RewardIcons';
 import { useModalA11y } from '../../shared/hooks/useModalA11y';
 import { sealCeremony } from '../../shared/animations/seal';
 import { humanise, titleKey } from './achievementCatalog';
@@ -107,7 +108,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   const [seals, setSeals] = useState<DaySeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<Phase>('page');
-  const [award, setAward] = useState<{ xpAwarded: number; vigor: number; achievementIds: string[] } | null>(null);
+  const [award, setAward] = useState<{ xpAwarded: number; vigor: number; achievementIds: string[]; obolosGranted: number } | null>(null);
   const [problem, setProblem] = useState<Problem>(null);
   const [holdPct, setHoldPct] = useState(0);
 
@@ -166,7 +167,12 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
       if (res.reason === 'already_sealed') load();
       return;
     }
-    setAward({ xpAwarded: res.xpAwarded, vigor: res.vigor, achievementIds: res.achievementIds ?? [] });
+    setAward({
+      xpAwarded: res.xpAwarded,
+      vigor: res.vigor,
+      achievementIds: res.achievementIds ?? [],
+      obolosGranted: typeof res.obolosGranted === 'number' ? res.obolosGranted : 0,
+    });
     setPhase('sealing');
     window.dispatchEvent(new Event('rpg:statsChanged'));
     window.dispatchEvent(new Event(CODEX_SEALED_EVENT));
@@ -421,6 +427,21 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
                         defaultValue: 'día vivo × vigor {{vigor}}',
                       })}
                     </div>
+                    {award.obolosGranted > 0 && (
+                      <div className="codex-obolos">
+                        <span className="codex-obolos__coins" aria-hidden="true">
+                          <span className="codex-obolos__coin"><Obolus width={15} height={15} /></span>
+                          <span className="codex-obolos__coin"><Obolus width={13} height={13} /></span>
+                          <span className="codex-obolos__coin"><Obolus width={15} height={15} /></span>
+                        </span>
+                        <span className="codex-obolos__text">
+                          {t('rpg.codexObolosGranted', {
+                            n: award.obolosGranted,
+                            defaultValue: '+{{n}} óbolos a la bolsa',
+                          })}
+                        </span>
+                      </div>
+                    )}
                     {award.achievementIds.length > 0 && (
                       <div className="codex-unlocks">
                         <div className="qb-small-caps codex-unlocks__title">

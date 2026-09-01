@@ -215,6 +215,43 @@ export const coreMigrations: Migration[] = [
         ON rpg_events(module_id, created_at);
     `,
   },
+  {
+    namespace: 'core',
+    version: 5,
+    up: `
+      -- ── RPG phase 3: óbolos + recompensas propias ───────────────────────────
+      -- obolos_ledger: the spendable currency, as an APPEND-ONLY ledger.
+      -- delta > 0 earns (reason 'day_sealed' | 'achievement'), delta < 0 spends
+      -- (reason 'reward_redeemed'). Rows are never UPDATEd nor DELETEd — a
+      -- correction is a counter-entry — so the balance is always SUM(delta),
+      -- and cross-device sync is a pure union by id.
+      CREATE TABLE IF NOT EXISTS obolos_ledger (
+        id TEXT PRIMARY KEY,
+        delta INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        ref_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      -- One probe answers both idempotency guards ('was this seal/achievement
+      -- already paid?') and the per-reward redeem count.
+      CREATE INDEX IF NOT EXISTS idx_obolos_ledger_reason_ref
+        ON obolos_ledger(reason, ref_id);
+
+      -- rewards: the player's OWN counter of treats ("2 h de jueguito").
+      -- Soft-deleted (deleted_at) so a retired reward keeps its ledger history
+      -- and merges across devices by LWW on updated_at.
+      CREATE TABLE IF NOT EXISTS rewards (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        cost INTEGER NOT NULL,
+        icon TEXT DEFAULT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT DEFAULT NULL
+      );
+    `,
+  },
 ];
 
 const DUPLICATE_COLUMN = 'duplicate column name';

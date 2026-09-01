@@ -22,6 +22,7 @@ import {
 import {
   ACHIEVEMENTS,
   ACHIEVEMENTS_TOTAL,
+  ACHIEVEMENT_OBOLOS,
   ACHIEVEMENT_XP,
   type AchievementContext,
   type AchievementEventContext,
@@ -767,6 +768,14 @@ export function evaluateAchievements(
     console.error('[RPG] achievement award failed:', err);
     return [];
   }
+
+  // Óbolos ride OUTSIDE the award transaction and behind their own guards:
+  // a ledger problem must never roll back the unlock it decorates. Idempotent
+  // per achievement id, so the backfill sweep can never pay one twice — and the
+  // same helper serves both the live unlock and the backfill path, which both
+  // arrive here.
+  for (const id of newly) grantObolos(db, 'achievement', id, ACHIEVEMENT_OBOLOS);
+
   return newly;
 }
 
@@ -883,6 +892,11 @@ export type SealResult =
       modules: string[];
       /** Achievements the seal itself unlocked. */
       achievementIds: string[];
+      /**
+       * Óbolos this seal minted (0 when the ledger declined — already paid, or
+       * pre-v5 handle). Optional so older callers keep compiling.
+       */
+      obolosGranted?: number;
     }
   | { ok: false; reason: SealBlockedReason };
 
@@ -1075,9 +1089,18 @@ export function sealDay(
     timestamp: Date.now(),
   });
 
+  // The seal's óbolos: keyed by the sealed date, so even if two devices race
+  // (the day_seals PK already makes the seal first-wins) the ledger entry is
+  // minted exactly once. A failure here degrades to obolosGranted = 0 — the
+  // reward layer never takes the ritual down.
+  const obolosGranted = grantObolos(db, 'day_sealed', date, sealObolos(xpAwarded));
+
   broadcast('rpg:daySealed', { date, xpAwarded });
 
-  return { ok: true, date, xpAwarded, vigor, eventsCount, modules, achievementIds: result.achievementIds };
+  return {
+    ok: true, date, xpAwarded, vigor, eventsCount, modules,
+    achievementIds: result.achievementIds, obolosGranted,
+  };
 }
 
 /** Seals in [fromDate, toDate], inclusive, ascending — the seal calendar. */
@@ -1091,6 +1114,222 @@ export function getSeals(db: Database.Database, fromDate: string, toDate: string
     return rows.map(rowToSeal);
   } catch {
     return [];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Óbolos + recompensas propias (phase 3)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Design rules (Habitica/Duolingo/Riot research, phase-3 brief):
+//   - óbolos are earned ONLY by sealing the day and by achievements. Never per
+//     individual action — per-action gold is the infinite-faucet anti-pattern.
+//   - they are spent on rewards the player defines ("2 h de jueguito"): the
+//     elastic drain that keeps the currency meaning something.
+//   - the ledger is append-only. No UPDATE, no DELETE — a correction is a
+//     counter-entry. Balance = SUM(delta), always.
+//   - nothing in here may ever fail a seal or an RPG event: every write is
+//     wrapped, every failure degrades to "no óbolos this time".
+
+/**
+ * Óbolos minted by one seal: half its XP, rounded.
+ *
+ *   obolos = round(sealXp / 2)   →  6 … 28 per day (sealXp is 12…55).
+ *
+ * Calibration: an ordinary day (5-10 events, full vigor) seals for ~22-33 XP
+ * → ~11-17 óbolos, so ~3-4 sealed days afford a small (~50) reward. The declared
+ * failure metric is a balance nobody spends for 30 days; keeping the faucet
+ * this narrow is what keeps the drain interesting.
+ */
+export function sealObolos(xpAwarded: number): number {
+  return Math.max(0, Math.round(xpAwarded / 2));
+}
+
+export type ObolosEarnReason = 'day_sealed' | 'achievement';
+
+/**
+ * Appends one EARNING entry, idempotently per (reason, ref_id).
+ *
+ * Returns the amount actually minted: 0 when that seal/achievement was already
+ * paid, when amount is not positive, or when the ledger is unavailable (pre-v5
+ * handle mid-migration) — never throws, so the seal/achievement that triggered
+ * it can never be taken down by its own reward.
+ */
+export function grantObolos(
+  db: Database.Database,
+  reason: ObolosEarnReason,
+  refId: string,
+  amount: number,
+): number {
+  const minted = Math.round(amount);
+  if (!Number.isFinite(minted) || minted <= 0 || !refId) return 0;
+  try {
+    const now = localTimestamp();
+    const info = db.prepare(`
+      INSERT INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?
+      WHERE NOT EXISTS (SELECT 1 FROM obolos_ledger WHERE reason = ? AND ref_id = ?)
+    `).run(crypto.randomUUID(), minted, reason, refId, now, now, reason, refId);
+    if (info.changes === 0) return 0;
+    broadcast('rpg:obolosChanged');
+    return minted;
+  } catch (err) {
+    console.error('[RPG] grantObolos failed:', err);
+    return 0;
+  }
+}
+
+export interface ObolosBalance {
+  balance: number;
+  earned: number;
+  spent: number;
+}
+
+/** SUM over the whole ledger. Append-only, so there is nothing to filter. */
+export function getObolosBalance(db: Database.Database): ObolosBalance {
+  try {
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(delta), 0) AS balance,
+             COALESCE(SUM(CASE WHEN delta > 0 THEN delta ELSE 0 END), 0) AS earned,
+             COALESCE(SUM(CASE WHEN delta < 0 THEN -delta ELSE 0 END), 0) AS spent
+      FROM obolos_ledger
+    `).get() as ObolosBalance | undefined;
+    return row ?? { balance: 0, earned: 0, spent: 0 };
+  } catch {
+    return { balance: 0, earned: 0, spent: 0 };
+  }
+}
+
+export interface Reward {
+  id: string;
+  name: string;
+  cost: number;
+  /** Name of an icon from the app's own SVG set — never an emoji. */
+  icon: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** How many times it was ever redeemed — counted from the ledger. */
+  redeemedCount: number;
+}
+
+const REWARD_NAME_MAX = 80;
+const REWARD_COST_MAX = 1_000_000;
+
+function readReward(db: Database.Database, id: string): Reward | null {
+  const row = db.prepare(`
+    SELECT r.id, r.name, r.cost, r.icon,
+           r.created_at AS createdAt, r.updated_at AS updatedAt,
+           (SELECT COUNT(*) FROM obolos_ledger l
+             WHERE l.reason = 'reward_redeemed' AND l.ref_id = r.id) AS redeemedCount
+    FROM rewards r WHERE r.id = ?
+  `).get(id) as Reward | undefined;
+  return row ?? null;
+}
+
+/** Living rewards, cheapest first, each carrying its lifetime redeem count. */
+export function getRewards(db: Database.Database): Reward[] {
+  try {
+    return db.prepare(`
+      SELECT r.id, r.name, r.cost, r.icon,
+             r.created_at AS createdAt, r.updated_at AS updatedAt,
+             (SELECT COUNT(*) FROM obolos_ledger l
+               WHERE l.reason = 'reward_redeemed' AND l.ref_id = r.id) AS redeemedCount
+      FROM rewards r
+      WHERE r.deleted_at IS NULL
+      ORDER BY r.cost ASC, r.name COLLATE NOCASE ASC
+    `).all() as Reward[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Upsert. Everything arrives from the renderer, so it is sanitised here:
+ * name trimmed and bounded, cost a positive integer, icon a plain token.
+ * Returns the stored row, or null when the input was unusable.
+ */
+export function saveReward(
+  db: Database.Database,
+  input: { id?: unknown; name?: unknown; cost?: unknown; icon?: unknown },
+): Reward | null {
+  try {
+    const name = typeof input.name === 'string' ? input.name.trim().slice(0, REWARD_NAME_MAX) : '';
+    // Validate BEFORE clamping: clampNumber would lift a cost of 0 (or of
+    // garbage) up to the minimum, silently storing a reward nobody priced.
+    const rawCost = typeof input.cost === 'number' && Number.isFinite(input.cost)
+      ? Math.round(input.cost)
+      : 0;
+    if (!name || rawCost < 1) return null;
+    const cost = Math.min(rawCost, REWARD_COST_MAX);
+    const icon = typeof input.icon === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(input.icon)
+      ? input.icon
+      : null;
+    const id = typeof input.id === 'string' && input.id ? input.id : crypto.randomUUID();
+    const now = localTimestamp();
+    // deleted_at is deliberately untouched: editing never resurrects a retired
+    // reward, and the UI only ever hands back living ids anyway.
+    db.prepare(`
+      INSERT INTO rewards (id, name, cost, icon, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name, cost = excluded.cost, icon = excluded.icon,
+        updated_at = excluded.updated_at
+    `).run(id, name, cost, icon, now, now);
+    return readReward(db, id);
+  } catch (err) {
+    console.error('[RPG] saveReward failed:', err);
+    return null;
+  }
+}
+
+/** Soft delete. The ledger keeps every entry the reward ever produced. */
+export function deleteReward(db: Database.Database, id: string): { ok: boolean } {
+  try {
+    const now = localTimestamp();
+    const info = db.prepare(
+      'UPDATE rewards SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL'
+    ).run(now, now, typeof id === 'string' ? id : '');
+    return { ok: info.changes > 0 };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export type RedeemResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'not_found' };
+
+/**
+ * Spends óbolos on one reward.
+ *
+ * Deliberately NOT idempotent: redeeming twice is two treats, two spends. The
+ * balance check and the ledger append share one transaction so two racing
+ * redeems can never both pass on the same óbolos.
+ */
+export function redeemReward(db: Database.Database, id: string): RedeemResult {
+  try {
+    const redeem = db.transaction((): RedeemResult => {
+      const reward = db.prepare(
+        'SELECT id, cost FROM rewards WHERE id = ? AND deleted_at IS NULL'
+      ).get(typeof id === 'string' ? id : '') as { id: string; cost: number } | undefined;
+      if (!reward) return { ok: false, reason: 'not_found' };
+
+      const { balance } = getObolosBalance(db);
+      if (balance < reward.cost) return { ok: false, reason: 'insufficient' };
+
+      const now = localTimestamp();
+      db.prepare(`
+        INSERT INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
+        VALUES (?, ?, 'reward_redeemed', ?, ?, ?)
+      `).run(crypto.randomUUID(), -reward.cost, reward.id, now, now);
+      return { ok: true, balance: balance - reward.cost };
+    });
+    const result = redeem();
+    if (result.ok) broadcast('rpg:obolosChanged');
+    return result;
+  } catch (err) {
+    console.error('[RPG] redeemReward failed:', err);
+    return { ok: false, reason: 'not_found' };
   }
 }
 
@@ -1203,6 +1442,18 @@ export function registerRpgHandlers(): void {
 
   ipcHandle('rpg:getSeals', (_e, fromDate: string, toDate: string): DaySeal[] =>
     getSeals(getDb(), fromDate, toDate));
+
+  // ── Óbolos + recompensas propias ──
+  ipcHandle('rpg:getObolosBalance', (): ObolosBalance => getObolosBalance(getDb()));
+
+  ipcHandle('rpg:getRewards', (): Reward[] => getRewards(getDb()));
+
+  ipcHandle('rpg:saveReward', (_e, input: Record<string, unknown>): Reward | null =>
+    saveReward(getDb(), input ?? {}));
+
+  ipcHandle('rpg:deleteReward', (_e, id: string): { ok: boolean } => deleteReward(getDb(), id));
+
+  ipcHandle('rpg:redeemReward', (_e, id: string): RedeemResult => redeemReward(getDb(), id));
 
   ipcHandle('sync:restoreStats', (_e, stats: Record<string, unknown>) => restorePlayerStats(getDb(), stats));
 }
