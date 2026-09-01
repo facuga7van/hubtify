@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../../shared/components/useToast';
 import type { Currency, PaymentMethod } from '../../types';
@@ -6,6 +6,8 @@ import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
+import { formatCurrency } from '../../utils/format';
+import { splitTotalIntoInstallments, installmentAmountsFromTotal } from '../../utils/split-total';
 import { todayDateString } from '../../../../../shared/date-utils';
 
 interface Props {
@@ -40,19 +42,35 @@ export default function InstallmentAddForm({ onCreated }: Props) {
   const [firstAmount, setFirstAmount] = useState('');
   const [lastAmount, setLastAmount] = useState('');
   const [customLastAmount, setCustomLastAmount] = useState(false);
+  /**
+   * Cómo se escribe la plata: el precio de la cuota, o el total financiado.
+   * Comprar en cuotas se piensa casi siempre por el total («la heladera salió
+   * 900 mil en 12»), y obligaba a sacar la división a mano antes de cargarla.
+   */
+  const [amountMode, setAmountMode] = useState<'installment' | 'total'>('installment');
   const [submitting, setSubmitting] = useState(false);
+
+  /** Vista previa de la división mientras se escribe. */
+  const totalSplit = useMemo(() => {
+    if (amountMode !== 'total') return null;
+    return splitTotalIntoInstallments(parseFloat(firstAmount), parseInt(installmentCount, 10));
+  }, [amountMode, installmentCount, firstAmount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const count = parseInt(installmentCount, 10);
-    const first = parseFloat(firstAmount);
-    const last = lastAmount ? parseFloat(lastAmount) : first;
+    const typed = parseFloat(firstAmount);
+    // En modo total, lo tipeado es el total: se divide acá y la última cuota
+    // se lleva el resto del redondeo.
+    const split = amountMode === 'total' ? splitTotalIntoInstallments(typed, count) : null;
+    const first = split ? split.per : typed;
+    const last = split ? split.last : (lastAmount ? parseFloat(lastAmount) : first);
     if (!description || !count || !first) return;
     if (count < 1 || count > 120) {
       toast({ type: 'warning', message: t('coinify.validationInstallmentCount', 'Las cuotas deben ser entre 1 y 120') });
       return;
     }
-    if (first > 999_999_999) {
+    if (typed > 999_999_999) {
       toast({ type: 'warning', message: t('coinify.validationAmountTooLarge', 'El monto es demasiado grande') });
       return;
     }
@@ -61,7 +79,10 @@ export default function InstallmentAddForm({ onCreated }: Props) {
     try {
       const amounts = first === last
         ? undefined
-        : computeLinearAmounts(first, last, count);
+        : split
+          // Total repartido: todas iguales menos la última, que absorbe el resto.
+          ? installmentAmountsFromTotal(typed, count) ?? undefined
+          : computeLinearAmounts(first, last, count);
 
       const useAccount = accountsSupported && paymentMethod !== 'credit_card';
       if (useAccount) rememberLastAccountId(accountValue === '' ? NO_ACCOUNT : accountValue);
@@ -158,12 +179,49 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             onChange={setFirstAmount}
             min={0}
             step={1}
-            placeholder={customLastAmount
-              ? t('coinify.firstAmount', '1ra cuota $')
-              : t('coinify.installmentAmount', 'Monto cuota $')}
+            placeholder={amountMode === 'total'
+              ? t('coinify.totalAmountPlaceholder', 'Monto total $')
+              : customLastAmount
+                ? t('coinify.firstAmount', '1ra cuota $')
+                : t('coinify.installmentAmount', 'Monto cuota $')}
             required
           />
         </div>
+
+        {/* Qué número estás escribiendo. Una compra en cuotas se piensa por el
+            total («salió 900 mil en 12»), y antes había que dividir a mano. */}
+        <div style={{ display: 'flex', gap: 0, border: '1px solid var(--gold-dark)', borderRadius: 4, overflow: 'hidden', alignSelf: 'flex-start' }} role="group" aria-label={t('coinify.amountModeLabel', 'Qué monto estás cargando')}>
+          <button
+            type="button"
+            style={{ padding: '4px 12px', border: 0, cursor: 'pointer', fontFamily: 'IM Fell English SC, serif', fontSize: 'var(--fs-label)', background: amountMode === 'installment' ? 'var(--gold)' : 'transparent', color: amountMode === 'installment' ? 'var(--leather-dark)' : 'var(--ink-soft)' }}
+            aria-pressed={amountMode === 'installment'}
+            onClick={() => setAmountMode('installment')}
+          >
+            {t('coinify.amountModeInstallment', 'Monto de la cuota')}
+          </button>
+          <button
+            type="button"
+            style={{ padding: '4px 12px', border: 0, cursor: 'pointer', fontFamily: 'IM Fell English SC, serif', fontSize: 'var(--fs-label)', background: amountMode === 'total' ? 'var(--gold)' : 'transparent', color: amountMode === 'total' ? 'var(--leather-dark)' : 'var(--ink-soft)' }}
+            aria-pressed={amountMode === 'total'}
+            onClick={() => setAmountMode('total')}
+          >
+            {t('coinify.amountModeTotal', 'Monto total')}
+          </button>
+        </div>
+
+        {totalSplit && (
+          <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }} role="status">
+            {t('coinify.totalSplitHint', '{{count}} cuotas de {{per}}', {
+              count: parseInt(installmentCount, 10),
+              per: formatCurrency(totalSplit.per, { currency }),
+            })}
+            {totalSplit.last !== totalSplit.per && (
+              <> · {t('coinify.totalSplitLast', 'la última, {{last}}', {
+                last: formatCurrency(totalSplit.last, { currency }),
+              })}</>
+            )}
+          </p>
+        )}
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--fs-label)' }}>
           <div style={{

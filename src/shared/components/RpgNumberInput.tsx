@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useHoldToRepeat } from '../hooks/useHoldToRepeat';
 
 interface Props {
@@ -25,6 +26,7 @@ export default function RpgNumberInput({
   value, onChange, step = 1, min, max, placeholder, suffix, autoFocus, fontSize, style, onKeyDown, required,
   id, 'aria-label': ariaLabel, 'aria-describedby': ariaDescribedBy,
 }: Props) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const clamp = useCallback((v: number) => {
@@ -41,25 +43,10 @@ export default function RpgNumberInput({
 
   const { startHold, stopHold, handleClick, handleKeyDown } = useHoldToRepeat(adjust);
 
-  const arrowBtn: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, minWidth: 32, height: '50%', minHeight: 16,
-    border: 'none', cursor: 'pointer',
-    background: 'linear-gradient(180deg, var(--leather-light), var(--leather))',
-    color: 'var(--gold)',
-    userSelect: 'none', padding: 0, borderRadius: 2,
-  };
+
 
   return (
-    <div style={{ position: 'relative', ...style }}>
-      <style>{`
-        .rpg-number-input::-webkit-inner-spin-button,
-        .rpg-number-input::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        .rpg-number-input { -moz-appearance: textfield; }
-      `}</style>
+    <div className="rpg-number" style={style}>
       <input
         ref={inputRef}
         id={id}
@@ -82,34 +69,26 @@ export default function RpgNumberInput({
         }}
         placeholder={placeholder}
         className="rpg-input rpg-number-input"
-        style={{
-          width: '100%', textAlign: 'center',
-          paddingLeft: 36, paddingRight: 36,
-          ...(fontSize ? { fontSize } : {}),
-        }}
+        style={{ ...(fontSize ? { fontSize } : {}) }}
         autoFocus={autoFocus}
         required={required}
       />
       {suffix && (
-        <span style={{
-          position: 'absolute', right: 40, top: '50%', transform: 'translateY(-50%)',
-          fontSize: 'var(--fs-label)', opacity: 0.65, pointerEvents: 'none',
-        }}>
+        <span className="rpg-number__suffix">
           {suffix}
         </span>
       )}
-      <div style={{
-        position: 'absolute', right: 2, top: 2, bottom: 2,
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        <button type="button" style={arrowBtn} aria-label="Increase"
+      <div className="rpg-number__spin">
+        <button type="button" className="rpg-number__arrow" aria-label={t('common.increase', 'Aumentar')}
+          tabIndex={-1}
           onMouseDown={() => startHold(1)} onMouseUp={stopHold} onMouseLeave={stopHold}
           onClick={() => handleClick(1)} onKeyDown={handleKeyDown}>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M2 7L5 3l3 4"/>
           </svg>
         </button>
-        <button type="button" style={arrowBtn} aria-label="Decrease"
+        <button type="button" className="rpg-number__arrow" aria-label={t('common.decrease', 'Disminuir')}
+          tabIndex={-1}
           onMouseDown={() => startHold(-1)} onMouseUp={stopHold} onMouseLeave={stopHold}
           onClick={() => handleClick(-1)} onKeyDown={handleKeyDown}>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
