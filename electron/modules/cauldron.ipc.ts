@@ -1011,7 +1011,7 @@ export function registerCauldronIpcHandlers(): void {
       .prepare(
         `SELECT s.id, s.preset_id AS presetId, s.type, s.duration_minutes AS durationMinutes,
                 s.completed, s.started_at AS startedAt, s.completed_at AS completedAt,
-                s.abandoned, s.task_id AS taskId,
+                s.abandoned, s.retroactive, s.task_id AS taskId,
                 p.name AS presetName,
                 ${taskCols}
          FROM cauldron_sessions s
@@ -1044,6 +1044,8 @@ export function registerCauldronIpcHandlers(): void {
         completedAt: r.completedAt,
         presetName: r.presetName ?? null,
         abandoned,
+        // Registrada a mano, después de ocurrir: el frasco lleva borde punteado.
+        retroactive: (r.retroactive as number) === 1,
         elapsedMinutes,
         taskId: r.taskId ?? null,
         // Una tarea borrada deja el vínculo pero se queda sin nombre: el frasco
@@ -1056,6 +1058,69 @@ export function registerCauldronIpcHandlers(): void {
     });
 
     return { sessions, hasMore };
+  });
+
+  /**
+   * «Trabajé 90 minutos sin el caldero» — registrar una sesión PASADA.
+   *
+   * Cuenta para el registro, no para la recompensa (mismo precedente que la
+   * prórroga): la fila entra completada y `retroactive = 1`, pero acá NO se
+   * emite `cauldron:sessionEnd` ni ningún evento RPG — ese broadcast es la
+   * única puerta por la que el renderer paga XP de pomodoros, y esta sesión
+   * paga CERO. El estante y las stats la ven igual porque leen
+   * `cauldron_sessions` directo (`completed = 1`); el frasco sale con borde
+   * punteado gracias a la marca.
+   *
+   * El INSERT es único y atómico con `completed = 1` desde el primer instante,
+   * así `cleanupOrphanedSessions` (que solo barre `completed = 0`) no puede
+   * verla jamás, ni siquiera a medio insertar.
+   */
+  ipcHandle('cauldron:logPastSession', (_e, payload: Record<string, unknown>) => {
+    const db = getDb();
+
+    const rawMinutes = Number(payload?.minutes);
+    if (!Number.isFinite(rawMinutes)) throw new Error('Invalid minutes');
+    // Clamp 1–600: diez horas es el techo de un «me olvidé el caldero un día
+    // entero»; más que eso es un typo, no una jornada.
+    const minutes = Math.min(600, Math.max(1, Math.round(rawMinutes)));
+
+    const nowMs = Date.now();
+    let startMs = nowMs - minutes * 60_000;
+    if (payload?.when != null && payload.when !== '') {
+      const parsed = new Date(String(payload.when)).getTime();
+      if (!Number.isFinite(parsed)) throw new Error('Invalid date');
+      startMs = parsed;
+    }
+    // El pasado se registra; el futuro se vive. Ni el inicio ni el final pueden
+    // quedar adelante del reloj (60 s de tolerancia por skew entre superficies).
+    if (startMs > nowMs || startMs + minutes * 60_000 > nowMs + 60_000) {
+      throw new Error('Cannot log a session in the future');
+    }
+
+    // preset_id tiene FK dura: un id que no resuelve tira toda la inserción.
+    // Se degrada a null — la receta es color local, la sesión es lo que importa.
+    let presetId = typeof payload?.presetId === 'string' ? payload.presetId : null;
+    if (presetId) {
+      const found = db
+        .prepare('SELECT id FROM cauldron_presets WHERE id = ? AND deleted_at IS NULL')
+        .get(presetId);
+      if (!found) presetId = null;
+    }
+    // task_id no tiene FK (a propósito, ver migración v6): viaja tal cual.
+    const taskId = typeof payload?.taskId === 'string' ? payload.taskId : null;
+
+    const id = genId();
+    const nowIso = new Date().toISOString();
+    const startedAt = new Date(startMs).toISOString();
+    const completedAt = new Date(startMs + minutes * 60_000).toISOString();
+    db.prepare(
+      `INSERT INTO cauldron_sessions
+         (id, preset_id, type, duration_minutes, completed, started_at, completed_at,
+          created_at, updated_at, target_end_time, is_extension, task_id, retroactive)
+       VALUES (?, ?, 'work', ?, 1, ?, ?, ?, ?, NULL, 0, ?, 1)`,
+    ).run(id, presetId, minutes, startedAt, completedAt, nowIso, nowIso, taskId);
+
+    return { id, minutes, startedAt, completedAt };
   });
 
   /**

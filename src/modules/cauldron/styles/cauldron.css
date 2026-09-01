@@ -1268,6 +1268,52 @@
   opacity: 0.85;
 }
 
+/* Frasco retroactivo («trabajé sin el caldero»): el borde punteado vive en el
+   SVG (strokeDasharray). Acá solo un matiz: se distingue, no se castiga. */
+.cauldron-jar--retro {
+  opacity: 0.92;
+}
+
+/* -- 17c-bis. Registrar una sesión pasada -------------------- */
+
+/* Enlace tenue bajo el estante — hereda el tono de .cauldron-mission-trigger. */
+.cauldron-retro-link {
+  display: block;
+  margin-top: 10px;
+}
+
+.cauldron-retro-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(107, 85, 53, 0.45);
+  border-radius: 4px;
+  background: var(--parch-1);
+}
+
+.cauldron-retro-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cauldron-retro-input {
+  width: 72px;
+}
+
+/* La letra chica, honesta: cuenta para el registro, no da XP. */
+.cauldron-retro-hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-family: var(--ff-body);
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
 /* -- 17d. Misión en las superficies flotantes ---------------- */
 
 .cauldron-ft-mission,

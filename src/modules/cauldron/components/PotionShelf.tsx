@@ -116,7 +116,12 @@ export default function PotionShelf({ sessions, week, hasMore, onLoadMore }: Pro
           minutes: s.elapsedMinutes ?? 0,
         })
       : t('cauldron.history.duration', '{{minutes}} min', { minutes: s.durationMinutes });
-    return `${time} · ${duration}\n${mission}`;
+    // Retroactiva: se dice en el tooltip, además del borde punteado. Que el
+    // estante no mienta, pero sin castigar.
+    const retroMark = s.retroactive
+      ? ` · ${t('cauldron.retro.jarMark', 'registrada a mano')}`
+      : '';
+    return `${time} · ${duration}${retroMark}\n${mission}`;
   };
 
   if (sessions.length === 0) {
@@ -140,6 +145,7 @@ export default function PotionShelf({ sessions, week, hasMore, onLoadMore }: Pro
                 id={s.id}
                 color={s.projectColor}
                 broken={s.abandoned}
+                retroactive={!!s.retroactive}
                 title={jarTitle(s)}
               />
             ))}

@@ -27,6 +27,7 @@ import { getDueDateStatus, bonusMultiplierToTier, TierBadge } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
 import QuillCheckbox from '../../../shared/components/QuillCheckbox';
 import { completeTask as completeTaskAnim, removeItem } from '../../../shared/animations/feedback';
+import { celebrateCompletion } from '../../../shared/animations/celebrate';
 import Tooltip from '../../../shared/components/Tooltip';
 import HelpBubble from '../../../shared/components/HelpBubble';
 
@@ -882,6 +883,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
   const [animatingComplete, setAnimatingComplete] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
+  const checkRef = useRef<HTMLSpanElement>(null);
   const tier = getTierInfo(task);
   const isOverdue = task.dueDate && getDueDateStatus(task.dueDate) === 'overdue' && !task.status;
 
@@ -889,6 +891,13 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
     if (animatingComplete) return;
     setAnimatingComplete(true);
     playTaskComplete();
+    // Los ~300 ms que siguen a completar: chispas doradas desde el checkbox y
+    // un pop sutil en la fila. Fire-and-forget — el toast, la regeneración de
+    // recurrentes y el resto del flujo no esperan a nadie. El pop va sobre
+    // .quest-row-inner y no sobre la fila raíz para no pisar el transform que
+    // dnd-kit administra ahí.
+    const inner = rowRef.current?.querySelector<HTMLElement>('.quest-row-inner');
+    celebrateCompletion(checkRef.current ?? rowRef.current, { popEl: inner });
   }, [animatingComplete]);
 
   const handleDrawComplete = useCallback(() => {
@@ -936,7 +945,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
         </div>
 
         {/* QuillCheckbox */}
-        <span onPointerDown={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center' }}>
+        <span ref={checkRef} onPointerDown={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center' }}>
           <QuillCheckbox
             checked={animatingComplete}
             onChange={handleCheckboxComplete}

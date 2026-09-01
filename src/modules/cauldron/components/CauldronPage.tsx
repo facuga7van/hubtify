@@ -27,7 +27,9 @@ import { useCauldronLabels, usePresetName, rememberLastPreset, POPOUT_ON_START_K
 import {
   cancelAutoStart,
   getWeekByProject,
+  isRetroLogWired,
   isTaskLinkWired,
+  logPastSession,
   setSessionTask,
   startBrew,
 } from '../api';
@@ -121,6 +123,15 @@ export default function CauldronPage() {
    */
   const taskLinkWired = useMemo(() => isTaskLinkWired(), []);
   const { missions, reloadMissions } = useOpenMissions(taskLinkWired);
+  /**
+   * «¿Trabajaste sin el caldero?» — registrar una sesión pasada. Cuenta para el
+   * registro (estante, stats), no para la recompensa: cero XP. Mientras preload
+   * no exponga el canal, el enlace no se muestra (patrón `api.ts`).
+   */
+  const retroWired = useMemo(() => isRetroLogWired(), []);
+  const [retroOpen, setRetroOpen] = useState(false);
+  const [retroMinutes, setRetroMinutes] = useState('');
+  const [retroTaskId, setRetroTaskId] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState<CauldronInterruptedSession | null>(null);
   const [popoutOnStart, setPopoutOnStart] = useState(() => {
     try { return localStorage.getItem(POPOUT_ON_START_KEY) === 'true'; } catch { return false; }
@@ -489,6 +500,36 @@ export default function CauldronPage() {
   const handleDiscardInterrupted = guarded(async () => {
     await window.api.cauldronDiscardInterruptedSession();
     setInterrupted(null);
+  });
+
+  /**
+   * Registrar la sesión pasada. Sin XP, sin evento RPG, sin toast dorado: el
+   * frasco aparece en el estante con borde punteado y listo. La recompensa es
+   * que el registro no mienta.
+   */
+  const handleLogPastSession = guarded(async () => {
+    const minutes = parseInt(retroMinutes, 10);
+    if (!Number.isFinite(minutes) || minutes < 1) return;
+    try {
+      const logged = await logPastSession({
+        minutes: Math.min(600, minutes),
+        taskId: retroTaskId,
+      });
+      if (!logged) return; // canal no expuesto todavía
+      toast({
+        type: 'info',
+        message: t('cauldron.retro.logged', 'Sesión registrada en el estante — sin XP'),
+      });
+      setRetroOpen(false);
+      setRetroMinutes('');
+      setRetroTaskId(null);
+      loadSessions(0);
+      loadStats();
+      loadWeeklyFocus();
+      loadWeekByProject();
+    } catch (err) {
+      toast({ type: 'warning', message: String(err) });
+    }
   });
 
   /* -- Preset handlers -- */
@@ -1062,6 +1103,71 @@ export default function CauldronPage() {
             hasMore={sessionsHasMore}
             onLoadMore={() => loadSessions(sessionsOffset)}
           />
+        )}
+
+        {/* «¿Trabajaste sin el caldero?» — sesión pasada, a mano. Enlace tenue,
+            nunca un botón que compita con el play: es un trámite de honestidad,
+            no una función estrella. Cuenta para el registro, cero XP. */}
+        {retroWired && !retroOpen && (
+          <button
+            type="button"
+            className="cauldron-mission-trigger cauldron-retro-link"
+            onClick={() => setRetroOpen(true)}
+          >
+            {t('cauldron.retro.link', '¿Trabajaste sin el caldero?')}
+          </button>
+        )}
+        {retroWired && retroOpen && (
+          <form
+            className="cauldron-retro-form"
+            onSubmit={(e) => { e.preventDefault(); handleLogPastSession(); }}
+          >
+            <label className="cauldron-retro-field">
+              <span className="cauldron-kv-key">
+                {t('cauldron.retro.minutes', 'Minutos')}
+              </span>
+              <input
+                className="cauldron-input cauldron-mono cauldron-retro-input"
+                type="number"
+                min="1"
+                max="600"
+                value={retroMinutes}
+                onChange={(e) => setRetroMinutes(e.target.value)}
+                autoFocus
+              />
+            </label>
+            {taskLinkWired && (
+              <MissionPicker
+                missions={missions}
+                selectedId={retroTaskId}
+                onPick={setRetroTaskId}
+                label={retroTaskId
+                  ? (missions.find((m) => m.id === retroTaskId)?.name
+                      ?? t('cauldron.mission.deleted', 'Misión ya no disponible'))
+                  : t('cauldron.mission.prompt', '¿Sobre qué misión?')}
+              />
+            )}
+            <button
+              type="submit"
+              className="cauldron-btn"
+              disabled={actionPending || !(parseInt(retroMinutes, 10) >= 1)}
+            >
+              {t('cauldron.retro.submit', 'Registrar')}
+            </button>
+            <button
+              type="button"
+              className="cauldron-btn"
+              onClick={() => { setRetroOpen(false); setRetroMinutes(''); setRetroTaskId(null); }}
+            >
+              {t('common.cancel', 'Cancelar')}
+            </button>
+            <p className="cauldron-retro-hint">
+              {t(
+                'cauldron.retro.hint',
+                'Entra al estante con borde punteado. Cuenta para el registro, no da XP.',
+              )}
+            </p>
+          </form>
         )}
       </Section>
 

@@ -124,4 +124,17 @@ export const cauldronMigrations: Migration[] = [
         ON cauldron_sessions(type, deleted_at, is_extension, started_at);
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 7,
+    up: `
+      -- retroactive: «trabajé 90 minutos sin el caldero». Una sesión registrada
+      -- a mano DESPUÉS de ocurrir. Cuenta para el registro (estante, stats),
+      -- jamás para la recompensa: cero XP, mismo precedente que la prórroga.
+      -- Sin esto, el estante miente — el día existió aunque el caldero no lo vio.
+      -- DEFAULT 0 para que las filas que vienen por sync desde versiones viejas
+      -- sigan mergeando sin drama.
+      ALTER TABLE cauldron_sessions ADD COLUMN retroactive INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

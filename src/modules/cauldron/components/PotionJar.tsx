@@ -36,11 +36,16 @@ export interface PotionJarProps {
   color?: string | null;
   /** Frasco roto: silueta quebrada y tono apagado. Memoria, no acusación. */
   broken?: boolean;
+  /**
+   * Registrada a mano, después de ocurrir: borde punteado. Se distingue —
+   * el estante no miente — pero no se castiga: mismo color, misma opacidad.
+   */
+  retroactive?: boolean;
   title?: string;
   size?: number;
 }
 
-function PotionJarComponent({ id, color, broken = false, title, size = 44 }: PotionJarProps) {
+function PotionJarComponent({ id, color, broken = false, retroactive = false, title, size = 44 }: PotionJarProps) {
   const uid = useId().replace(/:/g, '');
   const variant = jarVariant(id);
   const body = BODIES[variant];
@@ -53,7 +58,7 @@ function PotionJarComponent({ id, color, broken = false, title, size = 44 }: Pot
 
   return (
     <svg
-      className={`cauldron-jar${broken ? ' cauldron-jar--broken' : ''}`}
+      className={`cauldron-jar${broken ? ' cauldron-jar--broken' : ''}${retroactive ? ' cauldron-jar--retro' : ''}`}
       width={size}
       height={size * 1.4}
       viewBox="0 0 40 56"
@@ -86,8 +91,15 @@ function PotionJarComponent({ id, color, broken = false, title, size = 44 }: Pot
         </>
       )}
 
+      {/* Retroactiva: el vidrio es «de memoria», el contorno va punteado. */}
       <g clipPath={broken ? `url(#${uid}-shatter)` : undefined}>
-        <path d={body} fill={fill} stroke="rgba(40,30,20,0.55)" strokeWidth="1.2" />
+        <path
+          d={body}
+          fill={fill}
+          stroke="rgba(40,30,20,0.55)"
+          strokeWidth="1.2"
+          strokeDasharray={retroactive ? '3 2.2' : undefined}
+        />
       </g>
 
       {broken ? (

@@ -58,6 +58,11 @@ export type CauldronShelfSession = CauldronSession & {
   presetName?: string | null;
   /** Frasco roto: silueta quebrada, tono apagado. Memoria, no acusación. */
   abandoned: boolean;
+  /**
+   * Registrada a mano DESPUÉS de ocurrir («trabajé sin el caldero»): borde
+   * punteado, cero XP. Opcional: un main viejo no devuelve la columna.
+   */
+  retroactive?: boolean;
   /** Solo en los rotos: «abandonada a los N min». */
   elapsedMinutes: number | null;
   taskId: string | null;

@@ -27,7 +27,25 @@ type ApiPhase2 = {
   cauldronStart: (presetId: string, taskId?: string | null) => Promise<CauldronTimerState>;
   cauldronSetSessionTask?: (taskId: string | null) => Promise<CauldronTimerState>;
   cauldronGetWeekByProject?: () => Promise<CauldronWeekTaskRow[]>;
+  cauldronLogPastSession?: (payload: Record<string, unknown>) => Promise<LoggedPastSession>;
 };
+
+/** Lo que devuelve `cauldron:logPastSession`: la fila recién depositada. */
+export interface LoggedPastSession {
+  id: string;
+  minutes: number;
+  startedAt: string;
+  completedAt: string;
+}
+
+/** Lo que el usuario declara al registrar una sesión pasada. */
+export interface LogPastSessionInput {
+  minutes: number;
+  presetId?: string | null;
+  taskId?: string | null;
+  /** Inicio de la sesión (ISO). Default en el main: ahora − minutos. */
+  when?: string;
+}
 
 function api(): ApiPhase2 {
   return window.api as unknown as ApiPhase2;
@@ -82,6 +100,27 @@ export async function setSessionTask(taskId: string | null): Promise<CauldronTim
   const fn = api().cauldronSetSessionTask;
   if (typeof fn !== 'function') return null;
   return (await fn(taskId)) as CauldronTimerStateEx;
+}
+
+/**
+ * ¿Se puede registrar una sesión pasada? Igual que `isTaskLinkWired`: mientras
+ * preload no exponga `cauldronLogPastSession`, el enlace «¿Trabajaste sin el
+ * caldero?» directamente no se muestra.
+ */
+export function isRetroLogWired(): boolean {
+  return typeof api().cauldronLogPastSession === 'function';
+}
+
+/**
+ * Registrar una sesión pasada: entra al estante con marca retroactiva y CERO
+ * XP. Devuelve null si el canal todavía no está expuesto en preload.
+ */
+export async function logPastSession(
+  input: LogPastSessionInput,
+): Promise<LoggedPastSession | null> {
+  const fn = api().cauldronLogPastSession;
+  if (typeof fn !== 'function') return null;
+  return fn({ ...input });
 }
 
 /** El resumen semanal por misión. Array vacío mientras el canal no esté expuesto. */
