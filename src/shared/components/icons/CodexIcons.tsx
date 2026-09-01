@@ -217,6 +217,23 @@ export function Key(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+export function Padlock(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      {/* Shackle */}
+      <path d="M8.5 10.5 V8 a3.5 3.5 0 0 1 7 0 v2.5" />
+      {/* Body, slightly barrelled like a forged casket */}
+      <path d="M6.5 10.5 h11 a1 1 0 0 1 1 1 v7 a1 1 0 0 1 -1 1 h-11 a1 1 0 0 1 -1 -1 v-7 a1 1 0 0 1 1 -1 Z" fill="currentColor" fillOpacity=".08" />
+      {/* Keyhole */}
+      <circle cx="12" cy="14" r="1.3" />
+      <path d="M12 15.3 V17.2" />
+      {/* Rivets */}
+      <circle cx="7.6" cy="11.8" r=".5" fill="currentColor" fillOpacity=".18" />
+      <circle cx="16.4" cy="11.8" r=".5" fill="currentColor" fillOpacity=".18" />
+    </svg>
+  );
+}
+
 export function Quill(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...defaults} {...props}>

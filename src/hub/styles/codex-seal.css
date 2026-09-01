@@ -554,6 +554,90 @@
   color: var(--ink-faded);
 }
 
+/* ── Barra de avance + filtro ─────────────────────────────────────────────
+   Arriba de todo, como en cualquier lista de trofeos: primero te decís dónde
+   estás, después mirás los medallones. */
+.ach-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 0 0 14px;
+}
+.ach-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 190px;
+  min-width: 160px;
+}
+.ach-progress__track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  background: #bfae8e;
+  box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.35);
+  overflow: hidden;
+}
+.ach-progress__fill {
+  height: 100%;
+  background: linear-gradient(180deg, #e6cd82 0%, var(--gold) 60%, var(--gold-dark) 100%);
+  box-shadow: 0 0 5px rgba(168, 138, 60, 0.5);
+  transition: width 420ms ease;
+}
+.ach-progress__pct {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ach-filter {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--gold-dark);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #cbbb9c;
+}
+.ach-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 0;
+  border-right: 1px solid rgba(74, 55, 32, 0.25);
+  background: transparent;
+  cursor: pointer;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  min-height: 30px;
+}
+.ach-filter__btn:last-child { border-right: 0; }
+.ach-filter__btn:hover { background: rgba(245, 231, 192, 0.5); color: var(--ink); }
+.ach-filter__btn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+/* El activo se hunde, como una pestaña de verdad apretada. */
+.ach-filter__btn--on {
+  background: linear-gradient(180deg, #f7ecd0 0%, #ecdcb4 100%);
+  color: var(--ink);
+  box-shadow: inset 0 2px 4px rgba(42, 29, 14, 0.2);
+  font-weight: 600;
+}
+.ach-filter__count {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.85em;
+  color: var(--ink-faded);
+  font-variant-numeric: tabular-nums;
+}
+.ach-filter__btn--on .ach-filter__count { color: var(--gold-dark); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ach-progress__fill { transition: none; }
+}
+
 .ach-shelf {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -564,6 +648,15 @@
   box-shadow: 0 2px 0 rgba(244, 228, 193, 0.5);
 }
 
+/* ── El estante: medalla acuñada vs engarce vacío ──────────────────────────
+   El diseño anterior apilaba transparencias sobre una textura de pergamino:
+   la tarjeta bloqueada era pergamino al 45 % sobre pergamino, la desbloqueada
+   le sumaba un dorado al 18 %, y "bloqueado" era `opacity: .82`. Resultado:
+   no se distinguía cuál estaba hecho y cuál no.
+   La convención de los juegos (y la recomendación explícita de Valve) es que
+   lo bloqueado va desaturado y lo obtenido va a todo color. Acá se traduce al
+   tema: lo obtenido es una medalla ACUÑADA que sobresale del estante, lo
+   pendiente es un ENGARCE VACÍO hundido en la madera, gris y con candado. */
 .ach-card {
   position: relative;
   display: grid;
@@ -571,26 +664,26 @@
   gap: 10px;
   align-items: start;
   padding: 10px 12px;
-  border: 1px solid rgba(74, 55, 32, 0.35);
   border-radius: 4px;
-  background: rgba(244, 228, 193, 0.45);
 }
 
-/* Unlocked: gold. */
-.ach-card--unlocked {
-  border-color: var(--gold-dark);
-  background: linear-gradient(180deg, rgba(196, 168, 78, 0.18), rgba(244, 228, 193, 0.5));
-}
-
-/* Visible but not earned: stone. The description stays readable — these are
-   the map of what to try next, not a locked door. */
-.ach-card--locked { opacity: 0.82; }
-
-/* Hidden and not earned: silhouette only. */
+/* Pendiente: hueco tallado. Opaco (no translúcido), frío, hundido. */
+.ach-card--locked,
 .ach-card--secret {
-  border-style: dashed;
-  background: rgba(74, 55, 32, 0.06);
+  border: 1px solid rgba(74, 55, 32, 0.28);
+  background: #cbbb9c;
+  box-shadow: inset 0 2px 5px rgba(42, 29, 14, 0.28), inset 0 -1px 0 rgba(245, 231, 192, 0.35);
 }
+
+/* Obtenida: pergamino claro, marco dorado grueso y sombra que la levanta. */
+.ach-card--unlocked {
+  border: 2px solid var(--gold);
+  background: linear-gradient(180deg, #fbf1d6 0%, #f2e3bb 100%);
+  box-shadow: 0 2px 5px rgba(42, 29, 14, 0.22), inset 0 1px 0 rgba(255, 252, 240, 0.85);
+}
+
+/* Oculto y sin ganar: ni siquiera se insinúa qué es. */
+.ach-card--secret { border-style: dashed; }
 
 .ach-card__medal {
   display: grid;
@@ -598,19 +691,23 @@
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  border: 1px solid rgba(74, 55, 32, 0.4);
-  background: rgba(74, 55, 32, 0.1);
-  color: var(--ink-faded);
 }
 
-.ach-card--unlocked .ach-card__medal {
-  border-color: var(--gold-dark);
-  color: var(--gold-dark);
-  background: radial-gradient(circle at 38% 32%, rgba(230, 205, 130, 0.9) 0%, rgba(196, 168, 78, 0.75) 55%, rgba(138, 112, 48, 0.8) 100%);
-}
-
+/* El engarce vacío: un hueco, no un medallón apagado. */
+.ach-card--locked .ach-card__medal,
 .ach-card--secret .ach-card__medal {
-  color: rgba(74, 55, 32, 0.45);
+  border: 1px solid rgba(74, 55, 32, 0.3);
+  background: #b7a888;
+  box-shadow: inset 0 2px 4px rgba(42, 29, 14, 0.4);
+  color: rgba(74, 55, 32, 0.55);
+}
+
+/* La medalla acuñada: metal con brillo alto y borde propio. */
+.ach-card--unlocked .ach-card__medal {
+  border: 1px solid var(--gold-dark);
+  color: #4a3208;
+  background: radial-gradient(circle at 36% 30%, #f3e08f 0%, #d9b95a 45%, #a8862e 100%);
+  box-shadow: 0 1px 3px rgba(42, 29, 14, 0.4), inset 0 1px 1px rgba(255, 250, 220, 0.7);
 }
 
 .ach-card__body { min-width: 0; }
@@ -622,8 +719,8 @@
   letter-spacing: 0.03em;
 }
 
-.ach-card--unlocked .ach-card__title { color: var(--ink); }
-.ach-card--locked .ach-card__title { color: var(--ink-soft); }
+.ach-card--unlocked .ach-card__title { color: var(--ink); text-shadow: 0 1px 0 rgba(255, 252, 240, 0.6); }
+.ach-card--locked .ach-card__title { color: var(--ink-faded); }
 .ach-card--secret .ach-card__title {
   font-family: 'Fira Code', monospace;
   color: var(--ink-faded);

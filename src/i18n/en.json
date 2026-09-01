@@ -1521,8 +1521,13 @@
     "yesterday": "Yesterday"
   },
   "rpg": {
+    "achAllUnlocked": "Nothing left pending. You have them all.",
     "achEmpty": "Nothing on the shelf yet. It fills up on its own, by playing.",
     "achEyebrow": "SHELF OF ACHIEVEMENTS",
+    "achFilterAll": "All",
+    "achFilterLabel": "Filter achievements",
+    "achFilterLocked": "Pending",
+    "achFilterUnlocked": "Earned",
     "achGroupCauldron": "Of the Cauldron",
     "achGroupChronicle": "Chronicler",
     "achGroupCodex": "Of the Codex",
@@ -1535,6 +1540,8 @@
     "achGroupQuests": "Of Questify",
     "achGroupRhythm": "Rhythm and time",
     "achGroupStarts": "First steps",
+    "achNoneUnlocked": "You have not earned any yet. The shelf is waiting.",
+    "achProgressLabel": "{{done}} of {{total}} achievements earned",
     "achSecretDesc": "Something waits to be found.",
     "achSubtitle": "Where the medallions won are kept, and those still awaiting an owner",
     "achUnavailable": "Achievements are not available in this version yet.",

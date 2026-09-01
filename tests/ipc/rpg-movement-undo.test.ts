@@ -104,7 +104,9 @@ describe('Coinify add/delete is no longer a tap', () => {
     const s = stats(db);
     expect(netXp(db)).toBe(base.xp + one.xpGained);
     expect(s.combo).toBe(base.combo + 1);
-    expect(mastery(db, 'finance')).toBe(one.xpGained);
+    // La maestría es un contador entero: guarda el XP redondeado. Comparar
+    // contra el XP crudo sólo pasaba cuando el bonus aleatorio caía redondo.
+    expect(mastery(db, 'finance')).toBe(Math.round(one.xpGained));
     // And the medallions unlocked exactly once across the 21 altas.
     const unlockedRows = db.prepare("SELECT COUNT(*) AS n FROM rpg_events WHERE event_type = 'ACHIEVEMENT_UNLOCKED'").get() as { n: number };
     const unlockedIds = db.prepare('SELECT COUNT(*) AS n FROM achievements_unlocked').get() as { n: number };

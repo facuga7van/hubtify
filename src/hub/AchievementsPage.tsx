@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { BookPage } from '../shared/components/codex';
 import { Section, QBDividerSection } from '../shared/components/codex/CodexPrimitives';
-import { Chalice, Sparkle, Scroll } from '../shared/components/icons';
+import { Chalice, Sparkle, Scroll, Padlock } from '../shared/components/icons';
 import { Medallion, SealRosette } from './codex/CodexSealIcons';
 import Loading from '../shared/components/Loading';
 import {
@@ -52,6 +52,8 @@ function formatDate(iso: string | undefined, locale: string): string | null {
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+type AchFilter = 'all' | 'unlocked' | 'locked';
+
 /* ── one medallion ────────────────────────────────── */
 
 function AchievementCard({ item, locale, t }: { item: Shelved; locale: string; t: TFunction }) {
@@ -75,7 +77,7 @@ function AchievementCard({ item, locale, t }: { item: Shelved; locale: string; t
           ? <Medallion width={26} height={26} />
           : secret
             ? <Sparkle width={20} height={20} />
-            : <Medallion width={24} height={24} />}
+            : <Padlock width={22} height={22} />}
       </span>
       <div className="ach-card__body">
         <div className="ach-card__title">{title}</div>
@@ -97,6 +99,7 @@ export default function AchievementsPage() {
   const locale = i18n.language === 'en' ? 'en-US' : 'es-AR';
   const [items, setItems] = useState<AchievementState[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<AchFilter>('all');
 
   const available = codexApiReady();
 
@@ -136,13 +139,26 @@ export default function AchievementsPage() {
     return GROUP_ORDER
       .map((group) => ({
         group,
-        items: shelved.filter((s) => s.group === group).sort((a, b) => a.order - b.order),
+        items: shelved
+          .filter((s) => s.group === group)
+          .filter((s) => (filter === 'all' ? true : filter === 'unlocked' ? s.unlocked : !s.unlocked))
+          .sort((a, b) => a.order - b.order),
       }))
+      // Una estantería vacía bajo el filtro no se dibuja: nada de títulos
+      // colgando sobre la nada.
       .filter((s) => s.items.length > 0);
-  }, [items]);
+  }, [items, filter]);
 
   const unlockedCount = items?.filter((a) => a.unlocked).length ?? 0;
   const total = Math.max(items?.length ?? 0, catalogSize());
+  const lockedCount = (items?.length ?? 0) - unlockedCount;
+  const pct = total > 0 ? Math.round((unlockedCount / total) * 100) : 0;
+
+  const FILTERS: Array<{ key: AchFilter; label: string; count: number }> = [
+    { key: 'all', label: t('rpg.achFilterAll', 'Todos'), count: items?.length ?? 0 },
+    { key: 'unlocked', label: t('rpg.achFilterUnlocked', 'Obtenidos'), count: unlockedCount },
+    { key: 'locked', label: t('rpg.achFilterLocked', 'Pendientes'), count: lockedCount },
+  ];
 
   const body = (() => {
     if (!available) {
@@ -162,6 +178,41 @@ export default function AchievementsPage() {
     }
     return (
       <>
+        {/* Barra de avance + filtro. Los juegos ponen esto arriba de todo: te
+            dice dónde estás antes de que empieces a mirar medallones. */}
+        <div className="ach-toolbar">
+          <div className="ach-progress" role="img"
+            aria-label={t('rpg.achProgressLabel', '{{done}} de {{total}} logros obtenidos', { done: unlockedCount, total })}>
+            <div className="ach-progress__track">
+              <div className="ach-progress__fill" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="ach-progress__pct">{pct}%</span>
+          </div>
+          <div className="ach-filter" role="group"
+            aria-label={t('rpg.achFilterLabel', 'Filtrar logros')}>
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={`ach-filter__btn${filter === f.key ? ' ach-filter__btn--on' : ''}`}
+                aria-pressed={filter === f.key}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+                <span className="ach-filter__count">{f.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {shelves.length === 0 && (
+          <p className="ach-empty">
+            {filter === 'unlocked'
+              ? t('rpg.achNoneUnlocked', 'Todavía no ganaste ninguno. El estante espera.')
+              : t('rpg.achAllUnlocked', 'No queda ninguno pendiente. Los tenés todos.')}
+          </p>
+        )}
+
         {shelves.map(({ group, items: groupItems }, i) => (
           <div key={group}>
             {i > 0 && <QBDividerSection />}

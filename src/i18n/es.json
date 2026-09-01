@@ -1521,8 +1521,13 @@
     "yesterday": "Ayer"
   },
   "rpg": {
+    "achAllUnlocked": "No queda ninguno pendiente. Los tenés todos.",
     "achEmpty": "Todavía no hay nada en el estante. Se llena solo, jugando.",
     "achEyebrow": "ESTANTE DE LOS LOGROS",
+    "achFilterAll": "Todos",
+    "achFilterLabel": "Filtrar logros",
+    "achFilterLocked": "Pendientes",
+    "achFilterUnlocked": "Obtenidos",
     "achGroupCauldron": "Del Caldero",
     "achGroupChronicle": "Cronista",
     "achGroupCodex": "Del Códice",
@@ -1535,6 +1540,8 @@
     "achGroupQuests": "Del Questify",
     "achGroupRhythm": "Ritmo y tiempo",
     "achGroupStarts": "Primeros pasos",
+    "achNoneUnlocked": "Todavía no ganaste ninguno. El estante espera.",
+    "achProgressLabel": "{{done}} de {{total}} logros obtenidos",
     "achSecretDesc": "Algo espera a ser encontrado.",
     "achSubtitle": "Dó se guardan los medallones ganados y los que aún esperan dueño",
     "achUnavailable": "Los logros todavía no están disponibles en esta versión.",
