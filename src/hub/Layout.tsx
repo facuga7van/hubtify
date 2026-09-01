@@ -79,6 +79,23 @@ function SyncPushFailedWatcher() {
  * window event from the toggle handler below (Layout itself sits above the
  * ToastProvider and cannot toast).
  */
+/**
+ * A pull that changed local rows has to reach every data component. Quests,
+ * nutrition and cauldron listen to their `sync:*Updated` events; Coinify's
+ * components only ever listened to `finance:dataChanged` (their own mutation
+ * event), so a transaction synced from another device stayed invisible until
+ * the next manual action. That event also feeds the debounced push — a
+ * redundant push right after pull+push, cheap and idempotent, accepted over
+ * touching every finance component.
+ */
+function announcePulledData(): void {
+  window.dispatchEvent(new Event('sync:questsUpdated'));
+  window.dispatchEvent(new Event('sync:nutritionUpdated'));
+  window.dispatchEvent(new Event('sync:cauldronUpdated'));
+  window.dispatchEvent(new Event('finance:dataChanged'));
+  window.dispatchEvent(new Event('finance:accountsChanged'));
+}
+
 function RpgMomentsWatcher() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -153,6 +170,26 @@ function RpgMomentsWatcher() {
       }
     });
     return () => off();
+  }, [t, toast]);
+
+  /* ── achievements recognised from history ─────────
+     The boot/account-switch backfill can unlock dozens of medallions at once
+     (first run after an update). It pays nothing and sends ONE aggregated
+     broadcast — one quiet toast here, plus the shelf-refresh event, instead
+     of N toasts, N bursts and a phantom level-up. */
+  useEffect(() => {
+    const off = window.api.onRpgAchievementsBackfilled?.((ids) => {
+      if (!ids.length) return;
+      for (const id of ids) {
+        window.dispatchEvent(new CustomEvent('rpg:achievementUnlocked', { detail: { id } }));
+      }
+      if (isCodexModalOpen()) return;
+      toast({
+        message: t('rpg.achievements.backfilledToast', { n: ids.length, defaultValue: '{{n}} logros reconocidos de tu historia' }),
+        type: 'info',
+      });
+    });
+    return () => off?.();
   }, [t, toast]);
 
   /* Toast.tsx hard-wires its own onClick to onDismiss and takes no action
@@ -509,11 +546,7 @@ export default function Layout() {
         const freshStats = await window.api.getRpgStats();
         if (freshStats) prevLevelRef.current = freshStats.level;
         setStats(freshStats);
-        if (result.changed) {
-          window.dispatchEvent(new Event('sync:questsUpdated'));
-          window.dispatchEvent(new Event('sync:nutritionUpdated'));
-          window.dispatchEvent(new Event('sync:cauldronUpdated'));
-        }
+        if (result.changed) announcePulledData();
       } catch { /* Silent fail */ }
     };
     window.addEventListener('blur', onBlur);
@@ -551,11 +584,7 @@ export default function Layout() {
       const freshStats = await window.api.getRpgStats();
       if (freshStats) prevLevelRef.current = freshStats.level;
       setStats(freshStats);
-      if (result.changed) {
-        window.dispatchEvent(new Event('sync:questsUpdated'));
-        window.dispatchEvent(new Event('sync:nutritionUpdated'));
-        window.dispatchEvent(new Event('sync:cauldronUpdated'));
-      }
+      if (result.changed) announcePulledData();
     } catch {
       if (syncGenRef.current !== gen) return;
       setSyncError(true);

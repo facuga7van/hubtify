@@ -145,6 +145,11 @@ const api = {
     ipcRenderer.on('rpg:achievementUnlocked', handler);
     return () => { ipcRenderer.removeListener('rpg:achievementUnlocked', handler); };
   },
+  onRpgAchievementsBackfilled: (callback: (ids: string[]) => void) => {
+    const handler = (_e: unknown, payload: { ids: string[] }) => callback(payload?.ids ?? []);
+    ipcRenderer.on('rpg:achievementsBackfilled', handler);
+    return () => { ipcRenderer.removeListener('rpg:achievementsBackfilled', handler); };
+  },
   onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => {
     const handler = (_e: unknown, payload: { date: string; xpAwarded: number }) => callback(payload);
     ipcRenderer.on('rpg:daySealed', handler);
@@ -266,7 +271,7 @@ const api = {
 
   // Finance - Import
   financeImportSelectAndParsePDF: () => ipcRenderer.invoke('finance:importSelectAndParsePDF'),
-  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName, creditCardId),
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null, accountId?: string | null) => ipcRenderer.invoke('finance:importConfirm', rows, statementMonth, fileName, creditCardId, accountId),
   financeUndoImportBatch: (batchId: string) => ipcRenderer.invoke('finance:undoImportBatch', batchId),
   financeGetImportBatches: () => ipcRenderer.invoke('finance:getImportBatches'),
   financeGetCategoryMappings: () => ipcRenderer.invoke('finance:getCategoryMappings'),
@@ -306,7 +311,7 @@ const api = {
   financeGetCreditCardStatements: (filters?: Record<string, unknown>) => ipcRenderer.invoke('finance:getCreditCardStatements', filters),
   financeGetStatementDetail: (id: string) => ipcRenderer.invoke('finance:getStatementDetail', id),
   financeGenerateStatement: (cardId: string, periodMonth: string) => ipcRenderer.invoke('finance:generateStatement', cardId, periodMonth),
-  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number) => ipcRenderer.invoke('finance:payStatement', id, paidAmount, paidAmountUsd),
+  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number, accountId?: string | null) => ipcRenderer.invoke('finance:payStatement', id, paidAmount, paidAmountUsd, accountId),
   financeGetExpenseBreakdown: (month?: string) => ipcRenderer.invoke('finance:getExpenseBreakdown', month),
   financeGetExpenseBreakdownForRange: (startMonth: string, endMonth: string) => ipcRenderer.invoke('finance:getExpenseBreakdownForRange', startMonth, endMonth),
 

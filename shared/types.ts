@@ -399,6 +399,7 @@ export interface HubtifyApi {
     nextLevelXp: number | null; progress: number;
   }>>;
   onRpgAchievementUnlocked: (callback: (id: string) => void) => () => void;
+  onRpgAchievementsBackfilled: (callback: (ids: string[]) => void) => () => void;
   onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => () => void;
   processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number; pardonUsed?: boolean; achievementIds?: string[] }>;
   getRpgHistory: (limit: number) => Promise<RpgEventRecord[]>;
@@ -594,7 +595,7 @@ export interface HubtifyApi {
 
   // Finance - Import
   financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
-  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
+  financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null, accountId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
   financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;
   financeGetImportBatches: () => Promise<FinanceImportBatch[]>;
   financeGetBudgets: () => Promise<Array<{ category: string; monthlyLimit: number; createdAt: string; updatedAt: string }>>;
@@ -638,7 +639,7 @@ export interface HubtifyApi {
   financeGetCreditCardStatements: (filters?: Record<string, unknown>) => Promise<unknown[]>;
   financeGetStatementDetail: (id: string) => Promise<unknown>;
   financeGenerateStatement: (cardId: string, periodMonth: string) => Promise<string | null>;
-  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number) => Promise<void>;
+  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number, accountId?: string | null) => Promise<void>;
   financeGetExpenseBreakdown: (month?: string) => Promise<ExpenseBreakdownByCurrency>;
   financeGetExpenseBreakdownForRange: (startMonth: string, endMonth: string) => Promise<ExpenseBreakdownByCurrency | null>;
 
