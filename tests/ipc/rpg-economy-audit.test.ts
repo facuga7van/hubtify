@@ -281,7 +281,7 @@ describe('[medio #7] the seal only pays for meaningful events', () => {
     seedEvent(db, 'quests', 'TASK_UNCOMPLETED', TODAY, { xp: 0 });
     seedEvent(db, 'quests', 'HABIT_UNCHECKED', TODAY, { xp: 0 });
     seedEvent(db, 'quests', 'HABIT_SKIPPED', TODAY, { xp: 0 });
-    seedEvent(db, 'nutrition', 'NUTRITION_DAY_REOPENED', TODAY, { xp: 0 });
+    seedEvent(db, 'nutrition', 'DAY_REOPENED', TODAY, { xp: 0 });
     seedEvent(db, 'finance', 'STATEMENT_IMPORTED', TODAY, { xp: 0 });
     seedEvent(db, 'cauldron', 'POMODORO_ABANDONED', TODAY, { xp: 0 });
     const summary = getDaySummary(db, TODAY, TODAY);
@@ -352,7 +352,7 @@ describe('[medio #10] polymath / sunday_guardian / chronicler count real actions
 
   it('countByType stays raw so first_* / day_off / second_chance keep firing', () => {
     seedEvent(db, 'quests', 'HABIT_SKIPPED', TODAY, { xp: 0 });
-    seedEvent(db, 'nutrition', 'NUTRITION_DAY_REOPENED', TODAY, { xp: 0 });
+    seedEvent(db, 'nutrition', 'DAY_REOPENED', TODAY, { xp: 0 });
     const unlocked = evaluateAchievements(db, null, TODAY);
     expect(unlocked).toContain('day_off');
     expect(unlocked).toContain('second_chance');

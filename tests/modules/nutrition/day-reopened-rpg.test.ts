@@ -98,13 +98,16 @@ describe('DAY_REOPENED reverts the close exactly', () => {
 
     await process({ type: 'DAY_SUMMARY', moduleId: 'nutrition', payload: { xp: 40, hp: 0, date: '2026-05-02' }, timestamp: Date.now() });
     const afterDay2 = testDb.prepare("SELECT xp FROM player_stats WHERE user_id = 'default'").get() as { xp: number };
+    const achAfterDay2 = achievementXp();
 
     // Reopen only day 1.
     await process({ type: 'DAY_REOPENED', moduleId: 'nutrition', payload: { xp: -30, hp: 0, date: '2026-05-01' }, timestamp: Date.now() });
 
     const afterReopen = testDb.prepare("SELECT xp FROM player_stats WHERE user_id = 'default'").get() as { xp: number };
-    // Only day 1's exact contribution is removed; day 2's XP remains.
-    expect(afterReopen.xp).toBeCloseTo(afterDay2.xp - day1Xp, 2); // las medallas ya estaban en ambos lados
+    // Only day 1's exact contribution is removed; day 2's XP remains. Neto de
+    // medallas de los dos lados: reabrir destapa «second_chance», que entra
+    // DESPUÉS de haber medido day1Xp y no se revierte.
+    expect(afterReopen.xp - achievementXp()).toBeCloseTo(afterDay2.xp - achAfterDay2 - day1Xp, 2);
     expect(afterReopen.xp).toBeGreaterThan(before.xp); // day 2 still counts
     // Day 1's exact contribution is gone.
     const day1Event = testDb.prepare("SELECT COUNT(*) AS c FROM rpg_events WHERE event_type = 'DAY_SUMMARY' AND payload LIKE '%2026-05-01%'").get() as { c: number };

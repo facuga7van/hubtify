@@ -226,7 +226,9 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   ach('the_pardon', true, (c) => !!c.event?.pardonUsed),
   ach('deserved_rest', true, (c) => c.stats.innSince !== null),
   ach('day_off', true, (c) => n(c.countByType, 'HABIT_SKIPPED') >= 1),
-  ach('second_chance', true, (c) => n(c.countByType, 'NUTRITION_DAY_REOPENED') >= 1),
+  // El evento se llamó NUTRITION_DAY_REOPENED hasta que la reapertura pasó a
+  // ir por la vía de undo del motor: quedó esperando un tipo que ya nadie emite.
+  ach('second_chance', true, (c) => n(c.countByType, 'DAY_REOPENED') >= 1),
 ];
 
 /** Catalogue size, exported so the UI can render "n / TOTAL" without importing the array. */
