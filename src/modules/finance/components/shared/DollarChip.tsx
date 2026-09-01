@@ -1,6 +1,18 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
+import { useToast } from '../../../../shared/components/useToast';
+import type { DisplayMode } from '../../utils/valuation';
+import {
+  DEFAULT_FX_HOUSE,
+  backfillFxRates,
+  cycleDisplayMode,
+  getFxHouse,
+  getInflationSeries,
+  hasBackfillSupport,
+  setFxHouse,
+  useDisplayMode,
+} from '../../utils/display-mode';
 
 interface Rate {
   casa: string;
@@ -56,25 +68,34 @@ const GearIcon = ({ size = 12 }: { size?: number }) => (
 
 export function DollarChip() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [allRates, setAllRates] = useState<Rate[]>([]);
   const [visibleTypes, setVisibleTypes] = useState<string[]>([]);
   const [configMode, setConfigMode] = useState(false);
   const [open, setOpen] = useState(false);
+  const [fxHouse, setFxHouseState] = useState(DEFAULT_FX_HOUSE);
+  /** Gates the "ARS de hoy" leg of the cycle: no IPC series, no lies. */
+  const [inflationAvailable, setInflationAvailable] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
+  const mode = useDisplayMode();
   const ref = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [ratesRes, visible] = await Promise.all([
+      const [ratesRes, visible, house] = await Promise.all([
         window.api.dollarGetRates(),
         window.api.dollarGetVisibleTypes(),
+        getFxHouse(),
       ]);
       if (ratesRes.success && ratesRes.rates) {
         setAllRates(ratesRes.rates as Rate[]);
       }
       setVisibleTypes(visible);
+      setFxHouseState(house);
     } catch (err) {
       console.warn('[DollarChip] loadData failed:', err);
     }
+    getInflationSeries().then((series) => setInflationAvailable(series !== null && series.length > 0));
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -101,7 +122,10 @@ export function DollarChip() {
 
   if (allRates.length === 0) return null;
 
-  const featured = visibleRates.find((r) => r.casa === 'blue') || visibleRates[0];
+  const featured = allRates.find((r) => r.casa === fxHouse)
+    || visibleRates.find((r) => r.casa === 'blue')
+    || visibleRates[0]
+    || allRates[0];
   if (!featured) return null;
 
   const toggleType = async (casa: string) => {
@@ -116,18 +140,59 @@ export function DollarChip() {
     await window.api.dollarSetVisibleTypes(next);
   };
 
+  const pickHouse = async (casa: string) => {
+    setFxHouseState(casa);
+    await setFxHouse(casa);
+  };
+
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const res = await backfillFxRates();
+      if (res === null || res.ok === false) {
+        toast({ type: 'warning', message: t('coinify.backfillFxError', 'No hay cotización disponible para completar') });
+        return;
+      }
+      toast({
+        type: 'success',
+        message: t('coinify.backfillFxDone', '{{count}} movimientos con cotización congelada', { count: res.updated }),
+      });
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
+  const MODE_LABELS: Record<DisplayMode, string> = {
+    'ars': t('coinify.modeArs', 'ARS'),
+    'usd': t('coinify.modeUsd', 'USD'),
+    'ars-today': t('coinify.modeArsToday', 'ARS hoy'),
+  };
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        className="rpg-button"
-        onClick={() => { setOpen(!open); if (open) setConfigMode(false); }}
-        style={{ fontSize: 'var(--fs-label)', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
-      >
-        <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
-          USD ${featured.venta.toLocaleString('es-AR')}
-        </span>
-        {open ? <ChevronUp style={{ width: 8, height: 8 }} /> : <ChevronDown style={{ width: 8, height: 8 }} />}
-      </button>
+      <div className="coin-mode-chip">
+        {/* Master control: the chip stopped being an ornament. One click cycles
+            how EVERY amount in Coinify reads: ARS → USD → ARS de hoy. */}
+        <button
+          className={`rpg-button coin-mode-chip__mode${mode !== 'ars' ? ' coin-mode-chip__mode--active' : ''}`}
+          onClick={() => cycleDisplayMode(inflationAvailable)}
+          title={t('coinify.modeToggleTitle', 'Cambiar moneda de lectura: ARS → USD → ARS de hoy')}
+          aria-label={t('coinify.modeToggleTitle', 'Cambiar moneda de lectura: ARS → USD → ARS de hoy')}
+        >
+          <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
+            {MODE_LABELS[mode]} · ${featured.venta.toLocaleString('es-AR')}
+          </span>
+        </button>
+        <button
+          className="rpg-button coin-mode-chip__menu-btn"
+          onClick={() => { setOpen(!open); if (open) setConfigMode(false); }}
+          aria-expanded={open}
+          aria-label={t('coinify.dollarRatesTitle', 'Cotizaciones')}
+          title={t('coinify.dollarRatesTitle', 'Cotizaciones')}
+        >
+          {open ? <ChevronUp style={{ width: 8, height: 8 }} /> : <ChevronDown style={{ width: 8, height: 8 }} />}
+        </button>
+      </div>
       {open && (
         <div className="coin-dollar-menu">
           {/* Header with gear toggle */}
@@ -145,28 +210,54 @@ export function DollarChip() {
           </div>
 
           {configMode ? (
-            /* ── Config mode: checkboxes for all types ── */
-            allRates.map((rate) => {
-              const checked = visibleTypes.includes(rate.casa);
-              const isLast = checked && visibleTypes.length === 1;
-              const Icon = RATE_ICONS[rate.casa];
-              return (
-                <label
-                  key={rate.casa}
-                  className={`coin-dollar-menu__row coin-dollar-menu__row--checkbox${isLast ? ' coin-dollar-menu__row--disabled' : ''}`}
+            /* ── Config mode: visibility checkboxes + fx-house pick ── */
+            <>
+              {allRates.map((rate) => {
+                const checked = visibleTypes.includes(rate.casa);
+                const isLast = checked && visibleTypes.length === 1;
+                const isHouse = rate.casa === fxHouse;
+                const Icon = RATE_ICONS[rate.casa];
+                return (
+                  <label
+                    key={rate.casa}
+                    className={`coin-dollar-menu__row coin-dollar-menu__row--checkbox${isLast ? ' coin-dollar-menu__row--disabled' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={isLast}
+                      onChange={() => toggleType(rate.casa)}
+                      style={{ accentColor: 'var(--gold)' }}
+                    />
+                    {Icon && <Icon size={12} />}
+                    <span style={{ flex: 1 }}>{rate.nombre}</span>
+                    {/* Which casa freezes onto every new movement (fx_rate). */}
+                    <button
+                      type="button"
+                      className={`coin-fx-house-pick${isHouse ? ' coin-fx-house-pick--active' : ''}`}
+                      onClick={(e) => { e.preventDefault(); pickHouse(rate.casa); }}
+                      title={t('coinify.fxHouseLabel', 'Usar esta cotización para convertir')}
+                      aria-label={t('coinify.fxHouseLabel', 'Usar esta cotización para convertir')}
+                      aria-pressed={isHouse}
+                    >
+                      {isHouse ? '◈' : '◇'}
+                    </button>
+                  </label>
+                );
+              })}
+              {hasBackfillSupport() && (
+                <button
+                  type="button"
+                  className="rpg-button coin-dollar-menu__backfill"
+                  onClick={handleBackfill}
+                  disabled={backfilling}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isLast}
-                    onChange={() => toggleType(rate.casa)}
-                    style={{ accentColor: 'var(--rpg-gold)' }}
-                  />
-                  {Icon && <Icon size={12} />}
-                  <span>{rate.nombre}</span>
-                </label>
-              );
-            })
+                  {backfilling
+                    ? t('coinify.generating', 'Generando...')
+                    : t('coinify.backfillFx', 'Completar cotizaciones faltantes')}
+                </button>
+              )}
+            </>
           ) : (
             /* ── Normal mode: visible rates ── */
             visibleRates.map((rate) => {

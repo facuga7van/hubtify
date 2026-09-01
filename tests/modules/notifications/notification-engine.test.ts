@@ -58,7 +58,7 @@ describe('evaluateQuestNotifications', () => {
   it('returns quest_due_soon for task due tomorrow', () => {
     db.prepare(
       `INSERT INTO tasks (id, name, status, due_date, created_at, updated_at)
-       VALUES ('t1', 'Study', 0, DATE('now', '+1 day'), datetime('now'), datetime('now'))`
+       VALUES ('t1', 'Study', 0, DATE('now', 'localtime', '+1 day'), datetime('now'), datetime('now'))`
     ).run();
 
     const results = evaluateQuestNotifications(db);
@@ -73,7 +73,7 @@ describe('evaluateQuestNotifications', () => {
   it('returns quest_overdue for task past due date', () => {
     db.prepare(
       `INSERT INTO tasks (id, name, status, due_date, created_at, updated_at)
-       VALUES ('t2', 'Report', 0, DATE('now', '-2 days'), datetime('now'), datetime('now'))`
+       VALUES ('t2', 'Report', 0, DATE('now', 'localtime', '-2 days'), datetime('now'), datetime('now'))`
     ).run();
 
     const results = evaluateQuestNotifications(db);
@@ -99,7 +99,7 @@ describe('evaluateQuestNotifications', () => {
   it('ignores completed tasks', () => {
     db.prepare(
       `INSERT INTO tasks (id, name, status, due_date, updated_at, created_at)
-       VALUES ('t4', 'Done Task', 1, DATE('now', '-1 day'), datetime('now', '-10 days'), datetime('now', '-10 days'))`
+       VALUES ('t4', 'Done Task', 1, DATE('now', 'localtime', '-1 day'), datetime('now', '-10 days'), datetime('now', '-10 days'))`
     ).run();
 
     const results = evaluateQuestNotifications(db);
@@ -109,7 +109,7 @@ describe('evaluateQuestNotifications', () => {
   it('ignores deleted tasks', () => {
     db.prepare(
       `INSERT INTO tasks (id, name, status, due_date, deleted_at, updated_at, created_at)
-       VALUES ('t5', 'Deleted Task', 0, DATE('now', '-1 day'), datetime('now'), datetime('now', '-10 days'), datetime('now', '-10 days'))`
+       VALUES ('t5', 'Deleted Task', 0, DATE('now', 'localtime', '-1 day'), datetime('now'), datetime('now', '-10 days'), datetime('now', '-10 days'))`
     ).run();
 
     const results = evaluateQuestNotifications(db);
@@ -311,7 +311,7 @@ describe('autoResolve', () => {
     // Insert a completed task
     db.prepare(
       `INSERT INTO tasks (id, name, status, due_date, created_at, updated_at)
-       VALUES ('t1', 'Done', 1, DATE('now', '-1 day'), datetime('now'), datetime('now'))`
+       VALUES ('t1', 'Done', 1, DATE('now', 'localtime', '-1 day'), datetime('now'), datetime('now'))`
     ).run();
 
     // Insert an active notification for it
@@ -332,7 +332,7 @@ describe('autoResolve', () => {
   it('reactivates snoozed notifications past their snooze time', () => {
     db.prepare(
       `INSERT INTO tasks (id, name, status, due_date, created_at, updated_at)
-       VALUES ('t2', 'Pending', 0, DATE('now', '-1 day'), datetime('now'), datetime('now'))`
+       VALUES ('t2', 'Pending', 0, DATE('now', 'localtime', '-1 day'), datetime('now'), datetime('now'))`
     ).run();
 
     db.prepare(

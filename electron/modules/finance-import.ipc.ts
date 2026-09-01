@@ -3,7 +3,7 @@ import { getDb } from '../ipc/db';
 import { dialog, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import fs from 'fs';
-import { CARD_TAX_CATEGORY, nowIso } from './finance.balance';
+import { CARD_TAX_CATEGORY, getCurrentRate, getFxHouse, nowIso } from './finance.balance';
 
 // ── Types ───────────────────────────────────────────
 
@@ -309,9 +309,12 @@ export function registerFinanceImportIpcHandlers(): void {
 
   ipcHandle(
     'finance:importConfirm',
-    (_e, rows: ParsedRow[], statementMonth: string, fileName: string, creditCardId?: string | null) => {
+    async (_e, rows: ParsedRow[], statementMonth: string, fileName: string, creditCardId?: string | null) => {
       const db = getDb();
       const batchId = crypto.randomUUID();
+      // Imported rows freeze the rate of the day they are IMPORTED (best data
+      // available); offline with no cache leaves NULL for the backfill.
+      const fxRate = await getCurrentRate(db, getFxHouse(db));
       const now = nowIso();
 
       // A card statement belongs to a card. Rows written without one used to keep
@@ -344,8 +347,8 @@ export function registerFinanceImportIpcHandlers(): void {
       const insertTx = db.prepare(
         `INSERT INTO finance_transactions
          (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
-          installments, billed_amount_ars, credit_card_id, impacts_balance, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?)`,
+          installments, billed_amount_ars, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
 
       // One transaction: a failure halfway used to leave a partial import with a
@@ -388,6 +391,7 @@ export function registerFinanceImportIpcHandlers(): void {
             billedArs,
             cardId,
             impactsBalance,
+            fxRate,
             now,
             now,
           );

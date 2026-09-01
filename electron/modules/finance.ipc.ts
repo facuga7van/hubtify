@@ -7,13 +7,20 @@ import { todayDateString } from '../../shared/date-utils';
 import {
   CARD_PAYMENT_CATEGORY,
   MAX_INSTALLMENTS,
+  RECURRING_FREQUENCY_MONTHS,
   addMonthsClamped,
   addMonthsToMonth,
+  backfillFxRates,
   computeBudgetStatus,
   computeCategorySpend,
   computeExpenseBreakdown,
   computeMonthlyBalance,
+  computeUpcomingTimeline,
+  computeValuedView,
   generateRecurringForMonth,
+  getCurrentRate,
+  getFxHouse,
+  getIpcSeries,
   listBudgets,
   setBudget,
   getStatementPeriod,
@@ -35,6 +42,15 @@ function genId(): string {
 /** Uniform failure envelope for handlers that used to persist garbage or throw raw. */
 function fail(reason: string): { ok: false; reason: string } {
   return { ok: false, reason };
+}
+
+/**
+ * Venta rate of the preferred house to freeze on a new transaction.
+ * Cache-first, bounded fetch, and NEVER throws or blocks a write for long:
+ * offline with no cache simply means `fx_rate = NULL` (backfill fixes it later).
+ */
+function captureFxRate(db: ReturnType<typeof getDb>): Promise<number | null> {
+  return getCurrentRate(db, getFxHouse(db));
 }
 
 /**
@@ -68,6 +84,7 @@ function transactionColumns(alias = ''): string {
   ${p}credit_card_id AS creditCardId,
   ${p}impacts_balance AS impactsBalance,
   ${p}billed_amount_ars AS billedAmountArs,
+  ${p}fx_rate AS fxRate,
   ${p}created_at AS createdAt, ${p}updated_at AS updatedAt
 `;
 }
@@ -132,7 +149,7 @@ export function registerFinanceIpcHandlers(): void {
     `).all(...params);
   });
 
-  ipcHandle('finance:addTransaction', (_e, tx: {
+  ipcHandle('finance:addTransaction', async (_e, tx: {
     type: 'expense' | 'income';
     amount: number;
     currency?: string;
@@ -157,14 +174,17 @@ export function registerFinanceIpcHandlers(): void {
       throw new Error('Date must be a valid YYYY-MM-DD string');
     }
     const db = getDb();
+    // Freeze today's venta rate on the row. Offline with no cache → NULL, and
+    // the write goes through regardless — a missing rate never blocks the alta.
+    const fxRate = await captureFxRate(db);
     const id = genId();
     const now = nowIso();
     db.prepare(`
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, for_third_party, recurring_id,
-         import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       tx.type,
@@ -182,6 +202,7 @@ export function registerFinanceIpcHandlers(): void {
       tx.importBatchId ?? null,
       tx.creditCardId ?? null,
       (tx.impactsBalance === false || tx.paymentMethod === 'credit_card') ? 0 : 1,
+      fxRate,
       now,
       now,
     );
@@ -401,27 +422,38 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getCreditCards', () => {
     const db = getDb();
     return db.prepare(`
-      SELECT id, name, closing_day AS closingDay, created_at AS createdAt
+      SELECT id, name, closing_day AS closingDay, due_day AS dueDay, created_at AS createdAt
       FROM finance_credit_cards
       WHERE deleted_at IS NULL
       ORDER BY created_at ASC
     `).all();
   });
 
-  ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number }) => {
+  /** `dueDay` 1–31 or null/undefined (no due-date agenda for this card). */
+  function parseDueDay(value: unknown): number | null | 'invalid' {
+    if (value === undefined || value === null || value === 0 || value === '') return null;
+    const day = Number(value);
+    if (!Number.isInteger(day) || day < 1 || day > 31) return 'invalid';
+    return day;
+  }
+
+  ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number; dueDay?: number | null }) => {
     const name = parseNonEmptyString(card?.name);
     if (name === null) return fail('invalid_name');
     const closingDay = Number(card?.closingDay);
     if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 31) return fail('invalid_closing_day');
+    const dueDay = parseDueDay(card?.dueDay);
+    if (dueDay === 'invalid') return fail('invalid_due_day');
 
     const db = getDb();
     const id = genId();
     const now = nowIso();
-    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, name, closingDay, now, now);
+    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, due_day, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, name, closingDay, dueDay, now, now);
     return id;
   });
 
-  ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number }) => {
+  ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number; dueDay?: number | null }) => {
     const db = getDb();
     const now = nowIso();
     const sets: string[] = ['updated_at = ?'];
@@ -435,6 +467,11 @@ export function registerFinanceIpcHandlers(): void {
       const closingDay = Number(fields.closingDay);
       if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 31) return fail('invalid_closing_day');
       sets.push('closing_day = ?'); vals.push(closingDay);
+    }
+    if (fields.dueDay !== undefined) {
+      const dueDay = parseDueDay(fields.dueDay);
+      if (dueDay === 'invalid') return fail('invalid_due_day');
+      sets.push('due_day = ?'); vals.push(dueDay);
     }
     if (sets.length === 1) return { ok: true }; // only updated_at, no real changes
     vals.push(id);
@@ -571,7 +608,7 @@ export function registerFinanceIpcHandlers(): void {
    * mapped to the already-existing statement and was silently dropped forever.
    * Now only a `paid` statement is frozen; a `pending` one is recalculated.
    */
-  ipcHandle('finance:generateStatement', (_e, creditCardId: string, periodMonth: string) => {
+  ipcHandle('finance:generateStatement', async (_e, creditCardId: string, periodMonth: string) => {
     const db = getDb();
     if (!isValidMonthString(periodMonth)) return null;
 
@@ -580,6 +617,8 @@ export function registerFinanceIpcHandlers(): void {
     ).get(creditCardId) as { id: string; closingDay: number } | undefined;
     if (!card) return null;
 
+    // Before the write transaction opens: async work inside db.transaction is not allowed.
+    const fxRate = await captureFxRate(db);
     const now = nowIso();
     const paymentDate = `${periodMonth}-01`;
 
@@ -588,9 +627,9 @@ export function registerFinanceIpcHandlers(): void {
         INSERT INTO finance_transactions
           (id, type, amount, currency, category, description, date, payment_method,
            source, installments, installment_group_id, for_third_party, recurring_id,
-           import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-        VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?)
-      `).run(txId, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${periodMonth}`, paymentDate, now, now);
+           import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
+        VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?)
+      `).run(txId, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${periodMonth}`, paymentDate, fxRate, now, now);
     };
 
     /** Keeps the payment transaction for one currency in sync with the recomputed total. */
@@ -805,7 +844,7 @@ export function registerFinanceIpcHandlers(): void {
     return projection;
   });
 
-  ipcHandle('finance:createInstallmentGroup', (_e, group: {
+  ipcHandle('finance:createInstallmentGroup', async (_e, group: {
     description: string;
     totalAmount: number;
     installmentCount: number;
@@ -838,6 +877,9 @@ export function registerFinanceIpcHandlers(): void {
 
     const db = getDb();
     const groupId = genId();
+    // One purchase, one rate: every instalment freezes the rate of the day the
+    // plan was registered — that is when the price was agreed in pesos.
+    const fxRate = await captureFxRate(db);
     const now = nowIso();
 
     const isCreditCard = group.paymentMethod === 'credit_card' && !!group.creditCardId;
@@ -848,8 +890,8 @@ export function registerFinanceIpcHandlers(): void {
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, installment_number, for_third_party,
-         recurring_id, import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-      VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+         recurring_id, import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
+      VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)
     `);
 
     const trx = db.transaction(() => {
@@ -885,6 +927,7 @@ export function registerFinanceIpcHandlers(): void {
           group.forThirdParty ? 1 : 0,
           isCreditCard ? group.creditCardId : null,
           isCreditCard ? 0 : 1,
+          fxRate,
           now,
           now,
         );
@@ -1056,7 +1099,7 @@ export function registerFinanceIpcHandlers(): void {
       .run(now, now, id);
   });
 
-  ipcHandle('finance:createThirdPartyPurchase', (_e, data: {
+  ipcHandle('finance:createThirdPartyPurchase', async (_e, data: {
     description: string;
     installmentCount: number;
     installmentAmount: number;
@@ -1082,6 +1125,7 @@ export function registerFinanceIpcHandlers(): void {
     const totalAmount = installmentCount * installmentAmount;
     const groupId = genId();
     const loanId = genId();
+    const fxRate = await captureFxRate(db);
     const now = nowIso();
 
     // Same rule as createInstallmentGroup: only a real card defers to next month
@@ -1093,8 +1137,8 @@ export function registerFinanceIpcHandlers(): void {
       INSERT INTO finance_transactions
         (id, type, amount, currency, category, description, date, payment_method,
          source, installments, installment_group_id, installment_number, for_third_party,
-         recurring_id, import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-      VALUES (?, 'expense', ?, ?, ?, ?, ?, 'credit_card', 'manual', ?, ?, ?, 1, NULL, NULL, ?, ?, ?, ?)
+         recurring_id, import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
+      VALUES (?, 'expense', ?, ?, ?, ?, ?, 'credit_card', 'manual', ?, ?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?)
     `);
 
     const trx = db.transaction(() => {
@@ -1117,6 +1161,7 @@ export function registerFinanceIpcHandlers(): void {
           i + 1,
           data.creditCardId ?? null,
           isCreditCard ? 0 : 1,
+          fxRate,
           now,
           now,
         );
@@ -1200,12 +1245,20 @@ export function registerFinanceIpcHandlers(): void {
     return db.prepare(`
       SELECT id, name, type, amount, currency, category, active,
              billing_day AS billingDay,
+             frequency,
              created_at AS createdAt
       FROM finance_recurring
       WHERE deleted_at IS NULL
       ORDER BY created_at ASC
     `).all();
   });
+
+  /** `monthly` (default) | `bimonthly` | `quarterly` | `four_monthly` | `semiannual` | `annual`. */
+  function parseFrequency(value: unknown): string | 'invalid' {
+    if (value === undefined || value === null || value === '') return 'monthly';
+    if (typeof value !== 'string' || !(value in RECURRING_FREQUENCY_MONTHS)) return 'invalid';
+    return value;
+  }
 
   ipcHandle('finance:addRecurring', (_e, rec: {
     id?: string;
@@ -1215,19 +1268,22 @@ export function registerFinanceIpcHandlers(): void {
     currency?: string;
     category?: string;
     billingDay?: number;
+    frequency?: string;
   }) => {
     const name = parseNonEmptyString(rec?.name);
     if (name === null) return fail('invalid_name');
     const amount = parsePositiveAmount(rec?.amount);
     if (amount === null) return fail('invalid_amount');
+    const frequency = parseFrequency(rec?.frequency);
+    if (frequency === 'invalid') return fail('invalid_frequency');
 
     const db = getDb();
     const id = rec.id ?? genId();
     const now = nowIso();
     db.prepare(`
       INSERT OR IGNORE INTO finance_recurring
-        (id, name, type, amount, currency, category, billing_day, active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        (id, name, type, amount, currency, category, billing_day, frequency, active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(
       id,
       name,
@@ -1236,6 +1292,7 @@ export function registerFinanceIpcHandlers(): void {
       rec.currency ?? 'ARS',
       rec.category ?? 'Otros',
       rec.billingDay ?? 1,
+      frequency,
       now,
       now,
     );
@@ -1272,8 +1329,9 @@ export function registerFinanceIpcHandlers(): void {
     type?: 'expense' | 'income';
     category?: string;
     billingDay?: number;
+    frequency?: string;
   }) => {
-    const allowed = new Set(['name', 'type', 'category', 'billingDay']);
+    const allowed = new Set(['name', 'type', 'category', 'billingDay', 'frequency']);
     const safe = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.has(k))) as typeof fields;
 
     const db = getDb();
@@ -1292,6 +1350,11 @@ export function registerFinanceIpcHandlers(): void {
       const billingDay = Number(safe.billingDay);
       if (!Number.isInteger(billingDay) || billingDay < 1 || billingDay > 31) return fail('invalid_billing_day');
       sets.push('billing_day = ?'); params.push(billingDay);
+    }
+    if (safe.frequency !== undefined) {
+      const frequency = parseFrequency(safe.frequency);
+      if (frequency === 'invalid') return fail('invalid_frequency');
+      sets.push('frequency = ?'); params.push(frequency);
     }
 
     if (sets.length === 1) return { ok: true }; // only updated_at, no real changes
@@ -1322,8 +1385,11 @@ export function registerFinanceIpcHandlers(): void {
     trx();
   });
 
-  ipcHandle('finance:generateRecurringForMonth', (_e, month: string) => {
-    return generateRecurringForMonth(getDb(), month);
+  ipcHandle('finance:generateRecurringForMonth', async (_e, month: string) => {
+    const db = getDb();
+    // Rows generated today freeze today's rate (if any); offline stays NULL.
+    const fxRate = await captureFxRate(db);
+    return generateRecurringForMonth(db, month, { fxRate });
   });
 
   ipcHandle('finance:getRecurringAmountHistory', (_e, recurringId: string) => {
@@ -1336,6 +1402,52 @@ export function registerFinanceIpcHandlers(): void {
       WHERE recurring_id = ?
       ORDER BY created_at DESC
     `).all(recurringId);
+  });
+
+  // ── FX / inflation (cotización congelada, ARS·USD·ARS de hoy) ─────────────
+
+  /**
+   * Fills `fx_rate` on every live transaction that has none, with the best rate
+   * available right now. One pass, idempotent — safe to press twice.
+   */
+  ipcHandle('finance:backfillFxRates', async () => {
+    const db = getDb();
+    const rate = await captureFxRate(db);
+    if (rate === null) return fail('no_rate_available');
+    const updated = backfillFxRates(db, rate);
+    return { ok: true, updated, rate };
+  });
+
+  /**
+   * The dashboard re-expressed in USD (each amount with its own frozen rate)
+   * and in today's pesos (cumulative INDEC IPC coefficient), plus the
+   * nominal + real "% vs mes anterior" trend. See computeValuedView.
+   */
+  ipcHandle('finance:getValuedView', async (_e, month?: string) => {
+    const db = getDb();
+    const m = isValidMonthString(month) ? month : todayDateString().slice(0, 7);
+    const house = getFxHouse(db);
+    const [currentRate, series] = await Promise.all([
+      getCurrentRate(db, house),
+      getIpcSeries(db),
+    ]);
+    return computeValuedView(db, m, { currentRate, house, series });
+  });
+
+  /**
+   * Raw monthly IPC index series (nivel general nacional, base dic-2016),
+   * cache-first, for per-row conversion in the renderer.
+   */
+  ipcHandle('finance:getInflationSeries', async () => {
+    const series = await getIpcSeries(getDb());
+    if (series === null) return { ok: false as const, series: null };
+    return { ok: true as const, series };
+  });
+
+  // ── Upcoming timeline ("Próximas batallas", 30 días) ──────
+
+  ipcHandle('finance:getUpcoming', (_e, days?: number) => {
+    return computeUpcomingTimeline(getDb(), todayDateString(), typeof days === 'number' ? days : 30);
   });
 
   // ── C3: Monthly expenses sparkline (last 6 months) ────────

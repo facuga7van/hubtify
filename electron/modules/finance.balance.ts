@@ -1,7 +1,16 @@
 import type Database from 'better-sqlite3';
 import type { ExpenseBreakdown, ExpenseBreakdownByCurrency } from '../../shared/types';
+import {
+  buildIpcCoefficients,
+  coefficientForMonth,
+  convertArsToUsd,
+  nominalAndRealTrend,
+  type IpcCoefficients,
+  type IpcSeriesPoint,
+} from '../../src/modules/finance/utils/valuation';
 
 export type { ExpenseBreakdown, ExpenseBreakdownByCurrency };
+export type { IpcCoefficients, IpcSeriesPoint };
 
 /**
  * Shared, electron-free finance helpers.
@@ -384,6 +393,55 @@ export interface RecurringTemplate {
   currency: string;
   category: string;
   billingDay: number;
+  /** One of {@link RECURRING_FREQUENCIES}; anything else behaves as `monthly`. */
+  frequency: string;
+  createdAt: string;
+}
+
+/** Every cadence the `frequency` TEXT column supports, with its month interval. */
+export const RECURRING_FREQUENCY_MONTHS: Record<string, number> = {
+  monthly: 1,
+  bimonthly: 2,
+  quarterly: 3,
+  four_monthly: 4,
+  semiannual: 6,
+  annual: 12,
+};
+
+export const RECURRING_FREQUENCIES = Object.keys(RECURRING_FREQUENCY_MONTHS);
+
+/** Month interval for a frequency; unknown/legacy values behave as monthly. */
+export function frequencyIntervalMonths(frequency: string | null | undefined): number {
+  return RECURRING_FREQUENCY_MONTHS[frequency ?? 'monthly'] ?? 1;
+}
+
+/** Signed whole months from `fromMonth` to `toMonth` (both `YYYY-MM`). */
+export function monthDiff(fromMonth: string, toMonth: string): number {
+  const [fy, fm] = fromMonth.split('-').map(Number);
+  const [ty, tm] = toMonth.split('-').map(Number);
+  return (ty - fy) * 12 + (tm - fm);
+}
+
+/**
+ * Does a recurring template bill in `month`?
+ *
+ * The anchor is the month the template was created: the first charge lands that
+ * same month (exactly how monthly templates always behaved) and then every
+ * `interval` months. A bimonthly created in 2026-08 bills 08, 10, 12, 02…
+ * An invalid anchor (hand-edited data) falls back to "always due" so a broken
+ * timestamp can only ever over-generate one idempotent row, never silently
+ * starve a template.
+ */
+export function isRecurringDueInMonth(
+  frequency: string | null | undefined,
+  anchorMonth: string,
+  month: string,
+): boolean {
+  const interval = frequencyIntervalMonths(frequency);
+  if (interval === 1) return true;
+  if (!isValidMonthString(anchorMonth) || !isValidMonthString(month)) return true;
+  const diff = monthDiff(anchorMonth, month);
+  return diff >= 0 && diff % interval === 0;
 }
 
 /**
@@ -397,11 +455,20 @@ export interface RecurringTemplate {
  *
  * Runs inside a single SQLite transaction so a failure halfway leaves nothing behind.
  */
-export function generateRecurringForMonth(db: Database.Database, month: string): number {
+export function generateRecurringForMonth(
+  db: Database.Database,
+  month: string,
+  opts: {
+    /** Dollar venta rate to freeze on the generated rows (`fx_rate`).
+     *  `null`/omitted = not available right now; backfill can fill it later. */
+    fxRate?: number | null;
+  } = {},
+): number {
   if (!isValidMonthString(month)) return 0;
 
   const actives = db.prepare(`
-    SELECT id, name, type, amount, currency, category, billing_day AS billingDay
+    SELECT id, name, type, amount, currency, category, billing_day AS billingDay,
+           frequency, created_at AS createdAt
     FROM finance_recurring
     WHERE deleted_at IS NULL AND active = 1
   `).all() as RecurringTemplate[];
@@ -420,15 +487,22 @@ export function generateRecurringForMonth(db: Database.Database, month: string):
     INSERT OR IGNORE INTO finance_transactions
       (id, type, amount, currency, category, description, date, payment_method,
        source, installments, installment_group_id, for_third_party, recurring_id,
-       import_batch_id, credit_card_id, impacts_balance, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', 1, NULL, 0, ?, NULL, NULL, 1, ?, ?)
+       import_batch_id, credit_card_id, impacts_balance, fx_rate, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', 1, NULL, 0, ?, NULL, NULL, 1, ?, ?, ?)
   `);
 
   const now = nowIso();
+  const fxRate = typeof opts.fxRate === 'number' && Number.isFinite(opts.fxRate) && opts.fxRate > 0
+    ? opts.fxRate
+    : null;
 
   const run = db.transaction(() => {
     let generated = 0;
     for (const rec of actives) {
+      // Non-monthly cadences only bill on their own months, anchored on the
+      // month the template was created (see isRecurringDueInMonth).
+      if (!isRecurringDueInMonth(rec.frequency, (rec.createdAt ?? '').slice(0, 7), month)) continue;
+
       // Guard includes soft-deleted rows on purpose: if the user deleted this
       // month's instance by hand, do not bring it back next launch.
       const existing = existsStmt.get(rec.id, start, end) as { c: number };
@@ -443,6 +517,7 @@ export function generateRecurringForMonth(db: Database.Database, month: string):
         rec.name,
         dateInMonthClamped(month, rec.billingDay ?? 1),
         rec.id,
+        fxRate,
         now,
         now,
       );
@@ -591,4 +666,562 @@ export function computeBudgetStatus(db: Database.Database, month: string): Budge
 export function isBudgetMonthMet(status: BudgetStatus): boolean {
   if (status.categories.length === 0) return false;
   return status.categories.every((c) => c.spent <= c.limit);
+}
+
+// ── Dollar rate (frozen fx_rate) ───────────────────────────────────────────
+
+export const DOLLAR_API_URL = 'https://dolarapi.com/v1/dolares';
+
+/** Casa preferida para congelar cotizaciones. Stored in app_state `fx_house`. */
+export const DEFAULT_FX_HOUSE = 'blue';
+
+/** Rate cache is fresh for one hour — dolarapi updates a few times a day. */
+export const RATE_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
+
+export interface DollarApiRate {
+  casa: string;
+  nombre?: string;
+  compra?: number;
+  venta: number;
+  fechaActualizacion?: string;
+}
+
+/** Preferred dollar house for freezing rates. Defensive: a missing app_state
+ *  table (bare test db) just means the default. */
+export function getFxHouse(db: Database.Database): string {
+  try {
+    const row = db.prepare("SELECT value FROM app_state WHERE key = 'fx_house'").get() as { value: string } | undefined;
+    const value = row?.value?.trim();
+    return value ? value : DEFAULT_FX_HOUSE;
+  } catch {
+    return DEFAULT_FX_HOUSE;
+  }
+}
+
+export function setFxHouse(db: Database.Database, house: unknown): { ok: true; house: string } | { ok: false; reason: string } {
+  const value = parseNonEmptyString(house);
+  if (value === null) return { ok: false, reason: 'invalid_house' };
+  db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('fx_house', ?)").run(value.toLowerCase());
+  return { ok: true, house: value.toLowerCase() };
+}
+
+/** The `dollar_cache` row `dollar:getRates` also uses — one cache, two readers. */
+export function readDollarRatesCache(
+  db: Database.Database,
+): { rates: DollarApiRate[]; updatedAt: string } | null {
+  try {
+    const row = db.prepare('SELECT data, updated_at FROM dollar_cache WHERE id = ?').get('rates') as
+      { data: string; updated_at: string } | undefined;
+    if (!row) return null;
+    const rates = JSON.parse(row.data) as DollarApiRate[];
+    if (!Array.isArray(rates)) return null;
+    return { rates, updatedAt: row.updated_at };
+  } catch {
+    return null;
+  }
+}
+
+export function writeDollarRatesCache(db: Database.Database, rates: DollarApiRate[]): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO dollar_cache (id, data, updated_at)
+    VALUES ('rates', ?, datetime('now'))
+  `).run(JSON.stringify(rates));
+}
+
+/** Venta rate for a house, falling back to `blue`, then the first entry. */
+export function rateFromRates(rates: DollarApiRate[], house: string): number | null {
+  const pick = rates.find((r) => r.casa === house) ?? rates.find((r) => r.casa === DEFAULT_FX_HOUSE) ?? rates[0];
+  const venta = pick?.venta;
+  return typeof venta === 'number' && Number.isFinite(venta) && venta > 0 ? venta : null;
+}
+
+/**
+ * Age of a cache stamp in milliseconds. Handles both SQLite `datetime('now')`
+ * ("2026-08-31 14:12:01", UTC) and ISO stamps. Unparseable → Infinity (stale).
+ */
+export function cacheAgeMs(updatedAt: string, nowMs: number = Date.now()): number {
+  const iso = updatedAt.includes('T') ? updatedAt : `${updatedAt.replace(' ', 'T')}Z`;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return Infinity;
+  return Math.max(0, nowMs - t);
+}
+
+export interface RateFetchOptions {
+  /** Injectable for tests. Defaults to the global fetch. */
+  fetchFn?: typeof fetch;
+  maxAgeMs?: number;
+  /** Hard cap on how long a fetch may hold up a write path. */
+  timeoutMs?: number;
+  nowMs?: number;
+}
+
+/**
+ * Current venta rate for a house, cache-first:
+ *  1. cache younger than `maxAgeMs` (1h) → no network at all;
+ *  2. otherwise fetch dolarapi (bounded by `timeoutMs`) and refresh the cache;
+ *  3. fetch failed → whatever stale cache exists;
+ *  4. nothing anywhere → `null`.
+ *
+ * NEVER throws: a missing rate must not block registering a transaction.
+ */
+export async function getCurrentRate(
+  db: Database.Database,
+  house: string,
+  opts: RateFetchOptions = {},
+): Promise<number | null> {
+  const maxAgeMs = opts.maxAgeMs ?? RATE_CACHE_MAX_AGE_MS;
+  const cached = readDollarRatesCache(db);
+
+  if (cached && cacheAgeMs(cached.updatedAt, opts.nowMs) < maxAgeMs) {
+    return rateFromRates(cached.rates, house);
+  }
+
+  try {
+    const fetchFn = opts.fetchFn ?? fetch;
+    const response = await fetchFn(DOLLAR_API_URL, {
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 3000),
+    });
+    if (response.ok) {
+      const rates = await response.json() as DollarApiRate[];
+      if (Array.isArray(rates) && rates.length > 0) {
+        try { writeDollarRatesCache(db, rates); } catch { /* cache write is best-effort */ }
+        return rateFromRates(rates, house);
+      }
+    }
+  } catch {
+    // Offline / timeout — fall through to the stale cache.
+  }
+
+  return cached ? rateFromRates(cached.rates, house) : null;
+}
+
+/**
+ * Fills `fx_rate` on every live transaction that has none, with the best rate
+ * available today. One pass, idempotent: rows that already carry a frozen rate
+ * are never touched, so running it twice changes nothing.
+ *
+ * `updated_at` is bumped on purpose — without it, last-write-wins sync would
+ * never carry the backfilled value to the other devices.
+ */
+export function backfillFxRates(db: Database.Database, rate: number): number {
+  const parsed = parsePositiveAmount(rate);
+  if (parsed === null) return 0;
+  const result = db.prepare(`
+    UPDATE finance_transactions
+    SET fx_rate = ?, updated_at = ?
+    WHERE fx_rate IS NULL AND deleted_at IS NULL
+  `).run(parsed, nowIso());
+  return result.changes;
+}
+
+// ── Inflation (INDEC IPC) ──────────────────────────────────────────────────
+
+/**
+ * IPC nivel general NACIONAL, ÍNDICE mensual base dic-2016 (not the monthly
+ * variation): `latestIndex / monthIndex` gives the cumulative coefficient in
+ * one division. Verified against apis.datos.gob.ar (monthly, 2016-12 → today).
+ */
+export const IPC_SERIES_ID = '148.3_INIVELNAL_DICI_M_26';
+
+export const IPC_API_URL =
+  `https://apis.datos.gob.ar/series/api/series/?ids=${IPC_SERIES_ID}&format=json&limit=1000`;
+
+/** Monthly data: refetching more than once a day buys nothing. */
+export const IPC_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** datos.gob.ar payload → clean series. Tolerates nulls (unpublished months). */
+export function parseIpcApiResponse(json: unknown): IpcSeriesPoint[] {
+  const data = (json as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  const series: IpcSeriesPoint[] = [];
+  for (const row of data) {
+    if (!Array.isArray(row) || row.length < 2) continue;
+    const [date, value] = row as [unknown, unknown];
+    if (typeof date !== 'string' || typeof value !== 'number' || !Number.isFinite(value) || value <= 0) continue;
+    if (!/^\d{4}-\d{2}/.test(date)) continue;
+    series.push({ month: date.slice(0, 7), index: value });
+  }
+  return series;
+}
+
+export function readIpcSeriesCache(
+  db: Database.Database,
+): { series: IpcSeriesPoint[]; updatedAt: string } | null {
+  try {
+    const row = db.prepare('SELECT data, updated_at FROM dollar_cache WHERE id = ?').get('ipc') as
+      { data: string; updated_at: string } | undefined;
+    if (!row) return null;
+    const series = JSON.parse(row.data) as IpcSeriesPoint[];
+    if (!Array.isArray(series) || series.length === 0) return null;
+    return { series, updatedAt: row.updated_at };
+  } catch {
+    return null;
+  }
+}
+
+export function writeIpcSeriesCache(db: Database.Database, series: IpcSeriesPoint[]): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO dollar_cache (id, data, updated_at)
+    VALUES ('ipc', ?, datetime('now'))
+  `).run(JSON.stringify(series));
+}
+
+/**
+ * IPC series, same cache philosophy as {@link getCurrentRate}: fresh cache →
+ * no network; stale → fetch and refresh; offline → stale cache; nothing →
+ * `null`. Never throws, never blocks anything critical.
+ */
+export async function getIpcSeries(
+  db: Database.Database,
+  opts: RateFetchOptions = {},
+): Promise<IpcSeriesPoint[] | null> {
+  const maxAgeMs = opts.maxAgeMs ?? IPC_CACHE_MAX_AGE_MS;
+  const cached = readIpcSeriesCache(db);
+
+  if (cached && cacheAgeMs(cached.updatedAt, opts.nowMs) < maxAgeMs) {
+    return cached.series;
+  }
+
+  try {
+    const fetchFn = opts.fetchFn ?? fetch;
+    const response = await fetchFn(IPC_API_URL, {
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+    if (response.ok) {
+      const series = parseIpcApiResponse(await response.json());
+      if (series.length > 0) {
+        try { writeIpcSeriesCache(db, series); } catch { /* best-effort */ }
+        return series;
+      }
+    }
+  } catch {
+    // Offline — fall through.
+  }
+
+  return cached ? cached.series : null;
+}
+
+// ── Valued view (USD / ARS de hoy) ─────────────────────────────────────────
+
+export interface ValuedAggregates {
+  balance: { income: number; expenses: number; balance: number };
+  /** Six months of expenses ending on the requested month, converted. */
+  monthlyExpenses: number[];
+  categories: Array<{ category: string; value: number }>;
+  /** True when any converted amount used a fallback (current rate / nominal). */
+  approx: boolean;
+}
+
+export interface ValuedView {
+  month: string;
+  house: string;
+  currentRate: number | null;
+  /** `null` when no rate exists at all — dollars cannot be computed honestly. */
+  usd: ValuedAggregates | null;
+  /** `null` when the IPC series is unreachable and uncached. */
+  arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null;
+  /** Expenses vs previous month, ARS impacting — nominal and inflation-adjusted. */
+  trend: { nominalPct: number | null; realPct: number | null };
+}
+
+interface FxRow { amount: number; fxRate: number | null }
+
+/** Sum of ARS rows in dollars, each with its own frozen rate. */
+function sumUsd(rows: FxRow[], currentRate: number): { total: number; approx: boolean } {
+  let total = 0;
+  let approx = false;
+  for (const row of rows) {
+    const usd = convertArsToUsd(row.amount, row.fxRate, currentRate);
+    if (usd === null) { approx = true; continue; }
+    total += usd.value;
+    if (usd.approx) approx = true;
+  }
+  return { total, approx };
+}
+
+/**
+ * The dashboard, re-expressed. Same row-selection definitions as the nominal
+ * handlers on purpose (`impacting` for balances and the sparkline,
+ * {@link categorySpendFilter} for the wheel) so switching mode changes the
+ * unit, never which transactions count.
+ *
+ * USD: each ARS amount uses ITS OWN frozen `fx_rate`; a row without one uses
+ * `currentRate` and flips `approx`. ARS de hoy: nominal per-month totals times
+ * the cumulative IPC coefficient of their month (all rows of a month share it).
+ */
+export function computeValuedView(
+  db: Database.Database,
+  month: string,
+  ctx: { currentRate: number | null; house: string; series: IpcSeriesPoint[] | null },
+): ValuedView {
+  const { start, end } = monthRange(month);
+  const coefs = buildIpcCoefficients(ctx.series);
+
+  // One row-level query per aggregate the dashboard shows.
+  const balanceRows = db.prepare(`
+    SELECT type, amount, fx_rate AS fxRate
+    FROM finance_transactions
+    WHERE deleted_at IS NULL AND date >= ? AND date < ?
+      AND impacts_balance = 1 AND currency = 'ARS'
+  `).all(start, end) as Array<{ type: string; amount: number; fxRate: number | null }>;
+
+  const sparkStart = monthRange(addMonthsToMonth(month, -5)).start;
+  const sparkRows = db.prepare(`
+    SELECT amount, fx_rate AS fxRate, SUBSTR(date, 1, 7) AS m
+    FROM finance_transactions
+    WHERE deleted_at IS NULL AND date >= ? AND date < ?
+      AND type = 'expense' AND impacts_balance = 1 AND currency = 'ARS'
+  `).all(sparkStart, end) as Array<{ amount: number; fxRate: number | null; m: string }>;
+
+  const catWhere = buildTransactionWhere({ ...categorySpendFilter({ start, end }), currency: 'ARS' });
+  const catRows = db.prepare(`
+    SELECT category, amount, fx_rate AS fxRate
+    FROM finance_transactions
+    WHERE ${catWhere.where}
+  `).all(...catWhere.params) as Array<{ category: string; amount: number; fxRate: number | null }>;
+
+  const sparkMonths: string[] = [];
+  for (let i = 5; i >= 0; i--) sparkMonths.push(addMonthsToMonth(month, -i));
+
+  // ── USD ──
+  let usd: ValuedAggregates | null = null;
+  if (ctx.currentRate !== null && ctx.currentRate > 0) {
+    const income = sumUsd(balanceRows.filter((r) => r.type === 'income'), ctx.currentRate);
+    const expenses = sumUsd(balanceRows.filter((r) => r.type === 'expense'), ctx.currentRate);
+    const spark = sparkMonths.map((m) => sumUsd(sparkRows.filter((r) => r.m === m), ctx.currentRate!));
+    const catMap = new Map<string, FxRow[]>();
+    for (const r of catRows) {
+      const list = catMap.get(r.category) ?? [];
+      list.push(r);
+      catMap.set(r.category, list);
+    }
+    let approx = income.approx || expenses.approx || spark.some((s) => s.approx);
+    const categories = Array.from(catMap.entries()).map(([category, rows]) => {
+      const sum = sumUsd(rows, ctx.currentRate!);
+      if (sum.approx) approx = true;
+      return { category, value: sum.total };
+    }).sort((a, b) => b.value - a.value);
+
+    usd = {
+      balance: {
+        income: income.total,
+        expenses: expenses.total,
+        balance: income.total - expenses.total,
+      },
+      monthlyExpenses: spark.map((s) => s.total),
+      categories,
+      approx,
+    };
+  }
+
+  // ── ARS de hoy ──
+  let arsToday: (ValuedAggregates & { latestIpcMonth: string }) | null = null;
+  if (coefs) {
+    const monthCoef = coefficientForMonth(coefs, month);
+    const applyCoef = (nominal: number, coef: number | null) => coef === null ? nominal : nominal * coef;
+    let approx = monthCoef === null;
+
+    const nominalIncome = balanceRows.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const nominalExpenses = balanceRows.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const income = applyCoef(nominalIncome, monthCoef);
+    const expenses = applyCoef(nominalExpenses, monthCoef);
+
+    const monthlyExpenses = sparkMonths.map((m) => {
+      const coef = coefficientForMonth(coefs, m);
+      if (coef === null) approx = true;
+      const nominal = sparkRows.filter((r) => r.m === m).reduce((s, r) => s + r.amount, 0);
+      return applyCoef(nominal, coef);
+    });
+
+    const catTotals = new Map<string, number>();
+    for (const r of catRows) catTotals.set(r.category, (catTotals.get(r.category) ?? 0) + r.amount);
+    const categories = Array.from(catTotals.entries())
+      .map(([category, nominal]) => ({ category, value: applyCoef(nominal, monthCoef) }))
+      .sort((a, b) => b.value - a.value);
+
+    arsToday = {
+      balance: { income, expenses, balance: income - expenses },
+      monthlyExpenses,
+      categories,
+      approx,
+      latestIpcMonth: coefs.latestMonth,
+    };
+  }
+
+  // ── Trend (nominal + real) ──
+  const prevMonth = addMonthsToMonth(month, -1);
+  const currExpenses = balanceRows.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  const prevExpenses = sumByCurrency(db, {
+    ...monthRange(prevMonth),
+    type: 'expense',
+    currency: 'ARS',
+    balanceScope: 'impacting',
+  }).ARS;
+  const trend = nominalAndRealTrend(
+    currExpenses,
+    prevExpenses,
+    coefs ? coefficientForMonth(coefs, month) : null,
+    coefs ? coefficientForMonth(coefs, prevMonth) : null,
+  );
+
+  return { month, house: ctx.house, currentRate: ctx.currentRate, usd, arsToday, trend };
+}
+
+// ── Upcoming timeline ("Próximas batallas", 30 días) ───────────────────────
+
+export interface UpcomingItem {
+  kind: 'installment' | 'recurring' | 'card_due';
+  /** `YYYY-MM-DD` the money leaves the pocket. */
+  date: string;
+  label: string;
+  amount: number;
+  currency: 'ARS' | 'USD';
+  /** Transaction / recurring / statement id, per kind. */
+  refId: string;
+  /** Extra context: "3/6" for an instalment, the period for a card due. */
+  detail?: string;
+}
+
+export interface UpcomingTimeline {
+  from: string;
+  /** Exclusive upper bound. */
+  to: string;
+  items: UpcomingItem[];
+  totals: { ARS: number; USD: number };
+}
+
+/** `dateStr + days`, calendar-correct (UTC math, no DST surprises). */
+export function addDaysToDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * Everything that leaves the pocket in the next `days` days, ordered by date:
+ *
+ *  - `installment`: real instalment rows already scheduled inside the window;
+ *  - `recurring`:   active expense templates projected onto the months the
+ *                   window touches, respecting their frequency. If the month's
+ *                   row was already generated, the REAL row wins (its date and
+ *                   amount); a soft-deleted instance means the user cancelled
+ *                   that charge, so nothing is shown;
+ *  - `card_due`:    pending card statements whose due date (`due_day`) falls in
+ *                   the window. Due month convention: the statement for period
+ *                   M is due on `due_day` of M when `due_day > closing_day`,
+ *                   otherwise on `due_day` of M+1. Cards without `due_day` are
+ *                   silent here.
+ */
+export function computeUpcomingTimeline(
+  db: Database.Database,
+  fromDate: string,
+  days = 30,
+): UpcomingTimeline {
+  const span = Number.isFinite(days) ? Math.min(Math.max(Math.trunc(days), 1), 90) : 30;
+  const to = addDaysToDate(fromDate, span);
+  const items: UpcomingItem[] = [];
+
+  const pushCurrency = (currency: string): 'ARS' | 'USD' => currency === 'USD' ? 'USD' : 'ARS';
+
+  // 1. Instalments already written in the window.
+  const installmentRows = db.prepare(`
+    SELECT t.id, t.date, t.description, t.amount, t.currency,
+           t.installment_number AS installmentNumber,
+           g.total_installments AS totalInstallments,
+           g.description AS groupDescription
+    FROM finance_transactions t
+    JOIN finance_installment_groups g ON g.id = t.installment_group_id
+    WHERE t.deleted_at IS NULL AND t.type = 'expense'
+      AND t.installment_group_id IS NOT NULL
+      AND t.date >= ? AND t.date < ?
+  `).all(fromDate, to) as Array<{
+    id: string; date: string; description: string; amount: number; currency: string;
+    installmentNumber: number | null; totalInstallments: number; groupDescription: string;
+  }>;
+
+  for (const row of installmentRows) {
+    items.push({
+      kind: 'installment',
+      date: row.date,
+      label: row.groupDescription || row.description,
+      amount: row.amount,
+      currency: pushCurrency(row.currency),
+      refId: row.id,
+      detail: row.installmentNumber != null ? `${row.installmentNumber}/${row.totalInstallments}` : undefined,
+    });
+  }
+
+  // 2. Recurring expenses projected onto the window's months.
+  const templates = db.prepare(`
+    SELECT id, name, amount, currency, billing_day AS billingDay,
+           frequency, created_at AS createdAt
+    FROM finance_recurring
+    WHERE deleted_at IS NULL AND active = 1 AND type = 'expense'
+  `).all() as Array<{
+    id: string; name: string; amount: number; currency: string;
+    billingDay: number; frequency: string; createdAt: string;
+  }>;
+
+  if (templates.length > 0) {
+    const months: string[] = [];
+    for (let m = fromDate.slice(0, 7); m <= to.slice(0, 7); m = addMonthsToMonth(m, 1)) months.push(m);
+
+    const existsStmt = db.prepare(`
+      SELECT id, date, amount, currency, deleted_at AS deletedAt
+      FROM finance_transactions
+      WHERE source = 'recurring' AND recurring_id = ? AND date >= ? AND date < ?
+      LIMIT 1
+    `);
+
+    for (const rec of templates) {
+      for (const m of months) {
+        if (!isRecurringDueInMonth(rec.frequency, (rec.createdAt ?? '').slice(0, 7), m)) continue;
+        const range = monthRange(m);
+        const existing = existsStmt.get(rec.id, range.start, range.end) as
+          { id: string; date: string; amount: number; currency: string; deletedAt: string | null } | undefined;
+        if (existing?.deletedAt) continue; // the user cancelled this charge
+        const date = existing ? existing.date : dateInMonthClamped(m, rec.billingDay ?? 1);
+        if (date < fromDate || date >= to) continue;
+        items.push({
+          kind: 'recurring',
+          date,
+          label: rec.name,
+          amount: existing ? existing.amount : rec.amount,
+          currency: pushCurrency(existing ? existing.currency : rec.currency),
+          refId: rec.id,
+        });
+      }
+    }
+  }
+
+  // 3. Card statements due inside the window.
+  const statements = db.prepare(`
+    SELECT s.id, s.period_month AS periodMonth,
+           s.calculated_amount AS ars, s.calculated_amount_usd AS usd,
+           c.name AS cardName, c.closing_day AS closingDay, c.due_day AS dueDay
+    FROM finance_credit_card_statements s
+    JOIN finance_credit_cards c ON c.id = s.credit_card_id AND c.deleted_at IS NULL
+    WHERE s.deleted_at IS NULL AND s.status = 'pending' AND c.due_day IS NOT NULL
+  `).all() as Array<{
+    id: string; periodMonth: string; ars: number; usd: number;
+    cardName: string; closingDay: number; dueDay: number;
+  }>;
+
+  for (const s of statements) {
+    const dueMonth = s.dueDay > s.closingDay ? s.periodMonth : addMonthsToMonth(s.periodMonth, 1);
+    const date = dateInMonthClamped(dueMonth, s.dueDay);
+    if (date < fromDate || date >= to) continue;
+    if (s.ars > 0) {
+      items.push({ kind: 'card_due', date, label: s.cardName, amount: s.ars, currency: 'ARS', refId: s.id, detail: s.periodMonth });
+    }
+    if (s.usd > 0) {
+      items.push({ kind: 'card_due', date, label: s.cardName, amount: s.usd, currency: 'USD', refId: s.id, detail: s.periodMonth });
+    }
+  }
+
+  items.sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
+
+  const totals = { ARS: 0, USD: 0 };
+  for (const item of items) totals[item.currency] += item.amount;
+
+  return { from: fromDate, to, items, totals };
 }

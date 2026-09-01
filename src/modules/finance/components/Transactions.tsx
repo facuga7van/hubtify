@@ -22,6 +22,7 @@ import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { emitMovementLogged } from '../utils/rpg-events';
 import { checkBudgetOverflow } from '../utils/budget-guards';
+import { useValuationContext } from '../utils/display-mode';
 
 interface TransactionRow {
   id: string;
@@ -40,6 +41,8 @@ interface TransactionRow {
   /** Resolved from the loan that shares the instalment group. */
   thirdPartyName?: string | null;
   impactsBalance?: number;
+  /** Venta rate frozen the day the movement was recorded. NULL = none available. */
+  fxRate?: number | null;
 }
 
 // Source badge icons
@@ -108,6 +111,8 @@ export default function Transactions() {
 
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  // ARS → USD → ARS de hoy: the DollarChip cycles it, this converts each row.
+  const valuation = useValuationContext();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState('');
@@ -539,10 +544,31 @@ export default function Transactions() {
               )}
             </span>
             <span className={`coin-ledger-row__amount qb-numeral ${tx.type === 'income' ? 'coin-ledger-row__amount--income' : 'coin-ledger-row__amount--expense'}`}>
-              {formatCurrency(
-                tx.type === 'income' ? tx.amount : -tx.amount,
-                { currency: tx.currency, showSign: tx.type === 'income' },
-              )}
+              {(() => {
+                // Each historical ARS amount re-expressed with ITS OWN frozen
+                // rate (or today's coefficient). A row without a frozen rate
+                // uses the current rate and shows `~` (approximate).
+                const conv = valuation.convert(tx);
+                const converted = conv.currency !== tx.currency;
+                return (
+                  <>
+                    {conv.approx && (
+                      <span
+                        className="coin-approx"
+                        title={t('coinify.approxRateHint', 'Aproximado: convertido con la cotización actual, no la del día del movimiento')}
+                      >~</span>
+                    )}
+                    {formatCurrency(
+                      tx.type === 'income' ? conv.value : -conv.value,
+                      {
+                        currency: conv.currency,
+                        showSign: tx.type === 'income',
+                        decimals: converted && conv.currency === 'USD' ? 2 : 0,
+                      },
+                    )}
+                  </>
+                );
+              })()}
             </span>
             <div className="coin-ledger-row__actions">
               <button className="rpg-button coin-ledger-row__action-btn tap-target"

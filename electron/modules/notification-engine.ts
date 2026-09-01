@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import crypto from 'crypto';
+import { isRecurringDueInMonth } from './finance.balance';
 
 const genId = (): string => crypto.randomUUID();
 
@@ -49,6 +50,10 @@ const MESSAGES: Record<string, Record<'es' | 'en', { title: (name: string) => st
   finance_card_closing: {
     es: { title: (name) => `Tu tarjeta ${name} cierra pronto`, body: 'Revisá los consumos antes del cierre.' },
     en: { title: (name) => `Card ${name} is closing soon`, body: 'Review your charges before closing.' },
+  },
+  finance_card_due: {
+    es: { title: (name) => `El resumen de ${name} vence en 3 días`, body: 'Pagá el resumen antes del vencimiento para evitar intereses.' },
+    en: { title: (name) => `${name} statement is due in 3 days`, body: 'Pay the statement before the due date to avoid interest.' },
   },
   finance_loan_pending: {
     es: { title: (name) => `Préstamo con ${name} lleva más de un mes`, body: 'Considerá saldar este préstamo.' },
@@ -312,18 +317,23 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
     });
   }
 
-  // 2. Credit card closing within 2 days
+  // 2. Credit card closing within 2 days / statement due within 3 days
   const currentDay = new Date().getDate();
   const creditCards = db
-    .prepare(`SELECT id, name, closing_day FROM finance_credit_cards`)
-    .all() as { id: string; name: string; closing_day: number }[];
+    .prepare(`SELECT id, name, closing_day, due_day FROM finance_credit_cards`)
+    .all() as { id: string; name: string; closing_day: number; due_day: number | null }[];
+
+  /** Days until the next occurrence of a day-of-month, from now. */
+  const daysUntilDayOfMonth = (day: number): number => {
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), day);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, day);
+    const target = thisMonth.getTime() >= now.getTime() ? thisMonth : nextMonth;
+    return Math.ceil((target.getTime() - now.getTime()) / 86400000);
+  };
 
   for (const cc of creditCards) {
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), cc.closing_day);
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, cc.closing_day);
-    const target = thisMonth.getTime() >= now.getTime() ? thisMonth : nextMonth;
-    const daysUntilClosing = Math.ceil((target.getTime() - now.getTime()) / 86400000);
+    const daysUntilClosing = daysUntilDayOfMonth(cc.closing_day);
     if (daysUntilClosing > 0 && daysUntilClosing <= 2) {
       candidates.push({
         type: 'finance_card_closing',
@@ -332,6 +342,20 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
         actionRoute: '/finance',
         refId: cc.id,
       });
+    }
+
+    // Same style as the closing rule, against the (optional) due day.
+    if (cc.due_day != null) {
+      const daysUntilDue = daysUntilDayOfMonth(cc.due_day);
+      if (daysUntilDue > 0 && daysUntilDue <= 3) {
+        candidates.push({
+          type: 'finance_card_due',
+          module: 'finance',
+          ...msg('finance_card_due', cc.name),
+          actionRoute: '/finance/cards',
+          refId: cc.id,
+        });
+      }
     }
   }
 
@@ -362,13 +386,16 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
 
   const recurringItems = db
     .prepare(
-      `SELECT id, name, billing_day
+      `SELECT id, name, billing_day, frequency, created_at
        FROM finance_recurring
        WHERE active = 1`
     )
-    .all() as { id: string; name: string; billing_day: number }[];
+    .all() as { id: string; name: string; billing_day: number; frequency: string | null; created_at: string }[];
 
   for (const rec of recurringItems) {
+    // A bimonthly/quarterly/… template only "misses" on the months it actually
+    // bills — warning about an off month would train the user to ignore the bell.
+    if (!isRecurringDueInMonth(rec.frequency, (rec.created_at ?? '').slice(0, 7), currentMonth)) continue;
     if (currentDay >= rec.billing_day) {
       const txExists = db
         .prepare(
@@ -503,6 +530,17 @@ export function autoResolve(db: Database.Database): number {
         const createdAt = new Date(notif.created_at + 'Z');
         const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
         if (createdAt < threeDaysAgo) shouldResolve = true;
+      }
+
+      // Fires 3 days ahead of the due day, so after 4 days the date has passed
+      // either way (same time-based retirement as finance_card_closing).
+      if (n.type === 'finance_card_due') {
+        const notif = db
+          .prepare(`SELECT created_at FROM notifications WHERE id = ?`)
+          .get(n.id) as { created_at: string };
+        const createdAt = new Date(notif.created_at + 'Z');
+        const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+        if (createdAt < fourDaysAgo) shouldResolve = true;
       }
 
       if (n.type === 'finance_recurring_missing') {

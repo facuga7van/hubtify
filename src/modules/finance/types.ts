@@ -104,6 +104,8 @@ export interface CreditCard {
   id: string;
   name: string;
   closingDay: number;
+  /** Día de vencimiento del resumen. `null` = sin agenda de vencimiento. */
+  dueDay?: number | null;
   createdAt: string;
 }
 

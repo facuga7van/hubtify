@@ -21,21 +21,29 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
   const { toast } = useToast();
   const [newName, setNewName] = useState('');
   const [newClosingDay, setNewClosingDay] = useState(1);
+  /** 0 = "sin vencimiento" — sent as null so the card stays out of the agenda. */
+  const [newDueDay, setNewDueDay] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editClosingDay, setEditClosingDay] = useState(1);
+  const [editDueDay, setEditDueDay] = useState(0);
 
   const { dialogProps, stopPropagation } = useModalA11y({ onClose });
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    const result = await unwrap(window.api.financeAddCreditCard({ name: newName.trim(), closingDay: newClosingDay }));
+    const result = await unwrap(window.api.financeAddCreditCard({
+      name: newName.trim(),
+      closingDay: newClosingDay,
+      dueDay: newDueDay > 0 ? newDueDay : null,
+    }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
       return;
     }
     setNewName('');
     setNewClosingDay(1);
+    setNewDueDay(0);
     onSaved();
   };
 
@@ -60,11 +68,16 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
     setEditingId(card.id);
     setEditName(card.name);
     setEditClosingDay(card.closingDay);
+    setEditDueDay(card.dueDay ?? 0);
   };
 
   const handleUpdate = async () => {
     if (!editingId || !editName.trim()) return;
-    const result = await unwrap(window.api.financeUpdateCreditCard(editingId, { name: editName.trim(), closingDay: editClosingDay }));
+    const result = await unwrap(window.api.financeUpdateCreditCard(editingId, {
+      name: editName.trim(),
+      closingDay: editClosingDay,
+      dueDay: editDueDay > 0 ? editDueDay : null,
+    }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
       return;
@@ -109,6 +122,11 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
                 <RpgNumberInput value={String(editClosingDay)}
                   onChange={(v) => setEditClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
                   style={{ width: 70 }} min={1} max={31} step={1} />
+                {/* Día de vencimiento; 0 = sin agenda. */}
+                <RpgNumberInput value={String(editDueDay)}
+                  onChange={(v) => setEditDueDay(Math.min(31, Math.max(0, parseInt(v) || 0)))}
+                  aria-label={t('coinify.dueDay', 'Día de vencimiento')}
+                  style={{ width: 70 }} min={0} max={31} step={1} />
                 <button className="rpg-button coin-action-btn coin-action-btn--confirm" onClick={handleUpdate}
                   aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}>
                   <Checkmark style={{ width: '0.8em', height: '0.8em' }} />
@@ -121,7 +139,11 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
             ) : (
               <>
                 <span style={{ flex: 1, fontWeight: 'bold', minWidth: 0 }}>
-                  {card.name} <span style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>({t('coinify.closingDay')}: {card.closingDay})</span>
+                  {card.name}{' '}
+                  <span style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>
+                    ({t('coinify.closingDay')}: {card.closingDay}
+                    {card.dueDay ? <> · {t('coinify.dueDayShort', 'Vto')}: {card.dueDay}</> : null})
+                  </span>
                 </span>
                 {/* Editing used to mean clicking the name — a bare <span> with a
                     pointer cursor and no other hint that it did anything. */}
@@ -146,10 +168,17 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
           <RpgNumberInput value={String(newClosingDay)}
             onChange={(v) => setNewClosingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
             style={{ width: 70 }} min={1} max={31} step={1} />
+          <RpgNumberInput value={String(newDueDay)}
+            onChange={(v) => setNewDueDay(Math.min(31, Math.max(0, parseInt(v) || 0)))}
+            aria-label={t('coinify.dueDay', 'Día de vencimiento')}
+            style={{ width: 70 }} min={0} max={31} step={1} />
           <button className="rpg-button" onClick={handleCreate} disabled={!newName.trim()}>
             + {t('coinify.newCard')}
           </button>
         </div>
+        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', opacity: 0.6, margin: '6px 0 0' }}>
+          {t('coinify.dueDayHint', 'Cierre / vencimiento del resumen. Vencimiento 0 = sin aviso ni agenda.')}
+        </p>
       </div>
     </div>,
     document.body,

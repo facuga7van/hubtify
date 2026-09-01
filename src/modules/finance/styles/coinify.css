@@ -2266,3 +2266,134 @@ button.coin-sort-header--amount {
 .coin-budget-row--over .coin-budget-bar__fill {
   background: var(--rubric);
 }
+
+/* ── Display-mode chip (ARS → USD → ARS de hoy) ─────────────────────────── */
+
+.coin-mode-chip {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.coin-mode-chip__mode {
+  font-size: var(--fs-label);
+  padding: 3px 8px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.coin-mode-chip__mode--active {
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: var(--ink);
+}
+
+.coin-mode-chip__menu-btn {
+  display: flex;
+  align-items: center;
+  padding: 3px 5px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+}
+
+/* Which casa freezes onto every new movement (fx_rate). */
+.coin-fx-house-pick {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.coin-fx-house-pick--active {
+  color: var(--gold);
+}
+
+.coin-fx-house-pick:hover,
+.coin-fx-house-pick:focus-visible {
+  color: var(--gold-light);
+}
+
+.coin-dollar-menu__backfill {
+  width: 100%;
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  padding: 3px 6px;
+}
+
+/* Converted with a fallback rate, not the frozen one. */
+.coin-approx {
+  color: var(--ink-faded);
+  margin-right: 1px;
+  cursor: help;
+}
+
+/* ── Próximas batallas: 30-day money-out timeline ───────────────────────── */
+
+.coin-upcoming {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coin-upcoming__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.coin-upcoming__row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 4px 2px 7px;
+  border-bottom: 1px dashed rgba(168, 138, 60, 0.25);
+  border-left: 2px solid transparent;
+}
+
+.coin-upcoming__row--recurring   { border-left-color: var(--moss); }
+.coin-upcoming__row--installment { border-left-color: var(--gold-dark); }
+.coin-upcoming__row--card_due    { border-left-color: var(--rubric); }
+
+.coin-upcoming__date {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+  min-width: 34px;
+}
+
+.coin-upcoming__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-body);
+}
+
+.coin-upcoming__detail {
+  color: var(--ink-faded);
+  font-size: var(--fs-label);
+}
+
+.coin-upcoming__kind {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+  white-space: nowrap;
+}
+
+.coin-upcoming__amount {
+  font-size: var(--fs-body);
+  white-space: nowrap;
+}
+
+.coin-upcoming__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 4px 0;
+  border-top: 1.5px solid var(--gold-dark);
+  color: var(--ink);
+}

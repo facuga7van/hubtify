@@ -421,4 +421,20 @@ export const financeMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_finance_budgets_deleted ON finance_budgets(deleted_at);
     `,
   },
+  {
+    namespace: 'finance',
+    version: 16,
+    up: `
+      -- Cotización venta del dólar (casa preferida, app_state 'fx_house', default
+      -- 'blue') congelada al momento de registrar la transacción. NULL = no había
+      -- cotización disponible (offline sin cache); la lectura en USD usa entonces
+      -- la cotización actual con indicador de aproximado, y
+      -- finance:backfillFxRates puede completarla después.
+      ALTER TABLE finance_transactions ADD COLUMN fx_rate REAL DEFAULT NULL;
+
+      -- Día de vencimiento del resumen (el closing_day ya existía). NULL = no
+      -- configurado: sin aviso de vencimiento y sin fila en la agenda de 30 días.
+      ALTER TABLE finance_credit_cards ADD COLUMN due_day INTEGER DEFAULT NULL;
+    `,
+  },
 ];

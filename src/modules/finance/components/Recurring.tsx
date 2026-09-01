@@ -20,8 +20,22 @@ interface RecurringRow {
   currency: 'ARS' | 'USD';
   category: string;
   billingDay: number;
+  /** monthly | bimonthly | quarterly | four_monthly | semiannual | annual. */
+  frequency?: string;
   active: boolean | number;
 }
+
+/** Every cadence the backend generates. Order = how often, descending. */
+const FREQUENCIES = ['monthly', 'bimonthly', 'quarterly', 'four_monthly', 'semiannual', 'annual'] as const;
+
+const FREQUENCY_FALLBACKS: Record<string, string> = {
+  monthly: 'Mensual',
+  bimonthly: 'Bimestral',
+  quarterly: 'Trimestral',
+  four_monthly: 'Cuatrimestral',
+  semiannual: 'Semestral',
+  annual: 'Anual',
+};
 
 interface AmountHistoryRow {
   id: string;
@@ -70,6 +84,7 @@ export default function Recurring() {
   const [formCurrency, setFormCurrency] = useState<Currency>('ARS');
   const [formCategory, setFormCategory] = useState('Otros');
   const [formBillingDay, setFormBillingDay] = useState(1);
+  const [formFrequency, setFormFrequency] = useState<string>('monthly');
   const [formSubmitting, setFormSubmitting] = useState(false);
 
   // Inline edit state (amount)
@@ -78,7 +93,7 @@ export default function Recurring() {
 
   // Inline edit state (fields)
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
-  const [editRecurringFields, setEditRecurringFields] = useState({ name: '', type: '' as TransactionType, category: '', billingDay: 1 });
+  const [editRecurringFields, setEditRecurringFields] = useState({ name: '', type: '' as TransactionType, category: '', billingDay: 1, frequency: 'monthly' });
 
   // History state
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
@@ -107,13 +122,14 @@ export default function Recurring() {
     try {
       const result = await unwrap(window.api.financeAddRecurring({
         name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory, billingDay: formBillingDay,
+        frequency: formFrequency,
       }));
       if (!result.ok) {
         toast({ type: 'warning', message: failureMessage(result.reason, t) });
         return;
       }
       setFormName(''); setFormAmount(''); setFormType('expense');
-      setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setShowForm(false);
+      setFormCurrency('ARS'); setFormCategory('Otros'); setFormBillingDay(1); setFormFrequency('monthly'); setShowForm(false);
       load();
       window.dispatchEvent(new Event('finance:dataChanged'));
     } finally {
@@ -161,6 +177,7 @@ export default function Recurring() {
       type: item.type,
       category: item.category,
       billingDay: item.billingDay,
+      frequency: item.frequency ?? 'monthly',
     });
   };
 
@@ -174,6 +191,7 @@ export default function Recurring() {
       type: editRecurringFields.type,
       category: editRecurringFields.category,
       billingDay: editRecurringFields.billingDay,
+      frequency: editRecurringFields.frequency,
     }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
@@ -282,6 +300,15 @@ export default function Recurring() {
             <RpgNumberInput value={String(formBillingDay)}
               onChange={(v) => setFormBillingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
               style={{ width: 70 }} min={1} max={31} step={1} />
+            <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.frequencyLabel', 'Frecuencia')}</label>
+            {/* The aguinaldo at last: semiannual, annual and everything between.
+                First charge lands the month the template is created. */}
+            <select className="rpg-select" value={formFrequency} onChange={(e) => setFormFrequency(e.target.value)}
+              aria-label={t('coinify.frequencyLabel', 'Frecuencia')} style={{ flex: 1 }}>
+              {FREQUENCIES.map((f) => (
+                <option key={f} value={f}>{t(`coinify.freq_${f}`, FREQUENCY_FALLBACKS[f])}</option>
+              ))}
+            </select>
           </div>
 
           <button type="submit" className="rpg-button" style={{ width: '100%' }} disabled={formSubmitting}>
@@ -356,6 +383,14 @@ export default function Recurring() {
                     <RpgNumberInput value={String(editRecurringFields.billingDay)}
                       onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
                       style={{ width: 55 }} fontSize="0.8rem" min={1} max={31} step={1} />
+                    <select className="rpg-select" value={editRecurringFields.frequency}
+                      onChange={(e) => setEditRecurringFields((f) => ({ ...f, frequency: e.target.value }))}
+                      aria-label={t('coinify.frequencyLabel', 'Frecuencia')}
+                      style={{ fontSize: 'var(--fs-label)' }}>
+                      {FREQUENCIES.map((f) => (
+                        <option key={f} value={f}>{t(`coinify.freq_${f}`, FREQUENCY_FALLBACKS[f])}</option>
+                      ))}
+                    </select>
                     <button className="rpg-button coin-action-btn coin-action-btn--confirm"
                       aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}
                       onClick={() => saveRecurringEdit(item.id)}><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
@@ -373,7 +408,14 @@ export default function Recurring() {
                     <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.5 }}>
                       {t('coinify.billingDay')}: {item.billingDay}
                     </span>
-                    {isActive(item) && (() => {
+                    {(item.frequency ?? 'monthly') !== 'monthly' && (
+                      <Rune tone="gold">
+                        {t(`coinify.freq_${item.frequency}`, FREQUENCY_FALLBACKS[item.frequency ?? 'monthly'] ?? item.frequency)}
+                      </Rune>
+                    )}
+                    {/* The day counter assumes a monthly cadence; for the other
+                        frequencies the rune above already tells the story. */}
+                    {isActive(item) && (item.frequency ?? 'monthly') === 'monthly' && (() => {
                       const days = daysUntilBilling(item.billingDay);
                       if (days === 0) return <Rune tone="gold">{t('coinify.recurringToday', 'hoy')}</Rune>;
                       return <Rune tone="ink">{t('coinify.recurringDaysLeft', 'en {{count}} días', { count: days })}</Rune>;
