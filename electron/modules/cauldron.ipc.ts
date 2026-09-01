@@ -684,6 +684,18 @@ export function registerCauldronIpcHandlers(): void {
 
     lastCompletedWorkSessionId = null;
 
+    // Starting a fresh brew while a resumable session is still on offer is an
+    // implicit "discard": without this the old row kept its target_end_time
+    // and the "Retomar" banner came back after the next Stop, offering a
+    // session the user had already walked away from. Same soft-delete as
+    // cauldron:discardInterruptedSession — a crash-orphan is not a scar.
+    const stale = readInterruptedSession();
+    if (stale) {
+      const now = new Date().toISOString();
+      db.prepare('UPDATE cauldron_sessions SET deleted_at = ?, updated_at = ?, target_end_time = NULL WHERE id = ?')
+        .run(now, now, stale.id);
+    }
+
     timerState = withTask(
       {
         ...IDLE_STATE,

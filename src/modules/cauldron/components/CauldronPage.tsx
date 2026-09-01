@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { useModalA11y } from '../../../shared/hooks/useModalA11y';
 import { ambientOrbs, brewComplete, statsShimmer } from '../../../shared/animations/cauldron';
 import {
   playCauldronStart,
@@ -45,6 +46,7 @@ import {
 // tildarla en Questify: mismos XP por tier, mismo combo, mismo toast. Por eso se
 // reusan los helpers de quests en vez de reimplementar la tabla acá.
 import { tierXp, bonusMultiplierToTier } from '../../quests/utils';
+import { questsApi } from '../../quests/api';
 import type {
   CauldronPreset,
   CauldronStats,
@@ -133,6 +135,11 @@ export default function CauldronPage() {
   const [retroMinutes, setRetroMinutes] = useState('');
   const [retroTaskId, setRetroTaskId] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState<CauldronInterruptedSession | null>(null);
+  /**
+   * «Retomar» answered `preset_missing` (the recipe was deleted, locally or by
+   * sync): the session is kept, only «Descartar» stays on the banner.
+   */
+  const [resumeBlocked, setResumeBlocked] = useState(false);
   const [popoutOnStart, setPopoutOnStart] = useState(() => {
     try { return localStorage.getItem(POPOUT_ON_START_KEY) === 'true'; } catch { return false; }
   });
@@ -140,6 +147,20 @@ export default function CauldronPage() {
 
   // System notification copy comes from the renderer now — keep it in sync with i18n.
   useCauldronLabels();
+
+  /* Recipe editor: Escape, focus trap, focus restore. The overlay used to
+     listen for Escape on a div nobody focused, so the key did nothing and Tab
+     walked out of the modal into the page behind. */
+  const closePresetEditor = useCallback(() => setEditingPreset(null), []);
+  const presetModal = useModalA11y<HTMLDivElement>({ onClose: closePresetEditor, active: !!editingPreset });
+
+  /** Backend errors reach the toast as people-words, never `Error: Error invoking remote method…`. */
+  const describeError = useCallback((err: unknown): string => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/Preset not found/i.test(msg)) return t('cauldron.errors.presetNotFound', 'Esa receta ya no existe. Elegí otra.');
+    if (/Timer already active/i.test(msg)) return t('cauldron.errors.timerActive', 'Ya hay una poción al fuego.');
+    return t('common.somethingWentWrong', 'Algo salió mal');
+  }, [t]);
 
   /* -- Refs -- */
   const timerContainerRef = useRef<HTMLDivElement>(null);
@@ -195,7 +216,7 @@ export default function CauldronPage() {
   /** A session the app was killed in the middle of — offer it back instead of losing it. */
   const loadInterrupted = useCallback(() => {
     window.api.cauldronGetInterruptedSession()
-      .then((session) => setInterrupted(session))
+      .then((session) => { setInterrupted(session); setResumeBlocked(false); })
       .catch(() => setInterrupted(null));
   }, []);
 
@@ -210,7 +231,9 @@ export default function CauldronPage() {
     loadInterrupted();
   }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
 
-  /* -- Account switch reload -- */
+  /* -- Account switch / sync pull reload --
+     Layout fires `sync:cauldronUpdated` after a pull that changed rows; until
+     now nobody listened, so the shelf and stats stayed stale after alt-tab. */
   useEffect(() => {
     const handler = () => {
       loadPresets();
@@ -222,7 +245,11 @@ export default function CauldronPage() {
       loadInterrupted();
     };
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
+    window.addEventListener('sync:cauldronUpdated', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener('sync:cauldronUpdated', handler);
+    };
   }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
 
   /* -- Subscribe to tick events -- */
@@ -351,7 +378,7 @@ export default function CauldronPage() {
       // Opt-in: the external window used to land on top of whatever you were doing.
       if (popoutOnStart) window.api.cauldronOpenWindow();
     } catch (err) {
-      toast({ type: 'warning', message: String(err) });
+      toast({ type: 'warning', message: describeError(err) });
     }
   });
 
@@ -397,26 +424,37 @@ export default function CauldronPage() {
     }
 
     const xp = tierXp(task.tier);
-    const [, result] = await Promise.all([
-      window.api.questsSetTaskStatus(task.id, true),
-      window.api.processRpgEvent({
-        type: 'TASK_COMPLETED', moduleId: 'quests',
-        payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
-        timestamp: Date.now(),
-      }),
-    ]);
-    toast({
-      type: 'xp',
-      message: `+${result.xpGained} XP`,
-      details: {
-        xp: result.xpGained,
-        bonusTier: bonusMultiplierToTier(result.bonusMultiplier),
-        comboMultiplier: result.comboMultiplier,
-        streakMilestone: result.milestoneXp || undefined,
-      },
-    });
-    window.dispatchEvent(new Event('rpg:statsChanged'));
-    window.dispatchEvent(new Event('quests:dataChanged'));
+    try {
+      // Status FIRST, then XP: paid in parallel, a refused status left the XP
+      // banked and the mission still open. The status answer also says whether
+      // XP is owed at all — `paysXp === false` means another instance of this
+      // recurring chain already paid today (undefined = older main, pays).
+      const status = await questsApi().questsSetTaskStatus(task.id, true);
+      if (status && status.paysXp === false) {
+        toast({ type: 'info', message: t('questify.repeatAlreadyPaid', 'Esta misión ya pagó hoy — la cadena avanza igual') });
+      } else {
+        const result = await window.api.processRpgEvent({
+          type: 'TASK_COMPLETED', moduleId: 'quests',
+          payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
+          timestamp: Date.now(),
+        });
+        toast({
+          type: 'xp',
+          message: `+${result.xpGained} XP`,
+          details: {
+            xp: result.xpGained,
+            bonusTier: bonusMultiplierToTier(result.bonusMultiplier),
+            comboMultiplier: result.comboMultiplier,
+            streakMilestone: result.milestoneXp || undefined,
+          },
+        });
+      }
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+      window.dispatchEvent(new Event('quests:dataChanged'));
+    } catch (err) {
+      console.error('[Cauldron] complete mission failed', err);
+      toast({ type: 'warning', message: describeError(err) });
+    }
     reloadMissions();
   });
 
@@ -473,27 +511,49 @@ export default function CauldronPage() {
   };
 
   /**
-   * Retoma la sesion interrumpida DONDE QUEDO, reusando la fila existente. Si el
-   * backend no puede (receta borrada, timer ya activo), cae en reiniciar la receta
-   * para no dejar al usuario sin salida.
+   * Retoma la sesion interrumpida DONDE QUEDO, reusando la fila existente.
+   *
+   * Sin fallback destructivo: la version anterior DESCARTABA la sesion y recien
+   * despues intentaba `cauldronStart(presetId)`, que con la receta borrada tiraba
+   * «Preset not found» — la sesion ya no estaba y el banner seguia ahi. Ahora la
+   * fila se conserva siempre; si la receta no existe, solo queda «Descartar».
    */
   const handleResumeInterrupted = guarded(async () => {
     if (!interrupted?.presetId) return;
     try {
       const res = await window.api.cauldronResumeInterruptedSession();
-      if (res?.success && res.state) {
-        setTimerState(res.state);
-      } else {
-        await window.api.cauldronDiscardInterruptedSession();
-        setTimerState(await window.api.cauldronStart(interrupted.presetId));
+      if (!res?.success || !res.state) {
+        switch (res?.reason) {
+          case 'preset_missing':
+            setResumeBlocked(true);
+            toast({
+              type: 'warning',
+              message: t('cauldron.interrupted.presetMissing', 'La receta de esta poción ya no existe, así que no se puede retomar. Podés descartarla.'),
+            });
+            return;
+          case 'timer_active':
+            // Something else lit the fire meanwhile (widget, PiP): show it.
+            loadState();
+            toast({
+              type: 'info',
+              message: t('cauldron.interrupted.timerActive', 'Ya hay una poción al fuego: terminá esa antes de retomar la otra.'),
+            });
+            return;
+          default:
+            // not_found: resumed, finished or discarded elsewhere.
+            setInterrupted(null);
+            toast({ type: 'info', message: t('cauldron.interrupted.gone', 'Esa poción ya no está: alguien la terminó o la descartó.') });
+            return;
+        }
       }
+      setTimerState(res.state);
       setSelectedPresetId(interrupted.presetId);
       setInterrupted(null);
       playCauldronStart();
       setFlavorIdx(0);
       if (popoutOnStart) window.api.cauldronOpenWindow();
     } catch (err) {
-      toast({ type: 'warning', message: String(err) });
+      toast({ type: 'warning', message: describeError(err) });
     }
   });
 
@@ -527,8 +587,11 @@ export default function CauldronPage() {
       loadStats();
       loadWeeklyFocus();
       loadWeekByProject();
+      // The handler emits no broadcast on purpose (no XP, no session end), so
+      // this is the only thing that schedules the sync push for the new jar.
+      window.dispatchEvent(new Event('cauldron:dataChanged'));
     } catch (err) {
-      toast({ type: 'warning', message: String(err) });
+      toast({ type: 'warning', message: describeError(err) });
     }
   });
 
@@ -582,7 +645,9 @@ export default function CauldronPage() {
     loadPresets();
   };
 
-  const handleSavePreset = async () => {
+  // guarded(): a double click on «Save Brew» used to insert two identical
+  // recipes (upsert without an id mints a fresh genId() each time).
+  const handleSavePreset = guarded(async () => {
     if (!editingPreset || !editingPreset.name?.trim()) return;
     const payload: Record<string, unknown> = {
       name: editingPreset.name.trim(),
@@ -600,9 +665,9 @@ export default function CauldronPage() {
       loadPresets();
       setEditingPreset(null);
     } catch (err) {
-      toast({ type: 'warning', message: String(err) });
+      toast({ type: 'warning', message: describeError(err) });
     }
-  };
+  });
 
   /* -- Weekly chart data: rebuilt inline it was a new array on every 1 s tick -- */
   const weeklyChartData = useMemo(
@@ -676,17 +741,25 @@ export default function CauldronPage() {
             {t('cauldron.interrupted.prompt', 'Quedó una poción a medio preparar: {{name}}.', {
               name: interrupted.presetName ?? t('cauldron.history.unknownPreset', 'Receta desconocida'),
             })}{' '}
-            <span className="cauldron-resume-time">{formatTime(interrupted.remainingMs)}</span>{' '}
-            {t('cauldron.interrupted.remaining', 'restantes')}
+            {resumeBlocked ? (
+              t('cauldron.interrupted.presetMissing', 'La receta de esta poción ya no existe, así que no se puede retomar. Podés descartarla.')
+            ) : (
+              <>
+                <span className="cauldron-resume-time">{formatTime(interrupted.remainingMs)}</span>{' '}
+                {t('cauldron.interrupted.remaining', 'restantes')}
+              </>
+            )}
           </span>
-          <button
-            className="cauldron-btn cauldron-btn--primary"
-            onClick={handleResumeInterrupted}
-            disabled={actionPending || !interrupted.presetId}
-            title={t('cauldron.interrupted.resumeHelp', 'Continúa desde el tiempo que quedaba.')}
-          >
-            {t('cauldron.interrupted.resume', 'Retomar')}
-          </button>
+          {!resumeBlocked && (
+            <button
+              className="cauldron-btn cauldron-btn--primary"
+              onClick={handleResumeInterrupted}
+              disabled={actionPending || !interrupted.presetId}
+              title={t('cauldron.interrupted.resumeHelp', 'Continúa desde el tiempo que quedaba.')}
+            >
+              {t('cauldron.interrupted.resume', 'Retomar')}
+            </button>
+          )}
           <button className="cauldron-btn" onClick={handleDiscardInterrupted} disabled={actionPending}>
             {t('cauldron.interrupted.discard', 'Descartar')}
           </button>
@@ -1175,17 +1248,16 @@ export default function CauldronPage() {
       {editingPreset && createPortal(
         <div
           className="cauldron-modal-overlay"
-          onClick={() => setEditingPreset(null)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setEditingPreset(null); }}
+          onClick={closePresetEditor}
         >
           <div
+            {...presetModal.dialogProps}
             className="cauldron-modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
+            aria-labelledby="cauldron-modal-title"
+            onClick={presetModal.stopPropagation}
           >
             <div className="cauldron-modal-head">
-              <h2 className="cauldron-modal-title">
+              <h2 className="cauldron-modal-title" id="cauldron-modal-title">
                 {isCreating
                   ? t('cauldron.presets.createRecipe', 'Forge New Brew')
                   : t('cauldron.presets.editRecipe', 'Edit Brew')}
@@ -1211,6 +1283,7 @@ export default function CauldronPage() {
                     setEditingPreset({ ...editingPreset, name: e.target.value })
                   }
                   maxLength={32}
+                  autoFocus
                 />
               </div>
               <div>
@@ -1366,7 +1439,7 @@ export default function CauldronPage() {
               <button
                 className="cauldron-btn cauldron-btn--primary"
                 onClick={handleSavePreset}
-                disabled={!editingPreset.name?.trim()}
+                disabled={actionPending || !editingPreset.name?.trim()}
               >
                 {t('common.save', 'Save Brew')}
               </button>

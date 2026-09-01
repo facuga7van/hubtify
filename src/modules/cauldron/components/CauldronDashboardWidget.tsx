@@ -83,7 +83,9 @@ export default function CauldronDashboardWidget() {
     loadFirstPreset();
   }, [loadStats, loadState, loadFirstPreset]);
 
-  // Reload data when account is switched
+  // Reload on account switch and after a sync pull brought cauldron rows in
+  // (Layout fires `sync:cauldronUpdated`; nobody listened, so the widget showed
+  // stale stats until the next navigation).
   useEffect(() => {
     const handler = () => {
       loadStats();
@@ -91,7 +93,11 @@ export default function CauldronDashboardWidget() {
       loadFirstPreset();
     };
     window.addEventListener('account:switched', handler);
-    return () => window.removeEventListener('account:switched', handler);
+    window.addEventListener('sync:cauldronUpdated', handler);
+    return () => {
+      window.removeEventListener('account:switched', handler);
+      window.removeEventListener('sync:cauldronUpdated', handler);
+    };
   }, [loadStats, loadState, loadFirstPreset]);
 
   // Subscribe to tick events
