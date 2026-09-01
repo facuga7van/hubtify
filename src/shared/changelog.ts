@@ -13,6 +13,68 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.8.1',
+    date: '2026-09-01',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'rpg',
+        text: {
+          es: 'En el estante de los logros no se distinguía cuál habías ganado y cuál no: todo era casi el mismo pergamino traslúcido. Ahora un logro obtenido es una medalla acuñada en oro que sobresale del estante, y uno pendiente es un engarce vacío hundido en la madera, con su candado. Se ve de un vistazo',
+          en: 'On the achievements shelf you could not tell what you had earned from what you had not — it was all nearly the same translucent parchment. An earned achievement is now a medal struck in gold sitting proud of the shelf, and a pending one is an empty setting sunk into the wood, with its padlock. You see it at a glance',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'El estante gana filtro —Todos, Obtenidos, Pendientes— con la cuenta de cada uno, y una barra arriba que te dice cuánto llevás. Los grupos que quedan vacíos con el filtro puesto desaparecen en vez de dejar títulos colgando',
+          en: 'The shelf gains a filter — All, Earned, Pending — with a count for each, plus a bar up top telling you how far along you are. Groups left empty by the filter disappear instead of leaving headings hanging over nothing',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Tocar el cofre del tesoro te corría toda la columna de abajo de golpe. Ahora la lista de cuentas flota por encima y no mueve nada, y se cierra clickeando afuera o con Escape',
+          en: 'Tapping the treasure chest shoved the whole column below it down. The account list now floats above the content without moving anything, and closes on an outside click or Escape',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El cofre mostraba una cuenta «Efectivo» que nunca creaste, en cero y sin historia detrás — un saldo que no se podía rastrear y que hacía imposible entender para qué servía el cofre. Una cuenta sin usar y en cero ya no se muestra; una que usaste y volvió a cero sí, porque ese cero sí te dice algo',
+          en: 'The chest was showing an "Efectivo" account you never created, at zero with no history behind it — a balance you could not trace, and the reason the whole chest made no sense. An unused account at zero is now hidden; one you used that came back to zero still shows, because that zero actually tells you something',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'rpg',
+        text: {
+          es: 'En la crónica del panel aparecían renglones en mayúsculas tipo ACHIEVEMENT_UNLOCKED en medio de una lista en castellano. Faltaban siete nombres: logros, días sellados, meses dentro del presupuesto, hábitos salteados, movimientos borrados, calderos abandonados y quests creadas',
+          en: 'The dashboard chronicle printed raw lines like ACHIEVEMENT_UNLOCKED in the middle of a Spanish list. Seven names were missing: achievements, sealed days, months within budget, skipped habits, deleted movements, abandoned brews and created quests',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'rpg',
+        text: {
+          es: 'El logro «Segunda Oportunidad» era imposible de conseguir: esperaba un evento que la app había dejado de emitir, así que reabrir un día cerrado nunca lo desbloqueaba. Ya se puede ganar',
+          en: 'The "Second Chance" achievement could never be earned: it was waiting on an event the app had stopped emitting, so reopening a closed day never unlocked it. It can be won now',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Al menú lateral ya no le entraban todas las secciones y aparecía un scroll que cortaba «Recompensas» por la mitad. Ahora se acomoda según el alto de la ventana —no sólo el ancho— y entra completo hasta en la ventana más chica que la app permite',
+          en: 'The sidebar had run out of room for all its sections and a scrollbar was slicing "Rewards" in half. It now adapts to the window height — not just its width — and fits in full down to the smallest window the app allows',
+        },
+      },
+    ],
+  },
+  {
     version: '0.8.0',
     date: '2026-09-01',
     changes: [
