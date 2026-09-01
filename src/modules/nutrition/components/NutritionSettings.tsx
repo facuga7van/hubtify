@@ -11,7 +11,8 @@ import { Gear, Shield, Compass, Chalice, Scale } from '../../../shared/component
 import { todayDateString } from '../../../../shared/date-utils';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
-import { DAY_CUTOFF_OPTIONS, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
+import { DAY_CUTOFF_OPTIONS, DEFAULT_DAY_CUTOFF_HOUR, nutritionToday } from '../nutrition-day';
+import { notifyNutritionChanged } from '../notify';
 import type { NutritionProfile } from '../types';
 
 type Goal = 'deficit' | 'maintain' | 'surplus';
@@ -65,9 +66,14 @@ export default function NutritionSettings() {
     Promise.all([
       window.api.nutritionGetProfile(),
       window.api.nutritionGetWeights(),
-      window.api.nutritionGetSummary(todayDateString()),
       window.api.nutritionGetTodayTarget(),
-    ]).then(([prof, weights, summary, todayTarget]) => {
+    ]).then(async ([prof, weights, todayTarget]) => {
+      // The summary must be asked for the NUTRITIONAL day (profile cutoff), the
+      // same one `getTodayTarget` uses: with a 04:00 cutoff, between midnight
+      // and four the calendar date had no summary yet and the "TDEE in use"
+      // block vanished while the target beside it still spoke of yesterday.
+      const cutoff = (prof as NutritionProfile | null)?.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR;
+      const summary = await window.api.nutritionGetSummary(nutritionToday(cutoff));
       const sum = summary as { tdee?: number } | null;
       setEffectiveTdee(sum?.tdee && sum.tdee > 0 ? Math.round(sum.tdee) : null);
       setEffectiveTarget(typeof todayTarget === 'number' && todayTarget > 0 ? Math.round(todayTarget) : null);
@@ -161,6 +167,7 @@ export default function NutritionSettings() {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
       window.dispatchEvent(new Event('nutrition:settingsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : t('common.somethingWentWrong'));
     } finally {
@@ -216,7 +223,7 @@ export default function NutritionSettings() {
           <div className="nutri-field span-2">
             <label className="nutri-label">{t('nutrify.dateOfBirth', 'Fecha de nacimiento')}</label>
             <RpgDatePicker value={dateOfBirth} onChange={setDateOfBirth}
-              min="1900-01-01" max={new Date().toISOString().split('T')[0]} />
+              min="1900-01-01" max={todayDateString()} />
             {dateOfBirth && (
               <span className="nutri-field-hint">
                 {t('nutrify.calculatedAge', { age })}

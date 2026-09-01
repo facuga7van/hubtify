@@ -40,9 +40,9 @@ export interface SuggestionKeyHandlers {
  */
 export function useFoodSuggestions(query: string, enabled: boolean) {
   const [suggestions, setSuggestions] = useState<HistorySuggestion[]>([]);
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocusedState] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  /** Escape hides the list until the query changes again. */
+  /** Escape (or `close()`) hides the list until the user types or focuses again. */
   const [dismissed, setDismissed] = useState(false);
   /** Guards against an out-of-order response overwriting a newer one. */
   const requestRef = useRef(0);
@@ -53,7 +53,16 @@ export function useFoodSuggestions(query: string, enabled: boolean) {
       : trimmed.length >= MIN_QUERY_LENGTH ? 'search'
         : 'idle';
 
-  useEffect(() => { setDismissed(false); }, [trimmed]);
+  // Typing something un-dismisses; the query going EMPTY does not. Logging a
+  // suggestion clears the input and calls close() in the same batch, and the
+  // old "any change resets" rule reopened "Tus de siempre" right over the
+  // entry that was just added. A fresh focus still answers with the usuals.
+  useEffect(() => { if (trimmed.length > 0) setDismissed(false); }, [trimmed]);
+
+  const setFocused = useCallback((next: boolean) => {
+    setFocusedState(next);
+    if (next) setDismissed(false);
+  }, []);
 
   useEffect(() => {
     if (!enabled || !focused || mode === 'idle') {

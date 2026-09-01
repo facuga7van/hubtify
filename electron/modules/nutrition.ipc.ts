@@ -8,7 +8,8 @@ import {
   computeNutritionStreak, DEFAULT_DAY_CUTOFF_HOUR,
 } from '../../shared/meal-utils';
 import type { MealSchedule, StreakDay } from '../../shared/meal-utils';
-import { getLevel, getTitle, clampHp } from '../../shared/rpg-engine';
+import { getLevel, getTitle, clampHp, getLocalDateString } from '../../shared/rpg-engine';
+import { bumpMasteryXp } from '../ipc/rpg-handlers';
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
@@ -65,6 +66,24 @@ function escapeLike(value: string): string {
  */
 function syncStamp(): string {
   return new Date().toISOString();
+}
+
+/**
+ * A sync stamp (ISO, UTC) rewritten in the engine's `rpg_events.created_at`
+ * shape: LOCAL 'YYYY-MM-DD HH:MM:SS' (shared/date-utils localTimestamp).
+ *
+ * `reopenDay` compares `created_at >= closed_at` as strings. With the raw ISO
+ * stamp that was false for every event of the same day (' ' < 'T'), so the
+ * DAY_SUMMARY was never found: the closure refunded the BASE xp instead of the
+ * multiplied one, the event stayed in the log, and each close/reopen cycle
+ * stacked one more DAY_SUMMARY row (and one more combo tick).
+ * A stamp that doesn't parse (legacy shapes) is compared as-is.
+ */
+function toLocalStamp(stamp: string): string {
+  const d = new Date(stamp);
+  if (Number.isNaN(d.getTime())) return stamp;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /**
@@ -192,9 +211,9 @@ export function registerNutritionIpcHandlers(): void {
       : (existing?.protein_target_g ?? null);
     db.prepare(`
       INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule, dayCutoffHour, proteinTargetG);
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule, dayCutoffHour, proteinTargetG, syncStamp());
 
     // Recalc today's summary with new profile
     recalcSummary(db, nutritionToday(db));
@@ -279,19 +298,28 @@ export function registerNutritionIpcHandlers(): void {
 
     if (isDayClosed(db, to)) return { success: false, reason: 'day_closed', copied: 0 };
 
+    // La copia lleva TODO lo que describe la comida: la marca de evento (y su
+    // banda) y la proteína viajan con ella. Sin la marca, el asado de ayer
+    // copiado hoy se cerraba como un surplus común y costaba −20 HP injustos;
+    // sin protein_g, la proteína del día desaparecía.
     const rows = db.prepare(
-      `SELECT description, calories, source, frequent_food_id AS frequentFoodId, meal, time
+      `SELECT description, calories, source, frequent_food_id AS frequentFoodId, meal, time,
+              protein_g AS proteinG, is_event AS isEvent,
+              event_kcal_min AS eventKcalMin, event_kcal_max AS eventKcalMax
        FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC`,
     ).all(from) as Array<{
       description: string; calories: number; source: string;
       frequentFoodId: number | null; meal: string | null; time: string;
+      proteinG: number | null; isEvent: number | null;
+      eventKcalMin: number | null; eventKcalMax: number | null;
     }>;
 
     if (rows.length === 0) return { success: false, reason: 'source_empty', copied: 0 };
 
     const insert = db.prepare(`
-      INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, sync_id)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+      INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal,
+                            protein_g, is_event, event_kcal_min, event_kcal_max, updated_at, sync_id)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     db.transaction(() => {
@@ -299,7 +327,8 @@ export function registerNutritionIpcHandlers(): void {
         // La comida original pudo venir de la IA; la copia no vuelve a estimar, asi
         // que su origen es 'frequent' (reutilizada), no 'ai_estimate'.
         const source = r.source === 'ai_estimate' ? 'frequent' : r.source;
-        insert.run(to, r.time, r.description, r.calories, source, r.frequentFoodId, r.meal, syncStamp(), genId());
+        insert.run(to, r.time, r.description, r.calories, source, r.frequentFoodId, r.meal,
+          r.proteinG, r.isEvent ? 1 : 0, r.eventKcalMin, r.eventKcalMax, syncStamp(), genId());
       }
       recalcSummary(db, to);
     })();
@@ -619,8 +648,8 @@ export function registerNutritionIpcHandlers(): void {
     const date = metrics.date ?? nutritionToday(db);
     db.prepare(`
       INSERT OR REPLACE INTO nutrition_daily_metrics (date, steps, gym, updated_at)
-      VALUES (?, ?, ?, datetime('now'))
-    `).run(date, metrics.steps ?? null, metrics.gym ? 1 : 0);
+      VALUES (?, ?, ?, ?)
+    `).run(date, metrics.steps ?? null, metrics.gym ? 1 : 0, syncStamp());
     recalcSummary(db, date);
   });
 
@@ -864,6 +893,11 @@ export function registerNutritionIpcHandlers(): void {
    * and random-bonus multipliers, which the stored xp_total does not. If the event
    * can't be found (pre-v10 closures with no closed_at, or a purged log) the stored
    * base values are reversed as a best effort.
+   *
+   * This mirrors the engine's own undo path (rpg-handlers isUndo): delete the
+   * event, refund its XP/HP, and give back the daily_combo tick it earned when
+   * it was today's. Without the last step every close/reopen cycle left the
+   * combo one notch higher — 4 cycles = 2.0x on everything else that day.
    */
   ipcHandle('nutrition:reopenDay', (_e, date: string) => {
     const db = getDb();
@@ -875,27 +909,38 @@ export function registerNutritionIpcHandlers(): void {
 
       const xpTotal = (closed.xp_total as number) ?? 0;
       const hpChange = (closed.hp_change as number) ?? 0;
-      const since = (closed.closed_at as string | null) ?? date;
+      const closedAt = closed.closed_at as string | null;
+      const since = closedAt ? toLocalStamp(closedAt) : date;
 
       const event = db.prepare(`
-        SELECT id, xp_gained, hp_change FROM rpg_events
+        SELECT id, xp_gained, hp_change, created_at FROM rpg_events
         WHERE module_id = 'nutrition' AND event_type = 'DAY_SUMMARY'
           AND json_extract(payload, '$.xp') = ?
           AND json_extract(payload, '$.hp') = ?
           AND created_at >= ?
         ORDER BY id DESC LIMIT 1
-      `).get(xpTotal, hpChange, since) as { id: number; xp_gained: number; hp_change: number } | undefined;
+      `).get(xpTotal, hpChange, since) as { id: number; xp_gained: number; hp_change: number; created_at: string } | undefined;
 
       const xpToRevert = event ? event.xp_gained : xpTotal;
       const hpToRevert = event ? event.hp_change : hpChange;
-      if (event) db.prepare('DELETE FROM rpg_events WHERE id = ?').run(event.id);
+      if (event) {
+        db.prepare('DELETE FROM rpg_events WHERE id = ?').run(event.id);
+        // The close bumped the nutrition mastery; reopening annuls that entry
+        // (floor 0 inside) — otherwise close/reopen/close farms mastery.
+        bumpMasteryXp(db, 'nutrition', -event.xp_gained);
+      }
 
-      const stats = db.prepare('SELECT xp, hp, title FROM player_stats WHERE user_id = ?')
-        .get('default') as { xp: number; hp: number; title: string };
+      const stats = db.prepare('SELECT xp, hp, title, daily_combo AS combo FROM player_stats WHERE user_id = ?')
+        .get('default') as { xp: number; hp: number; title: string; combo: number };
       const newXp = Math.max(0, stats.xp - xpToRevert);
       const newLevel = getLevel(newXp);
-      db.prepare('UPDATE player_stats SET xp = ?, level = ?, title = ?, hp = ? WHERE user_id = ?')
-        .run(newXp, newLevel, getTitle(newLevel), clampHp(stats.hp - hpToRevert), 'default');
+      // The combo belongs to the calendar day: only a close made TODAY ticked
+      // the counter the player still carries, so only that one is given back.
+      const today = getLocalDateString();
+      const combo = stats.combo || 0;
+      const newCombo = event && event.created_at.slice(0, 10) === today && combo > 0 ? combo - 1 : combo;
+      db.prepare('UPDATE player_stats SET xp = ?, level = ?, title = ?, hp = ?, daily_combo = ? WHERE user_id = ?')
+        .run(newXp, newLevel, getTitle(newLevel), clampHp(stats.hp - hpToRevert), newCombo, 'default');
 
       // Soft delete, not DELETE: a hard delete is resurrected by the next pull,
       // because mergeNutritionData re-inserts any closure row it doesn't find locally.
@@ -1048,8 +1093,8 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
 
   db.prepare(`
     INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance, updated_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `).run(date, totalCals.total, Math.round(bmr), tdee, balance);
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(date, totalCals.total, Math.round(bmr), tdee, balance, syncStamp());
 }
 
 /**

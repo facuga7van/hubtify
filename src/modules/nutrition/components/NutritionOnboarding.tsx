@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getAgeFromDob } from '../../../../shared/date-utils';
 import RpgDatePicker from '../../../shared/components/RpgDatePicker';
 import { DEFAULT_MEAL_SCHEDULE } from '../../../../shared/meal-utils';
+import { notifyNutritionChanged } from '../notify';
 
 const ACTIVITY_MULTIPLIERS: Record<string, number> = {
   sedentary: 1.2,
@@ -62,6 +63,7 @@ export default function NutritionOnboarding({ onComplete, onSkip }: Props) {
         // ship sensible defaults and let them tune it later in Settings.
         mealSchedule: { ...DEFAULT_MEAL_SCHEDULE },
       });
+      notifyNutritionChanged();
       onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.somethingWentWrong'));

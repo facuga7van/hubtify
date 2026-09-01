@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
@@ -7,6 +7,7 @@ import { estimateNutrition } from '../estimate-service';
 import { resolveMealType } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
+import { notifyNutritionChanged } from '../notify';
 import type { NutritionProfile } from '../types';
 
 export default function NutritionDashboardWidget() {
@@ -87,7 +88,29 @@ export default function NutritionDashboardWidget() {
     }
   };
 
-  const handleConfirm = async () => {
+  // One write at a time: a double click on Confirmar logged the meal twice
+  // (two rows, two MEAL_LOGGED). The ref answers before React re-renders.
+  const loggingRef = useRef(false);
+  const [logging, setLogging] = useState(false);
+  const withLogGuard = async (run: () => Promise<void>) => {
+    if (loggingRef.current) return;
+    loggingRef.current = true;
+    setLogging(true);
+    try {
+      await run();
+    } finally {
+      loggingRef.current = false;
+      setLogging(false);
+    }
+  };
+
+  /** The one backend refusal worth naming: the nutritional day is already sealed. */
+  const logErrorMessage = (err: unknown) =>
+    /closed day/i.test(err instanceof Error ? err.message : String(err))
+      ? t('nutrify.dayClosedBanner', 'Este día está cerrado: no se pueden agregar ni editar comidas.')
+      : t('nutrify.logError', 'Error al registrar');
+
+  const handleConfirm = () => withLogGuard(async () => {
     if (!estimation) return;
     try {
       await window.api.nutritionLogFood({
@@ -111,10 +134,11 @@ export default function NutritionDashboardWidget() {
       setShowQuickLog(false);
       loadData();
       window.dispatchEvent(new Event('rpg:statsChanged'));
-    } catch {
-      toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar') });
+      notifyNutritionChanged();
+    } catch (err) {
+      toast({ type: 'warning', message: logErrorMessage(err) });
     }
-  };
+  });
 
   const handleDismiss = () => {
     setEstimation(null);
@@ -258,7 +282,7 @@ export default function NutritionDashboardWidget() {
                 <span className="qb-numeral">{estimation.totalCalories} kcal</span>
               </div>
               <div className="nutri-dash-quick-actions">
-                <button className="rpg-button nutri-dash-quick-confirm" onClick={handleConfirm}>
+                <button className="rpg-button nutri-dash-quick-confirm" onClick={handleConfirm} disabled={logging}>
                   {t('nutrify.confirm', 'Confirmar')}
                 </button>
                 <button className="nutri-dash-quick-cancel" onClick={handleDismiss}>
@@ -281,30 +305,37 @@ export default function NutritionDashboardWidget() {
               />
               <button
                 className="rpg-button"
-                disabled={!manualCalories || Number(manualCalories) <= 0}
-                onClick={async () => {
+                disabled={logging || !manualCalories || Number(manualCalories) <= 0}
+                onClick={() => withLogGuard(async () => {
                   const cal = Number(manualCalories);
-                  await window.api.nutritionLogFood({
-                    date: nutritionToday(dayCutoffHour),
-                    description: foodInput.trim() || t('nutrify.manualEntry', 'Entrada manual'),
-                    calories: cal,
-                    source: 'manual',
-                    meal: resolveNowMeal(),
-                  });
-                  const rpgResult = await window.api.processRpgEvent({
-                    type: 'MEAL_LOGGED',
-                    moduleId: 'nutrition',
-                    // Same reward as logging from the Nutrify page - the entry is identical.
-                    payload: { xp: 10, hp: 0, calories: cal },
-                    timestamp: Date.now(),
-                  });
-                  toast({ type: 'xp', message: `+${rpgResult.xpGained} XP` });
-                  window.dispatchEvent(new Event('rpg:statsChanged'));
-                  setShowManualFallback(false);
-                  setManualCalories('');
-                  setFoodInput('');
-                  loadData();
-                }}
+                  // With the day closed, `nutrition:logFood` throws — this used
+                  // to be an unhandled rejection with the number stuck in the input.
+                  try {
+                    await window.api.nutritionLogFood({
+                      date: nutritionToday(dayCutoffHour),
+                      description: foodInput.trim() || t('nutrify.manualEntry', 'Entrada manual'),
+                      calories: cal,
+                      source: 'manual',
+                      meal: resolveNowMeal(),
+                    });
+                    const rpgResult = await window.api.processRpgEvent({
+                      type: 'MEAL_LOGGED',
+                      moduleId: 'nutrition',
+                      // Same reward as logging from the Nutrify page - the entry is identical.
+                      payload: { xp: 10, hp: 0, calories: cal },
+                      timestamp: Date.now(),
+                    });
+                    toast({ type: 'xp', message: `+${rpgResult.xpGained} XP` });
+                    window.dispatchEvent(new Event('rpg:statsChanged'));
+                    notifyNutritionChanged();
+                    setShowManualFallback(false);
+                    setManualCalories('');
+                    setFoodInput('');
+                    loadData();
+                  } catch (err) {
+                    toast({ type: 'warning', message: logErrorMessage(err) });
+                  }
+                })}
               >
                 {t('nutrify.confirm', 'Confirmar')}
               </button>

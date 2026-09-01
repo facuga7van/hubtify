@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
@@ -20,6 +20,7 @@ import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
 import { useFoodSuggestions } from '../useFoodSuggestions';
 import { cacheEstimate } from '../history-api';
+import { notifyNutritionChanged } from '../notify';
 import FoodSuggestionList from './FoodSuggestionList';
 import type { HistorySuggestion } from '../history-search';
 import type { TFunction } from 'i18next';
@@ -186,6 +187,25 @@ export default function Today() {
   const { toast } = useToast();
   const confirm = useConfirm();
 
+  // ── One log at a time ────────────────────────────
+  // Every path that writes a meal (confirm, manual, favourite pill, history
+  // suggestion, repeat yesterday) shares this guard: a double click used to
+  // insert two rows and pay MEAL_LOGGED twice. The ref answers synchronously
+  // (state lags a render); the state disables the buttons.
+  const loggingRef = useRef(false);
+  const [logging, setLogging] = useState(false);
+  const withLogGuard = async (run: () => Promise<void>) => {
+    if (loggingRef.current) return;
+    loggingRef.current = true;
+    setLogging(true);
+    try {
+      await run();
+    } finally {
+      loggingRef.current = false;
+      setLogging(false);
+    }
+  };
+
   // ── History autocomplete ─────────────────────────
   // The fast lane: with a few weeks of log behind you, most meals are already in
   // there, and picking one skips the model entirely — no wait, no cost, works
@@ -303,6 +323,9 @@ export default function Today() {
   const handleEstimate = async (skipCache = false) => {
     if (!foodInput.trim() || estimating) return;
     const description = foodInput.trim();
+    // Enter with nothing highlighted: the dropdown (fixed, 320px tall) used to
+    // stay open right on top of the estimate the user now has to read and edit.
+    suggest.close();
     setEstimating(true);
     setEstimation(null);
     setEstimateError('');
@@ -322,7 +345,7 @@ export default function Today() {
     }
   };
 
-  const handleConfirmEstimation = async () => {
+  const handleConfirmEstimation = () => withLogGuard(async () => {
     if (!estimation) return;
     const calories = parseInt(editCalories) || estimation.totalCalories;
     if (calories <= 0) {
@@ -375,14 +398,15 @@ export default function Today() {
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] confirmEstimation error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
     }
-  };
+  });
 
   // ── Manual calorie entry ────────────────────────
-  const handleManualAdd = async () => {
+  const handleManualAdd = () => withLogGuard(async () => {
     const cal = parseInt(manualCalories);
     if (!foodInput.trim() || isNaN(cal) || cal <= 0) return;
     // Proteína opcional en la carga manual: vacío = sin dato, nunca 0 implícito.
@@ -411,11 +435,12 @@ export default function Today() {
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] manualAdd error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
     }
-  };
+  });
 
   // ── Modo evento ──────────────────────────────────
   /**
@@ -480,6 +505,7 @@ export default function Today() {
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] logEvent error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
@@ -494,30 +520,35 @@ export default function Today() {
       message: t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.'),
     });
     if (!ok) return;
-    try {
-      const res = await window.api.nutritionCopyDay({ to: date });
-      if (!res?.success) {
-        toast({
-          type: 'info',
-          message: res?.reason === 'day_closed'
-            ? t('nutrify.dayClosedBanner', 'Este día está cerrado.')
-            : t('nutrify.repeatYesterdayEmpty', 'Ayer no registraste ninguna comida.'),
+    await withLogGuard(async () => {
+      try {
+        const res = await window.api.nutritionCopyDay({ to: date });
+        if (!res?.success) {
+          toast({
+            type: 'info',
+            message: res?.reason === 'day_closed'
+              ? t('nutrify.dayClosedBanner', 'Este día está cerrado.')
+              : t('nutrify.repeatYesterdayEmpty', 'Ayer no registraste ninguna comida.'),
+          });
+          return;
+        }
+        // Un solo MEAL_LOGGED por la accion, no uno por comida copiada: cuatro
+        // eventos de un click inflarian el combo igual que cuatro registros
+        // manuales sin el esfuerzo. El camino comodo paga, pero paga una vez.
+        await window.api.processRpgEvent({
+          type: 'MEAL_LOGGED', moduleId: 'nutrition',
+          payload: { xp: 10, hp: 0, source: 'copy_day', copied: res.copied },
+          timestamp: Date.now(),
         });
-        return;
+        toast({ type: 'nutri', message: t('nutrify.repeatYesterdayDone', 'Comidas de ayer copiadas') });
+        await loadData(date);
+        window.dispatchEvent(new Event('rpg:statsChanged'));
+        notifyNutritionChanged();
+      } catch (err) {
+        console.error('[Nutrition] copyDay error:', err);
+        toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
       }
-      // Un solo MEAL_LOGGED por la accion, no uno por comida copiada: cuatro
-      // eventos de un click inflarian el combo igual que cuatro registros
-      // manuales sin el esfuerzo. El camino comodo paga, pero paga una vez.
-      await window.api.processRpgEvent({
-        type: 'MEAL_LOGGED', moduleId: 'nutrition',
-        payload: { xp: 10, hp: 0, source: 'copy_day', copied: res.copied },
-        timestamp: Date.now(),
-      });
-      toast({ type: 'nutri', message: t('nutrify.repeatYesterdayDone', 'Comidas de ayer copiadas') });
-      await loadData(date);
-    } catch (err) {
-      toast({ type: 'warning', message: String(err) });
-    }
+    });
   };
 
   /** What clicking this pill would log: a staged chip wins, else the pill's own. */
@@ -531,7 +562,7 @@ export default function Today() {
    * usual MEAL_LOGGED XP, because the user recorded a meal; the reward is for
    * keeping the log honest, not for waiting on a model.
    */
-  const handleLogSuggestion = async (s: HistorySuggestion) => {
+  const handleLogSuggestion = (s: HistorySuggestion) => withLogGuard(async () => {
     // The portion chips from phase 1 stage a multiplier for the next thing
     // logged — a suggestion counts as "the next thing".
     const portion = nextPortion ?? 1;
@@ -565,18 +596,19 @@ export default function Today() {
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] logSuggestion error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
     }
-  };
+  });
 
   /** Tab on a suggestion: take the text, leave the logging — they want to edit it. */
   const handleCompleteSuggestion = (s: HistorySuggestion) => {
     setFoodInput(s.description);
   };
 
-  const handleLogFavorite = async (food: FavoriteFood) => {
+  const handleLogFavorite = (food: FavoriteFood) => withLogGuard(async () => {
     // Portion chips scale the saved calories, so "half a milanesa" is one click.
     const portion = portionFor(food.id);
     const calories = Math.round(food.calories * portion);
@@ -604,11 +636,12 @@ export default function Today() {
       if (updatedFoods.length > 0) setLastAddedId(Math.max(...updatedFoods.map(f => f.id)));
       loadData(date);
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] logFavorite error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
     }
-  };
+  });
 
   const handleAddFavorite = async (description: string, calories: number, source?: string, aiBreakdown?: string) => {
     try {
@@ -621,6 +654,7 @@ export default function Today() {
       });
       const favorites = await window.api.nutritionGetFavoriteFoods();
       setFavoriteFoods(favorites as FavoriteFood[]);
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] addFavorite error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
@@ -639,6 +673,7 @@ export default function Today() {
       toast({ type: 'info', message: t('nutrify.favoriteRemoved', 'Favorito eliminado') });
       const favorites = await window.api.nutritionGetFavoriteFoods();
       setFavoriteFoods(favorites as FavoriteFood[]);
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] removeFavorite error:', err);
       toast({ type: 'warning', message: t('nutrify.logError', 'Error al registrar comida') });
@@ -649,6 +684,7 @@ export default function Today() {
     try {
       await window.api.nutritionUpdateFood(id, { meal });
       loadData(date);
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrify] meal change failed', err);
     }
@@ -659,6 +695,7 @@ export default function Today() {
       try {
         await window.api.nutritionDeleteFood(id);
         loadData(date);
+        notifyNutritionChanged();
       } catch (err) {
         console.error('[Nutrify] delete failed', err);
       }
@@ -676,6 +713,7 @@ export default function Today() {
       await window.api.nutritionDeleteByDate(date);
       toast({ type: 'info', message: t('nutrify.deleteDaySuccess', 'Comidas del día eliminadas') });
       loadData(date);
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] deleteDay error:', err);
       toast({ type: 'warning', message: t('nutrify.deleteDayError', 'Error al eliminar comidas') });
@@ -707,6 +745,7 @@ export default function Today() {
     try {
       await window.api.nutritionSaveWeeklyMetrics({ weightKg: kg });
       setWeightPopup({ show: false });
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrify] weight save failed', err);
       setWeightError(t('nutrify.weightCheckin.saveFailed', 'Error saving weight'));
@@ -730,6 +769,7 @@ export default function Today() {
       const stepsVal = popupSteps ? parseInt(popupSteps) : null;
       await window.api.nutritionSaveDailyMetrics({ ...metrics, steps: stepsVal, gym: popupGym, date });
       setCloseDayPopup(false);
+      notifyNutritionChanged();
       await doCloseDay();
       loadPendingDays();
     } catch {
@@ -776,6 +816,7 @@ export default function Today() {
       await loadData(date);
       loadPendingDays();
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } catch (err) {
       console.error('[Nutrition] reopenDay error:', err);
       toast({ type: 'warning', message: t('nutrify.reopenDayError', 'No se pudo reabrir el día') });
@@ -798,6 +839,7 @@ export default function Today() {
       });
       toast({ type: 'info', message: `+${xp} XP` });
       window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
     } else if (result.alreadyClosed) {
       const closed = await window.api.nutritionIsDayClosed(date);
       setDayClosed(closed as typeof dayClosed);
@@ -1187,7 +1229,7 @@ export default function Today() {
               <button
                 className="nutri-btn"
                 onClick={handleManualAdd}
-                disabled={!foodInput.trim() || !manualCalories}
+                disabled={logging || !foodInput.trim() || !manualCalories}
               >
                 {t('nutrify.add', 'Agregar')}
               </button>
@@ -1279,8 +1321,8 @@ export default function Today() {
                     )}
                   </div>
                   <div className="nutri-est-actions">
-                    <button className="nutri-btn nutri-btn-primary" onClick={handleConfirmEstimation}>
-                      {t('nutrify.confirmLog', 'Confirmar y registrar')}
+                    <button className="nutri-btn nutri-btn-primary" onClick={handleConfirmEstimation} disabled={logging}>
+                      {logging ? t('common.loading', 'Cargando...') : t('nutrify.confirmLog', 'Confirmar y registrar')}
                     </button>
                     <button className="nutri-btn nutri-btn-ghost" onClick={() => handleAddFavorite(
                       foodInput.trim(),
@@ -1330,7 +1372,7 @@ export default function Today() {
                   type="button"
                   className="nutri-btn nutri-btn-sm"
                   onClick={handleRepeatYesterday}
-                  disabled={!!dayClosed}
+                  disabled={!!dayClosed || logging}
                   title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
                 >
                   {t('nutrify.repeatYesterday', 'Repetir ayer')}
@@ -1356,6 +1398,7 @@ export default function Today() {
                     <button
                       className="nutri-btn nutri-pill"
                       onClick={() => handleLogFavorite(f)}
+                      disabled={logging}
                       title={t('nutrify.favoriteLogTitle', 'Registrar {{name}} ({{kcal}} kcal)', {
                         name: f.description,
                         kcal: Math.round(f.calories * mult),
@@ -1444,6 +1487,7 @@ export default function Today() {
               <FoodLogItem key={f.id} entry={f} isNew={lastAddedId === f.id} className="" readOnly={!!dayClosed} onDelete={handleDelete} onMealChange={handleMealChange} mealSchedule={mealSchedule} dayCutoffHour={dayCutoffHour} onFavorite={() => handleAddFavorite(f.description, f.calories, f.source || undefined, f.aiBreakdown || undefined)} onUpdate={async (id, fields) => {
                 await window.api.nutritionUpdateFood(id, fields);
                 loadData(date);
+                notifyNutritionChanged();
               }} />
             ))}
           </div>
