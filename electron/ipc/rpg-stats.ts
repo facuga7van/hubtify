@@ -22,7 +22,30 @@ export function defaultStats(): PlayerStatsV2 {
   };
 }
 
-export function rowToStats(row: Record<string, unknown>, today = getLocalDateString()): PlayerStatsV2 {
+/**
+ * Extra pardon capacity BOUGHT for `month` (shop item `pardon_extra`).
+ *
+ * Counted from `shop_purchases` by the month the purchase belongs to. The row
+ * id is deterministic (`pardon_extra:YYYY-MM`) so this is 0 or 1 per month by
+ * construction, and the count converges across devices after a sync. Degrades
+ * to 0 on a pre-v6 handle — the automatic 2/month never depends on the shop.
+ */
+export function purchasedPardonExtras(db: Database.Database, month: string): number {
+  try {
+    const row = db.prepare(
+      "SELECT COUNT(*) AS c FROM shop_purchases WHERE item_id = 'pardon_extra' AND purchased_at LIKE ?"
+    ).get(`${month}%`) as { c: number } | undefined;
+    return row?.c ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function rowToStats(
+  row: Record<string, unknown>,
+  today = getLocalDateString(),
+  extraPardons = 0,
+): PlayerStatsV2 {
   const xp = row.xp as number;
   const level = row.level as number;
   const pardonsMonth = (row.pardons_month as string | null) ?? null;
@@ -47,7 +70,8 @@ export function rowToStats(row: Record<string, unknown>, today = getLocalDateStr
     pardonsUsed,
     // Month-rolled on read: the stored counter is stale as soon as the month
     // turns, and nothing writes to player_stats until the next event.
-    pardonsRemaining: pardonsRemaining(pardonsMonth, pardonsUsed, monthKey(today)),
+    // `extraPardons` folds in the shop's bought pardon (0 on pre-shop builds).
+    pardonsRemaining: pardonsRemaining(pardonsMonth, pardonsUsed, monthKey(today), extraPardons),
     bestStreak: (row.best_streak as number | null) ?? 0,
     innSince: (row.inn_since as string | null) ?? null,
   };
@@ -73,5 +97,8 @@ export function rolloverVigor(db: Database.Database, today = getLocalDateString(
 /** Reads the single-player stats row (user_id='default'), falling back to defaults. */
 export function getPlayerStats(db: Database.Database): PlayerStatsV2 {
   const row = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown> | undefined;
-  return row ? rowToStats(row) : defaultStats();
+  const today = getLocalDateString();
+  // Read-only, so the Syl snapshot path stays side-effect free.
+  const extra = purchasedPardonExtras(db, monthKey(today));
+  return row ? rowToStats(row, today, extra) : defaultStats();
 }

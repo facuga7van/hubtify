@@ -18,6 +18,12 @@
  *   rpgGetSeals(from, to)   -> DaySeal[]
  *   rpgGetAchievements()    -> AchievementState[]
  *   onRpgAchievementUnlocked(cb) -> unsubscribe
+ *
+ * Phase 4 additions (same wiring rules):
+ *   rpgGetShopCatalog()                -> ShopCatalogResult
+ *   rpgPurchaseShopItem(itemId)        -> PurchaseShopResult
+ *   rpgEquipShopItem(itemId, kind?)    -> EquipShopResult   (itemId null + kind = unequip)
+ *   rpgGetMasteries()                  -> MasteryState[]
  */
 
 /* ── contract types ───────────────────────────────── */
@@ -99,6 +105,56 @@ export type RedeemResult =
   | { ok: true; balance: number }
   | { ok: false; reason: 'insufficient' | 'not_found' };
 
+/* ── la tienda + maestrías (phase 4) ──────────────── */
+
+export type ShopItemKind = 'seal_style' | 'pardon' | 'frame' | 'background';
+
+export interface ShopCatalogEntry {
+  id: string;
+  kind: ShopItemKind;
+  cost: number;
+  /** `rpg.shop.items.<id>` — `.name` and `.desc` underneath. */
+  i18nKey: string;
+  /** Pardon: purchased THIS month (= monthly cap reached). Others: ever bought. */
+  owned: boolean;
+  equipped: boolean;
+  purchasedAt: string | null;
+}
+
+export interface ShopEquipped {
+  sealStyle: string | null;
+  frame: string | null;
+  background: string | null;
+}
+
+export interface ShopCatalogResult {
+  items: ShopCatalogEntry[];
+  balance: number;
+  equipped: ShopEquipped;
+}
+
+export type PurchaseShopResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' };
+
+export type EquipShopResult =
+  | { ok: true; equipped: ShopEquipped }
+  | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' };
+
+export interface MasteryState {
+  moduleId: string;
+  xp: number;
+  level: number;
+  /** Untranslated (Spanish) rank name; translate via `levelKey`. */
+  levelName: string;
+  /** i18n key: `rpg.mastery.ranks.<rank>`. */
+  levelKey: string;
+  /** Cumulative XP that opens the next level; null at level 10. */
+  nextLevelXp: number | null;
+  /** 0..1 within the current level. */
+  progress: number;
+}
+
 interface CodexApiShape {
   rpgGetDaySummary?: (date?: string) => Promise<DaySummary>;
   rpgSealDay?: (date?: string) => Promise<SealResult>;
@@ -110,6 +166,10 @@ interface CodexApiShape {
   rpgSaveReward?: (input: Record<string, unknown>) => Promise<Reward | null>;
   rpgDeleteReward?: (id: string) => Promise<{ ok: boolean }>;
   rpgRedeemReward?: (id: string) => Promise<RedeemResult>;
+  rpgGetShopCatalog?: () => Promise<ShopCatalogResult>;
+  rpgPurchaseShopItem?: (itemId: string) => Promise<PurchaseShopResult>;
+  rpgEquipShopItem?: (itemId: string | null, kind?: string) => Promise<EquipShopResult>;
+  rpgGetMasteries?: () => Promise<MasteryState[]>;
 }
 
 function api(): CodexApiShape {
@@ -222,6 +282,127 @@ export async function redeemReward(id: string): Promise<RedeemResult | null> {
 
 /** Fired after a redeem/save/delete so purses elsewhere re-read the balance. */
 export const OBOLOS_CHANGED_EVENT = 'obolos:changed';
+
+/* ── la tienda + maestrías (phase 4) ──────────────── */
+
+/** True once the main process exposes the shop handlers. */
+export function shopApiReady(): boolean {
+  return typeof api().rpgGetShopCatalog === 'function'
+    && typeof api().rpgPurchaseShopItem === 'function';
+}
+
+/** True once the main process exposes the masteries handler. */
+export function masteriesApiReady(): boolean {
+  return typeof api().rpgGetMasteries === 'function';
+}
+
+export async function getShopCatalog(): Promise<ShopCatalogResult | null> {
+  const fn = api().rpgGetShopCatalog;
+  if (!fn) return null;
+  try {
+    return (await fn()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function purchaseShopItem(itemId: string): Promise<PurchaseShopResult | null> {
+  const fn = api().rpgPurchaseShopItem;
+  if (!fn) return null;
+  try {
+    return (await fn(itemId)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function equipShopItem(
+  itemId: string | null,
+  kind?: ShopItemKind,
+): Promise<EquipShopResult | null> {
+  const fn = api().rpgEquipShopItem;
+  if (!fn) return null;
+  try {
+    return (await fn(itemId, kind)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getMasteries(): Promise<MasteryState[] | null> {
+  const fn = api().rpgGetMasteries;
+  if (!fn) return null;
+  try {
+    return (await fn()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fired after a purchase or an equip so the card, the modal and the shop agree. */
+export const SHOP_CHANGED_EVENT = 'shop:changed';
+
+/* ── equipped cosmetics → data attributes on <html> ──
+ *
+ * The bought frames/backgrounds/seal styles are pure CSS keyed off
+ * `:root[data-equip-frame=…]` etc. (src/hub/styles/codex-seal.css, which the
+ * shell loads at boot through Layout → CodexSealModal). Stamping the ids on
+ * the root element styles the PlayerCard and the hero portrait WITHOUT
+ * touching their components: CSS selects them from above.
+ *
+ * This module is imported by Layout, so the one-time init below runs with the
+ * shell — before any page is visited — and re-runs on account switches and on
+ * every equip. All of it degrades to "default look" while the handlers are
+ * not wired.
+ */
+
+const EQUIP_ATTRS = {
+  sealStyle: 'data-equip-seal',
+  frame: 'data-equip-frame',
+  background: 'data-equip-bg',
+} as const;
+
+function stampEquipped(equipped: ShopEquipped | null): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  for (const key of Object.keys(EQUIP_ATTRS) as Array<keyof typeof EQUIP_ATTRS>) {
+    const id = equipped?.[key] ?? null;
+    if (id) root.setAttribute(EQUIP_ATTRS[key], id);
+    else root.removeAttribute(EQUIP_ATTRS[key]);
+  }
+}
+
+/** Reads the equipment and stamps it on <html>. Safe to call any time. */
+export async function applyEquippedCosmetics(): Promise<void> {
+  if (!shopApiReady()) { stampEquipped(null); return; }
+  const catalog = await getShopCatalog();
+  stampEquipped(catalog?.equipped ?? null);
+}
+
+/** The seal-style id currently stamped on <html> (null = default rosette). */
+export function equippedSealStyleId(): string | null {
+  if (typeof document === 'undefined') return null;
+  return document.documentElement.getAttribute(EQUIP_ATTRS.sealStyle);
+}
+
+let cosmeticsInitDone = false;
+
+/** Idempotent: first call applies and subscribes; later calls are no-ops. */
+export function initEquippedCosmetics(): void {
+  if (cosmeticsInitDone || typeof window === 'undefined') return;
+  cosmeticsInitDone = true;
+  const refresh = () => { void applyEquippedCosmetics(); };
+  window.addEventListener('account:switched', refresh);
+  window.addEventListener(SHOP_CHANGED_EVENT, refresh);
+  refresh();
+}
+
+// Module-load side effect, on purpose: Layout imports this module at boot and
+// nothing else runs early enough to dress the PlayerCard before first paint.
+// Deferred a tick so the import itself stays pure-ish and never blocks.
+if (typeof window !== 'undefined') {
+  setTimeout(initEquippedCosmetics, 0);
+}
 
 /** Returns an unsubscribe; a no-op one while the broadcast is not wired. */
 export function onAchievementUnlocked(cb: (id: string) => void): () => void {

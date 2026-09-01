@@ -147,19 +147,130 @@ export function monthKey(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
 
-/** Pardons still available in `month`, given the stored counter and its month. */
+/**
+ * Pardons still available in `month`, given the stored counter and its month.
+ *
+ * `extra` is the count of PURCHASED pardons for that month (the shop's
+ * `pardon_extra`, capped at 1/month at purchase time). It raises the month's
+ * capacity without touching the used counter, so the automatic 2/month and
+ * the bought one share a single bookkeeping path.
+ */
 export function pardonsRemaining(
   storedMonth: string | null,
   storedUsed: number,
   month: string,
+  extra = 0,
 ): number {
   const used = storedMonth === month ? Math.max(0, storedUsed || 0) : 0;
-  return Math.max(0, PARDONS_PER_MONTH - used);
+  const bought = Math.max(0, Math.floor(extra) || 0);
+  return Math.max(0, PARDONS_PER_MONTH + bought - used);
 }
 
 export function xpToNextLevel(totalXp: number): number {
   const level = getLevel(totalXp);
   return xpThreshold(level + 1) - totalXp;
+}
+
+// ── Maestrías por módulo (phase 4) ─────────────────────────────────────────
+//
+// The global level becomes a badge of history; what the day-180 player feels
+// is the four per-module bars, each with its own line. Their fuel is the
+// `mastery_xp` accumulator (electron/ipc/db.ts core v6): `rpg_events` is
+// pruned at 365 days, so a mastery can never be recomputed from it — it is
+// summed forward, event by event, and backfilled once from whatever history
+// still exists.
+
+/** Mastery levels run 1..10. */
+export const MASTERY_MAX_LEVEL = 10;
+
+/**
+ * Cumulative XP required to REACH each level (index 0 → level 1).
+ *
+ * Deliberately slower than the global curve (global L10 ≈ 3.800 XP): a module
+ * used seriously earns ~40-60 XP/day, so level 10 at 9.500 XP lands around six
+ * months of real use — the brief's target. Early ranks still come fast
+ * (level 2 inside the first days), because a bar that never moves teaches
+ * nothing.
+ */
+export const MASTERY_THRESHOLDS: readonly number[] = [
+  0, 100, 300, 700, 1300, 2200, 3400, 5000, 7000, 9500,
+];
+
+/** Cumulative XP needed to reach mastery level `n` (clamped to 1..10). */
+export function masteryThreshold(n: number): number {
+  const idx = Math.max(1, Math.min(MASTERY_MAX_LEVEL, Math.floor(n))) - 1;
+  return MASTERY_THRESHOLDS[idx];
+}
+
+/** Mastery level for an accumulated XP total. Monotonic, 1..10. */
+export function masteryLevel(xp: number): number {
+  const total = Number.isFinite(xp) ? Math.max(0, xp) : 0;
+  let level = 1;
+  while (level < MASTERY_MAX_LEVEL && MASTERY_THRESHOLDS[level] <= total) level++;
+  return level;
+}
+
+/**
+ * Thematic rank names, one per level — guild ranks, not numbers.
+ * `[i18n suffix, Spanish fallback]`; the full key is `rpg.mastery.ranks.<suffix>`.
+ */
+export const MASTERY_RANKS: ReadonlyArray<readonly [string, string]> = [
+  ['apprentice', 'Aprendiz'],
+  ['initiate', 'Iniciado'],
+  ['journeyman', 'Oficial'],
+  ['artisan', 'Artesano'],
+  ['adept', 'Adepto'],
+  ['veteran', 'Veterano'],
+  ['expert', 'Experto'],
+  ['master', 'Maestro'],
+  ['grandmaster', 'Gran Maestro'],
+  ['legend', 'Leyenda del Oficio'],
+];
+
+/** i18n key for the rank at mastery level `n`. */
+export function masteryRankKey(n: number): string {
+  const idx = Math.max(1, Math.min(MASTERY_MAX_LEVEL, Math.floor(n))) - 1;
+  return `rpg.mastery.ranks.${MASTERY_RANKS[idx][0]}`;
+}
+
+/** Untranslated (Spanish) rank name at mastery level `n`. */
+export function masteryRankName(n: number): string {
+  const idx = Math.max(1, Math.min(MASTERY_MAX_LEVEL, Math.floor(n))) - 1;
+  return MASTERY_RANKS[idx][1];
+}
+
+/**
+ * Everything a mastery bar renders, derived from the accumulator alone.
+ * `nextLevelXp` is null at level 10; `progress` is 0..1 within the level
+ * (pinned to 1 at the cap).
+ */
+export function masteryInfo(xp: number): {
+  level: number;
+  levelName: string;
+  levelKey: string;
+  nextLevelXp: number | null;
+  progress: number;
+} {
+  const total = Number.isFinite(xp) ? Math.max(0, xp) : 0;
+  const level = masteryLevel(total);
+  if (level >= MASTERY_MAX_LEVEL) {
+    return {
+      level,
+      levelName: masteryRankName(level),
+      levelKey: masteryRankKey(level),
+      nextLevelXp: null,
+      progress: 1,
+    };
+  }
+  const floor = MASTERY_THRESHOLDS[level - 1];
+  const ceil = MASTERY_THRESHOLDS[level];
+  return {
+    level,
+    levelName: masteryRankName(level),
+    levelKey: masteryRankKey(level),
+    nextLevelXp: ceil,
+    progress: Math.max(0, Math.min(1, (total - floor) / (ceil - floor))),
+  };
 }
 
 export function getStreakMilestoneBonus(streak: number): number {

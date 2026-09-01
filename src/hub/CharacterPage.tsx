@@ -38,7 +38,12 @@ import { useAuthContext } from '../shared/AuthContext';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
 import { Medallion } from './codex/CodexSealIcons';
 import { catalogSize } from './codex/achievementCatalog';
-import { CODEX_SEALED_EVENT, getAchievements } from './codex/codexApi';
+import {
+  CODEX_SEALED_EVENT,
+  type MasteryState,
+  getAchievements,
+  getMasteries,
+} from './codex/codexApi';
 import './styles/character.css';
 import './styles/codex-seal.css';
 
@@ -105,6 +110,8 @@ export default function CharacterPage() {
   const [stats, setStats] = useState<PlayerStats | null>(null);
   /** null while the achievement handlers are not wired — the line stays hidden. */
   const [achievements, setAchievements] = useState<{ unlocked: number; total: number } | null>(null);
+  /** null while the masteries handler is not wired — the bars stay hidden. */
+  const [masteries, setMasteries] = useState<MasteryState[] | null>(null);
   const [history, setHistory] = useState<RpgEventRecord[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [characterName, setCharacterName] = useState<string>('');
@@ -128,6 +135,9 @@ export default function CharacterPage() {
         total: Math.max(list.length, catalogSize()),
       });
     });
+
+    // Masteries (phase 4): feature-detected — hidden until the handler lands.
+    getMasteries().then(setMasteries);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -253,11 +263,27 @@ export default function CharacterPage() {
             )}
           </div>
 
-          {/* Level & motto */}
+          {/* Level & motto. With masteries live, the global level steps back
+              into an insignia of history \u2014 the per-module bars below are the
+              progression that is actually felt. */}
           <div className="hero-info">
-            <div className="qb-small-caps hero-rank">
-              {t('rpg.level', 'Nivel').toUpperCase()} {levelDisplay} {'\u00b7'} {translatedTitle.toUpperCase()}
-            </div>
+            {masteries ? (
+              <div
+                className="hero-legend-badge"
+                title={t('rpg.legendLevelTip', 'Tu nivel global: la historia entera de la cuenta. El oficio de cada m\u00f3dulo se mide abajo.')}
+              >
+                <Crown width={12} height={12} />
+                {t('rpg.legendLevel', 'Nivel de leyenda')}
+                <span className="qb-numeral">{levelDisplay}</span>
+              </div>
+            ) : (
+              <div className="qb-small-caps hero-rank">
+                {t('rpg.level', 'Nivel').toUpperCase()} {levelDisplay} {'\u00b7'} {translatedTitle.toUpperCase()}
+              </div>
+            )}
+            {masteries && (
+              <div className="qb-small-caps hero-rank">{translatedTitle.toUpperCase()}</div>
+            )}
             <div className="hero-motto">
               {t('character.motto', '\u00ab Que el constante obrar sea su escudo \u00bb')}
             </div>
@@ -286,6 +312,21 @@ export default function CharacterPage() {
               </div>
             </div>
           </div>
+
+          {/* Maestrías (phase 4): four bars, each with its own line. Hidden
+              until the rpg:getMasteries handler is wired. */}
+          {masteries && (
+            <div className="hero-masteries-block">
+              <div className="qb-small-caps hero-masteries-title">
+                {t('rpg.masteryTitle', 'Maestrías del oficio').toUpperCase()}
+              </div>
+              <div className="hero-masteries">
+                {masteries.map((m) => (
+                  <MasteryBar key={m.moduleId} mastery={m} t={t} />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Wax seals */}
           <div className="hero-seals">
@@ -422,6 +463,60 @@ export default function CharacterPage() {
         {t('character.marginalia', 'nota del escriba \u2014 el retrato fue pintado en la feria de Midsummer')} <ArrowUpRight width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} />
       </div>
     </BookPage>
+  );
+}
+
+/* ── MasteryBar ──────────────────────────────────── */
+
+const MASTERY_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
+  quests: Sword,
+  nutrition: Scale,
+  finance: Coin,
+  cauldron: Cauldron,
+};
+
+const MASTERY_TONES: Record<string, 'rubric' | 'sage' | 'gold' | 'ink'> = {
+  quests: 'rubric',
+  nutrition: 'sage',
+  finance: 'gold',
+  cauldron: 'ink',
+};
+
+const MASTERY_LABEL_KEYS: Record<string, [string, string]> = {
+  quests: ['dashboard.moduleTasks', 'Misiones'],
+  nutrition: ['dashboard.moduleNutrition', 'Vituallas'],
+  finance: ['dashboard.moduleFinance', 'Arcas'],
+  cauldron: ['dashboard.moduleCauldron', 'Caldero'],
+};
+
+function MasteryBar({ mastery, t }: { mastery: MasteryState; t: TFunction }) {
+  const Icon = MASTERY_ICONS[mastery.moduleId] ?? Sparkle;
+  const tone = MASTERY_TONES[mastery.moduleId] ?? 'ink';
+  const [labelKey, labelFallback] = MASTERY_LABEL_KEYS[mastery.moduleId] ?? ['', mastery.moduleId];
+  const label = labelKey ? t(labelKey, labelFallback) : mastery.moduleId;
+  const rank = t(mastery.levelKey, mastery.levelName);
+  const pct = Math.round(mastery.progress * 100);
+  const hint = mastery.nextLevelXp !== null
+    ? t('rpg.masteryNext', {
+        n: mastery.nextLevelXp - mastery.xp,
+        defaultValue: '{{n}} xp al siguiente rango',
+      })
+    : t('rpg.masteryPeak', 'cima del oficio');
+
+  return (
+    <div className={`hero-mastery hero-mastery--${mastery.moduleId}`}>
+      <span className="hero-mastery__icon"><Icon width={13} height={13} /></span>
+      <div className="hero-mastery__body">
+        <div className="hero-mastery__header">
+          <span className="qb-small-caps hero-mastery__module">{label}</span>
+          <span className="qb-hand hero-mastery__rank">
+            {rank} {'·'} {t('rpg.masteryLevelShort', 'Rango')} {mastery.level}
+          </span>
+        </div>
+        <Gauge value={pct} max={100} tone={tone} showPips={false} />
+        <div className="hero-mastery__hint">{hint}</div>
+      </div>
+    </div>
   );
 }
 

@@ -252,6 +252,52 @@ export const coreMigrations: Migration[] = [
       );
     `,
   },
+  {
+    namespace: 'core',
+    version: 6,
+    up: `
+      -- ── RPG phase 4: la tienda + maestrías ──────────────────────────────────
+      -- shop_purchases: one row per bought catalogue item. The catalogue lives
+      -- in code (shared/shop-catalog.ts); only the purchase is data. Row ids are
+      -- DETERMINISTIC (item id; item id + month for the monthly pardon), so the
+      -- cross-device merge is a pure union that dedupes a double purchase
+      -- instead of charging it twice. Append-only in practice, like
+      -- achievements_unlocked. Equipment is NOT here: it is per-device state in
+      -- app_state (equipped_seal_style / equipped_frame / equipped_background),
+      -- which deliberately does not sync.
+      CREATE TABLE IF NOT EXISTS shop_purchases (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL,
+        purchased_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_shop_purchases_item ON shop_purchases(item_id);
+
+      -- mastery_xp: per-module XP ACCUMULATOR. rpg_events is pruned at 365
+      -- days, so a mastery can never be recomputed from it — it is summed
+      -- forward: backfilled once here from whatever history exists, then
+      -- incremented by every processRpgEvent in the same transaction.
+      -- Sync semantics: merge by MAX(xp) per module_id (a converging counter;
+      -- two devices accumulating in parallel may lose the smaller device's
+      -- delta between syncs — accepted, the number is cosmetic).
+      CREATE TABLE IF NOT EXISTS mastery_xp (
+        module_id TEXT PRIMARY KEY,
+        xp INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      );
+
+      -- One-time backfill from the surviving event log. Only POSITIVE XP feeds
+      -- a mastery (undo rows log 0; nutrition can log negative closes) so the
+      -- accumulator is monotonic. INSERT OR IGNORE keeps the statement
+      -- idempotent for handles where a partial run left rows behind.
+      INSERT OR IGNORE INTO mastery_xp (module_id, xp, updated_at)
+        SELECT module_id,
+               CAST(ROUND(SUM(MAX(xp_gained, 0))) AS INTEGER),
+               datetime('now')
+        FROM rpg_events
+        GROUP BY module_id;
+    `,
+  },
 ];
 
 const DUPLICATE_COLUMN = 'duplicate column name';

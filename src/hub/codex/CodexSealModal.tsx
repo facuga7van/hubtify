@@ -19,6 +19,7 @@ import {
   Sword,
 } from '../../shared/components/icons';
 import { SealRosette } from './CodexSealIcons';
+import { sealStyleIcon } from './SealStyleIcons';
 import { Obolus } from '../rewards/RewardIcons';
 import { useModalA11y } from '../../shared/hooks/useModalA11y';
 import { sealCeremony } from '../../shared/animations/seal';
@@ -31,6 +32,7 @@ import {
   type SealFailReason,
   addDaysISO,
   codexApiReady,
+  equippedSealStyleId,
   getDaySummary,
   getSeals,
   localDateISO,
@@ -114,6 +116,20 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
 
   const available = codexApiReady();
   const today = localDateISO();
+
+  /* ── which matrix stamps the wax ──
+     The equipped seal style lives as a data attribute on <html> (stamped by
+     codexApi.applyEquippedCosmetics). Observing the attribute — rather than
+     re-fetching the shop — makes the stamp follow equips instantly and keeps
+     one source of truth. Default (attribute absent) = the free rosette. */
+  const [sealStyle, setSealStyle] = useState<string | null>(() => equippedSealStyleId());
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => setSealStyle(equippedSealStyleId()));
+    observer.observe(root, { attributes: true, attributeFilter: ['data-equip-seal'] });
+    setSealStyle(equippedSealStyleId());
+    return () => observer.disconnect();
+  }, []);
 
   /* ── the flag that keeps the global achievement toast quiet ──
      While this modal is up, unlocks are shown inside the ceremony; the watcher
@@ -409,7 +425,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
               <div className="codex-seal-halo" data-seal="halo" aria-hidden="true" />
               <div className="qb-seal codex-seal-disc" data-seal="wax">
                 <span data-seal="stamp" className="codex-seal-mark">
-                  <SealRosette width={34} height={34} />
+                  {sealStyleIcon(sealStyle, 34)}
                 </span>
               </div>
               <div className="codex-sealed__text" data-seal="result">
@@ -494,7 +510,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
               >
                 <span className="codex-wax__fill" aria-hidden="true" />
                 <span className="codex-wax__face">
-                  <SealRosette width={30} height={30} />
+                  {sealStyleIcon(sealStyle, 30)}
                 </span>
               </button>
               <div className="qb-hand codex-wax__hint">

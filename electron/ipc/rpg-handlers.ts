@@ -18,7 +18,19 @@ import {
   sealXp,
   sealWindowStatus,
   MAX_VIGOR,
+  masteryInfo,
 } from '../../shared/rpg-engine';
+import {
+  SHOP_CATALOG,
+  SHOP_CATALOG_BY_ID,
+  EQUIPPABLE_KINDS,
+  EQUIP_STATE_KEYS,
+  PARDON_ITEM_ID,
+  PARDON_PURCHASES_PER_MONTH,
+  purchaseRowId,
+  type ShopItem,
+  type ShopItemKind,
+} from '../../shared/shop-catalog';
 import {
   ACHIEVEMENTS,
   ACHIEVEMENTS_TOTAL,
@@ -30,7 +42,7 @@ import {
 } from '../../shared/achievements';
 import type { RpgEvent, RpgEventRecord } from '../../shared/types';
 import { todayDateString, localTimestamp, daysAgoDateString, nextDateString, formatDateString } from '../../shared/date-utils';
-import { getPlayerStats, rolloverVigor, type PlayerStatsV2 } from './rpg-stats';
+import { getPlayerStats, purchasedPardonExtras, rolloverVigor, type PlayerStatsV2 } from './rpg-stats';
 
 /**
  * Hard bounds for anything arriving from the renderer (or, via sync, from an
@@ -368,7 +380,13 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           const gap = lastDate ? daysDiff(lastDate, today) : Number.POSITIVE_INFINITY;
           if (gap === 1) {
             streak = streak + 1;
-          } else if (gap === 2 && pardonsRemaining(storedPardonMonth, pardonsUsed, month) > 0) {
+          } else if (
+            gap === 2
+            // Capacity = 2 automatic + any pardon BOUGHT this month (shop,
+            // max 1). One shared used-counter, so the bought pardon extends
+            // the same rule instead of forking a second bookkeeping path.
+            && pardonsRemaining(storedPardonMonth, pardonsUsed, month, purchasedPardonExtras(db, month)) > 0
+          ) {
             // Exactly ONE missed day, and the month still has a pardon: the streak
             // continues as if the gap never happened — milestones included.
             // A gap > 2 falls normally; pardons do not stack.
@@ -421,6 +439,12 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         event.moduleId, event.type, loggedXp, hpChange, comboMultiplier, bonusMultiplier,
         JSON.stringify(event.payload), now, refId, crypto.randomUUID(),
       );
+
+      // Mastery accumulator: same transaction as the event, so the bar can
+      // never drift from the log it mirrors. Only positive XP counts (undo
+      // logs 0; a negative nutrition close must not erode a mastery) — the
+      // accumulator is monotonic by design.
+      bumpMasteryXp(db, event.moduleId, loggedXp, now);
 
       if (isUndo) {
         db.prepare(`
@@ -1333,6 +1357,291 @@ export function redeemReward(db: Database.Database, id: string): RedeemResult {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// La Tienda (phase 4) — the second drain of the óbolos
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Design rules (phase 4 brief):
+//   - the shop sells ONLY things that did not exist before it: seal-matrix
+//     variants, one extra monthly pardon, hero-card frames/backgrounds. The
+//     avatar picker's 237.600 free combos are not touched and never will be.
+//   - what is BOUGHT syncs (shop_purchases, pure union, deterministic ids);
+//     what is EQUIPPED does not (app_state, per-device by decision — two
+//     devices may dress the card differently, and app_state never syncs).
+//   - every spend is a ledger entry (reason 'shop_purchase'), so the balance
+//     stays SUM(delta) with zero special cases.
+
+export interface ShopEquipped {
+  sealStyle: string | null;
+  frame: string | null;
+  background: string | null;
+}
+
+/** ShopEquipped field per catalogue kind. */
+const EQUIPPED_FIELD: Record<string, keyof ShopEquipped> = {
+  seal_style: 'sealStyle',
+  frame: 'frame',
+  background: 'background',
+};
+
+function readAppState(db: Database.Database, key: string): string | null {
+  try {
+    const row = db.prepare('SELECT value FROM app_state WHERE key = ?').get(key) as
+      { value: string | null } | undefined;
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The per-device equipment, validated against the catalogue. */
+export function getShopEquipped(db: Database.Database): ShopEquipped {
+  const equipped: ShopEquipped = { sealStyle: null, frame: null, background: null };
+  for (const kind of EQUIPPABLE_KINDS) {
+    const raw = readAppState(db, EQUIP_STATE_KEYS[kind]);
+    // Only a real catalogue id of the right kind survives the read; anything
+    // else (stale key, hand-edited value) degrades to the default look.
+    if (raw && SHOP_CATALOG_BY_ID.get(raw)?.kind === kind) {
+      equipped[EQUIPPED_FIELD[kind]] = raw;
+    }
+  }
+  return equipped;
+}
+
+export interface ShopCatalogEntry extends ShopItem {
+  /**
+   * Non-consumables: ever purchased. The pardon: purchased THIS month —
+   * i.e. `owned === true` on a pardon means the monthly cap is reached.
+   */
+  owned: boolean;
+  equipped: boolean;
+  /** Timestamp of the owning purchase, when owned. */
+  purchasedAt: string | null;
+}
+
+export interface ShopCatalogResult {
+  items: ShopCatalogEntry[];
+  balance: number;
+  equipped: ShopEquipped;
+}
+
+/** The whole catalogue with per-entry state, plus balance — one read for the UI. */
+export function getShopCatalog(
+  db: Database.Database,
+  today: string = getLocalDateString(),
+): ShopCatalogResult {
+  let purchases = new Map<string, string>();
+  try {
+    const rows = db.prepare(
+      'SELECT id, purchased_at AS purchasedAt FROM shop_purchases'
+    ).all() as Array<{ id: string; purchasedAt: string }>;
+    purchases = new Map(rows.map((r) => [r.id, r.purchasedAt]));
+  } catch { /* pre-v6 handle: everything reads as not owned */ }
+
+  const month = monthKey(today);
+  const equipped = getShopEquipped(db);
+  const items = SHOP_CATALOG.map((item): ShopCatalogEntry => {
+    const rowId = purchaseRowId(item.id, item.kind, month);
+    const purchasedAt = purchases.get(rowId) ?? null;
+    const field = EQUIPPED_FIELD[item.kind];
+    return {
+      ...item,
+      owned: purchasedAt !== null,
+      equipped: field ? equipped[field] === item.id : false,
+      purchasedAt,
+    };
+  });
+
+  return { items, balance: getObolosBalance(db).balance, equipped };
+}
+
+export type PurchaseResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' };
+
+/**
+ * Spends óbolos on one catalogue item.
+ *
+ * Balance check, purchase row and ledger entry share ONE transaction, so two
+ * racing purchases can never both pass on the same óbolos. Both row ids are
+ * deterministic (see purchaseRowId), so a double purchase across devices
+ * merges into a single row AND a single charge after sync.
+ */
+export function purchaseShopItem(
+  db: Database.Database,
+  itemId: string,
+  today: string = getLocalDateString(),
+): PurchaseResult {
+  const item = SHOP_CATALOG_BY_ID.get(typeof itemId === 'string' ? itemId : '');
+  if (!item) return { ok: false, reason: 'not_found' };
+  try {
+    const buy = db.transaction((): PurchaseResult => {
+      const month = monthKey(today);
+
+      if (item.kind === 'pardon') {
+        // The automatic pardons are 2/month (rpg-engine); the shop adds at
+        // most PARDON_PURCHASES_PER_MONTH on top. Counted from the purchase
+        // rows, so the cap survives restarts and converges across devices.
+        if (purchasedPardonExtras(db, month) >= PARDON_PURCHASES_PER_MONTH) {
+          return { ok: false, reason: 'monthly_cap' };
+        }
+      } else if (db.prepare('SELECT 1 FROM shop_purchases WHERE item_id = ? LIMIT 1').get(item.id)) {
+        return { ok: false, reason: 'already_owned' };
+      }
+
+      const { balance } = getObolosBalance(db);
+      if (balance < item.cost) return { ok: false, reason: 'insufficient' };
+
+      const now = localTimestamp();
+      const rowId = purchaseRowId(item.id, item.kind, month);
+      const info = db.prepare(`
+        INSERT OR IGNORE INTO shop_purchases (id, item_id, purchased_at, updated_at)
+        VALUES (?, ?, ?, ?)
+      `).run(rowId, item.id, now, now);
+      // A row that was already there (raced in from sync between the check
+      // and here) means the purchase happened elsewhere: charge nothing.
+      if (info.changes === 0) {
+        return { ok: false, reason: item.kind === 'pardon' ? 'monthly_cap' : 'already_owned' };
+      }
+      db.prepare(`
+        INSERT OR IGNORE INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
+        VALUES (?, ?, 'shop_purchase', ?, ?, ?)
+      `).run(`shop:${rowId}`, -item.cost, item.id, now, now);
+      return { ok: true, balance: balance - item.cost };
+    });
+    const result = buy();
+    if (result.ok) {
+      broadcast('rpg:obolosChanged');
+      broadcast('rpg:shopChanged');
+    }
+    return result;
+  } catch (err) {
+    console.error('[RPG] purchaseShopItem failed:', err);
+    return { ok: false, reason: 'not_found' };
+  }
+}
+
+export type EquipResult =
+  | { ok: true; equipped: ShopEquipped }
+  | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' };
+
+/**
+ * Equips one owned item (or, with itemId null + a kind, restores that kind's
+ * default look). Per-device by design: app_state does not sync, so each
+ * device dresses its own card. What is OWNED still syncs everywhere.
+ */
+export function equipShopItem(
+  db: Database.Database,
+  itemId: string | null,
+  kind?: ShopItemKind,
+): EquipResult {
+  try {
+    if (itemId === null) {
+      const stateKey = kind ? EQUIP_STATE_KEYS[kind] : undefined;
+      if (!stateKey || !EQUIPPABLE_KINDS.includes(kind as ShopItemKind)) {
+        return { ok: false, reason: 'not_equippable' };
+      }
+      db.prepare('DELETE FROM app_state WHERE key = ?').run(stateKey);
+      broadcast('rpg:shopChanged');
+      return { ok: true, equipped: getShopEquipped(db) };
+    }
+
+    const item = SHOP_CATALOG_BY_ID.get(typeof itemId === 'string' ? itemId : '');
+    if (!item) return { ok: false, reason: 'not_found' };
+    if (!EQUIPPABLE_KINDS.includes(item.kind)) return { ok: false, reason: 'not_equippable' };
+    const owned = db.prepare('SELECT 1 FROM shop_purchases WHERE item_id = ? LIMIT 1').get(item.id);
+    if (!owned) return { ok: false, reason: 'not_owned' };
+
+    db.prepare('INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)')
+      .run(EQUIP_STATE_KEYS[item.kind], item.id);
+    broadcast('rpg:shopChanged');
+    return { ok: true, equipped: getShopEquipped(db) };
+  } catch (err) {
+    console.error('[RPG] equipShopItem failed:', err);
+    return { ok: false, reason: 'not_found' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Maestrías por módulo (phase 4)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The global level becomes a badge of history; the four per-module bars are
+// what makes day 180 feel different from day 30. Fuel: the mastery_xp
+// ACCUMULATOR (core v6) — rpg_events is pruned at 365 days, so a mastery can
+// never be recomputed from it. Backfilled once by the migration, incremented
+// forward by every event, merged across devices by MAX(xp) per module.
+
+/** The four modules that get a mastery bar (same set as "Día Perfecto"). */
+export const MASTERY_MODULES = ['quests', 'nutrition', 'finance', 'cauldron'] as const;
+
+/**
+ * Adds one event's positive XP to its module's accumulator. Same transaction
+ * as the event insert — but wrapped, because a pre-v6 handle mid-migration
+ * must degrade to "no mastery this time", never take the XP down with it.
+ */
+export function bumpMasteryXp(
+  db: Database.Database,
+  moduleId: string,
+  xpDelta: number,
+  now: string = localTimestamp(),
+): void {
+  const delta = Math.round(xpDelta);
+  if (!Number.isFinite(delta) || delta <= 0 || !moduleId) return;
+  try {
+    db.prepare(`
+      INSERT INTO mastery_xp (module_id, xp, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(module_id) DO UPDATE SET xp = xp + excluded.xp, updated_at = excluded.updated_at
+    `).run(moduleId, delta, now);
+  } catch { /* pre-v6 handle: the accumulator can wait, the event cannot */ }
+}
+
+/**
+ * Idempotent backfill: seeds the accumulator from the surviving event log for
+ * modules that have NO row yet, and never touches a module that already has
+ * one (its accumulator is ahead of the pruned log by definition). Same
+ * statement the v6 migration runs — exported for tests and self-heal.
+ */
+export function backfillMasteryXp(db: Database.Database): void {
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO mastery_xp (module_id, xp, updated_at)
+        SELECT module_id, CAST(ROUND(SUM(MAX(xp_gained, 0))) AS INTEGER), ?
+        FROM rpg_events
+        GROUP BY module_id
+    `).run(localTimestamp());
+  } catch { /* pre-v6 handle */ }
+}
+
+export interface MasteryState {
+  moduleId: string;
+  xp: number;
+  level: number;
+  /** Untranslated (Spanish) rank name; the UI translates via `levelKey`. */
+  levelName: string;
+  /** i18n key: `rpg.mastery.ranks.<rank>`. */
+  levelKey: string;
+  /** Cumulative XP that opens the next level; null at level 10. */
+  nextLevelXp: number | null;
+  /** 0..1 within the current level (1 at the cap). */
+  progress: number;
+}
+
+/** One bar per event module, always all four, zeroes included. */
+export function getMasteries(db: Database.Database): MasteryState[] {
+  let byModule = new Map<string, number>();
+  try {
+    const rows = db.prepare('SELECT module_id AS m, xp FROM mastery_xp').all() as
+      Array<{ m: string; xp: number }>;
+    byModule = new Map(rows.map((r) => [r.m, Math.max(0, r.xp)]));
+  } catch { /* pre-v6 handle: four empty bars */ }
+
+  return MASTERY_MODULES.map((moduleId) => {
+    const xp = byModule.get(moduleId) ?? 0;
+    return { moduleId, xp, ...masteryInfo(xp) };
+  });
+}
+
 /** Runs the catalogue sweep once per process, lazily. */
 let backfillDone = false;
 function ensureBackfill(db: Database.Database): void {
@@ -1454,6 +1763,24 @@ export function registerRpgHandlers(): void {
   ipcHandle('rpg:deleteReward', (_e, id: string): { ok: boolean } => deleteReward(getDb(), id));
 
   ipcHandle('rpg:redeemReward', (_e, id: string): RedeemResult => redeemReward(getDb(), id));
+
+  // ── La Tienda + maestrías (phase 4) ──
+  ipcHandle('rpg:getShopCatalog', (): ShopCatalogResult => getShopCatalog(getDb()));
+
+  ipcHandle('rpg:purchaseShopItem', (_e, itemId: string): PurchaseResult =>
+    purchaseShopItem(getDb(), itemId));
+
+  ipcHandle('rpg:equipShopItem', (_e, itemId: string | null, kind?: string): EquipResult =>
+    equipShopItem(getDb(), itemId, kind as ShopItemKind | undefined));
+
+  ipcHandle('rpg:getMasteries', (): MasteryState[] => {
+    const db = getDb();
+    // Self-heal for handles whose v6 migration ran against an empty log (a
+    // fresh install that then pulled history via sync): fills only modules
+    // with no row yet, so it can never double-count. Idempotent and cheap.
+    backfillMasteryXp(db);
+    return getMasteries(db);
+  });
 
   ipcHandle('sync:restoreStats', (_e, stats: Record<string, unknown>) => restorePlayerStats(getDb(), stats));
 }

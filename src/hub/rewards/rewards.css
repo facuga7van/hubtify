@@ -246,6 +246,150 @@
   justify-content: flex-end;
 }
 
+/* ── tabs: Recompensas | Tienda ───────────────────── */
+
+.rwd-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+
+.rwd-tab {
+  padding: 5px 14px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  background: rgba(244, 228, 193, 0.4);
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  border-radius: 4px 4px 0 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.rwd-tab:hover { color: var(--ink); border-color: var(--gold-dark); }
+
+.rwd-tab--on {
+  color: var(--ink);
+  background: rgba(196, 168, 78, 0.22);
+  border-color: var(--gold-dark);
+  border-bottom-color: var(--gold);
+}
+
+/* ── la tienda ────────────────────────────────────── */
+
+.shop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shop-item {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 4px;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.28);
+}
+
+.shop-item--owned { opacity: 0.96; }
+
+.shop-preview {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  background: rgba(244, 228, 193, 0.5);
+  color: var(--ink-soft);
+  overflow: hidden;
+}
+
+/* Seal previews read as wax: round, rubric-tinted. */
+.shop-preview--seal {
+  border-radius: 50%;
+  color: var(--parch-0);
+  background: radial-gradient(circle at 38% 30%, var(--rubric-light) 0%, var(--rubric) 62%, #5d1515 100%);
+  border-color: #5d1515;
+}
+
+.shop-preview--pardon { color: var(--rubric); }
+
+.shop-item__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shop-item__name {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.shop-item__desc {
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.shop-item__notice {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.shop-item__notice--good { color: var(--moss); }
+
+.shop-item__cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--gold-dark);
+  font-size: var(--fs-sub);
+  white-space: nowrap;
+}
+
+/* Out of reach reads as distance, never as fault. */
+.shop-item__cost--far { color: var(--ink-faded); }
+
+.shop-item__buy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.shop-item__buy--on { opacity: 0.85; }
+
+.shop-item__state {
+  color: var(--gold-dark);
+  white-space: nowrap;
+}
+
+.shop-group__foot {
+  margin: 8px 0 2px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+@media (max-width: 620px) {
+  .shop-item {
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-areas:
+      'preview body'
+      'preview actions';
+  }
+  .shop-preview { grid-area: preview; }
+  .shop-item__body { grid-area: body; }
+  .shop-item__cost { grid-area: actions; justify-self: start; }
+  .shop-item__state { grid-area: actions; justify-self: start; }
+  .shop-item__buy { grid-area: actions; justify-self: end; }
+}
+
 /* ── prose ────────────────────────────────────────── */
 
 .rwd-empty {

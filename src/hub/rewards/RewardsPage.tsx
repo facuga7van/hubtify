@@ -19,6 +19,7 @@ import {
   saveReward,
 } from '../codex/codexApi';
 import { Obolus, REWARD_ICON_NAMES, rewardIcon } from './RewardIcons';
+import ShopSection from './ShopSection';
 import './rewards.css';
 
 /** How many coins the redeem micro-ceremony drops into the purse. */
@@ -57,6 +58,8 @@ export default function RewardsPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(CLOSED_FORM);
   const [notice, setNotice] = useState<Notice>(null);
+  /** Rewards FIRST — the player's own counter is the economy's main drain. */
+  const [tab, setTab] = useState<'rewards' | 'shop'>('rewards');
 
   const available = rewardsApiReady();
 
@@ -353,9 +356,38 @@ export default function RewardsPage() {
           </div>
         </div>
 
+        {/* ── the two counters: own rewards | the shop ── */}
+        <div className="rwd-tabs" role="tablist" aria-label={t('rpg.rwdTitle', 'Recompensas')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'rewards'}
+            className={`rwd-tab${tab === 'rewards' ? ' rwd-tab--on' : ''}`}
+            onClick={() => setTab('rewards')}
+          >
+            {t('rpg.rwdTab', 'Recompensas')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'shop'}
+            className={`rwd-tab${tab === 'shop' ? ' rwd-tab--on' : ''}`}
+            onClick={() => setTab('shop')}
+          >
+            {t('rpg.shopTab', 'Tienda')}
+          </button>
+        </div>
+
         <QBDividerSection />
 
-        {/* ── the counter ───────────────────────────── */}
+        {tab === 'shop' && (
+          <ShopSection
+            balance={balance?.balance ?? 0}
+            onCelebrate={celebrate}
+          />
+        )}
+
+        {tab === 'rewards' && (
         <Section
           title={t('rpg.rwdEyebrow', 'EL MOSTRADOR DE RECOMPENSAS').toUpperCase()}
           icon={<Scroll width={12} height={12} style={{ color: 'var(--rubric)' }} />}
@@ -385,6 +417,7 @@ export default function RewardsPage() {
             </p>
           )}
         </Section>
+        )}
       </>
     );
   })();

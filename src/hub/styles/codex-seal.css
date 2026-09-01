@@ -687,3 +687,245 @@
 }
 
 .dash-brief__seal:hover { color: var(--rubric-light); }
+
+/* ══════════════════════════════════════════════════════
+   PHASE 4 — LA TIENDA: equipped cosmetics
+   The art IS this CSS: frames and backgrounds bought in the shop are keyed
+   off data attributes that codexApi stamps on <html> (data-equip-frame /
+   data-equip-bg). Styling flows from the root, so neither PlayerCard.tsx nor
+   Sidebar.tsx needs to know the shop exists. Equipment is per-device
+   (app_state), so these attributes describe THIS machine's look.
+   ══════════════════════════════════════════════════════ */
+
+/* ── marcos (frames) — avatar ring + hero portrait ── */
+
+/* Marco de Laureles: the victor's green, quiet and alive. */
+:root[data-equip-frame='frame_laurel'] .player-card__avatar-ring {
+  border-color: var(--moss-light);
+  box-shadow:
+    0 0 0 2px var(--leather-dark),
+    0 0 0 3.5px rgba(107, 138, 76, 0.65),
+    0 0 10px rgba(107, 138, 76, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+:root[data-equip-frame='frame_laurel'] .hero-portrait-frame {
+  border: 1.5px solid var(--moss);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 231, 192, 0.8),
+    inset 0 0 0 3px rgba(85, 107, 60, 0.25),
+    0 3px 0 rgba(30, 19, 9, 0.15);
+}
+
+/* Marco Remachado: cold-forged iron, dotted with rivets. */
+:root[data-equip-frame='frame_iron'] .player-card__avatar-ring {
+  border-color: #9a9da3;
+  box-shadow:
+    0 0 0 2px var(--leather-dark),
+    0 0 0 3.5px rgba(154, 157, 163, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+}
+:root[data-equip-frame='frame_iron'] .hero-portrait-frame {
+  border: 2px solid #6a6d73;
+  outline: 1px dotted #9a9da3;
+  outline-offset: -5px;
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 231, 192, 0.8),
+    0 3px 0 rgba(30, 19, 9, 0.25);
+}
+
+/* Marco Dorado: the sun-struck double ring. */
+:root[data-equip-frame='frame_gilded'] .player-card__avatar-ring {
+  border-color: var(--gold-light);
+  box-shadow:
+    0 0 0 2px var(--leather-dark),
+    0 0 0 4px var(--gold-dark),
+    0 0 12px rgba(196, 168, 78, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+:root[data-equip-frame='frame_gilded'] .hero-portrait-frame {
+  border: 2px solid var(--gold-dark);
+  outline: 1px solid rgba(196, 168, 78, 0.6);
+  outline-offset: -6px;
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 231, 192, 0.8),
+    0 0 10px rgba(196, 168, 78, 0.35),
+    0 3px 0 rgba(30, 19, 9, 0.15);
+}
+
+/* ── fondos (backgrounds) — card ground + portrait ──
+   Tints, not paint-overs: every one keeps the parchment/leather beneath it
+   so ink and gold text stay readable (the recurring contrast lesson). */
+
+:root[data-equip-bg='bg_burgundy'] .player-card {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(122, 30, 30, 0.38) 0%, rgba(122, 30, 30, 0.12) 55%, transparent 100%);
+}
+:root[data-equip-bg='bg_burgundy'] .hero-portrait-frame {
+  background:
+    linear-gradient(160deg, rgba(122, 30, 30, 0.18) 0%, rgba(122, 30, 30, 0.06) 60%),
+    rgba(245, 231, 192, 0.6);
+}
+
+:root[data-equip-bg='bg_forest'] .player-card {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(85, 107, 60, 0.4) 0%, rgba(85, 107, 60, 0.12) 55%, transparent 100%);
+}
+:root[data-equip-bg='bg_forest'] .hero-portrait-frame {
+  background:
+    linear-gradient(160deg, rgba(85, 107, 60, 0.2) 0%, rgba(85, 107, 60, 0.06) 60%),
+    rgba(245, 231, 192, 0.6);
+}
+
+:root[data-equip-bg='bg_night'] .player-card {
+  background:
+    radial-gradient(1.5px 1.5px at 18% 22%, rgba(245, 231, 192, 0.8) 0%, transparent 100%),
+    radial-gradient(1px 1px at 62% 12%, rgba(245, 231, 192, 0.7) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 82% 34%, rgba(245, 231, 192, 0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 38% 42%, rgba(245, 231, 192, 0.5) 0%, transparent 100%),
+    radial-gradient(120% 100% at 50% 0%, rgba(18, 24, 48, 0.55) 0%, rgba(18, 24, 48, 0.18) 60%, transparent 100%);
+}
+:root[data-equip-bg='bg_night'] .hero-portrait-frame {
+  background:
+    radial-gradient(1.5px 1.5px at 20% 18%, rgba(42, 29, 14, 0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 74% 26%, rgba(42, 29, 14, 0.45) 0%, transparent 100%),
+    linear-gradient(160deg, rgba(18, 24, 48, 0.16) 0%, rgba(18, 24, 48, 0.05) 60%),
+    rgba(245, 231, 192, 0.6);
+}
+
+/* ── shop swatches — the same art, in miniature ─────
+   Worn by ShopSection previews (.shop-swatch--<itemId>), so what the grid
+   shows is literally what the card will wear. Living here (not rewards.css)
+   keeps each cosmetic's full art — card + swatch — in one place. */
+
+.shop-swatch { position: relative; }
+
+.shop-swatch__dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--parch-0);
+  border: 1.5px solid var(--gold);
+}
+
+.shop-swatch--frame_laurel .shop-swatch__dot {
+  border-color: var(--moss-light);
+  box-shadow: 0 0 0 2px rgba(107, 138, 76, 0.5), 0 0 6px rgba(107, 138, 76, 0.4);
+}
+.shop-swatch--frame_iron .shop-swatch__dot {
+  border-color: #9a9da3;
+  box-shadow: 0 0 0 2px rgba(106, 109, 115, 0.6);
+}
+.shop-swatch--frame_gilded .shop-swatch__dot {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 0 2px var(--gold-dark), 0 0 8px rgba(196, 168, 78, 0.55);
+}
+
+.shop-swatch--bg_burgundy {
+  background: radial-gradient(100% 80% at 50% 0%, rgba(122, 30, 30, 0.5) 0%, rgba(122, 30, 30, 0.15) 70%), var(--parch-1);
+}
+.shop-swatch--bg_forest {
+  background: radial-gradient(100% 80% at 50% 0%, rgba(85, 107, 60, 0.5) 0%, rgba(85, 107, 60, 0.15) 70%), var(--parch-1);
+}
+.shop-swatch--bg_night {
+  background:
+    radial-gradient(1.5px 1.5px at 25% 30%, rgba(245, 231, 192, 0.9) 0%, transparent 100%),
+    radial-gradient(1px 1px at 70% 20%, rgba(245, 231, 192, 0.8) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 60% 65%, rgba(245, 231, 192, 0.7) 0%, transparent 100%),
+    linear-gradient(160deg, #1a2138 0%, #2b3455 100%);
+}
+.shop-swatch--bg_burgundy .shop-swatch__dot,
+.shop-swatch--bg_forest .shop-swatch__dot,
+.shop-swatch--bg_night .shop-swatch__dot { display: none; }
+
+/* ══════════════════════════════════════════════════════
+   PHASE 4 — MAESTRÍAS (.hero-mastery-*)
+   Four per-module bars on the hero page. The global level steps back into
+   a badge of history; these are what day 180 feels like.
+   ══════════════════════════════════════════════════════ */
+
+/* The badge of history: the global level, smaller, stamped. */
+.hero-legend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 3px 12px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  color: var(--gold-dark);
+  border: 1px solid rgba(138, 112, 48, 0.5);
+  border-radius: 999px;
+  background: rgba(196, 168, 78, 0.12);
+}
+
+.hero-legend-badge .qb-numeral {
+  font-size: var(--fs-sub);
+  color: var(--ink);
+}
+
+.hero-masteries-block {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px dotted rgba(74, 55, 32, 0.35);
+}
+
+.hero-masteries-title {
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+
+.hero-masteries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hero-mastery {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.hero-mastery__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1px solid rgba(74, 55, 32, 0.4);
+  background: rgba(244, 228, 193, 0.5);
+  color: var(--ink-soft);
+}
+
+/* Module colours, coherent with the codex vocabulary. */
+.hero-mastery--quests .hero-mastery__icon { color: var(--rubric); }
+.hero-mastery--nutrition .hero-mastery__icon { color: var(--moss); }
+.hero-mastery--finance .hero-mastery__icon { color: var(--gold-dark); }
+.hero-mastery--cauldron .hero-mastery__icon { color: var(--ink); }
+
+.hero-mastery__body { min-width: 0; }
+
+.hero-mastery__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.hero-mastery__module { color: var(--ink-soft); }
+
+.hero-mastery__rank {
+  font-size: var(--fs-label);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.hero-mastery__hint {
+  margin-top: 2px;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
