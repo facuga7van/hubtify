@@ -1,4 +1,5 @@
 import React, { useId, useMemo } from 'react';
+import { useElementWidth } from '../../hooks/useElementWidth';
 import './charts.css';
 
 export interface BarDatum {
@@ -34,7 +35,10 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
   legend,
   valueFormatter,
 }) => {
-  const formatValue = valueFormatter ?? ((v: number) => v.toLocaleString());
+  const formatValue = useMemo(
+    () => valueFormatter ?? ((v: number) => v.toLocaleString()),
+    [valueFormatter],
+  );
   const uid = useId();
 
   const computedMax = useMemo(
@@ -43,14 +47,22 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
   );
 
   const barCount = data.length;
-  // Was 420 while the host card is ~345px wide: everything, text included,
-  // was scaled down by 0.82 on top of its own size (fontSize 9 -> 7.4px).
-  const viewBoxWidth = 345;
+  /*
+   * El viewBox sigue al contenedor en lugar de ser fijo.
+   *
+   * Con `viewBox="0 0 345 220"`, `width: 100%` y `preserveAspectRatio`, el alto
+   * dibujado es ancho × (220/345): en una tarjeta de 1640 px el gráfico se
+   * dibujaba de 1046 px de alto, con las cifras a 52 px y pisándose entre
+   * ellas. Midiendo el ancho real, el dibujo va 1:1 — el `height` que pide
+   * quien lo usa es por fin el alto que se ve, en cualquier ventana.
+   */
+  const [hostRef, hostWidth] = useElementWidth<HTMLDivElement>(345);
+  const viewBoxWidth = Math.max(280, hostWidth);
   const chartTop = 40;
   const chartBottom = height - 20;
   const chartHeight = chartBottom - chartTop;
   const barSpacing = viewBoxWidth / barCount;
-  const barWidth = Math.min(36, barSpacing * 0.6);
+  const barWidth = Math.min(64, Math.max(14, barSpacing * 0.55));
 
   // At 30 bars the x labels overlap into a smear; show one every `labelStep`.
   const labelStep = useMemo(() => {
@@ -58,6 +70,12 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
     const needed = longest * 7 + 6; // approx. label width in viewBox units
     return Math.max(1, Math.ceil(needed / Math.max(1, barSpacing)));
   }, [data, barSpacing]);
+
+  /** ¿Entran todas las cifras sin pisarse? Si no, se rotula selectivamente. */
+  const showAllValues = useMemo(() => {
+    const longest = data.reduce((m, d) => Math.max(m, formatValue(d.value).length), 1);
+    return longest * 7 + 12 <= barSpacing;
+  }, [data, barSpacing, formatValue]);
 
   const tallestIdx = useMemo(() => {
     let maxIdx = 0;
@@ -69,11 +87,12 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
 
   if (!themed) {
     return (
-      <div className="castle-chart castle-chart--simple chart-container">
+      <div className="castle-chart castle-chart--simple chart-container" ref={hostRef}>
         <svg
           className="castle-chart-svg"
           viewBox={`0 0 ${viewBoxWidth} ${height}`}
           preserveAspectRatio="xMidYMid meet"
+          style={{ height }}
         >
           {/* Grid lines */}
           {[0.25, 0.5, 0.75].map((frac) => (
@@ -184,11 +203,12 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
 
   // ── Themed: Castle towers with merlons ──
   return (
-    <div className="castle-chart chart-container">
+    <div className="castle-chart chart-container" ref={hostRef}>
       <svg
         className="castle-chart-svg"
         viewBox={`0 0 ${viewBoxWidth} ${height}`}
         preserveAspectRatio="xMidYMid meet"
+        style={{ height }}
       >
         <defs>
           {/* Stone gradient fills per status */}
@@ -215,7 +235,6 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
             x2={viewBoxWidth}
             y2={chartBottom - chartHeight * frac}
             stroke="rgba(74,45,26,0.12)"
-            strokeDasharray="2 4"
           />
         ))}
 
@@ -358,8 +377,11 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                 </g>
               )}
 
-              {/* Value badge */}
-              {(() => {
+              {/* Value badge — selectivo: una cifra sobre cada barra es ruido
+                  que nadie lee, y con doce columnas las cajas se pisaban entre
+                  sí. Cuando no entran, se rotula sólo la más alta y los dos
+                  extremos; el resto lo cuenta el eje. */}
+              {(showAllValues || isTallest || i === 0 || i === barCount - 1) && (() => {
                 const label = formatValue(d.value);
                 const badgeW = Math.max(barWidth + 4, label.length * 7 + 8);
                 const badgeX = tx + barWidth / 2 - badgeW / 2;
