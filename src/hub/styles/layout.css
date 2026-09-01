@@ -585,16 +585,72 @@
   .sidebar-toggle:not(.sidebar-toggle--collapsed) {
     left: 220px;
   }
+}
 
+/* ── Densidad compacta ─────────────────────────────────────────────────────
+   El sidebar se desborda a lo ALTO —siete entradas de menú más las barras,
+   la racha y el pie no entran en una ventana de portátil— pero lo único que
+   lo compactaba era un breakpoint de ANCHO. Achicar la ventana de costado
+   arreglaba el problema por casualidad, y a tamaño normal aparecía un scroll
+   que cortaba «Recompensas» por la mitad.
+   La coma es un OR: las mismas métricas para una ventana angosta o baja. */
+@media (max-width: 900px), (max-height: 900px) {
   .sidebar-nav-item {
-    padding: 7px 8px;
+    padding: 6px 8px;
     font-size: var(--fs-label);
   }
 
   .sidebar-nav-item__label {
     font-size: var(--fs-label);
   }
+
+  /* El bloque de barras es lo segundo que más alto ocupa después del menú. */
+  .sidebar-bars {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .sidebar-divider { margin: 3px 12px; }
+
+  .sidebar-nav { padding: 2px 6px; }
+
+  .sidebar-footer { padding: 8px 12px 10px; gap: 6px; }
 }
+
+/* Ventanas de verdad bajas: se aprieta un punto más antes que aparezca scroll.
+   Medido: a 720 px de alto con las métricas compactas todavía sobra espacio, así
+   que la línea «faltan N niveles» sólo se sacrifica más abajo de eso. */
+@media (max-height: 700px) {
+  .sidebar-nav-item { padding: 5px 8px; }
+  .sidebar-nav { gap: 1px; }
+  .sidebar-bars { padding: 6px 12px; gap: 5px; }
+}
+/* El mínimo de la ventana es 650 px de alto (electron/main.ts), o sea ~618 px
+   de viewport: el sidebar tiene que entrar hasta ahí, no sólo en pantallas
+   cómodas. Acá se paga con la línea de «faltan N niveles» y con el pie. */
+@media (max-height: 665px) {
+  .sidebar-bar__next-rank { display: none; }
+  .sidebar-nav-item { padding: 3px 8px; }
+  .sidebar-bars { padding: 4px 12px; gap: 3px; }
+  .sidebar-nav { gap: 0; padding: 1px 6px; }
+  .sidebar-footer { padding: 6px 12px 8px; gap: 4px; }
+  .sidebar-divider { margin: 2px 12px; }
+}
+
+/* Si aun así hay que scrollear, que no parezca roto: barra fina, del tema, y
+   sin que la aparición del scroll corra el contenido de lugar. */
+.sidebar-nav {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 138, 60, 0.55) transparent;
+}
+.sidebar-nav::-webkit-scrollbar { width: 6px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(168, 138, 60, 0.5);
+  border-radius: 3px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(168, 138, 60, 0.75); }
 
 /* ══════════════════════════════════════════════════════
    ACCOUNT DROPDOWN

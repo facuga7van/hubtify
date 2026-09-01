@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { fileURLToPath } from 'node:url';
+import pkg from './package.json' with { type: 'json' };
 
 // Absolute paths — Vite's browser transform won't resolve relative aliases.
 const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -12,6 +13,9 @@ const alias = {
 };
 
 export default defineConfig({
+  // El renderer se compila con este define (vite.renderer.config.ts); sin él un
+  // test de browser que monte el shell revienta con «APP_VERSION is not defined».
+  define: { APP_VERSION: JSON.stringify(pkg.version) },
   resolve: { alias },
   test: {
     projects: [
