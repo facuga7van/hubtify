@@ -5,8 +5,10 @@ import { Tick } from '../../../shared/components/codex';
 import Loading from '../../../shared/components/Loading';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
+// `Project` is deliberately not imported: the project selector this widget used
+// to carry was removed (see the note above `actualOverdueCount`).
 import { type Task, XP_MAP } from '../types';
-import { getDueDateStatus, bonusMultiplierToTier } from '../utils';
+import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved } from '../utils';
 import { questsApi } from '../api';
 
 export default function TasksDashboardWidget() {
@@ -92,6 +94,9 @@ export default function TasksDashboardWidget() {
           timestamp: Date.now(),
         });
         toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+        // Only a paid event can carry `pardonUsed` — the skipped branch never
+        // reached the engine, so there is no grace to announce there.
+        notifyStreakSaved(result, { toast, t });
       }
       loadData();
       window.dispatchEvent(new Event('rpg:statsChanged'));

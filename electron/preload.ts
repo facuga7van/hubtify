@@ -46,6 +46,7 @@ const api = {
   questsSaveDrawing: (drawing: Record<string, unknown>) => ipcRenderer.invoke('quests:saveDrawing', drawing),
   questsDeleteDrawing: (id: string) => ipcRenderer.invoke('quests:deleteDrawing', id),
   questsGetHabitHeatmap: (days?: number) => ipcRenderer.invoke('quests:getHabitHeatmap', days),
+  questsGetHabitHistory: (habitId: string, days?: number) => ipcRenderer.invoke('quests:getHabitHistory', habitId, days),
   questsGetHabits: () => ipcRenderer.invoke('quests:getHabits'),
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number }) => ipcRenderer.invoke('quests:addHabit', habit),
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number }) => ipcRenderer.invoke('quests:updateHabit', id, updates),
@@ -74,6 +75,8 @@ const api = {
   nutritionCacheEstimate: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:cacheEstimate', entry),
   nutritionDeleteFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFood', id),
   nutritionDeleteByDate: (date: string) => ipcRenderer.invoke('nutrition:deleteByDate', date),
+  nutritionRepeatDay: (fromDate: string, toDate: string) => ipcRenderer.invoke('nutrition:repeatDay', fromDate, toDate),
+  nutritionGetRecentLoggedDays: (beforeDate?: string, limit?: number) => ipcRenderer.invoke('nutrition:getRecentLoggedDays', beforeDate, limit),
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => ipcRenderer.invoke('nutrition:updateFood', id, fields),
   nutritionGetFrequentFoods: () => ipcRenderer.invoke('nutrition:getFrequentFoods'),
   nutritionCreateFrequentFood: (food: Record<string, unknown>) => ipcRenderer.invoke('nutrition:createFrequentFood', food),
@@ -85,7 +88,9 @@ const api = {
   nutritionSaveWeeklyMetrics: (metrics: Record<string, unknown>) => ipcRenderer.invoke('nutrition:saveWeeklyMetrics', metrics),
   nutritionGetSummary: (date: string) => ipcRenderer.invoke('nutrition:getSummary', date),
   nutritionGetSummaryRange: (start: string, end: string) => ipcRenderer.invoke('nutrition:getSummaryRange', start, end),
+  nutritionGetMacroTargets: (date?: string) => ipcRenderer.invoke('nutrition:getMacroTargets', date),
   nutritionGetWeights: () => ipcRenderer.invoke('nutrition:getWeights'),
+  nutritionGetAdaptiveTdee: () => ipcRenderer.invoke('nutrition:getAdaptiveTdee'),
   nutritionGetStreak: () => ipcRenderer.invoke('nutrition:getStreak'),
   nutritionGetWeekCalories: () => ipcRenderer.invoke('nutrition:getWeekCalories'),
   nutritionGetTodayCalories: () => ipcRenderer.invoke('nutrition:getTodayCalories'),
@@ -324,6 +329,7 @@ const api = {
   // Updater
   updaterCheck: () => ipcRenderer.invoke('updater:check'),
   updaterDownload: () => ipcRenderer.invoke('updater:download') as Promise<string>,
+  updaterRestart: () => ipcRenderer.invoke('updater:restart') as Promise<void>,
   onUpdateAvailable: (callback: (info: { version: string }) => void) => {
     const handler = (_e: unknown, info: { version: string }) => callback(info);
     ipcRenderer.on('updater:update-available', handler);

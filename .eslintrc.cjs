@@ -34,6 +34,10 @@ module.exports = {
     'functions/node_modules/',
     '.worktrees/',
     'docsexample/',
+    // Artefactos de los tests e2e/visuales que llegaron con nutrify-deep-improvements.
+    'coverage/',
+    'e2e/.artifacts/',
+    'tests/visual/screens/',
     'designIdeas/',
     '*.config.js',
     '*.config.mjs',

@@ -375,8 +375,8 @@ export function mergeNutritionFoods(
   if (Array.isArray(d.frequentFoods)) step(db, 'frequentFoods', () => {
     const getFreqBySync = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE sync_id = ?');
     const getFreqByName = db.prepare('SELECT id, updated_at FROM frequent_foods WHERE name = ? COLLATE NOCASE');
-    const insertFreq = db.prepare('INSERT INTO frequent_foods (sync_id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
+    const insertFreq = db.prepare('INSERT INTO frequent_foods (sync_id, name, calories, ai_breakdown, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const updateFreq = db.prepare('UPDATE frequent_foods SET calories = ?, ai_breakdown = ?, protein_g = ?, carbs_g = ?, fat_g = ?, times_used = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
     const adoptFreqSync = db.prepare('UPDATE frequent_foods SET sync_id = ? WHERE id = ? AND sync_id IS NULL AND NOT EXISTS (SELECT 1 FROM frequent_foods WHERE sync_id = ?)');
 
     for (const raw of d.frequentFoods!) {
@@ -400,10 +400,14 @@ export function mergeNutritionFoods(
       }
 
       if (!local) {
-        insertFreq.run(syncId, f.name, f.calories, f.ai_breakdown ?? null, f.times_used ?? 0, f.created_at ?? f.updated_at ?? null, f.updated_at ?? null, f.deleted_at ?? null);
+        insertFreq.run(syncId, f.name, f.calories, f.ai_breakdown ?? null,
+          f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null,
+          f.times_used ?? 0, f.created_at ?? f.updated_at ?? null, f.updated_at ?? null, f.deleted_at ?? null);
         changed = true;
       } else if (isNewerStamp(f.updated_at, local.updated_at)) {
-        updateFreq.run(f.calories, f.ai_breakdown ?? null, f.times_used ?? 0, f.updated_at, f.deleted_at ?? null, local.id);
+        updateFreq.run(f.calories, f.ai_breakdown ?? null,
+          f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null,
+          f.times_used ?? 0, f.updated_at, f.deleted_at ?? null, local.id);
         changed = true;
       }
     }
@@ -417,17 +421,18 @@ export function mergeNutritionFoods(
     type LocalFood = {
       id: number; date: string; updated_at: string | null; source: string;
       frequent_food_id: number | null; ai_breakdown: string | null; meal: string | null;
-      is_event: number; event_kcal_min: number | null; event_kcal_max: number | null; protein_g: number | null;
+      is_event: number; event_kcal_min: number | null; event_kcal_max: number | null;
+      protein_g: number | null; carbs_g: number | null; fat_g: number | null;
     };
-    const LOCAL_COLS = 'id, date, updated_at, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g';
+    const LOCAL_COLS = 'id, date, updated_at, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, carbs_g, fat_g';
     const getFoodBySync = db.prepare(`SELECT ${LOCAL_COLS} FROM food_log WHERE sync_id = ?`);
     const getFoodByNatural = db.prepare(`SELECT ${LOCAL_COLS} FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?`);
-    const insertFood = db.prepare('INSERT INTO food_log (sync_id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const insertFood = db.prepare('INSERT INTO food_log (sync_id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, carbs_g, fat_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     // Full last-write-wins, same shape as the INSERT. This used to write ONLY
     // deleted_at + updated_at: an edit (800 → 1200 kcal, +protein, event → meal)
     // never crossed, but the row still ADOPTED the newer stamp — so the stale
     // values were pushed back to the cloud as the "newest" version, for good.
-    const updateFood = db.prepare('UPDATE food_log SET date = ?, time = ?, description = ?, calories = ?, source = ?, frequent_food_id = ?, ai_breakdown = ?, meal = ?, is_event = ?, event_kcal_min = ?, event_kcal_max = ?, protein_g = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
+    const updateFood = db.prepare('UPDATE food_log SET date = ?, time = ?, description = ?, calories = ?, source = ?, frequent_food_id = ?, ai_breakdown = ?, meal = ?, is_event = ?, event_kcal_min = ?, event_kcal_max = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
     const adoptFoodSync = db.prepare('UPDATE food_log SET sync_id = ? WHERE id = ? AND sync_id IS NULL AND NOT EXISTS (SELECT 1 FROM food_log WHERE sync_id = ?)');
     const freqBySync = db.prepare('SELECT id FROM frequent_foods WHERE sync_id = ?');
 
@@ -458,7 +463,8 @@ export function mergeNutritionFoods(
 
       if (!local) {
         insertFood.run(syncId, f.date, f.time, f.description, f.calories, f.source ?? 'manual', frequentFoodId, f.ai_breakdown ?? null, f.meal ?? null,
-          f.is_event ?? 0, f.event_kcal_min ?? null, f.event_kcal_max ?? null, f.protein_g ?? null,
+          f.is_event ?? 0, f.event_kcal_min ?? null, f.event_kcal_max ?? null,
+          f.protein_g ?? null, f.carbs_g ?? null, f.fat_g ?? null,
           f.updated_at ?? null, f.deleted_at ?? null);
         affectedDates.add(f.date);
         changed = true;
@@ -478,6 +484,8 @@ export function mergeNutritionFoods(
           pick('event_kcal_min', 'event_kcal_min', null),
           pick('event_kcal_max', 'event_kcal_max', null),
           pick('protein_g', 'protein_g', null),
+          pick('carbs_g', 'carbs_g', null),
+          pick('fat_g', 'fat_g', null),
           f.updated_at ?? null, f.deleted_at ?? null, local.id,
         );
         // A row that merely flipped deleted_at changes that day's totals too.
@@ -1044,17 +1052,17 @@ export function registerSyncIpcHandlers(): void {
       SELECT f.id, f.sync_id, f.date, f.time, f.description, f.calories, f.source,
              f.frequent_food_id, ff.sync_id AS frequent_food_sync_id,
              f.ai_breakdown, f.meal, f.is_event, f.event_kcal_min, f.event_kcal_max,
-             f.protein_g, f.updated_at, f.deleted_at
+             f.protein_g, f.carbs_g, f.fat_g, f.updated_at, f.deleted_at
       FROM food_log f
       LEFT JOIN frequent_foods ff ON ff.id = f.frequent_food_id
       ORDER BY f.date DESC, f.time DESC
     `).all();
-    const frequentFoods = db.prepare('SELECT id, sync_id, name, calories, ai_breakdown, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
+    const frequentFoods = db.prepare('SELECT id, sync_id, name, calories, ai_breakdown, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
     const dailyMetrics = db.prepare('SELECT date, steps, gym, updated_at FROM nutrition_daily_metrics ORDER BY date DESC').all();
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
-    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
+    const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
 
     return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods };
   });
@@ -1321,7 +1329,7 @@ export function mergeNutritionDataInto(db: Database.Database, data: Record<strin
         console.warn('[Sync] profile: skipping, missing a NOT NULL column', required.filter((_, i) => values[i] == null || values[i] === ''));
         return;
       }
-      db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, carbs_target_g, fat_target_g, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         ...values,
         pick('deficit_target_kcal', 500) ?? 500,
         pick('gym_calories', 300) ?? 300,
@@ -1332,6 +1340,8 @@ export function mergeNutritionDataInto(db: Database.Database, data: Record<strin
         pick('meal_schedule'),
         pick('day_cutoff_hour', 4) ?? 4,
         pick('protein_target_g'),
+        pick('carbs_target_g'),
+        pick('fat_target_g'),
         remoteUpdatedAt || null,
       );
       changed = true;
@@ -1429,20 +1439,44 @@ export function mergeNutritionDataInto(db: Database.Database, data: Record<strin
 
     // Favorite foods — dedup by description (UNIQUE), LWW on the tombstone
     if (Array.isArray(d.favoriteFoods)) step(db, 'favoriteFoods', () => {
-      const getFav = db.prepare('SELECT id, updated_at FROM favorite_foods WHERE id = ?');
-      const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-      const updateFav = db.prepare('UPDATE favorite_foods SET deleted_at = ?, updated_at = ? WHERE id = ?');
+      const getFav = db.prepare('SELECT id, description, calories, source, ai_breakdown, protein_g, carbs_g, fat_g, updated_at FROM favorite_foods WHERE id = ?');
+      const insertFav = db.prepare('INSERT OR IGNORE INTO favorite_foods (id, description, calories, source, ai_breakdown, protein_g, carbs_g, fat_g, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      // Full last-write-wins, same shape as the INSERT. Writing only the stamps
+      // was the food_log bug all over again: an edit never crossed, but the row
+      // adopted the newer timestamp and pushed the stale values back as 'newest'.
+      const updateFav = db.prepare('UPDATE favorite_foods SET description = ?, calories = ?, source = ?, ai_breakdown = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
       for (const raw of d.favoriteFoods) {
         if (!isUsableRow(raw, 'favoriteFoods', ['id', 'description', 'calories'])) continue;
         const f = withNormStamps(raw);
         const remoteUpdated = f.updatedAt ?? f.updated_at ?? null;
         const remoteDeleted = f.deletedAt ?? f.deleted_at ?? null;
-        const local = getFav.get(f.id) as { id: string; updated_at: string | null } | undefined;
+        type LocalFav = {
+          id: string; description: string; calories: number; source: string;
+          ai_breakdown: string | null; protein_g: number | null; carbs_g: number | null;
+          fat_g: number | null; updated_at: string | null;
+        };
+        const macro = (camel: string, snake: string): number | null =>
+          (f[camel] ?? f[snake] ?? null) as number | null;
+        const local = getFav.get(f.id) as LocalFav | undefined;
         if (!local) {
-          const r = insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual', f.aiBreakdown ?? f.ai_breakdown ?? null, f.createdAt ?? f.created_at ?? remoteUpdated ?? new Date().toISOString(), remoteUpdated, remoteDeleted);
+          const r = insertFav.run(f.id, f.description, f.calories, f.source ?? 'manual',
+            f.aiBreakdown ?? f.ai_breakdown ?? null,
+            macro('proteinG', 'protein_g'), macro('carbsG', 'carbs_g'), macro('fatG', 'fat_g'),
+            f.createdAt ?? f.created_at ?? remoteUpdated ?? new Date().toISOString(), remoteUpdated, remoteDeleted);
           if (r.changes > 0) changed = true;
         } else if (isNewerStamp(remoteUpdated, local.updated_at)) {
-          updateFav.run(remoteDeleted, remoteUpdated, f.id);
+          // Macro columns arrived in nutrition v10: a payload from a client that
+          // predates them carries no opinion, so keep the local value.
+          const keep = (camel: string, snake: string, localValue: number | null): number | null =>
+            (camel in f || snake in f) ? macro(camel, snake) : localValue;
+          updateFav.run(
+            f.description ?? local.description, f.calories ?? local.calories,
+            f.source ?? local.source, f.aiBreakdown ?? f.ai_breakdown ?? local.ai_breakdown,
+            keep('proteinG', 'protein_g', local.protein_g),
+            keep('carbsG', 'carbs_g', local.carbs_g),
+            keep('fatG', 'fat_g', local.fat_g),
+            remoteUpdated, remoteDeleted, f.id,
+          );
           changed = true;
         }
       }

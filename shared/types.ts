@@ -426,6 +426,7 @@ export interface HubtifyApi {
   questsGetCategories: (projectId?: string | null) => Promise<string[]>;
   questsEnsureCategory: (name: string, projectId?: string | null) => Promise<void>;
   questsGetHabitHeatmap: (days?: number) => Promise<{ days: Array<{ date: string; count: number; skipCount: number }>; totalHabits: number }>;
+  questsGetHabitHistory: (habitId: string, days?: number) => Promise<{ days: Array<{ date: string; checked: boolean }>; bestStreak: number }>;
   questsGetHabits: () => Promise<unknown[]>;
   questsAddHabit: (habit: { name: string; frequency: string; timesPerWeek: number; specificDays?: number[] | null }) => Promise<string>;
   questsUpdateHabit: (id: string, updates: { name?: string; frequency?: string; timesPerWeek?: number; specificDays?: number[] | null }) => Promise<void>;
@@ -465,6 +466,8 @@ export interface HubtifyApi {
   nutritionCopyDay: (opts?: { from?: string; to?: string }) => Promise<{ success: boolean; reason?: string; copied: number; from?: string; to?: string }>;
   nutritionDeleteFood: (id: number) => Promise<void>;
   nutritionDeleteByDate: (date: string) => Promise<void>;
+  nutritionRepeatDay: (fromDate: string, toDate: string) => Promise<{ copied: number }>;
+  nutritionGetRecentLoggedDays: (beforeDate?: string, limit?: number) => Promise<Array<{ date: string; meals: number; calories: number }>>;
   nutritionUpdateFood: (id: number, fields: Record<string, unknown>) => Promise<void>;
   nutritionGetFrequentFoods: () => Promise<unknown[]>;
   nutritionCreateFrequentFood: (food: Record<string, unknown>) => Promise<{ id: number; created: boolean }>;
@@ -476,7 +479,17 @@ export interface HubtifyApi {
   nutritionSaveWeeklyMetrics: (metrics: Record<string, unknown>) => Promise<void>;
   nutritionGetSummary: (date: string) => Promise<unknown>;
   nutritionGetSummaryRange: (start: string, end: string) => Promise<unknown[]>;
+  nutritionGetMacroTargets: (date?: string) => Promise<{ proteinG: number; carbsG: number; fatG: number; auto: boolean } | null>;
   nutritionGetWeights: () => Promise<unknown[]>;
+  nutritionGetAdaptiveTdee: () => Promise<{
+    tdee: number | null;
+    confidence: 'insufficient' | 'low' | 'medium' | 'high';
+    windowDays: number;
+    sampleDays: number;
+    weightSamples: number;
+    intakeAvg: number | null;
+    deltaKg: number | null;
+  }>;
   nutritionGetStreak: () => Promise<{ streak: number; todayPending: boolean; graceUsedOn?: string }>;
   nutritionGetWeekCalories: () => Promise<number[]>;
   nutritionGetTodayCalories: () => Promise<number>;
@@ -484,7 +497,11 @@ export interface HubtifyApi {
   nutritionGetTodayTarget: () => Promise<number | null>;
   nutritionCloseDay: (date: string) => Promise<{ success: boolean; alreadyClosed?: boolean; error?: string; breakdown?: unknown }>;
   nutritionIsDayClosed: (date: string) => Promise<unknown>;
-  nutritionReopenDay: (date: string) => Promise<{ success: boolean; error?: string; xpReverted?: number; hpReverted?: number; eventFound?: boolean }>;
+  /** Reversal runs through the engine's undo path (DAY_REOPENED → DAY_SUMMARY). */
+  nutritionReopenDay: (date: string) => Promise<{
+    success: boolean; error?: string; notClosed?: boolean;
+    xpReverted?: number; hpReverted?: number; eventFound?: boolean;
+  }>;
   nutritionShouldAskWeight: () => Promise<{ shouldAsk: boolean; lastWeight?: number }>;
   nutritionGetFavoriteFoods: () => Promise<FavoriteFood[]>;
   nutritionAddFavoriteFood: (food: Record<string, unknown>) => Promise<{ id: string; created: boolean }>;
@@ -685,6 +702,7 @@ export interface HubtifyApi {
   // Updater
   updaterCheck: () => Promise<{ available: boolean; version?: string }>;
   updaterDownload: () => Promise<string>;
+  updaterRestart: () => Promise<void>;
   onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
   onUpdateDownloaded: (callback: () => void) => () => void;
   onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;
@@ -699,6 +717,9 @@ export interface FavoriteFood {
   calories: number;
   source: string;
   aiBreakdown?: string;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -708,10 +729,16 @@ export interface FavoriteFood {
 interface EstimationItem {
   name: string;
   calories: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
 }
 
 export interface EstimationResult {
   totalCalories: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   items: EstimationItem[];
   aiError?: string;
 }

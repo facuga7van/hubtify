@@ -168,6 +168,16 @@
   stroke-dasharray: none;
 }
 
+/* Smoothed trend overlay — the prominent, solid gold headline line. */
+.treasure-trend-line {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(59, 35, 20, 0.35));
+}
+
 .treasure-area {
   opacity: 0.3;
 }

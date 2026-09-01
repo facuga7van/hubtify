@@ -422,7 +422,7 @@ textarea:focus-visible {
 }
 
 .auth-card {
-  width: 380px;
+  width: min(380px, calc(100vw - 32px));
   padding: 36px 32px;
   background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%);
   border: 2px solid var(--gold-dark);
@@ -475,18 +475,102 @@ textarea:focus-visible {
   gap: 14px;
 }
 
+/* Smooth entry when switching login / register / forgot views */
+.auth-card__form--enter {
+  animation: authFormIn 0.32s ease both;
+}
+
+@keyframes authFormIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Each field groups its input with its inline hint/error so messages
+   expand within the field instead of jolting the whole form. */
+.auth-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .auth-card__input {
   width: 100%;
   padding: 10px 14px;
   font-size: var(--fs-body);
 }
 
-.auth-card__error {
-  color: var(--rubric);
+/* Password input + reveal toggle */
+.auth-card__password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-card__input--password {
+  padding-right: 42px;
+}
+
+.auth-card__password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.auth-card__password-toggle:hover {
+  color: var(--gold-dark);
+  background: rgba(168, 138, 60, 0.12);
+}
+
+.auth-card__error,
+.auth-card__hint {
   font-size: var(--fs-label);
   font-family: 'IM Fell English', serif;
   font-style: italic;
   margin: 0;
+  animation: authMsgIn 0.22s ease both;
+}
+
+.auth-card__error {
+  color: var(--rubric);
+}
+
+.auth-card__hint {
+  color: var(--ink-faded);
+}
+
+@keyframes authMsgIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading state inside the submit button */
+.auth-card__loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-card__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 
 .auth-card__success {
@@ -507,11 +591,15 @@ textarea:focus-visible {
 }
 
 .auth-card__toggle-wrap {
-  text-align: center;
-  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .auth-card__toggle {
+  align-self: center;
   background: none;
   border: none;
   color: var(--gold-dark);
@@ -530,6 +618,7 @@ textarea:focus-visible {
 }
 
 .auth-card__back {
+  align-self: center;
   background: none;
   border: none;
   color: var(--ink-faded);

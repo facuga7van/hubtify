@@ -18,7 +18,7 @@ function setupDb(): Database.Database {
   return db;
 }
 
-/** A profile as it existed BEFORE v11, so v11 runs against real legacy data. */
+/** A profile as it existed BEFORE v13, so v13 runs against real legacy data. */
 function seedLegacyProfile(db: Database.Database, mealSchedule: string | null): void {
   db.prepare(`
     INSERT INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, meal_schedule)
@@ -39,7 +39,7 @@ function readSchedule(db: Database.Database): MealSchedule | null {
   return row.meal_schedule ? JSON.parse(row.meal_schedule) : null;
 }
 
-describe('nutrition migration v11 — day_cutoff_hour', () => {
+describe('nutrition migration v13 — day_cutoff_hour', () => {
   it('adds the column with a 4 AM default', () => {
     const db = setupDb();
     const cols = db.pragma('table_info(nutrition_profile)') as Array<{ name: string }>;
@@ -52,11 +52,12 @@ describe('nutrition migration v11 — day_cutoff_hour', () => {
   });
 
   it('backfills existing rows that predate the column', () => {
-    // Run everything up to v10, insert, then apply v11 — the real upgrade order.
+    // Run everything up to v12, insert, then apply v13 — the real upgrade order.
+    // (v10/v11 son de la rama de macros; el corte se corrió con la integración.)
     const db = new Database(':memory:');
-    for (const m of nutritionMigrations.filter(m => m.version <= 10)) db.exec(m.up);
+    for (const m of nutritionMigrations.filter(m => m.version <= 12)) db.exec(m.up);
     seedLegacyProfile(db, LEGACY_DEFAULT_JSON);
-    db.exec(nutritionMigrations.find(m => m.version === 11)!.up);
+    db.exec(nutritionMigrations.find(m => m.version === 13)!.up);
 
     const row = db.prepare('SELECT day_cutoff_hour FROM nutrition_profile WHERE id = 1')
       .get() as { day_cutoff_hour: number };
@@ -64,12 +65,12 @@ describe('nutrition migration v11 — day_cutoff_hour', () => {
   });
 });
 
-describe('nutrition migration v11 — merienda in the schedule', () => {
+describe('nutrition migration v13 — merienda in the schedule', () => {
   function migrateFromV10(mealSchedule: string | null): Database.Database {
     const db = new Database(':memory:');
-    for (const m of nutritionMigrations.filter(m => m.version <= 10)) db.exec(m.up);
+    for (const m of nutritionMigrations.filter(m => m.version <= 12)) db.exec(m.up);
     seedLegacyProfile(db, mealSchedule);
-    db.exec(nutritionMigrations.find(m => m.version === 11)!.up);
+    db.exec(nutritionMigrations.find(m => m.version === 13)!.up);
     return db;
   }
 
@@ -104,10 +105,10 @@ describe('nutrition migration v11 — merienda in the schedule', () => {
     expect(grafted.dinner).toMatchObject({ startHour: 21, endHour: 23 });
   });
 
-  it('is idempotent — re-running v11 does not clobber the new default', () => {
+  it('is idempotent — re-running v13 does not clobber the new default', () => {
     const db = migrateFromV10(LEGACY_DEFAULT_JSON);
     const first = readSchedule(db);
-    db.exec(nutritionMigrations.find(m => m.version === 11)!.up.replace(/ALTER TABLE[^;]*;/g, ''));
+    db.exec(nutritionMigrations.find(m => m.version === 13)!.up.replace(/ALTER TABLE[^;]*;/g, ''));
     expect(readSchedule(db)).toEqual(first);
   });
 });

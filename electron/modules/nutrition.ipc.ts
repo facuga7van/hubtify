@@ -8,14 +8,19 @@ import {
   computeNutritionStreak, DEFAULT_DAY_CUTOFF_HOUR,
 } from '../../shared/meal-utils';
 import type { MealSchedule, StreakDay } from '../../shared/meal-utils';
-import { getLevel, getTitle, clampHp, getLocalDateString } from '../../shared/rpg-engine';
-import { bumpMasteryXp } from '../ipc/rpg-handlers';
+import { calcAutoMacroTargets } from '../../shared/macro-utils';
+import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adaptive-tdee';
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
 
 function genId(): string {
   return crypto.randomUUID();
+}
+
+/** Normalize a macro gram value to a finite, non-negative number rounded to 0.1, or null. */
+function normMacro(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
 }
 
 /**
@@ -62,28 +67,10 @@ function escapeLike(value: string): string {
  * These columns are compared as STRINGS by the last-write-wins merge, so the
  * whole module must use one format. It used to mix ISO on insert with
  * datetime('now') on delete, and since 'T' > ' ' a soft-delete could never beat
- * the row's own insert timestamp. Migration nutrition v10 normalised the history.
+ * the row's own insert timestamp. Migration nutrition v12 normalised the history.
  */
 function syncStamp(): string {
   return new Date().toISOString();
-}
-
-/**
- * A sync stamp (ISO, UTC) rewritten in the engine's `rpg_events.created_at`
- * shape: LOCAL 'YYYY-MM-DD HH:MM:SS' (shared/date-utils localTimestamp).
- *
- * `reopenDay` compares `created_at >= closed_at` as strings. With the raw ISO
- * stamp that was false for every event of the same day (' ' < 'T'), so the
- * DAY_SUMMARY was never found: the closure refunded the BASE xp instead of the
- * multiplied one, the event stayed in the log, and each close/reopen cycle
- * stacked one more DAY_SUMMARY row (and one more combo tick).
- * A stamp that doesn't parse (legacy shapes) is compared as-is.
- */
-function toLocalStamp(stamp: string): string {
-  const d = new Date(stamp);
-  if (Number.isNaN(d.getTime())) return stamp;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /**
@@ -107,28 +94,6 @@ export function getDayCutoffHour(db: ReturnType<typeof getDb>): number {
  */
 export function nutritionToday(db: ReturnType<typeof getDb>): string {
   return nutritionDayString(new Date(), getDayCutoffHour(db));
-}
-
-/**
- * Objetivo diario de proteína en gramos.
- *
- * `nutrition_profile.protein_target_g` NULL significa "auto": el peso más
- * reciente (o el inicial) × 1.6 g/kg — la referencia estándar para conservar
- * masa magra en déficit y un piso razonable en cualquier objetivo. Exportado
- * para que los tests fijen el contrato del default.
- */
-export function getProteinTargetG(db: ReturnType<typeof getDb>): number | null {
-  const row = db.prepare(
-    'SELECT protein_target_g AS target, initial_weight_kg AS initialWeight FROM nutrition_profile WHERE id = 1',
-  ).get() as { target: number | null; initialWeight: number } | undefined;
-  if (!row) return null;
-  if (row.target != null && Number.isFinite(row.target) && row.target > 0) return Math.round(row.target);
-  const latest = db.prepare(
-    'SELECT weight_kg AS weightKg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1',
-  ).get() as { weightKg: number } | undefined;
-  const weight = latest?.weightKg ?? row.initialWeight;
-  if (!Number.isFinite(weight) || weight <= 0) return null;
-  return Math.round(weight * 1.6);
 }
 
 /** True si el día tiene al menos un evento vivo (asado, cumpleaños…). */
@@ -167,10 +132,11 @@ export function registerNutritionIpcHandlers(): void {
       sex: row.sex, heightCm: row.height_cm,
       initialWeightKg: row.initial_weight_kg, activityLevel: row.activity_level,
       deficitTargetKcal: row.deficit_target_kcal,
-      // NULL = auto (peso × 1.6). El efectivo ya viene resuelto para que la UI
-      // nunca tenga que conocer la fórmula ni el peso más reciente.
+      // NULL on any of the three = "auto": nutrition:getMacroTargets derives all
+      // three from the calorie target and the latest weight (macro-utils).
       proteinTargetG: row.protein_target_g ?? null,
-      proteinTargetEffectiveG: getProteinTargetG(db),
+      carbsTargetG: row.carbs_target_g ?? null,
+      fatTargetG: row.fat_target_g ?? null,
       mealSchedule,
       // The renderer needs the cutoff to agree with the backend on which day
       // "today" is; it caches it alongside the profile it already loads.
@@ -183,8 +149,8 @@ export function registerNutritionIpcHandlers(): void {
     activityLevel: string; deficitTargetKcal?: number;
     weightCheckDay?: number; weightPopupEnabled?: boolean;
     mealSchedule?: MealSchedule; dayCutoffHour?: number;
-    /** null = volver al auto (peso × 1.6); undefined = no tocar lo guardado. */
-    proteinTargetG?: number | null;
+    /** null = back to auto (macro-utils); undefined = leave what is stored. */
+    proteinTargetG?: number | null; carbsTargetG?: number | null; fatTargetG?: number | null;
   }) => {
     if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth)) throw new Error('Invalid date of birth format');
     const dobDate = new Date(profile.dateOfBirth + 'T00:00:00');
@@ -192,28 +158,41 @@ export function registerNutritionIpcHandlers(): void {
     if (!Number.isFinite(profile.heightCm) || profile.heightCm < 100 || profile.heightCm > 250) throw new Error('Invalid height: must be between 100 and 250 cm');
     if (!Number.isFinite(profile.initialWeightKg) || profile.initialWeightKg < 10 || profile.initialWeightKg > 500) throw new Error('Invalid weight: must be between 10 and 500 kg');
     if (profile.deficitTargetKcal !== undefined && (!Number.isFinite(profile.deficitTargetKcal) || Math.abs(profile.deficitTargetKcal) > 2000)) throw new Error('Invalid deficit/surplus target: must be between -2000 and 2000 kcal');
-    if (profile.proteinTargetG != null && (!Number.isFinite(profile.proteinTargetG) || profile.proteinTargetG <= 0 || profile.proteinTargetG > 500)) throw new Error('Invalid protein target: must be between 1 and 500 g');
     const age = getAgeFromDob(profile.dateOfBirth);
     const weightCheckDay = Math.max(1, Math.min(7, profile.weightCheckDay ?? 1));
     const weightPopupEnabled = profile.weightPopupEnabled !== false ? 1 : 0;
     const mealScheduleJson = profile.mealSchedule ? JSON.stringify(ensureMerienda(profile.mealSchedule)) : null;
+    // Validate macro target overrides (nullable; undefined = leave existing untouched)
+    const validMacro = (v: number | null | undefined, label: string): number | null | undefined => {
+      if (v === undefined) return undefined;
+      if (v === null) return null;
+      if (!Number.isFinite(v) || v < 0 || v > 2000) throw new Error(`Invalid ${label} target: must be between 0 and 2000 g`);
+      return Math.round(v * 10) / 10;
+    };
+    const proteinTargetG = validMacro(profile.proteinTargetG, 'protein');
+    const carbsTargetG = validMacro(profile.carbsTargetG, 'carbs');
+    const fatTargetG = validMacro(profile.fatTargetG, 'fat');
     const db = getDb();
-    // Read existing meal_schedule / cutoff / protein target to preserve them when not provided
-    const existing = db.prepare('SELECT meal_schedule, day_cutoff_hour, protein_target_g FROM nutrition_profile WHERE id = 1')
-      .get() as { meal_schedule: string | null; day_cutoff_hour: number | null; protein_target_g: number | null } | undefined;
+    // Read existing values to preserve them when not provided
+    const existing = db.prepare('SELECT meal_schedule, day_cutoff_hour, protein_target_g, carbs_target_g, fat_target_g FROM nutrition_profile WHERE id = 1')
+      .get() as {
+        meal_schedule: string | null; day_cutoff_hour: number | null;
+        protein_target_g: number | null; carbs_target_g: number | null; fat_target_g: number | null;
+      } | undefined;
     const finalMealSchedule = mealScheduleJson ?? existing?.meal_schedule ?? null;
     const dayCutoffHour = profile.dayCutoffHour !== undefined
       ? clampCutoffHour(profile.dayCutoffHour)
       : (existing?.day_cutoff_hour ?? DEFAULT_DAY_CUTOFF_HOUR);
-    // undefined = untouched; null = explicit "back to auto" (peso × 1.6).
-    const proteinTargetG = profile.proteinTargetG !== undefined
-      ? profile.proteinTargetG
-      : (existing?.protein_target_g ?? null);
+    const finalProteinTarget = proteinTargetG !== undefined ? proteinTargetG : (existing?.protein_target_g ?? null);
+    const finalCarbsTarget = carbsTargetG !== undefined ? carbsTargetG : (existing?.carbs_target_g ?? null);
+    const finalFatTarget = fatTargetG !== undefined ? fatTargetG : (existing?.fat_target_g ?? null);
     db.prepare(`
-      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, carbs_target_g, fat_target_g, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(age, profile.sex, profile.heightCm, profile.initialWeightKg,
-      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay, weightPopupEnabled, finalMealSchedule, dayCutoffHour, proteinTargetG, syncStamp());
+      profile.activityLevel, profile.deficitTargetKcal ?? 500, profile.dateOfBirth, weightCheckDay,
+      weightPopupEnabled, finalMealSchedule, dayCutoffHour,
+      finalProteinTarget, finalCarbsTarget, finalFatTarget, syncStamp());
 
     // Recalc today's summary with new profile
     recalcSummary(db, nutritionToday(db));
@@ -226,8 +205,8 @@ export function registerNutritionIpcHandlers(): void {
   ipcHandle('nutrition:logFood', (_e, entry: {
     date?: string; description: string; calories: number; source: string;
     frequentFoodId?: number; aiBreakdown?: string; meal?: string;
-    /** Gramos de proteína, si se conocen (IA, cache o carga manual). */
-    proteinG?: number | null;
+    /** Macros in grams, when known (AI, cache or manual entry). */
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
     /** Modo evento: una sola entrada con banda honesta; calories = punto medio. */
     isEvent?: boolean; eventKcalMin?: number | null; eventKcalMax?: number | null;
   }) => {
@@ -269,23 +248,29 @@ export function registerNutritionIpcHandlers(): void {
       // surrogate that collides between devices). updated_at is set on INSERT too —
       // a NULL there loses every last-write-wins comparison later.
       db.prepare(`
-        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, protein_g, is_event, event_kcal_min, event_kcal_max, updated_at, sync_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal,
+                              protein_g, carbs_g, fat_g, is_event, event_kcal_min, event_kcal_max, updated_at, sync_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(date, time, entry.description, entry.calories, normalizeFoodSource(entry.source),
         entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal,
-        entry.proteinG ?? null, isEvent, eventMin, eventMax, syncStamp(), genId());
+        normMacro(entry.proteinG), normMacro(entry.carbsG), normMacro(entry.fatG),
+        isEvent, eventMin, eventMax, syncStamp(), genId());
       recalcSummary(db, date);
     })();
   });
-
 
   /**
    * Copia las comidas de `from` a `to` (por defecto, ayer -> hoy).
    *
    * "Repetir el almuerzo de siempre" costaba retipear la descripcion y pagar otra
    * llamada a la IA, cuando el modulo se vende como registro rapido. Copia
-   * descripcion y calorias, re-sella la hora y genera sync_id nuevos: son comidas
-   * nuevas, no las mismas filas.
+   * descripcion, calorias y macros, re-sella la hora y genera sync_id nuevos: son
+   * comidas nuevas, no las mismas filas.
+   *
+   * Convive con `nutrition:repeatDay` a propósito: este es el atajo de un toque
+   * ("copiá ayer") y devuelve un motivo cuando no puede; repeatDay es el picker
+   * explícito de origen/destino. Comparten `repeatDayMeals` salvo por el remapeo
+   * de `source`, que solo hace este.
    */
   ipcHandle('nutrition:copyDay', (_e, opts?: { from?: string; to?: string }) => {
     const db = getDb();
@@ -298,42 +283,42 @@ export function registerNutritionIpcHandlers(): void {
 
     if (isDayClosed(db, to)) return { success: false, reason: 'day_closed', copied: 0 };
 
-    // La copia lleva TODO lo que describe la comida: la marca de evento (y su
-    // banda) y la proteína viajan con ella. Sin la marca, el asado de ayer
-    // copiado hoy se cerraba como un surplus común y costaba −20 HP injustos;
-    // sin protein_g, la proteína del día desaparecía.
-    const rows = db.prepare(
-      `SELECT description, calories, source, frequent_food_id AS frequentFoodId, meal, time,
-              protein_g AS proteinG, is_event AS isEvent,
-              event_kcal_min AS eventKcalMin, event_kcal_max AS eventKcalMax
-       FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC`,
-    ).all(from) as Array<{
-      description: string; calories: number; source: string;
-      frequentFoodId: number | null; meal: string | null; time: string;
-      proteinG: number | null; isEvent: number | null;
-      eventKcalMin: number | null; eventKcalMax: number | null;
-    }>;
+    let copied = 0;
+    db.transaction(() => { copied = repeatDayMeals(db, from, to, { demoteAiSource: true }); })();
 
-    if (rows.length === 0) return { success: false, reason: 'source_empty', copied: 0 };
+    if (copied === 0) return { success: false, reason: 'source_empty', copied: 0 };
+    return { success: true, copied, from, to };
+  });
 
-    const insert = db.prepare(`
-      INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal,
-                            protein_g, is_event, event_kcal_min, event_kcal_max, updated_at, sync_id)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
-    `);
+  // Copy every non-deleted meal from a source day to a destination day.
+  // Adds on top of whatever the destination already has (never replaces),
+  // preserving each meal's original time/meal/macros so the day keeps its shape.
+  ipcHandle('nutrition:repeatDay', (_e, fromDate: string, toDate: string) => {
+    if (!fromDate || !toDate || !/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+      throw new Error('Invalid date format');
+    }
+    const db = getDb();
+    if (isDayClosed(db, toDate)) throw new Error('Cannot modify a closed day');
+    let copied = 0;
+    db.transaction(() => { copied = repeatDayMeals(db, fromDate, toDate); })();
+    return { copied };
+  });
 
-    db.transaction(() => {
-      for (const r of rows) {
-        // La comida original pudo venir de la IA; la copia no vuelve a estimar, asi
-        // que su origen es 'frequent' (reutilizada), no 'ai_estimate'.
-        const source = r.source === 'ai_estimate' ? 'frequent' : r.source;
-        insert.run(to, r.time, r.description, r.calories, source, r.frequentFoodId, r.meal,
-          r.proteinG, r.isEvent ? 1 : 0, r.eventKcalMin, r.eventKcalMax, syncStamp(), genId());
-      }
-      recalcSummary(db, to);
-    })();
-
-    return { success: true, copied: rows.length, from, to };
+  // Recent days (last 30) that have at least one logged meal, before `beforeDate`.
+  // Used by the "repeat a day" picker so the user can choose a source day.
+  ipcHandle('nutrition:getRecentLoggedDays', (_e, beforeDate?: string, limit?: number) => {
+    const db = getDb();
+    const date = beforeDate ?? nutritionToday(db);
+    const lowerBound = shiftDateString(date, -30);
+    const max = Number.isFinite(limit) && (limit as number) > 0 ? Math.min(Math.floor(limit as number), 60) : 14;
+    return db.prepare(`
+      SELECT date, COUNT(*) AS meals, COALESCE(SUM(calories), 0) AS calories
+      FROM food_log
+      WHERE deleted_at IS NULL AND date < ? AND date >= ?
+      GROUP BY date
+      ORDER BY date DESC
+      LIMIT ?
+    `).all(date, lowerBound, max);
   });
 
   ipcHandle('nutrition:getFoodByDate', (_e, date: string) => {
@@ -343,7 +328,7 @@ export function registerNutritionIpcHandlers(): void {
              frequent_food_id AS frequentFoodId,
              ai_breakdown AS aiBreakdown,
              meal,
-             protein_g AS proteinG,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
              is_event AS isEvent,
              event_kcal_min AS eventKcalMin,
              event_kcal_max AS eventKcalMax
@@ -370,7 +355,7 @@ export function registerNutritionIpcHandlers(): void {
    * With 30 days of log this is how most meals get recorded: type three letters,
    * arrow down, Enter — no network, no model, no waiting, and it works on a
    * plane. `food_log` and `favorite_foods` are unified on `description_norm`
-   * (migration v12's generated column) and ranked by frequency x recency; see
+   * (migration v14's generated column) and ranked by frequency x recency; see
    * history-search.ts for the formula and why the tiers exist.
    *
    * An empty query returns the top of the ranking, which is what the input shows
@@ -480,9 +465,9 @@ export function registerNutritionIpcHandlers(): void {
 
     if (byNorm.size === 0) return [];
 
-    // Protein rides along from the AI cache when it happens to know it. The
-    // estimate function returns only calories today, so this is almost always
-    // NULL — it is here so the field exists the day macros land.
+    // Protein rides along from the AI cache when it knows it. Only protein: the
+    // suggestion row exists to pre-fill the input, and protein is the one macro
+    // the user is shown a per-meal number for.
     const norms = [...byNorm.keys()];
     const proteins = db.prepare(
       `SELECT description_norm AS norm, protein_g AS proteinG FROM nutrition_ai_cache
@@ -496,7 +481,7 @@ export function registerNutritionIpcHandlers(): void {
     return rankSuggestions([...byNorm.values()], nutritionToday(db), cap);
   });
 
-  // ── AI estimate cache (local-only; see migration v12) ──────────────
+  // ── AI estimate cache (local-only; see migration v14) ──────────────
 
   /**
    * The cached estimate for a description, or null.
@@ -510,9 +495,13 @@ export function registerNutritionIpcHandlers(): void {
     if (!norm) return null;
     const db = getDb();
     const row = db.prepare(
-      `SELECT calories, ai_breakdown AS aiBreakdown, protein_g AS proteinG, hits
+      `SELECT calories, ai_breakdown AS aiBreakdown,
+              protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, hits
        FROM nutrition_ai_cache WHERE description_norm = ?`,
-    ).get(norm) as { calories: number; aiBreakdown: string | null; proteinG: number | null; hits: number } | undefined;
+    ).get(norm) as {
+      calories: number; aiBreakdown: string | null;
+      proteinG: number | null; carbsG: number | null; fatG: number | null; hits: number;
+    } | undefined;
     if (!row) return null;
     db.prepare('UPDATE nutrition_ai_cache SET hits = hits + 1, updated_at = ? WHERE description_norm = ?')
       .run(syncStamp(), norm);
@@ -536,7 +525,8 @@ export function registerNutritionIpcHandlers(): void {
    */
   ipcHandle('nutrition:cacheEstimate', (_e, entry: {
     description: string; calories: number; aiBreakdown?: string | null;
-    proteinG?: number | null; corrected?: boolean;
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
+    corrected?: boolean;
   }) => {
     const norm = normalizeDescription(entry.description);
     if (!norm) return { cached: false };
@@ -544,18 +534,25 @@ export function registerNutritionIpcHandlers(): void {
     const breakdown = entry.corrected ? null : (entry.aiBreakdown ?? null);
     const now = syncStamp();
     getDb().prepare(`
-      INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, hits, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 1, ?, ?)
+      INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, carbs_g, fat_g, hits, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
       ON CONFLICT(description_norm) DO UPDATE SET
         calories = excluded.calories,
         ai_breakdown = excluded.ai_breakdown,
         protein_g = COALESCE(excluded.protein_g, nutrition_ai_cache.protein_g),
+        carbs_g = COALESCE(excluded.carbs_g, nutrition_ai_cache.carbs_g),
+        fat_g = COALESCE(excluded.fat_g, nutrition_ai_cache.fat_g),
         updated_at = excluded.updated_at
-    `).run(norm, Math.round(entry.calories), breakdown, entry.proteinG ?? null, now, now);
+    `).run(norm, Math.round(entry.calories), breakdown,
+      normMacro(entry.proteinG), normMacro(entry.carbsG), normMacro(entry.fatG), now, now);
     return { cached: true };
   });
 
-  ipcHandle('nutrition:updateFood', (_e, id: number, fields: { description?: string; calories?: number; meal?: string; time?: string; aiBreakdown?: string; source?: string; proteinG?: number | null }) => {
+  ipcHandle('nutrition:updateFood', (_e, id: number, fields: {
+    description?: string; calories?: number; meal?: string; time?: string;
+    aiBreakdown?: string; source?: string;
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
+  }) => {
     if (fields.calories !== undefined && (!Number.isFinite(fields.calories) || fields.calories <= 0)) throw new Error('Invalid calories: must be a positive number');
     if (fields.proteinG != null && (!Number.isFinite(fields.proteinG) || fields.proteinG < 0)) throw new Error('Invalid protein: must be >= 0 grams');
     const db = getDb();
@@ -569,7 +566,9 @@ export function registerNutritionIpcHandlers(): void {
     if (fields.time !== undefined) { sets.push('time = ?'); vals.push(fields.time); }
     if (fields.aiBreakdown !== undefined) { sets.push('ai_breakdown = ?'); vals.push(fields.aiBreakdown); }
     if (fields.source !== undefined) { sets.push('source = ?'); vals.push(normalizeFoodSource(fields.source)); }
-    if (fields.proteinG !== undefined) { sets.push('protein_g = ?'); vals.push(fields.proteinG); }
+    if (fields.proteinG !== undefined) { sets.push('protein_g = ?'); vals.push(normMacro(fields.proteinG)); }
+    if (fields.carbsG !== undefined) { sets.push('carbs_g = ?'); vals.push(normMacro(fields.carbsG)); }
+    if (fields.fatG !== undefined) { sets.push('fat_g = ?'); vals.push(normMacro(fields.fatG)); }
     sets.push('updated_at = ?'); vals.push(syncStamp());
     if (sets.length === 1) return; // only updated_at, no real changes
     vals.push(id);
@@ -595,12 +594,16 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     return db.prepare(`
       SELECT id, name, calories,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
              times_used AS timesUsed, created_at AS createdAt
       FROM frequent_foods WHERE deleted_at IS NULL ORDER BY times_used DESC
     `).all();
   });
 
-  ipcHandle('nutrition:createFrequentFood', (_e, food: { name: string; calories: number }) => {
+  ipcHandle('nutrition:createFrequentFood', (_e, food: {
+    name: string; calories: number;
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
+  }) => {
     const trimmedName = typeof food.name === 'string' ? food.name.trim() : '';
     if (!trimmedName) throw new Error('Invalid name: must be a non-empty string');
     if (!Number.isFinite(food.calories) || food.calories <= 0) throw new Error('Invalid calories: must be a positive number');
@@ -613,13 +616,18 @@ export function registerNutritionIpcHandlers(): void {
       .get(trimmedName) as { id: number } | undefined;
 
     if (existing) {
-      db.prepare('UPDATE frequent_foods SET calories = ?, updated_at = ?, deleted_at = NULL WHERE id = ?')
-        .run(food.calories, now, existing.id);
+      db.prepare(`
+        UPDATE frequent_foods
+        SET calories = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?, deleted_at = NULL
+        WHERE id = ?
+      `).run(food.calories, normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG), now, existing.id);
       return { id: existing.id, created: false };
     }
-    const info = db.prepare(
-      'INSERT INTO frequent_foods (name, calories, times_used, created_at, updated_at, sync_id) VALUES (?, ?, 1, ?, ?, ?)'
-    ).run(trimmedName, food.calories, now, now, genId());
+    const info = db.prepare(`
+      INSERT INTO frequent_foods (name, calories, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, sync_id)
+      VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+    `).run(trimmedName, food.calories, normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG),
+      now, now, genId());
     return { id: Number(info.lastInsertRowid), created: true };
   });
 
@@ -664,8 +672,8 @@ export function registerNutritionIpcHandlers(): void {
     if (metrics.waistCm != null && (!Number.isFinite(metrics.waistCm) || metrics.waistCm < 30 || metrics.waistCm > 250)) throw new Error('Invalid waist: must be between 30 and 250 cm');
     const db = getDb();
     const date = metrics.date ?? getMondayOfWeek();
-    db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm, updated_at) VALUES (?, ?, ?, datetime(\'now\'))')
-      .run(date, metrics.weightKg ?? null, metrics.waistCm ?? null);
+    db.prepare('INSERT OR REPLACE INTO nutrition_weekly_metrics (date, weight_kg, waist_cm, updated_at) VALUES (?, ?, ?, ?)')
+      .run(date, metrics.weightKg ?? null, metrics.waistCm ?? null, syncStamp());
     recalcSummary(db, nutritionToday(db));
   });
 
@@ -677,15 +685,77 @@ export function registerNutritionIpcHandlers(): void {
     return row ? {
       date: row.date, totalCaloriesIn: row.total_calories_in,
       bmr: row.bmr, tdee: row.tdee, balance: row.balance,
+      proteinG: row.protein_g ?? null, carbsG: row.carbs_g ?? null, fatG: row.fat_g ?? null,
     } : null;
   });
 
   ipcHandle('nutrition:getSummaryRange', (_e, start: string, end: string) => {
     const db = getDb();
     return db.prepare(`
-      SELECT date, total_calories_in AS totalCaloriesIn, bmr, tdee, balance
+      SELECT date, total_calories_in AS totalCaloriesIn, bmr, tdee, balance,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG
       FROM nutrition_daily_summary WHERE date BETWEEN ? AND ? ORDER BY date ASC
     `).all(start, end);
+  });
+
+  // Macro targets: profile override when all three set, otherwise auto from the helper.
+  ipcHandle('nutrition:getMacroTargets', (_e, date?: string) => {
+    const db = getDb();
+    const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
+    if (!profile) return null;
+
+    const p = profile.protein_target_g as number | null;
+    const c = profile.carbs_target_g as number | null;
+    const f = profile.fat_target_g as number | null;
+    if (p != null && c != null && f != null) {
+      return { proteinG: p, carbsG: c, fatG: f, auto: false };
+    }
+
+    const targetDate = date ?? nutritionToday(db);
+    // Ensure a summary (and thus a fresh tdee) exists for the target date.
+    let summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(targetDate) as { tdee: number } | undefined;
+    if (!summary) {
+      recalcSummary(db, targetDate);
+      summary = db.prepare('SELECT tdee FROM nutrition_daily_summary WHERE date = ?').get(targetDate) as { tdee: number } | undefined;
+    }
+    const tdee = summary?.tdee ?? 0;
+    const deficit = (profile.deficit_target_kcal as number) ?? 0;
+    const targetCalories = tdee - deficit;
+
+    const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
+    const weight = latestWeight?.weight_kg ?? (profile.initial_weight_kg as number);
+
+    const auto = calcAutoMacroTargets(targetCalories, weight, deficit);
+    return { ...auto, auto: true };
+  });
+
+  // Adaptive (data-derived) TDEE INSIGHT. Reads logged intake + the weight series
+  // over the lookback window and infers the user's REAL expenditure via the pure
+  // energy-balance helper. Read-only: never recalibrates the goal or touches the
+  // day-close math. Returns the estimate with a confidence level and the sample
+  // counts so the renderer can either show the number or say what's still missing.
+  ipcHandle('nutrition:getAdaptiveTdee', () => {
+    const db = getDb();
+    const today = nutritionToday(db);
+    const start = shiftDateString(today, -(ADAPTIVE_LOOKBACK_DAYS - 1));
+
+    const intake = db.prepare(`
+      SELECT date, COALESCE(SUM(calories), 0) AS calories
+      FROM food_log
+      WHERE date BETWEEN ? AND ? AND deleted_at IS NULL
+      GROUP BY date
+      HAVING calories > 0
+      ORDER BY date ASC
+    `).all(start, today) as Array<{ date: string; calories: number }>;
+
+    const weights = db.prepare(`
+      SELECT date, weight_kg AS weightKg
+      FROM nutrition_weekly_metrics
+      WHERE weight_kg IS NOT NULL AND date BETWEEN ? AND ?
+      ORDER BY date ASC
+    `).all(start, today) as Array<{ date: string; weightKg: number }>;
+
+    return estimateAdaptiveTdee(intake, weights);
   });
 
   // ── Dashboard ──────────────────────────────────────
@@ -808,7 +878,7 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
 
     return db.transaction(() => {
-      // Check if day already closed
+      // Check if day already closed (a soft-deleted row counts as reopened → re-closable)
       if (isDayClosed(db, date)) return { success: false, alreadyClosed: true };
 
       // Get summary
@@ -860,13 +930,19 @@ export function registerNutritionIpcHandlers(): void {
       const xpWeight = weightLogged ? 5 : 0;
       const xpTotal = xpPrecision + xpBonus + xpSteps + xpGym + xpWeight;
 
+      // Save close record. UPSERT so a previously reopened (soft-deleted) day can be
+      // re-closed: clear deleted_at and refresh closed_at/updated_at for sync.
       const closedAt = syncStamp();
-      // OR REPLACE: a day that was reopened leaves a soft-deleted row behind, and
-      // date is the primary key.
       db.prepare(`
-        INSERT OR REPLACE INTO nutrition_daily_closed
-          (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, closed_at, updated_at, deleted_at)
+        INSERT INTO nutrition_daily_closed (date, xp_precision, xp_steps, xp_gym, xp_weight, xp_bonus, xp_total, hp_change, consumed, target, closed_at, updated_at, deleted_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ON CONFLICT(date) DO UPDATE SET
+          xp_precision = excluded.xp_precision, xp_steps = excluded.xp_steps,
+          xp_gym = excluded.xp_gym, xp_weight = excluded.xp_weight,
+          xp_bonus = excluded.xp_bonus, xp_total = excluded.xp_total,
+          hp_change = excluded.hp_change, consumed = excluded.consumed,
+          target = excluded.target, closed_at = excluded.closed_at,
+          updated_at = excluded.updated_at, deleted_at = NULL
       `).run(date, xpPrecision, xpSteps, xpGym, xpWeight, xpBonus, xpTotal, hpChange, consumed, Math.round(target), closedAt, closedAt);
 
       return {
@@ -884,73 +960,50 @@ export function registerNutritionIpcHandlers(): void {
 
   /**
    * Reopens a closed day so the user can keep logging (they closed at 20:00 and
-   * then had dinner). Reverses the XP and HP the closure granted, then soft-deletes
-   * the closure record.
+   * then had dinner). Soft-deletes the closure record and reports what the close
+   * had granted — it does NOT touch the player's XP/HP itself.
    *
-   * The DAY_SUMMARY rpg_event is emitted by the renderer right after closeDay
-   * returns, so it is located by (module, type, payload xp/hp, created after
-   * closed_at) and its EXACT xp_gained is reversed — that value includes the combo
-   * and random-bonus multipliers, which the stored xp_total does not. If the event
-   * can't be found (pre-v10 closures with no closed_at, or a purged log) the stored
-   * base values are reversed as a best effort.
+   * The reversal belongs to the RPG ENGINE. The renderer emits
+   * `DAY_REOPENED` with `payload: { date }` after this returns, and
+   * `rpg-handlers` treats it as a generic undo of the `DAY_SUMMARY` carrying the
+   * same `$.date`: it deletes the event row, refunds the EXACT multiplied
+   * xp_gained (not the base xp_total stored here), gives back the daily_combo
+   * tick when the close was today's, and reverses the mastery bump.
    *
-   * This mirrors the engine's own undo path (rpg-handlers isUndo): delete the
-   * event, refund its XP/HP, and give back the daily_combo tick it earned when
-   * it was today's. Without the last step every close/reopen cycle left the
-   * combo one notch higher — 4 cycles = 2.0x on everything else that day.
+   * That is also what killed the ' ' < 'T' bug this handler used to carry: it
+   * matched the DAY_SUMMARY by `created_at >= closed_at`, comparing an ISO UTC
+   * stamp against the engine's LOCAL 'YYYY-MM-DD HH:MM:SS'. Since ' ' < 'T' the
+   * event of the same day was NEVER found — the base XP got refunded instead of
+   * the multiplied one, the row stayed in the log, and every close/reopen cycle
+   * stacked another combo tick. Matching on `payload.date` compares no
+   * timestamps at all, so the bug cannot come back.
+   *
+   * `xpReverted` / `hpReverted` are the STORED BASE values, for the toast only.
    */
   ipcHandle('nutrition:reopenDay', (_e, date: string) => {
     const db = getDb();
     return db.transaction(() => {
-      const closed = db.prepare(
-        'SELECT * FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL'
-      ).get(date) as Record<string, unknown> | undefined;
-      if (!closed) return { success: false, error: 'Day is not closed' };
+      const record = reopenDayRecord(db, date);
+      if (!record) return { success: false, notClosed: true, error: 'Day is not closed' };
 
-      const xpTotal = (closed.xp_total as number) ?? 0;
-      const hpChange = (closed.hp_change as number) ?? 0;
-      const closedAt = closed.closed_at as string | null;
-      const since = closedAt ? toLocalStamp(closedAt) : date;
-
-      const event = db.prepare(`
-        SELECT id, xp_gained, hp_change, created_at FROM rpg_events
+      // Read-only: tells the renderer whether the engine will have a DAY_SUMMARY
+      // to undo. A closure from before payload.date existed has none, and the
+      // reopen is then just an unlock (the XP stays paid).
+      const eventFound = !!db.prepare(`
+        SELECT 1 FROM rpg_events
         WHERE module_id = 'nutrition' AND event_type = 'DAY_SUMMARY'
-          AND json_extract(payload, '$.xp') = ?
-          AND json_extract(payload, '$.hp') = ?
-          AND created_at >= ?
-        ORDER BY id DESC LIMIT 1
-      `).get(xpTotal, hpChange, since) as { id: number; xp_gained: number; hp_change: number; created_at: string } | undefined;
-
-      const xpToRevert = event ? event.xp_gained : xpTotal;
-      const hpToRevert = event ? event.hp_change : hpChange;
-      if (event) {
-        db.prepare('DELETE FROM rpg_events WHERE id = ?').run(event.id);
-        // The close bumped the nutrition mastery; reopening annuls that entry
-        // (floor 0 inside) — otherwise close/reopen/close farms mastery.
-        bumpMasteryXp(db, 'nutrition', -event.xp_gained);
-      }
-
-      const stats = db.prepare('SELECT xp, hp, title, daily_combo AS combo FROM player_stats WHERE user_id = ?')
-        .get('default') as { xp: number; hp: number; title: string; combo: number };
-      const newXp = Math.max(0, stats.xp - xpToRevert);
-      const newLevel = getLevel(newXp);
-      // The combo belongs to the calendar day: only a close made TODAY ticked
-      // the counter the player still carries, so only that one is given back.
-      const today = getLocalDateString();
-      const combo = stats.combo || 0;
-      const newCombo = event && event.created_at.slice(0, 10) === today && combo > 0 ? combo - 1 : combo;
-      db.prepare('UPDATE player_stats SET xp = ?, level = ?, title = ?, hp = ?, daily_combo = ? WHERE user_id = ?')
-        .run(newXp, newLevel, getTitle(newLevel), clampHp(stats.hp - hpToRevert), newCombo, 'default');
-
-      // Soft delete, not DELETE: a hard delete is resurrected by the next pull,
-      // because mergeNutritionData re-inserts any closure row it doesn't find locally.
-      const now = syncStamp();
-      db.prepare('UPDATE nutrition_daily_closed SET deleted_at = ?, updated_at = ? WHERE date = ?')
-        .run(now, now, date);
+          AND json_extract(payload, '$.date') = ?
+        LIMIT 1
+      `).get(date);
 
       recalcSummary(db, date);
 
-      return { success: true, xpReverted: xpToRevert, hpReverted: hpToRevert, eventFound: !!event };
+      return {
+        success: true,
+        xpReverted: record.xpTotal,
+        hpReverted: record.hpChange,
+        eventFound,
+      };
     })();
   });
 
@@ -1008,10 +1061,18 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:getFavoriteFoods', () => {
     const db = getDb();
-    return db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, created_at AS createdAt, updated_at AS updatedAt FROM favorite_foods WHERE deleted_at IS NULL ORDER BY created_at DESC').all();
+    return db.prepare(`
+      SELECT id, description, calories, source, ai_breakdown AS aiBreakdown,
+             protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
+             created_at AS createdAt, updated_at AS updatedAt
+      FROM favorite_foods WHERE deleted_at IS NULL ORDER BY created_at DESC
+    `).all();
   });
 
-  ipcHandle('nutrition:addFavoriteFood', (_e, food: { description: string; calories: number; source?: string; aiBreakdown?: string }) => {
+  ipcHandle('nutrition:addFavoriteFood', (_e, food: {
+    description: string; calories: number; source?: string; aiBreakdown?: string;
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
+  }) => {
     const db = getDb();
     const now = syncStamp();
     // favorite_foods.description is UNIQUE. The old INSERT OR IGNORE silently did
@@ -1022,16 +1083,23 @@ export function registerNutritionIpcHandlers(): void {
       .get(food.description) as { id: string } | undefined;
 
     if (existing) {
-      db.prepare(
-        'UPDATE favorite_foods SET calories = ?, source = ?, ai_breakdown = ?, updated_at = ?, deleted_at = NULL WHERE id = ?'
-      ).run(food.calories, food.source || 'manual', food.aiBreakdown || null, now, existing.id);
+      db.prepare(`
+        UPDATE favorite_foods
+        SET calories = ?, source = ?, ai_breakdown = ?,
+            protein_g = ?, carbs_g = ?, fat_g = ?,
+            updated_at = ?, deleted_at = NULL
+        WHERE id = ?
+      `).run(food.calories, food.source || 'manual', food.aiBreakdown || null,
+        normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG), now, existing.id);
       return { id: existing.id, created: false };
     }
 
     const id = genId();
-    db.prepare(
-      'INSERT INTO favorite_foods (id, description, calories, source, ai_breakdown, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null, now, now);
+    db.prepare(`
+      INSERT INTO favorite_foods (id, description, calories, source, ai_breakdown, protein_g, carbs_g, fat_g, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, food.description, food.calories, food.source || 'manual', food.aiBreakdown || null,
+      normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG), now, now);
     return { id, created: true };
   });
 
@@ -1071,12 +1139,89 @@ export function isDayClosed(db: ReturnType<typeof getDb>, date: string): boolean
   return !!db.prepare('SELECT 1 FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL').get(date);
 }
 
+/**
+ * Copy all non-deleted meals from `fromDate` to `toDate`, returning the count
+ * copied. New rows get fresh autoincrement IDs AND fresh sync_ids — they are new
+ * meals, not the same rows replicated — while description/calories/macros/meal,
+ * the event mark with its honest band, and the ORIGINAL time are preserved so the
+ * repeated day keeps its shape. Adds on top of existing entries (never replaces).
+ * Recalculates the destination summary afterwards.
+ *
+ * @param demoteAiSource `true` (what `nutrition:copyDay` passes) rewrites
+ *   `ai_estimate` to `frequent`: the copy did NOT re-estimate anything, so
+ *   claiming the AI produced it would be a lie the badge repeats.
+ */
+export function repeatDayMeals(
+  db: ReturnType<typeof getDb>,
+  fromDate: string,
+  toDate: string,
+  opts: { demoteAiSource?: boolean } = {},
+): number {
+  const rows = db.prepare(`
+    SELECT time, description, calories, source, frequent_food_id, ai_breakdown, meal,
+           protein_g, carbs_g, fat_g, is_event, event_kcal_min, event_kcal_max
+    FROM food_log WHERE date = ? AND deleted_at IS NULL ORDER BY time ASC
+  `).all(fromDate) as Array<{
+    time: string; description: string; calories: number; source: string;
+    frequent_food_id: number | null; ai_breakdown: string | null; meal: string | null;
+    protein_g: number | null; carbs_g: number | null; fat_g: number | null;
+    is_event: number | null; event_kcal_min: number | null; event_kcal_max: number | null;
+  }>;
+  if (rows.length === 0) return 0;
+  const insert = db.prepare(`
+    INSERT INTO food_log (date, time, description, calories, source, frequent_food_id, ai_breakdown, meal,
+                          protein_g, carbs_g, fat_g, is_event, event_kcal_min, event_kcal_max, updated_at, sync_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const r of rows) {
+    const source = opts.demoteAiSource && r.source === 'ai_estimate' ? 'frequent' : r.source;
+    insert.run(toDate, r.time, r.description, r.calories, source,
+      r.frequent_food_id, opts.demoteAiSource ? null : r.ai_breakdown, r.meal,
+      r.protein_g, r.carbs_g, r.fat_g,
+      r.is_event ? 1 : 0, r.event_kcal_min, r.event_kcal_max, syncStamp(), genId());
+  }
+  recalcSummary(db, toDate);
+  return rows.length;
+}
+
+/**
+ * Reopen a closed day by soft-deleting its nutrition_daily_closed record.
+ * Returns the granted XP/HP (and the closure's `closed_at`, which the IPC handler
+ * needs to find the DAY_SUMMARY rpg_event) for the caller to revert, or null if
+ * the day was not closed — an idempotent no-op for non-closed / already-reopened
+ * days.
+ *
+ * Soft delete, not DELETE: a hard delete is resurrected by the next pull, because
+ * mergeNutritionData re-inserts any closure row it doesn't find locally.
+ */
+export function reopenDayRecord(
+  db: ReturnType<typeof getDb>,
+  date: string,
+): { xpTotal: number; hpChange: number; closedAt: string | null } | null {
+  const row = db.prepare(
+    'SELECT xp_total AS xpTotal, hp_change AS hpChange, closed_at AS closedAt FROM nutrition_daily_closed WHERE date = ? AND deleted_at IS NULL'
+  ).get(date) as { xpTotal: number; hpChange: number; closedAt: string | null } | undefined;
+  if (!row) return null;
+  const now = syncStamp();
+  db.prepare(
+    'UPDATE nutrition_daily_closed SET deleted_at = ?, updated_at = ? WHERE date = ? AND deleted_at IS NULL'
+  ).run(now, now, date);
+  return { xpTotal: row.xpTotal, hpChange: row.hpChange, closedAt: row.closedAt ?? null };
+}
+
 export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void {
   const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() as Record<string, unknown> | undefined;
   if (!profile) return;
 
   const totalCals = db.prepare('SELECT COALESCE(SUM(calories), 0) AS total FROM food_log WHERE date = ? AND deleted_at IS NULL').get(date) as { total: number };
-  const metrics = db.prepare('SELECT * FROM nutrition_daily_metrics WHERE date = ?').get(date) as Record<string, unknown> | undefined;
+  // Sum macros for the day. NULL when no food entry reported that macro (avoids faking 0g totals).
+  const macroTotals = db.prepare(`
+    SELECT SUM(protein_g) AS protein, SUM(carbs_g) AS carbs, SUM(fat_g) AS fat
+    FROM food_log WHERE date = ? AND deleted_at IS NULL
+  `).get(date) as { protein: number | null; carbs: number | null; fat: number | null };
+  // The day's steps/gym are NOT read here: they reach the TDEE through
+  // getDynamicActivityFactor, which blends the whole 14-day window rather than
+  // one day. (Both branches had this dead read; it goes.)
 
   const latestWeight = db.prepare('SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1').get() as { weight_kg: number } | undefined;
   const weight = latestWeight?.weight_kg ?? (profile.initial_weight_kg as number);
@@ -1084,17 +1229,19 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
   const dob = profile.date_of_birth as string | null;
   const age = dob ? getAgeFromDob(dob) : (profile.age as number) ?? 30;
   const bmr = calculateBMR(weight, profile.height_cm as number, age, profile.sex as string);
-  const steps = (metrics?.steps as number) ?? 0;
-  const gym = !!(metrics?.gym);
 
   const dynamicFactor = getDynamicActivityFactor(db, profile.activity_level as string);
   const tdee = calculateTDEEWithFactor(bmr, dynamicFactor);
   const balance = tdee - totalCals.total;
 
+  const roundMacro = (v: number | null): number | null =>
+    v != null && Number.isFinite(v) ? Math.round(v * 10) / 10 : null;
+
   db.prepare(`
-    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(date, totalCals.total, Math.round(bmr), tdee, balance, syncStamp());
+    INSERT OR REPLACE INTO nutrition_daily_summary (date, total_calories_in, bmr, tdee, balance, protein_g, carbs_g, fat_g, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(date, totalCals.total, Math.round(bmr), tdee, balance,
+    roundMacro(macroTotals.protein), roundMacro(macroTotals.carbs), roundMacro(macroTotals.fat), syncStamp());
 }
 
 /**
@@ -1102,7 +1249,7 @@ export function recalcSummary(db: ReturnType<typeof getDb>, date: string): void 
  * Blends the user's chosen base level with actual gym/steps history.
  * More gym days + more steps → higher factor, fewer → lower factor.
  */
-function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: string): number {
+export function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: string): number {
   const baseFactor: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
   const base = baseFactor[baseLevel] ?? 1.2;
 
@@ -1140,12 +1287,11 @@ function getDynamicActivityFactor(db: ReturnType<typeof getDb>, baseLevel: strin
   return Math.round((base * 0.4 + dynamicFactor * 0.6) * 1000) / 1000;
 }
 
-function calculateBMR(weight: number, height: number, age: number, sex: string): number {
+export function calculateBMR(weight: number, height: number, age: number, sex: string): number {
   const base = 10 * weight + 6.25 * height - 5 * age;
   return Math.max(800, Math.min(3500, sex === 'M' ? base + 5 : base - 161));
 }
 
-function calculateTDEEWithFactor(bmr: number, factor: number): number {
+export function calculateTDEEWithFactor(bmr: number, factor: number): number {
   return Math.round(bmr * factor);
 }
-

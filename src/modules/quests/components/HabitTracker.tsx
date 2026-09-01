@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useToast } from '../../../shared/components/useToast';
@@ -53,9 +53,25 @@ export default function HabitTracker({ onXpGained }: Props) {
   const [editByDays, setEditByDays] = useState(false);
   const HABITS_PER_PAGE = 10;
   const [page, setPage] = useState(0);
-  const [heatmapOpen, setHeatmapOpen] = useState(false);
+  const [heatmapOpen, setHeatmapOpen] = useState(() => {
+    try { return localStorage.getItem('quests:heatmapOpen') !== '0'; } catch { return true; }
+  });
   const [heatmapData, setHeatmapData] = useState<CellLevel[]>([]);
   const [heatmapStart, setHeatmapStart] = useState('');
+  // Per-habit history heatmap (expandable per row)
+  const [expandedHabitId, setExpandedHabitId] = useState<string | null>(null);
+  const [historyCells, setHistoryCells] = useState<CellLevel[]>([]);
+  const [historyStart, setHistoryStart] = useState('');
+  const [historyTooltips, setHistoryTooltips] = useState<string[]>([]);
+  const [historyBest, setHistoryBest] = useState(0);
+
+  const toggleHeatmap = useCallback(() => {
+    setHeatmapOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem('quests:heatmapOpen', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   const loadHabits = useCallback(async () => {
     try {
@@ -87,6 +103,25 @@ export default function HabitTracker({ onXpGained }: Props) {
     });
     setHeatmapData(cells);
   }, []);
+
+  const loadHistory = useCallback(async (habitId: string) => {
+    const { days, bestStreak } = await window.api.questsGetHabitHistory(habitId, 91);
+    const todayStr = formatDateString(new Date());
+    setHistoryStart(days[0]?.date ?? '');
+    setHistoryCells(days.map(d =>
+      d.date === todayStr ? (d.checked ? 'today' : 'l0') : (d.checked ? 'l4' : 'l0')
+    ));
+    setHistoryTooltips(days.map(d => (d.checked ? `${d.date} ✓` : d.date)));
+    setHistoryBest(bestStreak);
+  }, []);
+
+  const toggleHistory = useCallback((habitId: string) => {
+    setExpandedHabitId(prev => {
+      if (prev === habitId) return null;
+      loadHistory(habitId);
+      return habitId;
+    });
+  }, [loadHistory]);
 
   useEffect(() => { loadHabits(); }, [loadHabits]);
   useEffect(() => { if (heatmapOpen) loadHeatmap(); }, [heatmapOpen, loadHeatmap]);
@@ -122,6 +157,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     await processHabitCheck(habitId, habits, { toast, t, onXpGained });
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
+    if (expandedHabitId === habitId) loadHistory(habitId);
   });
 
   const canRetroCheck = useCallback((h: HabitWithStreak): boolean => {
@@ -154,6 +190,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     await processHabitCheck(habitId, habits, { toast, t, onXpGained }, yesterday);
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
+    if (expandedHabitId === habitId) loadHistory(habitId);
   });
 
   /**
@@ -178,12 +215,16 @@ export default function HabitTracker({ onXpGained }: Props) {
     });
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
+    if (expandedHabitId === h.id) loadHistory(h.id);
     window.dispatchEvent(new Event('quests:dataChanged'));
   };
 
   const isDuplicateName = (name: string, excludeId?: string) => {
     return habits.some(h => h.name.toLowerCase() === name.toLowerCase() && h.id !== excludeId);
   };
+
+  const newNameTaken = newName.trim().length > 0 && isDuplicateName(newName.trim());
+  const editNameTaken = editName.trim().length > 0 && isDuplicateName(editName.trim(), editingId ?? undefined);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
@@ -311,7 +352,8 @@ export default function HabitTracker({ onXpGained }: Props) {
 
       {/* Habit list */}
       {habits.slice(page * HABITS_PER_PAGE, (page + 1) * HABITS_PER_PAGE).map((h) => (
-        <div key={h.id} className="quest-habit-row">
+        <Fragment key={h.id}>
+        <div className="quest-habit-row">
           {editingId === h.id ? (
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <input className="rpg-input" value={editName} onChange={(e) => setEditName(e.target.value)}
@@ -338,12 +380,24 @@ export default function HabitTracker({ onXpGained }: Props) {
                     : <RpgStepper value={editTimes} onChange={setEditTimes} min={1} max={7} />}
                 </>
               )}
-              <button type="button" className="qb-rune qb-rune--sage quest-rune-btn tap-target" onClick={handleEditSave}>
+              {/* Real <button>s (keyboard + tap target) carrying upstream's
+                  live duplicate-name guard. */}
+              <button
+                type="button"
+                className="qb-rune qb-rune--sage quest-rune-btn tap-target"
+                onClick={handleEditSave}
+                disabled={editNameTaken}
+              >
                 {t('questify.save')}
               </button>
               <button type="button" className="qb-rune quest-rune-btn tap-target" onClick={() => setEditingId(null)}>
                 {t('questify.cancel')}
               </button>
+              {editNameTaken && (
+                <span style={{ flexBasis: '100%', fontSize: 'var(--fs-label)', color: 'var(--rubric)', fontStyle: 'italic' }}>
+                  {t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre')}
+                </span>
+              )}
             </div>
           ) : (
             <>
@@ -446,10 +500,15 @@ export default function HabitTracker({ onXpGained }: Props) {
                 />
               </div>
 
-              {/* Edit / skip / delete, kept clear of the tick by a divider */}
+              {/* History / edit / skip / delete, kept clear of the tick by a
+                  divider. Upstream's three loose 10px SVGs (including its
+                  history toggle) all live inside the menu now — a row cannot
+                  carry four icon targets next to the tick and stay tappable. */}
               <div className="quest-habit-actions">
                 <HabitRowMenu
                   skipped={h.skippedToday}
+                  historyOpen={expandedHabitId === h.id}
+                  onHistory={() => toggleHistory(h.id)}
                   onEdit={() => startEdit(h)}
                   onSkip={() => handleSkip(h)}
                   onDelete={() => handleDelete(h.id)}
@@ -458,6 +517,17 @@ export default function HabitTracker({ onXpGained }: Props) {
             </>
           )}
         </div>
+        {expandedHabitId === h.id && historyCells.length > 0 && (
+          <div style={{ padding: '6px 2px 12px' }}>
+            <HeatmapCalendar data={historyCells} startDate={historyStart} tooltips={historyTooltips} columns={7} legend={false} />
+            {historyBest > 0 && (
+              <div style={{ marginTop: 6, fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', textAlign: 'center' }}>
+                {t('questify.bestStreak', 'Mejor racha')}: <strong>{historyBest}</strong>
+              </div>
+            )}
+          </div>
+        )}
+        </Fragment>
       ))}
 
       {/* Pagination */}
@@ -531,12 +601,22 @@ export default function HabitTracker({ onXpGained }: Props) {
               )}
             </div>
           )}
-          <button type="button" className="qb-rune qb-rune--sage quest-rune-btn tap-target" onClick={handleAdd}>
+          <button
+            type="button"
+            className="qb-rune qb-rune--sage quest-rune-btn tap-target"
+            onClick={handleAdd}
+            disabled={newNameTaken}
+          >
             {t('questify.save')}
           </button>
           <button type="button" className="qb-rune quest-rune-btn tap-target" onClick={() => setAdding(false)}>
             {t('questify.cancel')}
           </button>
+          {newNameTaken && (
+            <span style={{ flexBasis: '100%', fontSize: 'var(--fs-label)', color: 'var(--rubric)', fontStyle: 'italic' }}>
+              {t('questify.habitDuplicate', 'Ya existe un hábito con ese nombre')}
+            </span>
+          )}
         </div>
       )}
 
@@ -544,12 +624,14 @@ export default function HabitTracker({ onXpGained }: Props) {
       {habits.length > 0 && (
         <div style={{ marginTop: 10 }}>
           {/* The help bubble sits OUTSIDE the toggle button — asking for help
-              used to collapse the very section you were asking about. */}
+              used to collapse the very section you were asking about. The
+              toggle goes through `toggleHeatmap` so the open/closed choice is
+              remembered between sessions (upstream). */}
           <div className="quest-project-header" style={{ padding: '4px 6px' }}>
             <button
               type="button"
               className="quest-project-header-btn"
-              onClick={() => setHeatmapOpen(!heatmapOpen)}
+              onClick={toggleHeatmap}
               aria-expanded={heatmapOpen}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"

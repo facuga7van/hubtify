@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import TitleBar from '../shared/components/TitleBar';
 import { useAuthContext } from '../shared/AuthContext';
+import { Eye, EyeOff } from '../shared/components/icons';
+import TitleBar from '../shared/components/TitleBar';
 
 interface Props {
   onAuth: () => void;
@@ -21,6 +22,15 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordTooShort, setPasswordTooShort] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [usernameSanitized, setUsernameSanitized] = useState(false);
+
+  // Identifies the current view so React remounts the form on mode change,
+  // re-triggering the entry animation and a fresh autoFocus.
+  const formKey = isForgot ? 'forgot' : isLogin ? 'login' : 'register';
+  const isSignup = !isLogin && mode !== 'addAccount';
+  /** Registration is the only flow with password rules of its own. */
+  const isRegistering = !isLogin && !isForgot && mode !== 'addAccount';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,12 +55,13 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
     }
 
     if (!email.trim() || !password.trim()) return;
-    if (!isLogin && mode !== 'addAccount' && !username.trim()) {
+    if (isSignup && !username.trim()) {
       // Used to be a silent `return` — the user pressed the button and nothing
       // happened, with the error string already sitting unused in the catalog.
       setError(t('auth.errors.usernameRequired'));
       return;
     }
+    if (isSignup && password.length < 6) { setPasswordTooShort(true); return; }
     setError('');
     setLoading(true);
 
@@ -79,16 +90,30 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
     }
   };
 
+  const handleUsernameChange = (raw: string) => {
+    const clean = raw.replace(/[^a-zA-Z0-9_]/g, '');
+    setUsername(clean);
+    setUsernameSanitized(clean !== raw);
+  };
+
+  const toggleAuthMode = () => {
+    setIsLogin(!isLogin);
+    setError('');
+    setUsername('');
+    setPassword('');
+    setPasswordTooShort(false);
+    setShowPassword(false);
+    setUsernameSanitized(false);
+  };
+
   const enterForgotMode = () => {
     setIsForgot(true);
     setResetSent(false);
     setError('');
     setPassword('');
     setUsername('');
+    setShowPassword(false);
   };
-
-  /** Registration is the only flow with password rules of its own. */
-  const isRegistering = !isLogin && !isForgot && mode !== 'addAccount';
 
   const exitForgotMode = () => {
     setIsForgot(false);
@@ -117,75 +142,109 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
         </p>
 
         {isForgot && resetSent ? (
-          <div className="auth-card__form">
-            <p className="auth-card__success">{t('auth.resetEmailSent', 'Te enviamos un enlace para restablecer tu contraseña. Revisá tu correo.')}</p>
+          <div className="auth-card__form auth-card__form--enter">
+            <p className="auth-card__success" role="status">{t('auth.resetEmailSent', 'Te enviamos un enlace para restablecer tu contraseña. Revisá tu correo.')}</p>
             <button onClick={exitForgotMode} className="auth-card__toggle">
               {t('auth.backToLogin', 'Volver al inicio de sesión')}
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="auth-card__form" role="form" aria-labelledby="auth-card-title">
-            {!isLogin && !isForgot && mode !== 'addAccount' && (
-              <input
-                type="text"
-                placeholder={t('auth.username', 'Nombre de usuario')}
-                aria-label={t('auth.username', 'Nombre de usuario')}
-                value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                className="rpg-input auth-card__input"
-                maxLength={20}
-                autoFocus
-              />
-            )}
-            <input
-              type={isForgot ? 'email' : isLogin || mode === 'addAccount' ? 'text' : 'email'}
-              placeholder={isForgot
-                ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
-                : isLogin || mode === 'addAccount'
-                  ? t('auth.emailOrUsername', 'Email o nombre de usuario')
-                  : t('auth.email')}
-              aria-label={isForgot
-                ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
-                : isLogin || mode === 'addAccount'
-                  ? t('auth.emailOrUsername', 'Email o nombre de usuario')
-                  : t('auth.email')}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rpg-input auth-card__input"
-              autoFocus={isForgot || isLogin || mode === 'addAccount'}
-            />
-            {!isForgot && (
-              <>
+          <form key={formKey} onSubmit={handleSubmit} className="auth-card__form auth-card__form--enter" role="form" aria-labelledby="auth-card-title" noValidate>
+            {isSignup && !isForgot && (
+              <div className="auth-card__field">
                 <input
-                  type="password"
-                  placeholder={t('auth.password')}
-                  aria-label={t('auth.password')}
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setPasswordTooShort(false); }}
-                  /* Only registration has a 6-char rule. Scolding someone who is
-                     signing in to an existing account is just wrong. */
-                  onBlur={() => { if (isRegistering && password.length > 0 && password.length < 6) setPasswordTooShort(true); }}
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  placeholder={t('auth.username', 'Nombre de usuario')}
+                  aria-label={t('auth.username', 'Nombre de usuario')}
+                  value={username}
+                  onChange={(e) => handleUsernameChange(e.target.value)}
                   className="rpg-input auth-card__input"
-                  minLength={isRegistering ? 6 : undefined}
+                  maxLength={20}
+                  autoFocus
                 />
-                {passwordTooShort && (
-                  <p className="auth-card__error">{t('auth.passwordTooShort', 'La contraseña debe tener al menos 6 caracteres')}</p>
+                {usernameSanitized && (
+                  <p className="auth-card__hint" role="status">
+                    {t('auth.usernameHint', 'Solo letras, números y guion bajo (_)')}
+                  </p>
                 )}
-              </>
+              </div>
+            )}
+            <div className="auth-card__field">
+              <input
+                type={isForgot ? 'email' : isLogin || mode === 'addAccount' ? 'text' : 'email'}
+                name="email"
+                autoComplete={isSignup ? 'email' : isForgot ? 'email' : 'username'}
+                placeholder={isForgot
+                  ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
+                  : isLogin || mode === 'addAccount'
+                    ? t('auth.emailOrUsername', 'Email o nombre de usuario')
+                    : t('auth.email')}
+                aria-label={isForgot
+                  ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
+                  : isLogin || mode === 'addAccount'
+                    ? t('auth.emailOrUsername', 'Email o nombre de usuario')
+                    : t('auth.email')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="rpg-input auth-card__input"
+                autoFocus={isForgot || isLogin || mode === 'addAccount'}
+              />
+            </div>
+            {!isForgot && (
+              <div className="auth-card__field">
+                <div className="auth-card__password-wrap">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                    placeholder={t('auth.password')}
+                    aria-label={t('auth.password')}
+                    aria-invalid={passwordTooShort}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setPasswordTooShort(false); }}
+                    /* Only registration has a 6-char rule. Scolding someone who is
+                       signing in to an existing account is just wrong. */
+                    onBlur={() => { if (isRegistering && password.length > 0 && password.length < 6) setPasswordTooShort(true); }}
+                    className="rpg-input auth-card__input auth-card__input--password"
+                  />
+                  <button
+                    type="button"
+                    className="auth-card__password-toggle"
+                    onClick={() => setShowPassword((s) => !s)}
+                    aria-label={showPassword
+                      ? t('auth.hidePassword', 'Ocultar contraseña')
+                      : t('auth.showPassword', 'Mostrar contraseña')}
+                    title={showPassword
+                      ? t('auth.hidePassword', 'Ocultar contraseña')
+                      : t('auth.showPassword', 'Mostrar contraseña')}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff width={18} height={18} /> : <Eye width={18} height={18} />}
+                  </button>
+                </div>
+                {passwordTooShort && (
+                  <p className="auth-card__error" role="alert">{t('auth.passwordTooShort', 'La contraseña debe tener al menos 6 caracteres')}</p>
+                )}
+              </div>
             )}
 
             {error && (
-              <p className="auth-card__error">{error}</p>
+              <p className="auth-card__error auth-card__error--submit" role="alert">{error}</p>
             )}
 
             <button className="rpg-button auth-card__submit" type="submit" disabled={loading}>
-              {loading
-                ? t('common.loading')
-                : isForgot
-                  ? t('auth.sendResetLink', 'Enviar enlace')
-                  : mode === 'addAccount'
-                    ? t('auth.addAccount')
-                    : isLogin ? t('auth.enterRealm') : t('auth.createAccount')}
+              {loading ? (
+                <span className="auth-card__loading">
+                  <span className="auth-card__spinner" aria-hidden="true" />
+                  {t('common.loading')}
+                </span>
+              ) : isForgot
+                ? t('auth.sendResetLink', 'Enviar enlace')
+                : mode === 'addAccount'
+                  ? t('auth.addAccount')
+                  : isLogin ? t('auth.enterRealm') : t('auth.createAccount')}
             </button>
           </form>
         )}
@@ -201,7 +260,7 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
         {!isForgot && mode !== 'addAccount' && (
           <div className="auth-card__toggle-wrap">
             <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); setUsername(''); }}
+              onClick={toggleAuthMode}
               className="auth-card__toggle"
             >
               {isLogin ? t('auth.noAccount') : t('auth.hasAccount')}

@@ -89,7 +89,22 @@ const TIER_WORD: Record<string, TaskTier> = {
 
 const DAY_NOUNS = new Set(['dia', 'dias']);
 
+const WEEK_NOUNS = new Set(['semana', 'semanas']);
+
 const HOUR_MARKERS = new Set(['hs', 'h']);
+
+const MERIDIEM = new Set(['am', 'pm']);
+
+/**
+ * Determiners that introduce a date without adding meaning: "el lunes",
+ * "este viernes", "la próxima semana".
+ *
+ * They are consumed WITH the date they introduce — leaving "Reunión el" as the
+ * title reads like a bug. They never form a date on their own, and because the
+ * lookahead re-enters `matchAt` the `NOUN_GUARD` still fires from inside it, so
+ * "por la mañana" stays plain text.
+ */
+const DETERMINERS = new Set(['el', 'la', 'este', 'esta', 'proximo', 'proxima']);
 
 /**
  * Words that turn `mañana` / `pasado` into ordinary nouns.
@@ -175,6 +190,21 @@ function parseClock(norm: string, allowBare: boolean): string | null {
     }
   }
   return null;
+}
+
+/**
+ * `5pm`, `5:30pm`, `12am` → 24-hour. Returns null when there is no meridiem,
+ * so the caller can fall through to the 24-hour rules.
+ */
+function parseMeridiem(norm: string): string | null {
+  const m = /^(\d{1,2})(?::(\d{2}))?(am|pm)$/.exec(norm);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2] ? Number(m[2]) : 0;
+  if (h < 1 || h > 12 || min > 59) return null;
+  if (m[3] === 'pm' && h !== 12) h += 12;
+  if (m[3] === 'am' && h === 12) h = 0;
+  return `${pad(h)}:${pad(min)}`;
 }
 
 /**
@@ -267,11 +297,37 @@ function matchAt(
     if (project) return { kind: 'project', consumed: 1, project };
   }
 
+  // el lunes · este viernes · el próximo martes · la próxima semana
+  if (DETERMINERS.has(n) && next) {
+    const inner = matchAt(words, i + 1, projects, now, ignoreGuard);
+    if (inner && inner.kind === 'date') {
+      return { ...inner, consumed: inner.consumed + 1 };
+    }
+  }
+
   // en N días
   if (n === 'en' && next && third && DAY_NOUNS.has(third.norm)) {
     if (/^\d{1,3}$/.test(next.norm)) {
       return { kind: 'date', consumed: 3, day: addDays(now, Number(next.norm)) };
     }
+  }
+
+  // en una semana · en N semanas
+  if (n === 'en' && next && third && WEEK_NOUNS.has(third.norm)) {
+    if (next.norm === 'una') return { kind: 'date', consumed: 3, day: addDays(now, 7) };
+    if (/^\d{1,3}$/.test(next.norm)) {
+      return { kind: 'date', consumed: 3, day: addDays(now, 7 * Number(next.norm)) };
+    }
+  }
+
+  // próxima semana (the article, if any, is eaten by the DETERMINERS rule above)
+  if ((n === 'proxima' || n === 'proximo') && next && WEEK_NOUNS.has(next.norm)) {
+    return { kind: 'date', consumed: 2, day: addDays(now, 7) };
+  }
+
+  // semana que viene — "semana" alone is never a date ("Planificar la semana").
+  if (n === 'semana' && next && next.norm === 'que' && third && third.norm === 'viene') {
+    return { kind: 'date', consumed: 3, day: addDays(now, 7) };
   }
 
   // pasado mañana / pasado
@@ -287,15 +343,25 @@ function matchAt(
   }
 
   if (Object.prototype.hasOwnProperty.call(WEEKDAY_NUMBER, n)) {
-    return { kind: 'date', consumed: 1, day: nextWeekday(now, WEEKDAY_NUMBER[n]) };
+    // "el lunes que viene" resolves to the same day as "el lunes" — the phrase
+    // is emphasis, not a second week — but it has to be eaten off the title.
+    const queViene = next && next.norm === 'que' && third && third.norm === 'viene';
+    return { kind: 'date', consumed: queViene ? 3 : 1, day: nextWeekday(now, WEEKDAY_NUMBER[n]) };
   }
 
   // DD/MM · DD-MM  (before the clock rules: the separators never collide)
   const dayMonth = matchDayMonth(n, now);
   if (dayMonth) return { kind: 'date', consumed: 1, day: dayMonth };
 
-  // a las HH · a la HH
+  // a las HH · a la HH · a las HH pm
   if (n === 'a' && next && (next.norm === 'las' || next.norm === 'la') && third) {
+    const fourth = words[i + 3];
+    if (fourth && MERIDIEM.has(fourth.norm)) {
+      const split = parseMeridiem(third.norm + fourth.norm);
+      if (split) return { kind: 'time', consumed: 4, time: split };
+    }
+    const joined = parseMeridiem(third.norm);
+    if (joined) return { kind: 'time', consumed: 3, time: joined };
     const time = parseClock(third.norm, true);
     if (time) return { kind: 'time', consumed: 3, time };
   }
@@ -304,6 +370,14 @@ function matchAt(
   if (next && HOUR_MARKERS.has(next.norm)) {
     const time = parseClock(n, true);
     if (time) return { kind: 'time', consumed: 2, time };
+  }
+
+  // 5pm · 5:30pm · 5 pm
+  const meridiem = parseMeridiem(n);
+  if (meridiem) return { kind: 'time', consumed: 1, time: meridiem };
+  if (next && MERIDIEM.has(next.norm)) {
+    const split = parseMeridiem(n + next.norm);
+    if (split) return { kind: 'time', consumed: 2, time: split };
   }
 
   // HH:MM · HHhs · HHh

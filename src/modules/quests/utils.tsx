@@ -2,6 +2,9 @@ import type { TFunction } from 'i18next';
 import type { TaskTier, HabitWithStreak } from './types';
 import { XP_MAP } from './types';
 import { playTaskComplete } from '../../shared/audio';
+// `getComboMultiplier` is gone from here on purpose: `rollBonus` /
+// `calculateXpForAction` were the only callers and they now live in the main
+// process (the renderer must not roll its own XP — see the paysXp gate).
 import type { ToastData } from '../../shared/components/useToast';
 import { GemRough, GemCut, GemBrilliant } from '../../shared/components/icons/CodexIcons';
 import { todayDateString } from '../../../shared/date-utils';
@@ -68,6 +71,25 @@ export interface HabitCheckCallbacks {
   onXpGained?: () => void;
 }
 
+/**
+ * Shows an empathetic toast when a pardon kept the streak alive.
+ *
+ * Upstream shipped this UI against its own unlimited one-day grace
+ * (`streakSaved`). The engine we kept is the pardon system — 2 per month,
+ * gap === 2, plus Inn Mode — which reports the very same thing under
+ * `pardonUsed`. Only the source of the flag changed; the reassurance stays.
+ */
+export function notifyStreakSaved(
+  result: { pardonUsed?: boolean },
+  callbacks: { toast: HabitCheckCallbacks['toast']; t: HabitCheckCallbacks['t'] },
+): void {
+  if (!result.pardonUsed) return;
+  callbacks.toast({
+    type: 'info',
+    message: callbacks.t('questify.streakSaved', 'Tu racha sobrevivió — un día no te define, aventurero'),
+  });
+}
+
 export async function processHabitCheck(
   habitId: string,
   habits: HabitWithStreak[],
@@ -104,6 +126,7 @@ export async function processHabitCheck(
           streakMilestone: rpgResult.milestoneXp || undefined,
         },
       });
+      notifyStreakSaved(rpgResult, callbacks);
       callbacks.onXpGained?.();
       window.dispatchEvent(new Event('rpg:statsChanged'));
     } else {
@@ -128,6 +151,7 @@ export async function processHabitCheck(
             streakMilestone: rpgResult.milestoneXp || undefined,
           },
         });
+        notifyStreakSaved(rpgResult, callbacks);
         callbacks.onXpGained?.();
         window.dispatchEvent(new Event('rpg:statsChanged'));
       }

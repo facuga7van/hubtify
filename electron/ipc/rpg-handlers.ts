@@ -75,6 +75,8 @@ const REF_FIELD_BY_TYPE: Record<string, string> = {
   EXPENSE_LOGGED: '$.transactionId',
   INCOME_LOGGED: '$.transactionId',
   MOVEMENT_DELETED: '$.transactionId',
+  DAY_SUMMARY: '$.date',
+  DAY_REOPENED: '$.date',
 };
 
 /**
@@ -149,6 +151,12 @@ const REF_PAYLOAD_KEY_BY_TYPE: Record<string, string> = {
   EXPENSE_LOGGED: 'transactionId',
   INCOME_LOGGED: 'transactionId',
   MOVEMENT_DELETED: 'transactionId',
+  // Nutrify: closing a day writes DAY_SUMMARY, reopening it emits DAY_REOPENED
+  // for the SAME date. Routing the reversal through the engine's generic undo
+  // path (instead of the module deleting the row by a timestamp heuristic)
+  // is what makes the exact XP, the mastery refund and the combo tick line up.
+  DAY_SUMMARY: 'date',
+  DAY_REOPENED: 'date',
 };
 
 /** The entity id an event refers to — persisted to rpg_events.ref_id on insert. */
@@ -334,7 +342,8 @@ export function setInnMode(db: Database.Database, on: boolean, today = getLocalD
  */
 export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEventResult {
     const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED'
-      || event.type === 'HABIT_UNCHECKED' || event.type === 'MOVEMENT_DELETED';
+      || event.type === 'HABIT_UNCHECKED' || event.type === 'MOVEMENT_DELETED'
+      || event.type === 'DAY_REOPENED';
     let undoReversedMovement = false;
 
     const processTransaction = db.transaction(() => {
@@ -400,6 +409,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           'TASK_UNCOMPLETED': 'TASK_COMPLETED',
           'SUBTASK_UNCOMPLETED': 'SUBTASK_COMPLETED',
           'HABIT_UNCHECKED': 'HABIT_CHECKED',
+          'DAY_REOPENED': 'DAY_SUMMARY',
         };
         // A deleted movement names which alta it annuls via movementType.
         const originalType = event.type === 'MOVEMENT_DELETED'

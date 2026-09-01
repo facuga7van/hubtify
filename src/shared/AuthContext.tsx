@@ -20,7 +20,7 @@ interface AuthContextValue {
   getCachedAccounts: () => CachedAccount[];
 }
 
-const AuthContext = createContext<AuthContextValue>({
+export const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   switching: false,

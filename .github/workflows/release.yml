@@ -38,37 +38,46 @@ jobs:
       - name: Build installers
         run: npm run make
 
-      - name: Deploy Cloud Functions
-        shell: bash
-        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --force --token "$FIREBASE_TOKEN"
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-
       - name: Get version from tag
         id: version
         shell: bash
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      # `require()` cannot load a .ts file, so this step used to throw, get
+      # swallowed by `|| true`, never write RELEASE_NOTES.md, and every release
+      # silently fell back to GitHub's auto-generated commit list. Node's type
+      # stripping loads the module for real; and `text` is `{ es, en }`, so
+      # printing it raw rendered "[object Object]".
       - name: Extract changelog
         id: changelog
         shell: bash
         run: |
-          node -e "
-            const { changelog } = require('./src/shared/changelog');
-            const version = '${{ steps.version.outputs.version }}';
-            const entry = changelog.find(e => e.version === version);
-            if (!entry) { console.log('No changelog entry for ' + version); process.exit(0); }
-            const cats = { feat: 'New Features', fix: 'Bug Fixes', refactor: 'Refactoring', chore: 'Maintenance' };
-            const grouped = {};
-            entry.changes.forEach(c => { (grouped[c.category] = grouped[c.category] || []).push(c); });
-            let md = '';
-            for (const [cat, items] of Object.entries(grouped)) {
-              md += '## ' + (cats[cat] || cat) + '\n';
-              items.forEach(c => { md += '- ' + (c.scope ? '**' + c.scope + ':** ' : '') + c.text + '\n'; });
-              md += '\n';
-            }
-            require('fs').writeFileSync('RELEASE_NOTES.md', md.trim());
-          " || true
+          node --experimental-strip-types -e "
+            import('./src/shared/changelog.ts').then(({ changelog }) => {
+              const version = '${{ steps.version.outputs.version }}';
+              const entry = changelog.find(e => e.version === version);
+              if (!entry) { console.log('No changelog entry for ' + version); return; }
+              const cats = { feat: ['Novedades', 'New Features'], fix: ['Arreglos', 'Bug Fixes'], refactor: ['Mejoras', 'Refactoring'], chore: ['Mantenimiento', 'Maintenance'] };
+              const order = ['feat', 'fix', 'refactor', 'chore'];
+              const grouped = {};
+              entry.changes.forEach(c => { (grouped[c.category] = grouped[c.category] || []).push(c); });
+              const render = (langIndex, key) => {
+                let md = '';
+                for (const cat of order) {
+                  const items = grouped[cat];
+                  if (!items) continue;
+                  md += '### ' + (cats[cat] ? cats[cat][langIndex] : cat) + String.fromCharCode(10);
+                  items.forEach(c => { md += '- ' + (c.scope ? '**' + c.scope + ':** ' : '') + c.text[key] + String.fromCharCode(10); });
+                  md += String.fromCharCode(10);
+                }
+                return md.trim();
+              };
+              const md = '## Espanol' + String.fromCharCode(10, 10) + render(0, 'es')
+                + String.fromCharCode(10, 10) + '## English' + String.fromCharCode(10, 10) + render(1, 'en');
+              require('fs').writeFileSync('RELEASE_NOTES.md', md);
+              console.log('Wrote RELEASE_NOTES.md for ' + version);
+            }).catch(err => { console.log('Changelog extraction failed: ' + err.message); });
+          "
 
       - name: Check release notes
         id: notes
@@ -95,4 +104,15 @@ jobs:
           files: |
             out/make/squirrel.windows/x64/*.exe
             out/make/squirrel.windows/x64/*.nupkg
+            out/make/squirrel.windows/x64/RELEASES
             out/make/zip/win32/x64/*.zip
+
+      # Best-effort: deploying Functions must NOT block the app release. Runs
+      # after the release is published and won't fail the workflow if the
+      # FIREBASE_TOKEN is stale (regenerate with `firebase login:ci`).
+      - name: Deploy Cloud Functions
+        continue-on-error: true
+        shell: bash
+        run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --force --token "$FIREBASE_TOKEN"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

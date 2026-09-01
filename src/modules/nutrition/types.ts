@@ -11,16 +11,19 @@ export interface NutritionProfile {
   mealSchedule?: import('../../../shared/meal-utils').MealSchedule | null;
   /** Hour the nutritional day flips (0-23, default 4). 0 = strict midnight. */
   dayCutoffHour?: number;
-  /** Objetivo de proteína guardado, o null = auto (peso × 1.6 g/kg). */
+  /** Macro target overrides in grams; null means "use the auto calculation". */
   proteinTargetG?: number | null;
-  /** Objetivo de proteína ya resuelto por el backend (guardado o peso × 1.6). */
-  proteinTargetEffectiveG?: number | null;
+  carbsTargetG?: number | null;
+  fatTargetG?: number | null;
 }
 
 export interface FrequentFood {
   id: number;
   name: string;
   calories: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   timesUsed: number;
   createdAt: string;
 }
@@ -43,10 +46,24 @@ export interface DailySummary {
   bmr: number;
   tdee: number;
   balance: number;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
+}
+
+export interface MacroTargets {
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  /** true when the targets came from the auto helper, false when the user overrode them. */
+  auto: boolean;
 }
 
 export interface EstimationResult {
   totalCalories: number;
-  items: Array<{ name: string; calories: number }>;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
+  items: Array<{ name: string; calories: number; proteinG?: number | null; carbsG?: number | null; fatG?: number | null }>;
   aiError?: string;
 }

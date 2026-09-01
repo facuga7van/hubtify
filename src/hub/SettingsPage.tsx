@@ -9,6 +9,7 @@ import { isSoundEnabled, setSoundEnabled as setGlobalSound } from '../shared/aud
 import { useTour } from '../shared/components/tour';
 import { PAGE_ANIMATIONS_KEY } from '../shared/components/AnimatedOutlet';
 import FeedbackDialog from './FeedbackDialog';
+import UpdateSettings from './UpdateSettings';
 import ChangelogModal from '../shared/components/ChangelogModal';
 import { changelog } from '../shared/changelog';
 import { SHORTCUTS } from '../shared/shortcuts';
@@ -57,6 +58,7 @@ export default function SettingsPage() {
   const { startTour } = useTour();
   const { user: authUser } = useAuthContext();
   const [fontScale, setFontScale] = useState(() => localStorage.getItem('hubtify_font_scale') || '1');
+  const [updateMode, setUpdateMode] = useState(() => localStorage.getItem('hubtify_update_mode') || 'notify');
   const [soundEnabled, setSoundEnabled] = useState(() => isSoundEnabled());
   const [helpBubbles, setHelpBubbles] = useState(() => localStorage.getItem('hubtify_help_bubbles') !== 'false');
   const [pageAnimations, setPageAnimations] = useState(
@@ -375,6 +377,18 @@ export default function SettingsPage() {
       </SettingsGroup>
 
       {/* ═══ DATOS Y CUENTA ═══════════════════════════════ */}
+      {/* Preferencias de actualización (llegaron con la rama de upstream): el
+          rediseño de esta página es de la auditoría UX, así que el componente
+          se injerta como una tarjeta más en lugar de su bloque viejo. */}
+      <UpdateSettings
+        mode={updateMode}
+        onChange={(m) => {
+          setUpdateMode(m);
+          localStorage.setItem('hubtify_update_mode', m);
+          window.dispatchEvent(new Event('updateMode:changed'));
+        }}
+      />
+
       <SettingsGroup title={t('settings.groupData', 'Datos y cuenta')}>
         <SettingsCard
           title={t('settings.cloudSync')}

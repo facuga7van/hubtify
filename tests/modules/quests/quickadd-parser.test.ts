@@ -121,10 +121,22 @@ describe('weekdays resolve to the next occurrence', () => {
     });
   }
 
-  it('keeps the article: "el lunes" is still a date', () => {
+  it('eats the article with the weekday: "el lunes" leaves no dangling "el"', () => {
     const r = parse('entrenar el lunes');
     expect(r.dueDate).toBe('2026-03-16');
-    expect(r.title).toBe('entrenar el');
+    expect(r.title).toBe('entrenar');
+  });
+
+  it('eats "este" and "el próximo" too', () => {
+    expect(parse('entrenar este lunes').title).toBe('entrenar');
+    expect(parse('entrenar el próximo lunes').title).toBe('entrenar');
+    expect(parse('entrenar el próximo lunes').dueDate).toBe('2026-03-16');
+  });
+
+  it('"lunes que viene" is the same Monday, phrase and all', () => {
+    const r = parse('entrenar el lunes que viene');
+    expect(r.dueDate).toBe('2026-03-16');
+    expect(r.title).toBe('entrenar');
   });
 });
 
@@ -155,6 +167,42 @@ describe('en N días', () => {
     const r = parse('llegar en 3 pasos');
     expect(r.dueDate).toBeNull();
     expect(r.title).toBe('llegar en 3 pasos');
+  });
+});
+
+/* Week phrasings absorbed from the branch's other quick-add parser
+   (`parseQuickTask`), which understood these and this one did not. */
+describe('week phrasings', () => {
+  it('en una semana', () => {
+    const r = parse('renovar seguro en una semana');
+    expect(r.dueDate).toBe('2026-03-17');
+    expect(r.title).toBe('renovar seguro');
+  });
+
+  it('en 2 semanas', () => {
+    expect(parse('renovar en 2 semanas').dueDate).toBe('2026-03-24');
+  });
+
+  it('la próxima semana', () => {
+    const r = parse('planificar sprint la próxima semana');
+    expect(r.dueDate).toBe('2026-03-17');
+    expect(r.title).toBe('planificar sprint');
+  });
+
+  it('proxima semana without the article or the accent', () => {
+    expect(parse('planificar proxima semana').dueDate).toBe('2026-03-17');
+  });
+
+  it('semana que viene', () => {
+    const r = parse('planificar sprint la semana que viene');
+    expect(r.dueDate).toBe('2026-03-17');
+    expect(r.title).toBe('planificar sprint');
+  });
+
+  it('a bare "semana" is not a date', () => {
+    const r = parse('planificar la semana');
+    expect(r.dueDate).toBeNull();
+    expect(r.title).toBe('planificar la semana');
   });
 });
 
@@ -266,6 +314,39 @@ describe('times', () => {
     expect(r.dueDate).toBeNull();
     expect(r.title).toBe('comprar 15 manzanas rojas');
   });
+
+  /* am/pm came from `parseQuickTask`, which stripped it from the name without
+     storing it. Here it actually lands on the quest. */
+  it('5pm glued', () => {
+    const r = parse('reunion mañana 5pm');
+    expect(r.dueDate).toBe('2026-03-11T17:00');
+    expect(r.title).toBe('reunion');
+  });
+
+  it('5 pm separated', () => {
+    expect(parse('reunion mañana 5 pm').dueDate).toBe('2026-03-11T17:00');
+  });
+
+  it('5:30pm', () => {
+    expect(parse('reunion mañana 5:30pm').dueDate).toBe('2026-03-11T17:30');
+  });
+
+  it('a las 5 pm', () => {
+    const r = parse('misa domingo a las 5 pm');
+    expect(r.dueDate).toBe('2026-03-15T17:00');
+    expect(r.title).toBe('misa');
+  });
+
+  it('12am is midnight and 12pm is noon', () => {
+    expect(parse('x mañana 12am').dueDate).toBe('2026-03-11T00:00');
+    expect(parse('x mañana 12pm').dueDate).toBe('2026-03-11T12:00');
+  });
+
+  it('rejects a meridiem hour out of range', () => {
+    const r = parse('contar 15pm monedas');
+    expect(r.dueDate).toBeNull();
+    expect(r.title).toBe('contar 15pm monedas');
+  });
 });
 
 /* ── Tier ──────────────────────────────────────────────────────────────── */
@@ -372,7 +453,7 @@ describe('combinations', () => {
 
   it('tokens interleaved with the title', () => {
     const r = parse('!epica rendir #Facultad final el viernes a las 8');
-    expect(r.title).toBe('rendir final el');
+    expect(r.title).toBe('rendir final');
     expect(r.dueDate).toBe('2026-03-13T08:00');
     expect(r.tier).toBe(3);
     expect(r.projectId).toBe('p-fac');
@@ -455,7 +536,7 @@ describe('the \\ escape prefix', () => {
   it('escapes only the word it precedes', () => {
     const r = parse('planear el \\mañana para el viernes');
     expect(r.dueDate).toBe('2026-03-13');
-    expect(r.title).toBe('planear el mañana para el');
+    expect(r.title).toBe('planear el mañana para');
   });
 
   it('escapes a multi-word token from its first word', () => {

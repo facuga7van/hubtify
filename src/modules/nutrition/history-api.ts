@@ -20,6 +20,8 @@ export interface CachedEstimate {
   calories: number;
   aiBreakdown: string | null;
   proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
   hits: number;
 }
 
@@ -28,7 +30,8 @@ interface NutritionPhase2Api {
   nutritionGetCachedEstimate: (description: string) => Promise<CachedEstimate | null>;
   nutritionCacheEstimate: (entry: {
     description: string; calories: number; aiBreakdown?: string | null;
-    proteinG?: number | null; corrected?: boolean;
+    proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
+    corrected?: boolean;
   }) => Promise<{ cached: boolean }>;
 }
 
@@ -70,7 +73,8 @@ export async function getCachedEstimate(description: string): Promise<CachedEsti
  */
 export async function cacheEstimate(entry: {
   description: string; calories: number; aiBreakdown?: string | null;
-  proteinG?: number | null; corrected?: boolean;
+  proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
+  corrected?: boolean;
 }): Promise<void> {
   const fn = bridge().nutritionCacheEstimate;
   if (!fn) return;

@@ -65,6 +65,9 @@ export default function HelpBubble({ text, position = 'top-right', variant = 'se
     };
   }, [open, positionTip]);
 
+  // All hooks above run on every render; bail out only after they're declared.
+  if (hidden) return null;
+
   const show = () => {
     setOpen(true);
     requestAnimationFrame(() => requestAnimationFrame(positionTip));

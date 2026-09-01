@@ -1,15 +1,17 @@
 /**
  * Review RPG — MEDIO #9: cerrar/reabrir el día de Nutrify inflaba `daily_combo`.
  *
- * Flujo real: `nutrition:closeDay` → el renderer emite DAY_SUMMARY (motor:
- * +1 combo, XP multiplicado) → `nutrition:reopenDay` revertía XP/HP a mano
- * pero nunca el combo. Peor: `closed_at` es ISO UTC y `rpg_events.created_at`
- * es local ('YYYY-MM-DD HH:MM:SS'); como ' ' < 'T', `created_at >= closed_at`
- * era falso el mismo día y el evento NUNCA se encontraba — quedaba en el log,
- * se revertía el XP base (no el multiplicado) y cada ciclo sumaba una fila.
+ * El mecanismo cambió con la integración: `nutrition:reopenDay` ya NO revierte
+ * nada por su cuenta (buscaba el evento comparando `closed_at` ISO contra
+ * `created_at` local y, como ' ' < 'T', nunca lo encontraba). Ahora el cierre
+ * emite DAY_SUMMARY con `payload.date` y la reapertura emite DAY_REOPENED con
+ * la MISMA fecha: la vía de undo del motor revierte el XP exacto multiplicado,
+ * borra la fila del log y devuelve el tick de combo. El bug desapareció por
+ * construcción — ya no se compara ningún timestamp.
  *
- * Bajo test: close → reopen → close, 4 veces → el combo (y el XP, y el log) es
- * el de UN solo cierre.
+ * Lo que este test sigue protegiendo es el invariante, no la implementación:
+ * close → reopen → close, cuatro veces, deja el combo, el XP y el log de UN
+ * solo cierre.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
@@ -85,10 +87,24 @@ async function closeAndEmit(): Promise<{ breakdown: Breakdown; xpGained: number 
   expect(res.success).toBe(true);
   const r = processRpgEvent(harness.db, {
     type: 'DAY_SUMMARY', moduleId: 'nutrition',
-    payload: { xp: res.breakdown.xpTotal, hp: res.breakdown.hpChange },
+    // `date` es lo que hace posible el match del undo: sin esto el motor no
+    // sabría qué cierre anula una reapertura.
+    payload: { xp: res.breakdown.xpTotal, hp: res.breakdown.hpChange, date: TODAY },
     timestamp: Date.now(),
   });
   return { breakdown: res.breakdown, xpGained: r.xpGained };
+}
+
+/** Y esto es lo que hace al reabrir: soft-delete + el undo por la vía del motor. */
+async function reopenAndEmit(date = TODAY): Promise<{ xpReverted: number }> {
+  const res = await invoke<{ success: boolean }>('nutrition:reopenDay', date);
+  expect(res.success).toBe(true);
+  const r = processRpgEvent(harness.db, {
+    type: 'DAY_REOPENED', moduleId: 'nutrition',
+    payload: { xp: 0, hp: 0, date },
+    timestamp: Date.now(),
+  });
+  return { xpReverted: -r.xpGained };
 }
 
 beforeEach(async () => {
@@ -100,32 +116,29 @@ beforeEach(async () => {
 
 afterEach(() => { vi.useRealTimers(); });
 
-describe('nutrition:reopenDay revierte el cierre por completo', () => {
-  it('encuentra el DAY_SUMMARY del mismo día (closed_at ISO vs created_at local)', async () => {
+describe('reabrir un día revierte el cierre por completo', () => {
+  it('revierte el XP MULTIPLICADO que pagó el motor, no el base, y limpia el log', async () => {
     const { breakdown, xpGained } = await closeAndEmit();
     expect(breakdown.xpTotal).toBeGreaterThan(0);
     expect(summaryRows()).toBe(1);
 
-    const reopen = await invoke<{ success: boolean; eventFound: boolean; xpReverted: number }>('nutrition:reopenDay', TODAY);
-    expect(reopen.success).toBe(true);
-    expect(reopen.eventFound).toBe(true);
-    // Se revierte el XP MULTIPLICADO que el motor pagó, no el base.
-    expect(reopen.xpReverted).toBeCloseTo(xpGained, 2);
+    const { xpReverted } = await reopenAndEmit();
+    expect(xpReverted).toBeCloseTo(xpGained, 2);
     expect(summaryRows()).toBe(0);
     expect(stats().xp).toBeCloseTo(achievementXp(), 2);
   });
 
-  it('decrementa daily_combo cuando el cierre era de hoy', async () => {
+  it('devuelve el tick de daily_combo cuando el cierre era de hoy', async () => {
     await closeAndEmit();
     expect(stats().combo).toBe(1);
-    await invoke('nutrition:reopenDay', TODAY);
+    await reopenAndEmit();
     expect(stats().combo).toBe(0);
   });
 
   it('close → reopen → close, 4 veces: el combo, el XP y el log son los de UN cierre', async () => {
     let last = await closeAndEmit();
     for (let i = 0; i < 4; i++) {
-      await invoke('nutrition:reopenDay', TODAY);
+      await reopenAndEmit();
       last = await closeAndEmit();
     }
     const s = stats();
@@ -142,9 +155,7 @@ describe('nutrition:reopenDay revierte el cierre por completo', () => {
     expect(stats().combo).toBe(2);
     // El evento del cierre "envejece" un día (como si se reabriera mañana).
     harness.db.prepare("UPDATE rpg_events SET created_at = '2026-08-30 12:00:00' WHERE event_type = 'DAY_SUMMARY'").run();
-    harness.db.prepare("UPDATE nutrition_daily_closed SET closed_at = '2026-08-30T15:00:00.000Z' WHERE date = ?").run(TODAY);
-    const reopen = await invoke<{ eventFound: boolean }>('nutrition:reopenDay', TODAY);
-    expect(reopen.eventFound).toBe(true);
+    await reopenAndEmit();
     expect(stats().combo).toBe(2);
   });
 });

@@ -13,6 +13,288 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.8.0',
+    date: '2026-09-01',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'El Códice del día: pasadas las 21 se abre la página de hoy con lo que hiciste como marginalia, mantenés apretado dos segundos y cae el lacre. Sellar el día te da óbolos, avanza la racha y a veces destapa un logro — es salteable, se puede sellar al día siguiente y nunca te castiga',
+          en: 'The Codex of the day: after 9pm today opens as a page with what you did in the margins, you hold for two seconds and the wax falls. Sealing the day pays obolos, advances the streak and sometimes uncovers an achievement — skippable, sealable the next day, and never punishing',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'Cuarenta logros repartidos por los cuatro módulos, con estante propio para mirarlos. Arrancás con varios ya desbloqueados por lo que venías haciendo: nada de «completá 2000 tareas»',
+          en: 'Forty achievements across the four modules, with their own shelf to browse. You start with several already unlocked from what you had been doing: none of that «complete 2000 tasks» nonsense',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'Los óbolos son la moneda que se gasta: se ganan al sellar el día y por logros, y los cambiás por recompensas que definís vos — «2 h de jueguito, 300 óbolos». Vos ponés el premio, la app lleva la cuenta',
+          en: 'Obolos are the coin you spend: earned by sealing the day and by achievements, traded for rewards you define yourself — «2 hours of gaming, 300 obolos». You set the prize, the app keeps count',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'Abrió la tienda: seis lacres coleccionables para el Códice, marcos y fondos para tu ficha, y un indulto extra por mes. Todo lo que ya tenías sigue siendo gratis para siempre — la tienda sólo vende cosas nuevas',
+          en: 'The shop is open: six collectible seals for the Codex, frames and backgrounds for your character sheet, and one extra pardon a month. Everything you already had stays free forever — the shop only sells new things',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'Maestrías por módulo: el nivel global pasa a ser una insignia de leyenda y en su lugar aparecen cuatro barras, una por cada parte de tu vida. El día 180 se siente distinto del día 30',
+          en: 'Per-module masteries: the global level becomes a legend badge and four bars take its place, one for each part of your life. Day 180 feels different from day 30',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'rpg',
+        text: {
+          es: 'Se acabó la deuda de vida: el Vigor arranca en 100 todas las mañanas, así que un mal día muere con el día. Sumamos dos indultos por mes que salvan la racha en silencio y el Modo Posada, para congelarla sin culpa cuando te vas unos días',
+          en: 'No more health debt: Vigor starts at 100 every morning, so a bad day dies with the day. Plus two pardons a month that quietly save your streak, and Inn Mode to freeze it guilt-free while you are away',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'Cada gasto guarda la cotización del día en que lo cargaste, y el chip del dólar deja de ser un adorno para volverse el control maestro: tocalo y todo el tablero se re-expresa en dólares —cada gasto con SU cotización, no la de hoy— o en pesos de hoy ajustados por el IPC del INDEC',
+          en: 'Every expense freezes the exchange rate of the day you logged it, and the dollar chip stops being decoration to become the master control: tap it and the whole board re-expresses in dollars — each expense at ITS rate, not today rate — or in today pesos adjusted by official inflation',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'Cuentas y billeteras: efectivo, banco y billetera virtual, cada una con su saldo. El cofre se abre en filas y el total por fin coincide con lo que ves en Mercado Pago y el homebanking, sin cuentas mentales. Con transferencias entre cuentas que no te ensucian los gastos del mes',
+          en: 'Accounts and wallets: cash, bank and digital wallet, each with its own balance. The chest opens into rows and the total finally matches what your bank app shows, no mental math. With transfers between accounts that never pollute the month spending',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'La agenda de la plata: las tarjetas ganan día de vencimiento con aviso tres días antes, los recurrentes soportan frecuencias bimestrales, cuatrimestrales, semestrales y anuales —el aguinaldo entra sin trucos— y «Próximas batallas» pasa a ser una línea de tiempo de 30 días',
+          en: 'The money agenda: cards gain a due day with a three-day heads-up, recurring items support bimonthly, four-monthly, semiannual and annual cadences — the yearly bonus fits with no tricks — and «Upcoming battles» becomes a 30-day timeline',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'Ponele un límite mensual a cada categoría y la app te avisa cuando te pasaste — justo al cargar el gasto, que es el momento en el que todavía podés hacer algo',
+          en: 'Set a monthly limit per category and the app warns you when you blow past it — right as you log the expense, the moment you can still do something about it',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'Macros completos: proteínas, carbohidratos y grasas con objetivos editables, barras de progreso e historial en el panel. Y cuando te pasaste del objetivo se nota de un vistazo, sin tener que leer números',
+          en: 'Full macros: protein, carbs and fat with editable targets, progress bars and history on the dashboard. And when you go over target it shows at a glance, without reading a single number',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'La app aprende tu gasto energético real cruzando lo que comés con lo que pesás, y te muestra la tendencia de peso suavizada en vez del ruido de la balanza de cada mañana',
+          en: 'The app learns your real energy expenditure by crossing what you eat with what you weigh, and shows a smoothed weight trend instead of the daily noise of the scale',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'El asado del domingo ya no te rompe nada: un botón registra el evento con una banda honesta —«~1.200-1.600 kcal»—, el día no te castiga y la racha sigue viva. Registrar es presentarse, y presentarse es lo que cuenta',
+          en: 'Sunday barbecue no longer breaks anything: one button logs the event with an honest range — «~1,200-1,600 kcal» — the day does not punish you and the streak stays alive. Logging is showing up, and showing up is what counts',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'Registrar es mucho más rápido: repetir el día anterior, multiplicador de porción, corregir a mano lo que estimó la IA, y sugerencias sacadas de lo que ya comiste antes. La estimación además reintenta sola y guarda lo que ya calculó, así que repetir un plato es instantáneo y gratis',
+          en: 'Logging is much faster: repeat yesterday, portion multiplier, hand-correct whatever the AI estimated, and suggestions drawn from what you have eaten before. Estimation also retries on its own and caches what it computed, so repeating a meal is instant and free',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'La merienda existe: quinta comida entre las 16 y las 19, cena hasta tarde, y el día nutricional que corta a las 4 de la mañana — el postre de las 00:30 cuenta para la cena de ayer, no arruina el desayuno de mañana',
+          en: 'The afternoon snack exists: a fifth meal between 4 and 7pm, late dinner, and a nutritional day that rolls over at 4am — the 00:30 dessert counts toward last night dinner instead of ruining tomorrow breakfast',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'quests',
+        text: {
+          es: '«Pagar el alquiler» se carga una vez y vuelve sola todos los meses, con la fecha corrida desde el vencimiento original y no desde el día que la completaste. Cada instancia queda en el historial',
+          en: '«Pay the rent» is created once and comes back on its own every month, with the date shifted from the original due date rather than the day you ticked it. Every instance stays in your history',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'quests',
+        text: {
+          es: 'Ctrl+K entiende castellano: escribí «mañana 9am pagar la luz #hogar !alta» y la tarea sale con fecha, hora, proyecto y prioridad, sin tocar un solo desplegable',
+          en: 'Ctrl+K speaks plain language: type «tomorrow 9am pay the power bill #home !high» and the task lands with date, time, project and priority, without touching a single dropdown',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'quests',
+        text: {
+          es: 'Los hábitos ganan mapa de calor propio con el récord de tu mejor racha, la posibilidad de saltear un día a propósito sin que cuente como falla, y escudos que te cubren un tropiezo',
+          en: 'Habits gain their own heatmap with your best-streak record, the option to deliberately skip a day without it counting as a miss, and shields that cover a stumble',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'cauldron',
+        text: {
+          es: 'El Caldero se ata a tus misiones: arrancalo sobre una tarea concreta desde la propia lista y al final de la semana mirá el estante para ver en qué se te fue el tiempo. El descanso ahora arranca solo, y si trabajaste sin el caldero podés registrar esa sesión a mano',
+          en: 'The Cauldron ties into your quests: start it on a specific task straight from the list, then check the shelf at the end of the week to see where your time went. Breaks now start on their own, and if you worked without the cauldron you can log that session by hand',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'ui',
+        text: {
+          es: 'Completar una misión ahora se siente: una lluvia corta de partículas doradas desde el casillero. Si tenés activadas las animaciones reducidas del sistema, queda un destello suave en su lugar',
+          en: 'Completing a quest now feels like something: a short burst of golden particles from the checkbox. If you have reduced motion enabled, a gentle glow takes its place',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'sync',
+        text: {
+          es: '¿Volviste a entrar y faltaban cosas? Cerramos varias vías por las que la sincronización podía perder o pisar datos: días del Códice que se colapsaban a uno solo en la nube, ediciones de comidas que nunca viajaban al otro dispositivo, hábitos que perdían sus escudos al sincronizar, y una sola fila corrupta que podía frenar TODA la bajada de datos para siempre',
+          en: 'Came back and things were missing? We closed several paths where sync could lose or clobber your data: Codex days collapsing into a single one in the cloud, meal edits that never travelled to the other device, habits losing their shields on sync, and one corrupt row that could jam the ENTIRE download forever',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El importador de resúmenes descartaba las cuotas 2 a 12 de una misma compra: el banco imprime la fecha original en todas y parecían duplicadas — una heladera en 12 cuotas perdía $275.000. Además, ahora las cuotas caen en el resumen que elegís y no en el del mes de compra',
+          en: 'The statement importer was discarding installments 2 through 12 of the same purchase: the bank prints the original date on all of them and they looked like duplicates — a fridge in 12 installments lost $275,000. Installments now land on the statement you pick, not the month of purchase',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'rpg',
+        text: {
+          es: 'Cerramos varios agujeros por los que se podía inflar la experiencia sin hacer nada: sellar «ayer» todos los días daba racha infinita, la Posada resucitaba rachas ya muertas, y completar y descompletar una tarea —o cargar y borrar un gasto— pagaba de nuevo cada vez',
+          en: 'We closed several holes that let you inflate XP without doing anything: sealing «yesterday» every day gave an infinite streak, the Inn resurrected long-dead streaks, and completing then un-completing a task — or logging then deleting an expense — paid out all over again',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'El historial de un hábito pintaba de dorado los días que habías salteado a propósito y los contaba para tu récord de mejor racha. La válvula de escape se había vuelto una forma de fabricar rachas',
+          en: 'A habit history painted the days you deliberately skipped in gold and counted them toward your best-streak record. The escape hatch had become a way to manufacture streaks',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Reabrir un día cerrado devolvía mal la experiencia: buscaba el registro comparando horarios guardados en dos formatos distintos y nunca lo encontraba. Ahora la reversión es exacta, y podés reabrir tranquilo',
+          en: 'Reopening a closed day gave back the wrong XP: it looked for the record by comparing timestamps stored in two different formats and never found it. The reversal is exact now, so reopen away',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Un gasto cargado después de las nueve de la noche quedaba fechado al día siguiente — y a fin de mes, en el mes siguiente. Ahora usa tu hora local, como corresponde',
+          en: 'An expense logged after 9pm was dated to the next day — and at month end, to the next month. It now uses your local time, as it should',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Un doble click apurado registraba dos veces la misma comida, y pagaba la experiencia dos veces. Los botones ahora se bloquean mientras el registro está en camino',
+          en: 'A hurried double click logged the same meal twice, and paid XP twice. Buttons now lock while the entry is on its way',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: '¿Abrías un cuadro de diálogo, empezabas a escribir y no aparecía nada? El foco se lo quedaba el botón de cerrar. Ahora escribís donde esperás escribir, y Escape te devuelve donde estabas',
+          en: 'Opened a dialog, started typing, and nothing appeared? The close button was stealing the focus. Now you type where you expect to type, and Escape returns you where you were',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'cauldron',
+        text: {
+          es: '«Retomar» descartaba tu sesión interrumpida antes de intentar arrancarla: si la receta ya no existía perdías los minutos cumplidos y el cartel no se iba más. Ahora no se descarta nada hasta que la sesión arrancó de verdad',
+          en: '«Resume» discarded your interrupted session before trying to start it: if the recipe was gone you lost the minutes you had earned and the banner never went away. Nothing is discarded now until the session truly starts',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'Creabas una tarea con Ctrl+K o desde el Caldero y la lista no se enteraba hasta que recargabas la pantalla',
+          en: 'You created a task with Ctrl+K or from the Cauldron and the list did not notice until you reloaded the screen',
+        },
+      },
+    ],
+  },
+  {
+    version: '0.7.5',
+    date: '2026-06-26',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'updater',
+        text: {
+          es: 'El aviso de nueva versión se renovó: ahora aparece como un cartelito discreto que no te interrumpe, te muestra QUÉ hay de nuevo antes de actualizar, y vos elegís cuándo reiniciar. Y en Ajustes podés decidir si querés que se actualice solo, que solo te avise, o que no moleste',
+          en: 'The update prompt got a makeover: it now shows up as a discreet little banner that stays out of your way, tells you WHAT\'s new before you update, and lets you choose when to restart. And in Settings you decide whether it updates on its own, just notifies you, or stays quiet',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'auth',
+        text: {
+          es: '¿Escribiste mal la contraseña y no sabés dónde? Ahora podés mostrarla u ocultarla con un toque al iniciar sesión',
+          en: 'Typed your password wrong and can\'t tell where? You can now show or hide it with one tap when logging in',
+        },
+      },
+    ],
+  },
+  {
+    version: '0.7.4',
+    date: '2026-06-26',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'updater',
+        text: {
+          es: '¿Cada actualización te borraba el acceso directo o te rompía el ícono fijado en la barra de tareas? Se terminó. Ahora las actualizaciones respetan tus accesos directos, y de paso bajan mucho más livianas y rápidas — solo lo que cambió, no toda la app de nuevo',
+          en: 'Every update wiping your shortcut or breaking the icon you pinned to the taskbar? Done with that. Updates now leave your shortcuts alone, and they download much lighter and faster too — only what changed, not the whole app again',
+        },
+      },
+    ],
+  },
+  {
     version: '0.7.3',
     date: '2026-06-16',
     changes: [

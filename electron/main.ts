@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { spawnSync } from 'child_process';
 import { registerAllIpcHandlers } from './ipc/registry';
 import { closeDb, getDb, runModuleMigrations } from './ipc/db';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
@@ -14,8 +15,54 @@ import { generateRecurringForMonth } from './modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 import { todayDateString } from '../shared/date-utils';
 
-// Handle Squirrel events (Windows installer lifecycle)
-if (require('electron-squirrel-startup')) app.quit();
+// Set a stable AppUserModelID matching the one Squirrel assigns to shortcuts
+// (com.squirrel.<PACKAGE>.<EXE>). Required so Windows keeps pinned taskbar items
+// associated with the app across updates instead of breaking the pin.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.squirrel.Hubtify.Hubtify');
+}
+
+// Handle Squirrel events (Windows installer lifecycle). Custom handler instead of
+// electron-squirrel-startup: on update we pass --updateOnly so Squirrel re-points
+// shortcuts that still exist to the new version WITHOUT resurrecting ones the user
+// deleted or breaking pinned taskbar items. On first install we create normally.
+function handleSquirrelEvent(): boolean {
+  if (process.platform !== 'win32') return false;
+  const squirrelEvent = process.argv[1];
+  if (!squirrelEvent || !squirrelEvent.startsWith('--squirrel')) return false;
+
+  const exeName = path.basename(process.execPath); // Hubtify.exe
+  const updateExe = path.resolve(path.dirname(process.execPath), '..', 'Update.exe');
+  // spawnSync (not detached) so the shortcut op fully completes BEFORE we quit.
+  // Squirrel allows ~15s; we cap at 12s so we never hang the install.
+  const runUpdate = (args: string[]) => {
+    try {
+      spawnSync(updateExe, args, { timeout: 12000 });
+    } catch {
+      // Update.exe unavailable — app quits regardless, nothing to recover
+    }
+  };
+
+  switch (squirrelEvent) {
+    case '--squirrel-install':
+      runUpdate([`--createShortcut=${exeName}`]);
+      return true;
+    case '--squirrel-updated':
+      runUpdate([`--createShortcut=${exeName}`, '--updateOnly']);
+      return true;
+    case '--squirrel-uninstall':
+      runUpdate([`--removeShortcut=${exeName}`]);
+      return true;
+    case '--squirrel-obsolete':
+      return true;
+    default:
+      return false;
+  }
+}
+
+if (handleSquirrelEvent()) {
+  app.quit();
+}
 
 /**
  * Without these, an exception thrown outside a request/response cycle — a

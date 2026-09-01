@@ -170,9 +170,52 @@ export const nutritionMigrations: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_frequent_foods_name ON frequent_foods(name COLLATE NOCASE);
     `,
   },
+  // ── v10 / v11 come from upstream (nutrify-deep-improvements) ────────────────
+  // They already occupied these two version numbers on origin/master, so the
+  // four migrations this branch wrote as v10-v13 were renumbered to v12-v15
+  // below. The runner skips by (namespace, version) and tolerates duplicate
+  // columns, so a device that already ran the old numbering is unaffected in
+  // practice: every statement that moved is either an idempotent ALTER or a
+  // backfill guarded by `WHERE ... IS NULL`.
   {
     namespace: 'nutrition',
     version: 10,
+    up: `
+      ALTER TABLE food_log ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE food_log ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE food_log ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE favorite_foods ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE favorite_foods ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE favorite_foods ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE frequent_foods ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE frequent_foods ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE frequent_foods ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE nutrition_daily_summary ADD COLUMN protein_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_daily_summary ADD COLUMN carbs_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_daily_summary ADD COLUMN fat_g REAL DEFAULT NULL;
+
+      ALTER TABLE nutrition_profile ADD COLUMN protein_target_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN carbs_target_g REAL DEFAULT NULL;
+      ALTER TABLE nutrition_profile ADD COLUMN fat_target_g REAL DEFAULT NULL;
+    `,
+  },
+  {
+    // Soft-delete support for closed days so "reopen day" replicates across accounts.
+    // A row with deleted_at set is treated as reopened (no longer a closed day).
+    namespace: 'nutrition',
+    version: 11,
+    up: `
+      ALTER TABLE nutrition_daily_closed ADD COLUMN updated_at TEXT DEFAULT NULL;
+      ALTER TABLE nutrition_daily_closed ADD COLUMN deleted_at TEXT DEFAULT NULL;
+    `,
+  },
+  {
+    // Was v10 on this branch before the merge with upstream's v10/v11.
+    namespace: 'nutrition',
+    version: 12,
     up: `
       -- ── sync_id: cross-device identity for AUTOINCREMENT tables ─────────────
       -- food_log.id and frequent_foods.id are INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -223,16 +266,17 @@ export const nutritionMigrations: Migration[] = [
 
       -- ── Reopening a closed day ──────────────────────────────────────────────
       -- closed_at narrows the search for the DAY_SUMMARY rpg_event whose XP/HP the
-      -- reopen has to reverse. deleted_at makes the reopen a soft delete so a pull
-      -- from another device cannot resurrect the closure.
+      -- reopen has to reverse.
+      -- nutrition_daily_closed.updated_at / .deleted_at used to be added here as
+      -- well (same intent: make the reopen a soft delete a pull cannot resurrect).
+      -- Upstream's v11 already adds both, so only closed_at is left.
       ALTER TABLE nutrition_daily_closed ADD COLUMN closed_at TEXT;
-      ALTER TABLE nutrition_daily_closed ADD COLUMN updated_at TEXT;
-      ALTER TABLE nutrition_daily_closed ADD COLUMN deleted_at TEXT DEFAULT NULL;
     `,
   },
   {
+    // Was v11 on this branch before the merge with upstream's v10/v11.
     namespace: 'nutrition',
-    version: 11,
+    version: 13,
     up: `
       -- ── The nutritional day has a cutoff hour ───────────────────────────────
       -- The 00:30 dessert used to count for TOMORROW: it ruined the day that was
@@ -265,8 +309,9 @@ export const nutritionMigrations: Migration[] = [
     `,
   },
   {
+    // Was v12 on this branch before the merge with upstream's v10/v11.
     namespace: 'nutrition',
-    version: 12,
+    version: 14,
     up: `
       -- ── description_norm: the history IS the database ────────────────────────
       -- Phase 2 answers "what did you eat?" from your own log instead of from
@@ -276,11 +321,11 @@ export const nutritionMigrations: Migration[] = [
       --
       -- GENERATED ... VIRTUAL, not a plain column, for one decisive reason:
       -- NOTHING has to maintain it. food_log and favorite_foods are written by
-      -- the IPC handlers, by copyDay, AND by sync.ipc.ts's merge — which inserts
-      -- with an explicit column list this migration must not have to edit. A
-      -- plain column would arrive NULL on every synced row and the autocomplete
-      -- would go blind on exactly the meals that came from the user's phone.
-      -- SQLite computes a generated column for every writer, forever.
+      -- the IPC handlers, by copyDay/repeatDay, AND by sync.ipc.ts's merge —
+      -- which inserts with an explicit column list this migration must not have
+      -- to edit. A plain column would arrive NULL on every synced row and the
+      -- autocomplete would go blind on exactly the meals that came from the
+      -- user's phone. SQLite computes a generated column for every writer, forever.
       --
       -- VIRTUAL rather than STORED because ALTER TABLE ADD COLUMN cannot add a
       -- STORED generated column. It costs nothing here: the INDEX below persists
@@ -316,6 +361,12 @@ export const nutritionMigrations: Migration[] = [
       -- Keyed by the SAME description_norm. Second time you type "milanesa con
       -- puré" there is no network call, no spinner and no cost.
       --
+      -- This is the ONE estimate cache in the app. Upstream shipped a second one
+      -- (a localStorage map in estimate-cache.ts); it lost the merge because this
+      -- one is per-account, shares its key with the history autocomplete, counts
+      -- hits, and stores the number the user CONFIRMED rather than the one the
+      -- model guessed.
+      --
       -- LOCAL-ONLY ON PURPOSE — deliberately absent from USER_DATA_TABLES and
       -- from sync:getAll/mergeNutritionData. This is a network cache, not user
       -- data: every row is reconstructible for free by asking the model again,
@@ -325,10 +376,8 @@ export const nutritionMigrations: Migration[] = [
       -- API call. The rows the user actually owns (the meals) are in food_log,
       -- which IS synced.
       --
-      -- protein_g is plumbing: the estimate Cloud Function returns only calories
-      -- and items today, so it stays NULL until the function grows macros. It is
-      -- here now because adding a column later to a PK-keyed cache is free but
-      -- re-deriving a schema decision is not.
+      -- protein_g / carbs_g / fat_g mirror what the estimate Cloud Function now
+      -- returns, so a cache hit is exactly as complete as a fresh call.
       CREATE TABLE IF NOT EXISTS nutrition_ai_cache (
         description_norm TEXT PRIMARY KEY,
         calories INTEGER NOT NULL,
@@ -338,11 +387,19 @@ export const nutritionMigrations: Migration[] = [
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT
       );
+      -- carbs_g / fat_g arrive as ALTERs rather than columns of the CREATE so
+      -- that BOTH paths land on the same shape: a fresh database (table created
+      -- here, then altered) and a database that already created this table under
+      -- the OLD numbering, when this migration was v12 and the cache held
+      -- protein only. Neither path raises "duplicate column".
+      ALTER TABLE nutrition_ai_cache ADD COLUMN carbs_g REAL;
+      ALTER TABLE nutrition_ai_cache ADD COLUMN fat_g REAL;
     `,
   },
   {
+    // Was v13 on this branch before the merge with upstream's v10/v11.
     namespace: 'nutrition',
-    version: 13,
+    version: 15,
     up: `
       -- ── Modo evento: el asado del domingo ────────────────────────────────────
       -- La causa documentada #2 y #3 de abandono es el evento social que "rompe"
@@ -354,12 +411,9 @@ export const nutritionMigrations: Migration[] = [
       ALTER TABLE food_log ADD COLUMN event_kcal_min REAL DEFAULT NULL;
       ALTER TABLE food_log ADD COLUMN event_kcal_max REAL DEFAULT NULL;
 
-      -- ── Proteina — y solo proteina ───────────────────────────────────────────
-      -- Decision de producto explicita: calorias + proteina, sin carbohidratos ni
-      -- grasas. protein_g por comida (nutrition_ai_cache ya lo tenia desde v12);
-      -- protein_target_g NULL significa "auto": peso mas reciente x 1.6 g/kg.
-      ALTER TABLE food_log ADD COLUMN protein_g REAL DEFAULT NULL;
-      ALTER TABLE nutrition_profile ADD COLUMN protein_target_g REAL DEFAULT NULL;
+      -- food_log.protein_g y nutrition_profile.protein_target_g VIVIAN aca antes
+      -- del merge. Upstream los agrega en v10 junto con carbohidratos y grasas, y
+      -- con targets configurables para los tres: gana la version completa.
     `,
   },
 ];

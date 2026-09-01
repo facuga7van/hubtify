@@ -91,7 +91,7 @@ describe('the JS normalizer and the SQL expression cannot drift', () => {
   });
 });
 
-describe('migration v12 — indexes and the generated columns', () => {
+describe('migration v14 — indexes and the generated columns', () => {
   it('adds description_norm to both tables without touching the writers', () => {
     const db = setupDb();
     // The INSERT does NOT mention description_norm — that is the point: the sync
@@ -131,7 +131,8 @@ describe('migration v12 — indexes and the generated columns', () => {
     const db = setupDb();
     const cols = db.pragma('table_info(nutrition_ai_cache)') as Array<{ name: string; pk: number }>;
     expect(cols.map(c => c.name).sort()).toEqual(
-      ['ai_breakdown', 'calories', 'created_at', 'description_norm', 'hits', 'protein_g', 'updated_at'],
+      // Los tres macros: el caché guarda lo mismo que devuelve la estimación.
+      ['ai_breakdown', 'calories', 'carbs_g', 'created_at', 'description_norm', 'fat_g', 'hits', 'protein_g', 'updated_at'],
     );
     expect(cols.find(c => c.name === 'description_norm')?.pk).toBe(1);
   });

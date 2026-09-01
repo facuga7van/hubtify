@@ -521,29 +521,25 @@ export function registerQuestsIpcHandlers(): void {
 
   // ── Categories ─────────────────────────────────────
 
+  // Categories are derived directly from the tasks themselves — tasks.category is the
+  // single source of truth. The old task_categories catalog table is no longer read or
+  // written (it remains in the sync payload as inert legacy data until a future cleanup,
+  // to stay forward-compatible with older clients per the expand-contract pattern).
   ipcHandle('quests:getCategories', (_e, projectId?: string | null) => {
     const db = getDb();
     if (projectId === undefined) {
-      return (db.prepare('SELECT id, name FROM task_categories WHERE deleted_at IS NULL ORDER BY created_at ASC').all() as { id: string; name: string }[])
-        .map((r) => r.name);
-    } else {
-      return (db.prepare('SELECT id, name FROM task_categories WHERE deleted_at IS NULL AND project_id IS ? ORDER BY created_at ASC').all(projectId) as { id: string; name: string }[])
-        .map((r) => r.name);
+      return (db.prepare(
+        "SELECT DISTINCT category FROM tasks WHERE deleted_at IS NULL AND category != '' ORDER BY category COLLATE NOCASE ASC"
+      ).all() as { category: string }[]).map((r) => r.category);
     }
+    return (db.prepare(
+      "SELECT DISTINCT category FROM tasks WHERE deleted_at IS NULL AND category != '' AND project_id IS ? ORDER BY category COLLATE NOCASE ASC"
+    ).all(projectId) as { category: string }[]).map((r) => r.category);
   });
 
-  ipcHandle('quests:ensureCategory', (_e, name: string, projectId?: string | null) => {
-    const db = getDb();
-    const pid = projectId ?? null;
-    const existing = db.prepare(
-      'SELECT id FROM task_categories WHERE name = ? AND project_id IS ? AND deleted_at IS NULL'
-    ).get(name, pid);
-    if (existing) return;
-    const id = genId();
-    const now = new Date().toISOString();
-    db.prepare('INSERT INTO task_categories (id, name, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, name, pid, now, now);
-  });
+  // Deprecated: kept as a no-op so the preload bridge and any older renderer that still
+  // calls it don't break. Creating a task with a category now implicitly "registers" it.
+  ipcHandle('quests:ensureCategory', () => { /* no-op — categories derive from tasks.category */ });
 
   // ── Stats helpers ──────────────────────────────────
 
@@ -732,6 +728,53 @@ export function registerQuestsIpcHandlers(): void {
     }
 
     return { days: result, totalHabits };
+  });
+
+  // Per-habit history for the individual heatmap: a consecutive run of the last
+  // `days` days, each flagged checked/not. Also returns the best (longest) historical
+  // run of consecutive checked days as a personal record to beat.
+  ipcHandle('quests:getHabitHistory', (_e, habitId: string, days: number = 91) => {
+    const db = getDb();
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - days + 1);
+    const startStr = formatDateString(startDate);
+
+    // `kind = 'check'` matters: habit_checks also stores 'skip' rows, and a
+    // skipped day painted gold (and counted into the record) would turn the
+    // escape hatch into a way to fake a streak.
+    const rows = db.prepare(
+      "SELECT date FROM habit_checks WHERE habit_id = ? AND deleted_at IS NULL AND kind = 'check' AND date >= ?"
+    ).all(habitId, startStr) as Array<{ date: string }>;
+    const checkedDates = new Set(rows.map((r) => r.date));
+
+    const result: Array<{ date: string; checked: boolean }> = [];
+    const d = new Date(startDate);
+    for (let i = 0; i < days; i++) {
+      const ds = formatDateString(d);
+      result.push({ date: ds, checked: checkedDates.has(ds) });
+      d.setDate(d.getDate() + 1);
+    }
+
+    // Best historical streak across ALL recorded checks (not limited to the window).
+    const allDates = (db.prepare(
+      "SELECT date FROM habit_checks WHERE habit_id = ? AND deleted_at IS NULL AND kind = 'check' ORDER BY date ASC"
+    ).all(habitId) as Array<{ date: string }>).map((r) => r.date);
+    let bestStreak = 0;
+    let run = 0;
+    let prev: Date | null = null;
+    for (const ds of allDates) {
+      const cur = new Date(ds + 'T12:00:00');
+      if (prev && Math.round((cur.getTime() - prev.getTime()) / 86400000) === 1) {
+        run++;
+      } else {
+        run = 1;
+      }
+      if (run > bestStreak) bestStreak = run;
+      prev = cur;
+    }
+
+    return { days: result, bestStreak };
   });
 
   // `specificDays` (ISO 1=Mon..7=Sun) and `timesPerWeek` are mutually exclusive

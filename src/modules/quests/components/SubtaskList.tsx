@@ -6,9 +6,10 @@ import { CSS } from '@dnd-kit/utilities';
 import SubtaskInlineForm from './SubtaskInlineForm';
 import Checkbox from '../../../shared/components/Checkbox';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
+import { useToast } from '../../../shared/components/useToast';
 import type { XpToastData } from '../types';
 import { type TaskTier, type Subtask, XP_MAP, MAX_SUBTASKS } from '../types';
-import { TierBadge, tierXp, bonusMultiplierToTier } from '../utils';
+import { TierBadge, tierXp, bonusMultiplierToTier, notifyStreakSaved } from '../utils';
 import { todayDateString } from '../../../../shared/date-utils';
 import { completeTask } from '../../../shared/animations/feedback';
 import { playTaskComplete } from '../../../shared/audio';
@@ -23,6 +24,7 @@ interface Props {
 export default function SubtaskList({ taskId, subtasks, onShowToast, onSubtaskChanged }: Props) {
   const { t } = useTranslation();
   const confirm = useConfirm();
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingSubtask, setEditingSubtask] = useState<Subtask | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -67,6 +69,7 @@ export default function SubtaskList({ taskId, subtasks, onShowToast, onSubtaskCh
       } else {
         onShowToast(toastData);
       }
+      notifyStreakSaved(result, { toast, t });
     } else {
       await window.api.questsSetSubtaskStatus(subtask.id, false);
       await window.api.processRpgEvent({
@@ -142,8 +145,15 @@ export default function SubtaskList({ taskId, subtasks, onShowToast, onSubtaskCh
         <button className="rpg-button" disabled={atLimit} title={atLimit ? t('questify.subtaskLimit', 'Max 30 subtasks reached') : undefined} onClick={() => setShowForm(true)}
           style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', marginTop: 6 }}>
           {t('questify.addSubtask')}
-          {subtasks.length >= 20 && (
-            <span style={{ marginLeft: 6, opacity: 0.7 }}>({subtasks.length}/{MAX_SUBTASKS})</span>
+          {subtasks.length > 0 && (
+            <span style={{
+              marginLeft: 6,
+              opacity: subtasks.length >= 25 ? 1 : 0.55,
+              color: subtasks.length >= 25 ? 'var(--rubric)' : 'inherit',
+              fontWeight: subtasks.length >= 25 ? 600 : 'normal',
+            }}>
+              ({subtasks.length}/{MAX_SUBTASKS})
+            </span>
           )}
         </button>
       ) : null}

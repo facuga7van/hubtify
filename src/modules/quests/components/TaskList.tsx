@@ -23,7 +23,7 @@ import ProjectManager from './ProjectManager';
 import ScrollNotes from './ScrollNotes';
 import HabitTracker from './HabitTracker';
 import { type Task, type Subtask, type Project, XP_MAP } from '../types';
-import { getDueDateStatus, bonusMultiplierToTier, TierBadge } from '../utils';
+import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved, TierBadge } from '../utils';
 import { playTaskComplete, playDelete } from '../../../shared/audio';
 import QuillCheckbox from '../../../shared/components/QuillCheckbox';
 import { completeTask as completeTaskAnim, removeItem } from '../../../shared/animations/feedback';
@@ -280,6 +280,8 @@ export default function TaskList() {
             timestamp: Date.now(),
           });
           toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+          // Only the branch that actually paid can carry the one-day grace flag.
+          notifyStreakSaved(result, { toast, t });
         }
         // Recurring quest: the backend already dealt the next instance.
         if (statusResult && statusResult.repeated) {

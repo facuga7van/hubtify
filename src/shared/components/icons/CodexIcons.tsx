@@ -644,3 +644,33 @@ export function FloralHeart(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function Eye(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      {/* Eye almond */}
+      <path d="M2 12 C5 7.5 8.5 5.5 12 5.5 C15.5 5.5 19 7.5 22 12 C19 16.5 15.5 18.5 12 18.5 C8.5 18.5 5 16.5 2 12Z" fill="currentColor" fillOpacity=".06" />
+      {/* Iris */}
+      <circle cx="12" cy="12" r="3.2" />
+      {/* Pupil */}
+      <circle cx="12" cy="12" r="1" fill="currentColor" fillOpacity=".35" />
+      {/* Lash hints */}
+      <path d="M3.5 8.5 Q3 7.8 2.6 7 M20.5 8.5 Q21 7.8 21.4 7" strokeWidth=".5" />
+    </svg>
+  );
+}
+
+export function EyeOff(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      {/* Eye almond */}
+      <path d="M2 12 C5 7.5 8.5 5.5 12 5.5 C15.5 5.5 19 7.5 22 12 C19 16.5 15.5 18.5 12 18.5 C8.5 18.5 5 16.5 2 12Z" fill="currentColor" fillOpacity=".04" />
+      {/* Iris */}
+      <circle cx="12" cy="12" r="3.2" />
+      {/* Pupil */}
+      <circle cx="12" cy="12" r="1" fill="currentColor" fillOpacity=".35" />
+      {/* Slash across — concealed */}
+      <path d="M4 4 L20 20" strokeWidth="1.5" />
+    </svg>
+  );
+}

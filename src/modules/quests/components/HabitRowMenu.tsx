@@ -7,19 +7,22 @@ import { useMenuKeyboard } from './useMenuKeyboard';
 interface Props {
   /** Today already carries a 'skip' row — the menu offers to undo it. */
   skipped: boolean;
+  /** The per-habit history heatmap is currently expanded under the row. */
+  historyOpen: boolean;
+  onHistory: () => void;
   onEdit: () => void;
   onSkip: () => void;
   onDelete: () => void;
 }
 
 /**
- * Overflow menu for a habit row: edit, skip today, delete.
+ * Overflow menu for a habit row: history, edit, skip today, delete.
  *
  * "Skip today" needs a home that is not a fourth 14px icon competing with the
- * tick, so the two existing icon buttons moved in here with it. Same portaled
+ * tick, so the existing icon buttons moved in here with it. Same portaled
  * pattern as QuestRowActions — a row with overflow hidden must not clip it.
  */
-export default function HabitRowMenu({ skipped, onEdit, onSkip, onDelete }: Props) {
+export default function HabitRowMenu({ skipped, historyOpen, onHistory, onEdit, onSkip, onDelete }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
@@ -70,6 +73,29 @@ export default function HabitRowMenu({ skipped, onEdit, onSkip, onDelete }: Prop
           style={{ position: 'fixed', top: pos.top, left: pos.left }}
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            type="button"
+            role="menuitem"
+            className="quest-row-menu-item"
+            aria-pressed={historyOpen}
+            onClick={run(onHistory)}
+          >
+            {/* Same nine-square glyph the standalone toggle used to carry. */}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <rect x="0.5" y="0.5" width="3" height="3" rx="0.6"/>
+              <rect x="5.5" y="0.5" width="3" height="3" rx="0.6"/>
+              <rect x="10.5" y="0.5" width="3" height="3" rx="0.6"/>
+              <rect x="0.5" y="5.5" width="3" height="3" rx="0.6"/>
+              <rect x="5.5" y="5.5" width="3" height="3" rx="0.6"/>
+              <rect x="10.5" y="5.5" width="3" height="3" rx="0.6"/>
+              <rect x="0.5" y="10.5" width="3" height="3" rx="0.6"/>
+              <rect x="5.5" y="10.5" width="3" height="3" rx="0.6"/>
+              <rect x="10.5" y="10.5" width="3" height="3" rx="0.6"/>
+            </svg>
+            {historyOpen
+              ? t('questify.habitHistoryHide', 'Ocultar historial')
+              : t('questify.habitHistory', 'Ver historial')}
+          </button>
           <button type="button" role="menuitem" className="quest-row-menu-item" onClick={run(onEdit)}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"
               fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">

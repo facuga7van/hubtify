@@ -323,6 +323,33 @@ export function getStreakMilestoneBonus(streak: number): number {
   return STREAK_MILESTONES[streak] ?? 0;
 }
 
+/**
+ * Computes the next streak value applying a one-day grace period ("streak freeze").
+ * The grace lets a single missed day survive the streak instead of resetting it to 1,
+ * which is the biggest abandonment trigger in streak-based apps.
+ *
+ *  - Same day            → unchanged (today already counted).
+ *  - Consecutive (diff 1) → +1, the player advances.
+ *  - One day missed (diff 2) → streak survives but does NOT advance (grace, can't be farmed).
+ *  - Two+ days missed (diff ≥ 3) or any anomaly → reset to 1.
+ *  - No prior activity → starts at 1.
+ *
+ * `saved` is true only when the grace period kept an existing streak alive,
+ * so the UI can show an empathetic "your streak survived" message.
+ */
+export function nextStreak(
+  currentStreak: number,
+  lastDate: string | null,
+  today: string,
+): { streak: number; saved: boolean } {
+  if (lastDate === today) return { streak: currentStreak, saved: false };
+  if (!lastDate) return { streak: 1, saved: false };
+  const diff = daysDiff(lastDate, today);
+  if (diff === 1) return { streak: currentStreak + 1, saved: false };
+  if (diff === 2 && currentStreak >= 1) return { streak: currentStreak, saved: true };
+  return { streak: 1, saved: false };
+}
+
 export { todayDateString as getLocalDateString } from './date-utils';
 
 export function daysDiff(a: string, b: string): number {

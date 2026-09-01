@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import TitleBar from '../shared/components/TitleBar';
 import Sidebar from './Sidebar';
+import UpdateNotification from './UpdateNotification';
+import UpdateBanner from './UpdateBanner';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull, SYNC_PUSH_FAILED_EVENT } from '../shared/sync';
@@ -217,80 +219,6 @@ function RpgMomentsWatcher() {
   return null;
 }
 
-interface UpdateDialogProps {
-  version: string;
-  state: 'idle' | 'downloading';
-  percent: number;
-  error: string | null;
-  onDownload: () => void;
-  onHide: () => void;
-  onDismiss: () => void;
-}
-
-/**
- * The old markup was `position:fixed; inset:0` with no X, no backdrop click, no
- * Escape, and both buttons hidden behind `state === 'idle'` — pressing
- * "Download" locked you into a full-screen modal that also covered the custom
- * title bar (so not even the window X was reachable).
- */
-function UpdateDialog({ version, state, percent, error, onDownload, onHide, onDismiss }: UpdateDialogProps) {
-  const { t } = useTranslation();
-  const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose: onHide });
-
-  return (
-    <div className="update-dialog-overlay" onClick={onHide}>
-      <div
-        {...dialogProps}
-        className="update-dialog"
-        aria-label={t('settings.updateAvailable', { version })}
-        onClick={stopPropagation}
-      >
-        <button
-          className="update-dialog__close tap-target"
-          onClick={onHide}
-          aria-label={t('common.hide', 'Ocultar')}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-            <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
-          </svg>
-        </button>
-
-        <h3 className="update-dialog__title">
-          {t('settings.updateAvailable', { version })}
-        </h3>
-
-        {state === 'downloading' && (
-          <div className="update-dialog__progress">
-            <div className="update-dialog__track">
-              <div className="update-dialog__fill" style={{ width: `${Math.round(percent)}%` }} />
-            </div>
-            {/* Raw percent used to render as "43.216871450%". */}
-            <span className="update-dialog__percent">{Math.round(percent)}%</span>
-          </div>
-        )}
-
-        {error && <p className="update-dialog__error">{error}</p>}
-
-        {state === 'idle' && (
-          <button className="rpg-button update-dialog__primary" onClick={onDownload}>
-            {t('settings.downloadUpdate')}
-          </button>
-        )}
-
-        {/* Always reachable, whatever the state. */}
-        <button className="rpg-button update-dialog__secondary" onClick={onHide}>
-          {t('common.hide', 'Ocultar')}
-        </button>
-        {state === 'idle' && (
-          <button className="rpg-button update-dialog__secondary" onClick={onDismiss}>
-            {t('common.later', 'Más tarde')}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function Layout() {
   const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<PlayerStats | null>(null);
@@ -335,41 +263,63 @@ export default function Layout() {
   const [syncError, setSyncError] = useState(false);
 
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null);
-  const [updateState, setUpdateState] = useState<'idle' | 'downloading'>('idle');
+  const [updateState, setUpdateState] = useState<'idle' | 'downloading' | 'ready'>('idle');
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
-  /** Collapses the update dialog to a chip; the download keeps running. */
-  const [updateMinimized, setUpdateMinimized] = useState(false);
+  const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
-  useEffect(() => {
-    const c1 = window.api.onUpdateAvailable((info) => setUpdateAvailable(info));
-    const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
-    const c3 = window.api.onUpdateError((info) => {
-      setUpdateError(info.message);
-      // Without this the dialog stayed in 'downloading' forever — no buttons, no
-      // close, and it covers the custom title bar: the app was unusable.
-      setUpdateState('idle');
-    });
-
-    // Also actively check on mount — the passive listener may have missed
-    // the message if it was sent before React mounted
-    window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
-      if (res?.available && res.version) {
-        setUpdateAvailable({ version: res.version });
-      }
-    }).catch(() => { /* not available in dev */ });
-
-    return () => { c1(); c2(); c3(); };
-  }, []);
-
-  const handleUpdate = async () => {
+  const handleUpdate = useCallback(async () => {
     setUpdateState('downloading');
     setUpdateError(null);
     try {
       await window.api.updaterDownload();
-      // App will auto-quit and installer runs
+      setUpdateState('ready'); // staged — user chooses when to restart
     } catch { setUpdateState('idle'); }
-  };
+  }, []);
+
+  const handleRestart = useCallback(() => {
+    window.api.updaterRestart?.();
+  }, []);
+
+  // Dismiss the banner and remember this version so it isn't shown again until
+  // a newer one ships.
+  const handleDismissUpdate = useCallback(() => {
+    setUpdateAvailable((cur) => {
+      if (cur) localStorage.setItem('hubtify_update_dismissed_version', cur.version);
+      return null;
+    });
+  }, []);
+
+  // Decide whether to surface an update given the user's preference + snooze.
+  // 'off' suppresses everything; a dismissed version stays hidden; 'auto' starts
+  // the download right away so only the banner's 'ready' state is shown.
+  const considerUpdate = useCallback((version: string) => {
+    const mode = localStorage.getItem('hubtify_update_mode') || 'notify';
+    if (mode === 'off') return;
+    if (localStorage.getItem('hubtify_update_dismissed_version') === version) return;
+    setUpdateAvailable({ version });
+    if (mode === 'auto') handleUpdate();
+  }, [handleUpdate]);
+
+  useEffect(() => {
+    const c1 = window.api.onUpdateAvailable((info) => considerUpdate(info.version));
+    const c2 = window.api.onDownloadProgress((info) => setDownloadPercent(info.percent));
+    const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
+    const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
+
+    const check = () => {
+      window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
+        if (res?.available && res.version) considerUpdate(res.version);
+      }).catch(() => { /* not available in dev */ });
+    };
+
+    // Check on mount (the passive listener may miss a message fired before React
+    // mounted) and every 6 hours for long-running sessions.
+    check();
+    const interval = setInterval(check, 6 * 60 * 60 * 1000);
+
+    return () => { c1(); c2(); c3(); c4(); clearInterval(interval); };
+  }, [considerUpdate]);
 
   // Ctrl+K to open quick add. It was Ctrl+Q, which is Quit on macOS/Linux, and
   // it fired while typing — the INPUT/TEXTAREA guard is the same one
@@ -801,31 +751,29 @@ export default function Layout() {
         entries={patchEntries}
       />
 
-      {/* Update popup */}
-      {updateAvailable && !updateMinimized && (
-        <UpdateDialog
+      {/* Discreet banner — always shown while an update is available */}
+      {updateAvailable && (
+        <UpdateBanner
           version={updateAvailable.version}
           state={updateState}
           percent={downloadPercent}
           error={updateError}
-          onDownload={handleUpdate}
-          onHide={() => setUpdateMinimized(true)}
-          onDismiss={() => { setUpdateAvailable(null); setUpdateMinimized(false); }}
+          onViewDetails={() => setShowUpdateDetails(true)}
+          onRestart={handleRestart}
+          onDismiss={handleDismissUpdate}
         />
       )}
-
-      {/* Collapsed chip — the download carries on in the background */}
-      {updateAvailable && updateMinimized && (
-        <button
-          className="update-chip"
-          onClick={() => setUpdateMinimized(false)}
-          title={t('settings.updateAvailable', { version: updateAvailable.version })}
-        >
-          <span className="update-chip__dot" />
-          {updateState === 'downloading'
-            ? `${t('settings.downloading')} ${Math.round(downloadPercent)}%`
-            : t('settings.updateAvailable', { version: updateAvailable.version })}
-        </button>
+      {/* Full changelog modal — opened from the banner's "View what's new" */}
+      {updateAvailable && showUpdateDetails && (
+        <UpdateNotification
+          version={updateAvailable.version}
+          state={updateState}
+          percent={downloadPercent}
+          error={updateError}
+          onDownload={() => { handleUpdate(); setShowUpdateDetails(false); }}
+          onRestart={handleRestart}
+          onDismiss={() => setShowUpdateDetails(false)}
+        />
       )}
 
     </div>

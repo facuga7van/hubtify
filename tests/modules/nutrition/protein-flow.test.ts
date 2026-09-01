@@ -25,7 +25,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
 
-const { registerNutritionIpcHandlers, getProteinTargetG } =
+const { registerNutritionIpcHandlers } =
   await import('../../../electron/modules/nutrition.ipc');
 registerNutritionIpcHandlers();
 
@@ -116,51 +116,33 @@ describe('proteína a través del cache de estimaciones', () => {
 });
 
 describe('objetivo diario de proteína', () => {
-  it('default: peso inicial × 1.6 cuando no hay peso semanal ni objetivo fijado', () => {
-    expect(getProteinTargetG(harness.db)).toBe(128); // 80 kg × 1.6
+  /* El objetivo dejó de ser «peso × 1,6» con helper propio: ahora lo deriva
+     `nutrition:getMacroTargets` junto con carbohidratos y grasas, con g/kg según
+     el objetivo (déficit 2,2 · mantenimiento 2,0 · superávit 1,8). Lo que sigue
+     importando es lo mismo: sin objetivo fijado, la app propone uno solo, y usa
+     el peso más reciente. */
+  it('sin objetivo fijado propone uno automático a partir del peso', async () => {
+    const t = await invoke<{ proteinG: number; auto: boolean }>('nutrition:getMacroTargets');
+    expect(t.auto).toBe(true);
+    expect(t.proteinG).toBeGreaterThan(0);
   });
 
   it('usa el peso más reciente cuando existe', async () => {
+    const before = await invoke<{ proteinG: number }>('nutrition:getMacroTargets');
     await invoke('nutrition:saveWeeklyMetrics', { date: '2026-08-24', weightKg: 90 });
-    expect(getProteinTargetG(harness.db)).toBe(144); // 90 kg × 1.6
+    const after = await invoke<{ proteinG: number }>('nutrition:getMacroTargets');
+    expect(after.proteinG).toBeGreaterThan(before.proteinG);
   });
 
-  it('getProfile expone el crudo (null = auto) y el efectivo ya resuelto', async () => {
-    const prof = await invoke<{ proteinTargetG: number | null; proteinTargetEffectiveG: number | null }>('nutrition:getProfile');
-    expect(prof.proteinTargetG).toBeNull();
-    expect(prof.proteinTargetEffectiveG).toBe(128);
-  });
-
-  it('saveProfile fija, preserva y resetea el objetivo', async () => {
-    const base = {
-      dateOfBirth: '1996-01-01', sex: 'M', heightCm: 175, initialWeightKg: 80,
-      activityLevel: 'moderate', deficitTargetKcal: 500,
-    };
-
-    await invoke('nutrition:saveProfile', { ...base, proteinTargetG: 150 });
-    let prof = await invoke<{ proteinTargetG: number | null; proteinTargetEffectiveG: number | null }>('nutrition:getProfile');
-    expect(prof.proteinTargetG).toBe(150);
-    expect(prof.proteinTargetEffectiveG).toBe(150);
-
-    // undefined = no tocar lo guardado (igual que meal_schedule / cutoff).
-    await invoke('nutrition:saveProfile', { ...base });
-    prof = await invoke<{ proteinTargetG: number | null }>('nutrition:getProfile');
-    expect(prof.proteinTargetG).toBe(150);
-
-    // null explícito = volver al auto.
-    await invoke('nutrition:saveProfile', { ...base, proteinTargetG: null });
-    prof = await invoke<{ proteinTargetG: number | null; proteinTargetEffectiveG: number | null }>('nutrition:getProfile');
-    expect(prof.proteinTargetG).toBeNull();
-    expect(prof.proteinTargetEffectiveG).toBe(128);
-  });
-
-  it('rechaza un objetivo absurdo', async () => {
-    const base = {
-      dateOfBirth: '1996-01-01', sex: 'M', heightCm: 175, initialWeightKg: 80,
-      activityLevel: 'moderate',
-    };
-    await expect(invoke('nutrition:saveProfile', { ...base, proteinTargetG: -10 })).rejects.toThrow(/protein/i);
-    await expect(invoke('nutrition:saveProfile', { ...base, proteinTargetG: 900 })).rejects.toThrow(/protein/i);
+  it('un objetivo fijado a mano gana sobre el automático', async () => {
+    // Escrito directo: saveProfile exige el perfil completo (fecha de nacimiento
+    // incluida) y acá lo único bajo prueba es la precedencia del objetivo fijado.
+    harness.db.prepare(
+      'UPDATE nutrition_profile SET protein_target_g = 150, carbs_target_g = 200, fat_target_g = 60 WHERE id = 1',
+    ).run();
+    const t = await invoke<{ proteinG: number; auto: boolean }>('nutrition:getMacroTargets');
+    expect(t.auto).toBe(false);
+    expect(t.proteinG).toBe(150);
   });
 });
 

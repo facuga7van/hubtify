@@ -1,8 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { XP_MAP, type TaskTier, type Task, type Project } from '../types';
+import { XP_MAP, PROJECT_COLORS, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
 import { parseRepeatRule, buildRepeatRule, jsToIsoDay, type RepeatFreq } from '../repeat';
+// One parser for the whole app: `quickadd-parser` is a superset of the old
+// `parseQuickTask` (dates + time + !tier + #project, with an escape hatch), so
+// the form and the Ctrl+Q modal understand exactly the same language.
+import { parseQuickAdd, type QuickAddProjectRef } from '../quickadd-parser';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
 import HabitDayPicker from './HabitDayPicker';
@@ -26,10 +30,35 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   const [dueDate, setDueDate] = useState('');
   const [useDate, setUseDate] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  const [newProject, setNewProject] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [repeatFreq, setRepeatFreq] = useState<RepeatFreq | 'never'>('never');
   /** Chosen weekdays for freq 'days', in the picker's ISO numbering (1 = Monday). */
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [dismissedQuick, setDismissedQuick] = useState(false);
+
+  const projectRefs = useMemo<QuickAddProjectRef[]>(
+    () => projects.map((p) => ({ id: p.id, name: p.name })),
+    [projects],
+  );
+
+  // Natural-language quick-add, as you type. Only while CREATING: re-parsing the
+  // name of an existing quest would quietly reschedule "Reunión lunes" every
+  // time you opened it to fix a typo.
+  const quick = useMemo(
+    () => parseQuickAdd(editingTask ? '' : name, { projects: projectRefs }),
+    [name, projectRefs, editingTask],
+  );
+  const quickActive = quick.tokens.length > 0 && !dismissedQuick;
+  const quickDateLabel = quick.dueDay
+    ? new Date(quick.dueDay + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
+    : '';
+  /** Everything the parser took out of the name, so nothing is stripped silently. */
+  const quickParts = [
+    quickDateLabel && `${quickDateLabel}${quick.dueTime ? ` ${quick.dueTime}` : ''}`,
+    quick.tier && t(TIER_LABEL[quick.tier]),
+    quick.projectName,
+  ].filter(Boolean) as string[];
 
   const loadCategories = useCallback(async (pid: string | null | undefined) => {
     try {
@@ -38,9 +67,13 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { loadCategories(projectId); }, [projectId, loadCategories]);
+  useEffect(() => {
+    if (projectId === '__new__') { setCategories([]); return; }
+    loadCategories(projectId);
+  }, [projectId, loadCategories]);
 
   useEffect(() => {
+    setDismissedQuick(false);
     if (editingTask) {
       setName(editingTask.name);
       setDescription(editingTask.description);
@@ -65,14 +98,31 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     const resolvedCategory = category === '__new__' ? newCategory.trim() : category;
 
+    // Quick-add: whatever the parser CUT OUT of the name has to be applied, or
+    // typing "!épica" would delete the word and silently keep tier 2.
+    const resolvedName = quickActive ? quick.title : name.trim();
+    const resolvedDueDate = quickActive && quick.dueDate
+      ? quick.dueDate
+      : (useDate && dueDate ? dueDate : null);
+    const resolvedTier = quickActive && quick.tier ? quick.tier : tier;
+    if (!resolvedName) return;
+
+    // Resolve the project: if the user chose "new project", create it first and use its id.
+    let resolvedProjectId: string | null = projectId === '__new__' ? null : projectId;
+    if (projectId === '__new__' && newProject.trim()) {
+      const color = PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
+      resolvedProjectId = await window.api.questsUpsertProject({ name: newProject.trim(), color });
+    }
+    if (quickActive && quick.projectId) resolvedProjectId = quick.projectId;
+
     const task = {
       id: editingTask?.id,
-      name: name.trim(),
+      name: resolvedName,
       description: description.trim(),
-      tier,
+      tier: resolvedTier,
       category: resolvedCategory,
-      projectId,
-      dueDate: useDate && dueDate ? dueDate : null,
+      projectId: resolvedProjectId,
+      dueDate: resolvedDueDate,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
       repeatRule: buildRepeatRule(repeatFreq, repeatDays),
@@ -80,12 +130,11 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     await window.api.questsUpsertTask(task as Record<string, unknown>);
 
-    if (resolvedCategory && resolvedCategory.trim()) {
-      await window.api.questsEnsureCategory(resolvedCategory.trim(), projectId);
-    }
-
-    setName(''); setDescription(''); setTier(2); setNewCategory(''); setCategory(''); setDueDate(''); setUseDate(false);
+    // No `questsEnsureCategory` call any more: categories are derived from
+    // `tasks.category` (the handler is a no-op), so saving the task registers it.
+    setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(''); setUseDate(false);
     setRepeatFreq('never'); setRepeatDays([]);
+    setDismissedQuick(false);
     setProjectId(activeProjectId);
     onSaved();
   };
@@ -123,6 +172,28 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
         )}
       </div>
 
+      {/* Quick-add: live hint for everything recognized in the name */}
+      {quickActive && quickParts.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 'var(--fs-label)', color: 'var(--gold-dark)' }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" style={{ flexShrink: 0 }}>
+            <rect x="2" y="3" width="12" height="11" rx="1.5" />
+            <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
+          </svg>
+          <span>
+            {t('questify.quickDateHint', 'Se agenda para')} <strong>{quickParts.join(' · ')}</strong>
+            <span style={{ opacity: 0.6 }}>{` · "${quick.title}"`}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setDismissedQuick(true)}
+            title={t('questify.cancel', 'Descartar')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faded)', padding: 0, display: 'inline-flex', alignItems: 'center' }}
+          >
+            <svg width="10" height="10" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 1l6 6M7 1l-6 6" /></svg>
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Tier buttons */}
         <div style={{ display: 'flex', gap: 4 }}>
@@ -150,12 +221,12 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
         />
 
         {/* Project */}
-        {projects.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <select
-            value={projectId ?? ''}
+            value={projectId === '__new__' ? '__new__' : (projectId ?? '')}
             onChange={(e) => {
               const val = e.target.value;
-              setProjectId(val || null);
+              setProjectId(val === '' ? null : val);
               setCategory('');
             }}
             className="rpg-select"
@@ -164,8 +235,20 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
             {projects.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
+            <option value="__new__">+ {t('questify.newProject', 'Nuevo proyecto')}</option>
           </select>
-        )}
+          {projectId === '__new__' && (
+            <input
+              type="text"
+              placeholder={t('questify.projectName', 'Nombre del proyecto')}
+              value={newProject}
+              onChange={(e) => setNewProject(e.target.value)}
+              className="rpg-input"
+              style={{ width: 120 }}
+              autoFocus
+            />
+          )}
+        </div>
 
         {/* Category */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>

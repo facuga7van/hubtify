@@ -1,31 +1,127 @@
 import { BrowserWindow, app } from 'electron';
 import { ipcHandle } from '../ipc/ipc-handle';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
 import { spawn } from 'child_process';
 
+// Updates go through Squirrel's own Update.exe against a feed served by
+// update.electronjs.org (free for public repos). This applies delta packages
+// and fires --squirrel-updated, so our shortcut handler (main.ts) runs with
+// --updateOnly — existing shortcuts are re-pointed, deleted/pinned ones left
+// untouched. Update.exe also prints download progress to stdout, which we parse
+// to keep the renderer's progress bar working.
 const REPO = 'facuga7van/hubtify-releases';
-const GITHUB_API = `https://api.github.com/repos/${REPO}/releases/latest`;
-
-/** Abort the installer download if no bytes arrive for this long. */
-const STALL_TIMEOUT_MS = 60_000;
 
 let mainWindow: BrowserWindow | null = null;
-
-interface ReleaseInfo {
-  version: string;
-  setupUrl: string;
-}
 
 function sendError(message: string): void {
   mainWindow?.webContents.send('updater:error', { message });
 }
 
+// Squirrel installs Update.exe one level above the app executable.
+function updateExePath(): string {
+  return path.resolve(path.dirname(process.execPath), '..', 'Update.exe');
+}
+
+function feedUrl(): string {
+  return `https://update.electronjs.org/${REPO}/win32/${app.getVersion()}`;
+}
+
+// Squirrel updates only exist in the packaged Windows app.
+function canUpdate(): boolean {
+  return app.isPackaged && process.platform === 'win32';
+}
+
+// Spawn Update.exe, accumulate stdout, and forward any plain "0-100" progress
+// lines (Squirrel prints these during download) to onProgress.
+function runUpdate(args: string[], onProgress?: (percent: number) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(updateExePath(), args);
+    } catch (err) {
+      reject(err as Error);
+      return;
+    }
+
+    let stdout = '';
+    child.stdout?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      stdout += text;
+      if (!onProgress) return;
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        // Treat a line that is exactly an integer 0-100 as a progress tick
+        if (/^\d{1,3}$/.test(trimmed)) {
+          const pct = Number(trimmed);
+          if (pct >= 0 && pct <= 100) onProgress(pct);
+        }
+      }
+    });
+
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`Update.exe exited with code ${code ?? 'null'}`));
+    });
+  });
+}
+
+// Update.exe prints its JSON result as the last line of stdout (same parsing as
+// Electron's own autoUpdater). The newest release is the last entry of
+// releasesToApply, and its `version` field holds the target version string.
+function parseReleasesToApply(stdout: string): Array<{ version?: string }> {
+  const lastLine = stdout.trim().split('\n').pop()?.trim();
+  if (!lastLine) return [];
+  try {
+    const json = JSON.parse(lastLine) as { releasesToApply?: Array<{ version?: string }> };
+    return Array.isArray(json?.releasesToApply) ? json.releasesToApply : [];
+  } catch {
+    return [];
+  }
+}
+
+async function checkForUpdate(): Promise<{ available: boolean; version?: string }> {
+  if (!canUpdate()) return { available: false };
+  try {
+    const stdout = await runUpdate([`--checkForUpdate=${feedUrl()}`]);
+    const releases = parseReleasesToApply(stdout);
+    if (releases.length > 0) {
+      return { available: true, version: releases[releases.length - 1]?.version };
+    }
+    return { available: false };
+  } catch {
+    return { available: false };
+  }
+}
+
+export function initAutoUpdater(win: BrowserWindow): void {
+  mainWindow = win;
+  if (!canUpdate()) return;
+
+  // Delay so the renderer registers its update listeners before we notify.
+  // did-finish-load fires before React mounts; 3s ensures useEffect ran.
+  setTimeout(() => {
+    checkForUpdate()
+      .then((res) => {
+        if (res.available) {
+          mainWindow?.webContents.send('updater:update-available', { version: res.version ?? '' });
+        }
+      })
+      .catch(() => { /* silent — update check is non-critical */ });
+  }, 3000);
+}
+
+
+/**
+ * Versions up to 0.7.5 downloaded the installer by hand into temp; the native
+ * Squirrel flow no longer does, but those files are still sitting there on any
+ * machine that updated the old way. One-time hygiene sweep, never blocking.
+ */
 function cleanupOldInstallers(): void {
   try {
     const tempDir = app.getPath('temp');
-    const entries = fs.readdirSync(tempDir);
-    for (const entry of entries) {
+    for (const entry of fs.readdirSync(tempDir)) {
       if (/^Hubtify-.*-Setup\.exe$/i.test(entry)) {
         try {
           fs.unlinkSync(path.join(tempDir, entry));
@@ -39,194 +135,45 @@ function cleanupOldInstallers(): void {
   }
 }
 
-async function getLatestRelease(): Promise<ReleaseInfo | null> {
-  try {
-    const res = await fetch(GITHUB_API, {
-      headers: { 'User-Agent': 'Hubtify' },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as {
-      tag_name: string;
-      assets: Array<{ name: string; browser_download_url: string }>;
-    };
-    const version = data.tag_name.replace(/^v/, '');
-    const setupAsset = data.assets.find(a => a.name.toLowerCase().includes('setup') && a.name.endsWith('.exe'));
-    if (!setupAsset) return null;
-    return { version, setupUrl: setupAsset.browser_download_url };
-  } catch {
-    return null;
-  }
-}
-
-function isNewer(remote: string, local: string): boolean {
-  const r = remote.split('.').map(Number);
-  const l = local.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((r[i] ?? 0) > (l[i] ?? 0)) return true;
-    if ((r[i] ?? 0) < (l[i] ?? 0)) return false;
-  }
-  return false;
-}
-
-export function initAutoUpdater(win: BrowserWindow): void {
-  mainWindow = win;
-
-  cleanupOldInstallers();
-
-  if (app.isPackaged) {
-    // Wait for React to mount and register IPC listeners before sending.
-    // did-finish-load fires when HTML is parsed but BEFORE React mounts.
-    // A 3s delay ensures useEffect listeners are registered.
-    const check = () => {
-      getLatestRelease().then(release => {
-        if (release && isNewer(release.version, app.getVersion())) {
-          mainWindow?.webContents.send('updater:update-available', {
-            version: release.version,
-          });
-        }
-      }).catch(() => { /* silent */ });
-    };
-
-    setTimeout(check, 3000);
-  }
-}
-
 export function registerUpdaterIpcHandlers(): void {
-  ipcHandle('updater:check', async () => {
-    const release = await getLatestRelease();
-    if (release && isNewer(release.version, app.getVersion())) {
-      return { available: true, version: release.version };
-    }
-    return { available: false };
-  });
+  cleanupOldInstallers();
+  ipcHandle('updater:check', async () => checkForUpdate());
 
   ipcHandle('updater:download', async () => {
-    const release = await getLatestRelease();
-    if (!release) throw new Error('No release found');
-
-    const installerPath = path.join(app.getPath('temp'), `Hubtify-${release.version}-Setup.exe`);
-
-    // AbortSignal.timeout() only covers the response HEADERS. The body was then read
-    // in an unbounded `while (true) { await reader.read() }`: a socket that stalled
-    // mid-download left that promise pending forever, so the catch that resets the
-    // UI to idle never ran and the user was stuck on a modal with no buttons.
-    // This controller aborts on INACTIVITY — no bytes for STALL_TIMEOUT_MS.
-    const controller = new AbortController();
-    let stallTimer: NodeJS.Timeout | null = null;
-    let stalled = false;
-    const armStallTimer = () => {
-      if (stallTimer) clearTimeout(stallTimer);
-      stallTimer = setTimeout(() => {
-        stalled = true;
-        controller.abort();
-      }, STALL_TIMEOUT_MS);
-    };
-    const disarmStallTimer = () => {
-      if (stallTimer) clearTimeout(stallTimer);
-      stallTimer = null;
-    };
-
-    armStallTimer();
-    let res: Response;
-    try {
-      res = await fetch(release.setupUrl, { signal: controller.signal });
-    } catch (err) {
-      disarmStallTimer();
-      const msg = stalled ? 'Download timed out' : `Download failed: ${(err as Error).message}`;
-      sendError(msg);
-      throw new Error(msg);
+    if (!canUpdate()) {
+      throw new Error('Updates are only available in the packaged Windows app');
     }
-
-    if (!res.ok) {
-      disarmStallTimer();
-      const msg = `Download failed (HTTP ${res.status})`;
-      sendError(msg);
-      throw new Error(msg);
-    }
-
-    const total = Number(res.headers.get('content-length')) || 0;
-    const reader = res.body?.getReader();
-    if (!reader) {
-      disarmStallTimer();
-      const msg = 'No response body';
-      sendError(msg);
-      throw new Error(msg);
-    }
-
-    // Stream to disk instead of accumulating the whole installer in memory
-    // (`chunks: Uint8Array[]` + Buffer.concat held ~2x the .exe in RAM).
-    const out = fs.createWriteStream(installerPath);
-    let downloaded = 0;
-    let lastPercent = -1;
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        armStallTimer();
-        if (!out.write(Buffer.from(value))) {
-          await new Promise<void>((resolve) => out.once('drain', resolve));
-        }
-        downloaded += value.length;
-        if (total > 0) {
-          const percent = Math.round((downloaded / total) * 100);
-          if (percent !== lastPercent) {
-            lastPercent = percent;
-            mainWindow?.webContents.send('updater:download-progress', { percent });
-          }
-        }
-      }
-      await new Promise<void>((resolve, reject) => {
-        out.end(() => resolve());
-        out.on('error', reject);
+      // --update downloads (reporting progress on stdout) AND stages the new
+      // version, firing --squirrel-updated so the shortcut handler runs.
+      await runUpdate([`--update=${feedUrl()}`], (percent) => {
+        mainWindow?.webContents.send('updater:download-progress', { percent });
       });
     } catch (err) {
-      out.destroy();
-      try { fs.unlinkSync(installerPath); } catch { /* nothing to clean */ }
-      const msg = stalled
-        ? `Download stalled (no data for ${STALL_TIMEOUT_MS / 1000}s)`
-        : `Download failed: ${(err as Error).message}`;
-      sendError(msg);
-      throw new Error(msg);
-    } finally {
-      disarmStallTimer();
-    }
-
-    // Validate downloaded file
-    if (!fs.existsSync(installerPath)) {
-      const msg = 'Installer file was not written';
-      sendError(msg);
-      throw new Error(msg);
-    }
-    const fileSize = fs.statSync(installerPath).size;
-    if (fileSize === 0) {
-      fs.unlinkSync(installerPath);
-      const msg = 'Downloaded installer is empty';
-      sendError(msg);
-      throw new Error(msg);
-    }
-    if (total > 0 && fileSize !== total) {
-      fs.unlinkSync(installerPath);
-      const msg = `Installer size mismatch (expected ${total}, got ${fileSize})`;
+      const msg = `Update failed: ${(err as Error).message}`;
       sendError(msg);
       throw new Error(msg);
     }
 
-    // Auto-install: launch installer then quit
+    // Update staged into a new app-x.y.z folder. Tell the renderer it's ready
+    // and let the user choose when to restart (updater:restart) — otherwise the
+    // new version simply takes effect on the next manual launch.
+    mainWindow?.webContents.send('updater:update-downloaded');
+    return 'downloaded';
+  });
+
+  ipcHandle('updater:restart', async () => {
+    if (!canUpdate()) return;
+    // Relaunch the freshly-staged version. --processStartAndWait makes Update.exe
+    // WAIT for this (old) instance to exit — and release the single-instance lock —
+    // before starting the new one, so the new instance isn't killed by the lock.
     try {
-      const child = spawn(installerPath, [], { detached: true, stdio: 'ignore' });
-      child.unref();
-      child.on('error', (err) => {
-        sendError(`Failed to launch installer: ${err.message}`);
-      });
-      setTimeout(() => app.quit(), 1000);
-    } catch (err) {
-      const msg = `Failed to launch installer: ${(err as Error).message}`;
-      sendError(msg);
-      throw new Error(msg);
+      const exeName = path.basename(process.execPath);
+      spawn(updateExePath(), [`--processStartAndWait=${exeName}`], { detached: true }).unref();
+    } catch {
+      // Relaunch failed — the update is applied; user can reopen manually.
     }
-
-    return installerPath;
+    setTimeout(() => app.quit(), 500);
   });
 }

@@ -15,10 +15,12 @@ import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
  * empty on every other device.
  */
 
+// Normalizado a LF: los marcadores llevan saltos de linea y el working tree
+// de Windows puede tener CRLF — un guard no se puede caer por eso.
 const SYNC_SRC = fs.readFileSync(
   path.join(__dirname, '../../../electron/modules/sync.ipc.ts'),
   'utf-8',
-);
+).replace(new RegExp(String.fromCharCode(13), 'g'), '');
 
 type MigrationSet = Array<{ up: string }>;
 const MIGRATIONS: Record<string, MigrationSet> = {
