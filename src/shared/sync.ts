@@ -1,6 +1,7 @@
 import { doc, setDoc, getDoc, getDocs, collection, writeBatch } from 'firebase/firestore';
 import { getActiveFirestore } from './firebase';
 import { mergeQuestData } from './sync-merge';
+import { daysAgoDateString } from '../../shared/date-utils';
 import {
   habitCheckDocId,
   checkToDoc,
@@ -82,9 +83,8 @@ export function mergeRpgEvents(
   local: RpgEventLike[] | undefined,
   remote: RpgEventLike[] | undefined,
 ): RpgEventLike[] {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - RPG_EVENTS_PUSH_DAYS);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // Local-day cutoff, same as the main process: created_at is a local stamp.
+  const cutoffStr = daysAgoDateString(RPG_EVENTS_PUSH_DAYS);
 
   const bySyncId = new Map<string, RpgEventLike>();
   for (const e of [...(remote ?? []), ...(local ?? [])]) {
