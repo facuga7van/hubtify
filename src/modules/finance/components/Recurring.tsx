@@ -291,13 +291,32 @@ export default function Recurring() {
 
   return (
     <div>
-      <button className="rpg-button" onClick={() => navigate('/finance/transactions')}
-        style={{ padding: '4px 10px', fontSize: 'var(--fs-label)', marginBottom: 12, opacity: 0.7 }}>
-        {'\u25C1'} {t('coinify.transactions')}
-      </button>
+      {/* Una sola fila de acciones. Eran tres bloques marrones apilados, de
+          anchos distintos, ocupando tres renglones: volver y generar quedan
+          como secundarias (fantasma) y crear un recurrente como la principal. */}
+      <div className="coin-recurring__actions">
+        <button className="rpg-button coin-recurring__action coin-recurring__action--ghost"
+          onClick={() => navigate('/finance/transactions')}>
+          {'\u25C1'} {t('coinify.transactions')}
+        </button>
 
-      <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
-        <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', padding: '4px 12px' }}
+        <span className="coin-recurring__actions-spacer" aria-hidden="true" />
+
+        <div className="coin-recurring__drop-container">
+          <button className="rpg-button coin-recurring__action coin-recurring__action--ghost"
+            onClick={handleGenerate} disabled={generating}>
+            {generating ? t('coinify.generating') : t('coinify.generateForMonth')}
+          </button>
+          {showCoinDrop && (
+            <>
+              <div className="coin-recurring__drop-coin" />
+              <div className="coin-recurring__drop-coin" />
+              <div className="coin-recurring__drop-coin" />
+            </>
+          )}
+        </div>
+
+        <button className="rpg-button coin-recurring__action coin-recurring__action--primary"
           onClick={() => setShowForm((v) => !v)}>
           {showForm ? t('coinify.cancel') : `+ ${t('coinify.addRecurring')}`}
         </button>
@@ -336,10 +355,15 @@ export default function Recurring() {
           </div>
 
           <div className="coin-quick-add-form__row">
-            <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
-            <RpgNumberInput value={String(formBillingDay)}
+            {/* Tenía 70 px de ancho con 72 px de padding interno (las dos
+                flechas): el número directamente no se veía. */}
+            <label htmlFor="coin-recurring-add-day"
+              style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
+            <RpgNumberInput id="coin-recurring-add-day"
+              aria-label={t('coinify.billingDayAria', 'Día de cobro, del 1 al 31')}
+              value={String(formBillingDay)}
               onChange={(v) => setFormBillingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
-              style={{ width: 70 }} min={1} max={31} step={1} />
+              style={{ width: 110 }} min={1} max={31} step={1} />
             <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.frequencyLabel', 'Frecuencia')}</label>
             {/* The aguinaldo at last: semiannual, annual and everything between.
                 First charge lands the month the template is created. */}
@@ -376,22 +400,6 @@ export default function Recurring() {
         </form>
       )}
 
-      {/* Generate Button */}
-      <div className="coin-recurring__generate-row">
-        <div className="coin-recurring__drop-container">
-          <button className="rpg-button" onClick={handleGenerate} disabled={generating}>
-            {generating ? t('coinify.generating') : t('coinify.generateForMonth')}
-          </button>
-          {showCoinDrop && (
-            <>
-              <div className="coin-recurring__drop-coin" />
-              <div className="coin-recurring__drop-coin" />
-              <div className="coin-recurring__drop-coin" />
-            </>
-          )}
-        </div>
-      </div>
-
       {/* List */}
       {items.length === 0 ? (
         <div className="coin-empty-codex">
@@ -420,65 +428,116 @@ export default function Recurring() {
 
                 {/* Name, Type, Category, Billing Day */}
                 {editingRecurringId === item.id ? (
-                  <>
-                    <input type="text" value={editRecurringFields.name}
-                      onChange={(e) => setEditRecurringFields((f) => ({ ...f, name: e.target.value }))}
-                      className="rpg-input" style={{ flex: 1, minWidth: 80, fontSize: 'var(--fs-label)' }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveRecurringEdit(item.id);
-                        if (e.key === 'Escape') cancelRecurringEdit();
-                      }}
-                    />
-                    <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'expense' }))}
-                      className={`rpg-button coin-action-btn ${editRecurringFields.type === 'expense' ? 'rpg-btn-active' : ''}`}>
-                      {t('coinify.expense')}
-                    </button>
-                    <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'income' }))}
-                      className={`rpg-button coin-action-btn ${editRecurringFields.type === 'income' ? 'rpg-btn-active' : ''}`}>
-                      {t('coinify.income')}
-                    </button>
-                    <CategorySelect value={editRecurringFields.category}
-                      onChange={(v) => setEditRecurringFields((f) => ({ ...f, category: v }))} />
-                    <RpgNumberInput value={String(editRecurringFields.billingDay)}
-                      onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
-                      style={{ width: 55 }} fontSize="0.8rem" min={1} max={31} step={1} />
-                    <select className="rpg-select" value={editRecurringFields.frequency}
-                      onChange={(e) => setEditRecurringFields((f) => ({ ...f, frequency: e.target.value }))}
-                      aria-label={t('coinify.frequencyLabel', 'Frecuencia')}
-                      style={{ fontSize: 'var(--fs-label)' }}>
-                      {FREQUENCIES.map((f) => (
-                        <option key={f} value={f}>{t(`coinify.freq_${f}`, FREQUENCY_FALLBACKS[f])}</option>
-                      ))}
-                    </select>
-                    <AccountSelect value={editRecurringFields.account}
-                      onChange={(v) => setEditRecurringFields((f) => ({ ...f, account: v }))}
-                      onSupported={setAccountsSupported} />
+                  /* Cada control con su rótulo. Antes, entre la categoría y
+                     «Mensual», había un número con flechitas y nada que dijera
+                     que era el día de cobro; y los anchos iban de 55 a 120 px
+                     sin criterio. */
+                  <div className="coin-recurring-edit">
+                    <label className="coin-field coin-field--grow">
+                      <span className="coin-field__label">{t('coinify.name')}</span>
+                      <input type="text" value={editRecurringFields.name}
+                        onChange={(e) => setEditRecurringFields((f) => ({ ...f, name: e.target.value }))}
+                        className="rpg-input" style={{ width: '100%', fontSize: 'var(--fs-label)' }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveRecurringEdit(item.id);
+                          if (e.key === 'Escape') cancelRecurringEdit();
+                        }}
+                      />
+                    </label>
+
+                    <div className="coin-field">
+                      <span className="coin-field__label">{t('coinify.typeLabel', 'Tipo')}</span>
+                      <div className="coin-field__group">
+                        <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'expense' }))}
+                          className={`rpg-button coin-action-btn ${editRecurringFields.type === 'expense' ? 'rpg-btn-active' : ''}`}>
+                          {t('coinify.expense')}
+                        </button>
+                        <button type="button" onClick={() => setEditRecurringFields((f) => ({ ...f, type: 'income' }))}
+                          className={`rpg-button coin-action-btn ${editRecurringFields.type === 'income' ? 'rpg-btn-active' : ''}`}>
+                          {t('coinify.income')}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="coin-field coin-field--cat">
+                      <span className="coin-field__label">{t('coinify.categoryLabel', 'Categoría')}</span>
+                      <CategorySelect value={editRecurringFields.category}
+                        onChange={(v) => setEditRecurringFields((f) => ({ ...f, category: v }))} />
+                    </div>
+
+                    <div className="coin-field coin-field--day">
+                      <label className="coin-field__label" htmlFor={`coin-recurring-day-${item.id}`}>
+                        {t('coinify.billingDay')}
+                      </label>
+                      <RpgNumberInput id={`coin-recurring-day-${item.id}`}
+                        aria-label={t('coinify.billingDayAria', 'Día de cobro, del 1 al 31')}
+                        value={String(editRecurringFields.billingDay)}
+                        onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
+                        style={{ width: '100%' }} fontSize="0.8rem" min={1} max={31} step={1} />
+                    </div>
+
+                    <div className="coin-field coin-field--freq">
+                      <label className="coin-field__label" htmlFor={`coin-recurring-freq-${item.id}`}>
+                        {t('coinify.frequencyLabel', 'Frecuencia')}
+                      </label>
+                      <select id={`coin-recurring-freq-${item.id}`} className="rpg-select"
+                        value={editRecurringFields.frequency}
+                        onChange={(e) => setEditRecurringFields((f) => ({ ...f, frequency: e.target.value }))}
+                        aria-label={t('coinify.frequencyLabel', 'Frecuencia')}
+                        style={{ width: '100%', fontSize: 'var(--fs-label)' }}>
+                        {FREQUENCIES.map((f) => (
+                          <option key={f} value={f}>{t(`coinify.freq_${f}`, FREQUENCY_FALLBACKS[f])}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* AccountSelect se autodetecta y devuelve null si el puente
+                        de cuentas no está montado: el rótulo sigue su suerte. */}
+                    <div className="coin-field coin-field--account">
+                      {accountsSupported && (
+                        <span className="coin-field__label">{t('coinify.accountLabel', 'Cuenta')}</span>
+                      )}
+                      <AccountSelect value={editRecurringFields.account}
+                        onChange={(v) => setEditRecurringFields((f) => ({ ...f, account: v }))}
+                        onSupported={setAccountsSupported} />
+                    </div>
+
                     {editRecurringFields.frequency !== 'monthly' && (
-                      <input type="month" className="rpg-input" value={editRecurringFields.anchorMonth}
-                        aria-label={t('coinify.anchorMonthLabel', 'Mes ancla')}
-                        title={t('coinify.anchorMonthHint', 'Mes desde el que cuenta la cadencia: la primera cuota cae en ese mes y después cada N meses.')}
-                        onChange={(e) => setEditRecurringFields((f) => ({ ...f, anchorMonth: e.target.value }))}
-                        style={{ fontSize: 'var(--fs-label)', width: 120 }} />
+                      <div className="coin-field coin-field--anchor">
+                        <label className="coin-field__label" htmlFor={`coin-recurring-anchor-${item.id}`}
+                          title={t('coinify.anchorMonthHint', 'Mes desde el que cuenta la cadencia: la primera cuota cae en ese mes y después cada N meses.')}>
+                          {t('coinify.anchorMonthLabel', 'Mes ancla')}
+                        </label>
+                        <input id={`coin-recurring-anchor-${item.id}`} type="month" className="rpg-input"
+                          value={editRecurringFields.anchorMonth}
+                          aria-label={t('coinify.anchorMonthLabel', 'Mes ancla')}
+                          title={t('coinify.anchorMonthHint', 'Mes desde el que cuenta la cadencia: la primera cuota cae en ese mes y después cada N meses.')}
+                          onChange={(e) => setEditRecurringFields((f) => ({ ...f, anchorMonth: e.target.value }))}
+                          style={{ width: '100%', fontSize: 'var(--fs-label)' }} />
+                      </div>
                     )}
-                    <button className="rpg-button coin-action-btn coin-action-btn--confirm"
-                      aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}
-                      onClick={() => saveRecurringEdit(item.id)}><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
-                    <button className="rpg-button coin-action-btn coin-action-btn--cancel"
-                      aria-label={t('coinify.cancel', 'Cancelar')} title={t('coinify.cancel', 'Cancelar')}
-                      onClick={cancelRecurringEdit}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
-                  </>
+
+                    <div className="coin-recurring-edit__actions">
+                      <button className="rpg-button coin-action-btn coin-action-btn--confirm"
+                        aria-label={t('coinify.save', 'Guardar')} title={t('coinify.save', 'Guardar')}
+                        onClick={() => saveRecurringEdit(item.id)}><Checkmark style={{ width: '0.8em', height: '0.8em' }} /></button>
+                      <button className="rpg-button coin-action-btn coin-action-btn--cancel"
+                        aria-label={t('coinify.cancel', 'Cancelar')} title={t('coinify.cancel', 'Cancelar')}
+                        onClick={cancelRecurringEdit}><CrossMark style={{ width: '0.7em', height: '0.7em' }} /></button>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     <span className="coin-recurring-card__name qb-hand" title={item.name}>{item.name}</span>
                     <Rune tone={item.type === 'income' ? 'sage' : 'rubric'}>
                       {item.type === 'income' ? t('coinify.income') : t('coinify.expense')}
                     </Rune>
-                    <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.5 }}>{item.category}</span>
-                    <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.5 }}>
+                    <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>{item.category}</span>
+                    <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                       {t('coinify.billingDay')}: {item.billingDay}
                     </span>
                     {accountName(item.accountId) && (
-                      <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', opacity: 0.5 }}
+                      <span className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}
                         title={t('coinify.accountLabel', 'Cuenta')}>
                         {accountName(item.accountId)}
                       </span>
@@ -521,7 +580,7 @@ export default function Recurring() {
                 ) : (
                   /* Dotted underline + pencil on hover: a borderless transparent
                      button gave no hint that the amount was editable at all. */
-                  <button className="coin-recurring-card__amount-btn qb-numeral coin-editable-amount" onClick={() => startEdit(item)}
+                  <button className="coin-recurring-card__amount-btn coin-editable-amount" onClick={() => startEdit(item)}
                     title={t('coinify.editAmount')}>
                     {formatCurrency(item.amount, { currency: item.currency })}
                     <Pencil className="coin-editable-amount__pencil" style={{ width: '0.7em', height: '0.7em' }} />
@@ -556,7 +615,7 @@ export default function Recurring() {
                 <div className="coin-recurring-card__timeline">
                   <p className="qb-small-caps" style={{ fontSize: 'var(--fs-label)', marginBottom: 6 }}>{t('coinify.amountHistory')}</p>
                   {(history[item.id] ?? []).length === 0 ? (
-                    <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', opacity: 0.5, margin: 0 }}>{t('coinify.noHistory')}</p>
+                    <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', margin: 0 }}>{t('coinify.noHistory')}</p>
                   ) : (
                     <div>
                       {history[item.id].map((h) => (

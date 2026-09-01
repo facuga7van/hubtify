@@ -181,7 +181,10 @@ export default function Installments() {
   );
 
   return (
-    <div>
+    /* La pantalla nació pensada para una tarjeta angosta: a 1600 px el nombre
+       del plan quedaba contra el borde izquierdo y el importe contra el
+       derecho. Un ancho máximo centrado deja al ojo asociar nombre ↔ monto. */
+    <div className="coin-installments">
       <div style={{ marginBottom: 16 }}>
         <MonthNavigator month={month} onChange={setMonth} />
       </div>
@@ -227,17 +230,23 @@ export default function Installments() {
                   {(() => {
                     const first = parseInstallmentNumber(group.rows[0]);
                     return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-                        <Gauge value={first.current} max={first.total} tone={first.current === first.total ? 'sage' : 'gold'} showPips={false} label={`${first.current}/${first.total}`} />
+                      /* Era `flex: 1`: a pantalla completa la barra se estiraba
+                         cientos de píxeles y abría el vacío entre título y monto. */
+                      <div className="coin-installment-group__progress">
+                        <Gauge value={first.current} max={first.total} tone={first.current === first.total ? 'sage' : 'gold'} showPips={false} />
+                        {/* El rótulo del medidor es `--parch-0` sobre el riel:
+                            encima del tramo vacío no se lee. Afuera, en tinta. */}
+                        <span className="coin-installment-group__count">{first.current}/{first.total}</span>
                       </div>
                     );
                   })()}
+                  {/* Mismo botón de borrado que el resto de Coinify, en vez de
+                      un estilo inline propio. */}
                   <button
-                    className="rpg-button"
+                    className="rpg-button coin-action-btn coin-action-btn--danger"
                     onClick={() => handleDeleteGroup(group.groupId)}
                     aria-label={t('coinify.deleteGroup', 'Eliminar grupo')}
                     title={t('coinify.deleteInstallmentGroup', 'Eliminar grupo de cuotas')}
-                    style={{ padding: '2px 6px', fontSize: 'var(--fs-label)', color: 'var(--rubric)', opacity: 0.6 }}
                   >
                     <CrossMark style={{ width: '0.65em', height: '0.65em' }} />
                   </button>
@@ -251,7 +260,9 @@ export default function Installments() {
                       key={row.id}
                       className={`coin-installment-row ${isComplete ? 'coin-installment-row--complete' : ''}`}
                     >
-                      <span className="qb-small-caps coin-installment-row__counter">
+                      {/* Sin `qb-small-caps`: ese util fija --fs-label y el
+                          contador es el dato que ancla la fila. */}
+                      <span className="coin-installment-row__counter">
                         {t('coinify.installmentCounter', `Cuota ${current}/${total}`, { current, total })}
                       </span>
                       <div className="coin-installment-row__right">
@@ -298,7 +309,9 @@ export default function Installments() {
                         ) : (
                           <button
                             type="button"
-                            className="qb-numeral coin-installment-row__amount coin-editable-amount"
+                            /* Sin `qb-numeral`: UnifrakturCook a 13 px sobre
+                               pergamino texturado es ilegible para una cifra. */
+                            className="coin-installment-row__amount coin-editable-amount"
                             title={t('coinify.clickToEdit', 'Click para editar')}
                             onClick={() => {
                               setEditingId(row.id);

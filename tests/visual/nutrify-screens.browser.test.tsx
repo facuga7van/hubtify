@@ -232,8 +232,11 @@ describe('Nutrify — full screens (macros, Fases 0-2)', () => {
   test('05 — Today repeat-previous-day picker', async () => {
     render(<Providers><Today /></Providers>);
     await expect.element(page.getByText('Registro de Comidas')).toBeVisible();
-    // The "Repetir día" button lives in the food-log header (foods exist).
-    await page.getByRole('button', { name: 'Repetir día' }).click();
+    // «Repetir día» dejó de ser un botón suelto en la cabecera del registro: la
+    // integración con la rama de auditoría lo movió al menú de acciones, junto
+    // al resto. Se abre el menú y recién ahí está.
+    await page.getByRole('button', { name: 'Acciones del registro' }).click();
+    await page.getByRole('menuitem', { name: 'Repetir día' }).click();
     await expect.element(page.getByText('Repetir el festín de…')).toBeVisible();
     await sleep(200);
     await page.screenshot({ path: `${SCREENS}/nutri-screen-05-repeat-day.png` });
