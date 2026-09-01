@@ -237,8 +237,8 @@ export default function TaskList() {
   const handleComplete = async (task: Task) => {
     const newStatus = !task.status;
     if (newStatus) {
-      const [, result] = await Promise.all([
-        window.api.questsSetTaskStatus(task.id, true),
+      const [statusResult, result] = await Promise.all([
+        questsApi().questsSetTaskStatus(task.id, true),
         window.api.processRpgEvent({
           type: 'TASK_COMPLETED', moduleId: 'quests',
           payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
@@ -246,6 +246,11 @@ export default function TaskList() {
         }),
       ]);
       toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+      // Recurring quest: the backend already dealt the next instance (an older
+      // main process answers undefined — that IS the feature detection).
+      if (statusResult && typeof statusResult === 'object' && statusResult.repeated) {
+        toast({ type: 'info', message: t('questify.repeatNextReady', 'La próxima ya está en el tablero') });
+      }
     } else {
       await window.api.questsSetTaskStatus(task.id, false);
       await window.api.processRpgEvent({

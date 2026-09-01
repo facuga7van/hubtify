@@ -52,6 +52,174 @@ export function postponeTasks(
   return moved;
 }
 
+// ── Recurring tasks (Fase 3) ─────────────────────────────────────────────────
+
+/**
+ * Parsed form of `tasks.repeat_rule` (see quests migration v13).
+ * `days` uses JS `Date.getDay()` numbering: 0 = Sunday … 6 = Saturday.
+ */
+export interface RepeatRule {
+  freq: 'daily' | 'weekly' | 'monthly' | 'days';
+  days?: number[];
+}
+
+/**
+ * Defensive parser: `repeat_rule` can arrive from sync or an older build, so
+ * anything that isn't a well-formed rule quietly means "never repeats" instead
+ * of throwing mid-completion. For freq 'days' the list is deduped, sorted and
+ * must be non-empty (a "repeat on no days" rule is not a rule).
+ */
+export function parseRepeatRule(raw: string | null | undefined): RepeatRule | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { freq?: unknown; days?: unknown };
+    if (parsed.freq === 'daily' || parsed.freq === 'weekly' || parsed.freq === 'monthly') {
+      return { freq: parsed.freq };
+    }
+    if (parsed.freq === 'days' && Array.isArray(parsed.days)) {
+      const days = [...new Set(parsed.days.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))]
+        .sort((a, b) => a - b);
+      if (days.length > 0) return { freq: 'days', days };
+    }
+  } catch { /* malformed JSON → no rule */ }
+  return null;
+}
+
+/** due_date is 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:mm' — split date from optional time. */
+function splitDueDate(due: string): { date: string; time: string | null } {
+  const tIdx = due.indexOf('T');
+  return tIdx === -1 ? { date: due, time: null } : { date: due.slice(0, tIdx), time: due.slice(tIdx + 1) };
+}
+
+function pad2(n: number): string { return String(n).padStart(2, '0'); }
+
+/** Local calendar date → 'YYYY-MM-DD' without any locale/UTC detour. */
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/**
+ * The next occurrence for a rule, advanced FROM the completed instance's own
+ * due_date — never from today. Completing March's rent on the 3rd still puts
+ * April's on the 1st. All arithmetic is LOCAL (`new Date(y, m, d)`), matching
+ * the project's UTC-vs-local unification (shared/date-utils conventions).
+ *
+ * - daily   → +1 day
+ * - weekly  → +7 days
+ * - monthly → +1 month, day-of-month = min(anchor day, last day of that month).
+ *             `anchorDue` is the chain root's due_date: it remembers "the 31st"
+ *             across a Feb 28 hop (Jan 31 → Feb 28 → Mar 31, not Mar 28).
+ * - days    → the first listed weekday strictly after the base date.
+ *
+ * A task with no due_date starts its cadence from today. The time-of-day part,
+ * when present, is carried over unchanged.
+ */
+export function nextRepeatDueDate(
+  rule: RepeatRule,
+  currentDue: string | null,
+  anchorDue?: string | null,
+  today: string = todayDateString(),
+): string {
+  const { date, time } = splitDueDate(currentDue || today);
+  const [y, m, d] = date.split('-').map(Number);
+
+  let next: Date;
+  if (rule.freq === 'daily') {
+    next = new Date(y, m - 1, d + 1);
+  } else if (rule.freq === 'weekly') {
+    next = new Date(y, m - 1, d + 7);
+  } else if (rule.freq === 'monthly') {
+    const anchorDate = anchorDue ? splitDueDate(anchorDue).date : date;
+    const anchorDay = Number(anchorDate.slice(8, 10)) || d;
+    // Target month is index `m` (current is m-1, 0-based); its last day is
+    // day 0 of the month after it.
+    const lastDayOfTarget = new Date(y, m + 1, 0).getDate();
+    next = new Date(y, m, Math.min(anchorDay, lastDayOfTarget));
+  } else {
+    const days = rule.days ?? [];
+    next = new Date(y, m - 1, d + 1);
+    for (let i = 0; i < 7; i++) {
+      if (days.includes(next.getDay())) break;
+      next = new Date(next.getFullYear(), next.getMonth(), next.getDate() + 1);
+    }
+  }
+
+  const nextDate = ymd(next);
+  return time ? `${nextDate}T${time}` : nextDate;
+}
+
+interface RepeatTaskRow {
+  id: string; name: string; description: string; tier: number; category: string;
+  projectId: string | null; dueDate: string | null;
+  repeatRule: string | null; repeatOf: string | null; deletedAt: string | null;
+}
+
+/**
+ * Spawns the next instance of a recurring chain after `taskId` was completed.
+ * Returns the new instance, or null when nothing was (or had to be) generated.
+ *
+ * IDEMPOTENT by design: completing twice, or a sync merge replaying the same
+ * completion, cannot duplicate the next instance — generation is skipped while
+ * ANY live, open task of the chain exists (invariant: at most one open instance
+ * per chain). Soft-deleted instances don't count, so deleting the generated
+ * task doesn't freeze the chain: the next completion regenerates it.
+ *
+ * What the new instance inherits: name, description, tier, category, project
+ * and the rule itself. Deliberately NOT copied: scroll notes/drawings and
+ * subtasks — they belong to the specific occurrence, not to the template.
+ *
+ * Un-completing a recurring task does NOT delete the instance it spawned
+ * (simplicity: reverse bookkeeping across a chain isn't worth the edge cases;
+ * the invariant above still prevents duplicates on the next completion).
+ */
+export function spawnNextRepeatInstance(
+  db: Database.Database,
+  taskId: string,
+  now: string = new Date().toISOString(),
+): { nextTaskId: string; nextDueDate: string | null } | null {
+  return db.transaction(() => {
+    const task = db.prepare(`
+      SELECT id, name, description, tier, category, project_id AS projectId,
+             due_date AS dueDate, repeat_rule AS repeatRule, repeat_of AS repeatOf,
+             deleted_at AS deletedAt
+      FROM tasks WHERE id = ?
+    `).get(taskId) as RepeatTaskRow | undefined;
+    if (!task || task.deletedAt) return null;
+
+    const rule = parseRepeatRule(task.repeatRule);
+    if (!rule) return null;
+
+    const chainId = task.repeatOf ?? task.id;
+    const openInChain = db.prepare(`
+      SELECT 1 FROM tasks
+      WHERE deleted_at IS NULL AND status = 0 AND id != ?
+        AND (id = ? OR repeat_of = ?)
+      LIMIT 1
+    `).get(taskId, chainId, chainId);
+    if (openInChain) return null;
+
+    // Monthly anchor: the root's due day-of-month. The root may be soft-deleted
+    // or missing (partial sync) — its date is still a perfectly good anchor,
+    // and when it's gone the completed instance's own date fills in.
+    const root = db.prepare('SELECT due_date AS dueDate FROM tasks WHERE id = ?')
+      .get(chainId) as { dueDate: string | null } | undefined;
+    const nextDueDate = nextRepeatDueDate(rule, task.dueDate, root?.dueDate ?? task.dueDate);
+
+    const nextTaskId = genId();
+    const maxOrder = db.prepare(
+      'SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks WHERE deleted_at IS NULL'
+    ).get() as { next: number };
+    db.prepare(`
+      INSERT INTO tasks (id, name, description, tier, category, project_id, due_date,
+                         task_order, status, repeat_rule, repeat_of, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+    `).run(nextTaskId, task.name, task.description, task.tier, task.category, task.projectId,
+      nextDueDate, maxOrder.next, task.repeatRule, chainId, now, now);
+
+    return { nextTaskId, nextDueDate };
+  })();
+}
+
 /** 'today' / 'tomorrow' shorthands, or a literal date the picker produced. */
 function resolvePostponeTarget(target: string): string {
   if (target === 'today') return todayDateString();
@@ -81,7 +249,7 @@ export function registerQuestsIpcHandlers(): void {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
-               completed_at AS completedAt,
+               completed_at AS completedAt, repeat_rule AS repeatRule, repeat_of AS repeatOf,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL ORDER BY task_order ASC
       `).all();
@@ -89,7 +257,7 @@ export function registerQuestsIpcHandlers(): void {
       return db.prepare(`
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
-               completed_at AS completedAt,
+               completed_at AS completedAt, repeat_rule AS repeatRule, repeat_of AS repeatOf,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL AND project_id IS ? ORDER BY task_order ASC
       `).all(projectId);
@@ -99,28 +267,37 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:upsertTask', (_e, task: {
     id?: string; name: string; description?: string; tier?: number;
     category?: string; projectId?: string | null; dueDate?: string | null; order?: number; status?: boolean;
+    repeatRule?: string | null;
   }) => {
     const db = getDb();
     const id = task.id || genId();
     const now = new Date().toISOString();
     const validTier = [1, 2, 3].includes(task.tier ?? 2) ? (task.tier ?? 2) : 2;
+    // Normalized on the way in: a rule that doesn't parse is stored as NULL,
+    // never as junk a later completion has to survive.
+    const repeatRule = task.repeatRule && parseRepeatRule(task.repeatRule) ? task.repeatRule : null;
+    // Callers that don't know about repeat_rule yet (QuickAdd, older widgets)
+    // omit the key entirely — updating through them must not wipe the rule.
+    const touchRepeat = task.repeatRule !== undefined;
 
     if (task.id) {
       db.prepare(`
         UPDATE tasks SET name = ?, description = ?, tier = ?, category = ?,
                project_id = ?, due_date = ?, task_order = ?, status = ?, updated_at = ?
+               ${touchRepeat ? ', repeat_rule = ?' : ''}
         WHERE id = ?
       `).run(
         task.name, task.description ?? '', validTier, task.category ?? '',
-        task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now, id
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now,
+        ...(touchRepeat ? [repeatRule] : []), id
       );
     } else {
       const maxOrder = db.prepare('SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks WHERE deleted_at IS NULL').get() as { next: number };
       db.prepare(`
-        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, repeat_rule, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
       `).run(id, task.name, task.description ?? '', validTier, task.category ?? '',
-        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, now, now);
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, repeatRule, now, now);
     }
     return id;
   });
@@ -156,6 +333,16 @@ export function registerQuestsIpcHandlers(): void {
     // completed after 21:00 (UTC-3) out of today's counters.
     db.prepare('UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
       .run(status ? 1 : 0, status ? localTimestamp() : null, now, taskId);
+
+    // Recurring chain: completing spawns the next instance (idempotent — see
+    // spawnNextRepeatInstance). Un-completing deliberately does NOT undo it.
+    // The RPG flow is untouched: XP is paid by the renderer per completion.
+    // Older renderers ignore the return value, so widening void → object is safe.
+    if (status) {
+      const spawned = spawnNextRepeatInstance(db, taskId, now);
+      if (spawned) return { repeated: spawned };
+    }
+    return undefined;
   });
 
   ipcHandle('quests:syncTaskOrders', (_e, orders: Array<{ id: string; order: number }>) => {

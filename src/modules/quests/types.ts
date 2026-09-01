@@ -75,6 +75,14 @@ export interface Task {
   dueDate: string | null;
   order: number;
   completedAt: string | null;
+  /**
+   * Recurrence rule as stored (JSON string, see src/modules/quests/repeat.ts)
+   * or null. Optional: rows served by a main process older than quests
+   * migration v13 simply don't carry the field.
+   */
+  repeatRule?: string | null;
+  /** Root (template) task id of the recurring chain; null/absent on the root. */
+  repeatOf?: string | null;
   createdAt: string;
   updatedAt: string;
 }

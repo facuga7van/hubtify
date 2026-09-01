@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XP_MAP, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
+import { parseRepeatRule, buildRepeatRule, jsToIsoDay, type RepeatFreq } from '../repeat';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
+import HabitDayPicker from './HabitDayPicker';
 
 interface Props {
   editingTask: Task | null;
@@ -25,6 +27,9 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   const [useDate, setUseDate] = useState(false);
   const [newCategory, setNewCategory] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
+  const [repeatFreq, setRepeatFreq] = useState<RepeatFreq | 'never'>('never');
+  /** Chosen weekdays for freq 'days', in the picker's ISO numbering (1 = Monday). */
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
 
   const loadCategories = useCallback(async (pid: string | null | undefined) => {
     try {
@@ -44,8 +49,12 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       setProjectId(editingTask.projectId ?? null);
       setDueDate(editingTask.dueDate ?? '');
       setUseDate(!!editingTask.dueDate);
+      const rule = parseRepeatRule(editingTask.repeatRule);
+      setRepeatFreq(rule?.freq ?? 'never');
+      setRepeatDays(rule?.days ? rule.days.map(jsToIsoDay).sort((a, b) => a - b) : []);
     } else {
       setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(''); setUseDate(false);
+      setRepeatFreq('never'); setRepeatDays([]);
       setProjectId(activeProjectId);
     }
   }, [editingTask, activeProjectId]);
@@ -66,6 +75,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       dueDate: useDate && dueDate ? dueDate : null,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
+      repeatRule: buildRepeatRule(repeatFreq, repeatDays),
     };
 
     await window.api.questsUpsertTask(task as Record<string, unknown>);
@@ -75,6 +85,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     }
 
     setName(''); setDescription(''); setTier(2); setNewCategory(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setRepeatFreq('never'); setRepeatDays([]);
     setProjectId(activeProjectId);
     onSaved();
   };
@@ -189,6 +200,29 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
         {useDate && (
           <RpgDateTimePicker value={dueDate} onChange={setDueDate} />
         )}
+
+        {/* Recurrence: completing spawns the next instance with the due date
+            shifted by the rule (backend, quests migration v13). */}
+        <div className="quest-repeat-field">
+          <label className="quest-repeat-label" htmlFor="quest-repeat-select">
+            {t('questify.repeatLabel', 'Repetir')}
+          </label>
+          <select
+            id="quest-repeat-select"
+            className="rpg-select"
+            value={repeatFreq}
+            onChange={(e) => setRepeatFreq(e.target.value as RepeatFreq | 'never')}
+          >
+            <option value="never">{t('questify.repeatNever', 'Nunca')}</option>
+            <option value="daily">{t('questify.repeatDaily', 'Diaria')}</option>
+            <option value="weekly">{t('questify.repeatWeekly', 'Semanal')}</option>
+            <option value="monthly">{t('questify.repeatMonthly', 'Mensual')}</option>
+            <option value="days">{t('questify.repeatDays', 'Días específicos')}</option>
+          </select>
+          {repeatFreq === 'days' && (
+            <HabitDayPicker value={repeatDays} onChange={setRepeatDays} />
+          )}
+        </div>
       </div>
     </form>
   );

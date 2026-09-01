@@ -28,6 +28,16 @@ export interface QuestsApiFase1 {
     days: Array<{ date: string; count: number; skipCount: number }>;
     totalHabits: number;
   }>;
+  /**
+   * Fase 3 widening of an EXISTING channel (no preload change needed — the
+   * bridge forwards whatever the handler returns): completing a task with a
+   * `repeat_rule` answers with the spawned next instance. An older main
+   * process resolves `undefined`, so callers must treat the result as
+   * optional — that IS the feature detection for recurring tasks.
+   */
+  questsSetTaskStatus: (taskId: string, status: boolean) => Promise<
+    { repeated: { nextTaskId: string; nextDueDate: string | null } } | undefined | void
+  >;
 }
 
 export type QuestsApi = Omit<HubtifyApi, keyof QuestsApiFase1> & QuestsApiFase1;

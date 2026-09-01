@@ -430,6 +430,30 @@
   border: 1px solid rgba(74, 55, 32, 0.3);
 }
 
+/* ── Recurrence (Fase 3) ─────────────────────────── */
+/* Quiet seal on the row: informational, not clickable. */
+.quest-repeat-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gold-dark);
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+/* "Repetir" group in the task form. */
+.quest-repeat-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quest-repeat-label {
+  font-family: var(--ff-accent, 'IM Fell English SC'), serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  letter-spacing: 0.06em;
+}
+
 /* ── Expanded detail area ────────────────────────── */
 .quest-row-expanded {
   padding-left: 30px;

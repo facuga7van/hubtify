@@ -244,4 +244,29 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_habit_checks_kind ON habit_checks(kind, deleted_at);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 13,
+    up: `
+      -- ── Fase 3: recurring tasks ───────────────────────────────────────────
+      -- repeat_rule: NULL = never repeats. Otherwise compact JSON:
+      --   {"freq":"daily"|"weekly"|"monthly"|"days","days":[0-6]?}
+      -- "days" (only for freq "days") uses JS Date.getDay() numbering:
+      --   0 = Sunday … 6 = Saturday.
+      -- Completing a task with a rule spawns the NEXT instance (new row), with
+      -- due_date advanced FROM the completed instance's due_date — never from
+      -- "today" (rent due the 1st, paid the 3rd, is still due the 1st next month).
+      ALTER TABLE tasks ADD COLUMN repeat_rule TEXT DEFAULT NULL;
+
+      -- repeat_of: id of the chain's ROOT (template) task — NULL on the root
+      -- itself. Every generated instance points at the root, so the history is
+      -- a flat chain (each completed instance STAYS in the completed list) and
+      -- the generator can ask "is there already an open instance of this chain?"
+      -- in one indexed query. Monthly rules also read the root's day-of-month as
+      -- the anchor, so Jan 31 → Feb 28 → Mar 31 (the 31 is never forgotten).
+      ALTER TABLE tasks ADD COLUMN repeat_of TEXT DEFAULT NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_tasks_repeat_chain ON tasks(repeat_of, status, deleted_at);
+    `,
+  },
 ];

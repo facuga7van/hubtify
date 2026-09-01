@@ -6,6 +6,7 @@ import { useToast } from '../../../shared/components/useToast';
 import { isTaskLinkWired, startBrew, setSessionTask } from '../../cauldron/api';
 import { quickStartPresetId } from '../../cauldron/hooks';
 import { getDueDateStatus } from '../utils';
+import { parseRepeatRule, describeRepeatRule } from '../repeat';
 import PostponeMenu, { PostponeOptions } from './PostponeMenu';
 import type { Task } from '../types';
 
@@ -28,6 +29,19 @@ function CauldronIcon() {
       <path d="M3 6h10M4 6c0 4 1.5 7 4 7s4-3 4-7" />
       <path d="M2.5 7.5L1.5 9M13.5 7.5l1 1.5" />
       <path d="M6 3.5c0-.8.7-1 .7-1.8M9.3 3.5c0-.8.7-1 .7-1.8" />
+    </svg>
+  );
+}
+
+/** Two chasing arrows in a circle — the medieval "this quest returns" seal. */
+function RepeatIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12.8 5.2A5.4 5.4 0 003.4 6.6" />
+      <path d="M3.2 10.8a5.4 5.4 0 009.4-1.4" />
+      <path d="M3.2 3.4v3.2h3.2" />
+      <path d="M12.8 12.6V9.4H9.6" />
     </svg>
   );
 }
@@ -112,9 +126,22 @@ export default function QuestRowActions({
   };
 
   const dueStatus = task.dueDate ? getDueDateStatus(task.dueDate) : null;
+  const repeatRule = parseRepeatRule(task.repeatRule);
 
   return (
     <div className="quest-row-actions" onPointerDown={(e) => e.stopPropagation()}>
+      {/* Recurrence seal: quiet mark + tooltip with the concrete rule. */}
+      {repeatRule && (
+        <span
+          className="quest-repeat-badge"
+          title={describeRepeatRule(repeatRule, t)}
+          aria-label={describeRepeatRule(repeatRule, t)}
+          role="img"
+        >
+          <RepeatIcon />
+        </span>
+      )}
+
       {/* Due date badge */}
       {task.dueDate && dueStatus && (
         <span className={`quest-due--${dueStatus}`}>
