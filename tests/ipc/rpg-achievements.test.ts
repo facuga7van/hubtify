@@ -10,6 +10,7 @@ import {
 import { ACHIEVEMENTS, ACHIEVEMENT_XP, ACHIEVEMENTS_TOTAL } from '../../shared/achievements';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');
@@ -47,6 +48,8 @@ function task(db: Database.Database, id: string) {
     payload: { xp: 10, hp: 0, taskId: id }, timestamp: Date.now(),
   });
 }
+
+pinClockToNoon();
 
 describe('achievement backfill', () => {
   let db: Database.Database;

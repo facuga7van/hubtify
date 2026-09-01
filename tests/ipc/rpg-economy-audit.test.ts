@@ -14,6 +14,7 @@ import {
   backfillAchievements,
 } from '../../electron/ipc/rpg-handlers';
 import { sealXp, MAX_VIGOR, isMeaningfulEvent } from '../../shared/rpg-engine';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 /** Every broadcast the engine sends, so a test can count them. */
 const broadcasts: Array<{ channel: string; data: unknown }> = [];
@@ -87,6 +88,8 @@ function primeStreak(db: Database.Database, streak: number, lastDate: string, ex
 }
 
 // ─────────────────────── #1 crítico: cadena de sellos retroactivos ───────────────────────
+
+pinClockToNoon();
 
 describe('[crítico #1] retro-seal chain: a seal is not a day lived', () => {
   let db: Database.Database;

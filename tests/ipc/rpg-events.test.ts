@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
 import { processRpgEvent } from '../../electron/ipc/rpg-handlers';
 import { ACHIEVEMENT_XP } from '../../shared/achievements';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');
@@ -23,6 +24,8 @@ function primeStreak(db: Database.Database, streak: number): void {
   db.prepare('UPDATE player_stats SET streak = ?, streak_last_date = ?, last_milestone_streak = 0 WHERE user_id = ?')
     .run(streak - 1, yesterday.toLocaleDateString('en-CA'), 'default');
 }
+
+pinClockToNoon();
 
 describe('streak milestone bonus (task 13)', () => {
   let db: Database.Database;

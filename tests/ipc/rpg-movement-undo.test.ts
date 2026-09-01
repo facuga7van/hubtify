@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
 import { processRpgEvent } from '../../electron/ipc/rpg-handlers';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 vi.mock('electron', () => ({
   ipcMain: { handle: () => undefined },
@@ -66,6 +67,8 @@ function deleteMovement(db: Database.Database, transactionId: string, type: 'exp
     timestamp: Date.now(),
   });
 }
+
+pinClockToNoon();
 
 describe('Coinify add/delete is no longer a tap', () => {
   it('the alta persists transactionId as ref_id', () => {

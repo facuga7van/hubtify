@@ -4,6 +4,7 @@ import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/
 import { processRpgEvent, setInnMode, restorePlayerStats } from '../../electron/ipc/rpg-handlers';
 import { rolloverVigor, getPlayerStats } from '../../electron/ipc/rpg-stats';
 import { PARDONS_PER_MONTH } from '../../shared/rpg-engine';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 /**
  * RPG phase 1 — "stop the bleeding".
@@ -36,6 +37,8 @@ const task = (db: Database.Database, id: string, xp = 10, hp = 0) =>
   processRpgEvent(db, { type: 'TASK_COMPLETED', moduleId: 'quests', payload: { xp, hp, taskId: id }, timestamp: Date.now() });
 
 // ───────────────────────────── Vigor (task 1) ─────────────────────────────
+
+pinClockToNoon();
 
 describe('HP is daily Vigor, not accumulated debt (phase 1, task 1)', () => {
   let db: Database.Database;

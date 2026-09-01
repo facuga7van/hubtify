@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
 import { processRpgEvent, getDaySummary, sealDay, getSeals } from '../../electron/ipc/rpg-handlers';
 import { sealXp, MAX_VIGOR } from '../../shared/rpg-engine';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');
@@ -39,6 +40,8 @@ function eventsOn(db: Database.Database, date: string): number {
   ).get(date) as { c: number };
   return row.c;
 }
+
+pinClockToNoon();
 
 describe('rpg:getDaySummary', () => {
   let db: Database.Database;

@@ -16,6 +16,7 @@ import {
   masteryRankKey,
   masteryRankName,
 } from '../../shared/rpg-engine';
+import { pinClockToNoon } from '../helpers/pin-clock';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');
@@ -44,6 +45,8 @@ function masteryRow(db: Database.Database, moduleId: string): number {
     { xp: number } | undefined;
   return row?.xp ?? 0;
 }
+
+pinClockToNoon();
 
 describe('masteryLevel curve', () => {
   it('is monotonic, non-decreasing, bounded 1..10', () => {
