@@ -194,8 +194,10 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                     className="sidebar-streak__pardons"
                     title={t('rpg.pardonsHint', 'Indultos del mes: si te salteás un solo día, se usa uno solo y la racha sigue.')}
                   >
+                    {/* No "/2": a shop-bought pardon extends the month's cap,
+                        and "3/2" would read as a bug. The hint carries the rule. */}
                     <Shield width={11} height={11} />
-                    {' '}{stats.pardonsRemaining ?? 0}/2
+                    {' '}{stats.pardonsRemaining ?? 0}
                   </span>
                   <button
                     type="button"

@@ -610,6 +610,18 @@
     "year": "Year"
   },
   "coinify": {
+    "accountInitialBalance": "Starting balance",
+    "accountInitialHint": "Starting balance: what the account holds TODAY. From here on, every movement with an account updates it on its own.",
+    "accountKindLabel": "Account type",
+    "accountKind_bank": "Bank",
+    "accountKind_cash": "Cash",
+    "accountKind_wallet": "Virtual wallet",
+    "accountLabel": "Account",
+    "accountName": "Account name",
+    "accountNone": "No account",
+    "accountRowHint": "See the movements of {{name}}",
+    "accountsTotal": "Total across accounts",
+    "allAccounts": "All accounts",
     "approxRateHint": "Approximate: converted at today's rate, not the rate frozen on the day",
     "backfillFx": "Backfill missing rates",
     "backfillFxDone": "{{count}} movements got a frozen rate",
@@ -677,6 +689,7 @@
     "cash": "Cash",
     "categoryHelp": "Expense breakdown by category. Tap a slice to see the detail.",
     "chestHelp": "Net balance for the month: income minus expenses. The percentage compares with last month, and the line shows the trend over the last 6 months.",
+    "chestHelpAccounts": "Net balance for the month above. Click the chest: your accounts with their real balances (starting balance + movements). Click an account: its movements.",
     "clickToEdit": "Click to edit",
     "colAmount": "COINS",
     "colCategory": "CATEGORY",
@@ -847,6 +860,10 @@
     "closingDay": "Closing day",
     "newCard": "New card",
     "deleteCardConfirm": "Delete this card? Associated transactions won't be affected.",
+    "deleteAccountConfirm": "Delete this account? Its movements keep their history.",
+    "editAccount": "Edit account",
+    "manageAccounts": "Manage accounts",
+    "newAccount": "New account",
     "selectCard": "Select card",
     "statements": "Statements",
     "statementsHelp": "Per-card summary: billing period, current cycle expenses, and closing status.",
@@ -877,7 +894,19 @@
     "showComparison": "Compare with previous month",
     "spendingAboveAverage": "Spending above average",
     "usdOnlyCategories": "+ {{amount}} across {{count}} categories with no peso spending",
-    "reason_currency_mismatch": "The payment must be in the same currency as the loan"
+    "reason_account_not_found": "That account no longer exists",
+    "reason_currency_mismatch": "The payment must be in the same currency as the loan",
+    "reason_invalid_currency": "Invalid currency",
+    "reason_invalid_kind": "Invalid account type",
+    "reason_same_account": "Pick two different accounts",
+    "reason_transfer_currency_mismatch": "Both accounts must share the same currency",
+    "transferBetween": "Transfer between accounts",
+    "transferFrom": "From",
+    "transferHint": "Moves money between your own accounts: it counts as neither income nor expense for the month.",
+    "transferSameAccount": "Pick two different accounts",
+    "transferSubmit": "Transfer",
+    "transferSuccess": "Transfer registered",
+    "transferTo": "To"
   },
   "character": {
     "atLevel": "at level",
@@ -1064,6 +1093,14 @@
     "recipe": "Recipe",
     "resting": "Resting…",
     "resume": "Resume",
+    "retro": {
+      "hint": "Goes on the shelf with a dotted outline. Counts for the record, grants no XP.",
+      "jarMark": "logged by hand",
+      "link": "Worked without the cauldron?",
+      "logged": "Session logged on the shelf — no XP",
+      "minutes": "Minutes",
+      "submit": "Log it"
+    },
     "round": "round {{round}}",
     "selectedRecipe": "Selected recipe",
     "shelf": {
@@ -1421,8 +1458,28 @@
     "innResting": "Resting at the Inn",
     "innSince": "Resting since {{date}}",
     "innWelcomeBack": "Welcome back! Your streak was waiting for you",
+    "legendLevel": "Legend level",
+    "legendLevelTip": "Your global level: the whole account's history. Each module's craft is measured below.",
     "level": "Level",
     "levelUp": "LEVEL UP!",
+    "mastery": {
+      "ranks": {
+        "adept": "Adept",
+        "apprentice": "Apprentice",
+        "artisan": "Artisan",
+        "expert": "Expert",
+        "grandmaster": "Grandmaster",
+        "initiate": "Initiate",
+        "journeyman": "Journeyman",
+        "legend": "Legend of the Craft",
+        "master": "Master",
+        "veteran": "Veteran"
+      }
+    },
+    "masteryLevelShort": "Rank",
+    "masteryNext": "{{n}} xp to the next rank",
+    "masteryPeak": "peak of the craft",
+    "masteryTitle": "Masteries of the craft",
     "pardonUsed": "A pardon was used — your streak lives on",
     "pardons": "Pardons",
     "pardonsEmpty": "No pardons left this month",
@@ -1448,11 +1505,87 @@
     "rwdRedeemedTimes": "redeemed ×{{n}}",
     "rwdSpent": "spent",
     "rwdSubtitle": "Where earned obols are traded for treats you place on the counter yourself",
+    "rwdTab": "Rewards",
     "rwdTitle": "Rewards",
     "rwdUnavailable": "The counter is not available in this version yet.",
     "sealInvite": "Seal the day",
     "sealInviteSub": "{{n}} deeds still open",
     "sealInviteYesterday": "You left yesterday unsealed",
+    "shop": {
+      "items": {
+        "bg_burgundy": {
+          "name": "Burgundy Tapestry",
+          "desc": "A deep wine-dark ground for the hero's card."
+        },
+        "bg_forest": {
+          "name": "Forest Tapestry",
+          "desc": "Moss and green shade behind the portrait."
+        },
+        "bg_night": {
+          "name": "Night Sky",
+          "desc": "Stars over the hero who keeps late hours."
+        },
+        "frame_gilded": {
+          "name": "Gilded Frame",
+          "desc": "A double ring of gold for the hero's portrait."
+        },
+        "frame_iron": {
+          "name": "Riveted Frame",
+          "desc": "Cold-forged iron, rivets showing."
+        },
+        "frame_laurel": {
+          "name": "Laurel Frame",
+          "desc": "The victor's green around your portrait."
+        },
+        "pardon_extra": {
+          "name": "Extra pardon",
+          "desc": "A third forgiveness for this month. The streak is grateful."
+        },
+        "seal_crescent": {
+          "name": "The Moon",
+          "desc": "For those who seal the day while everyone sleeps."
+        },
+        "seal_oak": {
+          "name": "The Oak",
+          "desc": "Deep roots, wide crown: steadiness grown into a tree."
+        },
+        "seal_serpent": {
+          "name": "The Serpent",
+          "desc": "Coiled on itself: every day begins again."
+        },
+        "seal_stag": {
+          "name": "The Stag",
+          "desc": "Antlers to the wind, the seal of the early riser."
+        },
+        "seal_sun": {
+          "name": "The Radiant Sun",
+          "desc": "The seal of the golden days."
+        },
+        "seal_tower": {
+          "name": "The Tower",
+          "desc": "Stone upon stone, like the days."
+        }
+      }
+    },
+    "shopAlreadyOwned": "It was already yours.",
+    "shopBuy": "Buy",
+    "shopBuyConfirm": "Buy «{{name}}» for {{cost}} obols?",
+    "shopEquip": "Use",
+    "shopEquipped": "in use",
+    "shopGroupOrnaments": "Hero's ornaments",
+    "shopGroupPardon": "Extra pardon",
+    "shopGroupSeals": "Collectible seals",
+    "shopInsufficient": "Not enough obols yet. A couple more sealed days.",
+    "shopMonthlyCap": "The bought pardon is one per month, and this month's is already done.",
+    "shopOwned": "owned",
+    "shopPardonBought": "bought this month",
+    "shopPardonFoot": "Adds a third pardon to the current month, on top of the two automatic ones. One per month, no stacking.",
+    "shopPerDevice": "What you buy follows you to every machine; what's in use is chosen on each one.",
+    "shopPurchased": "Bought. Yours, forever.",
+    "shopSealsFoot": "The Codex wax stamps the seal you choose. The classic rosette is yours and isn't going anywhere.",
+    "shopTab": "Shop",
+    "shopUnavailable": "The shop isn't available in this version yet.",
+    "shopUnequip": "Remove",
     "streak": "streak",
     "titles": {
       "peasant": "Peasant",

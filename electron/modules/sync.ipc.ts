@@ -147,6 +147,10 @@ interface SyncQuestData {
   /** Fase 3: recompensas propias — LWW por updatedAt, soft-delete. */
   rewards?: Array<{ id: string; name: string; cost: number; icon: string | null;
                     createdAt: string; updatedAt: string; deletedAt: string | null }>;
+  /** Fase 4: ids deterministas — unión pura colapsa la doble compra entre devices. */
+  shopPurchases?: Array<{ id: string; itemId: string; purchasedAt: string; updatedAt: string }>;
+  /** Fase 4: acumulador monotónico — converge por MAX(xp) por módulo. */
+  masteryXp?: Array<{ moduleId: string; xp: number; updatedAt: string }>;
 }
 
 const USER_DATA_TABLES = [
@@ -156,7 +160,10 @@ const USER_DATA_TABLES = [
   'day_seals',
   'obolos_ledger',
   'rewards',
+  'shop_purchases',
+  'mastery_xp',
   'finance_budgets',
+  'finance_accounts',
   'user_profile',
   'character_data',
   'tasks',
@@ -735,6 +742,42 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
         }
       }
     });
+
+    step('shopPurchases', () => {
+      // Pure union: purchase ids are deterministic (item id, or pardon:YYYY-MM),
+      // so the same purchase made on two devices collapses to one row here —
+      // and its obolos_ledger entry (also deterministic) collapses with it.
+      const ins = db.prepare(
+        'INSERT OR IGNORE INTO shop_purchases (id, item_id, purchased_at, updated_at) VALUES (?, ?, ?, ?)',
+      );
+      for (const sp of rows<{ id: string; itemId: string; purchasedAt: string; updatedAt: string }>(remote.shopPurchases)) {
+        if (!sp || typeof sp.id !== 'string' || !sp.id || typeof sp.itemId !== 'string') continue;
+        const r = ins.run(sp.id, sp.itemId, sp.purchasedAt ?? sp.updatedAt, sp.updatedAt ?? sp.purchasedAt);
+        if (r.changes > 0) changed = true;
+      }
+    });
+
+    step('masteryXp', () => {
+      // Monotonic accumulator: converge on MAX(xp) per module. Two devices
+      // accumulating in parallel can lose the smaller delta between syncs —
+      // accepted trade-off, mastery is cosmetic and only ever climbs.
+      const ins = db.prepare(
+        'INSERT OR IGNORE INTO mastery_xp (module_id, xp, updated_at) VALUES (?, ?, ?)',
+      );
+      const upd = db.prepare(
+        'UPDATE mastery_xp SET xp = MAX(xp, ?), updated_at = ? WHERE module_id = ? AND xp < ?',
+      );
+      for (const mx of rows<{ moduleId: string; xp: number; updatedAt: string }>(remote.masteryXp)) {
+        if (!mx || typeof mx.moduleId !== 'string' || !mx.moduleId || typeof mx.xp !== 'number') continue;
+        const r = ins.run(mx.moduleId, Math.max(0, mx.xp), mx.updatedAt ?? null);
+        if (r.changes === 0) {
+          const u = upd.run(mx.xp, mx.updatedAt ?? null, mx.moduleId, mx.xp);
+          if (u.changes > 0) changed = true;
+        } else {
+          changed = true;
+        }
+      }
+    });
   });
 
   tx();
@@ -874,7 +917,16 @@ export function registerSyncIpcHandlers(): void {
       FROM rewards
     `).all();
 
-    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents, achievements, daySeals, obolosLedger, rewards };
+    const shopPurchases = db.prepare(`
+      SELECT id, item_id AS itemId, purchased_at AS purchasedAt, updated_at AS updatedAt
+      FROM shop_purchases
+    `).all();
+
+    const masteryXp = db.prepare(`
+      SELECT module_id AS moduleId, xp, updated_at AS updatedAt FROM mastery_xp
+    `).all();
+
+    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents, achievements, daySeals, obolosLedger, rewards, shopPurchases, masteryXp };
   });
 
   // Merges remote quest data with local using last-write-wins
@@ -1056,6 +1108,8 @@ export function registerSyncIpcHandlers(): void {
              installment_number AS installmentNumber,
              billed_amount_ars AS billedAmountArs,
              fx_rate AS fxRate,
+             account_id AS accountId,
+             transfer_group_id AS transferGroupId,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_transactions ORDER BY date DESC
@@ -1106,6 +1160,13 @@ export function registerSyncIpcHandlers(): void {
 
     const categories = db.prepare(`SELECT name, updated_at AS updatedAt, deleted_at AS deletedAt FROM finance_categories`).all();
 
+    const accounts = db.prepare(`
+      SELECT id, name, kind, currency, initial_balance AS initialBalance,
+             account_order AS accountOrder,
+             created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
+      FROM finance_accounts
+    `).all();
+
     const creditCards = db.prepare(`
       SELECT id, name, closing_day AS closingDay, due_day AS dueDay,
              created_at AS createdAt, updated_at AS updatedAt,
@@ -1150,7 +1211,7 @@ export function registerSyncIpcHandlers(): void {
     return {
       transactions, loans, loanPayments, recurring, recurringHistory,
       installmentGroups, categoryMappings, categories, creditCards,
-      creditCardStatements, importBatches, incomeSources, budgets,
+      creditCardStatements, importBatches, incomeSources, budgets, accounts,
     };
   });
 
@@ -1259,8 +1320,9 @@ export function registerSyncIpcHandlers(): void {
              source, installments, installment_group_id, for_third_party,
              recurring_id, import_batch_id, credit_card_id, impacts_balance,
              installment_number, billed_amount_ars, fx_rate,
+             account_id, transfer_group_id,
              created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const updateTx = db.prepare(`
           UPDATE finance_transactions SET type = ?, amount = ?, currency = ?, category = ?,
@@ -1268,7 +1330,10 @@ export function registerSyncIpcHandlers(): void {
             installment_group_id = ?, for_third_party = ?, recurring_id = ?,
             import_batch_id = ?, credit_card_id = ?, impacts_balance = ?,
             installment_number = ?, billed_amount_ars = ?,
-            fx_rate = COALESCE(?, fx_rate), updated_at = ?,
+            fx_rate = COALESCE(?, fx_rate),
+            account_id = CASE WHEN ? THEN ? ELSE account_id END,
+            transfer_group_id = COALESCE(?, transfer_group_id),
+            updated_at = ?,
             deleted_at = ?
           WHERE id = ?
         `);
@@ -1284,6 +1349,7 @@ export function registerSyncIpcHandlers(): void {
               t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
               t.creditCardId ?? null, t.impactsBalance ?? 1,
               t.installmentNumber ?? null, t.billedAmountArs ?? null, t.fxRate ?? null,
+              t.accountId ?? null, t.transferGroupId ?? null,
               t.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt,
             );
             if (result.changes > 0) changed = true;
@@ -1295,7 +1361,9 @@ export function registerSyncIpcHandlers(): void {
               t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
               t.creditCardId ?? null, t.impactsBalance ?? 1,
               t.installmentNumber ?? null, t.billedAmountArs ?? null,
-              t.fxRate ?? null, remoteUpdatedAt,
+              t.fxRate ?? null,
+              ('accountId' in t) ? 1 : 0, t.accountId ?? null,
+              t.transferGroupId ?? null, remoteUpdatedAt,
               remoteDeletedAt, t.id,
             );
             changed = true;
@@ -1441,6 +1509,39 @@ export function registerSyncIpcHandlers(): void {
             s.active ?? 1, s.createdAt ?? now,
           );
           if (result.changes > 0) changed = true;
+        }
+      }
+
+      if (data.accounts && Array.isArray(data.accounts)) {
+        // LWW by updated_at with soft-delete. The deterministic seed
+        // ('account-cash-default') collapses across devices on its own id.
+        const getAcc = db.prepare('SELECT id, updated_at FROM finance_accounts WHERE id = ?');
+        const insAcc = db.prepare(`
+          INSERT OR IGNORE INTO finance_accounts
+            (id, name, kind, currency, initial_balance, account_order, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const updAcc = db.prepare(`
+          UPDATE finance_accounts SET name = ?, kind = ?, currency = ?, initial_balance = ?,
+                 account_order = ?, updated_at = ?, deleted_at = ?
+          WHERE id = ?
+        `);
+        for (const a of data.accounts as Array<Record<string, unknown>>) {
+          if (!isUsableRow(a, 'accounts', ['id', 'name'])) continue;
+          const remoteUpdated = (a.updatedAt as string) ?? (a.createdAt as string) ?? now;
+          const remoteDeleted = (a.deletedAt as string) ?? null;
+          const local = getAcc.get(a.id) as { id: string; updated_at: string } | undefined;
+          if (!local) {
+            const r = insAcc.run(a.id, a.name, a.kind ?? 'cash', a.currency ?? 'ARS',
+              a.initialBalance ?? a.initial_balance ?? 0, a.accountOrder ?? a.account_order ?? 0,
+              a.createdAt ?? now, remoteUpdated, remoteDeleted);
+            if (r.changes > 0) changed = true;
+          } else if (remoteUpdated > (local.updated_at || '')) {
+            updAcc.run(a.name, a.kind ?? 'cash', a.currency ?? 'ARS',
+              a.initialBalance ?? a.initial_balance ?? 0, a.accountOrder ?? a.account_order ?? 0,
+              remoteUpdated, remoteDeleted, a.id);
+            changed = true;
+          }
         }
       }
 
@@ -1624,7 +1725,7 @@ export function registerSyncIpcHandlers(): void {
       // in every stat (+1 today, +minutes on the weekly chart, +XP eligibility).
       // task_id and abandoned travel too: without them, mission links and broken
       // flasks (the shelf's scars) never crossed devices.
-      const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at, is_extension, task_id, abandoned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at, is_extension, task_id, abandoned, retroactive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const completeSession = db.prepare(`UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ? WHERE id = ?`);
       // preset_id is a FOREIGN KEY: a session whose preset this device has never
       // seen would fail the constraint and (now that this runs in a transaction)
@@ -1635,7 +1736,7 @@ export function registerSyncIpcHandlers(): void {
         const local = getSession.get(s.id) as { id: string; completed: number } | undefined;
         if (!local) {
           const presetId = s.preset_id && presetExists.get(s.preset_id) ? s.preset_id : null;
-          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null, s.is_extension ?? 0, s.task_id ?? null, s.abandoned ?? 0);
+          const result = insertSession.run(s.id, presetId, s.type, s.duration_minutes ?? 0, s.completed ?? 0, s.started_at, s.completed_at ?? null, s.created_at, s.updated_at, s.deleted_at ?? null, s.is_extension ?? 0, s.task_id ?? null, s.abandoned ?? 0, s.retroactive ?? 0);
           if (result.changes > 0) changed = true;
         } else if (s.completed === 1 && local.completed === 0) {
           completeSession.run(s.completed_at, s.updated_at, s.id);

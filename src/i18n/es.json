@@ -610,6 +610,18 @@
     "year": "Año"
   },
   "coinify": {
+    "accountInitialBalance": "Saldo inicial",
+    "accountInitialHint": "Saldo inicial: lo que la cuenta tiene HOY. Desde acá, cada movimiento con cuenta lo actualiza solo.",
+    "accountKindLabel": "Tipo de cuenta",
+    "accountKind_bank": "Banco",
+    "accountKind_cash": "Efectivo",
+    "accountKind_wallet": "Billetera virtual",
+    "accountLabel": "Cuenta",
+    "accountName": "Nombre de cuenta",
+    "accountNone": "Sin cuenta",
+    "accountRowHint": "Ver los movimientos de {{name}}",
+    "accountsTotal": "Total en cuentas",
+    "allAccounts": "Todas las cuentas",
     "approxRateHint": "Aproximado: convertido con la cotización actual, no la del día del movimiento",
     "backfillFx": "Completar cotizaciones faltantes",
     "backfillFxDone": "{{count}} movimientos con cotización congelada",
@@ -677,6 +689,7 @@
     "cash": "Efectivo",
     "categoryHelp": "Distribución de gastos por categoría. Tocá una porción para ver el detalle.",
     "chestHelp": "Balance neto del mes: ingresos menos gastos. El porcentaje compara con el mes anterior y la línea muestra la tendencia de los últimos 6 meses.",
+    "chestHelpAccounts": "Balance neto del mes arriba. Click en el cofre: tus cuentas con su saldo real (saldo inicial + movimientos). Click en una cuenta: sus movimientos.",
     "clickToEdit": "Click para editar",
     "colAmount": "MONEDAS",
     "colCategory": "CATEGORÍA",
@@ -846,6 +859,10 @@
     "closingDay": "Día de cierre",
     "newCard": "Nueva tarjeta",
     "deleteCardConfirm": "¿Eliminar esta tarjeta? Los gastos asociados no se verán afectados.",
+    "deleteAccountConfirm": "¿Eliminar esta cuenta? Sus movimientos conservan el historial.",
+    "editAccount": "Editar cuenta",
+    "manageAccounts": "Gestionar cuentas",
+    "newAccount": "Nueva cuenta",
     "selectCard": "Seleccionar tarjeta",
     "statements": "Resúmenes",
     "statementsHelp": "Resumen por tarjeta: período de facturación, gastos del ciclo actual y estado de cierre.",
@@ -876,7 +893,19 @@
     "showComparison": "Comparar con mes anterior",
     "spendingAboveAverage": "Gasto por encima del promedio",
     "usdOnlyCategories": "+ {{amount}} en {{count}} categorías sin gasto en pesos",
+    "reason_account_not_found": "La cuenta ya no existe",
     "reason_currency_mismatch": "El pago debe estar en la misma moneda que el préstamo",
+    "reason_invalid_currency": "Moneda inválida",
+    "reason_invalid_kind": "Tipo de cuenta inválido",
+    "reason_same_account": "Elegí dos cuentas distintas",
+    "reason_transfer_currency_mismatch": "Las dos cuentas deben tener la misma moneda",
+    "transferBetween": "Transferir entre cuentas",
+    "transferFrom": "Desde",
+    "transferHint": "Mueve plata entre tus cuentas: no cuenta como gasto ni como ingreso del mes.",
+    "transferSameAccount": "Elegí dos cuentas distintas",
+    "transferSubmit": "Transferir",
+    "transferSuccess": "Transferencia registrada",
+    "transferTo": "Hacia",
     "widgetHelp": "Balance mensual rápido: ingresos vs gastos del mes actual."
   },
   "character": {
@@ -1064,6 +1093,14 @@
     "recipe": "Receta",
     "resting": "Descansando…",
     "resume": "Continuar",
+    "retro": {
+      "hint": "Entra al estante con borde punteado. Cuenta para el registro, no da XP.",
+      "jarMark": "registrada a mano",
+      "link": "¿Trabajaste sin el caldero?",
+      "logged": "Sesión registrada en el estante — sin XP",
+      "minutes": "Minutos",
+      "submit": "Registrar"
+    },
     "round": "{{round}}ª ronda",
     "selectedRecipe": "Receta seleccionada",
     "shelf": {
@@ -1421,8 +1458,28 @@
     "innResting": "Descansando en la Posada",
     "innSince": "Descansando desde el {{date}}",
     "innWelcomeBack": "¡Bienvenido de vuelta! Tu racha te esperaba",
+    "legendLevel": "Nivel de leyenda",
+    "legendLevelTip": "Tu nivel global: la historia entera de la cuenta. El oficio de cada módulo se mide abajo.",
     "level": "Nivel",
     "levelUp": "¡SUBISTE DE NIVEL!",
+    "mastery": {
+      "ranks": {
+        "adept": "Adepto",
+        "apprentice": "Aprendiz",
+        "artisan": "Artesano",
+        "expert": "Experto",
+        "grandmaster": "Gran Maestro",
+        "initiate": "Iniciado",
+        "journeyman": "Oficial",
+        "legend": "Leyenda del Oficio",
+        "master": "Maestro",
+        "veteran": "Veterano"
+      }
+    },
+    "masteryLevelShort": "Rango",
+    "masteryNext": "{{n}} xp al siguiente rango",
+    "masteryPeak": "cima del oficio",
+    "masteryTitle": "Maestrías del oficio",
     "pardonUsed": "Se usó un indulto — tu racha sigue viva",
     "pardons": "Indultos",
     "pardonsEmpty": "Sin indultos este mes",
@@ -1448,11 +1505,87 @@
     "rwdRedeemedTimes": "canjeada ×{{n}}",
     "rwdSpent": "gastados",
     "rwdSubtitle": "Dó los óbolos ganados se cambian por gustos que vos mismo ponés en el mostrador",
+    "rwdTab": "Recompensas",
     "rwdTitle": "Recompensas",
     "rwdUnavailable": "El mostrador todavía no está disponible en esta versión.",
     "sealInvite": "Sellar el día",
     "sealInviteSub": "{{n}} hechos por cerrar",
     "sealInviteYesterday": "Te quedó ayer sin sellar",
+    "shop": {
+      "items": {
+        "bg_burgundy": {
+          "name": "Tapiz Borgoña",
+          "desc": "Un fondo de vino profundo para la ficha del héroe."
+        },
+        "bg_forest": {
+          "name": "Tapiz del Bosque",
+          "desc": "Musgo y sombra verde tras el retrato."
+        },
+        "bg_night": {
+          "name": "Cielo Nocturno",
+          "desc": "Estrellas sobre el héroe que trasnocha."
+        },
+        "frame_gilded": {
+          "name": "Marco Dorado",
+          "desc": "Doble anillo de oro para el retrato del héroe."
+        },
+        "frame_iron": {
+          "name": "Marco Remachado",
+          "desc": "Hierro forjado en frío, con sus remaches a la vista."
+        },
+        "frame_laurel": {
+          "name": "Marco de Laureles",
+          "desc": "El verde del vencedor rodea tu retrato."
+        },
+        "pardon_extra": {
+          "name": "Indulto extra",
+          "desc": "Un tercer perdón para este mes. La racha agradece."
+        },
+        "seal_crescent": {
+          "name": "La Luna",
+          "desc": "Para quien sella el día cuando todos duermen."
+        },
+        "seal_oak": {
+          "name": "El Roble",
+          "desc": "Raíces hondas, copa ancha: constancia hecha árbol."
+        },
+        "seal_serpent": {
+          "name": "La Sierpe",
+          "desc": "Se enrosca sobre sí: cada día vuelve a empezar."
+        },
+        "seal_stag": {
+          "name": "El Ciervo",
+          "desc": "Astas al viento, el sello de quien madruga."
+        },
+        "seal_sun": {
+          "name": "El Sol Radiante",
+          "desc": "El sello de las jornadas doradas."
+        },
+        "seal_tower": {
+          "name": "La Torre",
+          "desc": "Piedra sobre piedra, como los días."
+        }
+      }
+    },
+    "shopAlreadyOwned": "Ya era tuyo.",
+    "shopBuy": "Comprar",
+    "shopBuyConfirm": "¿Comprar «{{name}}» por {{cost}} óbolos?",
+    "shopEquip": "Usar",
+    "shopEquipped": "en uso",
+    "shopGroupOrnaments": "Ornamentos del héroe",
+    "shopGroupPardon": "Indulto extra",
+    "shopGroupSeals": "Sellos coleccionables",
+    "shopInsufficient": "Todavía no te alcanzan los óbolos. Un par de días sellados más.",
+    "shopMonthlyCap": "El indulto comprado es uno por mes, y este mes ya está.",
+    "shopOwned": "comprado",
+    "shopPardonBought": "comprado este mes",
+    "shopPardonFoot": "Suma un tercer indulto al mes en curso, además de los dos automáticos. Uno por mes, sin acumular.",
+    "shopPerDevice": "Lo comprado te sigue a todas tus máquinas; lo que está en uso se elige en cada una.",
+    "shopPurchased": "Comprado. Ya es tuyo, para siempre.",
+    "shopSealsFoot": "El lacre del Códice estampa el sello que elijas. La roseta de siempre es tuya y no se va a ningún lado.",
+    "shopTab": "Tienda",
+    "shopUnavailable": "La tienda todavía no está disponible en esta versión.",
+    "shopUnequip": "Quitar",
     "streak": "racha",
     "titles": {
       "peasant": "Campesino",

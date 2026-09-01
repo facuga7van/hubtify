@@ -385,6 +385,19 @@ export interface HubtifyApi {
   rpgSaveReward: (input: Record<string, unknown>) => Promise<Reward | null>;
   rpgDeleteReward: (id: string) => Promise<{ ok: boolean }>;
   rpgRedeemReward: (id: string) => Promise<RedeemResult>;
+  rpgGetShopCatalog: () => Promise<{
+    items: Array<{ id: string; kind: string; cost: number; i18nKey: string; owned: boolean; equipped: boolean; purchasedAt: string | null }>;
+    balance: number;
+    equipped: { sealStyle: string | null; frame: string | null; background: string | null };
+  }>;
+  rpgPurchaseShopItem: (itemId: string) => Promise<
+    { ok: true; balance: number } | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' }>;
+  rpgEquipShopItem: (itemId: string | null, kind?: 'seal_style' | 'frame' | 'background') => Promise<
+    { ok: true; equipped: Record<string, string | null> } | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' }>;
+  rpgGetMasteries: () => Promise<Array<{
+    moduleId: string; xp: number; level: number; levelName: string; levelKey: string;
+    nextLevelXp: number | null; progress: number;
+  }>>;
   onRpgAchievementUnlocked: (callback: (id: string) => void) => () => void;
   onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => () => void;
   processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number; pardonUsed?: boolean; achievementIds?: string[] }>;
@@ -530,6 +543,12 @@ export interface HubtifyApi {
   financeGetValuedView: (month?: string) => Promise<Record<string, unknown>>;
   financeGetInflationSeries: () => Promise<{ ok: boolean; series: Array<{ month: string; index: number }> | null }>;
   financeGetUpcoming: (days?: number) => Promise<Record<string, unknown>>;
+  financeGetAccounts: () => Promise<Array<Record<string, unknown>>>;
+  financeGetAccountsOverview: () => Promise<{ accounts: Array<Record<string, unknown>>; totalArs: number; totalUsd: number }>;
+  financeSaveAccount: (input: Record<string, unknown>) => Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
+  financeDeleteAccount: (id: string) => Promise<{ ok: boolean; reason?: string }>;
+  financeTransferBetweenAccounts: (input: Record<string, unknown>) =>
+    Promise<{ ok: true; transferGroupId: string; expenseId: string; incomeId: string } | { ok: false; reason: string }>;
   dollarGetVisibleTypes: () => Promise<string[]>;
   dollarSetVisibleTypes: (types: string[]) => Promise<void>;
 
@@ -644,6 +663,8 @@ export interface HubtifyApi {
   cauldronDiscardInterruptedSession: () => Promise<{ success: boolean }>;
   cauldronCancelAutoStart: () => Promise<CauldronTimerState>;
   cauldronSetSessionTask: (taskId: string | null) => Promise<CauldronTimerState>;
+  cauldronLogPastSession: (payload: Record<string, unknown>) =>
+    Promise<{ id: string; minutes: number; startedAt: string; completedAt: string }>;
   cauldronGetWeekByProject: () => Promise<CauldronWeekTaskRow[]>;
   /** Pushes already-translated OS-notification texts to the main process. */
   cauldronSetLabels: (labels: Record<string, string>) => Promise<void>;
