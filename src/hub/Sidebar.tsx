@@ -6,7 +6,7 @@ import type { PlayerStats } from '../../shared/types';
 import { TITLE_THRESHOLDS } from '../../shared/types';
 import { xpThreshold } from '../../shared/rpg-engine';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
-import { Scroll, Shield, Sword, Bread, Coin, Cauldron, Chalice, MoonCrescent } from '../shared/components/icons';
+import { Scroll, Shield, Sword, Bread, Coin, Cauldron, Chalice, Bag, MoonCrescent } from '../shared/components/icons';
 import { SealRosette } from './codex/CodexSealIcons';
 import { useSealInvite } from './codex/useSealInvite';
 import { openCodex } from './codex/codexApi';
@@ -45,6 +45,7 @@ const NAV_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement
   coin: Coin,
   cauldron: Cauldron,
   chalice: Chalice,
+  bag: Bag,
 };
 
 function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -71,6 +72,8 @@ const navKeys: Array<{ path: string; key: string; icon: string }> = [
      at opacity .4 that did nothing). The shelf exists now, so it is back —
      Chalice, because a footed cup already IS the trophy in this icon family. */
   { path: '/achievements', key: 'nav.achievements', icon: 'chalice' },
+  /* The purse: obolos earned at the seal, spent on the user's own rewards. */
+  { path: '/rewards', key: 'nav.rewards', icon: 'bag' },
 ];
 
 const bottomNavKeys: Array<{ path: string; key: string; icon: string }> = [

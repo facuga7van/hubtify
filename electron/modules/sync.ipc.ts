@@ -37,6 +37,8 @@ interface SyncTask {
   dueDate: string | null;
   order: number;
   completedAt: string | null;
+  repeatRule?: string | null;
+  repeatOf?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -139,6 +141,12 @@ interface SyncQuestData {
   /** Fase 2: PK = date; el primer sello gana, re-sellar no existe. */
   daySeals?: Array<{ date: string; sealedAt: string; xpAwarded: number; vigor: number;
                      eventsCount: number; modules: string; updatedAt: string }>;
+  /** Fase 3: append-only ledger. Union por id; ganancias con guard (reason, ref_id). */
+  obolosLedger?: Array<{ id: string; delta: number; reason: string; refId: string | null;
+                         createdAt: string; updatedAt: string }>;
+  /** Fase 3: recompensas propias — LWW por updatedAt, soft-delete. */
+  rewards?: Array<{ id: string; name: string; cost: number; icon: string | null;
+                    createdAt: string; updatedAt: string; deletedAt: string | null }>;
 }
 
 const USER_DATA_TABLES = [
@@ -146,6 +154,8 @@ const USER_DATA_TABLES = [
   'rpg_events',
   'achievements_unlocked',
   'day_seals',
+  'obolos_ledger',
+  'rewards',
   'finance_budgets',
   'user_profile',
   'character_data',
@@ -324,7 +334,7 @@ export function mergeNutritionFoods(
   if (Array.isArray(d.foodLog)) {
     const getFoodBySync = db.prepare('SELECT id, date, updated_at FROM food_log WHERE sync_id = ?');
     const getFoodByNatural = db.prepare('SELECT id, date, updated_at FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?');
-    const insertFood = db.prepare('INSERT INTO food_log (sync_id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const insertFood = db.prepare('INSERT INTO food_log (sync_id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     const updateFood = db.prepare('UPDATE food_log SET deleted_at = ?, updated_at = ? WHERE id = ?');
     const adoptFoodSync = db.prepare('UPDATE food_log SET sync_id = ? WHERE id = ? AND sync_id IS NULL AND NOT EXISTS (SELECT 1 FROM food_log WHERE sync_id = ?)');
     const freqBySync = db.prepare('SELECT id FROM frequent_foods WHERE sync_id = ?');
@@ -354,7 +364,9 @@ export function mergeNutritionFoods(
       }
 
       if (!local) {
-        insertFood.run(syncId, f.date, f.time, f.description, f.calories, f.source ?? 'manual', frequentFoodId, f.ai_breakdown ?? null, f.meal ?? null, f.updated_at ?? null, f.deleted_at ?? null);
+        insertFood.run(syncId, f.date, f.time, f.description, f.calories, f.source ?? 'manual', frequentFoodId, f.ai_breakdown ?? null, f.meal ?? null,
+          f.is_event ?? 0, f.event_kcal_min ?? null, f.event_kcal_max ?? null, f.protein_g ?? null,
+          f.updated_at ?? null, f.deleted_at ?? null);
         affectedDates.add(f.date);
         changed = true;
       } else if ((f.updated_at ?? '') > (local.updated_at || '')) {
@@ -437,14 +449,15 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
 
     // ── Merge tasks ──
     step('tasks', () => {
-      const getTask = db.prepare('SELECT id, updated_at FROM tasks WHERE id = ?');
+      const getTask = db.prepare('SELECT id, updated_at, repeat_rule, repeat_of FROM tasks WHERE id = ?');
       const insertTask = db.prepare(`
-        INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, repeat_rule, repeat_of, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const updateTask = db.prepare(`
         UPDATE tasks SET name = ?, description = ?, status = ?, tier = ?, category = ?,
-               project_id = ?, due_date = ?, task_order = ?, completed_at = ?, updated_at = ?, deleted_at = ?
+               project_id = ?, due_date = ?, task_order = ?, completed_at = ?,
+               repeat_rule = ?, repeat_of = ?, updated_at = ?, deleted_at = ?
         WHERE id = ?
       `);
       // tasks.project_id REFERENCES projects(id): a task pointing at a project this
@@ -456,14 +469,21 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
         // took the whole pull down with it.
         if (!isUsableRow(rt, 'tasks', ['id', 'name'])) continue;
         const projectId = rt.projectId && projectExists.get(rt.projectId) ? rt.projectId : null;
-        const local = getTask.get(rt.id) as { id: string; updated_at: string } | undefined;
+        const local = getTask.get(rt.id) as { id: string; updated_at: string; repeat_rule: string | null; repeat_of: string | null } | undefined;
         if (!local) {
           insertTask.run(rt.id, rt.name, rt.description ?? '', rt.status ?? 0, rt.tier ?? 2, rt.category ?? '',
-            projectId, rt.dueDate ?? null, rt.order ?? 0, rt.completedAt ?? null, rt.createdAt, rt.updatedAt, rt.deletedAt);
+            projectId, rt.dueDate ?? null, rt.order ?? 0, rt.completedAt ?? null,
+            rt.repeatRule ?? null, rt.repeatOf ?? null, rt.createdAt, rt.updatedAt, rt.deletedAt);
           changed = true;
         } else if (rt.updatedAt > local.updated_at) {
+          // A remote written by a client that predates repeat rules carries no
+          // opinion on them (property absent) — LWW must not wipe the local
+          // rule. An explicit null ("never") from a new client DOES win.
+          const repeatRule = 'repeatRule' in rt ? rt.repeatRule ?? null : local.repeat_rule;
+          const repeatOf = 'repeatOf' in rt ? rt.repeatOf ?? null : local.repeat_of;
           updateTask.run(rt.name, rt.description ?? '', rt.status ?? 0, rt.tier ?? 2, rt.category ?? '',
-            projectId, rt.dueDate ?? null, rt.order ?? 0, rt.completedAt ?? null, rt.updatedAt, rt.deletedAt, rt.id);
+            projectId, rt.dueDate ?? null, rt.order ?? 0, rt.completedAt ?? null,
+            repeatRule, repeatOf, rt.updatedAt, rt.deletedAt, rt.id);
           changed = true;
         }
       }
@@ -665,6 +685,56 @@ export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData)
         if (r.changes > 0) changed = true;
       }
     });
+
+    step('obolosLedger', () => {
+      // Append-only ledger: pure union by id. Earnings (delta > 0) carry one
+      // extra guard — the same (reason, ref_id) earned on two devices before
+      // they synced has two different uuids, and paying it twice would mint
+      // money. Spends have no guard: two legitimate redeems must both survive.
+      const existsEarning = db.prepare(
+        'SELECT 1 FROM obolos_ledger WHERE reason = ? AND ref_id = ? AND delta > 0',
+      );
+      const ins = db.prepare(`
+        INSERT OR IGNORE INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      for (const o of rows<{ id: string; delta: number; reason: string; refId: string | null;
+                             createdAt: string; updatedAt: string }>(remote.obolosLedger)) {
+        if (!o || typeof o.id !== 'string' || !o.id || typeof o.delta !== 'number') continue;
+        if (o.delta > 0 && o.refId && existsEarning.get(o.reason, o.refId)) continue;
+        const r = ins.run(o.id, o.delta, o.reason ?? 'day_sealed', o.refId ?? null,
+          o.createdAt ?? o.updatedAt, o.updatedAt ?? o.createdAt);
+        if (r.changes > 0) changed = true;
+      }
+    });
+
+    step('rewards', () => {
+      // LWW by updated_at; a soft-delete travels as one more column and wins
+      // like any other newer write.
+      const getReward = db.prepare('SELECT id, updated_at FROM rewards WHERE id = ?');
+      const ins = db.prepare(`
+        INSERT OR IGNORE INTO rewards (id, name, cost, icon, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      const upd = db.prepare(`
+        UPDATE rewards SET name = ?, cost = ?, icon = ?, updated_at = ?, deleted_at = ?
+        WHERE id = ?
+      `);
+      for (const rw of rows<{ id: string; name: string; cost: number; icon: string | null;
+                              createdAt: string; updatedAt: string; deletedAt: string | null }>(remote.rewards)) {
+        if (!rw || typeof rw.id !== 'string' || !rw.id || typeof rw.name !== 'string') continue;
+        const local = getReward.get(rw.id) as { id: string; updated_at: string } | undefined;
+        const remoteUpdated = rw.updatedAt ?? rw.createdAt;
+        if (!local) {
+          const r = ins.run(rw.id, rw.name, rw.cost ?? 0, rw.icon ?? null,
+            rw.createdAt ?? remoteUpdated, remoteUpdated, rw.deletedAt ?? null);
+          if (r.changes > 0) changed = true;
+        } else if (remoteUpdated > local.updated_at) {
+          upd.run(rw.name, rw.cost ?? 0, rw.icon ?? null, remoteUpdated, rw.deletedAt ?? null, rw.id);
+          changed = true;
+        }
+      }
+    });
   });
 
   tx();
@@ -729,6 +799,7 @@ export function registerSyncIpcHandlers(): void {
       SELECT id, name, description, status, tier, category,
              project_id AS projectId, due_date AS dueDate, task_order AS "order",
              completed_at AS completedAt,
+             repeat_rule AS repeatRule, repeat_of AS repeatOf,
              created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM tasks
     `).all();
@@ -793,7 +864,17 @@ export function registerSyncIpcHandlers(): void {
       FROM day_seals
     `).all();
 
-    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents, achievements, daySeals };
+    const obolosLedger = db.prepare(`
+      SELECT id, delta, reason, ref_id AS refId, created_at AS createdAt, updated_at AS updatedAt
+      FROM obolos_ledger
+    `).all();
+
+    const rewards = db.prepare(`
+      SELECT id, name, cost, icon, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
+      FROM rewards
+    `).all();
+
+    return { tasks, subtasks, projects, categories, habits, habitChecks, drawings, rpgEvents, achievements, daySeals, obolosLedger, rewards };
   });
 
   // Merges remote quest data with local using last-write-wins
@@ -813,7 +894,8 @@ export function registerSyncIpcHandlers(): void {
     const foodLog = db.prepare(`
       SELECT f.id, f.sync_id, f.date, f.time, f.description, f.calories, f.source,
              f.frequent_food_id, ff.sync_id AS frequent_food_sync_id,
-             f.ai_breakdown, f.meal, f.updated_at, f.deleted_at
+             f.ai_breakdown, f.meal, f.is_event, f.event_kcal_min, f.event_kcal_max,
+             f.protein_g, f.updated_at, f.deleted_at
       FROM food_log f
       LEFT JOIN frequent_foods ff ON ff.id = f.frequent_food_id
       ORDER BY f.date DESC, f.time DESC
@@ -838,14 +920,20 @@ export function registerSyncIpcHandlers(): void {
       // Profile — only overwrite if remote is newer (Issue #8)
       if (d.profile) {
         const p = d.profile;
-        const local = db.prepare('SELECT updated_at FROM nutrition_profile WHERE id = 1').get() as { updated_at: string | null } | undefined;
+        const local = db.prepare('SELECT updated_at, protein_target_g FROM nutrition_profile WHERE id = 1').get() as { updated_at: string | null; protein_target_g: number | null } | undefined;
         const remoteUpdatedAt = p.updated_at ?? '';
         if (!local || remoteUpdatedAt > (local.updated_at || '')) {
-          db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          // A profile exported by a client that predates protein targets has no
+          // protein_target_g property at all — that carries no opinion, and the
+          // INSERT OR REPLACE must not wipe the local target to NULL ("auto").
+          const proteinTarget = 'protein_target_g' in p
+            ? (p.protein_target_g as number | null) ?? null
+            : local?.protein_target_g ?? null;
+          db.prepare(`INSERT OR REPLACE INTO nutrition_profile (id, age, sex, height_cm, initial_weight_kg, activity_level, deficit_target_kcal, gym_calories, step_calories_factor, date_of_birth, weight_check_day, weight_popup_enabled, meal_schedule, day_cutoff_hour, protein_target_g, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
             p.age, p.sex, p.height_cm, p.initial_weight_kg, p.activity_level,
             p.deficit_target_kcal ?? 500, p.gym_calories ?? 300, p.step_calories_factor ?? 0.04,
             p.date_of_birth ?? null, p.weight_check_day ?? 1, p.weight_popup_enabled ?? 1,
-            p.meal_schedule ?? null, p.day_cutoff_hour ?? 4, remoteUpdatedAt || null
+            p.meal_schedule ?? null, p.day_cutoff_hour ?? 4, proteinTarget, remoteUpdatedAt || null
           );
           changed = true;
         }
@@ -967,6 +1055,7 @@ export function registerSyncIpcHandlers(): void {
              impacts_balance AS impactsBalance,
              installment_number AS installmentNumber,
              billed_amount_ars AS billedAmountArs,
+             fx_rate AS fxRate,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_transactions ORDER BY date DESC
@@ -1018,7 +1107,7 @@ export function registerSyncIpcHandlers(): void {
     const categories = db.prepare(`SELECT name, updated_at AS updatedAt, deleted_at AS deletedAt FROM finance_categories`).all();
 
     const creditCards = db.prepare(`
-      SELECT id, name, closing_day AS closingDay,
+      SELECT id, name, closing_day AS closingDay, due_day AS dueDay,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_credit_cards
@@ -1169,16 +1258,17 @@ export function registerSyncIpcHandlers(): void {
             (id, type, amount, currency, category, description, date, payment_method,
              source, installments, installment_group_id, for_third_party,
              recurring_id, import_batch_id, credit_card_id, impacts_balance,
-             installment_number, billed_amount_ars,
+             installment_number, billed_amount_ars, fx_rate,
              created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const updateTx = db.prepare(`
           UPDATE finance_transactions SET type = ?, amount = ?, currency = ?, category = ?,
             description = ?, date = ?, payment_method = ?, source = ?, installments = ?,
             installment_group_id = ?, for_third_party = ?, recurring_id = ?,
             import_batch_id = ?, credit_card_id = ?, impacts_balance = ?,
-            installment_number = ?, billed_amount_ars = ?, updated_at = ?,
+            installment_number = ?, billed_amount_ars = ?,
+            fx_rate = COALESCE(?, fx_rate), updated_at = ?,
             deleted_at = ?
           WHERE id = ?
         `);
@@ -1193,7 +1283,7 @@ export function registerSyncIpcHandlers(): void {
               t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
               t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
               t.creditCardId ?? null, t.impactsBalance ?? 1,
-              t.installmentNumber ?? null, t.billedAmountArs ?? null,
+              t.installmentNumber ?? null, t.billedAmountArs ?? null, t.fxRate ?? null,
               t.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt,
             );
             if (result.changes > 0) changed = true;
@@ -1204,7 +1294,8 @@ export function registerSyncIpcHandlers(): void {
               t.source ?? 'manual', t.installments ?? null, t.installmentGroupId ?? null,
               t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
               t.creditCardId ?? null, t.impactsBalance ?? 1,
-              t.installmentNumber ?? null, t.billedAmountArs ?? null, remoteUpdatedAt,
+              t.installmentNumber ?? null, t.billedAmountArs ?? null,
+              t.fxRate ?? null, remoteUpdatedAt,
               remoteDeletedAt, t.id,
             );
             changed = true;
@@ -1357,11 +1448,13 @@ export function registerSyncIpcHandlers(): void {
         const getCC = db.prepare('SELECT id, updated_at FROM finance_credit_cards WHERE id = ?');
         const insertCC = db.prepare(`
           INSERT OR IGNORE INTO finance_credit_cards
-            (id, name, closing_day, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+            (id, name, closing_day, due_day, created_at, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
         const updateCC = db.prepare(`
-          UPDATE finance_credit_cards SET name = ?, closing_day = ?, updated_at = ?, deleted_at = ?
+          UPDATE finance_credit_cards SET name = ?, closing_day = ?,
+                 due_day = CASE WHEN ? THEN ? ELSE due_day END,
+                 updated_at = ?, deleted_at = ?
           WHERE id = ?
         `);
         for (const card of data.creditCards as Array<Record<string, unknown>>) {
@@ -1369,10 +1462,17 @@ export function registerSyncIpcHandlers(): void {
           const remoteDeletedAt = (card.deletedAt as string) ?? (card.deleted_at as string) ?? null;
           const local = getCC.get(card.id ?? card.id) as { id: string; updated_at: string } | undefined;
           if (!local) {
-            insertCC.run(card.id, card.name ?? card.name, card.closingDay ?? card.closing_day, card.createdAt ?? card.created_at ?? now, remoteUpdatedAt, remoteDeletedAt);
+            insertCC.run(card.id, card.name ?? card.name, card.closingDay ?? card.closing_day,
+              (card.dueDay as number | null) ?? (card.due_day as number | null) ?? null,
+              card.createdAt ?? card.created_at ?? now, remoteUpdatedAt, remoteDeletedAt);
             changed = true;
           } else if (remoteUpdatedAt > (local.updated_at || '')) {
-            updateCC.run(card.name ?? card.name, card.closingDay ?? card.closing_day, remoteUpdatedAt, remoteDeletedAt, card.id);
+            // due_day: absent from an old client's payload = no opinion (keep
+            // local); an explicit null from a new client = clear the due day.
+            const hasDueDay = 'dueDay' in card || 'due_day' in card;
+            updateCC.run(card.name ?? card.name, card.closingDay ?? card.closing_day,
+              hasDueDay ? 1 : 0, (card.dueDay as number | null) ?? (card.due_day as number | null) ?? null,
+              remoteUpdatedAt, remoteDeletedAt, card.id);
             changed = true;
           }
         }

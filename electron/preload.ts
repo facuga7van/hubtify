@@ -10,6 +10,11 @@ const api = {
   rpgGetDaySummary: (date?: string | null) => ipcRenderer.invoke('rpg:getDaySummary', date),
   rpgSealDay: (date?: string | null) => ipcRenderer.invoke('rpg:sealDay', date),
   rpgGetSeals: (fromDate: string, toDate: string) => ipcRenderer.invoke('rpg:getSeals', fromDate, toDate),
+  rpgGetObolosBalance: () => ipcRenderer.invoke('rpg:getObolosBalance'),
+  rpgGetRewards: () => ipcRenderer.invoke('rpg:getRewards'),
+  rpgSaveReward: (input: Record<string, unknown>) => ipcRenderer.invoke('rpg:saveReward', input),
+  rpgDeleteReward: (id: string) => ipcRenderer.invoke('rpg:deleteReward', id),
+  rpgRedeemReward: (id: string) => ipcRenderer.invoke('rpg:redeemReward', id),
   getRpgHistory: (limit: number) => ipcRenderer.invoke('rpg:getHistory', limit),
   rpgGetDashboardStats: () => ipcRenderer.invoke('rpg:getDashboardStats'),
   windowMinimize: () => ipcRenderer.send('window:minimize'),
@@ -60,6 +65,7 @@ const api = {
   nutritionGetFoodByDate: (date: string) => ipcRenderer.invoke('nutrition:getFoodByDate', date),
   nutritionCopyDay: (opts?: { from?: string; to?: string }) => ipcRenderer.invoke('nutrition:copyDay', opts),
   nutritionSearchHistory: (query?: string, limit?: number) => ipcRenderer.invoke('nutrition:searchHistory', query, limit),
+  nutritionGetEventDays: (start: string, end: string) => ipcRenderer.invoke('nutrition:getEventDays', start, end),
   nutritionGetCachedEstimate: (description: string) => ipcRenderer.invoke('nutrition:getCachedEstimate', description),
   nutritionCacheEstimate: (entry: Record<string, unknown>) => ipcRenderer.invoke('nutrition:cacheEstimate', entry),
   nutritionDeleteFood: (id: number) => ipcRenderer.invoke('nutrition:deleteFood', id),
@@ -198,6 +204,13 @@ const api = {
 
   // Dollar
   dollarGetRates: () => ipcRenderer.invoke('dollar:getRates'),
+  dollarGetFxHouse: () => ipcRenderer.invoke('dollar:getFxHouse'),
+  dollarSetFxHouse: (house: string) => ipcRenderer.invoke('dollar:setFxHouse', house),
+  dollarGetCurrentRate: (house?: string) => ipcRenderer.invoke('dollar:getCurrentRate', house),
+  financeBackfillFxRates: () => ipcRenderer.invoke('finance:backfillFxRates'),
+  financeGetValuedView: (month?: string) => ipcRenderer.invoke('finance:getValuedView', month),
+  financeGetInflationSeries: () => ipcRenderer.invoke('finance:getInflationSeries'),
+  financeGetUpcoming: (days?: number) => ipcRenderer.invoke('finance:getUpcoming', days),
   dollarGetVisibleTypes: () => ipcRenderer.invoke('dollar:getVisibleTypes'),
   dollarSetVisibleTypes: (types: string[]) => ipcRenderer.invoke('dollar:setVisibleTypes', types),
 

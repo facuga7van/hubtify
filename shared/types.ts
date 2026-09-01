@@ -73,8 +73,24 @@ export interface DaySummary {
 }
 export type SealResult =
   | { ok: true; date: string; xpAwarded: number; vigor: number; eventsCount: number;
-      modules: string[]; achievementIds: string[] }
+      modules: string[]; achievementIds: string[]; obolosGranted?: number }
   | { ok: false; reason: SealBlockedReason };
+
+export interface Reward {
+  id: string;
+  name: string;
+  cost: number;
+  icon: string | null;
+  createdAt: string;
+  updatedAt: string;
+  redeemedCount: number;
+}
+
+export interface ObolosBalance { balance: number; earned: number; spent: number }
+
+export type RedeemResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'not_found' };
 
 // ── Module Types ───────────────────────────────────────────
 
@@ -364,6 +380,11 @@ export interface HubtifyApi {
   rpgGetDaySummary: (date?: string | null) => Promise<DaySummary>;
   rpgSealDay: (date?: string | null) => Promise<SealResult>;
   rpgGetSeals: (fromDate: string, toDate: string) => Promise<DaySeal[]>;
+  rpgGetObolosBalance: () => Promise<ObolosBalance>;
+  rpgGetRewards: () => Promise<Reward[]>;
+  rpgSaveReward: (input: Record<string, unknown>) => Promise<Reward | null>;
+  rpgDeleteReward: (id: string) => Promise<{ ok: boolean }>;
+  rpgRedeemReward: (id: string) => Promise<RedeemResult>;
   onRpgAchievementUnlocked: (callback: (id: string) => void) => () => void;
   onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => () => void;
   processRpgEvent: (event: RpgEvent) => Promise<{ xpGained: number; hpChange: number; leveledUp: boolean; newTitle: string | null; milestoneXp?: number; comboMultiplier: number; bonusMultiplier: number; pardonUsed?: boolean; achievementIds?: string[] }>;
@@ -377,7 +398,10 @@ export interface HubtifyApi {
   questsGetTasks: (projectId?: string | null) => Promise<unknown[]>;
   questsUpsertTask: (task: Record<string, unknown>) => Promise<string>;
   questsDeleteTasks: (ids: string[]) => Promise<void>;
-  questsSetTaskStatus: (taskId: string, status: boolean) => Promise<void>;
+  questsSetTaskStatus: (
+    taskId: string,
+    status: boolean,
+  ) => Promise<{ repeated?: { nextTaskId: string; nextDueDate: string | null } } | undefined>;
   questsSyncTaskOrders: (orders: Array<{ id: string; order: number }>) => Promise<void>;
   questsGetSubtasks: (taskId: string) => Promise<unknown[]>;
   questsAddSubtask: (taskId: string, subtask: Record<string, unknown>) => Promise<string>;
@@ -416,6 +440,7 @@ export interface HubtifyApi {
   nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
   nutritionSearchHistory: (query?: string, limit?: number) => Promise<Array<{
+  nutritionGetEventDays: (start: string, end: string) => Promise<string[]>;
     description: string; calories: number; timesLogged: number;
     lastLogged: string | null; source: 'history' | 'favorite'; proteinG?: number;
   }>>;
@@ -497,6 +522,14 @@ export interface HubtifyApi {
 
   // Dollar
   dollarGetRates: () => Promise<{ success: boolean; rates: unknown[]; cached?: boolean; cachedAt?: string; error?: string }>;
+  dollarGetFxHouse: () => Promise<string>;
+  dollarSetFxHouse: (house: string) => Promise<{ ok: true; house: string } | { ok: false; reason: string }>;
+  dollarGetCurrentRate: (house?: string) => Promise<{ rate: number | null; house: string; cachedAt: string | null }>;
+  financeBackfillFxRates: () => Promise<{ ok: true; updated: number; rate: number } | { ok: false; reason: string }>;
+  /** Shapes owned by electron/modules/finance.balance.ts (mirrored in src/modules/finance/utils/display-mode.ts). */
+  financeGetValuedView: (month?: string) => Promise<Record<string, unknown>>;
+  financeGetInflationSeries: () => Promise<{ ok: boolean; series: Array<{ month: string; index: number }> | null }>;
+  financeGetUpcoming: (days?: number) => Promise<Record<string, unknown>>;
   dollarGetVisibleTypes: () => Promise<string[]>;
   dollarSetVisibleTypes: (types: string[]) => Promise<void>;
 

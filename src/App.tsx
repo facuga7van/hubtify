@@ -36,6 +36,7 @@ import { useAuthContext } from './shared/AuthContext';
    pass; `fallback={null}` keeps the page-flip transition from ever being
    handed a spinner as if it were the destination page. */
 const AchievementsPage = lazy(() => import('./hub/AchievementsPage'));
+const RewardsPage = lazy(() => import('./hub/rewards/RewardsPage'));
 
 function AuthPageWrapper() {
   const navigate = useNavigate();
@@ -107,6 +108,10 @@ export default function App() {
           <Route
             path="/achievements"
             element={<Suspense fallback={null}><AchievementsPage /></Suspense>}
+          />
+          <Route
+            path="/rewards"
+            element={<Suspense fallback={null}><RewardsPage /></Suspense>}
           />
           <Route path="/quests" element={<TaskList />} />
           <Route path="/nutrition" element={<Outlet />}>
