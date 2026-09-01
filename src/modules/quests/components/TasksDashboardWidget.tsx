@@ -7,6 +7,7 @@ import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
 import { type Task, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier } from '../utils';
+import { questsApi } from '../api';
 
 export default function TasksDashboardWidget() {
   const { t } = useTranslation();
@@ -77,21 +78,28 @@ export default function TasksDashboardWidget() {
     if (completingRef.current) return;
     completingRef.current = true;
     try {
-      await window.api.questsSetTaskStatus(task.id, true);
-      const result = await window.api.processRpgEvent({
-        type: 'TASK_COMPLETED', moduleId: 'quests',
-        payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
-        timestamp: Date.now(),
-      });
+      // `paysXp === false`: another instance of this recurring chain already
+      // paid today. The tick still lands, the XP does not. An older main
+      // answers undefined, which pays (see quests/api.ts).
+      const status = await questsApi().questsSetTaskStatus(task.id, true);
       playTaskComplete();
-      toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+      if (status && status.paysXp === false) {
+        toast({ type: 'info', message: t('questify.repeatAlreadyPaid', 'Esta misión ya pagó hoy — la cadena avanza igual') });
+      } else {
+        const result = await window.api.processRpgEvent({
+          type: 'TASK_COMPLETED', moduleId: 'quests',
+          payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
+          timestamp: Date.now(),
+        });
+        toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+      }
       loadData();
       window.dispatchEvent(new Event('rpg:statsChanged'));
       window.dispatchEvent(new Event('quests:dataChanged'));
     } finally {
       completingRef.current = false;
     }
-  }, [loadData, toast]);
+  }, [loadData, toast, t]);
 
   if (loading) return <Loading size="sm" />;
   if (loadError)

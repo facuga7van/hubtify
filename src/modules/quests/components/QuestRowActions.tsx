@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { useMenuKeyboard } from './useMenuKeyboard';
 import { useToast } from '../../../shared/components/useToast';
 import { isTaskLinkWired, startBrew, setSessionTask } from '../../cauldron/api';
 import { quickStartPresetId } from '../../cauldron/hooks';
@@ -74,6 +75,9 @@ export default function QuestRowActions({
   const [postponeOpen, setPostponeOpen] = useState(false);
   // Portaled so the menu is never clipped by a row/column with overflow hidden.
   const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
+  const closeMenu = useCallback(() => setOpen(false), []);
+  // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
+  useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
 
   useEffect(() => {
     if (!open) return;
@@ -85,13 +89,8 @@ export default function QuestRowActions({
       if (target.closest?.('.rpg-anchored-popup')) return;
       setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDocDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('mousedown', onDocDown);
   }, [open, anchorRef, popupRef]);
 
   // Vinculo Caldero <-> Questify: enciende el caldero sobre ESTA mision sin
@@ -172,8 +171,8 @@ export default function QuestRowActions({
           type="button"
           className="quest-icon-btn tap-target quest-note-btn"
           onClick={run(onOpenNotes)}
-          aria-label={t('questify.notes', 'Notes')}
-          title={t('questify.notes', 'Notes')}
+          aria-label={t('questify.notes', 'Notas')}
+          title={t('questify.notes', 'Notas')}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"
             fill="none" stroke="var(--ink-faded)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">

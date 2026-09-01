@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tick } from '../../../shared/components/codex/CodexPrimitives';
 import { NoonSun, Sparkle } from '../../../shared/components/icons/CodexIcons';
@@ -13,7 +13,8 @@ interface Props {
   /** Every pending task, unfiltered: this view deliberately ignores the filters. */
   tasks: Task[];
   projects: Project[];
-  onComplete: (task: Task) => void;
+  /** Resolves false when the backend refused: the row undoes its optimistic tick. */
+  onComplete: (task: Task) => void | Promise<boolean>;
   /** Fase 1 reschedule. Receives 'today' | 'tomorrow' | 'YYYY-MM-DDTHH:mm'. */
   onPostpone: (taskId: string, target: string) => void;
   /** Sends the user to the Pendientes tab — the planning surface. */
@@ -105,10 +106,20 @@ export default function TodayView({
 
   const pendingHabits = useMemo(() => habits.filter((h) => h.pendingToday), [habits]);
 
+  // In-flight guard per habit. processHabitCheck decides XP from the `habits`
+  // it was handed, which is only refreshed AFTER the await: a double click on
+  // the name checked, paid, then unchecked with stale data and never refunded.
+  const checkingRef = useRef<Set<string>>(new Set());
   const handleHabitCheck = async (habitId: string) => {
-    await processHabitCheck(habitId, habits, { toast, t, onXpGained: onHabitChecked });
-    await loadHabits();
-    onHabitChecked();
+    if (checkingRef.current.has(habitId)) return;
+    checkingRef.current.add(habitId);
+    try {
+      await processHabitCheck(habitId, habits, { toast, t, onXpGained: onHabitChecked });
+      await loadHabits();
+      onHabitChecked();
+    } finally {
+      checkingRef.current.delete(habitId);
+    }
   };
 
   const projectOf = (task: Task) => projects.find((p) => p.id === task.projectId) ?? null;
@@ -237,12 +248,17 @@ function TodayRow({ task, project, overdue, onComplete, onPostpone }: {
   task: Task;
   project: Project | null;
   overdue?: boolean;
-  onComplete: () => void;
+  onComplete: () => void | Promise<boolean>;
   onPostpone?: (target: string) => void;
 }) {
   const { t } = useTranslation();
   const [ticking, setTicking] = useState(false);
   const time = dueTimeOf(task.dueDate);
+
+  // A refused toggle un-ticks the quill; otherwise the row stayed ticked and dead.
+  const handleDrawComplete = () => {
+    Promise.resolve(onComplete()).then((ok) => { if (ok === false) setTicking(false); });
+  };
 
   return (
     <div className={`quest-row quest-today-row${overdue ? ' quest-row--delata quest-row--overdue' : ' quest-row--rara'}`}>
@@ -251,7 +267,7 @@ function TodayRow({ task, project, overdue, onComplete, onPostpone }: {
           <QuillCheckbox
             checked={ticking}
             onChange={() => { if (ticking) return; setTicking(true); playTaskComplete(); }}
-            onDrawComplete={onComplete}
+            onDrawComplete={handleDrawComplete}
           />
         </span>
 

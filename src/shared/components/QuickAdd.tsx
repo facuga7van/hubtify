@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useModalA11y } from '../hooks/useModalA11y';
+import { SHORTCUTS } from '../shortcuts';
 import type { Project } from '../../modules/quests/types';
 import { TierBadge, TIER_LABEL } from '../../modules/quests/utils';
 import type { TaskTier } from '../../modules/quests/types';
@@ -56,10 +57,17 @@ function MirrorText({ text, tokens }: { text: string; tokens: QuickAddToken[] })
   return <>{parts}</>;
 }
 
+/** The real binding lives in Layout + shortcuts.ts; the header used to say Ctrl+Q, which is Quit on macOS/Linux. */
+const QUICK_ADD_KEYS = SHORTCUTS.find((s) => s.i18nKey === 'shortcuts.quickAdd')?.keys ?? 'Ctrl+K';
+
 export default function QuickAdd({ onClose }: Props) {
   const { t, i18n } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
+  // Holding Enter (key autorepeat) used to create N identical quests: the form
+  // stayed mounted with a truthy title until two IPC round-trips finished.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState('');
   const [tier, setTier] = useState<TaskTier>(2);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -116,26 +124,35 @@ export default function QuickAdd({ onClose }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!parsed.title) return;
+    if (!parsed.title || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
 
-    await window.api.questsUpsertTask({
-      name: parsed.title,
-      tier: effectiveTier,
-      projectId: effectiveProjectId,
-      category: '',
-      description: '',
-      dueDate: parsed.dueDate,
-    });
+    try {
+      await window.api.questsUpsertTask({
+        name: parsed.title,
+        tier: effectiveTier,
+        projectId: effectiveProjectId,
+        category: '',
+        description: '',
+        dueDate: parsed.dueDate,
+      });
 
-    await window.api.processRpgEvent({
-      type: 'TASK_CREATED', moduleId: 'quests',
-      payload: { xp: 0, hp: 0 },
-      timestamp: Date.now(),
-    });
+      await window.api.processRpgEvent({
+        type: 'TASK_CREATED', moduleId: 'quests',
+        payload: { xp: 0, hp: 0 },
+        timestamp: Date.now(),
+      });
 
-    window.dispatchEvent(new Event('rpg:statsChanged'));
-    window.dispatchEvent(new Event('quests:dataChanged'));
-    onClose();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+      window.dispatchEvent(new Event('quests:dataChanged'));
+      onClose();
+    } catch (err) {
+      // The palette stays open with the text intact: nothing was lost, retry is one Enter away.
+      console.error('[QuickAdd] create failed', err);
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   /* ── Confirmation line ────────────────────────────
@@ -213,7 +230,7 @@ export default function QuickAdd({ onClose }: Props) {
           fontSize: 'var(--fs-label)', opacity: 0.65, marginBottom: 8,
           fontFamily: "'IM Fell English', serif", textAlign: 'center',
         }}>
-          {t('questify.quickAdd')} — Ctrl+Q
+          {t('questify.quickAdd')} — {QUICK_ADD_KEYS}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -285,7 +302,7 @@ export default function QuickAdd({ onClose }: Props) {
 
             <div style={{ flex: 1 }} />
 
-            <button type="submit" className="rpg-button" disabled={!parsed.title}
+            <button type="submit" className="rpg-button" disabled={!parsed.title || submitting}
               style={{ padding: '5px 16px', fontWeight: 'bold' }}>
               {t('questify.addQuest')}
             </button>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { useMenuKeyboard } from './useMenuKeyboard';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 
 interface Props {
@@ -87,6 +88,9 @@ export default function PostponeMenu({ onPick, children, className, title, disab
   const [open, setOpen] = useState(false);
   // Portaled so a row with overflow hidden can never clip it.
   const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
+  const closeMenu = useCallback(() => setOpen(false), []);
+  // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
+  useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
 
   useEffect(() => {
     if (!open) return;
@@ -98,13 +102,8 @@ export default function PostponeMenu({ onPick, children, className, title, disab
       if (target.closest?.('.rpg-anchored-popup')) return;
       setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDocDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('mousedown', onDocDown);
   }, [open, anchorRef, popupRef]);
 
   return (

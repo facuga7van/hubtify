@@ -220,6 +220,111 @@ export function spawnNextRepeatInstance(
   })();
 }
 
+/**
+ * Whether ANOTHER live instance of `taskId`'s recurring chain was already
+ * completed on `today` (local 'YYYY-MM-DD').
+ *
+ * The chain is `repeat_of ?? id`, so a plain task (no chain) never has
+ * siblings and this is simply false. Sync counts: an instance completed today
+ * on another device carries its `completed_at` over and blocks the same way.
+ */
+function chainPaidToday(db: Database.Database, taskId: string, today: string): boolean {
+  const task = db.prepare('SELECT repeat_of AS repeatOf FROM tasks WHERE id = ?')
+    .get(taskId) as { repeatOf: string | null } | undefined;
+  if (!task) return false;
+  const chainId = task.repeatOf ?? taskId;
+  const paid = db.prepare(`
+    SELECT 1 FROM tasks
+    WHERE deleted_at IS NULL AND status = 1 AND id != ?
+      AND (id = ? OR repeat_of = ?)
+      AND completed_at >= ? AND completed_at < ?
+    LIMIT 1
+  `).get(taskId, chainId, chainId, today, nextDateString(today));
+  return !!paid;
+}
+
+export interface SetTaskStatusResult {
+  /**
+   * Whether the renderer should emit TASK_COMPLETED for this completion.
+   *
+   * Every instance of a recurring chain has its own taskId, so the engine's
+   * undo-by-ref_id guard cannot see that "daily" completed three times in a
+   * minute is the same quest — each one paid full XP + combo + total_tasks.
+   * Rule: at most ONE payment per chain per LOCAL day. A second instance
+   * completed the same day still completes (the chain keeps advancing) but
+   * is not paid; a new day pays again. Un-completing the paid instance frees
+   * the day's slot (the refund already went through TASK_UNCOMPLETED).
+   */
+  paysXp: boolean;
+  repeated?: { nextTaskId: string; nextDueDate: string | null };
+}
+
+/**
+ * Marks a task (un)completed. `completedAt` is a LOCAL timestamp (see quests
+ * migration v11): it is read back against todayDateString(), which is local,
+ * and its date part is the "today" of the one-payment-per-chain rule.
+ * Returns undefined on un-completion (nothing to pay, nothing spawned).
+ */
+export function setTaskStatus(
+  db: Database.Database,
+  taskId: string,
+  status: boolean,
+  opts: { now?: string; completedAt?: string } = {},
+): SetTaskStatusResult | undefined {
+  const now = opts.now ?? new Date().toISOString();
+  const completedAt = opts.completedAt ?? localTimestamp();
+  return db.transaction(() => {
+    db.prepare('UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
+      .run(status ? 1 : 0, status ? completedAt : null, now, taskId);
+    if (!status) return undefined;
+
+    // Decided BEFORE spawning: the fresh open instance is status 0 and never
+    // counts, but the order keeps the rule independent of the spawn.
+    const paysXp = !chainPaidToday(db, taskId, completedAt.slice(0, 10));
+    // Recurring chain: completing spawns the next instance (idempotent — see
+    // spawnNextRepeatInstance). Un-completing deliberately does NOT undo it.
+    const spawned = spawnNextRepeatInstance(db, taskId, now);
+    return spawned ? { paysXp, repeated: spawned } : { paysXp };
+  })();
+}
+
+/**
+ * Toggles a real check for `date`. A row that is currently a 'skip' or a
+ * 'shield' is PROMOTED to a check rather than toggled off — the user asking
+ * for a check on an excused day means "actually, I did it", not "undo".
+ *
+ * Answers with the row's identity (`checkId`, `date`) in both directions, so
+ * the renderer can emit the HABIT_UNCHECKED that reverts exactly the
+ * HABIT_CHECKED it paid — a retroactive uncheck used to be free, and marking
+ * again promoted this same soft-deleted row and paid again.
+ */
+export function toggleHabitCheck(
+  db: Database.Database,
+  habitId: string,
+  date: string,
+): { checked: boolean; checkId: string; date: string } {
+  const now = new Date().toISOString();
+  return db.transaction(() => {
+    const existing = db.prepare(
+      'SELECT id, kind, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?'
+    ).get(habitId, date) as { id: string; kind: string | null; deleted_at: string | null } | undefined;
+
+    if (existing && !existing.deleted_at && (existing.kind ?? 'check') === 'check') {
+      db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, existing.id);
+      return { checked: false, checkId: existing.id, date };
+    }
+    if (existing) {
+      db.prepare("UPDATE habit_checks SET kind = 'check', deleted_at = NULL, updated_at = ? WHERE id = ?")
+        .run(now, existing.id);
+      return { checked: true, checkId: existing.id, date };
+    }
+    const checkId = genId();
+    db.prepare("INSERT INTO habit_checks (id, habit_id, date, kind, created_at, updated_at) VALUES (?, ?, ?, 'check', ?, ?)")
+      .run(checkId, habitId, date, now, now);
+    return { checked: true, checkId, date };
+  })();
+}
+
 /** 'today' / 'tomorrow' shorthands, or a literal date the picker produced. */
 function resolvePostponeTarget(target: string): string {
   if (target === 'today') return todayDateString();
@@ -325,25 +430,11 @@ export function registerQuestsIpcHandlers(): void {
     return { moved };
   });
 
-  ipcHandle('quests:setTaskStatus', (_e, taskId: string, status: boolean) => {
-    const db = getDb();
-    const now = new Date().toISOString();
-    // completed_at is a LOCAL timestamp (see quests migration v11): it is read back
-    // against todayDateString(), which is local. Writing UTC here dropped everything
-    // completed after 21:00 (UTC-3) out of today's counters.
-    db.prepare('UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?')
-      .run(status ? 1 : 0, status ? localTimestamp() : null, now, taskId);
-
-    // Recurring chain: completing spawns the next instance (idempotent — see
-    // spawnNextRepeatInstance). Un-completing deliberately does NOT undo it.
-    // The RPG flow is untouched: XP is paid by the renderer per completion.
-    // Older renderers ignore the return value, so widening void → object is safe.
-    if (status) {
-      const spawned = spawnNextRepeatInstance(db, taskId, now);
-      if (spawned) return { repeated: spawned };
-    }
-    return undefined;
-  });
+  // XP is paid by the renderer per completion, gated on the returned `paysXp`
+  // (see SetTaskStatusResult). Older renderers ignore the return value, so
+  // widening void → object is safe.
+  ipcHandle('quests:setTaskStatus', (_e, taskId: string, status: boolean) =>
+    setTaskStatus(getDb(), taskId, status));
 
   ipcHandle('quests:syncTaskOrders', (_e, orders: Array<{ id: string; order: number }>) => {
     const db = getDb();
@@ -694,41 +785,14 @@ export function registerQuestsIpcHandlers(): void {
     tx();
   });
 
-  /**
-   * Toggles a real check for `date`. A row that is currently a 'skip' or a
-   * 'shield' is PROMOTED to a check rather than toggled off — the user asking
-   * for a check on an excused day means "actually, I did it", not "undo".
-   */
-  function toggleCheck(db: Database.Database, habitId: string, date: string): { checked: boolean } {
-    const now = new Date().toISOString();
-    return db.transaction(() => {
-      const existing = db.prepare(
-        'SELECT id, kind, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?'
-      ).get(habitId, date) as { id: string; kind: string | null; deleted_at: string | null } | undefined;
-
-      if (existing && !existing.deleted_at && (existing.kind ?? 'check') === 'check') {
-        db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, existing.id);
-        return { checked: false };
-      }
-      if (existing) {
-        db.prepare("UPDATE habit_checks SET kind = 'check', deleted_at = NULL, updated_at = ? WHERE id = ?")
-          .run(now, existing.id);
-        return { checked: true };
-      }
-      db.prepare("INSERT INTO habit_checks (id, habit_id, date, kind, created_at, updated_at) VALUES (?, ?, ?, 'check', ?, ?)")
-        .run(genId(), habitId, date, now, now);
-      return { checked: true };
-    })();
-  }
-
-  ipcHandle('quests:checkHabit', (_e, habitId: string) => toggleCheck(getDb(), habitId, todayDateString()));
+  ipcHandle('quests:checkHabit', (_e, habitId: string) => toggleHabitCheck(getDb(), habitId, todayDateString()));
 
   ipcHandle('quests:checkHabitForDate', (_e, habitId: string, date: string) => {
     const yesterday = yesterdayDateString();
     if (date !== yesterday) {
       throw new Error(`Retroactive check only allowed for yesterday (${yesterday}), got: ${date}`);
     }
-    return toggleCheck(getDb(), habitId, date);
+    return toggleHabitCheck(getDb(), habitId, date);
   });
 
   /**

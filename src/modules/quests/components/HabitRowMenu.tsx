@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { useMenuKeyboard } from './useMenuKeyboard';
 
 interface Props {
   /** Today already carries a 'skip' row — the menu offers to undo it. */
@@ -22,6 +23,9 @@ export default function HabitRowMenu({ skipped, onEdit, onSkip, onDelete }: Prop
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
+  const closeMenu = useCallback(() => setOpen(false), []);
+  // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
+  useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
 
   useEffect(() => {
     if (!open) return;
@@ -30,13 +34,8 @@ export default function HabitRowMenu({ skipped, onEdit, onSkip, onDelete }: Prop
       if (popupRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
       setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDocDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('mousedown', onDocDown);
   }, [open, anchorRef, popupRef]);
 
   const run = (fn: () => void) => (e: React.MouseEvent) => {

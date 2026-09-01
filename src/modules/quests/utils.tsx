@@ -4,6 +4,8 @@ import { XP_MAP } from './types';
 import { playTaskComplete } from '../../shared/audio';
 import type { ToastData } from '../../shared/components/useToast';
 import { GemRough, GemCut, GemBrilliant } from '../../shared/components/icons/CodexIcons';
+import { todayDateString } from '../../../shared/date-utils';
+import { questsApi } from './api';
 
 export const TIER_LABEL: Record<TaskTier, string> = {
   1: 'questify.tier.quick',
@@ -76,15 +78,20 @@ export async function processHabitCheck(
   if (!habit) return;
 
   const result = date
-    ? await window.api.questsCheckHabitForDate(habitId, date)
-    : await window.api.questsCheckHabit(habitId);
+    ? await questsApi().questsCheckHabitForDate(habitId, date)
+    : await questsApi().questsCheckHabit(habitId);
+
+  // Every habit event names the day it is about. The engine reverts a
+  // HABIT_UNCHECKED against the HABIT_CHECKED of the same habit, and without
+  // the date "uncheck today" could refund yesterday's retro check instead.
+  const checkDate = date ?? todayDateString();
 
   if (result.checked) {
     if (date) {
       // Retroactive check: flat 5 XP (period-completion gate doesn't apply to past dates)
       const rpgResult = await window.api.processRpgEvent({
         type: 'HABIT_CHECKED', moduleId: 'quests',
-        payload: { xp: 5, hp: 0, habitId },
+        payload: { xp: 5, hp: 0, habitId, date: checkDate },
         timestamp: Date.now(),
       });
       callbacks.toast({
@@ -108,7 +115,7 @@ export async function processHabitCheck(
         const xp = 5 + Math.min(streak, 10);
         const rpgResult = await window.api.processRpgEvent({
           type: 'HABIT_CHECKED', moduleId: 'quests',
-          payload: { xp, hp: 0, habitId },
+          payload: { xp, hp: 0, habitId, date: checkDate },
           timestamp: Date.now(),
         });
         callbacks.toast({
@@ -127,18 +134,21 @@ export async function processHabitCheck(
     }
     playTaskComplete();
   } else {
-    // Uncheck logic (only for normal checks, not retroactive)
-    if (!date) {
-      const droppedBelowTarget = habit.checksThisPeriod === habit.targetThisPeriod;
-      if (droppedBelowTarget) {
-        await window.api.processRpgEvent({
-          type: 'HABIT_UNCHECKED', moduleId: 'quests',
-          payload: { xp: -5, hp: 0, habitId },
-          timestamp: Date.now(),
-        });
-        callbacks.toast({ type: 'warning', message: callbacks.t('questify.habitUnchecked', 'Habit unchecked — XP deducted') });
-        window.dispatchEvent(new Event('rpg:statsChanged'));
-      }
+    // A retroactive check ALWAYS paid (flat 5 XP, no period gate), so its
+    // uncheck always refunds. Unchecking today refunds only when the period
+    // that was paid for is no longer complete. Either way the undo carries the
+    // same habitId + date the payment did, so the engine reverts that event.
+    const droppedBelowTarget = date
+      ? true
+      : habit.checksThisPeriod === habit.targetThisPeriod;
+    if (droppedBelowTarget) {
+      await window.api.processRpgEvent({
+        type: 'HABIT_UNCHECKED', moduleId: 'quests',
+        payload: { xp: -5, hp: 0, habitId, date: checkDate },
+        timestamp: Date.now(),
+      });
+      callbacks.toast({ type: 'warning', message: callbacks.t('questify.habitUnchecked', 'Habit unchecked — XP deducted') });
+      window.dispatchEvent(new Event('rpg:statsChanged'));
     }
   }
   window.dispatchEvent(new Event('quests:dataChanged'));

@@ -109,10 +109,32 @@ export default function TaskList() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
+  /**
+   * `quests:dataChanged` is what Ctrl+K (QuickAdd) and the Cauldron's
+   * "Completar misión" fire — this list never listened, so a quest created
+   * from the palette only showed up after leaving and coming back. The list
+   * also EMITS the event after its own actions (for the widget and Layout's
+   * sync push); the ref keeps those from triggering a second reload.
+   */
+  const selfNotifyRef = useRef(false);
+  const notifyQuestsChanged = useCallback(() => {
+    selfNotifyRef.current = true;
+    try {
+      notifyQuestsChanged();
+    } finally {
+      selfNotifyRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     const handler = () => loadTasks();
+    const onDataChanged = () => { if (!selfNotifyRef.current) loadTasks(); };
     window.addEventListener('sync:questsUpdated', handler);
-    return () => window.removeEventListener('sync:questsUpdated', handler);
+    window.addEventListener('quests:dataChanged', onDataChanged);
+    return () => {
+      window.removeEventListener('sync:questsUpdated', handler);
+      window.removeEventListener('quests:dataChanged', onDataChanged);
+    };
   }, [loadTasks]);
 
   useEffect(() => {
@@ -235,46 +257,65 @@ export default function TaskList() {
   }, [projects, tasks]);
 
   /* ── Actions ────────────────────────────────────── */
-  const handleComplete = async (task: Task) => {
+  /**
+   * Resolves `true` when the toggle landed, `false` when the backend refused
+   * (DB locked, account mid-switch…) — the row that ticked optimistically
+   * reverts on `false` instead of staying grey forever.
+   */
+  const handleComplete = async (task: Task): Promise<boolean> => {
     const newStatus = !task.status;
-    if (newStatus) {
-      const [statusResult, result] = await Promise.all([
-        questsApi().questsSetTaskStatus(task.id, true),
-        window.api.processRpgEvent({
-          type: 'TASK_COMPLETED', moduleId: 'quests',
-          payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
+    try {
+      if (newStatus) {
+        // Sequential on purpose: the status answer decides whether XP is owed.
+        // `paysXp === false` means another instance of this recurring chain was
+        // already completed today (one payment per chain per local day). An
+        // older main process answers undefined — that IS the feature detection.
+        const statusResult = await questsApi().questsSetTaskStatus(task.id, true);
+        if (statusResult && statusResult.paysXp === false) {
+          toast({ type: 'info', message: t('questify.repeatAlreadyPaid', 'Esta misión ya pagó hoy — la cadena avanza igual') });
+        } else {
+          const result = await window.api.processRpgEvent({
+            type: 'TASK_COMPLETED', moduleId: 'quests',
+            payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
+            timestamp: Date.now(),
+          });
+          toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
+        }
+        // Recurring quest: the backend already dealt the next instance.
+        if (statusResult && statusResult.repeated) {
+          toast({ type: 'info', message: t('questify.repeatNextReady', 'La próxima ya está en el tablero') });
+        }
+      } else {
+        await window.api.questsSetTaskStatus(task.id, false);
+        await window.api.processRpgEvent({
+          type: 'TASK_UNCOMPLETED', moduleId: 'quests',
+          payload: { xp: -XP_MAP[task.tier], hp: 0, taskId: task.id },
           timestamp: Date.now(),
-        }),
-      ]);
-      toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
-      // Recurring quest: the backend already dealt the next instance (an older
-      // main process answers undefined — that IS the feature detection).
-      if (statusResult && typeof statusResult === 'object' && statusResult.repeated) {
-        toast({ type: 'info', message: t('questify.repeatNextReady', 'La próxima ya está en el tablero') });
+        });
+        // Losing XP used to happen in total silence, unlike unchecking a habit.
+        toast({
+          type: 'warning',
+          message: t('questify.taskUncompleted', 'Misión reabierta — {{xp}} XP descontados', { xp: XP_MAP[task.tier] }),
+        });
       }
-    } else {
-      await window.api.questsSetTaskStatus(task.id, false);
-      await window.api.processRpgEvent({
-        type: 'TASK_UNCOMPLETED', moduleId: 'quests',
-        payload: { xp: -XP_MAP[task.tier], hp: 0, taskId: task.id },
-        timestamp: Date.now(),
-      });
-      // Losing XP used to happen in total silence, unlike unchecking a habit.
-      toast({
-        type: 'warning',
-        message: t('questify.taskUncompleted', 'Misión reabierta — {{xp}} XP descontados', { xp: XP_MAP[task.tier] }),
-      });
+    } catch (err) {
+      console.error('[Quests] status toggle failed', err);
+      toast({ type: 'warning', message: t('common.somethingWentWrong', 'Algo salió mal') });
+      return false;
     }
     await loadTasks();
     window.dispatchEvent(new Event('rpg:statsChanged'));
-    window.dispatchEvent(new Event('quests:dataChanged'));
+    notifyQuestsChanged();
+    return true;
   };
 
   const handleBatchComplete = async () => {
     const ids = Array.from(selectedIds);
     const tasksToComplete = ids.map(id => pending.find(t => t.id === id)).filter(Boolean) as Task[];
     await Promise.all(tasksToComplete.map(async (task) => {
-      await window.api.questsSetTaskStatus(task.id, true);
+      // Same gate as the single tick: a recurring chain pays once per day.
+      const status = await questsApi().questsSetTaskStatus(task.id, true);
+      if (status && status.paysXp === false) return;
       await window.api.processRpgEvent({
         type: 'TASK_COMPLETED', moduleId: 'quests',
         payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
@@ -289,7 +330,7 @@ export default function TaskList() {
     setSelectedIds(new Set());
     await loadTasks();
     window.dispatchEvent(new Event('rpg:statsChanged'));
-    window.dispatchEvent(new Event('quests:dataChanged'));
+    notifyQuestsChanged();
   };
 
   /**
@@ -303,10 +344,10 @@ export default function TaskList() {
     if (moved > 0) {
       toast({ type: 'info', message: t('questify.postponed', '{{count}} misión(es) pospuesta(s)', { count: moved }) });
       await loadTasks();
-      window.dispatchEvent(new Event('quests:dataChanged'));
+      notifyQuestsChanged();
     }
     return moved;
-  }, [loadTasks, toast, t]);
+  }, [loadTasks, toast, t, notifyQuestsChanged]);
 
   const handleBatchPostpone = async (target: string) => {
     const moved = await postpone(Array.from(selectedIds), target);
@@ -337,7 +378,7 @@ export default function TaskList() {
     await window.api.questsDeleteTasks(Array.from(selectedIds));
     setSelectedIds(new Set());
     await loadTasks();
-    window.dispatchEvent(new Event('quests:dataChanged'));
+    notifyQuestsChanged();
   };
 
   /* Deleting ONE quest used to require discovering a 12px selection square
@@ -355,7 +396,7 @@ export default function TaskList() {
       const next = new Set(prev); next.delete(task.id); return next;
     });
     await loadTasks();
-    window.dispatchEvent(new Event('quests:dataChanged'));
+    notifyQuestsChanged();
   };
 
   const hasActiveFilters = !!searchQuery || !!filter || activeProjectId !== undefined;
@@ -422,8 +463,8 @@ export default function TaskList() {
       return updated;
     });
     await window.api.questsSyncTaskOrders(orders);
-    window.dispatchEvent(new Event('quests:dataChanged'));
-  }, [tasks]);
+    notifyQuestsChanged();
+  }, [tasks, notifyQuestsChanged]);
 
   const onDragEnd = async (event: DragEndEvent, visible: Task[]) => {
     const { active, over } = event;
@@ -459,7 +500,7 @@ export default function TaskList() {
       const next = new Set(prev); next.has(task.id) ? next.delete(task.id) : next.add(task.id); return next;
     }),
     onShowToast: (d: XpToastData) => toast({ type: 'xp', message: `+${d.xp} XP`, details: { xp: d.xp, bonusTier: d.bonusTier, comboMultiplier: d.comboMultiplier, streakMilestone: d.streakMilestone || undefined } }),
-    onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); },
+    onSubtaskChanged: () => { loadSubtasks(task.id); loadTasks(); notifyQuestsChanged(); },
     drawingCount: drawingCounts[task.id] ?? 0,
     onOpenNotes: () => setNotesTaskId(task.id),
     isEditing: editingTask?.id === task.id,
@@ -509,7 +550,7 @@ export default function TaskList() {
             editingTask={editingTask}
             projects={projects}
             activeProjectId={activeProjectId === undefined ? null : activeProjectId}
-            onSaved={() => { setEditingTask(null); setShowForm(false); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
+            onSaved={() => { setEditingTask(null); setShowForm(false); loadTasks(); notifyQuestsChanged(); }}
             onCancel={() => { setEditingTask(null); setShowForm(false); }}
             shouldFocus={showForm || !!editingTask}
           />
@@ -794,7 +835,7 @@ export default function TaskList() {
                         taskId={task.id}
                         subtasks={subs}
                         onShowToast={(d: XpToastData) => toast({ type: 'xp', message: `+${d.xp} XP`, details: { xp: d.xp, bonusTier: d.bonusTier, comboMultiplier: d.comboMultiplier, streakMilestone: d.streakMilestone || undefined } })}
-                        onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
+                        onSubtaskChanged={() => { loadSubtasks(task.id); loadTasks(); notifyQuestsChanged(); }}
                       />
                     </div>
                   )}
@@ -846,7 +887,7 @@ export default function TaskList() {
         <ProjectManager
           projects={projects}
           onClose={() => setShowProjectManager(false)}
-          onSaved={() => { loadTasks(); window.dispatchEvent(new Event('quests:dataChanged')); }}
+          onSaved={() => { loadTasks(); notifyQuestsChanged(); }}
         />
       )}
 
@@ -867,7 +908,10 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
   onToggleExpand, onComplete, onEdit, onDelete, onPostpone, onToggleSelect, onShowToast, onSubtaskChanged,
   drawingCount, onOpenNotes, isEditing, grouped }: {
   task: Task; expanded: boolean; selected: boolean; subtasks: Subtask[];
-  onToggleExpand: () => void; onComplete: () => void; onEdit: () => void;
+  onToggleExpand: () => void;
+  /** Resolves false when the backend refused: the row undoes its optimistic tick. */
+  onComplete: () => void | Promise<boolean>;
+  onEdit: () => void;
   onDelete: () => void;
   onPostpone: (target: string) => void;
   onToggleSelect: () => void; onShowToast: (d: XpToastData) => void;
@@ -903,12 +947,31 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
   const handleDrawComplete = useCallback(() => {
     const row = rowRef.current;
     const text = textRef.current;
-    if (!row || !text) { onComplete(); return; }
+
+    // The strike + slide already played by the time the backend answers. If it
+    // said no, undo both so the row is a row again — not a grey ghost whose
+    // checkbox ignores every click (`if (animatingComplete) return`).
+    const finish = () => {
+      Promise.resolve(onComplete()).then((ok) => {
+        if (ok !== false) return;
+        if (row) gsap.set(row, { clearProps: 'x,opacity' });
+        if (text) {
+          // completeTask() appends the 2px strikethrough div to the title span.
+          text.querySelectorAll<HTMLElement>(':scope > div').forEach((el) => {
+            if (el.style.height === '2px') el.remove();
+          });
+          gsap.set(text, { clearProps: 'opacity,position' });
+        }
+        setAnimatingComplete(false);
+      });
+    };
+
+    if (!row || !text) { finish(); return; }
 
     const tl = completeTaskAnim(row, text);
     tl.eventCallback('onComplete', () => {
       const removeTl = removeItem(row);
-      removeTl.eventCallback('onComplete', () => onComplete());
+      removeTl.eventCallback('onComplete', finish);
     });
   }, [onComplete]);
 

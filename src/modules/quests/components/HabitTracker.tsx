@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useToast } from '../../../shared/components/useToast';
@@ -103,11 +103,26 @@ export default function HabitTracker({ onXpGained }: Props) {
     return () => window.removeEventListener('account:switched', handler);
   }, [loadHabits, loadHeatmap, heatmapOpen]);
 
-  const handleCheck = async (habitId: string) => {
+  // In-flight guard per habit (the widget's checkingRef, per row). The XP
+  // decision inside processHabitCheck reads the `habits` it was handed, which
+  // only refreshes after the await: a double click checked, paid, then
+  // unchecked with stale data — habit off, XP kept.
+  const checkingRef = useRef<Set<string>>(new Set());
+  const withCheckGuard = async (habitId: string, run: () => Promise<void>) => {
+    if (checkingRef.current.has(habitId)) return;
+    checkingRef.current.add(habitId);
+    try {
+      await run();
+    } finally {
+      checkingRef.current.delete(habitId);
+    }
+  };
+
+  const handleCheck = (habitId: string) => withCheckGuard(habitId, async () => {
     await processHabitCheck(habitId, habits, { toast, t, onXpGained });
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
-  };
+  });
 
   const canRetroCheck = useCallback((h: HabitWithStreak): boolean => {
     // Only show badge if yesterday was NOT checked (checkedToday is irrelevant)
@@ -134,12 +149,12 @@ export default function HabitTracker({ onXpGained }: Props) {
     return false;
   }, []);
 
-  const handleRetroCheck = async (habitId: string) => {
+  const handleRetroCheck = (habitId: string) => withCheckGuard(habitId, async () => {
     const yesterday = daysAgoDateString(1);
     await processHabitCheck(habitId, habits, { toast, t, onXpGained }, yesterday);
     await loadHabits();
     if (heatmapOpen) loadHeatmap();
-  };
+  });
 
   /**
    * Skipping is the flu/travel escape hatch: the day is bridged, the streak
