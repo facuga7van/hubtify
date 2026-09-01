@@ -44,7 +44,19 @@ export default function CategoryManager({ categories, onClose, onSaved }: Props)
     });
     if (!ok) return;
     try {
-      await window.api.financeDeleteCategory(name);
+      const res = await window.api.financeDeleteCategory(name) as
+        { ok: boolean; reason?: string; count?: number } | void;
+      if (res && res.ok === false) {
+        // Decir POR QUÉ no se puede, y con cuántos: «Error al eliminar» a secas
+        // dejaba al usuario sin saber qué hacer.
+        toast({
+          type: 'warning',
+          message: res.reason === 'category_in_use'
+            ? t('coinify.categoryInUse', 'No se puede borrar «{{name}}»: hay {{count}} movimientos con esa categoría. Cambiáselas primero.', { name, count: res.count ?? 0 })
+            : t('coinify.deleteError', 'Error al eliminar'),
+        });
+        return;
+      }
       onSaved();
       window.dispatchEvent(new Event('finance:dataChanged'));
     } catch (err) {

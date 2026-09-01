@@ -426,6 +426,7 @@
     "cardPendingFlag": "Card purchase: does not leave your balance until you pay the statement",
     "cash": "Cash",
     "categoryHelp": "Expense breakdown by category. Tap a slice to see the detail.",
+    "categoryInUse": "Cannot delete \"{{name}}\": {{count}} movements use it. Reassign them first.",
     "categoryName": "Category name",
     "ccTracking": "CC",
     "chestHelp": "Net balance for the month: income minus expenses. The percentage compares with last month, and the line shows the trend over the last 6 months.",

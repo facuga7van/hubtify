@@ -15,6 +15,8 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
   const [showManager, setShowManager] = useState(false);
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  /** ¿Editó el campo? Hasta entonces la lista se muestra entera. */
+  const [typed, setTyped] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +51,7 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
   // Sync inputValue when value prop changes externally
   useEffect(() => {
     setInputValue(value);
+    setTyped(false);
   }, [value]);
 
   // Close dropdown when clicking outside
@@ -57,6 +60,7 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setOpen(false);
         // If the user typed something that doesn't match, revert to current value
+        setTyped(false);
         if (!categories.includes(inputValue)) {
           setInputValue(value);
         }
@@ -66,18 +70,28 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [categories, inputValue, value]);
 
-  const filtered = inputValue
+  /*
+   * Sólo se filtra con lo que el usuario TIPEÓ, no con el valor que ya traía.
+   *
+   * El formulario de cuotas abre con «Otros» puesto, así que `inputValue` valía
+   * «Otros» desde el primer render y la lista se filtraba contra sí misma: al
+   * abrirla mostraba una sola opción y parecía vacía — no había forma de elegir
+   * otra categoría sin borrar el texto a mano primero.
+   */
+  const filtered = typed
     ? categories.filter((cat) => cat.toLowerCase().includes(inputValue.toLowerCase()))
     : categories;
 
   const handleSelect = (cat: string) => {
     setInputValue(cat);
     onChange(cat);
+    setTyped(false);
     setOpen(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
+    setTyped(true);
     setOpen(true);
   };
 
@@ -88,6 +102,7 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setOpen(false);
+      setTyped(false);
       setInputValue(value);
       inputRef.current?.blur();
     }

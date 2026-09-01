@@ -426,6 +426,7 @@
     "cardPendingFlag": "Compra con tarjeta: no descuenta del saldo hasta que pagues el resumen",
     "cash": "Efectivo",
     "categoryHelp": "Distribución de gastos por categoría. Tocá una porción para ver el detalle.",
+    "categoryInUse": "No se puede borrar «{{name}}»: hay {{count}} movimientos con esa categoría. Cambiáselas primero.",
     "categoryName": "Nombre de categoría",
     "ccTracking": "TC",
     "chestHelp": "Balance neto del mes: ingresos menos gastos. El porcentaje compara con el mes anterior y la línea muestra la tendencia de los últimos 6 meses.",

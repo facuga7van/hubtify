@@ -454,16 +454,21 @@ export function registerFinanceIpcHandlers(): void {
     return { ok: true, name: trimmed };
   });
 
+  /**
+   * Borrar una categoría en uso rompería los movimientos que la referencian, así
+   * que se frena. Antes eso era un `throw` con un mensaje en inglés que la UI
+   * convertía en «Error al eliminar» a secas: el usuario no sabía por qué no
+   * podía, ni cuántos movimientos lo impedían. Devuelve la razón y el número.
+   */
   ipcHandle('finance:deleteCategory', (_e, name: string) => {
     const db = getDb();
     const usage = db.prepare(
       'SELECT COUNT(*) AS c FROM finance_transactions WHERE category = ? AND deleted_at IS NULL'
     ).get(name) as { c: number };
-    if (usage.c > 0) {
-      throw new Error(`Cannot delete category in use by ${usage.c} transactions`);
-    }
+    if (usage.c > 0) return { ok: false as const, reason: 'category_in_use', count: usage.c };
     const now = nowIso();
     db.prepare('UPDATE finance_categories SET deleted_at = ?, updated_at = ? WHERE name = ?').run(now, now, name);
+    return { ok: true as const };
   });
 
   // ── Budgets ─────────────────────────────────────────
