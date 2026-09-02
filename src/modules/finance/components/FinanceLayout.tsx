@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BookPage } from '../../../shared/components/codex/BookPage';
@@ -16,6 +17,15 @@ const tabs = [
 export default function FinanceLayout() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+
+  // Seis pestañas no entran en 390 px y la tira scrollea: al llegar por link
+  // directo a la sexta, la activa quedaba fuera de vista y la primera parecía
+  // la elegida. `nearest` no mueve nada cuando ya se ve.
+  useEffect(() => {
+    const active = navRef.current?.querySelector<HTMLElement>('.coin-tab-link--active');
+    active?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [location.pathname]);
 
   return (
     <BookPage
@@ -28,7 +38,7 @@ export default function FinanceLayout() {
       {/* Tab navigation. Scrolls horizontally rather than overflowing the page
           when the window is narrow — six tabs do not fit at the 700px minimum. */}
       <div className="coin-tab-nav-wrap">
-        <nav className="coin-tab-nav" role="tablist">
+        <nav ref={navRef} className="coin-tab-nav" role="tablist">
           {tabs.map((tab) => {
             const isActive = 'end' in tab && tab.end
               ? location.pathname === tab.path

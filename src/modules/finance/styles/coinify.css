@@ -2892,3 +2892,201 @@ button.coin-sort-header--amount {
 .coin-quick-add-form input[type='checkbox'] {
   accent-color: var(--gold);
 }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE — 390 px (Fase 3). Ver docs/superpowers/plans/2026-09-02-mobile-phase3-shell.md, Task 14.
+   El comentario de «Responsive» más arriba asume 700 px de ventana mínima;
+   en Android la columna es de ~366 px y ninguna regla de 780 px la contempla.
+   ══════════════════════════════════════════════════════ */
+/* C1: 50/20 px de margen del libro en 390 px de pantalla.
+   OJO: `.coin-book .qb-page` (líneas 56 y 2141) no matchea NADA — BookPage
+   pone el `className` en el MISMO <div class="qb-page">, no en un ancestro
+   (BookPage.tsx:33). Son reglas muertas; no se tocan acá porque arreglarlas
+   le metería 80/40 px de padding al escritorio. La forma real es el
+   compuesto, y `.main-content` delante le gana a cualquier regla del módulo. */
+[data-shell="mobile"] .main-content .qb-page.coin-book {
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 16px;
+  padding-bottom: 20px;
+}
+
+/* C2: cinco pistas fijas suman 330 px; el concepto quedaba en cero. Tres
+   pistas y dos renglones: día | concepto | monto, y debajo categoría | acciones. */
+[data-shell="mobile"] .coin-ledger-header {
+  display: none;
+}
+
+[data-shell="mobile"] .coin-ledger-row:not(.coin-ledger-row--editing) {
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'day desc amount'
+    '. cat actions';
+  row-gap: 2px;
+  padding: 10px 2px;   /* C15 */
+}
+
+[data-shell="mobile"] .coin-ledger-row__day { grid-area: day; }
+[data-shell="mobile"] .coin-ledger-row__desc { grid-area: desc; }
+[data-shell="mobile"] .coin-ledger-row__amount { grid-area: amount; }
+[data-shell="mobile"] .coin-ledger-row__cat { grid-area: cat; }
+[data-shell="mobile"] .coin-ledger-row__actions { grid-area: actions; justify-self: end; }
+
+/* C3 */
+[data-shell="mobile"] .coin-import-overlay {
+  padding: 8px;
+  align-items: flex-start;
+}
+
+[data-shell="mobile"] .coin-import-modal {
+  width: 100%;
+  max-width: 100%;
+  max-height: 92vh;
+  padding: 12px;
+}
+
+[data-shell="mobile"] .coin-import-table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+[data-shell="mobile"] .coin-import-row__merchant {
+  max-width: 120px;
+}
+
+[data-shell="mobile"] .coin-import-card__select {
+  max-width: 100%;
+}
+
+[data-shell="mobile"] .coin-modal-overlay {
+  padding: 8px;
+  align-items: flex-start;
+}
+
+[data-shell="mobile"] .coin-modal,
+[data-shell="mobile"] .coin-modal--narrow {
+  width: 100%;
+  max-height: 90vh;
+}
+
+/* C5 */
+[data-shell="mobile"] .coin-loan-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-shell="mobile"] .coin-loan-tabs {
+  flex: 1 1 100%;
+}
+
+[data-shell="mobile"] .coin-loan-tab {
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* C6 */
+[data-shell="mobile"] .coin-loan-card__row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+[data-shell="mobile"] .coin-loan-card__progress {
+  grid-column: 2 / -1;
+}
+
+/* C7 */
+[data-shell="mobile"] .coin-installment-group__header {
+  flex-wrap: wrap;
+}
+
+[data-shell="mobile"] .coin-installment-group__progress {
+  flex: 1 1 100%;
+  order: 3;
+}
+
+/* C8 */
+[data-shell="mobile"] .coin-category-legend__row,
+[data-shell="mobile"] .coin-category-legend__item .coin-category-legend__row {
+  grid-template-columns: 10px minmax(0, 1fr) auto 34px 18px;
+  gap: 4px;
+}
+
+[data-shell="mobile"] .coin-category-legend__pct {
+  display: none;
+}
+
+/* C9: alto táctil; con scroll-snap la pestaña queda centrada. */
+[data-shell="mobile"] .coin-tab-nav {
+  scroll-snap-type: x proximity;
+}
+
+[data-shell="mobile"] .coin-tab-link {
+  padding: 12px 10px 13px;
+  letter-spacing: 0.06em;
+  scroll-snap-align: center;
+}
+
+/* C10 */
+[data-shell="mobile"] .coin-dollar-menu {
+  min-width: 0;
+  width: calc(100vw - 24px);
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* C11 */
+[data-shell="mobile"] .coin-month-nav {
+  gap: 6px;
+}
+
+[data-shell="mobile"] .coin-month-nav__label {
+  font-size: calc(12px * var(--font-scale));
+  letter-spacing: 0.04em;
+}
+
+/* C12 */
+[data-shell="mobile"] .coin-quick-add-form--open {
+  max-height: 1400px;
+}
+
+[data-shell="mobile"] .coin-quick-add-form__amount-row,
+[data-shell="mobile"] .coin-quick-add-form__installment-row {
+  flex-wrap: wrap;
+}
+
+/* C14 */
+[data-shell="mobile"] .coin-upcoming__kind {
+  display: none;
+}
+
+@media (hover: none) {
+  /* C4: poner un presupuesto por primera vez era imposible en touch. */
+  .coin-budget-pencil {
+    opacity: 0.75;
+    width: 32px;
+    height: 32px;
+  }
+
+  /* C13 */
+  .coin-editable-amount__pencil {
+    opacity: 0.55;
+  }
+
+  .coin-fx-house-pick,
+  .coin-budget-edit__btn,
+  .coin-recurring-card__toggle {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .coin-action-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .coin-account-row {
+    padding: 10px 6px;
+  }
+}
