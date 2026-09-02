@@ -21,6 +21,11 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- Mismo cuero (leather-dark) que el fondo de las imágenes de
+             resources/splash*.png, para que el splash del sistema (API 31+)
+             y el drawable no muestren franjas de otro color. -->
+        <item name="windowSplashScreenBackground">#2a1d0e</item>
+        <item name="android:windowBackground">#2a1d0e</item>
         <item name="android:background">@drawable/splash</item>
     </style>
 </resources>
