@@ -4,9 +4,11 @@
  * monta cada página DENTRO del MobileShell real, para medirla con la cabecera
  * de 56 px, sin sidebar y con el drawer disponible.
  *
- * `page.screenshot({ path })` resuelve relativo al archivo de test, por eso
- * SHOTS sube un nivel: las capturas caen en tests/visual/__screenshots__/mobile/
- * (gitignored, como screens/).
+ * Dos carpetas de capturas, las dos gitignored (.gitignore:19-20):
+ *  - las de `shoot()`: `page.screenshot({ path })` resuelve relativo al archivo
+ *    de test, y SHOTS sube un nivel → tests/visual/__screenshots__/mobile/
+ *  - las de fallo que saca vitest sola, que van al lado del test →
+ *    tests/visual/mobile/__screenshots__/<archivo>/<nombre del test>.png
  */
 import type { ReactNode } from 'react';
 import { render } from 'vitest-browser-react';

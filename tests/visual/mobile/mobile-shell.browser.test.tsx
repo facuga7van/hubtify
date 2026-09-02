@@ -1,7 +1,17 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 import { page } from 'vitest/browser';
+import { render } from 'vitest-browser-react';
+import { MemoryRouter } from 'react-router-dom';
 import { isNativeMobile } from '@shared/platform-detect';
-import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX } from './mobile-harness';
+import Layout from '@hub/Layout';
+import { AuthContext } from '@shared/AuthContext';
+import { ConfirmProvider } from '@shared/components/ConfirmDialog';
+// Las dos consultas al DOM que decide el botón atrás de Android. Se importan de
+// dialog-dom y NO de native-shell: ese importa @capacitor/app, y cargarlo define
+// globalThis.Capacitor con isNativePlatform() false, que volvería false a
+// isNativeMobile() en todo este archivo.
+import { hasOpenDialog, closeTopDialog } from '../../../src/mobile/dialog-dom';
+import { baseAuth, installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX } from './mobile-harness';
 
 import '../../../src/i18n';
 import '../../../src/hub/styles/theme.css';
@@ -123,5 +133,45 @@ describe('MobileShell — cabecera y drawer', () => {
     expect(parseFloat(getComputedStyle(main).paddingBottom)).toBe(20);
     document.documentElement.style.removeProperty('--safe-area-inset-top');
     document.documentElement.style.removeProperty('--safe-area-inset-bottom');
+  });
+
+  /* Lo que ve el botón atrás de Android (native-shell.ts:22-29): el selector
+     del diálogo abierto es lo único que separa «hay algo que cerrar» de
+     «estamos en la raíz», y el drawer cerrado se distingue por `inert`. */
+  test('hasOpenDialog ve el drawer solo cuando está abierto, y closeTopDialog lo cierra', async () => {
+    await setMobileViewport();
+    mountInShell(<Page />);
+    await settle();
+    expect(hasOpenDialog(document)).toBe(false);
+
+    await openDrawer();
+    expect(hasOpenDialog(document)).toBe(true);
+
+    closeTopDialog();
+    await settle(400);
+    expect(drawer().hasAttribute('inert')).toBe(true);
+    expect(hasOpenDialog(document)).toBe(false);
+  });
+
+  /* La elección de shell vive en Layout (Layout.tsx:235-236) y hasta acá
+     ningún test montaba Layout: el arnés monta MobileShell a mano. */
+  test('Layout elige el shell mobile: hay cabecera y no hay TitleBar ni riel', async () => {
+    await setMobileViewport();
+    // Se mide DENTRO del árbol que montó Layout: el arnés monta su propia
+    // .mobile-header y un resto del test anterior daría un falso verde.
+    const { container } = await render(
+      <MemoryRouter initialEntries={['/']}>
+        <AuthContext.Provider value={baseAuth}>
+          <ConfirmProvider>
+            <Layout />
+          </ConfirmProvider>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+    await settle(600);
+    expect(container.querySelector('.mobile-header')).not.toBeNull();
+    expect(container.querySelector('.title-bar')).toBeNull();
+    expect(container.querySelector('.sidebar-wrapper')).toBeNull();
+    expect(docOverflowX()).toBeLessThanOrEqual(0);
   });
 });

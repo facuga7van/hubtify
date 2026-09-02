@@ -14,19 +14,9 @@
  */
 import { App } from '@capacitor/app';
 import { handleBackButton } from './back-button';
+import { hasOpenDialog, closeTopDialog } from './dialog-dom';
 
-/** Un modal abierto: todos pasan por useModalA11y (role + aria-modal); el drawer cerrado lleva `inert`. */
-const OPEN_DIALOG =
-  '[role="dialog"][aria-modal="true"]:not([inert]), [role="alertdialog"][aria-modal="true"]:not([inert])';
-
-export function hasOpenDialog(root: ParentNode = document): boolean {
-  return root.querySelector(OPEN_DIALOG) !== null;
-}
-
-/** useModalA11y escucha keydown en window y solo reacciona el diálogo de más arriba. */
-export function closeTopDialog(): void {
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-}
+export { hasOpenDialog, closeTopDialog };
 
 /** Devuelve la función que suelta el listener (MobileShell la llama al desmontar). */
 export async function bindNativeShell(): Promise<() => void> {
