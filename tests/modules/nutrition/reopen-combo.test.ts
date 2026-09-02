@@ -38,7 +38,7 @@ vi.mock('../../../shared-logic/db', async (importOriginal) => ({
 }));
 
 const { initCoreTables, applyMigrations, coreMigrations } = await import('../../../shared-logic/db');
-const { processRpgEvent } = await import('../../../electron/ipc/rpg-handlers');
+const { processRpgEvent } = await import('../../../shared-logic/modules/rpg-handlers');
 const { registerNutritionIpcHandlers } = await import('../../../electron/modules/nutrition.ipc');
 registerNutritionIpcHandlers();
 

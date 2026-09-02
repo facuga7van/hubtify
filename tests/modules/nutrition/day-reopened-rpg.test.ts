@@ -23,7 +23,7 @@ vi.mock('../../../shared-logic/db', async (importOriginal) => {
 const { initCoreTables, applyMigrations, coreMigrations } =
   await import('../../../shared-logic/db');
 
-import { registerRpgHandlers } from '../../../electron/ipc/rpg-handlers';
+import { registerRpgHandlers } from '../../../shared-logic/modules/rpg-handlers';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

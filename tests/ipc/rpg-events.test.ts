@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
-import { processRpgEvent } from '../../electron/ipc/rpg-handlers';
+import { processRpgEvent } from '../../shared-logic/modules/rpg-handlers';
 import { ACHIEVEMENT_XP } from '../../shared/achievements';
 import { pinClockToNoon } from '../helpers/pin-clock';
 

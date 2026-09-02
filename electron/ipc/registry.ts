@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { getHandler, listChannels } from '../../shared-logic/registry';
-import { registerRpgHandlers } from './rpg-handlers';
+import { registerRpgHandlers } from '../../shared-logic/modules/rpg-handlers';
 import { registerQuestsIpcHandlers } from '../modules/quests.ipc';
 import { registerNutritionIpcHandlers } from '../modules/nutrition.ipc';
 import { registerFinanceIpcHandlers } from '../modules/finance.ipc';

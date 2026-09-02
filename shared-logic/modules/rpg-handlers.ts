@@ -1,8 +1,8 @@
-import type Database from 'better-sqlite3';
-import { getDb } from './db';
-import { ipcHandle } from './ipc-handle';
-import crypto from 'crypto';
-import { BrowserWindow } from 'electron';
+import type { SqlDatabase } from '../db';
+import { getDb } from '../db';
+import { registerHandler as ipcHandle } from '../registry';
+import { genId } from '../ids';
+import { emit } from '../events';
 import {
   getLevel,
   getTitle,
@@ -45,7 +45,7 @@ import {
 } from '../../shared/achievements';
 import type { RpgEvent, RpgEventRecord } from '../../shared/types';
 import { todayDateString, localTimestamp, daysAgoDateString, nextDateString, formatDateString } from '../../shared/date-utils';
-import { getPlayerStats, purchasedPardonExtras, rolloverVigor, type PlayerStatsV2 } from '../../shared-logic/modules/rpg-stats';
+import { getPlayerStats, purchasedPardonExtras, rolloverVigor, type PlayerStatsV2 } from './rpg-stats';
 
 /**
  * Hard bounds for anything arriving from the renderer (or, via sync, from an
@@ -184,18 +184,6 @@ function resolveBaseXp(type: string, payload: Record<string, unknown> | null): n
   return clampNumber(DEFAULT_EVENT_XP[type] ?? 0, -MAX_EVENT_XP, MAX_EVENT_XP);
 }
 
-/** Defensive broadcast to every renderer. Never allowed to break a transaction. */
-function broadcast(channel: string, ...args: unknown[]): void {
-  // Under vitest the electron mock has no BrowserWindow, and at real startup
-  // there may be no windows yet. Notifications are a nicety — they must never
-  // take the XP transaction down with them.
-  try {
-    for (const win of BrowserWindow?.getAllWindows?.() ?? []) {
-      win.webContents.send(channel, ...args);
-    }
-  } catch { /* headless or test environment */ }
-}
-
 export interface RpgEventResult {
   xpGained: number;
   hpChange: number;
@@ -258,7 +246,7 @@ interface InnStatsRow {
  * exactly one day missed with a pardon left to cover it. Mirrors the gap rule
  * in processRpgEvent (gap 1 → continues; gap 2 + pardon → continues; else dies).
  */
-function streakIsAlive(db: Database.Database, row: InnStatsRow, today: string): boolean {
+function streakIsAlive(db: SqlDatabase, row: InnStatsRow, today: string): boolean {
   if (!row.streak_last_date || row.streak <= 0) return false;
   const gap = daysDiff(row.streak_last_date, today);
   if (gap <= 1) return true;
@@ -293,7 +281,7 @@ function streakIsAlive(db: Database.Database, row: InnStatsRow, today: string): 
  * Before this, check-out rewound to YESTERDAY unconditionally, so "Posada →
  * Volver" turned any ten-day silence into a one-day gap for free.
  */
-export function setInnMode(db: Database.Database, on: boolean, today = getLocalDateString()): { innSince: string | null } {
+export function setInnMode(db: SqlDatabase, on: boolean, today = getLocalDateString()): { innSince: string | null } {
   const row = db.prepare(
     'SELECT inn_since, streak_last_date, streak, pardons_month, pardons_used FROM player_stats WHERE user_id = ?'
   ).get('default') as InnStatsRow | undefined;
@@ -340,7 +328,7 @@ export function setInnMode(db: Database.Database, on: boolean, today = getLocalD
  * so the XP/streak/undo rules can be tested against an in-memory database without
  * an Electron main process.
  */
-export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEventResult {
+export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResult {
     const isUndo = event.type === 'TASK_UNCOMPLETED' || event.type === 'SUBTASK_UNCOMPLETED'
       || event.type === 'HABIT_UNCHECKED' || event.type === 'MOVEMENT_DELETED'
       || event.type === 'DAY_REOPENED';
@@ -551,7 +539,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         event.moduleId, event.type, loggedXp, hpChange, comboMultiplier, bonusMultiplier,
-        JSON.stringify(event.payload), now, refId, crypto.randomUUID(),
+        JSON.stringify(event.payload), now, refId, genId(),
       );
 
       // Mastery accumulator: same transaction as the event, so the bar can
@@ -677,7 +665,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
           VALUES (?, ?, 0, 0, 1.0, 1.0, ?, ?, ?, ?)
         `).run(
           event.moduleId, event.type, JSON.stringify(event.payload), localTimestamp(),
-          extractRefId(event.type, event.payload as Record<string, unknown> | null), crypto.randomUUID(),
+          extractRefId(event.type, event.payload as Record<string, unknown> | null), genId(),
         );
       } catch { /* best effort logging */ }
       return { ...EMPTY_RESULT };
@@ -688,7 +676,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       // Central broadcast: callers of processRpgEvent are scattered across four
       // modules; one listener in Layout turns this into the single, discreet
       // "se uso un indulto" toast instead of wiring every call site.
-      if (result.pardonUsed) broadcast('rpg:pardonUsed');
+      if (result.pardonUsed) emit('rpg:pardonUsed');
 
       // ── Achievement matcher ──
       // Runs AFTER the event transaction commits, in its own transaction, on
@@ -701,7 +689,7 @@ export function processRpgEvent(db: Database.Database, event: RpgEvent): RpgEven
       // through processRpgEvent — that would recurse, and the reward would
       // re-enter the matcher that produced it.
       result.achievementIds = evaluateAchievements(db, seed, today, previousEventAt);
-      for (const id of result.achievementIds) broadcast('rpg:achievementUnlocked', { id });
+      for (const id of result.achievementIds) emit('rpg:achievementUnlocked', { id });
     } catch (err) {
       // The XP is paid and logged; only the decoration failed.
       console.error(`[RPG] reward layer failed after "${event.type}" committed:`, err);
@@ -734,7 +722,7 @@ function lazyField<K extends keyof AchievementContext>(
 }
 
 /** A count query that degrades to 0 when the table/column is not there yet. */
-function safeCount(db: Database.Database, sql: string, ...params: unknown[]): number {
+function safeCount(db: SqlDatabase, sql: string, ...params: unknown[]): number {
   try {
     const row = db.prepare(sql).get(...params as never[]) as { c: number } | undefined;
     return row?.c ?? 0;
@@ -754,7 +742,7 @@ function safeCount(db: Database.Database, sql: string, ...params: unknown[]): nu
  * never runs them.
  */
 export function buildAchievementContext(
-  db: Database.Database,
+  db: SqlDatabase,
   event: AchievementEventContext | null,
   today: string = getLocalDateString(),
   previousEventAt: string | null = null,
@@ -896,7 +884,7 @@ export type UnlockMode = 'live' | 'backfill';
  * it, and would let a reward carry a combo/bonus roll of its own.
  */
 export function evaluateAchievements(
-  db: Database.Database,
+  db: SqlDatabase,
   event: AchievementEventContext | null,
   today: string = getLocalDateString(),
   previousEventAt: string | null = null,
@@ -939,7 +927,7 @@ export function evaluateAchievements(
     for (const id of newly) {
       insertUnlock.run(id, now, now);
       if (mode === 'live') {
-        insertEvent.run(ACHIEVEMENT_XP, JSON.stringify({ id, xp: ACHIEVEMENT_XP }), now, id, crypto.randomUUID());
+        insertEvent.run(ACHIEVEMENT_XP, JSON.stringify({ id, xp: ACHIEVEMENT_XP }), now, id, genId());
       }
     }
     if (mode !== 'live') return;
@@ -979,7 +967,7 @@ export interface AchievementState {
 }
 
 /** The whole catalogue with per-entry state — hidden-and-locked ones included. */
-export function getAchievements(db: Database.Database): AchievementState[] {
+export function getAchievements(db: SqlDatabase): AchievementState[] {
   let unlocked = new Map<string, string>();
   try {
     const rows = db.prepare(
@@ -1010,11 +998,11 @@ export function getAchievements(db: Database.Database): AchievementState[] {
  * renderer shows a single "N logros reconocidos" note, not N toasts.
  */
 export function backfillAchievements(
-  db: Database.Database,
+  db: SqlDatabase,
   today: string = getLocalDateString(),
 ): { unlocked: string[]; total: number } {
   const unlocked = evaluateAchievements(db, null, today, null, 'backfill');
-  if (unlocked.length > 0) broadcast('rpg:achievementsBackfilled', { ids: unlocked });
+  if (unlocked.length > 0) emit('rpg:achievementsBackfilled', { ids: unlocked });
   return { unlocked, total: ACHIEVEMENTS_TOTAL };
 }
 
@@ -1115,7 +1103,7 @@ function rowToSeal(row: Record<string, unknown>): DaySeal {
   };
 }
 
-function readSeal(db: Database.Database, date: string): DaySeal | null {
+function readSeal(db: SqlDatabase, date: string): DaySeal | null {
   try {
     const row = db.prepare(
       `SELECT date, sealed_at AS sealedAt, xp_awarded AS xpAwarded, vigor,
@@ -1146,7 +1134,7 @@ function readSeal(db: Database.Database, date: string): DaySeal | null {
  * tomorrow worth exactly what sealing tonight was worth — never more.
  */
 export function sealVigorFor(
-  db: Database.Database,
+  db: SqlDatabase,
   date: string,
   today: string = getLocalDateString(),
 ): number {
@@ -1168,7 +1156,7 @@ export function sealVigorFor(
 
 /** Everything the Códice page renders for one local day. Read-only. */
 export function getDaySummary(
-  db: Database.Database,
+  db: SqlDatabase,
   date: string = getLocalDateString(),
   today: string = getLocalDateString(),
 ): DaySummary {
@@ -1264,7 +1252,7 @@ export function getDaySummary(
  * sealed and paid, or nothing happened and it can be retried.
  */
 export function sealDay(
-  db: Database.Database,
+  db: SqlDatabase,
   date: string = getLocalDateString(),
   today: string = getLocalDateString(),
 ): SealResult {
@@ -1334,12 +1322,12 @@ export function sealDay(
   });
 
   const outcome = seal();
-  if (outcome.ok) broadcast('rpg:daySealed', { date, xpAwarded });
+  if (outcome.ok) emit('rpg:daySealed', { date, xpAwarded });
   return outcome;
 }
 
 /** Seals in [fromDate, toDate], inclusive, ascending — the seal calendar. */
-export function getSeals(db: Database.Database, fromDate: string, toDate: string): DaySeal[] {
+export function getSeals(db: SqlDatabase, fromDate: string, toDate: string): DaySeal[] {
   try {
     const rows = db.prepare(
       `SELECT date, sealed_at AS sealedAt, xp_awarded AS xpAwarded, vigor,
@@ -1391,7 +1379,7 @@ export type ObolosEarnReason = 'day_sealed' | 'achievement';
  * it can never be taken down by its own reward.
  */
 export function grantObolos(
-  db: Database.Database,
+  db: SqlDatabase,
   reason: ObolosEarnReason,
   refId: string,
   amount: number,
@@ -1404,9 +1392,9 @@ export function grantObolos(
       INSERT INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
       SELECT ?, ?, ?, ?, ?, ?
       WHERE NOT EXISTS (SELECT 1 FROM obolos_ledger WHERE reason = ? AND ref_id = ?)
-    `).run(crypto.randomUUID(), minted, reason, refId, now, now, reason, refId);
+    `).run(genId(), minted, reason, refId, now, now, reason, refId);
     if (info.changes === 0) return 0;
-    broadcast('rpg:obolosChanged');
+    emit('rpg:obolosChanged');
     return minted;
   } catch (err) {
     console.error('[RPG] grantObolos failed:', err);
@@ -1421,7 +1409,7 @@ export interface ObolosBalance {
 }
 
 /** SUM over the whole ledger. Append-only, so there is nothing to filter. */
-export function getObolosBalance(db: Database.Database): ObolosBalance {
+export function getObolosBalance(db: SqlDatabase): ObolosBalance {
   try {
     const row = db.prepare(`
       SELECT COALESCE(SUM(delta), 0) AS balance,
@@ -1450,7 +1438,7 @@ export interface Reward {
 const REWARD_NAME_MAX = 80;
 const REWARD_COST_MAX = 1_000_000;
 
-function readReward(db: Database.Database, id: string): Reward | null {
+function readReward(db: SqlDatabase, id: string): Reward | null {
   const row = db.prepare(`
     SELECT r.id, r.name, r.cost, r.icon,
            r.created_at AS createdAt, r.updated_at AS updatedAt,
@@ -1462,7 +1450,7 @@ function readReward(db: Database.Database, id: string): Reward | null {
 }
 
 /** Living rewards, cheapest first, each carrying its lifetime redeem count. */
-export function getRewards(db: Database.Database): Reward[] {
+export function getRewards(db: SqlDatabase): Reward[] {
   try {
     return db.prepare(`
       SELECT r.id, r.name, r.cost, r.icon,
@@ -1484,7 +1472,7 @@ export function getRewards(db: Database.Database): Reward[] {
  * Returns the stored row, or null when the input was unusable.
  */
 export function saveReward(
-  db: Database.Database,
+  db: SqlDatabase,
   input: { id?: unknown; name?: unknown; cost?: unknown; icon?: unknown },
 ): Reward | null {
   try {
@@ -1499,7 +1487,7 @@ export function saveReward(
     const icon = typeof input.icon === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(input.icon)
       ? input.icon
       : null;
-    const id = typeof input.id === 'string' && input.id ? input.id : crypto.randomUUID();
+    const id = typeof input.id === 'string' && input.id ? input.id : genId();
     const now = localTimestamp();
     // deleted_at is deliberately untouched: editing never resurrects a retired
     // reward, and the UI only ever hands back living ids anyway.
@@ -1518,7 +1506,7 @@ export function saveReward(
 }
 
 /** Soft delete. The ledger keeps every entry the reward ever produced. */
-export function deleteReward(db: Database.Database, id: string): { ok: boolean } {
+export function deleteReward(db: SqlDatabase, id: string): { ok: boolean } {
   try {
     const now = localTimestamp();
     const info = db.prepare(
@@ -1541,7 +1529,7 @@ export type RedeemResult =
  * balance check and the ledger append share one transaction so two racing
  * redeems can never both pass on the same óbolos.
  */
-export function redeemReward(db: Database.Database, id: string): RedeemResult {
+export function redeemReward(db: SqlDatabase, id: string): RedeemResult {
   try {
     const redeem = db.transaction((): RedeemResult => {
       const reward = db.prepare(
@@ -1556,11 +1544,11 @@ export function redeemReward(db: Database.Database, id: string): RedeemResult {
       db.prepare(`
         INSERT INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
         VALUES (?, ?, 'reward_redeemed', ?, ?, ?)
-      `).run(crypto.randomUUID(), -reward.cost, reward.id, now, now);
+      `).run(genId(), -reward.cost, reward.id, now, now);
       return { ok: true, balance: balance - reward.cost };
     });
     const result = redeem();
-    if (result.ok) broadcast('rpg:obolosChanged');
+    if (result.ok) emit('rpg:obolosChanged');
     return result;
   } catch (err) {
     console.error('[RPG] redeemReward failed:', err);
@@ -1595,7 +1583,7 @@ const EQUIPPED_FIELD: Record<string, keyof ShopEquipped> = {
   background: 'background',
 };
 
-function readAppState(db: Database.Database, key: string): string | null {
+function readAppState(db: SqlDatabase, key: string): string | null {
   try {
     const row = db.prepare('SELECT value FROM app_state WHERE key = ?').get(key) as
       { value: string | null } | undefined;
@@ -1606,7 +1594,7 @@ function readAppState(db: Database.Database, key: string): string | null {
 }
 
 /** The per-device equipment, validated against the catalogue. */
-export function getShopEquipped(db: Database.Database): ShopEquipped {
+export function getShopEquipped(db: SqlDatabase): ShopEquipped {
   const equipped: ShopEquipped = { sealStyle: null, frame: null, background: null };
   const ownsItem = db.prepare('SELECT 1 FROM shop_purchases WHERE item_id = ?');
   for (const kind of EQUIPPABLE_KINDS) {
@@ -1640,7 +1628,7 @@ export interface ShopCatalogResult {
 
 /** The whole catalogue with per-entry state, plus balance — one read for the UI. */
 export function getShopCatalog(
-  db: Database.Database,
+  db: SqlDatabase,
   today: string = getLocalDateString(),
 ): ShopCatalogResult {
   let purchases = new Map<string, string>();
@@ -1681,7 +1669,7 @@ export type PurchaseResult =
  * merges into a single row AND a single charge after sync.
  */
 export function purchaseShopItem(
-  db: Database.Database,
+  db: SqlDatabase,
   itemId: string,
   today: string = getLocalDateString(),
 ): PurchaseResult {
@@ -1724,8 +1712,8 @@ export function purchaseShopItem(
     });
     const result = buy();
     if (result.ok) {
-      broadcast('rpg:obolosChanged');
-      broadcast('rpg:shopChanged');
+      emit('rpg:obolosChanged');
+      emit('rpg:shopChanged');
     }
     return result;
   } catch (err) {
@@ -1744,7 +1732,7 @@ export type EquipResult =
  * device dresses its own card. What is OWNED still syncs everywhere.
  */
 export function equipShopItem(
-  db: Database.Database,
+  db: SqlDatabase,
   itemId: string | null,
   kind?: ShopItemKind,
 ): EquipResult {
@@ -1755,7 +1743,7 @@ export function equipShopItem(
         return { ok: false, reason: 'not_equippable' };
       }
       db.prepare('DELETE FROM app_state WHERE key = ?').run(stateKey);
-      broadcast('rpg:shopChanged');
+      emit('rpg:shopChanged');
       return { ok: true, equipped: getShopEquipped(db) };
     }
 
@@ -1767,7 +1755,7 @@ export function equipShopItem(
 
     db.prepare('INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)')
       .run(EQUIP_STATE_KEYS[item.kind], item.id);
-    broadcast('rpg:shopChanged');
+    emit('rpg:shopChanged');
     return { ok: true, equipped: getShopEquipped(db) };
   } catch (err) {
     console.error('[RPG] equipShopItem failed:', err);
@@ -1805,7 +1793,7 @@ const MASTERY_MODULES_SQL = MASTERY_MODULES.map((m) => `'${m}'`).join(', ');
  *     nothing reads but everything syncs.
  */
 export function bumpMasteryXp(
-  db: Database.Database,
+  db: SqlDatabase,
   moduleId: string,
   xpDelta: number,
   now: string = localTimestamp(),
@@ -1836,7 +1824,7 @@ export function bumpMasteryXp(
  * as the v6 migration, restricted to the bar modules — exported for tests and
  * self-heal.
  */
-export function backfillMasteryXp(db: Database.Database): void {
+export function backfillMasteryXp(db: SqlDatabase): void {
   try {
     db.prepare(`
       INSERT OR IGNORE INTO mastery_xp (module_id, xp, updated_at)
@@ -1863,7 +1851,7 @@ export interface MasteryState {
 }
 
 /** One bar per event module, always all four, zeroes included. */
-export function getMasteries(db: Database.Database): MasteryState[] {
+export function getMasteries(db: SqlDatabase): MasteryState[] {
   let byModule = new Map<string, number>();
   try {
     const rows = db.prepare('SELECT module_id AS m, xp FROM mastery_xp').all() as
@@ -1879,7 +1867,7 @@ export function getMasteries(db: Database.Database): MasteryState[] {
 
 /** Runs the catalogue sweep once per process, lazily. */
 let backfillDone = false;
-function ensureBackfill(db: Database.Database): void {
+function ensureBackfill(db: SqlDatabase): void {
   if (backfillDone) return;
   backfillDone = true;
   try {
@@ -2027,7 +2015,7 @@ export function registerRpgHandlers(): void {
  * of all the phase-1 columns, which older payloads simply do not carry — can be
  * exercised against an in-memory database.
  */
-export function restorePlayerStats(db: Database.Database, stats: Record<string, unknown>): { success: boolean } {
+export function restorePlayerStats(db: SqlDatabase, stats: Record<string, unknown>): { success: boolean } {
     try {
       // Everything here comes off the wire. Level/title are DERIVED from xp rather
       // than trusted, so a corrupt remote can never produce a negative

@@ -6,7 +6,7 @@ import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
 import { notificationsMigrations } from '../../../shared-logic/modules/notifications.schema';
-import { grantObolos, getObolosBalance, redeemReward, purchaseShopItem } from '../../../electron/ipc/rpg-handlers';
+import { grantObolos, getObolosBalance, redeemReward, purchaseShopItem } from '../../../shared-logic/modules/rpg-handlers';
 import {
   mergeQuestDataInto,
   mergeNutritionFoods,

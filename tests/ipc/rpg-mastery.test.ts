@@ -7,7 +7,7 @@ import {
   backfillMasteryXp,
   bumpMasteryXp,
   MASTERY_MODULES,
-} from '../../electron/ipc/rpg-handlers';
+} from '../../shared-logic/modules/rpg-handlers';
 import {
   MASTERY_MAX_LEVEL,
   MASTERY_THRESHOLDS,

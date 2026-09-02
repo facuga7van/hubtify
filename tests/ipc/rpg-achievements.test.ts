@@ -6,7 +6,7 @@ import {
   backfillAchievements,
   getAchievements,
   evaluateAchievements,
-} from '../../electron/ipc/rpg-handlers';
+} from '../../shared-logic/modules/rpg-handlers';
 import { ACHIEVEMENTS, ACHIEVEMENT_XP, ACHIEVEMENTS_TOTAL } from '../../shared/achievements';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

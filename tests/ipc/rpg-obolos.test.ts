@@ -12,7 +12,7 @@ import {
   saveReward,
   deleteReward,
   redeemReward,
-} from '../../electron/ipc/rpg-handlers';
+} from '../../shared-logic/modules/rpg-handlers';
 import { ACHIEVEMENT_OBOLOS } from '../../shared/achievements';
 
 function setupDb(): Database.Database {
