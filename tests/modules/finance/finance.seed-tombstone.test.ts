@@ -28,7 +28,7 @@ vi.mock('electron', () => ({
   BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 // sync.ipc pulls these two in for the nutrition / habits merges; neither is
 // exercised here and both drag Electron-only modules along.
 vi.mock('../../../electron/modules/nutrition.ipc', () => ({ recalcSummary: vi.fn() }));

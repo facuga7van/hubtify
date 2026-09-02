@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';

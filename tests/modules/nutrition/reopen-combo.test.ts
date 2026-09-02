@@ -30,12 +30,12 @@ vi.mock('electron', () => ({
   BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
 }));
 
-vi.mock('../../../electron/ipc/db', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../electron/ipc/db')>()),
+vi.mock('../../../shared-logic/db', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../shared-logic/db')>()),
   getDb: () => harness.db,
 }));
 
-const { initCoreTables, applyMigrations, coreMigrations } = await import('../../../electron/ipc/db');
+const { initCoreTables, applyMigrations, coreMigrations } = await import('../../../shared-logic/db');
 const { processRpgEvent } = await import('../../../electron/ipc/rpg-handlers');
 const { registerNutritionIpcHandlers } = await import('../../../electron/modules/nutrition.ipc');
 registerNutritionIpcHandlers();

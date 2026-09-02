@@ -33,7 +33,7 @@ vi.mock('electron', () => ({
   BrowserWindow: { getFocusedWindow: () => null },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
 const { registerFinanceIpcHandlers } = await import('../../../electron/modules/finance.ipc');
 const { registerFinanceImportIpcHandlers } = await import('../../../electron/modules/finance-import.ipc');

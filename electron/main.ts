@@ -3,7 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 import { registerAllIpcHandlers } from './ipc/registry';
-import { closeDb, getDb, runModuleMigrations } from './ipc/db';
+import { closeDb, runModuleMigrations, setDbFactory } from '../shared-logic/db';
+import { openDesktopDb, getDb } from './ipc/db';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
 import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
@@ -340,6 +341,8 @@ function createCauldronWindow(): void {
 }
 
 app.whenReady().then(() => {
+  setDbFactory(openDesktopDb);
+
   // Create the window FIRST so the renderer starts loading while the main
   // process is still busy. Everything below runs in the same synchronous tick,
   // so no IPC call can be serviced before its handler is registered.

@@ -17,7 +17,7 @@ function setupDb(): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   for (const m of financeMigrations) db.exec(m.up);
-  // app_state lives in core tables (electron/ipc/db.ts); mirror it for fx_house.
+  // app_state lives in core tables (shared-logic/db/migrate.ts); mirror it for fx_house.
   db.exec('CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
   return db;
 }

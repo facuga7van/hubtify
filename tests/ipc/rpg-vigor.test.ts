@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import { processRpgEvent, setInnMode, restorePlayerStats } from '../../electron/ipc/rpg-handlers';
 import { rolloverVigor, getPlayerStats } from '../../electron/ipc/rpg-stats';
 import { PARDONS_PER_MONTH } from '../../shared/rpg-engine';

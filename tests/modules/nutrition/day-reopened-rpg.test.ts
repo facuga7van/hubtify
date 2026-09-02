@@ -13,13 +13,13 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../../../electron/ipc/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../electron/ipc/db')>();
+vi.mock('../../../shared-logic/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../shared-logic/db')>();
   return { ...actual, getDb: () => testDb, runModuleMigrations: vi.fn() };
 });
 
 const { initCoreTables, applyMigrations, coreMigrations } =
-  await import('../../../electron/ipc/db');
+  await import('../../../shared-logic/db');
 
 import { registerRpgHandlers } from '../../../electron/ipc/rpg-handlers';
 

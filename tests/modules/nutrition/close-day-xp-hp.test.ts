@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({
+vi.mock('../../../shared-logic/db', () => ({
   getDb: () => testDb,
   runModuleMigrations: vi.fn(),
 }));

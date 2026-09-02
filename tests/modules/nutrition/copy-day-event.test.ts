@@ -21,7 +21,7 @@ vi.mock('electron', () => ({
   BrowserWindow: { getFocusedWindow: () => null },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
 const { registerNutritionIpcHandlers } = await import('../../../electron/modules/nutrition.ipc');
 registerNutritionIpcHandlers();

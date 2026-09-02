@@ -62,7 +62,7 @@ vi.mock('electron', () => ({
   ),
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 vi.mock('../../../electron/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));

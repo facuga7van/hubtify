@@ -925,7 +925,7 @@ export function registerSyncIpcHandlers(): void {
     return { success: true };
   });
 
-  // app_state is created by initCoreTables (electron/ipc/db.ts), not ad-hoc here:
+  // app_state is created by initCoreTables (shared-logic/db/migrate.ts), not ad-hoc here:
   // dollar:getVisibleTypes reads it without creating it, so on a clean install
   // where neither of these handlers had run yet it threw "no such table".
   ipcHandle('sync:setCurrentUser', (_e, uid: string) => {
