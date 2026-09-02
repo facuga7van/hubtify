@@ -25,6 +25,7 @@ import { startNotificationEngine } from '@logic/modules/notifications.ipc';
 import { generateRecurringForMonth } from '@logic/modules/finance.balance';
 import { todayDateString } from '../../shared/date-utils';
 import { WasmDatabase } from './db/wasm-database';
+import { registerMobileDbHandlers, type DbPool } from './db-backup-handlers';
 import { createWorkerProtocol } from './worker-protocol';
 import type { FatalMsg, UiToWorker, WorkerToUi } from './protocol';
 
@@ -196,6 +197,16 @@ async function boot(): Promise<void> {
   setEventSink((channel, payload) => post({ type: 'event', channel, payload }));
 
   // 4. Handlers, DB y migraciones (espejo de electron/main.ts).
+  // Backup .db crudo (Fase 5): canales mobile:exportDb / mobile:importDb.
+  // El .d.mts 3.53 tipa `exportFile`/`importDb` como `Promise<…>`, pero sus
+  // propios docblocks dicen que con un Uint8Array son SÍNCRONOS ("Synchronously
+  // reads … and returns it" / "On success, the number of bytes written is
+  // returned"; solo el overload con callback es async). Se adapta acá.
+  const dbPool: DbPool = {
+    exportFile: (name) => pool.exportFile(name) as unknown as Uint8Array,
+    importDb: (name, bytes) => pool.importDb(name, bytes) as unknown as number,
+  };
+  registerMobileDbHandlers({ pool: dbPool, dbFile: DB_FILE, isBooted: () => booted });
   registerAllHandlers();
   try {
     getDb(); // pragmas + initCoreTables + coreMigrations
