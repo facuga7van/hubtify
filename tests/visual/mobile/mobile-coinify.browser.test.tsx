@@ -91,6 +91,22 @@ describe('Coinify a 390×844', () => {
     expect(active.getBoundingClientRect().height).toBeGreaterThanOrEqual(38);
   });
 
+  test('COIN-03: Prestado / Tomado prestado van juntos en su propia fila', async () => {
+    await setMobileViewport();
+    mountInShell(<Finance />, '/finance/loans');
+    await settle(700);
+    await page.getByRole('button', { name: /Agregar préstamo/i }).click();
+    await settle(400);
+    const group = document.querySelector('.coin-loan-form__direction') as HTMLElement;
+    expect(group).not.toBeNull();
+    const [lent, borrowed] = [...group.querySelectorAll<HTMLElement>('button')].map((b) => b.getBoundingClientRect());
+    const input = (group.parentElement!.querySelector('input') as HTMLElement).getBoundingClientRect();
+    expect(Math.abs(lent.top - borrowed.top)).toBeLessThanOrEqual(1);
+    expect(lent.top).toBeGreaterThanOrEqual(input.bottom);
+    expect(input.width).toBeGreaterThanOrEqual(300);
+    noOverflow('COIN LOAN FORM');
+  });
+
   test('COIN-02: «Eliminar grupo» se ve sin hover y con un aspa legible', async () => {
     await setMobileViewport();
     mountInShell(<Finance />, '/finance/installments');

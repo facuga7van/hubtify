@@ -407,17 +407,22 @@ export default function Loans() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="coin-loan-form__who" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <input type="text" value={formPerson} onChange={(e) => setFormPerson(e.target.value)}
                   placeholder={t('coinify.personName')} className="rpg-input" style={{ flex: 1 }} required />
-                <button type="button" onClick={() => setFormDirection('lent')}
-                  className={`rpg-button ${formDirection === 'lent' ? 'rpg-btn-active' : ''}`}>
-                  {t('coinify.lent')}
-                </button>
-                <button type="button" onClick={() => setFormDirection('borrowed')}
-                  className={`rpg-button ${formDirection === 'borrowed' ? 'rpg-btn-active' : ''}`}>
-                  {t('coinify.borrowed')}
-                </button>
+                {/* COIN-03: the two directions are one control; grouped, they wrap
+                    together instead of «Prestado» staying next to the input and
+                    «Tomado prestado» dropping alone to the next line. */}
+                <div className="coin-loan-form__direction">
+                  <button type="button" onClick={() => setFormDirection('lent')}
+                    className={`rpg-button ${formDirection === 'lent' ? 'rpg-btn-active' : ''}`}>
+                    {t('coinify.lent')}
+                  </button>
+                  <button type="button" onClick={() => setFormDirection('borrowed')}
+                    className={`rpg-button ${formDirection === 'borrowed' ? 'rpg-btn-active' : ''}`}>
+                    {t('coinify.borrowed')}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: 6 }}>

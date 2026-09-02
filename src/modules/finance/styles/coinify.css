@@ -1491,6 +1491,13 @@ button.coin-sort-header--amount {
   gap: 4px;
 }
 
+/* Prestado / Tomado prestado del formulario: un solo control de dos botones,
+   con el mismo hueco que la fila que lo contiene. */
+.coin-loan-form__direction {
+  display: flex;
+  gap: 6px;
+}
+
 .coin-loan-tab {
   display: flex;
   align-items: center;
@@ -2989,6 +2996,16 @@ button.coin-sort-header--amount {
 [data-shell="mobile"] .coin-loan-tab {
   flex: 1;
   justify-content: center;
+  white-space: nowrap;
+}
+
+/* COIN-03: el par Prestado / Tomado prestado baja entero a su propio renglón. */
+[data-shell="mobile"] .coin-loan-form__direction {
+  flex: 1 1 100%;
+}
+
+[data-shell="mobile"] .coin-loan-form__direction .rpg-button {
+  flex: 1;
   white-space: nowrap;
 }
 
