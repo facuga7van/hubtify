@@ -1,8 +1,7 @@
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
-import { dialog, BrowserWindow } from 'electron';
-import crypto from 'crypto';
-import fs from 'fs';
+import { registerHandler as ipcHandle } from '../registry';
+import { getDb } from '../db';
+import { genId } from '../ids';
+import { platform } from '../platform';
 import { todayDateString } from '../../shared/date-utils';
 import {
   CARD_PAYMENT_CATEGORY,
@@ -45,11 +44,7 @@ import {
   saveAccount,
   softDeleteAccount,
   transferBetweenAccounts,
-} from '../../shared-logic/modules/finance.balance';
-
-function genId(): string {
-  return crypto.randomUUID();
-}
+} from './finance.balance';
 
 /** Uniform failure envelope for handlers that used to persist garbage or throw raw. */
 function fail(reason: string): { ok: false; reason: string } {
@@ -1789,17 +1784,6 @@ export function registerFinanceIpcHandlers(): void {
       return { success: false, error: 'no_data' };
     }
 
-    const win = BrowserWindow.getFocusedWindow();
-    const { filePath, canceled } = await dialog.showSaveDialog(win!, {
-      title: 'Export CSV',
-      defaultPath: `coinify-${m}.csv`,
-      filters: [{ name: 'CSV', extensions: ['csv'] }],
-    });
-
-    if (canceled || !filePath) {
-      return { success: false, canceled: true };
-    }
-
     const escape = (val: string) => {
       if (val.includes(',') || val.includes('"') || val.includes('\n')) {
         return `"${val.replace(/"/g, '""')}"`;
@@ -1821,8 +1805,9 @@ export function registerFinanceIpcHandlers(): void {
     );
 
     const csv = [header, ...csvRows].join('\n');
-    fs.writeFileSync(filePath, csv, 'utf-8');
+    const saved = await platform().saveTextFile(`coinify-${m}.csv`, csv);
+    if (!saved) return { success: false, canceled: true };
 
-    return { success: true, path: filePath, count: rows.length };
+    return { success: true, count: rows.length };
   });
 }

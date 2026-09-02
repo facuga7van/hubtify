@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { CARD_TAX_CATEGORY } from '../../../shared-logic/modules/finance.balance';
-import { parseGaliciaLine, type ParsedRow } from '../../../electron/modules/finance-import.ipc';
+import { parseGaliciaLine, type ParsedRow } from '../../../shared-logic/modules/finance-import.ipc';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
@@ -35,8 +35,8 @@ vi.mock('electron', () => ({
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
-const { registerFinanceIpcHandlers } = await import('../../../electron/modules/finance.ipc');
-const { registerFinanceImportIpcHandlers } = await import('../../../electron/modules/finance-import.ipc');
+const { registerFinanceIpcHandlers } = await import('../../../shared-logic/modules/finance.ipc');
+const { registerFinanceImportIpcHandlers } = await import('../../../shared-logic/modules/finance-import.ipc');
 
 registerFinanceIpcHandlers();
 registerFinanceImportIpcHandlers();

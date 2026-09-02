@@ -52,7 +52,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
-const { registerFinanceIpcHandlers } = await import('../../../electron/modules/finance.ipc');
+const { registerFinanceIpcHandlers } = await import('../../../shared-logic/modules/finance.ipc');
 registerFinanceIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {

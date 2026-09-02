@@ -1,8 +1,7 @@
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
-import { dialog, BrowserWindow } from 'electron';
-import crypto from 'crypto';
-import fs from 'fs';
+import { registerHandler as ipcHandle } from '../registry';
+import { getDb } from '../db';
+import { genId } from '../ids';
+import { platform } from '../platform';
 import {
   CARD_TAX_CATEGORY,
   DEFAULT_CASH_ACCOUNT_ID,
@@ -10,7 +9,7 @@ import {
   getFxHouse,
   isValidMonthString,
   nowIso,
-} from '../../shared-logic/modules/finance.balance';
+} from './finance.balance';
 
 // ── Types ───────────────────────────────────────────
 
@@ -257,23 +256,12 @@ function suggestCategory(merchant: string, mappings: Map<string, string>): strin
 
 export function registerFinanceImportIpcHandlers(): void {
   ipcHandle('finance:importSelectAndParsePDF', async () => {
-    const win = BrowserWindow.getFocusedWindow();
-    const { filePaths, canceled } = await dialog.showOpenDialog(win!, {
-      title: 'Seleccionar PDF de resumen',
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      properties: ['openFile'],
-    });
-    if (canceled || filePaths.length === 0) return null;
-
-    const filePath = filePaths[0];
-    const fileName = filePath.split(/[/\\]/).pop() || 'unknown.pdf';
-
-    const buffer = fs.readFileSync(filePath);
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PDFParse } = require('pdf-parse');
-    const parser = new PDFParse({ data: new Uint8Array(buffer), verbosity: 0 });
-    await parser.load();
-    const data = await parser.getText();
+    const picked = await platform().pickPdfText();
+    if (picked === null) return null;
+    // Android has no pdf-parse: the renderer shows a toast for this reason (Fase 5).
+    if ('unsupported' in picked) return { ok: false as const, reason: 'unsupported_platform' as const };
+    const fileName = picked.name;
+    const data = { text: picked.text };
 
     const db = getDb();
     const mappingsRaw = db
@@ -339,7 +327,7 @@ export function registerFinanceImportIpcHandlers(): void {
       accountId?: string | null,
     ) => {
       const db = getDb();
-      const batchId = crypto.randomUUID();
+      const batchId = genId();
       // Imported rows freeze the rate of the day they are IMPORTED (best data
       // available) — a PROCESS rate, never the line's own day, hence the `~`;
       // offline with no cache leaves NULL for the backfill.
@@ -436,7 +424,7 @@ export function registerFinanceImportIpcHandlers(): void {
           }
 
           insertTx.run(
-            crypto.randomUUID(),
+            genId(),
             type,
             amount,
             currency,
@@ -521,7 +509,7 @@ export function registerFinanceImportIpcHandlers(): void {
         db.prepare(
           `INSERT INTO finance_category_mappings (id, keyword, category, created_at)
            VALUES (?, ?, ?, ?)`,
-        ).run(crypto.randomUUID(), merchantPattern, category, nowIso());
+        ).run(genId(), merchantPattern, category, nowIso());
       }
     },
   );

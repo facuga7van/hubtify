@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGaliciaLine } from '../../../electron/modules/finance-import.ipc';
+import { parseGaliciaLine } from '../../../shared-logic/modules/finance-import.ipc';
 
 describe('Galicia VISA PDF parser', () => {
   const defaultMappings = new Map<string, string>([

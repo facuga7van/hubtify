@@ -33,8 +33,8 @@ vi.mock('electron', () => ({
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
-const { registerFinanceIpcHandlers } = await import('../../../electron/modules/finance.ipc');
-const { registerFinanceImportIpcHandlers } = await import('../../../electron/modules/finance-import.ipc');
+const { registerFinanceIpcHandlers } = await import('../../../shared-logic/modules/finance.ipc');
+const { registerFinanceImportIpcHandlers } = await import('../../../shared-logic/modules/finance-import.ipc');
 
 registerFinanceIpcHandlers();
 registerFinanceImportIpcHandlers();
