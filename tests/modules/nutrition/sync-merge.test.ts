@@ -260,6 +260,48 @@ describe('mergeNutritionData — food_log merge by sync_id', () => {
 
 // ── profile (LWW) ─────────────────────────────────────────────────────────
 
+// ── nutrition_ai_cache user corrections (v17) ─────────────────────────────
+
+describe('mergeNutritionData — aiCorrections', () => {
+  const readCache = (norm: string) =>
+    testDb.prepare('SELECT calories, source, prompt_version AS promptVersion, updated_at AS updatedAt FROM nutrition_ai_cache WHERE description_norm = ?').get(norm) as
+      { calories: number; source: string; promptVersion: string | null; updatedAt: string | null } | undefined;
+
+  it('exports only the user corrections, never the model rows', async () => {
+    testDb.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version) VALUES ('pizza', 300, 'model', 'v')`).run();
+    testDb.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source, updated_at) VALUES ('guiso', 700, 'user', ?)`).run(NEW);
+    const data = await getHandler('sync:getAllNutritionData')!({}) as { aiCorrections: Array<{ descriptionNorm: string; calories: number }> };
+    expect(data.aiCorrections).toEqual([expect.objectContaining({ descriptionNorm: 'guiso', calories: 700 })]);
+  });
+
+  it('inserts a remote correction as a user row', async () => {
+    const res = await merge({ aiCorrections: [{ descriptionNorm: 'asado con papa al horno', calories: 850, proteinG: 55, updatedAt: NEW }] });
+    expect(res.changed).toBe(true);
+    expect(readCache('asado con papa al horno')).toMatchObject({ calories: 850, source: 'user' });
+  });
+
+  it('a remote user correction beats a local model row regardless of stamps', async () => {
+    testDb.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version, updated_at) VALUES ('tostado', 238, 'model', 'v', ?)`).run(NEW);
+    await merge({ aiCorrections: [{ descriptionNorm: 'tostado', calories: 380, updatedAt: OLD }] });
+    expect(readCache('tostado')).toMatchObject({ calories: 380, source: 'user' });
+  });
+
+  it('between two user corrections the newer one wins', async () => {
+    testDb.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source, updated_at) VALUES ('tarta', 500, 'user', ?)`).run(NEW);
+    const res = await merge({ aiCorrections: [{ descriptionNorm: 'tarta', calories: 640, updatedAt: OLD }] });
+    expect(res.changed).toBe(false);
+    expect(readCache('tarta')?.calories).toBe(500);
+    await merge({ aiCorrections: [{ descriptionNorm: 'tarta', calories: 430, updatedAt: '2026-05-02T08:00:00.000Z' }] });
+    expect(readCache('tarta')?.calories).toBe(430);
+  });
+
+  it('skips rows without a key or with a nonsense calorie count', async () => {
+    const res = await merge({ aiCorrections: [{ descriptionNorm: '', calories: 100 }, { descriptionNorm: 'x', calories: 0 }, null] });
+    expect(res.changed).toBe(false);
+    expect((testDb.prepare('SELECT COUNT(*) AS c FROM nutrition_ai_cache').get() as { c: number }).c).toBe(0);
+  });
+});
+
 describe('mergeNutritionData — profile LWW', () => {
   function insertLocalProfile(deficit: number, updatedAt: string | null) {
     testDb.prepare(`

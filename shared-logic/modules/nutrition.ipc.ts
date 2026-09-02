@@ -14,6 +14,13 @@ import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adapt
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
+// The prompt's identity, from the same file the Cloud Function ships. A cached
+// model answer is only a hit while the prompt that produced it is the current
+// one (migration v17). gemini.ts has no imports, so this is safe in the worker.
+import { PROMPT_VERSION } from '../../functions/src/gemini';
+
+/** Who put a row in nutrition_ai_cache: the model, or the human overruling it. */
+export type CacheSource = 'model' | 'user';
 
 /** Normalize a macro gram value to a finite, non-negative number rounded to 0.1, or null. */
 function normMacro(v: unknown): number | null {
@@ -505,16 +512,23 @@ export function registerNutritionIpcHandlers(): void {
     const db = getDb();
     const row = db.prepare(
       `SELECT calories, ai_breakdown AS aiBreakdown,
-              protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, hits
+              protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, hits,
+              source, prompt_version AS promptVersion
        FROM nutrition_ai_cache WHERE description_norm = ?`,
     ).get(norm) as {
       calories: number; aiBreakdown: string | null;
       proteinG: number | null; carbsG: number | null; fatG: number | null; hits: number;
+      source: CacheSource; promptVersion: string | null;
     } | undefined;
     if (!row) return null;
+    // A model answer from another prompt is stale: the whole point of
+    // improving the prompt is that the most-repeated dishes get the new
+    // number. A human correction never expires (migration v17).
+    if (row.source !== 'user' && row.promptVersion !== PROMPT_VERSION) return null;
     db.prepare('UPDATE nutrition_ai_cache SET hits = hits + 1, updated_at = ? WHERE description_norm = ?')
       .run(syncStamp(), norm);
-    return { ...row, hits: row.hits + 1 };
+    const { promptVersion: _pv, ...hit } = row;
+    return { ...hit, hits: row.hits + 1 };
   });
 
   /**
@@ -541,20 +555,43 @@ export function registerNutritionIpcHandlers(): void {
     if (!norm) return { cached: false };
     if (!Number.isFinite(entry.calories) || entry.calories <= 0) return { cached: false };
     const breakdown = entry.corrected ? null : (entry.aiBreakdown ?? null);
+    // `corrected` is the one signal that the number came from a human. It is
+    // recorded as the row's origin so that (a) it survives every prompt change
+    // and (b) it can be offered back to the model as a personal example.
+    const source: CacheSource = entry.corrected ? 'user' : 'model';
     const now = syncStamp();
     getDb().prepare(`
-      INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, carbs_g, fat_g, hits, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, carbs_g, fat_g, hits, created_at, updated_at, source, prompt_version)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
       ON CONFLICT(description_norm) DO UPDATE SET
         calories = excluded.calories,
         ai_breakdown = excluded.ai_breakdown,
         protein_g = COALESCE(excluded.protein_g, nutrition_ai_cache.protein_g),
         carbs_g = COALESCE(excluded.carbs_g, nutrition_ai_cache.carbs_g),
         fat_g = COALESCE(excluded.fat_g, nutrition_ai_cache.fat_g),
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        source = excluded.source,
+        prompt_version = excluded.prompt_version
     `).run(norm, Math.round(entry.calories), breakdown,
-      normMacro(entry.proteinG), normMacro(entry.carbsG), normMacro(entry.fatG), now, now);
+      normMacro(entry.proteinG), normMacro(entry.carbsG), normMacro(entry.fatG), now, now,
+      source, PROMPT_VERSION);
     return { cached: true };
+  });
+
+  /**
+   * The user's corrections, newest first, for the renderer to pick examples
+   * from (src/modules/nutrition/similar-corrections.ts). Keyed by
+   * description_norm, so the sync duplicates in food_log cannot show up here
+   * twice; `description` IS the normalised text, which is what the model sees.
+   */
+  ipcHandle('nutrition:getUserCorrections', (_e, limit?: number) => {
+    const cap = Math.max(1, Math.min(1000, Number.isFinite(limit as number) ? Math.floor(limit as number) : 200));
+    return getDb().prepare(
+      `SELECT description_norm AS description, calories, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
+              updated_at AS updatedAt
+       FROM nutrition_ai_cache WHERE source = 'user'
+       ORDER BY updated_at DESC, description_norm ASC LIMIT ?`,
+    ).all(cap);
   });
 
   ipcHandle('nutrition:updateFood', (_e, id: number, fields: {

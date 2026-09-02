@@ -66,6 +66,53 @@ export function initCoreTables(db: SqlDatabase): void {
 }
 
 /**
+ * rpg_events rows that are a COPY of another row (same module, type, XP, HP,
+ * multipliers and payload, written in the same second) and carry the weaker
+ * identity of the pair.
+ *
+ * Where they come from: a client whose merge keys rpg_events by the
+ * device-local AUTOINCREMENT id (v0.7.5 and earlier). The ≥ 0.8 export does not
+ * ship `id`, so that client probes `WHERE id = NULL` — never a hit — and inserts
+ * EVERY event of the 90-day push window as a new row, without sync_id (a column
+ * it does not know) and with the ISO stamp normStamp() gave it on the way
+ * ('2026-06-11T23:18:23.000Z' next to the original's '2026-06-11 23:18:23').
+ * Seen on 2026-09-02: 44 twins of the 44 events in the window, plus five copies
+ * of one achievement that client fired itself. Hence the stamp is compared with
+ * the 'T' folded back to ' ' and the milliseconds dropped, and ref_id is NOT
+ * part of the key (that client never wrote it).
+ *
+ * Who loses, per pair:
+ *   - a row with NO sync_id loses to any identified row, and to an older
+ *     anonymous row (two anonymous copies keep the first);
+ *   - a `legacy-…` row (core v1 backfill) loses ONLY to a row minted by this
+ *     codebase (uuid): that is the twin a < 0.8 desktop inserted anonymously
+ *     and then backfilled with a stamp no other device derives.
+ * Two uuid rows, or two legacy rows the v1 backfill told apart with `#n`, are
+ * genuine repeats and are never touched.
+ *
+ * Shared by the core v7 repair and by the sweep at the start of every
+ * rpg_events merge (sync.ipc.ts), so both answer the same question.
+ */
+export const RPG_EVENTS_TWIN_IDS_SQL = `
+  SELECT f.id
+  FROM rpg_events f
+  WHERE (f.sync_id IS NULL OR f.sync_id LIKE 'legacy-%')
+    AND EXISTS (
+      SELECT 1 FROM rpg_events o
+      WHERE o.id <> f.id
+        AND o.module_id = f.module_id AND o.event_type = f.event_type
+        AND o.xp_gained = f.xp_gained AND o.hp_change = f.hp_change
+        AND o.combo_multiplier = f.combo_multiplier AND o.bonus_multiplier = f.bonus_multiplier
+        AND COALESCE(o.payload, '') = COALESCE(f.payload, '')
+        AND substr(replace(o.created_at, 'T', ' '), 1, 19) = substr(replace(f.created_at, 'T', ' '), 1, 19)
+        AND (
+          (f.sync_id IS NULL AND (o.sync_id IS NOT NULL OR o.id < f.id))
+          OR (f.sync_id LIKE 'legacy-%' AND o.sync_id IS NOT NULL AND o.sync_id NOT LIKE 'legacy-%')
+        )
+    )
+`;
+
+/**
  * Core (namespace-less module) migrations. These touch the tables created in
  * initCoreTables, which predate the per-module migration system.
  */
@@ -277,6 +324,33 @@ export const coreMigrations: Migration[] = [
                datetime('now')
         FROM rpg_events
         GROUP BY module_id;
+    `,
+  },
+  {
+    // ── Repair: rpg_events twins left by an id-keyed merge ───────────────────
+    // See RPG_EVENTS_TWIN_IDS_SQL for the pair rules and where the twins came
+    // from.
+    //
+    // HARD delete, not a tombstone: rpg_events has no deleted_at and is a pure
+    // union across devices, so a "deleted" marker would have nothing to travel
+    // on — and a twin has no identity the other devices share anyway (NULL, or
+    // a legacy- id nobody else derives). Removing the row locally is enough:
+    // the push only ever carries identified rows (mergeRpgEvents drops the
+    // rest), so the twins never left this device.
+    //
+    // Nothing else is recomputed ON PURPOSE. player_stats.xp / level and
+    // mastery_xp are accumulators written by processRpgEvent, never re-summed
+    // from the log; the merge that inserted the twins did not touch them
+    // (owner's DB: xp 2157 vs SUM(identified) 2152, vs SUM(all) 3197). What the
+    // twins doubled is what is READ from the log — the Bitácora, the XP ledger,
+    // the Códice's day summary, the achievement counters — and that heals by
+    // itself once the rows are gone. A day seal already paid stays paid.
+    //
+    // Idempotent: with no twins left the subquery is empty and nothing moves.
+    namespace: 'core',
+    version: 7,
+    up: `
+      DELETE FROM rpg_events WHERE id IN (${RPG_EVENTS_TWIN_IDS_SQL});
     `,
   },
 ];

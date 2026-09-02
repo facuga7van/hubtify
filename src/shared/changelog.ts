@@ -13,6 +13,60 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.2',
+    date: '2026-09-02',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'La estimación con IA aprendió a comer como argentino: ahora conoce las porciones reales de una milanesa, un asado, un pastel de papa, una hamburguesa de local, un tostado o una medialuna con jamón y queso. En las comidas que cargás de verdad el error medio bajó de unas 200 kcal a unas 60, y ya no te inventa ingredientes que no nombraste',
+          en: 'AI estimation learned to eat like an Argentine: it now knows the real portions of a milanesa, an asado, a pastel de papa, a burger-joint burger, a tostado or a ham-and-cheese medialuna. On the meals you actually log, the average error dropped from around 200 kcal to around 60, and it no longer makes up ingredients you never mentioned',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'La IA aprende de vos: cuando corregís una estimación, la próxima vez que cargues algo parecido usa TU porción como referencia en vez de la del manual. Tus correcciones viajan con tu cuenta, así que lo que le enseñás en la compu también lo sabe en el teléfono',
+          en: 'The AI learns from you: when you correct an estimate, the next time you log something similar it uses YOUR portion as the reference instead of the textbook one. Your corrections travel with your account, so what you teach it on the computer it also knows on the phone',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'El ícono de Android por fin es el libro de Hubtify, con el splash a juego sobre cuero. Ahora se lo reconoce de un vistazo en el cajón de apps',
+          en: 'The Android icon is finally the Hubtify book, with a matching splash on leather. You can now spot it at a glance in the app drawer',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Si tenías comidas duplicadas en el historial —y los totales del día al doble de lo real— se arregla solo al abrir la app. Era un cruce entre una versión vieja de escritorio y el teléfono, y ya no puede volver a pasar',
+          en: 'If you had duplicate meals in your history — and daily totals at twice the real amount — it fixes itself when you open the app. It was a mix-up between an old desktop version and the phone, and it cannot happen again',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'mobile',
+        text: {
+          es: 'Al abrir la app en Android ya no hay un flash blanco entre el splash y la pantalla. La espera ahora es sobre el mismo cuero del splash, de punta a punta',
+          en: 'Opening the app on Android no longer shows a white flash between the splash and the screen. The wait now stays on the same leather as the splash, end to end',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'character',
+        text: {
+          es: 'La Bitácora de XP y el resumen del Códice mostraban el doble de eventos en algunos días —el mismo cruce con la versión vieja de escritorio. Tu XP y tu nivel siempre estuvieron bien: lo que se duplicaba era el registro, y se limpia solo al abrir la app',
+          en: 'The XP Log and the Codex summary showed twice the events on some days — the same mix-up with the old desktop version. Your XP and level were always right: it was the record that got duplicated, and it cleans itself up when you open the app',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.1',
     date: '2026-09-02',
     changes: [

@@ -123,7 +123,7 @@ describe('a cache hit never reaches the Cloud Function', () => {
     estimateNutrition.mockReset();
     getCachedEstimate.mockReset();
     vi.doMock('../../../src/modules/nutrition/estimate-service', () => ({ estimateNutrition }));
-    vi.doMock('../../../src/modules/nutrition/history-api', () => ({ getCachedEstimate }));
+    vi.doMock('../../../src/modules/nutrition/history-api', () => ({ getCachedEstimate, getSimilarCorrections: async () => [] }));
   });
 
   async function load() {
@@ -154,7 +154,7 @@ describe('a cache hit never reaches the Cloud Function', () => {
 
     const result = await resolveEstimate('tarta de verdura');
 
-    expect(estimateNutrition).toHaveBeenCalledWith('tarta de verdura', { onRetry: undefined });
+    expect(estimateNutrition).toHaveBeenCalledWith('tarta de verdura', { onRetry: undefined, examples: [] });
     expect(result).toEqual({
       origin: 'ai', totalCalories: 640,
       proteinG: null, carbsG: null, fatG: null,

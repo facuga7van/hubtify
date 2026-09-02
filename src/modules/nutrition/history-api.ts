@@ -12,8 +12,13 @@
  * to three one-line pass-throughs.
  */
 import type { HistorySuggestion } from './history-search';
+import { selectSimilarCorrections, type CorrectionRow, type EstimateExample } from './similar-corrections';
 
 export type { HistorySuggestion, SuggestionSource } from './history-search';
+export type { EstimateExample } from './similar-corrections';
+
+/** How many of the user's corrections are pulled before the similarity ranking. */
+export const USER_CORRECTIONS_LIMIT = 200;
 
 /** What a cache hit looks like. `hits` already includes this lookup. */
 export interface CachedEstimate {
@@ -23,11 +28,14 @@ export interface CachedEstimate {
   carbsG: number | null;
   fatG: number | null;
   hits: number;
+  /** 'user' when the number is a correction the human typed; 'model' otherwise. */
+  source: 'model' | 'user';
 }
 
 interface NutritionPhase2Api {
   nutritionSearchHistory: (query?: string, limit?: number) => Promise<HistorySuggestion[]>;
   nutritionGetCachedEstimate: (description: string) => Promise<CachedEstimate | null>;
+  nutritionGetUserCorrections: (limit?: number) => Promise<CorrectionRow[]>;
   nutritionCacheEstimate: (entry: {
     description: string; calories: number; aiBreakdown?: string | null;
     proteinG?: number | null; carbsG?: number | null; fatG?: number | null;
@@ -61,6 +69,24 @@ export async function getCachedEstimate(description: string): Promise<CachedEsti
   } catch (err) {
     console.error('[Nutrition] getCachedEstimate failed', err);
     return null;
+  }
+}
+
+/**
+ * Up to three of the user's own corrections that resemble `description`, in
+ * the shape the Cloud Function accepts as `examples`. Empty when there are
+ * none, when the bridge is missing, or when the query fails — the estimate
+ * must go on without them.
+ */
+export async function getSimilarCorrections(description: string): Promise<EstimateExample[]> {
+  const fn = bridge().nutritionGetUserCorrections;
+  if (!fn) return [];
+  try {
+    const rows = (await fn(USER_CORRECTIONS_LIMIT)) ?? [];
+    return selectSimilarCorrections(description, rows);
+  } catch (err) {
+    console.error('[Nutrition] getSimilarCorrections failed', err);
+    return [];
   }
 }
 

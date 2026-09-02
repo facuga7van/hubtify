@@ -87,6 +87,7 @@ export const API_CHANNELS = {
   nutritionGetEventDays: { channel: 'nutrition:getEventDays', kind: 'invoke' },
   nutritionGetCachedEstimate: { channel: 'nutrition:getCachedEstimate', kind: 'invoke' },
   nutritionCacheEstimate: { channel: 'nutrition:cacheEstimate', kind: 'invoke' },
+  nutritionGetUserCorrections: { channel: 'nutrition:getUserCorrections', kind: 'invoke' },
   nutritionDeleteFood: { channel: 'nutrition:deleteFood', kind: 'invoke' },
   nutritionDeleteByDate: { channel: 'nutrition:deleteByDate', kind: 'invoke' },
   nutritionRepeatDay: { channel: 'nutrition:repeatDay', kind: 'invoke' },
