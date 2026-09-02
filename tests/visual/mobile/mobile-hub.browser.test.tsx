@@ -4,6 +4,8 @@ import Dashboard from '@hub/Dashboard';
 import CharacterPage from '@hub/CharacterPage';
 import AchievementsPage from '@hub/AchievementsPage';
 import RewardsPage from '@hub/rewards/RewardsPage';
+import SettingsPage from '@hub/SettingsPage';
+import { TourProvider } from '@shared/components/tour';
 import { ACHIEVEMENTS } from '../../../shared/achievements';
 import {
   installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes,
@@ -118,5 +120,15 @@ describe('Hub a 390×844', () => {
     await settle(600);
     await shoot('hub-04-recompensas');
     expectNoHorizontalOverflow('RECOMPENSAS MOBILE');
+  });
+
+  /* SET-01: sin teclado físico no hay atajos; la tarjeta «Atajos de teclado» sobra en Android. */
+  test('Ajustes no lista los atajos de teclado', async () => {
+    await setMobileViewport();
+    mountInShell(<TourProvider><SettingsPage /></TourProvider>, '/settings');
+    await settle(600);
+    // La página se montó entera: la tarjeta vecina del mismo grupo está.
+    await expect.element(page.getByText(/Reiniciar Tour/i).first()).toBeInTheDocument();
+    expect(document.querySelector('.settings-shortcuts')).toBeNull();
   });
 });
