@@ -3315,6 +3315,22 @@ Expected: los commits de este plan (más los de la Fase 1) y working tree limpio
 
 ## Resultado MIME `.wasm` (se completa en Task 14 Step 3)
 
-_pendiente_
+2026-09-02 — WebView 124.0.6367.219 (AVD `hubtify`, Android 15) — instantiateStreaming OK.
+`logcat -d | rg -c "falling back to ArrayBuffer instantiation"` → 0, y tampoco aparece
+`wasm streaming compile failed`: el WebView sirve `dist/mobile/assets/sqlite3-*.wasm` desde
+`https://localhost` con `application/wasm`, así que no hace falta tocar nada del lado nativo.
+
+Evidencia del smoke (mismo día, mismo AVD):
+
+```
+[worker] vfs: opfs-sahpool name=hubtify files=[]              ← primer arranque
+[worker] ready
+[worker] vfs: opfs-sahpool name=hubtify files=["/hubtify.db"] ← tras force-stop + reabrir
+[worker] ready
+[worker] suspended                                            ← HOME
+[worker] resumed                                              ← volver a la app
+```
+
+Screenshot de la pantalla inicial: `2026-09-02-mobile-phase2-smoke.png`.
 
 Formato: `YYYY-MM-DD — WebView <versionName> — instantiateStreaming OK | fallback a WebAssembly.instantiate ("wasm streaming compile failed: <motivo>")`.
