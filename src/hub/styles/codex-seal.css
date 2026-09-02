@@ -37,7 +37,25 @@
   background-size: 600px;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   animation: codex-rise 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Cerca del mínimo de ventana (760×640 medido) la página del día mide ~820 px
+     contra 588 de modal: el sello —la ÚNICA acción de la ceremonia— queda 200 px
+     abajo del pliegue, cortado por la mitad. Scrollea, pero nada lo anunciaba.
+     Misma barra fina y del tema que `.sidebar-nav`, con hueco reservado para que
+     su aparición no corra el contenido de lugar. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 112, 48, 0.6) transparent;
 }
+
+.codex-modal::-webkit-scrollbar { width: 8px; }
+.codex-modal::-webkit-scrollbar-track { background: transparent; border: none; }
+.codex-modal::-webkit-scrollbar-thumb {
+  background: rgba(138, 112, 48, 0.55);
+  border: none;
+  border-radius: 4px;
+}
+.codex-modal::-webkit-scrollbar-thumb:hover { background: rgba(138, 112, 48, 0.85); }
 
 @keyframes codex-rise {
   from { transform: translateY(14px) scale(0.985); opacity: 0; }
@@ -626,13 +644,17 @@
   box-shadow: inset 0 2px 4px rgba(42, 29, 14, 0.2);
   font-weight: 600;
 }
+/* Los contadores del filtro son el dato del filtro —«Obtenidos 14»— y estaban
+   en --ink-faded (3.74:1 sobre el botón) y en --gold-dark cuando el filtro
+   estaba activo (2.51:1). Justo el número, justo el activo, era el que menos
+   se leía. */
 .ach-filter__count {
   font-family: 'Fira Code', monospace;
   font-size: 0.85em;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
-.ach-filter__btn--on .ach-filter__count { color: var(--gold-dark); }
+.ach-filter__btn--on .ach-filter__count { color: var(--rubric); }
 
 @media (prefers-reduced-motion: reduce) {
   .ach-progress__fill { transition: none; }
@@ -720,10 +742,15 @@
 }
 
 .ach-card--unlocked .ach-card__title { color: var(--ink); text-shadow: 0 1px 0 rgba(255, 252, 240, 0.6); }
-.ach-card--locked .ach-card__title { color: var(--ink-faded); }
+/* El NOMBRE de la medalla pendiente estaba en --ink-faded sobre el gris de la
+   tarjeta bloqueada (#cbbb9c): 3.74:1, o sea MENOS legible que su propia
+   descripción (--ink-soft, 6.11:1) — la jerarquía dada vuelta. Que esté
+   pendiente ya lo dicen el gris, el candado y la falta de marco dorado; el
+   título es lo que tenés que poder leer para saber a qué apuntás. */
+.ach-card--locked .ach-card__title { color: var(--ink-soft); }
 .ach-card--secret .ach-card__title {
   font-family: 'Fira Code', monospace;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .ach-card__desc {
@@ -734,11 +761,14 @@
   line-height: 1.35;
 }
 
+/* La fecha en que se ganó la medalla venía en --gold-dark: 3.71:1 sobre el
+   pergamino de la tarjeta. El musgo es el color de «hecho» del sistema (ver
+   DESIGN_SYSTEM, XP/Success) y da 6.70:1. */
 .ach-card__date {
   margin-top: 4px;
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--gold-dark);
+  color: var(--moss);
 }
 
 .ach-empty {

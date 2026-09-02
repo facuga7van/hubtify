@@ -256,7 +256,7 @@ function surfaceStops(el: Element, fallback: string): string[] {
  * fondo opaco en la cadena de ancestros.
  */
 export function lowContrastText(root: ParentNode, bg: string, min = 4.5) {
-  const out: Array<{ sel: string; text: string; color: string; ratio: number; px: number }> = [];
+  const out: Array<{ sel: string; text: string; color: string; sobre: string; ratio: number; px: number }> = [];
   root.querySelectorAll('*').forEach((el) => {
     if (el.children.length > 0) return;
     const text = (el.textContent ?? '').trim();
@@ -265,12 +265,14 @@ export function lowContrastText(root: ParentNode, bg: string, min = 4.5) {
     if (cs.visibility === 'hidden' || cs.display === 'none') return;
     const px = parseFloat(cs.fontSize);
     const alpha = parseFloat(cs.opacity || '1');
-    let ratio = Math.min(...surfaceStops(el, bg).map((s) => contrast(cs.color, s)));
+    const stops = surfaceStops(el, bg);
+    const worst = stops.reduce((a, b) => (contrast(cs.color, b) < contrast(cs.color, a) ? b : a));
+    let ratio = contrast(cs.color, worst);
     if (alpha < 1) ratio = 1 + (ratio - 1) * alpha;
     // WCAG: 3:1 alcanza para texto grande (>=24px, o >=18.66px en negrita).
     const large = px >= 24 || (px >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
     if (ratio < (large ? 3 : min)) {
-      out.push({ sel: describe(el), text: text.slice(0, 44), color: cs.color, ratio: Math.round(ratio * 100) / 100, px });
+      out.push({ sel: describe(el), text: text.slice(0, 44), color: cs.color, sobre: worst, ratio: Math.round(ratio * 100) / 100, px });
     }
   });
   return out;

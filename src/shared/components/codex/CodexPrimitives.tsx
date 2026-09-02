@@ -332,9 +332,18 @@ export function MiniMacro({ label, value, max, tone = 'ink' }: MiniMacroProps) {
 export interface BannerProps {
   children: React.ReactNode;
   tone?: string;
+  /**
+   * Texto completo, para cuando la cinta lo recorta.
+   *
+   * La cinta del retrato lleva el TÍTULO del héroe, que es la recompensa de
+   * subir de nivel: si sale «Es…» en vez de «Escudero», el premio no existe.
+   * Cuando el hijo es texto plano se toma solo; si no, pasalo a mano.
+   */
+  title?: string;
 }
 
-export function Banner({ children, tone }: BannerProps) {
+export function Banner({ children, tone, title }: BannerProps) {
   const cls = tone ? `qb-banner qb-banner--${tone}` : 'qb-banner';
-  return <div className={cls}>{children}</div>;
+  const full = title ?? (typeof children === 'string' ? children : undefined);
+  return <div className={cls} title={full}>{children}</div>;
 }

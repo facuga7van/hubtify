@@ -1,7 +1,23 @@
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { changelog } from '../shared/changelog';
 
 export type UpdateState = 'idle' | 'downloading' | 'ready';
+
+/**
+ * El error del updater llegaba CRUDO a la pantalla: se leía
+ * «ERR_INTERNET_DISCONNECTED» —una constante de Chromium, en inglés y en
+ * mayúsculas— en medio de un diálogo en castellano, sin decir qué hacer.
+ * Acá se traduce a una frase con una salida; el código original viaja en el
+ * `title` para que siga sirviendo en un reporte de bug.
+ */
+export function humanUpdateError(raw: string, t: TFunction): string {
+  const code = raw.toUpperCase();
+  const offline = /ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ERR_CONNECTION|ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|NET::|NETWORK|OFFLINE|DNS/.test(code);
+  return offline
+    ? t('settings.updateErrorNetwork', 'No pudimos conectarnos para bajar la actualización. Revisá tu conexión y probá de nuevo.')
+    : t('settings.updateErrorGeneric', 'No pudimos bajar la actualización. Probá de nuevo más tarde.');
+}
 
 interface Props {
   version: string;
@@ -80,7 +96,13 @@ export default function UpdateNotification({ version, state, percent, error, onD
         )}
 
         {error && (
-          <p style={{ color: '#f87171', fontSize: 'var(--fs-label)', marginBottom: 8 }}>{error}</p>
+          <p
+            role="alert"
+            title={error}
+            style={{ color: '#f87171', fontSize: 'var(--fs-label)', marginBottom: 8, textAlign: 'left' }}
+          >
+            {humanUpdateError(error, t)}
+          </p>
         )}
 
         {state === 'idle' && (
@@ -88,21 +110,30 @@ export default function UpdateNotification({ version, state, percent, error, onD
             <button className="rpg-button" onClick={onDownload} style={{ width: '100%', marginBottom: 8 }}>
               {t('settings.downloadUpdate')}
             </button>
+            {/* Decía `nutrify.weightCheckin.later`: una clave del módulo de
+                nutrición usada en el diálogo de actualización. */}
             <button onClick={onDismiss} className="rpg-button"
-              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
-              {t('nutrify.weightCheckin.later')}
+              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold-light)' }}>
+              {t('common.later', 'Más tarde')}
             </button>
           </>
         )}
 
         {state === 'ready' && (
           <>
-            <p style={{ fontSize: 'var(--fs-label)', color: 'var(--moss)', marginBottom: 10 }}>{readyLabel}</p>
+            {/* `--moss` sobre `--leather` son 1.69:1: el ÚNICO cartel que
+                confirma que la actualización ya está lista era ilegible. El
+                verde vive ahora en una tablilla de pergamino (8.1:1). */}
+            <p style={{
+              fontSize: 'var(--fs-label)', color: 'var(--moss)', marginBottom: 10,
+              background: 'rgba(245, 231, 192, 0.92)', border: '1px solid var(--moss)',
+              borderRadius: 4, padding: '6px 10px',
+            }}>{readyLabel}</p>
             <button className="rpg-button" onClick={onRestart} style={{ width: '100%', marginBottom: 8 }}>
               {restartNow}
             </button>
             <button onClick={onDismiss} className="rpg-button"
-              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold)' }}>
+              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold-light)' }}>
               {restartLater}
             </button>
           </>

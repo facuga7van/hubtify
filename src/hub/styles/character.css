@@ -44,12 +44,14 @@
    sigue en el `title` del contenedor. */
 .hero-portrait-banner .qb-banner {
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* El título del héroe es la recompensa de subir de nivel: acá NO se recorta.
+     Son siete palabras cortas en todo el catálogo («Campesino» es la más
+     larga), así que antes de poner puntos suspensivos se achica el espaciado
+     entre letras, que es lo que las hacía no entrar. */
+  padding-left: 10px;
+  padding-right: 10px;
+  letter-spacing: 0.06em;
   white-space: nowrap;
-  padding-left: 12px;
-  padding-right: 12px;
-  letter-spacing: 0.1em;
 }
 
 /* ── editable character name ──────────────────── */

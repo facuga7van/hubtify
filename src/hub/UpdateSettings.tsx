@@ -43,7 +43,10 @@ export default function UpdateSettings({ mode, onChange }: Props) {
           </button>
         ))}
       </div>
-      <div className="settings-row__desc" style={{ marginTop: 8, opacity: 0.7 }}>
+      {/* Esta línea es la que EXPLICA qué hace el modo elegido, y venía con un
+          `opacity: .7` inline encima de un color ya apagado (--ink-faded):
+          3.71:1, por debajo de AA. Sin la opacidad son 4.86:1. */}
+      <div className="settings-row__desc" style={{ marginTop: 8 }}>
         {mode === 'auto' && t('settings.updateAutoDesc', 'Descarga las nuevas versiones en segundo plano y te avisa cuando están listas para instalar')}
         {mode === 'notify' && t('settings.updateNotifyDesc', 'Te avisa cuando hay una nueva versión y vos elegís cuándo descargar')}
         {mode === 'off' && t('settings.updateOffDesc', 'No busca actualizaciones automáticamente')}

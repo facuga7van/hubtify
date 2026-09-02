@@ -55,7 +55,13 @@ export default function UpdateBanner({ version, state, percent, error, onViewDet
             </div>
           </>
         ) : state === 'ready' ? (
-          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--moss)' }}>{readyLabel} · v{version}</span>
+          /* Mismo caso que en UpdateNotification: `--moss` sobre `--leather`
+             son 1.69:1. El verde pasa a la tablilla, el texto al pergamino. */
+          <span style={{
+            fontSize: 'var(--fs-label)', color: 'var(--moss)',
+            background: 'rgba(245, 231, 192, 0.92)', border: '1px solid var(--moss)',
+            borderRadius: 4, padding: '2px 8px', display: 'inline-block',
+          }}>{readyLabel} · v{version}</span>
         ) : (
           <span style={{ fontSize: 'var(--fs-label)', color: 'var(--gold-light)' }}>
             {t('settings.updateAvailable', { version })}
@@ -69,7 +75,10 @@ export default function UpdateBanner({ version, state, percent, error, onViewDet
             style={{ fontSize: 'var(--fs-label)', padding: '4px 10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
             {state === 'ready' ? restartLabel : error ? retryLabel : viewLabel}
           </button>
-          <button onClick={onDismiss} aria-label={t('nutrify.weightCheckin.later', 'Más tarde')}
+          {/* El nombre accesible de esta × era `nutrify.weightCheckin.later`:
+              una clave del módulo de nutrición prestada al shell, que le hacía
+              decir «Más tarde» al botón que descarta el aviso de versión. */}
+          <button onClick={onDismiss} aria-label={t('settings.updateDismiss', 'Descartar el aviso de actualización')}
             style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', flexShrink: 0, padding: 2, display: 'flex' }}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <path d="M3 3l6 6M9 3l-6 6" />

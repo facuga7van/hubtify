@@ -90,7 +90,19 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
   const translatedTitle = t(getTitleKey(stats.level), stats.title);
 
   const displayName = characterName || authUser?.displayName || authUser?.email?.split('@')[0] || translatedTitle;
-  const eyebrow = `${t('common.levelPrefix')}${stats.level} · ${translatedTitle}`;
+  /**
+   * El renglón de identidad decía «Nv.12 · Guerrero» y lo que se cortaba era
+   * SIEMPRE el final: «Nv.6 · Es…». Justo el título — que es el premio de subir
+   * de nivel, no un adorno — pagaba el prefijo.
+   *
+   * El número de nivel ya está acuñado en el medallón del avatar, a dos
+   * centímetros de acá: repetirlo en texto costaba ~55 px de los ~126 que tiene
+   * la columna en el riel angosto. Sale del renglón; el título se queda con la
+   * línea entera y entra completo incluso con «Campesino» —el más largo del
+   * catálogo (ver TITLE_THRESHOLDS)— y con el preset de fuente más grande.
+   * El nivel en palabras sigue disponible en el `title` de las dos piezas.
+   */
+  const rankHint = `${t('common.levelPrefix')}${stats.level} · ${translatedTitle}`;
 
   return (
     <div className={`player-card ${collapsed ? 'player-card--collapsed' : ''}`} style={{ position: 'relative' }}>
@@ -101,14 +113,17 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
           <div className="player-card__avatar-ring">
             <Character size={72} />
           </div>
-          {/* Level badge */}
-          <div className="player-card__level-badge">{stats.level}</div>
+          {/* El medallón ES el nivel: ahora carga también el rango, porque un
+              lector de pantalla leía «12» a secas. */}
+          <div className="player-card__level-badge" title={rankHint} aria-label={rankHint}>
+            {stats.level}
+          </div>
         </div>
 
         {/* Identity text — fades in on expand */}
         <div className="player-card__ident">
-          <div className="player-card__eyebrow" title={eyebrow}>
-            {eyebrow}
+          <div className="player-card__eyebrow" title={rankHint}>
+            {translatedTitle}
           </div>
           <div className="player-card__name" title={displayName}>
             {displayName}

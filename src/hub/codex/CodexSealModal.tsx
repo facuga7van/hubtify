@@ -366,7 +366,10 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
         {summary.modules.length > 0 && (
           <div className="codex-module-seals">
             {summary.modules.map((m) => (
-              <Rune key={m} tone="gold">
+              /* `tone="gold"` pinta el rótulo en --gold (#a88a3c) sobre
+                 pergamino: 2.27:1. Los tres sellos de módulo se veían
+                 fantasmales, como si estuvieran deshabilitados. */
+              <Rune key={m} tone="ink">
                 <span className="codex-module-seal">
                   {moduleIcon(m, 11)} {moduleLabel(m, t)}
                 </span>

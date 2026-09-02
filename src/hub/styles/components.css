@@ -487,7 +487,10 @@ textarea:focus-visible {
 .auth-card {
   width: min(380px, calc(100vw - 32px));
   padding: 36px 32px;
-  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%);
+  /* Termina en --parch-1, igual que `.rpg-card` y por el mismo motivo: hasta
+     --parch-2 el contraste del texto dependía de a qué altura de la tarjeta
+     caía (el subtítulo en --ink-faded bajaba a 3.80:1 ahí abajo). */
+  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 100%);
   border: 2px solid var(--gold-dark);
   border-radius: 6px;
   box-shadow:

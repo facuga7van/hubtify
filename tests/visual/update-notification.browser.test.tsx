@@ -32,11 +32,19 @@ describe('UpdateNotification — visual states', () => {
     await page.screenshot({ path: `${SCREENS}/update-02-downloading.png` });
   });
 
-  test('error', async () => {
+  /* El fallo del updater llega como una constante de Chromium
+     («ERR_INTERNET_DISCONNECTED») o como un mensaje en inglés de
+     electron-updater. Este test afirmaba que ESO se mostraba tal cual; ahora
+     afirma lo contrario: la pantalla explica el problema en el idioma de la
+     app y el texto crudo queda en el `title`, para el reporte de bug. */
+  test('error — se explica, y el texto crudo queda en el title', async () => {
     render(
       <UpdateNotification version="0.7.4" state="idle" percent={0} error="Update failed: network error" onDownload={noop} onRestart={noop} onDismiss={noop} />,
     );
-    await expect.element(page.getByText(/network error/i)).toBeVisible();
+    await expect.element(page.getByText(/Revisá tu conexión/i)).toBeVisible();
+    expect(document.body.textContent).not.toContain('Update failed: network error');
+    expect(document.querySelector('[role="alert"]')?.getAttribute('title'))
+      .toBe('Update failed: network error');
     await page.screenshot({ path: `${SCREENS}/update-03-error.png` });
   });
 

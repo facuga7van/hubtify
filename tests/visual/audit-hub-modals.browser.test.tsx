@@ -126,6 +126,16 @@ describe('Onboarding', () => {
       );
       await settle(300);
       report(`ONBOARDING ${name.toUpperCase()}`, document.body);
+      const shell = document.querySelector('.onboarding-page, .auth-page') as HTMLElement | null;
+      const card = document.querySelector('.onboarding-card, .auth-card') as HTMLElement | null;
+      // eslint-disable-next-line no-console
+      console.log(`ONBOARDING ${name.toUpperCase()} ALTO`, JSON.stringify({
+        shell: shell?.className,
+        shellScroll: shell ? shell.scrollHeight - shell.clientHeight : null,
+        shellOverflowY: shell ? getComputedStyle(shell).overflowY : null,
+        cardBottomOffViewport: card ? Math.round(card.getBoundingClientRect().bottom - window.innerHeight) : null,
+        docScroll: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      }, null, 1));
       fitCapture();
       await page.screenshot({ path: `${SCREENS}/audit-hub-onboarding-01-${name}.png` });
       resetCapture();
@@ -165,10 +175,39 @@ describe('Cierre del Códice (CodexSealModal)', () => {
           <CodexSealModal date={today} onClose={() => { closed = true; }} onSelectDate={() => {}} />
         </ConfirmProvider></ToastProvider>,
       );
-      await settle(600);
+      await settle(1400);
 
       const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
       report(`CODEX ${name.toUpperCase()}`, dlg);
+      // ¿El sello —el único botón que cierra el día— entra en pantalla?
+      const seal = dlg.querySelector('.codex-seal-btn, .codex-seal__wax, button[class*="seal"]') as HTMLElement | null;
+      const scrollers = [...dlg.querySelectorAll('*')]
+        .filter((el) => el.scrollHeight - el.clientHeight > 4)
+        .map((el) => ({ sel: (el as HTMLElement).className, over: el.scrollHeight - el.clientHeight }));
+      // Lo que se sale por ABAJO de la ventana, sea hijo del diálogo o no.
+      const belowFold = [...dlg.querySelectorAll('*')]
+        .map((el) => ({ sel: (el as HTMLElement).className || el.tagName, off: Math.round(el.getBoundingClientRect().bottom - window.innerHeight) }))
+        .filter((x) => x.off > 2)
+        .sort((a, b) => b.off - a.off);
+      // Chips de módulo: se ven fantasmales en la captura.
+      const chips = [...dlg.querySelectorAll('[class*="chip"], [class*="module"], [class*="rune"]')]
+        .slice(0, 6)
+        .map((el) => ({ sel: (el as HTMLElement).className, op: getComputedStyle(el).opacity, color: getComputedStyle(el).color }));
+      // eslint-disable-next-line no-console
+      console.log(`CODEX ${name.toUpperCase()} SELLO`, JSON.stringify({
+        seal: seal?.className,
+        sealBottomOff: seal ? Math.round(seal.getBoundingClientRect().bottom - window.innerHeight) : null,
+        scrollers: scrollers.slice(0, 5),
+        vOverflowDialog: dlg.scrollHeight - dlg.clientHeight,
+        dialogOverflowY: getComputedStyle(dlg).overflowY,
+        // Si offsetWidth == clientWidth no hay barra pintada: el modal scrollea
+        // pero nada lo anuncia.
+        scrollbarPx: dlg.offsetWidth - dlg.clientWidth,
+        scrollbarWidthCss: getComputedStyle(dlg).scrollbarWidth,
+        bookOverflowY: (() => { const b = dlg.querySelector('.codex-book') as HTMLElement | null; return b ? { of: getComputedStyle(b).overflowY, scroll: b.scrollHeight - b.clientHeight, h: Math.round(b.getBoundingClientRect().height) } : null; })(),
+        belowFold: belowFold.slice(0, 5),
+        chips,
+      }, null, 1));
       // eslint-disable-next-line no-console
       console.log(`CODEX ${name.toUpperCase()} CAJA`, JSON.stringify(insideViewport(dlg), null, 1));
 
@@ -229,5 +268,12 @@ describe('Avisos de actualización', () => {
     fitCapture();
     await page.screenshot({ path: `${SCREENS}/audit-hub-update-02-error.png` });
     resetCapture();
+
+    // La constante cruda de Chromium no se muestra: se explica y se ofrece
+    // una salida. El código sigue estando, en el `title`, para el reporte.
+    await expect.element(page.getByText(/Revisá tu conexión/i)).toBeVisible();
+    expect(document.body.textContent).not.toContain('ERR_INTERNET_DISCONNECTED');
+    expect(document.querySelector('[role="alert"]')?.getAttribute('title'))
+      .toBe('ERR_INTERNET_DISCONNECTED');
   });
 });
