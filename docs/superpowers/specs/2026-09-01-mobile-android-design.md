@@ -12,7 +12,7 @@ Hubtify corre hoy como Electron 41 + React 19 + better-sqlite3. Se quiere una ve
 
 **Fuera de alcance en v1 (explícito):** ejecución en background. En Android el WebView y su Worker se congelan cuando la app pasa a segundo plano; el temporizador del Cauldron y el motor de notificaciones solo corren con la app abierta (ver §6 y §12 Fase 6). Import de resúmenes PDF en mobile. Backup ZIP en mobile (usa `.db` crudo).
 
-Stack mobile: Capacitor 8.5.x (`@capacitor/core`, `@capacitor/android`, `@capacitor/cli`) + plugins `app`, `status-bar`, `local-notifications`, `filesystem`, `share`, `browser`; JDK 21 (Temurin instalado); Android SDK 35/36; `@sqlite.org/sqlite-wasm` 3.53.0-build1.
+Stack mobile: Capacitor 8.5.x (`@capacitor/core`, `@capacitor/android`, `@capacitor/cli`) + plugins `app`, `device`, `status-bar`, `local-notifications`, `filesystem`, `share`, `browser`; JDK 21 (Temurin instalado); Android SDK 35/36; `@sqlite.org/sqlite-wasm` 3.53.0-build1.
 
 Los hechos del código que sustentan cada decisión están en el **Anexo A**.
 
@@ -30,10 +30,12 @@ Los hechos del código que sustentan cada decisión están en el **Anexo A**.
                          shared-logic/               (TS puro, síncrono, sin electron/node/dom)
    ┌─────────────────────────────────────────────────────────────────────────┐
    │ registry.ts     registerHandler · getHandler · listChannels · clearHandlers
-   │                 registerAllHandlers()  (llama a los 14 register*Handlers) │
+   │                 registerLifecycle({suspend, resume}) · runSuspend/runResume
+   │                 registerAllHandlers()  (llama a los 14 register*IpcHandlers)
    │ db/sql-database.ts   interfaces SqlDatabase / SqlStatement / RunResult    │
-   │ db/provider.ts       getDb() · setDbFactory()                             │
-   │ db/migrate.ts        initCoreTables · applyMigrations · runModuleMigrations
+   │ db/provider.ts       getDb() · setDbFactory() · closeDb()                 │
+   │ db/migrate.ts        initCoreTables · coreMigrations · applyMigrations ·  │
+   │                      runModuleMigrations                                  │
    │ db/all-migrations.ts runAllModuleMigrations()  (6 módulos + notifications)│
    │ db/index.ts          re-exporta todo lo anterior (ÚNICO path de import)   │
    │ platform.ts     PlatformPort iface · setPlatform() · platform()           │
@@ -47,21 +49,28 @@ Los hechos del código que sustentan cada decisión están en el **Anexo A**.
               ▲ import                                       ▲ import
    ┌──────────┴────────────────────┐            ┌────────────┴──────────────────┐
    │ electron/ (binding desktop)   │            │ src/mobile/ (binding Android)  │
-   │ platform.ts  PlatformPort     │            │ worker.ts  setDbFactory(wasm   │
-   │  COMPLETO (dialog, fs, pdf-   │            │  opfs-sahpool) · setPlatform(  │
-   │  parse, app, os, Notification)│            │  proxy→UI) · registerAll...()  │
-   │ ipc/registry.ts registerAll-  │            │  · onmessage → getHandler(ch)  │
-   │  IpcHandlers(): registerAll-  │            │ install-api.ts  window.api     │
-   │  Handlers() + bind a ipcMain  │            │  desde shared/api-channels.ts  │
-   │ preload.ts  window.api desde  │            │ platform-host.ts  ejecuta      │
-   │  shared/api-channels.ts       │            │  PlatformPort con plugins Cap. │
-   │ modules/backup.ipc.ts, updater│            │ backup.ts (Fase 5), updater.ts │
-   │  .ts, main.ts (tray, ventanas)│            │  (Fase 6), FatalScreen.tsx     │
+   │ ipc/db.ts  (fino) crea el     │            │ worker.ts  setDbFactory(wasm   │
+   │  Database better-sqlite3 en   │            │  opfs-sahpool) · setPlatform(  │
+   │  app.getPath('userData')      │            │  proxy→UI) · registerAll...()  │
+   │ platform.ts  PlatformPort     │            │  · onmessage → getHandler(ch)  │
+   │  COMPLETO (dialog, fs, pdf-   │            │  · suspend/resume              │
+   │  parse, app, os, Notification)│            │ install-api.ts  window.api     │
+   │ modules/pdf-parse.d.ts        │            │  desde shared/api-channels.ts  │
+   │ ipc/registry.ts registerAll-  │            │ platform-host.ts  ejecuta      │
+   │  IpcHandlers(): registerAll-  │            │  PlatformPort con plugins Cap. │
+   │  Handlers() + bind a ipcMain  │            │ backup.ts (Fase 5), updater.ts │
+   │ preload.ts  window.api desde  │            │  (Fase 6), FatalScreen.tsx     │
+   │  shared/api-channels.ts       │            │                                │
+   │ modules/backup.ipc.ts, updater│            │                                │
+   │  .ts, main.ts (tray, ventanas)│            │                                │
    └───────────────────────────────┘            └────────────────────────────────┘
+
+   main.ts (orden de arranque): setDbFactory(openDesktopDb) → setPlatform(electronPlatform)
+     → setEventSink(webContentsSink) → registerAllIpcHandlers() → getDb() → runAllModuleMigrations()
                      src/ (renderer React) — API `window.api` sin cambios
 ```
 
-**Qué queda en `electron/` y no se comparte:** `modules/backup.ipc.ts` (adm-zip, fs, `db.backup()`), `modules/updater.ts` (Squirrel), `main.ts` (Tray, ventanas, `window:*`, ventana flotante del Cauldron). `adm-zip` y `pdf-parse` solo se importan desde `electron/`.
+**Qué queda en `electron/` y no se comparte:** `ipc/db.ts` (fino: `openDesktopDb()`), `platform.ts` + `modules/pdf-parse.d.ts`, `modules/backup.ipc.ts` (adm-zip, fs, `db.backup()`), `modules/updater.ts` (Squirrel), `main.ts` (Tray, ventanas, `window:*`, ventana flotante del Cauldron). `adm-zip` y `pdf-parse` solo se importan desde `electron/`.
 
 ### 3.1 `shared/api-channels.ts` — la tabla única
 
@@ -105,22 +114,29 @@ export function registerHandler(channel: string, fn: Handler): void  // throw si
 export function getHandler(channel: string): Handler | undefined
 export function listChannels(): string[]
 export function clearHandlers(): void     // solo tests
-export function registerAllHandlers(): void   // los 14 register*Handlers de modules/
+export function registerAllHandlers(): void   // invoca los 14 register*IpcHandlers de modules/ (conservan su nombre: cero churn)
+
+export interface Lifecycle { suspend(): void; resume(): void }
+export function registerLifecycle(l: Lifecycle): void
+export function runSuspend(): void        // ejecuta todos los suspend() registrados
+export function runResume(): void
 ```
+
+`registerLifecycle` existe porque `cauldron.ipc.ts` (5 `setInterval`: tick de 1 s y auto-start) y `notifications.ipc.ts` (`pollingInterval`, línea 98) mantienen timers que tocan la DB; con la DB cerrada durante `suspend` esos callbacks reventarían. Cada uno registra `{ suspend: clearInterval…, resume: re-crear el interval si había sesión activa }`. En Electron nunca se invoca (no hay suspend).
 
 Se conserva la firma `(event, ...args)` a propósito: 148 handlers ya la tienen como `(_e, ...)` y 21 tests los invocan como `fn(null, ...args)`. Quitar el parámetro es un follow-up cosmético.
 
-`electron/ipc/ipc-handle.ts` queda como `export { registerHandler as ipcHandle }`. `electron/ipc/registry.ts` conserva `registerAllIpcHandlers()`, que llama a `registerAllHandlers()` y luego `for (const ch of listChannels()) ipcMain.handle(ch, async (_e, ...a) => { try { return await fn({}, ...a) } catch (err) { console.error(`[${ch}]`, err); throw err } })`. Mismo logging que hoy. El worker hace lo equivalente con `fn({}, ...args)`; un canal sin handler responde `{ ok:false, error:{ name:'NoHandler', message: channel } }` e `install-api.ts` rechaza la promesa con ese error.
+`electron/ipc/ipc-handle.ts` queda como `export { registerHandler as ipcHandle }`. `electron/ipc/registry.ts` conserva `registerAllIpcHandlers()`, que llama a `registerAllHandlers()` de shared-logic y luego `for (const ch of listChannels()) ipcMain.handle(ch, async (_e, ...a) => { try { return await fn({}, ...a) } catch (err) { console.error(`[${ch}]`, err); throw err } })`. Mismo logging que hoy. El worker hace lo equivalente con `fn({}, ...args)`; un canal sin handler responde `{ ok:false, error:{ name:'NoHandler', message: channel } }` e `install-api.ts` rechaza la promesa con ese error.
 
 ### 3.3 Contexto implícito: `getDb()`, `platform()`, `emit()`
 
 Los handlers llaman `getDb()` inline (229 veces). **No se cambia la firma de los handlers.** El contexto se inyecta por proveedores globales de `shared-logic`:
 
-- `getDb()` (`shared-logic/db`) → en la primera llamada invoca la factory de `setDbFactory()` (better-sqlite3 en Electron y tests, shim WASM en el worker), aplica pragmas comunes, `initCoreTables` y migraciones core, como hoy `db.ts`. Luego cada binding llama `runAllModuleMigrations()` (`db/all-migrations.ts`), que reemplaza las 6 llamadas sueltas de `main.ts:360-365` y suma `notifications.schema.ts` (que se mueve a `shared-logic/modules/`).
+- `getDb()` (`shared-logic/db`) → en la primera llamada invoca la factory de `setDbFactory()` (better-sqlite3 en Electron y tests, shim WASM en el worker), aplica pragmas comunes, `initCoreTables` y `coreMigrations`, como hoy `db.ts`. Luego cada binding llama `runAllModuleMigrations()` (`db/all-migrations.ts`), que reemplaza las 6 llamadas sueltas de `main.ts:360-365` y suma `notifications.schema.ts` (que se mueve a `shared-logic/modules/`). `closeDb()` cierra y descarta el singleton; tras `closeDb()` y mientras el worker está suspendido, `getDb()` lanza `DbSuspended` (en Electron `closeDb()` solo lo usa `backup.ipc.ts` al restaurar, y la siguiente `getDb()` reabre normalmente). `electron/ipc/db.ts` SE CONSERVA como archivo fino: exporta `openDesktopDb()` que crea el `Database` de better-sqlite3 en `app.getPath('userData')/hubtify.db`; `main.ts` hace `setDbFactory(openDesktopDb)` antes de `registerAllIpcHandlers()`. `backup.ipc.ts` importa `closeDb` desde `shared-logic/db` en lugar del `require('../ipc/db')` dinámico de la línea 92.
 - `platform()` → `PlatformPort` inyectado con `setPlatform()` (§6).
 - `emit(channel, payload)` → reemplaza los `broadcast()` de `rpg-handlers.ts` y `cauldron.ipc.ts` y los `webContents.send` de `notifications.ipc.ts`. Sink inyectado con `setEventSink()`: Electron → `BrowserWindow.getAllWindows().forEach(w => w.webContents.send(...))` en try/catch como hoy; worker → `self.postMessage({ type:'event', channel, payload })`.
 
-Todos los módulos importan DB **solo** desde `shared-logic/db` (`index.ts`). Los 21 tests que hoy hacen `vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }))` pasan a mockear `shared-logic/db` — un solo mock.
+Todos los módulos importan DB **solo** desde `shared-logic/db` (`index.ts`), que re-exporta `getDb`, `setDbFactory`, `closeDb`, `initCoreTables`, `coreMigrations`, `applyMigrations`, `runModuleMigrations`, `runAllModuleMigrations` y los tipos. Los 21 tests que hoy hacen `vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }))` pasan a mockear `shared-logic/db` — un solo mock. Los 14 tests que importan `coreMigrations` cambian solo la ruta.
 
 ### 3.4 Interfaz `SqlDatabase` (subconjunto exacto usado)
 
@@ -158,11 +174,11 @@ export interface SqlDatabase {
 - `Uint8Array` (backup, `pickBinaryFile`) viaja con **transfer list** en ambos sentidos (`postMessage(msg, [buf])`).
 - Arranque: `src/main.tsx` hace `if (isNativeMobile()) await installMobileApi()` antes de `createRoot`. `installMobileApi()` crea el worker, espera `{ type:'ready' }` (VFS instalado, DB abierta, migraciones aplicadas) y asigna `window.api`. Ningún módulo lee `window.api` en top-level (verificado), así que el orden es seguro.
 - Fallos: `{ type:'fatal', reason:'vfs'|'migration'|'open', message, namespace?, version? }` antes de `ready` → se renderiza `src/mobile/FatalScreen.tsx` (mensaje, razón, botón "Reiniciar" = `location.reload()`; el botón "Exportar .db" llega en Fase 5 vía `src/mobile/backup.ts`). Después de `ready`, `worker.onerror`/`onmessageerror` → `install-api.ts` rechaza TODOS los invokes pendientes con `WorkerCrashed`, emite el `window` event `mobile:workerCrashed`, y `App` muestra `FatalScreen`. Sin recreación automática del worker. Sin timeout por invoke (paridad con `ipcRenderer.invoke`).
-- Ciclo de vida: `install-api.ts` escucha `App.addListener('appStateChange')` de `@capacitor/app` → `isActive:false` envía `{ type:'suspend' }` (worker: `poolUtil.pauseVfs()`, previo `db.close()`); `isActive:true` envía `{ type:'resume' }` (worker: `await poolUtil.unpauseVfs()`, reabre DB). `pagehide` → `worker.terminate()`. Mientras está suspendido, los invokes se encolan y se despachan tras `resume`.
+- Ciclo de vida: `install-api.ts` escucha `App.addListener('appStateChange')` de `@capacitor/app` → `isActive:false` envía `{ type:'suspend' }`; el worker ejecuta **primero `runSuspend()`** (todos los `suspend()` de lifecycle: cauldron y notifications limpian sus intervals), **luego `closeDb()` y `poolUtil.pauseVfs()`**. `isActive:true` envía `{ type:'resume' }`; el worker hace `await poolUtil.unpauseVfs()`, reabre vía `getDb()` y corre `runResume()`. `pagehide` → `worker.terminate()`. Mientras está suspendido, los invokes se encolan en `install-api.ts` y se despachan tras `resume`; si un handler igual llega a `getDb()` en ese estado recibe `DbSuspended`.
 
 ## 4. Persistencia mobile
 
-- `@sqlite.org/sqlite-wasm` 3.53.0-build1. El paquete publica **`dist/index.mjs`** y **`dist/sqlite3.wasm`** (no existe `sqlite-wasm/jswasm/` en el paquete npm; ese es el layout del tarball oficial). Import: `import sqlite3InitModule from '@sqlite.org/sqlite-wasm'` y `import wasmUrl from '@sqlite.org/sqlite-wasm/dist/sqlite3.wasm?url'`; `sqlite3InitModule({ locateFile: () => wasmUrl })`.
+- `@sqlite.org/sqlite-wasm` 3.53.0-build1. El mapa `exports` del paquete expone solo `.`, `./package.json` y **`./sqlite3.wasm`** (→ `dist/sqlite3.wasm`); `dist/` no es importable por subpath. Import: `import sqlite3InitModule from '@sqlite.org/sqlite-wasm'` y `import wasmUrl from '@sqlite.org/sqlite-wasm/sqlite3.wasm?url'`; `sqlite3InitModule({ locateFile: () => wasmUrl })`. La condición `node` de `exports` resuelve `dist/node.mjs` (es lo que ven vitest y los tests del shim); `browser`/`import` resuelven `dist/index.mjs` (worker en Vite).
 - VFS **`opfs-sahpool`**: `const poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'hubtify', initialCapacity: 6 })`; `db = new poolUtil.OpfsSAHPoolDb('/hubtify.db')`. No requiere `SharedArrayBuffer` ni COOP/COEP. `pauseVfs()` / `unpauseVfs()` / `isPaused()` existen desde 3.50 (doc `persistence.md`).
 - Exclusividad: la instalación falla si el VFS está activo en otro contexto del mismo origen con el mismo `name`. El worker reintenta `installOpfsSAHPoolVfs` 3 veces con backoff 300/600/1200 ms antes de `fatal(reason:'vfs')`. El suspend/resume de §3.5 evita que una instancia zombi retenga los handles.
 - Requisitos: contexto seguro. Capacitor sirve en `https://localhost` (`androidScheme:'https'`). **Live reload (`cap run -l`) sirve por `http://` → sin OPFS → NO soportado**; el flujo de desarrollo es `npm run mobile:sync && npx cap run android`.
@@ -177,7 +193,7 @@ export interface SqlDatabase {
 - **`capacitor.config.ts`**: `appId: 'com.hubtify.app'`, `appName: 'Hubtify'`, `webDir: 'dist/mobile'`, `server: { androidScheme: 'https' }`, `android: { allowMixedContent: false }`.
 - **Scripts**: `mobile:build` = `vite build -c vite.mobile.config.ts`; `mobile:sync` = `npm run mobile:build && cap sync android`; `mobile:run` = `npm run mobile:sync && cap run android`; `mobile:apk` = `npm run mobile:sync && cd android && ./gradlew assembleRelease`.
 - **`android/`**: generado por `cap add android`, commiteado. `app/build.gradle` lee `versionName` de `package.json` (bloque Groovy con `node -p`) y `versionCode = major*10000 + minor*100 + patch`. `signingConfigs.release` lee `android/keystore.properties` (gitignored) o variables de entorno.
-- **tsconfig**: `shared-logic/tsconfig.json` con `lib: ["ES2022"]` (sin `dom`), `types: []`, `include: ["./**/*", "../shared/**/*", "../src/modules/**/*.schema.ts"]`, `exclude: ["**/*.test.ts"]`. `npx tsc -p shared-logic --noEmit` en CI garantiza que `shared-logic` no dependa de Electron/Node/DOM. El `tsconfig.json` raíz suma `shared-logic/**/*` y `src/mobile/**/*`. Alias `@logic/*` → `shared-logic/*` en tsconfig, los 4 vite configs y vitest.
+- **tsconfig**: `shared-logic/tsconfig.json` con `lib: ["ES2022", "WebWorker"]` (declara `console`, timers, `fetch`, `crypto`, `setInterval`; NO `window`/`document`), `types: []`, `include: ["./**/*", "../shared/**/*", "../src/modules/**/*.schema.ts"]`, `exclude: ["**/*.test.ts"]`. `npx tsc -p shared-logic --noEmit` en CI garantiza que `shared-logic` no dependa de Electron/Node/DOM. El `tsconfig.json` raíz suma `shared-logic/**/*` y `src/mobile/**/*`. Alias `@logic/*` → `shared-logic/*` en tsconfig, los 4 vite configs y vitest.
 - **`.gitignore`**: `android/app/build/`, `android/.gradle/`, `android/keystore.properties`, `android/*.jks`, `dist/mobile/`.
 
 ## 6. PlatformPort
@@ -212,7 +228,7 @@ export interface PlatformPort {
 
 El `PlatformPort` del worker es un proxy: cada método envía `{ type:'platform', method, args }` al hilo UI y espera `platform-result`. Las Fases 1–2 necesitan `appVersion`, `osInfo`, `notify` (no-op) y `pickPdfText` (`{unsupported:true}`); el resto se implementa en Fase 5 y hasta entonces devuelve `false`/`null`.
 
-**Background (sin paridad en v1):** con la app en segundo plano el Worker se congela. Al reanudar, el tick del Cauldron recalcula `remainingMs = targetEndTime - Date.now()` (`cauldron.ipc.ts:263`) y `onTimeUp()` acredita la sesión usando `targetEndTime` (wall-clock), no la hora de reanudación — comportamiento ya existente que se preserva. Las notificaciones de rachas/recordatorios solo se evalúan con la app abierta hasta la Fase 6.
+**Background (sin paridad en v1):** con la app en segundo plano el Worker se congela (y en `suspend` los intervals se limpian). Al reanudar, el tick del Cauldron recalcula `remainingMs = targetEndTime - Date.now()` (`cauldron.ipc.ts:263`) y dispara `onTimeUp()`. **Cambio de comportamiento (Fase 2, con test):** hoy `onTimeUp()` escribe `completed_at = new Date().toISOString()` (`cauldron.ipc.ts:274-282`), es decir la hora en que corrió el callback; pasa a `completed_at = new Date(targetEndTime).toISOString()`, la hora en que la sesión realmente terminó. En desktop es equivalente (el tick corre a ≤1 s del target); en mobile evita que una sesión reanudada 40 min tarde quede registrada 40 min después. Las notificaciones de rachas/recordatorios solo se evalúan con la app abierta hasta la Fase 6.
 
 ## 7. Shell mobile
 
@@ -242,7 +258,7 @@ Sin cambios en `src/shared/sync.ts`, `sync-merge.ts`, `habit-checks-sync.ts` ni 
 ## 10. Testing
 
 - **Suite existente**: intacta salvo imports (`electron/modules/x` → `shared-logic/modules/x`; `electron/ipc/db` → `shared-logic/db`). Los `vi.mock('electron')` quedan inertes. Los 21 tests con `vi.mock('.../electron/ipc/db')` pasan a `vi.mock('.../shared-logic/db')`. Los 21 que capturan handlers vía mock de `ipcMain.handle` pasan a `getHandler(ch)` + `clearHandlers()` en `beforeEach`; la invocación `fn(null, ...args)` no cambia (pasa a `fn({}, ...args)` donde se toque).
-- **Nuevos tests** (project `unit`): `registry` (duplicado lanza, `listChannels`), `api-channels` (cada clave de `HubtifyApi` tiene entrada, canales únicos, los 8 desktop-only marcados), `build-api` (unwrap aplicado, `send` no-op en mobile), transporte (`install-api` con `MessageChannel` falso: invoke ok/error, `NoHandler`, event, platform round-trip con transfer, `WorkerCrashed` rechaza pendientes, cola durante `suspend`), shim WASM en memoria (`run/get/all`, `changes`, `lastInsertRowid`, LRU con `finalize`, rollback y savepoint anidado, booleanos), `electron/platform.ts` con `electron` mockeado.
+- **Nuevos tests** (project `unit`): `registry` (duplicado lanza, `listChannels`, `runSuspend/runResume` en orden de registro), `provider` (`closeDb` → `getDb` lanza `DbSuspended` mientras está suspendido, reabre después), `onTimeUp` con `completed_at = targetEndTime`, `api-channels` (cada clave de `HubtifyApi` tiene entrada, canales únicos, los 8 desktop-only marcados), `build-api` (unwrap aplicado, `send` no-op en mobile), transporte (`install-api` con `MessageChannel` falso: invoke ok/error, `NoHandler`, event, platform round-trip con transfer, `WorkerCrashed` rechaza pendientes, cola durante `suspend`), shim WASM en memoria (`run/get/all`, `changes`, `lastInsertRowid`, LRU con `finalize`, rollback y savepoint anidado, booleanos), `electron/platform.ts` con `electron` mockeado.
 - **Fase 6**: `tests/helpers/createTestDb.ts` + project `unit-wasm` que corre la misma suite con `setDbFactory(wasmInMemory)`.
 - **Gate de aislamiento**: `tsc -p shared-logic` en CI.
 - **Smoke mobile** (manual, emulador): login, crear tarea, completar, matar app, reabrir → persiste.
@@ -251,8 +267,8 @@ Sin cambios en `src/shared/sync.ts`, `sync-merge.ts`, `habit-checks-sync.ts` ni 
 
 | Fase | Contenido | Aceptación |
 |---|---|---|
-| 1. Extracción | `shared-logic/` completo (registry, db/*, platform, events, ids, modules/ incl. `notifications.schema.ts`), `shared/api-channels.ts` + `build-api.ts`, `preload.ts` generado, `electron/platform.ts` COMPLETO, `electron/ipc/registry.ts` como binding, `cauldron:openWindow/closeWindow` vía `ipcHandle`, `HubtifyApi` con los 8 desktop-only opcionales, edición mínima de cuerpos (tabla §6: crypto→`genId`, app/os→`platform()`, Notification→`notify`, broadcast→`emit`, dialog/fs→`platform()`), imports de tests actualizados | `npx tsc --noEmit` y `tsc -p shared-logic` verdes; `npm test` verde con la misma cantidad de tests que en `master`; `npm start` funciona igual (export CSV, import PDF, notificaciones, Cauldron flotante probados a mano); `git diff master -- src/` solo toca `global.d.ts`, `platform-detect.ts` y los `if (window.api.x)` de los 8 opcionales |
-| 2. Capacitor + worker | deps Capacitor 8.5, `capacitor.config.ts`, `android/`, `vite.mobile.config.ts`, `src/mobile/{worker,install-api,platform-host,FatalScreen}.ts(x)`, `db/wasm-database.ts`, suspend/resume, scripts | `npm run mobile:apk` produce un APK; existe `dist/mobile/assets/sqlite3-*.wasm`; el worker loguea `vfs: opfs-sahpool`; en emulador: login, crear tarea, matar app, reabrir → persiste; resultado del MIME `.wasm` anotado |
+| 1. Extracción | `shared-logic/` completo (registry + lifecycle, db/* con `closeDb`/`coreMigrations`, platform, events, ids, modules/ incl. `notifications.schema.ts`), `shared/api-channels.ts` + `build-api.ts`, `preload.ts` generado, `electron/platform.ts` COMPLETO, `electron/ipc/db.ts` reducido a `openDesktopDb()`, `electron/ipc/registry.ts` como binding, `backup.ipc.ts` usando `closeDb` de `shared-logic/db`, `cauldron:openWindow/closeWindow` vía `ipcHandle`, `HubtifyApi` con los 8 desktop-only opcionales, edición mínima de cuerpos (tabla §6: crypto→`genId`, app/os→`platform()`, Notification→`notify`, broadcast→`emit`, dialog/fs→`platform()`), imports de tests actualizados | `npx tsc --noEmit` y `tsc -p shared-logic` verdes; `npm test` verde con la misma cantidad de tests que en `master`; `npm start` funciona igual (export CSV, import PDF, notificaciones, Cauldron flotante probados a mano); `git diff master -- src/` solo toca `global.d.ts`, `platform-detect.ts` y los `if (window.api.x)` de los 8 opcionales |
+| 2. Capacitor + worker | deps Capacitor 8.5, `capacitor.config.ts`, `android/`, `vite.mobile.config.ts`, `src/mobile/{worker,install-api,platform-host,FatalScreen}.ts(x)`, `db/wasm-database.ts`, suspend/resume con lifecycle de cauldron y notifications, `completed_at = targetEndTime` en `onTimeUp` (con test), scripts | `npm run mobile:apk` produce un APK; existe `dist/mobile/assets/sqlite3-*.wasm`; el worker loguea `vfs: opfs-sahpool`; en emulador: login, crear tarea, matar app, reabrir → persiste; resultado del MIME `.wasm` anotado |
 | 3. Shell mobile | `MobileShell`, drawer, sin TitleBar, StatusBar, safe areas, back button, project `browser-mobile` | Screenshots 390×844 de Dashboard, Questify, Coinify, Nutrify, Cauldron sin overflow horizontal; drawer abre/cierra; back cierra drawer |
 | 4. CI/keystore | keystore generado, `release.yml` en 3 jobs, `ci.yml` con APK debug, `.gitignore` | Revisión del YAML + `assembleRelease` firmado local; `apksigner verify` OK |
 | 5. PlatformPort mobile | `notify` real, `saveTextFile`, `pickBinaryFile`, `saveBinaryFile`, `src/mobile/backup.ts`, botón "Exportar .db" en `FatalScreen`; toast i18n `unsupported_platform` para import PDF | Export CSV y `.db` comparten por Share; import `.db` restaura y recarga; el import PDF muestra el toast y no rompe nada |
@@ -293,7 +309,10 @@ Sin cambios en `src/shared/sync.ts`, `sync-merge.ts`, `habit-checks-sync.ts` ni 
 | `import type Database from 'better-sqlite3'` | 9 archivos (8 van a shared-logic + `db.ts`) |
 | `crypto` | `import crypto from 'crypto'` en 8 archivos; `genId()` local en quests, nutrition, finance, cauldron, notification-engine |
 | Node/Electron en módulos | `Notification` (notifications.ipc ×2 sitios, cauldron.ipc ×2), `dialog`+`fs` (backup, finance.ipc:1792, finance-import.ipc:260), `require('pdf-parse')` (finance-import:273), `AdmZip` (backup), `app.getVersion` (feedback, syl), `os.release`+`process.platform` (feedback), `app.getPath` (backup, updater, db.ts), `spawn` (updater), `fetch` (dollar, crypto, feedback) |
-| Cauldron timer | `targetEndTime` wall-clock (`cauldron.ipc.ts:135,263,454`), `onTimeUp()` en 272; 5 `setInterval` |
+| Cauldron timer | `targetEndTime` wall-clock (`cauldron.ipc.ts:135,263,454`), `onTimeUp()` en 272 escribe `completed_at = new Date().toISOString()`; 5 `setInterval` (tick + auto-start). `notifications.ipc.ts:98` `pollingInterval` |
+| `backup.ipc.ts:92` | `const { closeDb } = require('../ipc/db')` dinámico antes de restaurar |
+| `coreMigrations` | exportado en `db.ts:91`; 14 archivos de test lo importan |
+| sqlite-wasm `exports` | `.` (node→`dist/node.mjs`, browser/import→`dist/index.mjs`), `./package.json`, `./sqlite3.wasm`→`dist/sqlite3.wasm`. Sin subpath `./dist/*` |
 | Tests | 120 archivos; 69 usan `better-sqlite3`; 60 importan rutas `electron/`; 21 hacen `vi.mock('.../electron/ipc/db')`; 21 capturan handlers con mock de `ipcMain.handle`; 26 `vi.mock('electron')`; `tests/setup.ts` vacío |
 | Shell | `Layout.tsx:604-619`: `<TitleBar/>` (32 px) + `.sidebar-wrapper` (260/56 px) + `<Sidebar>` `position:fixed; top:32px` + `<main.main-content>`; `AUTO_COLLAPSE_WIDTH = 820`; `minWidth: 700` en `main.ts:206` |
 | Build | Forge 7.11 + plugin-vite (`vite.main/preload/renderer.config.ts`); `vite.main` externaliza `better-sqlite3`, `adm-zip`, `pdf-parse`. Un `tsconfig.json` (`include: src, electron, shared`), aliases `@core/@hub/@shared/@modules` duplicados en `vitest.config.ts` |
