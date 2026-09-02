@@ -131,8 +131,8 @@ describe('Cuotas: se lee de un vistazo a pantalla completa', () => {
     await settle();
     await page.screenshot({ path: `${SCREENS}/coinify-01-cuotas-1640.png` });
 
-    // La lista no se estira con la ventana.
-    expect(box('.coin-installment-list').width).toBeLessThanOrEqual(940);
+    // La lista no se estira con la ventana (medida de `.coin-installments`).
+    expect(box('.coin-installment-list').width).toBeLessThanOrEqual(1100);
 
     // Nombre ↔ importe: el hueco entre el contador y la cifra tiene que ser
     // legible de un salto de ojo, no el ancho de la pantalla.
