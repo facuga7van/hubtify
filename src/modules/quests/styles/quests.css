@@ -1139,6 +1139,15 @@
    ScrollNotes.tsx y el @media de abajo no podía tocarlo. */
 .quest-notes-dialog {
   min-width: 540px;
+  /* QST-01: un trazo que llega al borde no tiene que arrastrar la página de atrás. */
+  overscroll-behavior: contain;
+}
+
+/* QST-01: sin esto el WebView le da el gesto al scroll a los ~35 px y cancela
+   el pointer; el lienzo es el único lugar donde el dedo dibuja y no scrollea.
+   No cambia nada en pantalla, así que no va bajo [data-shell="mobile"]. */
+.quest-notes-canvas {
+  touch-action: none;
 }
 
 .quest-notes-status {

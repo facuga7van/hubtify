@@ -115,19 +115,25 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   }, [dirty, drawings, currentIdx, taskId]);
 
   // Drawing handlers
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const scaleX = CANVAS_W / rect.width;
     const scaleY = CANVAS_H / rect.height;
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   };
 
-  const onPointerDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  /* QST-01: en el teléfono cada trazo moría a los ~35 px — el scroll se
+     quedaba con el gesto y el pointer se cancelaba. `touch-action: none` (CSS)
+     le niega el gesto al scroll y la captura retiene el trazo aunque el dedo
+     salga del lienzo. La captura tira con un pointerId que el browser no
+     conoce (eventos sintéticos): no es motivo para perder el trazo. */
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDrawingRef.current = true;
     lastPosRef.current = getPos(e);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer sintético */ }
   };
 
-  const onPointerMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
     const pos = getPos(e);
 
@@ -149,8 +155,11 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     setSaveState('idle');
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDrawingRef.current = false;
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch { /* pointer sintético */ }
   };
 
   // Actions
@@ -319,11 +328,13 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         {/* Canvas */}
         <canvas
           ref={canvasRef}
+          className="quest-notes-canvas"
           width={CANVAS_W}
           height={CANVAS_H}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
           onPointerLeave={onPointerUp}
           style={{
             cursor: 'crosshair',
