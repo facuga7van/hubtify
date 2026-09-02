@@ -16,7 +16,7 @@ import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutriti
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
 // The prompt's identity, from the same file the Cloud Function ships. A cached
 // model answer is only a hit while the prompt that produced it is the current
-// one (migration v16). gemini.ts has no imports, so this is safe in the worker.
+// one (migration v17). gemini.ts has no imports, so this is safe in the worker.
 import { PROMPT_VERSION } from '../../functions/src/gemini';
 
 /** Who put a row in nutrition_ai_cache: the model, or the human overruling it. */
@@ -523,7 +523,7 @@ export function registerNutritionIpcHandlers(): void {
     if (!row) return null;
     // A model answer from another prompt is stale: the whole point of
     // improving the prompt is that the most-repeated dishes get the new
-    // number. A human correction never expires (migration v16).
+    // number. A human correction never expires (migration v17).
     if (row.source !== 'user' && row.promptVersion !== PROMPT_VERSION) return null;
     db.prepare('UPDATE nutrition_ai_cache SET hits = hits + 1, updated_at = ? WHERE description_norm = ?')
       .run(syncStamp(), norm);

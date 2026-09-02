@@ -288,11 +288,11 @@ describe('nutrition:getCachedEstimate / nutrition:cacheEstimate', () => {
 });
 
 /**
- * Migration v16: the cache knows WHO wrote a row and with WHICH prompt, so a
+ * Migration v17: the cache knows WHO wrote a row and with WHICH prompt, so a
  * better prompt is not buried under the old number for the dishes the user
  * repeats most, while a human correction survives every prompt change.
  */
-describe('nutrition_ai_cache — source and prompt_version (v16)', () => {
+describe('nutrition_ai_cache — source and prompt_version (v17)', () => {
   const rowFor = (norm: string) => harness.db.prepare(
     'SELECT source, prompt_version AS promptVersion, hits FROM nutrition_ai_cache WHERE description_norm = ?',
   ).get(norm) as { source: string; promptVersion: string | null; hits: number };
@@ -313,7 +313,7 @@ describe('nutrition_ai_cache — source and prompt_version (v16)', () => {
     expect(rowFor('tostado').hits).toBe(1);
   });
 
-  it('re-estimates rows that predate v16 (NULL prompt_version)', async () => {
+  it('re-estimates rows that predate v17 (NULL prompt_version)', async () => {
     harness.db.prepare(`
       INSERT INTO nutrition_ai_cache (description_norm, calories, created_at) VALUES ('manzana', 78, '2026-08-01T00:00:00.000Z')
     `).run();
@@ -375,17 +375,18 @@ describe('nutrition:getUserCorrections', () => {
 });
 
 /**
- * Migration v17: corrections that already lived in food_log (the breakdown no
+ * Migration v18: corrections that already lived in food_log (the breakdown no
  * longer sums to the total the user typed) are promoted to user rows once.
+ * Runs after the v16 twin repair, so food_log is already deduped here.
  */
-describe('nutrition v17 — backfill of pre-existing corrections', () => {
+describe('nutrition v18 — backfill of pre-existing corrections', () => {
   function freshDbUpTo(version: number): Database.Database {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     for (const m of nutritionMigrations) if (m.version <= version) db.exec(m.up);
     return db;
   }
-  const v17 = nutritionMigrations.find(m => m.version === 17)!;
+  const v18 = nutritionMigrations.find(m => m.version === 18)!;
   const breakdown = (...cals: number[]) => JSON.stringify(cals.map((c, i) => ({ name: `item ${i}`, calories: c })));
   function log(db: Database.Database, description: string, calories: number, aiBreakdown: string | null,
     opts: { source?: string; updatedAt?: string | null; syncId?: string; deleted?: boolean } = {}) {
@@ -400,7 +401,7 @@ describe('nutrition v17 — backfill of pre-existing corrections', () => {
   ).all() as Array<{ norm: string; calories: number; source: string; proteinG: number | null; updatedAt: string }>;
 
   it('promotes an edited AI entry (breakdown does not sum to the total) and dedupes the sync twins', () => {
-    const db = freshDbUpTo(16);
+    const db = freshDbUpTo(17);
     // The real case from the report: 1200+450+300 = 1950 estimated, 1750 kept — twice, thanks to sync.
     log(db, 'hamburguesa triple con papas', 1750, breakdown(1200, 450, 300), { syncId: 'legacy-x', updatedAt: '2026-04-29T16:00:00.000Z' });
     log(db, 'Hamburguesa triple con papas', 1750, breakdown(1200, 450, 300), { syncId: 'uuid-x', updatedAt: '2026-04-30T10:00:00.000Z' });
@@ -409,19 +410,19 @@ describe('nutrition v17 — backfill of pre-existing corrections', () => {
     // Manual entries and deleted rows do not count.
     log(db, 'tofi', 270, null, { source: 'manual' });
     log(db, 'asado con papa al horno', 850, breakdown(700, 250), { deleted: true });
-    db.exec(v17.up);
+    db.exec(v18.up);
     expect(cache(db)).toEqual([
       expect.objectContaining({ norm: 'hamburguesa triple con papas', calories: 1750, source: 'user', proteinG: null, updatedAt: '2026-04-30T10:00:00.000Z' }),
     ]);
   });
 
   it('overwrites a stale model row for the same dish but never an existing user row', () => {
-    const db = freshDbUpTo(16);
+    const db = freshDbUpTo(17);
     db.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version) VALUES ('guiso', 980, 'model', 'old')`).run();
     db.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source) VALUES ('tarta', 500, 'user')`).run();
     log(db, 'guiso', 700, breakdown(980));
     log(db, 'tarta', 640, breakdown(400, 300));
-    db.exec(v17.up);
+    db.exec(v18.up);
     expect(cache(db)).toEqual([
       expect.objectContaining({ norm: 'guiso', calories: 700, source: 'user' }),
       expect.objectContaining({ norm: 'tarta', calories: 500, source: 'user' }),
@@ -429,12 +430,12 @@ describe('nutrition v17 — backfill of pre-existing corrections', () => {
   });
 
   it('is a no-op on an empty log and idempotent when re-run', () => {
-    const db = freshDbUpTo(16);
-    db.exec(v17.up);
+    const db = freshDbUpTo(17);
+    db.exec(v18.up);
     expect(cache(db)).toEqual([]);
     log(db, 'milanesa', 400, breakdown(350));
-    db.exec(v17.up);
-    db.exec(v17.up);
+    db.exec(v18.up);
+    db.exec(v18.up);
     expect(cache(db)).toHaveLength(1);
   });
 });

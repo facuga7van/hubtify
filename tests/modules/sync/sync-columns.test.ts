@@ -104,7 +104,7 @@ const CASES: StatementCase[] = [
   { table: 'habit_checks', label: 'merge upsert insert', marker: 'INSERT INTO habit_checks (' },
   { table: 'habit_checks', label: 'merge upsert update', marker: 'ON CONFLICT(habit_id, date) DO UPDATE SET', exempt: ['id', 'habit_id', 'date', 'created_at'] },
   // ── nutrition ──
-  { table: 'food_log', label: 'export', marker: 'SELECT f.id, f.sync_id, f.date, f.time,' },
+  { table: 'food_log', label: 'export', marker: 'SELECT f.sync_id, f.date, f.time,' },
   { table: 'food_log', label: 'merge insert', marker: 'INSERT INTO food_log (' },
   { table: 'food_log', label: 'merge update', marker: 'UPDATE food_log SET', exempt: ['id', 'sync_id'] },
   // export is SELECT * — nothing to check there

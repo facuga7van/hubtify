@@ -260,7 +260,7 @@ describe('mergeNutritionData — food_log merge by sync_id', () => {
 
 // ── profile (LWW) ─────────────────────────────────────────────────────────
 
-// ── nutrition_ai_cache user corrections (v16) ─────────────────────────────
+// ── nutrition_ai_cache user corrections (v17) ─────────────────────────────
 
 describe('mergeNutritionData — aiCorrections', () => {
   const readCache = (norm: string) =>
