@@ -272,7 +272,7 @@ export default function Layout() {
     setUpdateState('downloading');
     setUpdateError(null);
     try {
-      await window.api.updaterDownload();
+      await window.api.updaterDownload?.();
       setUpdateState('ready'); // staged — user chooses when to restart
     } catch { setUpdateState('idle'); }
   }, []);

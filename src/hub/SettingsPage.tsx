@@ -448,7 +448,8 @@ export default function SettingsPage() {
             </div>
             <div className="settings-row__buttons">
               <button className="rpg-button" onClick={async () => {
-                const result = await window.api.backupExport();
+                const result = await window.api.backupExport?.();
+                if (!result) return;
                 if (result.success) toast({ message: t('settings.exportSuccess'), type: 'success' });
                 else if (!result.canceled) toast({ message: `${t('settings.exportFailed')}: ${result.error}`, type: 'warning' });
               }} style={{ flex: 1 }}>
@@ -457,8 +458,8 @@ export default function SettingsPage() {
               <button className="rpg-button" onClick={async () => {
                 // Primero el archivo, despues la confirmacion: asi el usuario ve QUE
                 // respaldo va a pisar sus datos antes de decidir.
-                const picked = await window.api.backupPickImportFile();
-                if (picked.canceled || !picked.path) return;
+                const picked = await window.api.backupPickImportFile?.();
+                if (!picked || picked.canceled || !picked.path) return;
                 const ok = await confirm({
                   title: t('settings.importBackup'),
                   message: t('settings.importConfirmFile', 'Importar «{{name}}» REEMPLAZA todos los datos actuales de este dispositivo. Esta acción no se puede deshacer.', { name: picked.name ?? '' }),
@@ -466,7 +467,8 @@ export default function SettingsPage() {
                   danger: true,
                 });
                 if (!ok) return;
-                const result = await window.api.backupImport(picked.path);
+                const result = await window.api.backupImport?.(picked.path);
+                if (!result) return;
                 if (result.success) {
                   toast({ message: t('settings.importSuccess'), type: 'success' });
                   window.location.reload();

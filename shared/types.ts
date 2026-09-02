@@ -526,9 +526,9 @@ export interface HubtifyApi {
   syncMergeCauldronData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
 
   // Backup
-  backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
-  backupPickImportFile: () => Promise<{ canceled: boolean; path?: string; name?: string }>;
-  backupImport: (filePath?: string) => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
+  backupExport?: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
+  backupPickImportFile?: () => Promise<{ canceled: boolean; path?: string; name?: string }>;
+  backupImport?: (filePath?: string) => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
 
   // Character
   characterSave: (data: Record<string, unknown>) => Promise<void>;
@@ -688,8 +688,8 @@ export interface HubtifyApi {
   cauldronSetLabels: (labels: Record<string, string>) => Promise<void>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
   onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
-  cauldronOpenWindow: () => Promise<void>;
-  cauldronCloseWindow: () => Promise<void>;
+  cauldronOpenWindow?: () => Promise<void>;
+  cauldronCloseWindow?: () => Promise<void>;
   onCauldronWindowOpened: (callback: () => void) => () => void;
   onCauldronWindowClosed: (callback: () => void) => () => void;
 
@@ -700,9 +700,9 @@ export interface HubtifyApi {
   sylBuildSnapshot: () => Promise<SylSnapshot>;
 
   // Updater
-  updaterCheck: () => Promise<{ available: boolean; version?: string }>;
-  updaterDownload: () => Promise<string>;
-  updaterRestart: () => Promise<void>;
+  updaterCheck?: () => Promise<{ available: boolean; version?: string }>;
+  updaterDownload?: () => Promise<string>;
+  updaterRestart?: () => Promise<void>;
   onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
   onUpdateDownloaded: (callback: () => void) => () => void;
   onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;
