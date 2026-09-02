@@ -85,4 +85,52 @@ describe('Notas de misión a 390×844', () => {
     await expect.element(page.getByText(/Sin guardar/i)).toBeVisible();
   });
 
+  test('QST-03: «Nueva» no persiste nada hasta el primer guardado', async () => {
+    const save = vi.fn(() => Promise.resolve('new-id'));
+    const onClose = await mountNotes([], { questsSaveDrawing: save });
+    // Un solo empty state, no uno en la cabecera y otro en el cuerpo.
+    expect(document.querySelectorAll('.quest-notes-dialog').length).toBe(1);
+    const dialog = document.querySelector('.quest-notes-dialog') as HTMLElement;
+    expect((dialog.textContent!.match(/Sin notas/g) ?? []).length).toBe(1);
+
+    await page.getByRole('button', { name: /Nueva/i }).click();
+    await settle(300);
+    expect(save).not.toHaveBeenCalled();
+    const canvas = document.querySelector('.quest-notes-canvas') as HTMLCanvasElement;
+    expect(getComputedStyle(canvas).display).not.toBe('none');
+
+    // Atrás sin dibujar: nada que guardar.
+    await page.getByRole('button', { name: /^Cerrar$/i }).click();
+    await settle(200);
+    expect(save).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test('QST-03: el primer trazo guardado crea la nota', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'setPointerCapture').mockImplementation(() => {});
+    const store: unknown[] = [];
+    const save = vi.fn((d: { id?: string; taskId: string; data: string }) => {
+      const id = d.id ?? `d${store.length + 1}`;
+      if (!d.id) store.push({ id, taskId: d.taskId, data: d.data, order: store.length, createdAt: '' });
+      return Promise.resolve(id);
+    });
+    const counted = vi.fn();
+    installApi({ ...QUESTS_API, questsGetDrawings: () => Promise.resolve([...store]), questsSaveDrawing: save });
+    await setMobileViewport();
+    mountInShell(<ScrollNotes taskId="t1" onClose={() => {}} onCountChanged={counted} />, '/quests');
+    await settle(900);
+
+    await page.getByRole('button', { name: /Nueva/i }).click();
+    await settle(300);
+    const canvas = document.querySelector('.quest-notes-canvas') as HTMLCanvasElement;
+    stroke(canvas);
+    await page.getByRole('button', { name: /^Guardar$/i }).click();
+    await settle(400);
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save.mock.calls[0][0].id).toBeUndefined();
+    expect(save.mock.calls[0][0].taskId).toBe('t1');
+    expect(counted).toHaveBeenCalled();
+    await expect.element(page.getByText(/Nota 1 de 1/i)).toBeVisible();
+  });
 });
