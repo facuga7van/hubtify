@@ -37,20 +37,20 @@ import {
   onAchievementUnlocked,
 } from './codex/codexApi';
 import { createParticleBurst } from '../shared/animations/particles';
+import { isNewerVersion } from '../shared/semver';
 
 /** Never pull+push more often than this on window focus (ms). */
 const FOCUS_SYNC_MIN_INTERVAL_MS = 3 * 60_000;
 const LAST_PULL_KEY = 'hubtify_last_pull_at';
 
-function isNewerVersion(a: string, b: string): boolean {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return true;
-    if ((pa[i] || 0) < (pb[i] || 0)) return false;
-  }
-  return false;
-}
+/**
+ * Plegado a `false` por `define` en el renderer de Electron. OJO: esbuild solo
+ * elimina un `import()` cuando la condición es la comparación LITERAL en el
+ * mismo sitio, no a través de este const — los dos `import('../mobile/updater')`
+ * de abajo repiten la comparación entera a propósito. Este const es para los
+ * usos que NO guardan un import dinámico.
+ */
+const IS_ANDROID_BUILD = typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android';
 
 /**
  * Sync push failures were completely silent: the data simply never left the
@@ -270,7 +270,21 @@ export default function Layout() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
+  // Android: URL del APK del último release (src/mobile/updater.ts). Sin
+  // descarga in-app: «Descargar» abre el navegador. Es un ref y no un state a
+  // propósito: como state, `handleUpdate` → `considerUpdate` → el `useEffect`
+  // del updater se re-ejecutarían y harían un segundo `check()` al montar.
+  const apkUrlRef = useRef<string | null>(null);
+
   const handleUpdate = useCallback(async () => {
+    if (typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android') {
+      const apkUrl = apkUrlRef.current;
+      if (apkUrl) {
+        const { openApkDownload } = await import('../mobile/updater');
+        await openApkDownload(apkUrl).catch((err: unknown) => setUpdateError(err instanceof Error ? err.message : String(err)));
+        return;
+      }
+    }
     setUpdateState('downloading');
     setUpdateError(null);
     try {
@@ -300,7 +314,7 @@ export default function Layout() {
     if (mode === 'off') return;
     if (localStorage.getItem('hubtify_update_dismissed_version') === version) return;
     setUpdateAvailable({ version });
-    if (mode === 'auto') handleUpdate();
+    if (mode === 'auto' && !IS_ANDROID_BUILD) handleUpdate();
   }, [handleUpdate]);
 
   useEffect(() => {
@@ -310,6 +324,17 @@ export default function Layout() {
     const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
 
     const check = () => {
+      if (typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android') {
+        import('../mobile/updater')
+          .then((m) => m.checkMobileUpdate())
+          .then((update) => {
+            if (!update) return;
+            apkUrlRef.current = update.apkUrl;
+            considerUpdate(update.version);
+          })
+          .catch(() => { /* sin red o rate limit: silencio, igual que en dev */ });
+        return;
+      }
       window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
         if (res?.available && res.version) considerUpdate(res.version);
       }).catch(() => { /* not available in dev */ });
