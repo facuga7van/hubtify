@@ -765,8 +765,8 @@ For togglable rows (recurring transactions, habits, reminders):
 | `< 880px` | Dashboard grids single column (`components.css`, `dashboard-layouts.css`), character sheet single column (`character.css`) |
 | `< 780px` | Coinify compact ledger, page padding 14/12 (`coinify.css`, `shell.css`) |
 | `< 480px` | Nutrify meal rows drop the time column (`nutri.css`, desktop-era rule; never reached by the window) |
-| `html[data-shell="mobile"]` | **Mobile (Android, 390–412px) — not a width breakpoint:** `MobileShell` sets the attribute; transversal rules in `layout.css` (`.qb-page` padding 12, `.qb-header` wraps, `.page-header__actions` static, `.qb-corner` hidden, `.qb-cartouche` tightened) plus one `[data-shell="mobile"] …` block at the end of each module sheet (`quests.css`, `coinify.css`, `nutri.css`, `cauldron.css`, `character.css`, `codex-seal.css`, `rewards.css`) |
-| `(hover: none)` | Touch: anything revealed only on hover is shown (`.widget-controls`, `.coin-budget-pencil`, quest postpone, nutri row icons); tap targets grow to 40–44px |
+| `html[data-shell="mobile"]` | **Mobile (Android, 390–412px) — not a width breakpoint:** `MobileShell` sets the attribute; transversal rules in `layout.css` (`.qb-page` padding 12, `.qb-header` wraps, `.page-header__actions` static, `.qb-corner` hidden, `.qb-cartouche` tightened) plus one `[data-shell="mobile"] …` block at the end of each module sheet (`quests.css`, `coinify.css`, `nutri.css`, `cauldron.css`, `character.css`, `codex-seal.css`) |
+| `(hover: none)` | Touch: anything revealed only on hover is shown (`.widget-controls`, `.coin-budget-pencil`, quest postpone, nutri row icons); tap targets grow to 40–44px. `rewards.css` carries only this kind of block, no `[data-shell="mobile"]` one |
 
 The desktop window never goes below 700px (`electron/main.ts` minWidth) and the
 desktop visual tests go down to 420px, so mobile rules are keyed on

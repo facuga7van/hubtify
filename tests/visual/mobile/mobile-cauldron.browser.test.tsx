@@ -53,12 +53,11 @@ describe('Caldero a 390×844', () => {
     await shoot('cauldron-02-corriendo');
     noOverflow('CAULDRON RUNNING');
     const ft = document.querySelector('.cauldron-floating-timer') as HTMLElement | null;
-    if (ft) {
-      const r = ft.getBoundingClientRect();
-      expect(r.left).toBeGreaterThanOrEqual(0);
-      expect(r.right).toBeLessThanOrEqual(window.innerWidth);
-      expect(ft.scrollWidth).toBeLessThanOrEqual(ft.clientWidth + 1);
-    }
+    expect(ft).not.toBeNull();
+    const r = ft!.getBoundingClientRect();
+    expect(r.left).toBeGreaterThanOrEqual(0);
+    expect(r.right).toBeLessThanOrEqual(window.innerWidth);
+    expect(ft!.scrollWidth).toBeLessThanOrEqual(ft!.clientWidth + 1);
   });
 
   test('el editor de recetas es de una columna (K5)', async () => {

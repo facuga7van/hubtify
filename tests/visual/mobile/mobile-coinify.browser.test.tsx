@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom';
 import FinanceLayout from '@modules/finance/components/FinanceLayout';
 import FinanceDashboard from '@modules/finance/components/Dashboard';
 import Transactions from '@modules/finance/components/Transactions';
+import Loans from '@modules/finance/components/Loans';
 import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes } from './mobile-harness';
 import { FINANCE_API } from './fixtures';
 
@@ -37,6 +38,7 @@ function Finance() {
       <Route path="/finance" element={<FinanceLayout />}>
         <Route index element={<FinanceDashboard />} />
         <Route path="transactions" element={<Transactions />} />
+        <Route path="loans" element={<Loans />} />
       </Route>
     </Routes>
   );
@@ -74,7 +76,10 @@ describe('Coinify a 390×844', () => {
 
   test('la pestaña activa se ve aunque sea la última (C9)', async () => {
     await setMobileViewport();
-    mountInShell(<Finance />, '/finance/transactions');
+    // Préstamos es la SEXTA pestaña: con `scrollLeft = 0` queda fuera de vista.
+    // Montar en la segunda (Transacciones) daría un falso verde: entra igual sin
+    // el scrollIntoView de FinanceLayout.
+    mountInShell(<Finance />, '/finance/loans');
     await settle(700);
     const active = document.querySelector('.coin-tab-link--active') as HTMLElement;
     const nav = document.querySelector('.coin-tab-nav') as HTMLElement;

@@ -138,7 +138,17 @@ const bal = {
   USD: { income: 3_200, expenses: 240, balance: 2_960 },
 };
 
+/** Formas de audit-coin-managers.browser.test.tsx:53-58. */
+export const COIN_LOANS: Row[] = [
+  { id: 'l1', personName: 'Victoria Fernández de la Vega', direction: 'lent', type: 'single', amount: 214_780_310, currency: 'ARS', date: '2026-05-12', description: 'Adelanto para la reforma completa del departamento de Palermo', settled: 0 },
+  { id: 'l2', personName: 'Victoria Fernández de la Vega', direction: 'lent', type: 'installment', amount: 8_000_000, currency: 'ARS', date: '2026-06-01', description: 'Notebook', settled: 0, installmentGroupId: 'g1' },
+  { id: 'l4', personName: 'Juan', direction: 'lent', type: 'single', amount: 1_250, currency: 'USD', date: '2026-08-02', description: '', settled: 0 },
+];
+
 export const FINANCE_API: Record<string, unknown> = {
+  financeGetLoans: (opts: { settled?: boolean } = {}) =>
+    Promise.resolve(opts.settled ? [] : COIN_LOANS),
+  financeGetLoanPayments: () => Promise.resolve([]),
   financeGetMonthlyBalance: () => Promise.resolve(bal),
   financeGetBalanceForRange: () => Promise.resolve(bal),
   financeGetCategoryBreakdown: () => Promise.resolve(COIN_CATEGORIES),
