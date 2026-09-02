@@ -13,6 +13,7 @@ import UpdateSettings from './UpdateSettings';
 import ChangelogModal from '../shared/components/ChangelogModal';
 import { changelog } from '../shared/changelog';
 import { SHORTCUTS } from '../shared/shortcuts';
+import { isNativeMobile } from '../shared/platform-detect';
 import './styles/shell.css';
 
 const LAST_PULL_KEY = 'hubtify_last_pull_at';
@@ -524,19 +525,22 @@ export default function SettingsPage() {
 
       {/* ═══ AYUDA ════════════════════════════════════════ */}
       <SettingsGroup title={t('settings.groupHelp', 'Ayuda')}>
-        <SettingsCard
-          title={t('settings.shortcuts')}
-          icon={<svg {...iconProps}><rect x="1" y="4" width="14" height="9" rx="2"/><path d="M4 7h1M7 7h2M11 7h1M4 10h8"/></svg>}
-        >
-          <div className="settings-shortcuts">
-            {SHORTCUTS.map((s) => (
-              <div key={s.keys} className="settings-shortcut">
-                <span className="settings-shortcut__label">{t(s.i18nKey, s.fallback)}</span>
-                <kbd className="settings-shortcut__key">{s.keys}</kbd>
-              </div>
-            ))}
-          </div>
-        </SettingsCard>
+        {/* Sin teclado físico no hay atajos: en Android la tarjeta sobra (SET-01). */}
+        {!isNativeMobile() && (
+          <SettingsCard
+            title={t('settings.shortcuts')}
+            icon={<svg {...iconProps}><rect x="1" y="4" width="14" height="9" rx="2"/><path d="M4 7h1M7 7h2M11 7h1M4 10h8"/></svg>}
+          >
+            <div className="settings-shortcuts">
+              {SHORTCUTS.map((s) => (
+                <div key={s.keys} className="settings-shortcut">
+                  <span className="settings-shortcut__label">{t(s.i18nKey, s.fallback)}</span>
+                  <kbd className="settings-shortcut__key">{s.keys}</kbd>
+                </div>
+              ))}
+            </div>
+          </SettingsCard>
+        )}
 
         <SettingsCard
           title={t('settings.guidedTour', 'Introducción y tour')}

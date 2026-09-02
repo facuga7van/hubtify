@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CachedAccount } from '../shared/accountStore';
 import type { AuthUser } from '../shared/hooks/useAuth';
+import { useAnchoredPopup } from '../shared/hooks/useAnchoredPopup';
 
 interface Props {
   activeUser: AuthUser;
@@ -17,20 +18,17 @@ interface Props {
 export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, onLogout, onClose, anchorRef }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const ref = useRef<HTMLDivElement>(null);
   const [expiredEmail, setExpiredEmail] = useState<string | null>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  const updatePos = useCallback(() => {
-    if (!anchorRef?.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.left });
-  }, [anchorRef]);
-
-  // Calculate position before paint — no jump
-  useLayoutEffect(() => {
-    updatePos();
-  }, [updatePos]);
+  /* Posicionado con el mismo hook que los demás popovers anclados: lo anota
+     como popover abierto para el botón atrás de Android y lo sujeta al
+     viewport. En el shell mobile el disparador es el ícono del extremo
+     derecho del PlayerCard, dentro de un drawer de 300 px: alineado al borde
+     izquierdo el menú (200 px mínimo) salía del drawer y se cortaba contra el
+     borde de la pantalla (DRW-01); alineado a su borde derecho queda adentro.
+     En escritorio conserva la alineación izquierda de siempre. */
+  const align = document.documentElement.dataset.shell === 'mobile' ? 'end' : 'start';
+  const { popupRef, pos } = useAnchoredPopup<HTMLElement, HTMLDivElement>(true, 4, { onClose, anchorRef, align });
 
   // Return focus to trigger on close
   useEffect(() => {
@@ -40,13 +38,13 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
+  }, [onClose, popupRef]);
 
   /* Del menú sólo se salía con el mouse: Escape no hacía nada, así que con el
      teclado quedabas adentro (y el foco vuelve al disparador en el cleanup). */
@@ -73,12 +71,9 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
     }
   };
 
-  // Don't render until position is known
-  if (!pos) return null;
-
   return createPortal(
     <div
-      ref={ref}
+      ref={popupRef}
       className="account-dropdown"
       role="menu"
       style={{ top: pos.top, left: pos.left }}

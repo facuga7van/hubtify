@@ -45,19 +45,33 @@ describe('Caldero a 390×844', () => {
     expect(getComputedStyle(stats).gridTemplateColumns.split(' ').length).toBe(1);
   });
 
-  test('corriendo con misión: la página y el temporizador flotante entran (K2)', async () => {
+  /* CAU-01: el chip flotante se mostraba sobre la propia página del Caldero,
+     tapando las stat cards. En mobile solo aparece FUERA de /cauldron. */
+  test('corriendo con misión: la página entra y el chip flotante no se le pone encima (K2, CAU-01)', async () => {
     await setMobileViewport();
     installApi(cauldronApi(CAULDRON_RUNNING));
     mountInShell(<><CauldronPage /><CauldronFloatingTimer /></>, '/cauldron');
     await settle(800);
     await shoot('cauldron-02-corriendo');
     noOverflow('CAULDRON RUNNING');
+    expect(document.querySelector('.cauldron-floating-timer')).toBeNull();
+    // CAU-02: la ventana flotante es de Electron; el checkbox no va en Android.
+    expect(document.querySelector('.cauldron-popout-toggle')).toBeNull();
+  });
+
+  test('fuera del Caldero el chip flotante entra en el ancho y no ofrece «abrir en ventana» (CAU-01)', async () => {
+    await setMobileViewport();
+    installApi(cauldronApi(CAULDRON_RUNNING));
+    mountInShell(<CauldronFloatingTimer />, '/quests');
+    await settle(800);
     const ft = document.querySelector('.cauldron-floating-timer') as HTMLElement | null;
     expect(ft).not.toBeNull();
     const r = ft!.getBoundingClientRect();
     expect(r.left).toBeGreaterThanOrEqual(0);
     expect(r.right).toBeLessThanOrEqual(window.innerWidth);
     expect(ft!.scrollWidth).toBeLessThanOrEqual(ft!.clientWidth + 1);
+    expect(ft!.querySelector('.cauldron-ft-btn--popout')).toBeNull();
+    await shoot('cauldron-03-chip-fuera');
   });
 
   test('el editor de recetas es de una columna (K5)', async () => {

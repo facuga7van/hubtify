@@ -23,6 +23,7 @@ import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { usePopoverRegistration } from '../../../shared/hooks/usePopoverRegistration';
 import { useFoodSuggestions } from '../useFoodSuggestions';
 import { cacheEstimate } from '../history-api';
 import { notifyNutritionChanged } from '../notify';
@@ -187,6 +188,10 @@ export default function Today() {
     try { return localStorage.getItem(FAVORITES_OPEN_KEY) !== 'false'; } catch { return true; }
   });
   const [logMenuOpen, setLogMenuOpen] = useState(false);
+  // No usa useAnchoredPopup (vive en flujo, no en portal): se anota a mano
+  // para que el botón atrás de Android lo cierre en vez de navegar.
+  const closeLogMenu = useCallback(() => setLogMenuOpen(false), []);
+  usePopoverRegistration(logMenuOpen, closeLogMenu);
   const [reopening, setReopening] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
   const [manualMode, setManualMode] = useState(false);
@@ -236,7 +241,7 @@ export default function Today() {
   // offline. Only the AI-mode input offers it; Manual already asks for a number.
   const suggest = useFoodSuggestions(foodInput, !dayClosed && !manualMode);
   const { anchorRef: suggestAnchorRef, popupRef: suggestPopupRef, pos: suggestPos } =
-    useAnchoredPopup<HTMLDivElement, HTMLDivElement>(suggest.open, 2);
+    useAnchoredPopup<HTMLDivElement, HTMLDivElement>(suggest.open, 2, { onClose: suggest.close });
   const [suggestWidth, setSuggestWidth] = useState(0);
 
   // Match the dropdown to the input row so the two read as one control.

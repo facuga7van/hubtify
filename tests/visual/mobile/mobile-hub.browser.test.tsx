@@ -4,6 +4,8 @@ import Dashboard from '@hub/Dashboard';
 import CharacterPage from '@hub/CharacterPage';
 import AchievementsPage from '@hub/AchievementsPage';
 import RewardsPage from '@hub/rewards/RewardsPage';
+import SettingsPage from '@hub/SettingsPage';
+import { TourProvider } from '@shared/components/tour';
 import { ACHIEVEMENTS } from '../../../shared/achievements';
 import {
   installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes,
@@ -48,11 +50,13 @@ describe('Hub a 390×844', () => {
     await settle();
     await shoot('hub-01-dashboard');
     expectNoHorizontalOverflow('DASH MOBILE');
-    // Los controles de los widgets no pueden depender del hover en touch (H6);
-    // el project emula touch, así que (hover: none) aplica.
+    // HUB-02: los cuatro controles de escritorio (arrastrar, ancho, alto) no
+    // sirven en el teléfono y robaban la cabecera de cada widget. La regla
+    // (hover: none) que los mostraba queda para escritorio táctil; bajo el
+    // shell mobile van ocultos.
     const controls = document.querySelector('.widget-controls');
     expect(controls).not.toBeNull();
-    expect(getComputedStyle(controls!).opacity).toBe('1');
+    expect(getComputedStyle(controls!).display).toBe('none');
     // Las cuatro cartelas (Nivel / XP hoy / Racha / Salud) van 2×2, no en
     // cuatro columnas de ~95 px donde «XP HOY» partía en tres renglones.
     const cartouches = [...document.querySelectorAll('.qb-cartouche')] as HTMLElement[];
@@ -61,6 +65,13 @@ describe('Hub a 390×844', () => {
     // eslint-disable-next-line no-console
     console.log('DASH MOBILE CARTELAS', JSON.stringify(widths));
     for (const w of widths) expect(w).toBeGreaterThanOrEqual(150);
+    // HUB-01 / HUB-03: la fila HOY (parte + sello) y Crónica + Bitácora van
+    // en una columna; eran grillas inline `1fr 220px` / `1.2fr 1fr`.
+    for (const sel of ['.dash-row-brief', '.dash-row-chronicle']) {
+      const row = document.querySelector(sel) as HTMLElement;
+      expect(row, sel).not.toBeNull();
+      expect(getComputedStyle(row).gridTemplateColumns.split(' ').length, sel).toBe(1);
+    }
     for (const c of cartouches) {
       const label = c.querySelector('.qb-cartouche-label') as HTMLElement;
       const cs = getComputedStyle(label);
@@ -109,5 +120,15 @@ describe('Hub a 390×844', () => {
     await settle(600);
     await shoot('hub-04-recompensas');
     expectNoHorizontalOverflow('RECOMPENSAS MOBILE');
+  });
+
+  /* SET-01: sin teclado físico no hay atajos; la tarjeta «Atajos de teclado» sobra en Android. */
+  test('Ajustes no lista los atajos de teclado', async () => {
+    await setMobileViewport();
+    mountInShell(<TourProvider><SettingsPage /></TourProvider>, '/settings');
+    await settle(600);
+    // La página se montó entera: la tarjeta vecina del mismo grupo está.
+    await expect.element(page.getByText(/Reiniciar Tour/i).first()).toBeInTheDocument();
+    expect(document.querySelector('.settings-shortcuts')).toBeNull();
   });
 });

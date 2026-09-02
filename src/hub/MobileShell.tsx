@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { gsap } from 'gsap';
@@ -60,6 +60,18 @@ export default function MobileShell({ stats, onBellClick, onToggleInn, children 
     setOpen(false);
   }, [pathname]);
 
+  // Cada ruta arranca arriba (GEN-03). El que scrollea en mobile es
+  // `.main-content`, no window. AnimatedOutlet ya resetea dos frames después
+  // de navigate(), pero con una ruta lazy React mantiene la página vieja
+  // hasta que llega el chunk: el reset caía sobre la vieja y la nueva heredaba
+  // su scroll. `pathname` cambia recién cuando la nueva commitea, y el layout
+  // effect corre antes del paint. Solo cambio de ruta: un setState de la
+  // página no pasa por acá.
+  const mainRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [pathname]);
+
   // Botón atrás: solo con el bridge nativo. El literal de `define` va primero
   // y a propósito (igual que src/main.tsx): esbuild pliega
   // `"desktop" === 'android'` a false y Rollup ELIMINA el import() del bundle
@@ -117,7 +129,7 @@ export default function MobileShell({ stats, onBellClick, onToggleInn, children 
       </header>
 
       <div className="app-layout app-layout--mobile">
-        <main className="main-content">{children}</main>
+        <main ref={mainRef} className="main-content">{children}</main>
       </div>
 
       <div ref={scrimRef} className="mobile-scrim" data-testid="mobile-scrim" onClick={closeDrawer} aria-hidden="true" />
