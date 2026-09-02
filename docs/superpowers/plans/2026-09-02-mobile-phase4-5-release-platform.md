@@ -54,6 +54,20 @@ Este plan **asume** la Fase 1 tal como quedó (`docs/superpowers/plans/2026-09-0
 16. **El log de Gradle imprime solo el nombre del `.jks`**, no el alias: en CI el alias es un secret y GitHub enmascararía cada aparición de esa palabra en el log entero.
 17. **`importDb` deja la DB suspendida «hasta el `reload()`» con un matiz**: si el usuario manda la app a segundo plano y vuelve antes de que el WebView recargue, el `resume` del worker (Fase 2) hace `resumeDb()` + `getDb()` sobre el archivo recién importado (reabre y corre migraciones). Es inocuo — es exactamente lo que el reload va a hacer — pero no es «nada funciona hasta recargar» en sentido estricto.
 
+18. **`notify` pasa `isExactNotification: false`** (agregado en la Tarea 17, no estaba en el plan).
+    `@capacitor/local-notifications` 8.3.1 asume `isExactNotification: true` y, en Android 12+ sin
+    `SCHEDULE_EXACT_ALARM`, `schedule()` **no notifica**: lanza la pantalla de sistema «Alarmas y
+    recordatorios» y deja la promesa pendiente hasta que el usuario vuelve. Ninguna notificación de
+    Hubtify lleva `schedule` — todas son inmediatas y no usan alarma —, así que el flag correcto es
+    `false`. Encontrado ejecutando el Step 2 en el emulador; sin esto el criterio de la spec §11
+    («`notify` real») no se cumple. Commit aparte: `fix(mobile): notificar en el acto…`.
+19. **`IS_ANDROID_BUILD` en `Layout.tsx` no guarda los `import()`.** El const se define igual (Step
+    5b) y se usa en `considerUpdate`, pero los dos `import('../mobile/updater')` repiten la
+    comparación LITERAL `typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ ===
+    'android'` en el sitio: esbuild solo pliega el `import()` así (mismo hallazgo que ya obligó a
+    hacerlo en `main.tsx`, `SettingsPage.tsx` y `FatalScreen.tsx`). Con el const, el bundle de
+    escritorio ganaba un chunk huérfano `worker-*.js`.
+
 **Revisión:** dos rondas. Ronda 1: 2 bloqueantes + 10 menores, todos aplicados. Ronda 2: 1 bloqueante (`OS_INFO_FALLBACK`, que `install-api.ts` importa y la reescritura de `platform-host.ts` borraba) + 8 menores, todos aplicados sin tercera ronda (tope de 2). Verificado localmente además: el `eval` de Task 3 Step 8 exporta la contraseña correcta, el snippet de `keystore.properties` de Task 2 Step 3 escribe las 4 claves, el YAML embebido parsea con js-yaml y el `rg` anti-fugas de Task 6 Step 3 da vacío contra ese YAML.
 
 **Menores señalados por el revisor y aceptados tal cual:** en `tests/mobile/platform-host.test.ts` se usa `r?.name` / `r!.bytes` sobre el `unknown` que devuelve `PlatformHostFns`; no rompe porque `tests/` está fuera del `include` del `tsconfig` y `no-non-null-assertion` está en `off`. No «arreglar» el tipo en `worker-client.ts` por esto.
@@ -2767,6 +2781,28 @@ Expected: los commits de este plan encima de los de Fases 1–2 y working tree l
 
 ## Resultados en el emulador (se completa en la Tarea 17)
 
-_pendiente_
+**2026-09-02 — AVD `hubtify` (Pixel 7, Android 15) — WebView `124.0.6367.219` — app `versionName=0.8.2`, `versionCode=802`.**
 
-Formato: fecha — WebView `<versionName>` — por cada Step 2–9: OK / FALLÓ + una línea.
+Los screenshots están en `docs/superpowers/plans/2026-09-02-mobile-phase5-*.png`. La UI se manejó
+por adb (`input tap`) y, donde hacía falta llamar a `window.api` o instalar un stub de `fetch`, por
+CDP sobre el socket `webview_devtools_remote_<pid>` (equivalente a `chrome://inspect`). Para llegar
+al hub sin credenciales se sembró un usuario ficticio (`smoke@local.test`) en el IndexedDB **del
+emulador** con modo avión, igual que en la Fase 3: no se creó ninguna cuenta real ni se escribió en
+Firestore.
+
+| Step | Resultado | Detalle | Screenshot |
+|---|---|---|---|
+| 1 · Build debug e inicio | **OK** | `BUILD SUCCESSFUL`, `Success`, log `[worker] vfs: opfs-sahpool name=hubtify files=[]` y `[worker] ready` | `…-boot.png` |
+| 2 · Notificación local | **OK (tras un fix)** | Android pidió POST_NOTIFICATIONS y la notificación «Prueba Hubtify» quedó en el shade, canal `hubtify`. Ver el desvío 18: sin `isExactNotification:false` el plugin abría «Alarmas y recordatorios» en vez de notificar | `…-notif-permission.png`, `…-notification.png` |
+| 3 · Exportar `.db` | **OK** | Share sheet con `hubtify-2026-09-02.db`; cancelar el sheet no deja toast (`canceled`) | `…-settings-backup.png`, `…-export-db-share.png` |
+| 4 · Importar el mismo `.db` | **OK** | Con la tarea `smoke fase 5` exportada y después borrada, importar el archivo la devolvió tras el reload. Un PNG elegido en el picker da el toast «Ese archivo no es una base de datos de Hubtify (.db).» | `…-import-confirm.png`, `…-import-restored.png`, `…-import-not-sqlite.png` |
+| 5 · Export CSV comparte | **OK** | Share sheet con `coinify-2026-09.csv`; el archivo tiene cabecera `date,description,amount,currency,category,type,payment_method` y la fila del movimiento | `…-export-csv-share.png` |
+| 6 · Import PDF muestra el toast | **OK** | «Importar resúmenes PDF no está disponible en Android. Usalo desde la app de escritorio.» Sin spinner colgado ni «No se pudo procesar el PDF» | `…-pdf-toast.png` |
+| 7 · `FatalScreen` con export | **OK (parcial, como preveía el plan)** | No se provocó un fatal de migración real. Cubierto por `db-backup-handlers.test.ts` y `backup.test.ts`, más el test de screenshot nuevo `tests/visual/mobile/mobile-fatal.browser.test.tsx` (layout de `.mobile-fatal__actions`; el botón de export no aparece ahí porque no hay worker) | `tests/visual/__screenshots__/mobile/fatal-00-migracion-a.png` (gitignored) |
+| 8 · Release firmado instala | **OK** | `[hubtify] release signing: release.jks`, `BUILD SUCCESSFUL`; `apksigner verify --print-certs` → `Signer #1 certificate DN: CN=Hubtify, OU=Hubtify, O=Hubtify, L=Buenos Aires, ST=BA, C=AR`; `adb install` y después `adb install -r` dieron `Success` las dos veces | `…-release-installed.png` |
+| 9 · Updater | **OK** | Con red, el GET real a `api.github.com/…/releases/latest` da 200 (`v0.8.2`, assets solo Windows) → sin banner falso, que es lo correcto. Con un stub de `fetch` inyectado por CDP antes del bundle (release `v0.9.9` con `Hubtify-0.9.9.apk`) aparece el banner «Nueva versión disponible: v0.9.9», «Ver novedades» abre el modal y «Descargar» dispara `Browser.open` con `https://github.com/facuga7van/hubtify-releases/releases/download/v0.9.9/Hubtify-0.9.9.apk` (verificado en el log de Capacitor) | `…-update-banner.png` |
+
+**Observación (no es de esta fase):** con el APK recién instalado y sin red, las fuentes de
+`theme.css` (Google Fonts por `@import`) no se pueden bajar y la UI cae a la familia de sistema;
+con red vuelven a la UnifrakturCook/IM Fell de siempre. Es el `@import` de siempre, no algo que
+introduzca la Fase 5, pero en Android es más visible que en escritorio.
