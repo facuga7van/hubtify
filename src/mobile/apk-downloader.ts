@@ -18,6 +18,13 @@
  * cortar la conexión sin `@capacitor/file-transfer` (que sí expone un
  * `AbortController`-like via `pause()`/`removeAllListeners`, pero implica
  * sumar una dependencia nueva fuera del alcance de este cambio).
+ *
+ * BUG REAL encontrado en el emulador (no lo hubiera atrapado ningún mock):
+ * `downloadFile({ recursive: true })` NO crea el directorio padre en esta
+ * versión — `LegacyFilesystemImplementation.kt` abre el `FileOutputStream`
+ * directo y revienta con `ENOENT` si `updates/` no existe todavía (primer
+ * uso de la app). El `recursive` de la doc aplica a otros métodos, no a
+ * este. Por eso `mkdir` explícito abajo, antes de descargar.
  */
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -66,6 +73,10 @@ export function downloadApk(url: string, version: string, expectedSize: number, 
   async function run(): Promise<string> {
     await clearOldApks();
     if (cancelled) throw new Error('cancelled');
+
+    // Ver el comentario de arriba: downloadFile no crea `updates/` solo.
+    await Filesystem.mkdir({ path: UPDATES_DIR, directory: Directory.Cache, recursive: true })
+      .catch(() => { /* ya existe — normal a partir del segundo update */ });
 
     progressHandle = await Filesystem.addListener('progress', (status) => {
       if (cancelled) return;
