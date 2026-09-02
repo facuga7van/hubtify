@@ -104,8 +104,15 @@ export default function HabitTracker({ onXpGained }: Props) {
     setHeatmapData(cells);
   }, []);
 
+  /* 42 días, no 91. El calendario compartido dibuja SIEMPRE siete columnas
+     (una por día de la semana), así que un trimestre son trece renglones:
+     ~330 px de mapa metidos entre dos hábitos, empujando el resto de la lista
+     fuera de la pantalla al abrir el historial del primero. Seis semanas
+     entran en seis renglones y siguen contando la misma historia. El récord
+     («Mejor racha») lo calcula el backend sobre TODO el historial, no sobre
+     esta ventana, así que acortarla no le saca nada. */
   const loadHistory = useCallback(async (habitId: string) => {
-    const { days, bestStreak } = await window.api.questsGetHabitHistory(habitId, 91);
+    const { days, bestStreak } = await window.api.questsGetHabitHistory(habitId, 42);
     const todayStr = formatDateString(new Date());
     setHistoryStart(days[0]?.date ?? '');
     setHistoryCells(days.map(d =>

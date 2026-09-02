@@ -197,4 +197,28 @@
   gap: 4px 16px;
   max-height: 155px;
   overflow-y: auto;
+
+  /* 155 px no es múltiplo del alto de fila (26 px + 4 de gap = 30): la sexta
+     fila entraba por 5 px y se veía una rebanada de checkbox partida al medio,
+     sin barra de scroll, o sea un glitch de render y no «hay más abajo».
+     El desvanecido de los últimos 12 px dice que la lista sigue, y sirve a
+     CUALQUIER escala de fuente —un max-height fijo deja de ser múltiplo
+     apenas el usuario toca el tamaño del texto—. La barra fina y del tema es
+     el mismo recurso que ya usa `.sidebar-nav`: el scroll existe, que se vea. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 112, 48, 0.55) transparent;
+}
+
+.widget-list-flow::-webkit-scrollbar { width: 6px; }
+.widget-list-flow::-webkit-scrollbar-track { background: transparent; border: none; }
+.widget-list-flow::-webkit-scrollbar-thumb {
+  background: rgba(138, 112, 48, 0.5);
+  border: none;
+  border-radius: 3px;
+}
+.widget-list-flow::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 112, 48, 0.8);
 }

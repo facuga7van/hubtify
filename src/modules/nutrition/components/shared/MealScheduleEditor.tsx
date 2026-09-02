@@ -81,6 +81,9 @@ export default function MealScheduleEditor({
               onClick={() => updateMeal(meal, { enabled: !r.enabled })}
               role="checkbox"
               aria-checked={r.enabled}
+              /* Sin rótulo el lector de pantalla anunciaba cinco casillas
+                 idénticas: la tilde sola no dice de qué comida es. */
+              aria-label={t('nutrify.mealEnableLabel', 'Activar {{meal}}', { meal: t(i18nKey, meal) })}
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); updateMeal(meal, { enabled: !r.enabled }); } }}
             >
@@ -93,6 +96,7 @@ export default function MealScheduleEditor({
                 <input
                   type="time"
                   className="nutri-meal-schedule-time"
+                  aria-label={t('nutrify.mealStartLabel', 'Inicio de {{meal}}', { meal: t(i18nKey, meal) })}
                   value={toTimeStr(r.startHour, r.startMinute)}
                   onChange={(e) => handleTimeChange(meal, 'start', e.target.value)}
                 />
@@ -100,6 +104,7 @@ export default function MealScheduleEditor({
                 <input
                   type="time"
                   className="nutri-meal-schedule-time"
+                  aria-label={t('nutrify.mealEndLabel', 'Fin de {{meal}}', { meal: t(i18nKey, meal) })}
                   value={toTimeStr(r.endHour, r.endMinute)}
                   onChange={(e) => handleTimeChange(meal, 'end', e.target.value)}
                 />

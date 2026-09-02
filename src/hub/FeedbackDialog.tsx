@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../shared/components/useToast';
+import { useModalA11y } from '../shared/hooks/useModalA11y';
+
+/** Mínimo de caracteres que el backend acepta como descripción útil. */
+const MIN_DESC = 10;
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -17,23 +21,18 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
   const [sending, setSending] = useState(false);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => descRef.current?.focus(), 50);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  /* Escape + trampa de foco + devolución del foco al cerrar, con la misma
+     plomería que el resto de los modales de la app. Antes había un listener de
+     Escape propio y NINGÚN cierre del Tab: se tabulaba fuera del diálogo hacia
+     la página de atrás, que seguía siendo operable con el modal encima. */
+  const { dialogProps } = useModalA11y<HTMLDivElement>({
+    onClose,
+    active: open,
+    initialFocus: descRef,
+  });
 
   const handleSubmit = async () => {
-    if (description.trim().length < 10 || sending) return;
+    if (description.trim().length < MIN_DESC || sending) return;
     setSending(true);
     try {
       await window.api.feedbackSend({ type, description: description.trim(), email: email.trim() || undefined });
@@ -57,8 +56,7 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }} onClick={onClose}>
       <div
-        role="dialog"
-        aria-modal="true"
+        {...dialogProps}
         aria-labelledby="feedback-dialog-title"
         style={{
           background: 'linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%)',
@@ -90,13 +88,17 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Type select */}
           <div>
-            <label style={{
+            {/* Los tres rótulos eran <label> sueltos, sin `htmlFor`: se veían
+                pero no estaban atados a nada, así que ningún lector de pantalla
+                —ni el click sobre el rótulo— llegaba al control. */}
+            <label htmlFor="feedback-type" style={{
               fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)',
               color: 'var(--ink-soft)', display: 'block', marginBottom: 4,
             }}>
               {t('settings.feedbackType', 'Tipo')}
             </label>
             <select
+              id="feedback-type"
               className="rpg-select"
               value={type}
               onChange={(e) => setType(e.target.value as 'bug' | 'feature' | 'other')}
@@ -110,13 +112,15 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
 
           {/* Description */}
           <div>
-            <label style={{
+            <label htmlFor="feedback-desc" style={{
               fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)',
               color: 'var(--ink-soft)', display: 'block', marginBottom: 4,
             }}>
               {t('settings.feedbackDescLabel', 'Descripción')}
             </label>
             <textarea
+              id="feedback-desc"
+              aria-describedby="feedback-desc-hint"
               ref={descRef}
               className="rpg-input"
               value={description}
@@ -125,17 +129,36 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
               rows={4}
               style={{ width: '100%', resize: 'vertical', minHeight: 80 }}
             />
+            {/* «Enviar» quedaba apagado a opacity .5 sin decir por qué: se
+                escribían cuatro palabras cortas y el botón seguía muerto. */}
+            <div
+              id="feedback-desc-hint"
+              role="status"
+              style={{
+                marginTop: 4, minHeight: '1.2em',
+                fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)',
+                color: 'var(--ink-soft)',
+              }}
+            >
+              {description.trim().length > 0 && description.trim().length < MIN_DESC
+                ? t('settings.feedbackDescTooShort', {
+                  n: MIN_DESC - description.trim().length,
+                  defaultValue: 'Contanos un poco más: faltan {{n}} caracteres.',
+                })
+                : ''}
+            </div>
           </div>
 
           {/* Email */}
           <div>
-            <label style={{
+            <label htmlFor="feedback-email" style={{
               fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-label)',
               color: 'var(--ink-soft)', display: 'block', marginBottom: 4,
             }}>
               {t('settings.feedbackEmail', 'Email (opcional)')}
             </label>
             <input
+              id="feedback-email"
               className="rpg-input"
               type="email"
               value={email}
@@ -151,10 +174,16 @@ export default function FeedbackDialog({ open, onClose, onSent }: FeedbackDialog
           <button
             className="rpg-button"
             onClick={handleSubmit}
-            disabled={description.trim().length < 10 || sending}
+            disabled={description.trim().length < MIN_DESC || sending}
+            title={description.trim().length < MIN_DESC
+              ? t('settings.feedbackDescMin', {
+                n: MIN_DESC,
+                defaultValue: 'Escribí al menos {{n}} caracteres',
+              })
+              : undefined}
             style={{
               padding: '6px 20px', fontSize: 'var(--fs-quote)', fontWeight: 'bold',
-              opacity: description.trim().length < 10 || sending ? 0.5 : 1,
+              opacity: description.trim().length < MIN_DESC || sending ? 0.5 : 1,
             }}
           >
             {sending ? t('settings.feedbackSending', 'Enviando...') : t('settings.feedbackSubmit', 'Enviar')}

@@ -147,7 +147,7 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
               <>
                 <span style={{ flex: 1, fontWeight: 'bold', minWidth: 0 }}>
                   {card.name}{' '}
-                  <span style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                     ({t('coinify.closingDay')}: {card.closingDay}
                     {card.dueDay ? <> · {t('coinify.dueDayShort', 'Vto')}: {card.dueDay}</> : null})
                   </span>
@@ -183,7 +183,7 @@ export default function CreditCardManager({ cards, onClose, onSaved }: Props) {
             + {t('coinify.newCard')}
           </button>
         </div>
-        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', opacity: 0.6, margin: '6px 0 0' }}>
+        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', margin: '6px 0 0' }}>
           {t('coinify.dueDayHint', 'Cierre / vencimiento del resumen. Vencimiento 0 = sin aviso ni agenda.')}
         </p>
       </div>

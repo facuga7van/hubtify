@@ -219,11 +219,13 @@
   overflow: hidden;
 }
 
-/* Eyebrow text */
+/* Eyebrow text.
+   `.22em` de letter-spacing sobre «Nv.12 · Guerrero» son ~45 px de aire en una
+   columna que ya venía corta: el rango se cortaba en «Nv.12 · Gu…». */
 .player-card__eyebrow {
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
-  letter-spacing: .22em;
+  letter-spacing: .1em;
   color: var(--rubric-light);
 }
 
@@ -265,9 +267,14 @@
   max-height: 200px;
 }
 
+/* Sin `gap` el rótulo y el valor se tocaban: a 220 px de riel se leía
+   «RACHA9 días» de corrido y el valor se partía en dos renglones, dejando el
+   «21» del récord huérfano bajo la palabra anterior. */
 .sidebar-bar__row {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
+  gap: 10px;
   font-size: var(--fs-label);
   margin-bottom: 2px;
 }
@@ -282,6 +289,7 @@
   font-family: 'Fira Code', monospace;
   font-size: calc(12px * var(--font-scale));
   color: var(--parch-0);
+  text-align: right;
 }
 
 .sidebar-bar__track {
@@ -775,17 +783,26 @@
 .sidebar-bar--resting .sidebar-bar__track { opacity: 0.45; }
 .sidebar-bar--resting .sidebar-bar__label { color: var(--gold); }
 
+/* Estaba en `--ink-faded` (#6b5535), un marrón OSCURO, sobre el cuero OSCURO
+   del sidebar: 1.7:1 de contraste. El récord de racha es un dato, no una marca
+   de agua — va en pergamino apagado, que sobre cuero da ~5.9:1. */
 .sidebar-streak__best {
-  color: var(--ink-faded);
+  color: var(--parch-3);
   font-size: var(--fs-label);
+  white-space: nowrap;
 }
 
 .sidebar-streak__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 10px;
   margin-top: 4px;
+}
+
+/* La Posada se queda a la derecha; indultos y récord se agrupan a la izquierda. */
+.sidebar-streak__meta .sidebar-streak__inn {
+  margin-left: auto;
 }
 
 .sidebar-streak__pardons {

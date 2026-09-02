@@ -117,7 +117,11 @@ export default function HabitsDashboardWidget() {
                   gap: 2,
                   fontSize: 'var(--fs-label)',
                   color: h.streak >= 10 ? 'var(--gold)' : 'var(--ink-faded)',
-                  fontFamily: "'Cinzel', serif",
+                  // 'Cinzel' no se carga en ningún lado (theme.css importa
+                  // UnifrakturCook, IM Fell English/SC, Cormorant y Fira Code):
+                  // el contador de racha caía a un serif genérico del sistema,
+                  // fuera del tono del resto. Es un número: va en Fira Code.
+                  fontFamily: "'Fira Code', ui-monospace, monospace",
                   fontWeight: 600,
                   flexShrink: 0,
                 }}

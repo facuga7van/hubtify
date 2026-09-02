@@ -286,10 +286,19 @@ export default function RewardsPage() {
           <span className="qb-numeral">{reward.cost}</span>
           <Obolus width={14} height={14} />
         </span>
+        {/* Un botón apagado que no dice POR QUÉ es un callejón sin salida: el
+            aviso de «no te alcanzan» sólo aparecía si lograbas hacer click, y
+            deshabilitado nunca lo lográs. El título dice cuántos óbolos faltan. */}
         <button
           type="button"
           className="rpg-button rpg-btn-sm rwd-item__redeem"
           disabled={!affordable}
+          title={affordable
+            ? undefined
+            : t('rpg.rwdMissing', {
+              n: reward.cost - (balance?.balance ?? 0),
+              defaultValue: 'Te faltan {{n}} óbolos para canjearla',
+            })}
           onClick={() => onRedeem(reward)}
         >
           {t('rpg.rwdRedeem', 'Canjear')}
@@ -433,7 +442,12 @@ export default function RewardsPage() {
       title={t('rpg.rwdTitle', 'Recompensas')}
       subtitle={t('rpg.rwdSubtitle', 'Dó los óbolos ganados se cambian por gustos que vos mismo ponés en el mostrador')}
     >
-      {body}
+      {/* El mostrador es un LISTADO: nombre a la izquierda, precio y botón a la
+          derecha. Sin techo de ancho, en ventana maximizada la fila medía
+          1380 px y quedaban ~700 px de pergamino vacío entre «Una tarde de
+          videojuegos sin culpa» y su precio — y la bolsa, un lingote de 1380 px
+          con todo apretado contra el borde izquierdo. */}
+      <div className="rwd-page">{body}</div>
     </BookPage>
   );
 }

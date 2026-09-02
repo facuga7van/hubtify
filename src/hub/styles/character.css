@@ -3,7 +3,9 @@
 /* ── two-column layout ─────────────────────────── */
 .hero-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  /* 240 px dejaban 212 para la cinta del nombre; la columna derecha tiene aire
+     de sobra en cualquier ventana, así que estos 20 px salen gratis. */
+  grid-template-columns: 260px 1fr;
   gap: 22px;
 }
 
@@ -35,11 +37,19 @@
   overflow: hidden;
 }
 
+/* El recorte de arriba se comía nombres CORTOS: `.qb-banner` trae 22 px de
+   padding a cada lado y 0.2em de letter-spacing, así que «FACUNDO EL BRAVO»
+   —16 caracteres— ya pedía ~222 px dentro de los 212 disponibles y salía
+   «FACUNDO EL BRA…». La cinta del retrato aprieta lo suyo; el nombre completo
+   sigue en el `title` del contenedor. */
 .hero-portrait-banner .qb-banner {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 12px;
+  padding-right: 12px;
+  letter-spacing: 0.1em;
 }
 
 /* ── editable character name ──────────────────── */

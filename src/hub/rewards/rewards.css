@@ -4,6 +4,13 @@
    Reuses the codex language (parchment, gold, rubric ink); no new vocabulary.
    ══════════════════════════════════════════════════════ */
 
+/* Medida de lectura del mostrador. Ver la nota en RewardsPage.tsx: sin esto la
+   página se estira a los 1380 px de una ventana maximizada y cada fila queda
+   partida en dos extremos con medio metro de pergamino en el medio. */
+.rwd-page {
+  max-width: 880px;
+}
+
 /* ── the purse (balance) ──────────────────────────── */
 
 .rwd-purse {

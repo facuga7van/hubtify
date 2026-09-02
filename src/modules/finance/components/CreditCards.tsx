@@ -63,7 +63,7 @@ export default function CreditCards() {
   };
 
   return (
-    <div>
+    <div className="coin-page-column">
       <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
         <button className="rpg-button" onClick={() => setShowManager(true)}>
           {t('coinify.manageCreditCards')}

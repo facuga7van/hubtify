@@ -156,6 +156,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* Los tres controles miden ~300 px juntos. Apilarlos en columna bajo 780 px
+     gastaba tres renglones —`<select>` y botón CSV de ancho completo— en algo
+     que entra de sobra en uno solo. Envuelven sólo si de verdad no entran. */
+  flex-wrap: wrap;
 }
 
 .coin-export-btn {
@@ -365,8 +369,12 @@
 }
 
 .coin-category-legend__amount {
-  font-size: var(--fs-label);
   text-align: right;
+  /* Gana a `.qb-numeral`: UnifrakturCook a 13 px sobre pergamino texturado no
+     se lee. Lo numérico va en Fira Code (misma regla que en Cuotas). */
+  font-family: 'Fira Code', monospace;
+  font-size: calc(12px * var(--font-scale));
+  color: var(--ink);
 }
 
 .coin-category-legend__pct {
@@ -415,6 +423,15 @@
   text-align: right;
   opacity: 0.85;
   transition: opacity 0.15s;
+  /* El botón se encoge a su contenido y el chevron caía a un segundo renglón:
+     se veía «Préstamos» con media flecha colgando debajo, recortada. */
+  white-space: nowrap;
+}
+
+.coin-loan-mini__link > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .coin-loan-mini__link:hover,
@@ -461,6 +478,15 @@
    amount landed under "CONCEPTO", and the conditional card chip shifted it one
    column further on any card purchase — so sorting by amount pointed its arrow
    at a column with no amounts in it. */
+/* La columna de lectura de Coinify. Cada pantalla nació pensada para una
+   tarjeta angosta y maximizada se desarmaba: el concepto contra el borde
+   izquierdo y el importe contra el derecho, con casi mil píxeles de pergamino
+   vacío en el medio. Mismo ancho que ya tenía la lista de cuotas. */
+.coin-page-column {
+  max-width: 940px;
+  margin-inline: auto;
+}
+
 .coin-ledger-header,
 .coin-ledger-row {
   display: grid;
@@ -469,7 +495,11 @@
 }
 
 .coin-ledger-header {
-  padding: 6px 2px;
+  /* 13px = el borde (1) + el relleno (10) de `.coin-ledger` + el relleno (2)
+     de la fila. El encabezado vive FUERA de la caja del libro, así que con
+     2px sus columnas quedaban 22 px corridas respecto de los datos: la flecha
+     de orden y cada rótulo se imprimían sobre la columna de al lado. */
+  padding: 6px 13px;
   border-bottom: 1.5px solid rgba(74, 55, 32, 0.5);
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
@@ -492,6 +522,12 @@ button.coin-sort-header {
   user-select: none;
   text-align: left;
   transition: color 0.15s;
+  /* «CATEGORÍA» con 0.14em de espaciado mide más que su columna en angosto y
+     se imprimía encima de «MONEDAS»: se leía «CATEGORÍAMONEDAS». */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 button.coin-sort-header:hover {
   color: var(--gold);
@@ -566,6 +602,19 @@ button.coin-sort-header--amount {
 .coin-ledger-row__cat {
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Sin esto la runa se cortaba a cuchillo a mitad de palabra («Transpor») en
+   cuanto la categoría no entraba en su columna. */
+.coin-ledger-row__cat .qb-rune {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Origin icon + payment method + card marker share one grid cell. */
@@ -725,6 +774,11 @@ button.coin-sort-header--amount {
 .coin-quick-add-form {
   overflow: hidden;
   transition: max-height 0.3s ease, opacity 0.3s ease;
+  /* Un formulario de seis campos no necesita 1040 px: maximizada, «Gasto» e
+     «Ingreso» medían medio metro cada uno y «Agregar» era una barra de pared a
+     pared. */
+  max-width: 720px;
+  margin-inline: auto;
 }
 
 .coin-quick-add-form--open {
@@ -800,7 +854,9 @@ button.coin-sort-header--amount {
 
 .coin-quick-add-form__installments-label {
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  /* Rótulo de un campo obligatorio: `--ink-faded` sobre pergamino texturado
+     no llegaba a leerse. */
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -808,7 +864,7 @@ button.coin-sort-header--amount {
   margin-left: auto;
   background: none;
   border: 1px solid rgba(122, 30, 30, 0.35);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-family: 'Cormorant Garamond', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.04em;
@@ -839,13 +895,18 @@ button.coin-sort-header--amount {
 .coin-quick-add-form__toggle {
   background: none;
   border: none;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-family: 'Cormorant Garamond', serif;
   font-size: var(--fs-label);
   cursor: pointer;
   padding: 4px 0;
   margin-bottom: 8px;
   transition: color 0.15s;
+  /* El chevron es un hermano inline: sin esto se apoyaba en la línea base y
+     empujaba el alto del renglón. */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .coin-quick-add-form__toggle:hover {
@@ -933,18 +994,23 @@ button.coin-sort-header--amount {
   margin-bottom: 10px;
 }
 
-/* Destructive action, legible at rest — was opacity 0.4. */
+/* Destructive action, legible at rest — was opacity 0.4.
+   Y era `--rubric` (#7a1e1e) sobre el cuero de `.rpg-button` (#4a2e19): 1.3:1,
+   o sea el botón «Eliminar» no se leía. Sobre pergamino el mismo rojo da 7.9:1
+   y además lo distingue de las acciones normales. */
 .coin-manager__delete {
   padding: 3px 8px;
   font-size: var(--fs-label);
   color: var(--rubric);
-  opacity: 0.8;
-  transition: opacity 0.15s;
+  background: var(--parch-0);
+  border-color: var(--rubric);
+  transition: background 0.15s, color 0.15s;
 }
 
 .coin-manager__delete:hover,
 .coin-manager__delete:focus-visible {
-  opacity: 1;
+  background: var(--rubric);
+  color: var(--parch-0);
 }
 
 /* ── Import Overlay ─────────────────────────────────────────── */
@@ -1509,7 +1575,8 @@ button.coin-sort-header--amount {
 .coin-loan-card__date {
   margin-left: 6px;
   font-size: var(--fs-label);
-  opacity: 0.55;
+  /* `opacity: .55` sobre pergamino texturado dejaba la fecha en un fantasma. */
+  color: var(--ink-soft);
 }
 
 .coin-loan-card__progress {
@@ -1557,7 +1624,9 @@ button.coin-sort-header--amount {
 .coin-cc-card__period {
   margin-left: 8px;
   font-size: var(--fs-label);
-  opacity: 0.6;
+  /* Era `opacity: .6` sobre pergamino texturado: el día de cierre y el período
+     facturado —dos datos que hay que poder leer— quedaban en un susurro. */
+  color: var(--ink-soft);
 }
 
 .coin-cc-card__stmt {
@@ -2076,12 +2145,6 @@ button.coin-sort-header--amount {
     padding-bottom: 30px;
   }
 
-  .coin-dashboard__header {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
-  }
-
   .coin-quick-actions {
     flex-direction: column;
   }
@@ -2099,7 +2162,12 @@ button.coin-sort-header--amount {
   .coin-ledger-header,
   .coin-ledger-row {
     /* The action column keeps room for two 32px tap targets. */
-    grid-template-columns: 28px minmax(0, 1fr) 76px 88px 68px;
+    grid-template-columns: 28px minmax(0, 1fr) 96px 88px 68px;
+  }
+
+  /* 0.14em de espaciado hacía que «CATEGORÍA» midiera más que su columna. */
+  .coin-ledger-header {
+    letter-spacing: 0.04em;
   }
 
   .coin-recurring-card__main {
@@ -2273,17 +2341,19 @@ button.coin-sort-header--amount {
 .coin-action-btn--confirm {
   color: var(--moss);
 }
+/* 0.4 y 0.5 son el rango de «deshabilitado» del sistema (0.5 + not-allowed):
+   dos botones vivos no pueden vestirse de muertos. */
 .coin-action-btn--cancel {
-  opacity: 0.4;
-}
-.coin-action-btn--cancel:hover {
   opacity: 0.7;
 }
+.coin-action-btn--cancel:hover {
+  opacity: 1;
+}
 .coin-action-btn--muted {
-  opacity: 0.5;
+  opacity: 0.75;
 }
 .coin-action-btn--muted:hover {
-  opacity: 0.8;
+  opacity: 1;
 }
 .coin-action-btn--danger {
   color: var(--rubric);
@@ -2291,6 +2361,15 @@ button.coin-sort-header--amount {
 }
 .coin-action-btn--danger:hover {
   opacity: 1;
+}
+
+/* Rótulo + control como una sola pieza: en una fila que envuelve, «Pagar
+   desde:» quedaba colgando al final de un renglón y su desplegable arrancaba
+   el siguiente, así que el rótulo no rotulaba nada. */
+.coin-statement-pay__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ── Statement detail: grouped card charges ─────────────────── */
@@ -2425,11 +2504,17 @@ button.coin-sort-header--amount {
   gap: 6px;
   margin: 0 0 3px 16px;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  /* `--ink-faded` para el dato que decide si te pasaste del presupuesto era
+     ilegible sobre la textura. */
+  color: var(--ink-soft);
 }
 
 .coin-budget-row__figures {
   white-space: nowrap;
+  /* Gastado / límite es el dato que hace falta leer: Fira Code y tinta plena,
+     no gótica desvaída a 13 px. */
+  font-family: 'Fira Code', monospace;
+  font-size: calc(11px * var(--font-scale));
 }
 
 .coin-budget-bar {
@@ -2453,6 +2538,20 @@ button.coin-sort-header--amount {
 
 .coin-budget-row--over .coin-budget-bar__fill {
   background: var(--rubric);
+}
+
+/* ── Reparto del gasto: un bloque, no una banda ─────────────────────────────
+   «Reparto del gasto» es la única sección de una sola columna del panel, así
+   que maximizada se estiraba a los 1600 px de la ventana: la rueda de 160 px
+   sola en el medio, cada categoría contra el borde izquierdo, su importe
+   contra el derecho y un metro de pergamino en el medio — y la barra de
+   presupuesto convertida en una raya de pared a pared. Se lee como un bloque
+   centrado bajo la rueda, igual que la lista de cuotas. */
+.coin-budget-summary,
+.coin-category-legend,
+.coin-category-legend__usd-note {
+  max-width: 620px;
+  margin-inline: auto;
 }
 
 /* ── Display-mode chip (ARS → USD → ARS de hoy) ─────────────────────────── */
@@ -2525,17 +2624,25 @@ button.coin-sort-header--amount {
   gap: 4px;
 }
 
+/* El alto era `180px` fijo contra filas de ~23 px: la octava quedaba partida
+   al medio, media línea de texto guillotinada contra el borde. Ahora la fila
+   tiene un alto propio y la lista mide exactamente siete de ellas, así que el
+   corte cae siempre entre dos filas — y sigue acompañando a `--font-scale`. */
 .coin-upcoming__list {
+  --coin-upcoming-row-h: calc(var(--fs-body) * 1.5 + 5px);
   display: flex;
   flex-direction: column;
-  max-height: 180px;
+  max-height: calc(var(--coin-upcoming-row-h) * 7);
   overflow-y: auto;
 }
 
 .coin-upcoming__row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
+  height: var(--coin-upcoming-row-h);
+  box-sizing: border-box;
+  flex: 0 0 auto;
   padding: 2px 4px 2px 7px;
   border-bottom: 1px dashed rgba(168, 138, 60, 0.25);
   border-left: 2px solid transparent;

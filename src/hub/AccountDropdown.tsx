@@ -48,6 +48,19 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
+  /* Del menú sólo se salía con el mouse: Escape no hacía nada, así que con el
+     teclado quedabas adentro (y el foco vuelve al disparador en el cleanup). */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   const otherAccounts = cachedAccounts.filter(a => a.uid !== activeUser.uid);
 
   const handleSwitch = async (account: CachedAccount) => {

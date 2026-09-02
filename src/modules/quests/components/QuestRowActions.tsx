@@ -74,7 +74,7 @@ export default function QuestRowActions({
   const [open, setOpen] = useState(false);
   const [postponeOpen, setPostponeOpen] = useState(false);
   // Portaled so the menu is never clipped by a row/column with overflow hidden.
-  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
+  const { anchorRef, popupRef, pos, reposition } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
   const closeMenu = useCallback(() => setOpen(false), []);
   // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
   useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
@@ -117,6 +117,12 @@ export default function QuestRowActions({
   };
 
   useEffect(() => { if (!open) setPostponeOpen(false); }, [open]);
+
+  // Abrir «Posponer» agrega tres renglones (o el calendario entero) DESPUÉS de
+  // que el popup se midió. En la última fila de la lista eso lo mandaba abajo
+  // del borde de la ventana, con las opciones fuera de la pantalla. El hook
+  // sabe re-anclarlo hacia arriba; hay que avisarle que creció.
+  useEffect(() => { if (open) reposition(); }, [postponeOpen, open, reposition]);
 
   const run = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();

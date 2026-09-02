@@ -1,0 +1,233 @@
+import { beforeAll, describe, expect, test } from 'vitest';
+import { render } from 'vitest-browser-react';
+import { page } from 'vitest/browser';
+import { MemoryRouter } from 'react-router-dom';
+import AuthPage from '@hub/AuthPage';
+import Onboarding from '@hub/Onboarding';
+import CodexSealModal from '@hub/codex/CodexSealModal';
+import UpdateBanner from '@hub/UpdateBanner';
+import UpdateNotification from '@hub/UpdateNotification';
+import ToastProvider from '@shared/components/ToastProvider';
+import { ConfirmProvider } from '@shared/components/ConfirmDialog';
+import { AuthContext } from '@shared/AuthContext';
+import {
+  installApi, SCREENS, WIDE, NARROW, fitCapture, resetCapture,
+  overflowingNodes, clippedText, unlabelledButtons, lowContrastText, PARCH_WORST,
+} from './audit-hub-harness';
+
+import '../../src/i18n';
+import '../../src/hub/styles/theme.css';
+import '../../src/hub/styles/components.css';
+import '../../src/hub/styles/layout.css';
+import '../../src/hub/styles/shell.css';
+import '../../src/hub/styles/codex-seal.css';
+
+const baseAuth = {
+  user: null, loading: false, switching: false,
+  login: async () => ({ success: false }), register: async () => ({ success: false }),
+  logout: async () => ({ success: true }), switchAccount: async () => ({ success: true }),
+  addAccount: async () => ({ success: false }), forgotPassword: async () => ({ success: false }),
+  getCachedAccounts: () => [],
+} as unknown as React.ContextType<typeof AuthContext>;
+
+const today = new Date().toISOString().slice(0, 10);
+
+beforeAll(() => {
+  document.body.style.margin = '0';
+  installApi({
+    rpgGetDaySummary: () => Promise.resolve({
+      date: today, sealed: false, xpTotal: 148, eventsCount: 7, maxCombo: 3,
+      modules: ['quests', 'nutrition', 'cauldron'], vigor: 84, streak: 9,
+      events: [
+        { moduleId: 'quests', eventType: 'TASK_COMPLETED', xpGained: 15, time: '09:12' },
+        { moduleId: 'nutrition', eventType: 'MEAL_LOGGED', xpGained: 5, time: '13:40' },
+        { moduleId: 'cauldron', eventType: 'POMODORO_COMPLETED', xpGained: 25, time: '16:02' },
+      ],
+    }),
+    rpgGetSeals: () => Promise.resolve([
+      { date: today, sealedAt: new Date().toISOString(), xpAwarded: 20 },
+    ]),
+  });
+});
+
+const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
+
+function report(tag: string, root: ParentNode) {
+  // eslint-disable-next-line no-console
+  console.log(tag, JSON.stringify({
+    overflow: overflowingNodes(root).slice(0, 8),
+    clipped: clippedText(root).slice(0, 8),
+    noLabel: unlabelledButtons(root),
+    bajoContraste: lowContrastText(root, PARCH_WORST).slice(0, 8),
+  }, null, 1));
+}
+
+/** El nodo cabe entero en la ventana. */
+function insideViewport(el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  return {
+    offTop: Math.round(-r.top), offLeft: Math.round(-r.left),
+    offRight: Math.round(r.right - window.innerWidth),
+    offBottom: Math.round(r.bottom - window.innerHeight),
+  };
+}
+
+describe('Puerta del Reino (AuthPage)', () => {
+  for (const [name, size] of [['wide', WIDE], ['narrow', NARROW]] as const) {
+    test(`entrada — ${name}`, async () => {
+      await page.viewport(...size);
+      resetCapture();
+      render(
+        <AuthContext.Provider value={baseAuth}>
+          <AuthPage onAuth={() => {}} />
+        </AuthContext.Provider>,
+      );
+      await expect.element(page.getByRole('button', { name: 'Entrar al Reino' })).toBeVisible();
+      await settle(250);
+      report(`AUTH ${name.toUpperCase()}`, document.body);
+      fitCapture();
+      await page.screenshot({ path: `${SCREENS}/audit-hub-auth-01-${name}.png` });
+      resetCapture();
+      expect(document.documentElement.scrollWidth - document.documentElement.clientWidth).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test('registro — el error de contraseña dice qué falta', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    render(
+      <AuthContext.Provider value={baseAuth}>
+        <AuthPage onAuth={() => {}} />
+      </AuthContext.Provider>,
+    );
+    await page.getByRole('button', { name: '¿No tenés cuenta? Registrate' }).click();
+    await page.getByPlaceholder('Nombre de usuario').fill('aventurero');
+    await page.getByPlaceholder('Correo electrónico').fill('test@hubtify.app');
+    await page.getByPlaceholder('Contraseña').fill('123');
+    await page.getByRole('button', { name: 'Crear Cuenta' }).click();
+    await expect.element(page.getByText(/al menos 6 caracteres/i)).toBeVisible();
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-auth-02-error.png` });
+    resetCapture();
+  });
+});
+
+describe('Onboarding', () => {
+  for (const [name, size] of [['wide', WIDE], ['narrow', NARROW]] as const) {
+    test(`primer paso — ${name}`, async () => {
+      await page.viewport(...size);
+      resetCapture();
+      render(
+        <MemoryRouter>
+          <ToastProvider><ConfirmProvider>
+            <Onboarding onComplete={() => {}} />
+          </ConfirmProvider></ToastProvider>
+        </MemoryRouter>,
+      );
+      await settle(300);
+      report(`ONBOARDING ${name.toUpperCase()}`, document.body);
+      fitCapture();
+      await page.screenshot({ path: `${SCREENS}/audit-hub-onboarding-01-${name}.png` });
+      resetCapture();
+      expect(document.documentElement.scrollWidth - document.documentElement.clientWidth).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test('avanza de paso y el shell no desborda a lo alto', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    render(
+      <MemoryRouter>
+        <ToastProvider><ConfirmProvider>
+          <Onboarding onComplete={() => {}} />
+        </ConfirmProvider></ToastProvider>
+      </MemoryRouter>,
+    );
+    await settle(300);
+    await page.getByRole('button', { name: /Comenzar Aventura/i }).click();
+    await settle(400);
+    report('ONBOARDING PASO 2', document.body);
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-onboarding-02-paso2.png` });
+    resetCapture();
+    expect(document.documentElement.scrollWidth - document.documentElement.clientWidth).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('Cierre del Códice (CodexSealModal)', () => {
+  for (const [name, size] of [['wide', WIDE], ['narrow', NARROW]] as const) {
+    test(`la página del día entra en la ventana — ${name}`, async () => {
+      await page.viewport(...size);
+      resetCapture();
+      let closed = false;
+      render(
+        <ToastProvider><ConfirmProvider>
+          <CodexSealModal date={today} onClose={() => { closed = true; }} onSelectDate={() => {}} />
+        </ConfirmProvider></ToastProvider>,
+      );
+      await settle(600);
+
+      const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+      report(`CODEX ${name.toUpperCase()}`, dlg);
+      // eslint-disable-next-line no-console
+      console.log(`CODEX ${name.toUpperCase()} CAJA`, JSON.stringify(insideViewport(dlg), null, 1));
+
+      fitCapture();
+      await page.screenshot({ path: `${SCREENS}/audit-hub-codex-01-${name}.png` });
+      resetCapture();
+
+      const box = insideViewport(dlg);
+      expect(box.offTop).toBeLessThanOrEqual(1);
+      expect(box.offBottom).toBeLessThanOrEqual(1);
+      expect(box.offLeft).toBeLessThanOrEqual(1);
+      expect(box.offRight).toBeLessThanOrEqual(1);
+
+      dlg.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await settle(150);
+      expect(closed).toBe(true);
+    });
+  }
+});
+
+describe('Avisos de actualización', () => {
+  test('la cinta no tapa nada ni se sale, y el detalle abre y cierra', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    render(
+      <UpdateBanner
+        version="0.9.0" state="idle" percent={0} error={null}
+        onViewDetails={() => {}} onRestart={() => {}} onDismiss={() => {}}
+      />,
+    );
+    await settle(250);
+    const banner = document.querySelector('.update-chip, .update-banner') as HTMLElement
+      ?? (document.body.firstElementChild as HTMLElement);
+    report('UPDATE BANNER', document.body);
+    // eslint-disable-next-line no-console
+    console.log('UPDATE BANNER CAJA', JSON.stringify(insideViewport(banner), null, 1));
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-update-01-banner.png` });
+    resetCapture();
+
+    const b = insideViewport(banner);
+    expect(b.offRight).toBeLessThanOrEqual(1);
+    expect(b.offBottom).toBeLessThanOrEqual(1);
+  });
+
+  test('el error de descarga se lee', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    render(
+      <UpdateNotification
+        version="0.9.0" state="idle" percent={0}
+        error="ERR_INTERNET_DISCONNECTED"
+        onDownload={() => {}} onRestart={() => {}} onDismiss={() => {}}
+      />,
+    );
+    await settle(250);
+    report('UPDATE NOTIF ERROR', document.body);
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-update-02-error.png` });
+    resetCapture();
+  });
+});

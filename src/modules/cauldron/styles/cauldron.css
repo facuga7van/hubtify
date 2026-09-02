@@ -4,8 +4,14 @@
 
 /* -- 1. BookPage overrides for cauldron ---------------------- */
 
+/* `max-width: none` era además un no-op (`.qb-page` no acota nada), y a 1640 px
+   la sala se deformaba: el panel derecho estiraba «ENFOQUE» contra un borde y
+   «25:00» contra el otro con casi medio metro de pergamino en el medio, y la
+   mitad de abajo de esa tarjeta quedaba vacía. La cámara sigue siendo amplia. */
 .cauldron-book {
-  max-width: none;
+  max-width: 1280px;
+  margin-inline: auto;
+  width: 100%;
 }
 
 /* -- 2. Recipe Meta (below header) --------------------------- */

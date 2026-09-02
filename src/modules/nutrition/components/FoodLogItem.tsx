@@ -156,12 +156,14 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
 
   if (editing) {
     return (
-      <div ref={rowRef} className={`nutri-meal-row nutri-pulse-gold ${className || ''}`}>
+      <div ref={rowRef} className={`nutri-meal-row nutri-meal-row--edit nutri-pulse-gold ${className || ''}`}>
         <div className="nutri-meal-ico">{MEAL_ICON_MAP[currentMeal] ?? <Platter width={16} height={16} />}</div>
         <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
+          aria-label={t('nutrify.editDescriptionLabel', 'Descripción de la comida')}
           className="nutri-text-input" style={{ padding: '4px 6px', fontSize: 'var(--fs-label)' }} />
         <input type="number" value={editCals} onChange={(e) => setEditCals(e.target.value)}
-          className="nutri-text-input" style={{ width: 60, padding: '4px 6px', fontSize: 'var(--fs-label)' }}
+          aria-label={t('nutrify.calories', 'Calorías')}
+          className="nutri-text-input" style={{ width: '100%', padding: '4px 6px', fontSize: 'var(--fs-label)' }}
           onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
         <button className="nutri-btn" onClick={handleReEstimate} disabled={estimating || !editDesc.trim()} title={t('nutrify.reEstimate', 'Re-estimar con IA')}
           style={{ padding: '4px 10px', fontSize: 'var(--fs-body)', opacity: estimating ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -177,7 +179,9 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
             </svg>
           )}
         </button>
-        <button className="nutri-btn nutri-btn-ghost" onClick={() => setEditing(false)} disabled={estimating} style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>
+        <button className="nutri-btn nutri-btn-ghost" onClick={() => setEditing(false)} disabled={estimating}
+          aria-label={t('common.cancel', 'Cancelar')} title={t('common.cancel', 'Cancelar')}
+          style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>
           <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg>
         </button>
       </div>
@@ -191,19 +195,26 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
     <div ref={rowRef} className={`nutri-meal-item-wrap ${className || ''}`} style={mealDropdown ? { position: 'relative', zIndex: 'var(--z-dropdown-top)' } : undefined}>
       <div className={`nutri-meal-row${isEvent ? ' nutri-meal-row--event' : ''}`}>
         <div className="nutri-meal-ico" ref={dropdownRef} style={{ position: 'relative' }}>
-          <span
+          <button
+            type="button"
+            className="nutri-meal-ico-btn"
             onClick={() => { if (!readOnly && onMealChange) setMealDropdown(v => !v); }}
-            style={{ cursor: readOnly ? 'default' : 'pointer' }}
+            disabled={readOnly || !onMealChange}
+            aria-haspopup={onMealChange ? 'menu' : undefined}
+            aria-expanded={onMealChange ? mealDropdown : undefined}
+            aria-label={t('nutrify.changeMealLabel', 'Momento: {{meal}}. Cambiar', { meal: getMealLabel(currentMeal, t) })}
             title={getMealLabel(currentMeal, t)}
           >
             {MEAL_ICON_MAP[currentMeal] ?? <Platter width={16} height={16} />}
-          </span>
+          </button>
           {!entry.meal && !readOnly && onMealChange && (
-            <span
+            <button
+              type="button"
               className="nutri-meal-unresolved"
               title={t('nutrify.pickMeal', 'Elegí la comida')}
+              aria-label={t('nutrify.pickMeal', 'Elegí la comida')}
               onClick={() => setMealDropdown(v => !v)}
-            >?</span>
+            >?</button>
           )}
           {mealDropdown && (
             <div className="nutri-meal-picker">
@@ -285,23 +296,28 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
           ) : (
             <div className="nutri-meal-del">
               {onFavorite && (
-                <span className="nutri-food-action" onClick={onFavorite}
+                <button type="button" className="nutri-food-action" onClick={onFavorite}
+                  aria-label={t('nutrify.favoriteEntryLabel', 'Guardar «{{name}}» en favoritos', { name: entry.description })}
                   title={t('nutrify.saveToFavorites', 'Guardar en favoritos')}>
-                  <Heart width={14} height={14} stroke="var(--rpg-hp-red)" />
-                </span>
+                  <Heart width={14} height={14} stroke="var(--rubric)" />
+                </button>
               )}
-              <span className="nutri-food-action" onClick={() => setEditing(true)}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+              <button type="button" className="nutri-food-action" onClick={() => setEditing(true)}
+                aria-label={t('nutrify.editEntryLabel', 'Editar «{{name}}»', { name: entry.description })}
+                title={t('nutrify.editEntry', 'Editar')}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
                   stroke="var(--gold-dark)" strokeWidth="1.2" strokeLinecap="round">
                   <path d="M8.5 1.5l2 2M3 7l5.5-5.5 2 2L5 9H3V7z"/>
                 </svg>
-              </span>
-              <span className="nutri-food-action" onClick={() => setConfirmDelete(true)}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+              </button>
+              <button type="button" className="nutri-food-action" onClick={() => setConfirmDelete(true)}
+                aria-label={t('nutrify.deleteEntryLabel', 'Eliminar «{{name}}»', { name: entry.description })}
+                title={t('common.delete', 'Eliminar')}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
                   stroke="var(--rubric)" strokeWidth="1.5" strokeLinecap="round">
                   <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
                 </svg>
-              </span>
+              </button>
             </div>
           )
         ) : <div />}

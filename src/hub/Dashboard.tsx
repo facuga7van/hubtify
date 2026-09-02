@@ -77,6 +77,18 @@ function formatEventTime(createdAt: string, t: TFunction): string {
 
 /* ── XP Ledger mini chart ─────────────────────────────────── */
 
+/**
+ * El eje de días vivía en un `<div>` con `justify-content: space-between` FUERA
+ * del SVG: las barras se posicionan como fracción del viewBox (la última queda
+ * al 87 % del ancho) mientras el último rótulo se pega al 100 %. A tarjeta
+ * angosta casi coincidían; en ventana maximizada «HOY» terminaba a un bar de
+ * distancia de su propia barra. Ahora los rótulos son `<text>` dentro del mismo
+ * sistema de coordenadas que las barras: no se pueden desalinear.
+ *
+ * Además el `width: 100%` sin techo estiraba un dibujo de 280×120 hasta 255 px
+ * de alto en pantalla completa. Tiene un `max-width` y las cifras van en
+ * Fira Code (numérico), no en UnifrakturCook a tamaño etiqueta.
+ */
 function XpLedger({ data, t }: { data: Array<{ date: string; xp: number }>; t: TFunction }) {
   if (data.length === 0) return null;
   const maxXp = Math.max(...data.map((d) => d.xp), 1);
@@ -89,42 +101,45 @@ function XpLedger({ data, t }: { data: Array<{ date: string; xp: number }>; t: T
 
   const barCount = data.length;
   const w = 280;
-  const h = 120;
+  const chartH = 104;          // suelo de las barras
+  const h = chartH + 22;       // + la franja de rótulos, DENTRO del svg
+  const pad = 8;
+  const slot = (w - pad * 2) / barCount;
+  const barW = Math.min(26, slot - 8);
 
   return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto' }}>
-        <defs>
-          <pattern id="hatch" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="4" stroke="var(--ink)" strokeWidth="0.7" />
-          </pattern>
-        </defs>
-        {/* ruled baselines */}
-        {[0, 30, 60, 90, 120].map((y) => (
-          <line key={y} x1="0" y1={y} x2={w} y2={y} stroke="rgba(74,55,32,.2)" strokeWidth="0.5" strokeDasharray="2 3" />
-        ))}
-        {/* bars */}
-        {data.map((d, i) => {
-          const barW = Math.min(24, (w - 20) / barCount - 14);
-          const gap = (w - 20) / barCount;
-          const x = 10 + i * gap;
-          const barH = (d.xp / maxXp) * 100;
-          return (
-            <g key={i}>
-              <rect x={x} y={h - barH} width={barW} height={barH} fill="url(#hatch)" stroke="var(--ink)" strokeWidth="0.8" />
-              <text x={x + barW / 2} y={h - barH - 4} textAnchor="middle" fontSize="10" fontFamily="'UnifrakturCook',serif" fill="var(--ink)">
-                {Math.round(d.xp)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>
-        {dayLabels.map((label, i) => (
-          <span key={i} className="qb-small-caps">{label}</span>
-        ))}
-      </div>
-    </div>
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      role="img"
+      aria-label={t('dashboard.xpLedgerHelp', 'XP ganada en los últimos 7 días, desglosada por módulo.')}
+      style={{ width: '100%', maxWidth: 360, height: 'auto', display: 'block', margin: '0 auto' }}
+    >
+      <defs>
+        <pattern id="hatch" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="4" stroke="var(--ink)" strokeWidth="0.7" />
+        </pattern>
+      </defs>
+      {/* ruled baselines */}
+      {[0, 26, 52, 78, chartH].map((y) => (
+        <line key={y} x1="0" y1={y} x2={w} y2={y} stroke="rgba(74,55,32,.2)" strokeWidth="0.5" strokeDasharray="2 3" />
+      ))}
+      {data.map((d, i) => {
+        const x = pad + i * slot + (slot - barW) / 2;
+        const barH = Math.max(1.5, (d.xp / maxXp) * (chartH - 14));
+        const cx = x + barW / 2;
+        return (
+          <g key={i}>
+            <rect x={x} y={chartH - barH} width={barW} height={barH} fill="url(#hatch)" stroke="var(--ink)" strokeWidth="0.8" />
+            <text x={cx} y={chartH - barH - 4} textAnchor="middle" fontSize="9" fontFamily="'Fira Code', monospace" fill="var(--ink)">
+              {Math.round(d.xp)}
+            </text>
+            <text x={cx} y={h - 6} textAnchor="middle" fontSize="8.5" fontFamily="'IM Fell English SC', serif" fill="var(--ink-soft)">
+              {dayLabels[i]}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -417,6 +432,10 @@ export default function Dashboard() {
           <div
             style={{
               marginTop: 12,
+              // Sin techo de ancho, en ventana maximizada la cita quedaba a la
+              // izquierda y el «— Séneca» (text-align: right) a 600 px de
+              // distancia, como si no fueran la misma cosa.
+              maxWidth: '46ch',
               fontFamily: "'Cormorant Garamond', serif",
               fontStyle: 'italic',
               fontSize: 'var(--fs-quote)',
@@ -438,7 +457,11 @@ export default function Dashboard() {
             <button
               type="button"
               className="codex-link"
-              style={{ whiteSpace: 'nowrap' }}
+              // Era `white-space: nowrap` dentro de una columna de 220 px: el
+              // enlace medía 280 y se salía 30 px por CADA lado, pisando el
+              // parte del día a su izquierda y el borde de la página a su
+              // derecha. Que envuelva.
+              style={{ maxWidth: '100%', textAlign: 'center' }}
               onClick={() => openCodex()}
             >
               <SealRosette width={12} height={12} />
@@ -543,7 +566,11 @@ export default function Dashboard() {
                     key={ev.id}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '18px 1fr auto auto',
+                      // Cada <li> es su propia grilla, así que con `auto auto`
+                      // las columnas de XP y de tiempo quedaban desalineadas
+                      // entre filas (cada fila medía su propio texto). Un ancho
+                      // mínimo por columna las pone en línea.
+                      gridTemplateColumns: '18px minmax(0, 1fr) minmax(56px, auto) minmax(72px, auto)',
                       gap: 8,
                       alignItems: 'baseline',
                       padding: '5px 0',
@@ -556,10 +583,10 @@ export default function Dashboard() {
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {description}
                     </span>
-                    <span className="qb-numeral" style={{ color: 'var(--moss)', fontSize: 'var(--fs-label)' }}>
+                    <span style={{ color: 'var(--moss)', fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", textAlign: 'right' }}>
                       +{Math.round(ev.xpGained)} xp
                     </span>
-                    <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)' }}>
+                    <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', textAlign: 'right' }}>
                       {formatEventTime(ev.createdAt, t)}
                     </span>
                   </li>

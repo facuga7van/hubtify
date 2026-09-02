@@ -601,7 +601,11 @@ export default function Transactions() {
               <span className="coin-ledger-row__source">
                 <SourceIcon source={tx.source} />
               </span>
-              <span className="coin-ledger-row__payment">{paymentMethodLabel(tx.paymentMethod)}</span>
+              {/* «Tarjeta de crédito» no entra en su columna y se recorta a
+                  «Tarjeta d…»: el título lo devuelve entero al pasar el mouse. */}
+              <span className="coin-ledger-row__payment" title={paymentMethodLabel(tx.paymentMethod)}>
+                {paymentMethodLabel(tx.paymentMethod)}
+              </span>
               {tx.impactsBalance === 0 && (
                 <span
                   className="coin-ledger-row__card-flag"
@@ -681,7 +685,11 @@ export default function Transactions() {
   const importModal = useModalA11y({ onClose: requestCloseImport, active: showImport });
 
   return (
-    <div>
+    // El libro se lee como una columna, no como una banda: maximizada, el
+    // concepto quedaba contra el borde izquierdo y la categoría, el importe y
+    // las acciones contra el derecho, con casi mil píxeles de pergamino vacío
+    // en el medio (`.coin-ledger-page` lo acota y lo centra).
+    <div className="coin-page-column">
       {/* Header with Month Nav */}
       <div className="coin-dashboard__header" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

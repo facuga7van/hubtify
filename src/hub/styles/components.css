@@ -495,6 +495,12 @@ textarea:focus-visible {
     0 0 0 1px rgba(168, 138, 60, 0.1),
     inset 0 1px 3px rgba(42, 29, 14, 0.1);
   position: relative;
+  /* El `align-items: flex-start` de arriba es correcto (evita que se corte la
+     tarjeta alta), pero dejaba la tarjeta flotando arriba de todo con media
+     pantalla de cuero vacío debajo en una ventana maximizada. El margen `auto`
+     en el eje cruzado la CENTRA cuando sobra lugar y se resuelve a 0 —o sea,
+     vuelve a pegarse arriba— justo cuando no entra. Las dos cosas a la vez. */
+  margin-block: auto;
 }
 
 /* Inner border ornament */
@@ -665,7 +671,11 @@ textarea:focus-visible {
   align-self: center;
   background: none;
   border: none;
-  color: var(--gold-dark);
+  /* Estaba en `--gold-dark` (#8a7030): sobre el final del degradé de la tarjeta
+     (--parch-2) eso son 2.55:1. Son los DOS únicos caminos a registrarse y a
+     recuperar la clave, y se leían como una marca de agua. El rúbrico es el
+     color de enlace del códice (mismo que `.dash-brief__seal`) y da ~6.3:1. */
+  color: var(--rubric);
   cursor: pointer;
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
@@ -676,15 +686,15 @@ textarea:focus-visible {
 }
 
 .auth-card__toggle:hover {
-  color: var(--gold);
-  border-bottom-color: var(--gold);
+  color: var(--rubric-light);
+  border-bottom-color: var(--rubric-light);
 }
 
 .auth-card__back {
   align-self: center;
   background: none;
   border: none;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   cursor: pointer;
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
@@ -756,8 +766,14 @@ textarea:focus-visible {
   margin-bottom: 24px;
 }
 
+/* `opacity: .45` apagaba el botón ENTERO —fondo, borde y rótulo— hasta ~2.5:1.
+   Las otras opciones de idioma y de tamaño de fuente no se leían, y con ellas
+   apagadas ni siquiera se veía que HUBIERA otras opciones. «No elegida» se
+   dice con la superficie, no borrando el texto: pergamino en vez de cuero. */
 .onboarding__btn-dim {
-  opacity: 0.45;
+  background: linear-gradient(180deg, var(--parch-1) 0%, var(--parch-2) 100%);
+  color: var(--ink-soft);
+  border-color: var(--gold-dark);
 }
 
 .onboarding__primary-btn {
@@ -1106,8 +1122,11 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+/* Misma historia que `.onboarding__btn-dim`: ver la nota de allá arriba. */
 .settings-btn--dim {
-  opacity: 0.45;
+  background: linear-gradient(180deg, var(--parch-1) 0%, var(--parch-2) 100%);
+  color: var(--ink-soft);
+  border-color: var(--gold-dark);
 }
 
 .rpg-btn-sm.settings-btn--danger {

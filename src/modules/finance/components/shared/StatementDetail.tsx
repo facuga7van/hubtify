@@ -108,14 +108,17 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
       <div
         {...dialogProps}
         className="rpg-card coin-modal"
-        aria-label={`${t('coinify.statementFor')} ${statement.creditCardName}`}
+        aria-label={`${t('coinify.statementFor')} ${statement.creditCardName ?? ''} ${statement.periodMonth}`.replace(/\s+/g, ' ').trim()}
         onClick={stopPropagation}
       >
         {/* An explicit close button: the only visible action used to be
             "Pagar resumen", so the obvious way out was a financial write. */}
         <div className="coin-modal__header">
+          {/* `creditCardName` es opcional en el tipo: sin él el título quedaba
+              como «Resumen de  — 2026-09», con la raya colgando de la nada. */}
           <div className="rpg-card-title" style={{ margin: 0 }}>
-            {t('coinify.statementFor')} {statement.creditCardName} — {statement.periodMonth}
+            {t('coinify.statementFor')}{statement.creditCardName ? ` ${statement.creditCardName}` : ''}
+            {' — '}{statement.periodMonth}
           </div>
           <button
             className="rpg-button tap-target"
@@ -198,9 +201,14 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
                   style={{ width: 110 }} step={0.01} min={0} />
               </>
             )}
-            {/* Renders nothing while the accounts bridge is not wired. */}
-            <span style={{ fontSize: 'var(--fs-label)' }}>{t('coinify.accountPaidFrom', 'Pagar desde')}:</span>
-            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+            {/* Renders nothing while the accounts bridge is not wired.
+                El rótulo y su selector viajan juntos: sueltos en una fila que
+                envuelve, «Pagar desde:» terminaba solo al final de un renglón y
+                el desplegable arrancaba el siguiente. */}
+            <span className="coin-statement-pay__field">
+              <span style={{ fontSize: 'var(--fs-label)' }}>{t('coinify.accountPaidFrom', 'Pagar desde')}:</span>
+              <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+            </span>
             <button className="rpg-button" onClick={handlePay} disabled={paying}>
               {t('coinify.payStatement')}
             </button>
@@ -209,7 +217,7 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
 
         {statement.status === 'paid' && (
           <div style={{ marginTop: 12, textAlign: 'center', opacity: 0.8, fontStyle: 'italic' }}>
-            {t('coinify.statementPaid')} — {statement.paidDate}
+            {t('coinify.statementPaid')}{statement.paidDate ? ` — ${statement.paidDate}` : ''}
           </div>
         )}
       </div>

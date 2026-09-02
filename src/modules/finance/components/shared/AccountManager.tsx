@@ -183,7 +183,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
     >
       <div
         {...dialogProps}
-        className="rpg-card coin-modal coin-modal--narrow"
+        className="rpg-card coin-modal"
         aria-label={t('coinify.manageAccounts', 'Gestionar cuentas')}
         onClick={stopPropagation}
       >
@@ -204,7 +204,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
               <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
                 <input className="rpg-input" value={editName}
                   aria-label={t('coinify.accountName', 'Nombre de cuenta')}
-                  onChange={(e) => setEditName(e.target.value)} style={{ flex: 1, minWidth: 90 }}
+                  onChange={(e) => setEditName(e.target.value)} style={{ flex: '1 1 200px', minWidth: 120 }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleUpdate();
                     if (e.key === 'Escape') setEditingId(null);
@@ -234,7 +234,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
                 </span>
                 <span style={{ flex: 1, fontWeight: 'bold', minWidth: 0 }}>
                   {account.name}{' '}
-                  <span style={{ fontSize: 'var(--fs-label)', opacity: 0.6 }}>
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                     ({kindLabel(account.kind)} · {account.currency})
                   </span>
                 </span>
@@ -258,7 +258,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
         <div className="coin-account-manager__create">
           <input className="rpg-input" placeholder={t('coinify.accountName', 'Nombre de cuenta')} value={newName}
             aria-label={t('coinify.accountName', 'Nombre de cuenta')}
-            onChange={(e) => setNewName(e.target.value)} style={{ flex: 1, minWidth: 90 }}
+            onChange={(e) => setNewName(e.target.value)} style={{ flex: '1 1 200px', minWidth: 120 }}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <select className="rpg-select" value={newKind}
             aria-label={t('coinify.accountKindLabel', 'Tipo de cuenta')}
@@ -275,12 +275,14 @@ export default function AccountManager({ onClose, onSaved }: Props) {
             onChange={setNewInitial}
             aria-label={t('coinify.accountInitialBalance', 'Saldo inicial')}
             placeholder={t('coinify.accountInitialBalance', 'Saldo inicial')}
-            style={{ width: 110 }} step={0.01} />
+            /* `.rpg-number` reserva 26 px de relleno a cada lado para sus
+               flechas: con 110 px el rótulo entraba como «Saldo inic». */
+            style={{ width: 132 }} step={0.01} />
           <button className="rpg-button" onClick={handleCreate} disabled={!newName.trim()}>
             + {t('coinify.newAccount', 'Nueva cuenta')}
           </button>
         </div>
-        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', opacity: 0.6, margin: '6px 0 0' }}>
+        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', margin: '6px 0 0' }}>
           {t('coinify.accountInitialHint', 'Saldo inicial: lo que la cuenta tiene HOY. Desde acá, cada movimiento con cuenta lo actualiza solo.')}
         </p>
 

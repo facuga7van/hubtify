@@ -1008,7 +1008,12 @@ export default function Dashboard() {
                           : <ArrowUp style={{ width: '0.75em', height: '0.75em' }} />
                         }{' '}{Math.abs(trendPct)}%
                       </span>{' '}
-                      {trendPct <= 0 ? t('coinify.lessThanLastMonth') : t('coinify.moreThanLastMonth')}
+                      {/* Las dos cadenas empezaban con «%», y la línea ya
+                          imprime el suyo arriba: se leía «↓ 12% % menos que
+                          el mes pasado». */}
+                      {trendPct <= 0
+                        ? t('coinify.lessThanLastMonth', 'menos que el mes pasado')
+                        : t('coinify.moreThanLastMonth', 'más que el mes pasado')}
                       {/* Inflation-adjusted twin: a month that only kept pace
                           with the IPC reads ~0% real, not the inflation. When
                           the month's index is not published yet there is NO

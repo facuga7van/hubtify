@@ -179,11 +179,6 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                   </span>
                   <span className="sidebar-bar__val">
                     {stats.streak} {t('rpg.days', 'días')}
-                    {stats.bestStreak > stats.streak && (
-                      <span className="sidebar-streak__best" title={t('rpg.bestStreak', 'Mejor racha')}>
-                        {' '}· {t('rpg.bestShort', 'récord')} {stats.bestStreak}
-                      </span>
-                    )}
                   </span>
                 </div>
                 <div className="sidebar-bar__track">
@@ -199,6 +194,15 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                     <Shield width={11} height={11} />
                     {' '}{stats.pardonsRemaining ?? 0}
                   </span>
+                  {/* El récord vivía pegado al valor de la racha: a 220 px de
+                      riel «RACHA» y «9 días» se tocaban y «· récord 21» se
+                      partía en dos renglones dejando el «21» huérfano. Acá
+                      abajo hay una fila con lugar de sobra. */}
+                  {stats.bestStreak > stats.streak && (
+                    <span className="sidebar-streak__best" title={t('rpg.bestStreak', 'Mejor racha')}>
+                      {t('rpg.bestShort', 'récord')} {stats.bestStreak}
+                    </span>
+                  )}
                   <button
                     type="button"
                     className="sidebar-streak__inn tap-target"
@@ -366,8 +370,12 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
         {/* The ES/EN toggle that used to live here duplicated Settings > Apariencia
             and, collapsed, became invisible but still tabbable. Removed. */}
         <div className="sidebar-footer__bottom">
+          {/* El número de versión —lo primero que se pide en un reporte de
+              bug— venía con `opacity: .5` inline: ~4:1 de contraste y un color
+              que ningún medidor puede leer del estilo computado. Color propio,
+              opacidad 1. */}
           {!collapsed && (
-            <div style={{ fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", opacity: 0.5, color: 'var(--parch-0)' }}>
+            <div style={{ fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", color: 'var(--parch-3)' }}>
               v{APP_VERSION}
             </div>
           )}

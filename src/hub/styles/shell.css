@@ -70,6 +70,10 @@
 .settings-page {
   padding: 24px 28px 32px;
   max-width: 860px;
+  /* La columna tenía techo de ancho pero no centrado: en ventana maximizada
+     quedaba pegada al borde izquierdo con ~520 px de pergamino vacío al lado,
+     como si la página se hubiera cargado a medias. */
+  margin-inline: auto;
 }
 
 .settings-group {
@@ -143,6 +147,23 @@
   gap: 2px;
   flex-shrink: 0;
   position: relative;
+}
+
+/* Con el riel desplegado, la campana + el menú de cuenta comían ~64 px FIJOS de
+   una fila de 236: a `__ident` le quedaban ~100 px y salía «Nv.12 · Gu…»,
+   «Facun…» y «facundot…» — las tres líneas cortadas a la vez. Sacados del
+   flujo, el rango y el nombre del héroe se quedan con la fila entera; el hueco
+   de los botones lo paga sólo el correo, que ya está completo en el menú de
+   cuenta y en su propio `title`. */
+.sidebar:not(.sidebar--collapsed) .player-card__actions {
+  position: absolute;
+  bottom: 14px;
+  right: 10px;
+  z-index: var(--z-base);
+}
+
+.sidebar:not(.sidebar--collapsed) .player-card__email {
+  padding-right: 62px;
 }
 
 .player-card--collapsed .player-card__profile {
@@ -298,6 +319,15 @@
 }
 
 /* ══ DASHBOARD BRIEF + EMPTY STATE ════════════════════ */
+
+/* El parte del día vive en la columna `1fr` de una grilla `1fr 220px`: en una
+   ventana maximizada eso son ~1140 px de renglón. Una medida de lectura, para
+   que la frase no cruce la pantalla entera. */
+.dash-brief,
+.dash-empty {
+  max-width: 68ch;
+}
+
 .dash-brief__eyebrow {
   color: var(--ink-faded);
   letter-spacing: 0.16em;

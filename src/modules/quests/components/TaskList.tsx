@@ -120,7 +120,11 @@ export default function TaskList() {
   const notifyQuestsChanged = useCallback(() => {
     selfNotifyRef.current = true;
     try {
-      notifyQuestsChanged();
+      // Ojo: acá iba `notifyQuestsChanged()` — la constante llamándose a sí
+      // misma. Recursión infinita: completar, borrar, posponer o guardar una
+      // misión reventaba con «Maximum call stack size exceeded» antes de
+      // avisarle a nadie. Lo que hay que emitir es el evento.
+      window.dispatchEvent(new Event('quests:dataChanged'));
     } finally {
       selfNotifyRef.current = false;
     }
@@ -1015,6 +1019,8 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
             checked={animatingComplete}
             onChange={handleCheckboxComplete}
             onDrawComplete={handleDrawComplete}
+
+            label={t('questify.completeQuest', 'Completar «{{name}}»', { name: task.name })}
           />
         </span>
 

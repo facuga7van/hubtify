@@ -27,6 +27,30 @@
 
 .nutri-page {
   padding: 24px 28px 32px;
+  /* Medida cómoda de lectura. A 1640 px la página se desparramaba: el rótulo
+     contra el borde izquierdo y el número contra el derecho, con 800 px de
+     pergamino vacío en el medio. Misma cura que Cuotas y el Tablero. */
+  --nutri-measure: 980px;
+}
+
+/* La crónica son gráficos: respira más ancho que un formulario. */
+.nutri-page:has(.nutri-charts-grid),
+.nutri-page:has(.nutri-kpi-strip) {
+  --nutri-measure: 1180px;
+}
+
+.nutri-page > .nutri-page-head,
+.nutri-page > .nutri-hero,
+.nutri-page > .nutri-card,
+.nutri-page > .nutri-closed-banner,
+.nutri-page > .nutri-sticky-footer,
+.nutri-page > .nutri-save-bar,
+.nutri-page > .nutri-kpi-strip,
+.nutri-page > .nutri-charts-grid,
+.nutri-page > p {
+  max-width: var(--nutri-measure);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .nutri-page-head {
@@ -68,6 +92,10 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  /* A 760 px las pestañas de rango empujaban al botón «Volver» fuera de la
+     fila y cada pestaña partía su rótulo en dos renglones. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 
@@ -328,7 +356,11 @@
 
 .nutri-cal-main {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  /* La columna de detalles NO se estira sin límite: con 1fr, «EXCEDIDO» quedaba
+     contra el borde izquierdo y «-1740 kcal» contra el derecho, con 800 px de
+     nada en el medio. Acotada y centrada, el rótulo y su número se leen juntos. */
+  grid-template-columns: 160px minmax(0, 440px);
+  justify-content: center;
   gap: 22px;
   align-items: center;
 }
@@ -390,7 +422,13 @@
   gap: 10px;
 }
 
+/* `inline-flex`: el rótulo puede llevar un sello de ayuda en línea y tiene que
+   medirse con él adentro, no dejarlo colgando fuera de su caja. */
 .nutri-cal-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.14em;
@@ -444,6 +482,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* 160 (anillo) + 22 (gap) + 440 (detalles): las barras quedan alineadas con
+     el bloque de arriba en vez de convertirse en filetes de 1000 px. */
+  max-width: 622px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .nutri-macros-head {
@@ -465,8 +508,9 @@
   font-family: 'IM Fell English', serif;
   font-style: italic;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
-  opacity: 0.7;
+  /* Sin `opacity`: sobre pergamino texturado el 0.7 lo dejaba casi invisible.
+     La bastardilla ya lo diferencia del rótulo. */
+  color: var(--ink-soft);
 }
 
 .nutri-macro {
@@ -706,10 +750,24 @@
   background: rgba(168, 138, 60, 0.08);
 }
 
+/* A 760 px la descripción se comprimía a ~100 px («¿Qué comist…») porque los
+   tres controles de la derecha son `flex-shrink: 0` y el input de texto sólo
+   tenía `width: 100%`. Ahora tiene base propia y la fila parte en dos. */
 .nutri-manual-inputs {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
+}
+
+.nutri-manual-inputs > .nutri-text-input {
+  flex: 1 1 240px;
+  min-width: 0;
+  width: auto;
+}
+
+.nutri-manual-inputs > .nutri-btn {
+  margin-left: auto;
 }
 
 .nutri-manual-cal {
@@ -723,7 +781,10 @@
 .nutri-suggest-popup {
   z-index: var(--z-dropdown-top);
   min-width: 240px;
-  max-width: min(560px, 92vw);
+  /* El `min(560px, …)` peleaba con el `width` que Today calcula para calzar con
+     la fila del input: la lista salía 560 px bajo un campo de 900 y las dos
+     piezas dejaban de leerse como un solo control. */
+  max-width: 92vw;
   max-height: 320px;
   overflow-y: auto;
   background: var(--parch-0, #f5e7c0);
@@ -954,7 +1015,8 @@
 
 .nutri-est-item-macros {
   font-family: 'Fira Code', monospace;
-  font-size: calc(var(--fs-label) * 0.85);
+  /* --fs-label es el MÍNIMO del sistema; el 0.85 lo bajaba a ~11 px. */
+  font-size: var(--fs-label);
   color: var(--ink-faded);
   letter-spacing: 0.02em;
 }
@@ -1024,7 +1086,7 @@
 
 .nutri-est-total-macros {
   font-family: 'Fira Code', monospace;
-  font-size: calc(var(--fs-label) * 0.85);
+  font-size: var(--fs-label);
   color: var(--ink-faded);
 }
 
@@ -1074,14 +1136,25 @@
    6. MEAL LOG
    ═══════════════════════════════════════════════════════════ */
 
+/* Columnas FIJAS, no `auto`. Cada fila es su propia grilla, así que con `auto`
+   el ancho de la celda de kcal dependía de si esa comida traía proteína: las
+   cifras bailaban de renglón en renglón y ninguna columna del registro
+   alineaba con la de arriba. Anchos fijos + alineación a derecha = tabla. */
 .nutri-meal-row {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto minmax(100px, auto);
+  grid-template-columns: 32px minmax(0, 1fr) 46px 104px 94px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 7px 4px;
   border-bottom: 1px dotted rgba(74, 55, 32, 0.3);
   transition: background 200ms ease;
+}
+
+/* La fila en edición lleva otros controles (dos inputs y dos botones): se
+   queda con el reparto flexible de siempre. */
+.nutri-meal-row--edit {
+  grid-template-columns: 32px minmax(0, 1fr) 72px auto auto;
+  gap: 8px;
 }
 
 .nutri-meal-row:last-child { border-bottom: none; }
@@ -1101,7 +1174,34 @@
   font-size: var(--fs-quote);
 }
 
+/* El ícono de comida abre el selector de momento: es un botón de verdad, no un
+   <span onClick> sin foco ni teclado. Hereda el círculo de `.nutri-meal-ico`. */
+.nutri-meal-ico-btn {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.nutri-meal-ico-btn:disabled {
+  cursor: default;
+}
+
+.nutri-meal-ico-btn:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 1px;
+}
+
 .nutri-meal-unresolved {
+  padding: 0;
+  border: none;
+  font-family: 'IM Fell English SC', serif;
   background: var(--rpg-gold);
   color: var(--ink);
   border-radius: 50%;
@@ -1132,6 +1232,7 @@
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
   color: var(--ink-faded);
+  text-align: right;
 }
 
 .nutri-meal-kcal {
@@ -1139,11 +1240,16 @@
   font-size: var(--fs-label);
   font-weight: 600;
   color: var(--ink);
+  text-align: right;
+  /* La banda de un evento («1200–1600 kcal») es lo más ancho que entra acá:
+     si no cabe, baja de renglón en vez de pisar los botones. */
+  overflow-wrap: anywhere;
 }
 
 .nutri-meal-del {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   background: transparent;
   border: none;
@@ -1152,8 +1258,12 @@
 }
 
 .nutri-food-action {
-  min-height: 32px;
-  min-width: 32px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1170,6 +1280,10 @@
 }
 .nutri-food-action:hover {
   background: rgba(0, 0, 0, 0.05);
+}
+.nutri-food-action:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 1px;
 }
 
 .nutri-empty {
@@ -1269,13 +1383,13 @@
 
 .nutri-breakdown-name {
   font-family: 'IM Fell English', serif;
-  font-size: calc(var(--fs-label) * 0.95);
+  font-size: var(--fs-label);
   color: var(--ink-faded);
 }
 
 .nutri-breakdown-kcal {
   font-family: 'Fira Code', monospace;
-  font-size: calc(var(--fs-label) * 0.9);
+  font-size: var(--fs-label);
   color: var(--ink-faded);
   font-weight: 600;
 }
@@ -1315,23 +1429,40 @@
   border-bottom-right-radius: 0 !important;
 }
 
+/* Vive SIEMPRE pegado a una pastilla de cuero oscuro: en `--ink-faded` el
+   glifo quedaba marrón sobre marrón, invisible. Va en oro, como la × que
+   tiene al lado, y se separa con el mismo filete. */
 .nutri-pill-portion {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 7px;
   border: 1px solid var(--gold);
-  border-left: none;
+  border-left: 1px solid rgba(168, 138, 60, 0.4);
   border-radius: 0 3px 3px 0;
-  background: rgba(138, 106, 61, 0.12);
-  color: var(--ink-faded);
+  background: rgba(168, 138, 60, 0.18);
+  color: var(--gold);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
+/* Dentro de un favorito no es el último segmento (después viene la ×): sin
+   esquinas redondeadas, y el marco lo pone `.nutri-fav-pill`. */
+.nutri-fav-pill .nutri-pill-portion {
+  border: none;
+  border-left: 1px solid rgba(168, 138, 60, 0.4);
+  border-radius: 0;
+}
+
 .nutri-pill-portion:hover {
   background: var(--gold);
-  color: var(--parch-0);
+  color: var(--ink);
+}
+
+.nutri-pill-portion:focus-visible,
+.nutri-fav-remove:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: -2px;
 }
 
 /* Repeat-day picker list */
@@ -1471,15 +1602,22 @@
   margin-bottom: 6px;
 }
 
+/* `gap` obligatorio: sin él «Precisión (1980 / 2000 kcal)» quedaba pegado
+   a «+30 XP», sin un pixel de aire entre el rótulo y su número. */
 .nutri-reward-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  gap: 12px;
   padding: 3px 0;
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
   color: var(--ink);
   border-bottom: 1px dotted rgba(74, 55, 32, 0.25);
+}
+
+.nutri-reward-row > span:first-child {
+  min-width: 0;
 }
 
 .nutri-reward-row:last-child { border-bottom: none; }
@@ -1494,6 +1632,8 @@
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .nutri-reward-xp.green { color: var(--moss); }
@@ -1502,6 +1642,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   padding-top: 6px;
   margin-top: 4px;
   border-top: 1px solid var(--ink-faded);
@@ -1512,7 +1654,13 @@
   color: var(--ink);
 }
 
+/* Lleva el sello de ayuda del HP en línea: se mide con él adentro. */
 .nutri-reward-xp-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
   font-weight: 700;
@@ -1583,13 +1731,20 @@
     inset 0 0 30px rgba(138, 106, 61, 0.15);
 }
 
+/* `flex`, no inline: el ícono de 16 px del título de evento se apoyaba en la
+   línea base y quedaba flotando ARRIBA del texto, como una mancha suelta. */
 .nutri-popup-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-quote);
   font-weight: 700;
   color: var(--ink);
   letter-spacing: 0.08em;
   margin: 0 0 12px;
+  /* Deja pasar la × de cerrar, que vive en la esquina superior derecha. */
+  padding-right: 28px;
 }
 
 .nutri-popup-hint {
@@ -1722,6 +1877,25 @@
   width: 100%;
   box-shadow: inset 0 1px 3px rgba(42, 29, 14, 0.06);
   appearance: none;
+}
+
+/* `appearance: none` le sacaba la flecha nativa y no la reemplazaba: un
+   desplegable que no se anuncia como desplegable. Chevron propio, en oro. */
+.nutri-select {
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%238a7030' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 10px 6px;
+}
+
+/* Un campo para UN número no necesita 900 px: el valor quedaba flotando en el
+   medio del vacío y el sufijo contra el borde derecho. (Los de
+   `.nutri-config-grid` ya vienen acotados por la grilla y no entran acá.) */
+.nutri-card > .nutri-field > .rpg-number,
+.nutri-card > .nutri-field > .nutri-select,
+.nutri-card > div > .nutri-field > .rpg-number {
+  max-width: 260px;
 }
 
 .nutri-select:focus,
@@ -1934,6 +2108,8 @@
 .nutri-goal-toggle {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  /* Tres opciones de una palabra no necesitan 330 px cada una. */
+  max-width: 620px;
   background: rgba(245, 231, 192, 0.5);
   border: 1.5px solid var(--ink-faded);
   border-radius: 3px;
@@ -2141,7 +2317,7 @@
    quiet — they explain the number, they must not compete with it. */
 .nutri-streak-note {
   font-family: 'IM Fell English', serif;
-  font-size: calc(var(--fs-label) * 0.9);
+  font-size: var(--fs-label);
   font-style: italic;
   line-height: 1.2;
   margin-top: 3px;
@@ -2175,6 +2351,8 @@
   font-size: var(--fs-label);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  /* «30 D» partido en dos renglones era el estado normal a 760 px. */
+  white-space: nowrap;
   padding: 4px 10px;
   color: var(--ink-faded);
   background: transparent;
@@ -2302,6 +2480,26 @@
 
 .nutri-meal-schedule-toggle {
   cursor: pointer;
+}
+
+/* Mismo tratamiento de «marcado» que el resto de las casillas del módulo: sin
+   esto la tilde quedaba verde sobre pergamino y no leía como activa. */
+.nutri-meal-schedule-toggle.active .nutri-check-box {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.nutri-meal-schedule-toggle:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* «Usar predeterminados» es una acción secundaria: no tiene por qué ocupar los
+   940 px de la tarjeta sólo porque la columna flex la estira. */
+.nutri-meal-schedule > .nutri-btn {
+  align-self: flex-start;
 }
 
 .nutri-meal-schedule-icon {
@@ -2597,6 +2795,17 @@
   border-radius: 0 !important;
   box-shadow: none !important;
   min-height: 28px;
+  /* Un favorito con nombre largo («Milanesa napolitana con papas fritas y
+     ensalada») partía la pastilla en dos renglones. El nombre completo sigue
+     en el `title`. */
+  max-width: 30ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* `block`, no `inline-flex`: el ellipsis no recorta el texto anónimo de un
+     contenedor flex. La altura la sostiene el line-height. */
+  display: block;
+  line-height: 20px;
 }
 
 .nutri-fav-remove {
@@ -2656,18 +2865,12 @@
   font-weight: 700;
 }
 
-/* Per-pill portion badge: shows the multiplier THIS favourite would log with,
-   so a staged ×2 is never invisible on the button you are about to press. */
-.nutri-pill-portion {
-  font-family: 'Fira Code', monospace;
-  font-size: calc(var(--fs-label) * 0.85);
-  font-weight: 700;
-  margin-left: 5px;
-  padding: 0 4px;
-  border-radius: 2px;
-  background: var(--gold-dark);
-  color: var(--parchment, #f5e7c0);
-}
+/* Acá vivía un SEGUNDO `.nutri-pill-portion` de la rama de las «chapitas de
+   porción» (las que se quedaban pegadas al próximo favorito). Pisaba el
+   `border-radius`, el fondo y el color de la definición de arriba y le metía
+   un `margin-left: 5px` que abría una ranura oscura entre la pastilla y su
+   botón — dos ramas conviviendo sobre el mismo selector. Se fue: la única
+   definición es la de la sección 7. */
 
 /* ── Day closed banner + reopen ── */
 
@@ -2731,6 +2934,8 @@
   flex-direction: column;
 }
 
+/* El rojo se reserva para lo que destruye. «Repetir día» salía del mismo color
+   que «Eliminar día» y las dos opciones del menú se leían como peligrosas. */
 .nutri-card-menu-item {
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
@@ -2740,14 +2945,27 @@
   background: transparent;
   border: none;
   border-radius: 3px;
-  color: var(--rubric);
+  color: var(--ink);
   cursor: pointer;
   text-transform: none;
   letter-spacing: 0;
 }
 
 .nutri-card-menu-item:hover {
+  background: rgba(168, 138, 60, 0.18);
+}
+
+.nutri-card-menu-item--danger {
+  color: var(--rubric);
+}
+
+.nutri-card-menu-item--danger:hover {
   background: rgba(122, 30, 30, 0.12);
+}
+
+.nutri-card-menu-item:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: -2px;
 }
 
 /* ── Settings sticky save bar ── */

@@ -312,7 +312,12 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
         {showAdvanced
           ? t('coinify.lessOptions', 'Menos opciones')
           : t('coinify.moreOptions', 'Más opciones')}
-        <span style={{ marginLeft: 4, fontSize: '0.8em' }}>{showAdvanced ? <ChevronUp /> : <ChevronDown />}</span>
+        {/* Sin medidas los iconos salían a su tamaño por defecto (24×24) dentro
+            de un renglón de 13 px: se veía una marca suelta colgando debajo del
+            texto, recortada por el `overflow: hidden` del acordeón. */}
+        {showAdvanced
+          ? <ChevronUp width={10} height={10} />
+          : <ChevronDown width={10} height={10} />}
       </button>
 
       {/* Advanced fields — date and currency, which almost always keep their

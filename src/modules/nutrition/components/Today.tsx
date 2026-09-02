@@ -18,7 +18,7 @@ import type { BreakdownItem, BreakdownTotals } from '../breakdown-utils';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
-import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark, Chalice, Meat } from '../../../shared/components/icons';
+import { DawnSun, NoonSun, MoonCrescent, Herb, Heart, Quill, Scroll, Platter, CrossMark, Chalice, Meat, Scale } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE, scoreNutritionDay } from '../../../../shared/meal-utils';
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
@@ -1335,7 +1335,10 @@ export default function Today() {
                 </span>
               </div>
               <div className="nutri-cal-row">
-                <span className="nutri-cal-label">{t('nutrify.target', 'Objetivo')}<HelpBubble text={t('nutrify.targetHelp', 'Tu objetivo se ajusta según tu nivel de actividad base y tu actividad reciente (gym, pasos) de los últimos 14 días.')} /></span>
+                <span className="nutri-cal-label">
+                  {t('nutrify.target', 'Objetivo')}
+                  <HelpBubble variant="inline" text={t('nutrify.targetHelp', 'Tu objetivo se ajusta según tu nivel de actividad base y tu actividad reciente (gym, pasos) de los últimos 14 días.')} />
+                </span>
                 <span className="nutri-cal-val">
                   {toleranceLow} – {toleranceHigh} kcal
                   {deficitTargetKcal !== 0 && (
@@ -1448,16 +1451,18 @@ export default function Today() {
                 onChange={setManualCalories}
                 step={10} min={0} max={9999}
                 placeholder={t('nutrify.calories', 'Calorías')}
+                aria-label={t('nutrify.calories', 'Calorías')}
                 onKeyDown={(e) => e.key === 'Enter' && foodInput.trim() && manualCalories && handleManualAdd()}
-                style={{ width: 130, flexShrink: 0 }}
+                style={{ width: 140, flexShrink: 0 }}
               />
               <RpgNumberInput
                 value={manualProtein}
                 onChange={setManualProtein}
                 step={1} min={0} max={500}
                 placeholder={t('nutrify.proteinManualPlaceholder', 'Prot. (g)')}
+                aria-label={t('nutrify.proteinManualPlaceholder', 'Prot. (g)')}
                 onKeyDown={(e) => e.key === 'Enter' && foodInput.trim() && manualCalories && handleManualAdd()}
-                style={{ width: 100, flexShrink: 0 }}
+                style={{ width: 120, flexShrink: 0 }}
               />
               <button
                 className="nutri-btn"
@@ -1704,7 +1709,7 @@ export default function Today() {
                     {t('nutrify.repeatDayShort', 'Repetir día')}
                   </button>
                   <button
-                    className="nutri-card-menu-item"
+                    className="nutri-card-menu-item nutri-card-menu-item--danger"
                     role="menuitem"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { setLogMenuOpen(false); handleDeleteDay(); }}
@@ -1781,7 +1786,7 @@ export default function Today() {
       <div className="nutri-card" style={{ marginBottom: 26 }}>
         <HelpBubble text={t('nutrify.closeDayHelp', 'Cerrá el día para calcular XP y HP. Se evalúa precisión calórica, pasos, gym y pesaje semanal.')} />
         <h3 className="nutri-card-title">
-          <span className="nutri-t-ico">{'\u25F7'}</span>
+          <span className="nutri-t-ico"><Scale width={14} height={14} /></span>
           {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDay', 'Cierre del Día')}
         </h3>
 
@@ -2100,11 +2105,17 @@ export default function Today() {
   );
 }
 
-// Small "multiply" glyph for the portion-adjust pill button (no emoji).
+/**
+ * Glifo de «ajustar porción»: un círculo con una porción separada. Antes era
+ * una × idéntica a la de «quitar favorito», que vive pegada al lado — dos
+ * botones con el mismo dibujo y sentidos opuestos.
+ */
 function PortionGlyph() {
   return (
-    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-      <line x1="2.5" y1="2.5" x2="9.5" y2="9.5" /><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" />
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+      strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 1.2a4.8 4.8 0 1 0 0 9.6" />
+      <path d="M7.4 1.5l3.3 3.3-3.3 3.3z" />
     </svg>
   );
 }
@@ -2125,14 +2136,31 @@ export function RepeatDayPicker({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: TFunction<any, any>;
 }) {
+  // Los otros popups del módulo tienen trampa de foco, Escape a nivel ventana y
+  // × de cerrar; éste no tenía ninguna de las tres. El `onKeyDown` del overlay
+  // no se dispara nunca hasta que algo de adentro toma el foco.
+  const modal = useModalA11y({ onClose });
   const dayLabel = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     const obj = new Date(y, m - 1, d);
     return obj.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' });
   };
   return (
-    <div className="nutri-popup-overlay" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-      <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
+    <div className="nutri-popup-overlay" onClick={onClose}>
+      <div
+        {...modal.dialogProps}
+        className="nutri-popup"
+        aria-label={t('nutrify.repeatDayTitle', 'Repetir el festín de…')}
+        onClick={modal.stopPropagation}
+      >
+        <button
+          className="nutri-popup-close tap-target"
+          onClick={onClose}
+          aria-label={t('common.close', 'Cerrar')}
+          title={t('common.close', 'Cerrar')}
+        >
+          <CrossMark width={12} height={12} />
+        </button>
         <h3 className="nutri-popup-title">{t('nutrify.repeatDayTitle', 'Repetir el festín de…')}</h3>
         {days.length === 0 ? (
           <p className="nutri-popup-hint">{t('nutrify.repeatDayNoneRecent', 'No hay días recientes con comidas para repetir.')}</p>
@@ -2187,14 +2215,28 @@ export function PortionPicker({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: TFunction<any, any>;
 }) {
+  const modal = useModalA11y({ onClose });
   const scaled = scalePortion(
     { calories: baseCalories, proteinG: baseProteinG, carbsG: baseCarbsG, fatG: baseFatG },
     factor,
   );
   const hasMacros = scaled.proteinG != null || scaled.carbsG != null || scaled.fatG != null;
   return (
-    <div className="nutri-popup-overlay" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-      <div className="nutri-popup" onClick={(e) => e.stopPropagation()}>
+    <div className="nutri-popup-overlay" onClick={onClose}>
+      <div
+        {...modal.dialogProps}
+        className="nutri-popup"
+        aria-label={t('nutrify.portionTitle', 'Ajustar porción')}
+        onClick={modal.stopPropagation}
+      >
+        <button
+          className="nutri-popup-close tap-target"
+          onClick={onClose}
+          aria-label={t('common.close', 'Cerrar')}
+          title={t('common.close', 'Cerrar')}
+        >
+          <CrossMark width={12} height={12} />
+        </button>
         <h3 className="nutri-popup-title">{t('nutrify.portionTitle', 'Ajustar porción')}</h3>
         <p className="nutri-popup-hint">{name}</p>
 
@@ -2217,6 +2259,7 @@ export function PortionPicker({
             value={String(factor)}
             onChange={(v) => onFactor(parseFloat(v) || 0)}
             step={0.5} min={0} max={20}
+            aria-label={t('nutrify.portionFactor', 'Porciones')}
             style={{ width: 120 }}
           />
         </label>
@@ -2448,7 +2491,7 @@ function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: numbe
               <span className={data.hpChange >= 0 ? 'nutri-green' : 'nutri-red'} style={{ marginLeft: 8 }}>
                 {data.hpChange >= 0 ? '+' : ''}{data.hpChange} HP
               </span>
-              <HelpBubble text={t('nutrify.hpExplanation', 'HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP')} />
+              <HelpBubble variant="inline" text={t('nutrify.hpExplanation', 'HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP')} />
             </>
           )}
         </span>

@@ -11,7 +11,7 @@ import {
 import type { BarDatum, PointDatum, CellLevel } from '../../../shared/components/charts';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import HelpBubble from '../../../shared/components/HelpBubble';
-import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal, Cauldron } from '../../../shared/components/icons';
+import { Flame, Book, Tower, Map as MapIcon, Scroll, Scale, HelpSeal, Cauldron, Quill } from '../../../shared/components/icons';
 import { normalizeStreak, nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import { getEventDays } from '../event-api';
 import type { StreakInfo } from '../nutrition-day';
@@ -322,7 +322,7 @@ export default function NutritionCharts() {
         <div className="nutri-page-head">
           <div>
             <h1 className="nutri-page-title">
-              <span className="nutri-title-ico">{'\u2694'}</span>{' '}
+            <span className="nutri-title-ico"><Quill width={18} height={18} /></span>{' '}
               {t('nutrify.chronicleTitle', "ALCHEMIST'S CHRONICLE")}
             </h1>
           </div>
@@ -355,7 +355,7 @@ export default function NutritionCharts() {
         <div className="nutri-page-head">
           <div>
             <h1 className="nutri-page-title">
-              <span className="nutri-title-ico">{'\u2694'}</span>{' '}
+            <span className="nutri-title-ico"><Quill width={18} height={18} /></span>{' '}
               {t('nutrify.chronicleTitle', "ALCHEMIST'S CHRONICLE")}
             </h1>
           </div>
@@ -389,11 +389,12 @@ export default function NutritionCharts() {
       <div className="nutri-page-head">
         <div>
           <h1 className="nutri-page-title">
-            <span className="nutri-title-ico">{'\u2694'}</span>{' '}
+            <span className="nutri-title-ico"><Quill width={18} height={18} /></span>{' '}
             {t('nutrify.chronicleTitle', "ALCHEMIST'S CHRONICLE")}
           </h1>
           <div className="nutri-page-sub">
             {t('nutrify.chronicleSub', 'Sustenance recorded in the parchment')}
+            <HelpBubble variant="inline" text={t('nutrify.kpiHelp', 'Indicadores del período: precisión calórica, peso actual, racha de registro y días logueados.')} />
           </div>
         </div>
         <div className="nutri-head-actions">
@@ -410,7 +411,6 @@ export default function NutritionCharts() {
 
       {/* KPI strip */}
       <div className="nutri-kpi-strip">
-        <HelpBubble text={t('nutrify.kpiHelp', 'Indicadores del período: precisión calórica, peso actual, racha de registro y días logueados.')} />
         <div className="nutri-kpi scroll-kpi">
           <div className="nutri-kpi-icon seal-icon"><HelpSeal width={18} height={18} /></div>
           <div className="nutri-kpi-body">

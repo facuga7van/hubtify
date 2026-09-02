@@ -268,6 +268,8 @@ function TodayRow({ task, project, overdue, onComplete, onPostpone }: {
             checked={ticking}
             onChange={() => { if (ticking) return; setTicking(true); playTaskComplete(); }}
             onDrawComplete={handleDrawComplete}
+
+            label={t('questify.completeQuest', 'Completar «{{name}}»', { name: task.name })}
           />
         </span>
 

@@ -10,6 +10,12 @@ export interface QuillCheckboxProps {
   disabled?: boolean;
   size?: number;
   onDrawComplete?: () => void;
+  /**
+   * Nombre accesible de la casilla. Sin esto un lector de pantalla anuncia
+   * «casilla sin etiqueta» en cada fila de misión: el nombre de la tarea vive
+   * en un `<span>` hermano, que la casilla no reclama.
+   */
+  label?: string;
 }
 
 // Codex palette — read straight from the CSS custom properties instead of
@@ -78,8 +84,7 @@ export default function QuillCheckbox({
   onChange,
   disabled = false,
   size = 24,
-  onDrawComplete,
-}: QuillCheckboxProps) {
+  onDrawComplete, label}: QuillCheckboxProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const checkPathRef = useRef<SVGPolylineElement>(null);
   const prevCheckedRef = useRef(checked);
@@ -182,6 +187,7 @@ export default function QuillCheckbox({
         onChange={handleChange}
         disabled={disabled}
         aria-checked={checked}
+        aria-label={label}
         style={{
           position: 'absolute',
           opacity: 0,

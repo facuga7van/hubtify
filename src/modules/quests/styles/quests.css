@@ -289,9 +289,14 @@
   flex-shrink: 0;
 }
 
+/* Lo numérico va en Fira Code. En UnifrakturCook un «+40» a 17 px es un
+   garabato: la fuente display existe para los títulos, no para las cifras que
+   el ojo tiene que comparar de fila a fila. */
 .quest-row-xp-value {
-  font-family: 'UnifrakturCook', serif;
-  font-size: calc(17px * var(--font-scale));
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-size: calc(14px * var(--font-scale));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
@@ -605,7 +610,12 @@
    habit name from blowing out the track (grid items default to min-width:auto). */
 .quest-habit-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) 24px 70px;
+  /* El nombre lleva PISO (88px). Con `minmax(0, 1fr)` el track de badges, que
+     pide `max-content`, se servía primero y el nombre quedaba en 0: a 760 px
+     —el mínimo que permite la ventana— la columna mostraba «Me…», «Gi…» y una
+     fila directamente sin nombre. El track de acciones era de 70 px para un
+     único botón de 32: 38 px de aire por fila que ahora son del nombre. */
+  grid-template-columns: minmax(88px, 1fr) minmax(0, max-content) 24px 40px;
   align-items: center;
   padding: 2px 0;
   border-bottom: 1px dotted rgba(74, 55, 32, 0.35);
@@ -1087,6 +1097,9 @@
 .quest-stats-help {
   display: flex;
   justify-content: flex-end;
+  /* Misma medida que la tira que explica: sin esto la ayuda quedaba flotando
+     sola contra el borde derecho de la ventana, a 400 px de su tira. */
+  max-width: 1180px;
   margin-bottom: 2px;
 }
 
@@ -1499,4 +1512,63 @@
   font-style: italic;
   font-size: var(--fs-sub);
   color: var(--ink-soft);
+}
+
+/* ── Medida de lectura y filas angostas ────────────
+   Dos males opuestos, encontrados mirando capturas reales a los dos tamaños
+   que la ventana permite (electron/main.ts: minWidth 700, minHeight 650).
+
+   1) MAXIMIZADA (~1640 px). La grilla se estiraba sin techo: en «Hoy» el
+      nombre de la misión quedaba pegado al borde izquierdo y el relojito de
+      posponer contra el derecho, con 1.200 px de pergamino vacío en el medio;
+      en «Pendientes» el hueco entre el título y el «+40 XP BASE» pasaba los
+      500 px. Un códice tiene ancho de página; esto le pone uno.
+
+   2) MÍNIMA (760 px, y en la app real la barra lateral se come 260 px más).
+      `.quest-row-body` era lo ÚNICO flexible de la fila —el bloque de XP y el
+      racimo de acciones son `flex-shrink: 0`—, así que absorbía todo el
+      achique y el título se reducía a UNA letra: «Pagar el alquiler» se veía
+      como «l». La fila ahora se parte en dos renglones antes de llegar a eso.
+      El disparador es el ANCHO DE LA FILA, no el de la ventana: con la barra
+      lateral de por medio un breakpoint de viewport miente ~300 px. */
+
+.quest-stats-strip,
+.quest-tab-bar,
+.quest-add-toggle-wrapper,
+.quest-form-wrapper,
+.quest-columns {
+  max-width: 1180px;
+}
+
+/* «Hoy» es una sola columna de renglones cortos: su medida cómoda es todavía
+   más angosta que la del tablero de dos columnas. */
+.quest-columns--single {
+  grid-template-columns: 1fr;
+  max-width: 820px;
+}
+
+.quest-row {
+  container-type: inline-size;
+}
+
+@container (max-width: 460px) {
+  .quest-row-inner {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  /* 62px = manija de arrastre + tilde + sus dos gaps: el título ocupa el resto
+     del primer renglón entero y la recompensa baja al segundo, alineada bajo
+     él en vez de pelearle los píxeles. */
+  .quest-row-body {
+    flex-basis: calc(100% - 62px);
+  }
+
+  .quest-row-xp {
+    margin-left: 62px;
+  }
+
+  .quest-row-actions {
+    margin-left: auto;
+  }
 }

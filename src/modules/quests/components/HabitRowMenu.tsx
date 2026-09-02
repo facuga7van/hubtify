@@ -56,8 +56,8 @@ export default function HabitRowMenu({ skipped, historyOpen, onHistory, onEdit, 
           onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={t('questify.rowActions', 'Acciones')}
-          title={t('questify.rowActions', 'Acciones')}
+          aria-label={t('questify.habitRowActions', 'Acciones del hábito')}
+          title={t('questify.habitRowActions', 'Acciones del hábito')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--ink-faded)" aria-hidden="true">
             <circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" />

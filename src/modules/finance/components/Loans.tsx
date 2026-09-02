@@ -293,8 +293,12 @@ export default function Loans() {
               >
                 <Rune>{t('coinify.singlePayment')}</Rune>
                 <span className="qb-hand coin-loan-card__desc" title={loan.description || loan.date}>
-                  {loan.description || loan.date}
-                  <span className="coin-loan-card__date">{loan.date.slice(0, 10)}</span>
+                  {/* Sin descripción el hueco lo llena la fecha, y el sello de
+                      al lado la repetía: se leía «2026-08-02 2026-08-02». */}
+                  {loan.description || loan.date.slice(0, 10)}
+                  {loan.description && (
+                    <span className="coin-loan-card__date">{loan.date.slice(0, 10)}</span>
+                  )}
                 </span>
                 <span className="coin-loan-card__progress">
                   {paidSoFar > 0 && !isSettled(loan) && (
@@ -334,8 +338,10 @@ export default function Loans() {
               <div key={groupId} className="coin-loan-card__row">
                 <Rune tone="gold">{t('coinify.installmentsLabel')}</Rune>
                 <span className="qb-hand coin-loan-card__desc" title={firstLoan.description || firstLoan.date}>
-                  {firstLoan.description || firstLoan.date}
-                  <span className="coin-loan-card__date">{firstLoan.date.slice(0, 10)}</span>
+                  {firstLoan.description || firstLoan.date.slice(0, 10)}
+                  {firstLoan.description && (
+                    <span className="coin-loan-card__date">{firstLoan.date.slice(0, 10)}</span>
+                  )}
                 </span>
                 <span className="coin-loan-card__progress">
                   <Gauge value={paid} max={total} tone={allSettled ? 'sage' : 'gold'} showPips={false} label={`${paid}/${total}`} />
@@ -362,7 +368,7 @@ export default function Loans() {
   };
 
   return (
-    <div>
+    <div className="coin-page-column">
       {/* Header. The help bubble is inline next to the tabs — as a sealed bubble
           it was absolutely positioned right on top of "+ Agregar Préstamo". */}
       <div className="coin-loan-header">
