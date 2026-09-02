@@ -13,6 +13,7 @@ vi.mock('../../../src/modules/nutrition/estimate-service', () => ({
 }));
 
 import Today from '@modules/nutrition/components/Today';
+import NutritionSettings from '@modules/nutrition/components/NutritionSettings';
 import { installApi, mountInShell, setMobileViewport, settle, shoot } from './mobile-harness';
 import { NUTRITION_API } from './fixtures';
 
@@ -160,6 +161,33 @@ describe('Nutrify — QA 0.9.0 (NUT-04)', () => {
     expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 1);
     box.scrollIntoView({ block: 'center' });
     await shoot('nutrify-qa-04-delete');
+  });
+});
+
+describe('Nutrify — QA 0.9.0 (NUT-05)', () => {
+  test('NUT-05: los inputs de hora del horario de comidas dan lugar a «10:00 AM»', async () => {
+    installApi(NUTRITION_API);
+    await setMobileViewport();
+    mountInShell(<NutritionSettings />, '/nutrition/settings');
+    await settle(700);
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.nutri-meal-schedule-time'));
+    expect(inputs.length).toBeGreaterThan(0);
+    // Sonda: el texto más ancho del formato de 12 h con la misma tipografía
+    // del input, más su padding y el reloj del picker nativo (≈ 20 px).
+    const probe = document.createElement('span');
+    const cs = getComputedStyle(inputs[0]);
+    probe.style.font = cs.font;
+    probe.style.whiteSpace = 'pre';
+    probe.textContent = '10:00 AM';
+    document.body.appendChild(probe);
+    const textW = probe.getBoundingClientRect().width;
+    probe.remove();
+    const chrome = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 20;
+    for (const input of inputs) {
+      expect(input.getBoundingClientRect().width).toBeGreaterThanOrEqual(textW + chrome);
+    }
+    const row = document.querySelector('.nutri-meal-schedule-row') as HTMLElement;
+    expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth + 1);
   });
 });
 

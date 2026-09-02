@@ -3262,6 +3262,13 @@
   padding-left: 44px;
 }
 
+/* NUT-05: a 90 px el formato de 12 h del teléfono mostraba «10:00 A»: ocho
+   caracteres de Fira Code (≈ 62 px) + padding + la flecha del picker nativo
+   (≈ 20 px) piden 110. Dos inputs y el guion entran de sobra en 366 px. */
+[data-shell="mobile"] .nutri-meal-schedule-time {
+  width: 110px;
+}
+
 /* NUT-03: con el teclado abierto el viewport se achica y la barra sticky
    «Cerrar el Día» quedaba encima de la fila en edición / del formulario.
    Mientras un campo de la página tiene el foco (= teclado abierto) la barra
