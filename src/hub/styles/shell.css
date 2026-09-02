@@ -321,6 +321,55 @@
   flex-shrink: 0;
 }
 
+/* Update in-app de Android (AndroidUpdateBanner.tsx): mismo .update-chip de
+   arriba, más ancho para que quepan la barra de progreso y el botón. La
+   barra reusa la paleta de `.rpg-bar` (moss sobre negro translúcido) en vez
+   de la clase en sí — `.rpg-bar` trae su propio marco/textura pensado para
+   stats de personaje, que desentona en un chip flotante compacto. */
+.update-chip--android {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 280px;
+  max-width: calc(100vw - 32px);
+  cursor: default;
+  border-radius: 10px;
+}
+
+.update-chip__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-chip__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-chip__bar {
+  height: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.update-chip__bar-fill {
+  height: 100%;
+  background: var(--moss);
+  transition: width 0.3s ease;
+}
+
+.update-chip__error {
+  color: var(--rubric-light);
+}
+
+.update-chip__permission {
+  font-size: var(--fs-label);
+  color: var(--gold-light);
+  line-height: 1.35;
+}
+
 /* ══ DASHBOARD BRIEF + EMPTY STATE ════════════════════ */
 
 /* El parte del día vive en la columna `1fr` de una grilla `1fr 220px`: en una
