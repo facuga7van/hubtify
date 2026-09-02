@@ -13,6 +13,60 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.0',
+    date: '2026-09-02',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'Hubtify llega a Android. Es la misma app —Questify, Coinify, Nutrify, el Caldero, tu Personaje, los Logros y las Recompensas— con la misma cuenta, así que lo que cargás en el teléfono aparece en la compu y al revés. Se instala con el APK que viene en cada versión, el menú vive en un cajón lateral, el botón atrás del teléfono hace lo que esperás y cada pantalla se rearmó para entrar en la mano',
+          en: 'Hubtify comes to Android. It is the same app — Questify, Coinify, Nutrify, the Cauldron, your Character, Achievements and Rewards — with the same account, so what you log on the phone shows up on the computer and back. It installs from the APK shipped with every release, the menu lives in a side drawer, the phone\'s back button does what you expect, and every screen was rebuilt to fit in your hand',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'En el teléfono la app te avisa por las notificaciones del sistema: cuando una racha está por vencerse y cuando el Pomodoro termina con la app abierta. Por ahora el Caldero necesita la app en pantalla — todavía no corre en segundo plano',
+          en: 'On the phone the app reaches you through system notifications: when a streak is about to expire, and when the Pomodoro ends with the app open. For now the Cauldron needs the app on screen — it does not run in the background yet',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'Desde Ajustes podés exportar la base de datos completa como un archivo que compartís a donde quieras, y volver a importarla en otro teléfono o después de reinstalar. El CSV de Coinify también se exporta. Lo que todavía no está en Android es importar resúmenes PDF de Coinify: la app te lo dice en lugar de fallar en silencio',
+          en: 'From Settings you can export the whole database as a file you share wherever you want, and import it back on another phone or after a reinstall. Coinify\'s CSV export works too. What is not on Android yet is importing Coinify PDF statements: the app tells you so instead of failing quietly',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'Cuando sale una versión nueva, el teléfono te avisa solo y te lleva a descargar el APK. Nada de andar revisando a mano si hay algo nuevo',
+          en: 'When a new version comes out, the phone lets you know on its own and takes you to download the APK. No more checking by hand whether there is something new',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'hub',
+        text: {
+          es: 'El Cierre del Códice decía «XP DEL DÍA +NaN» en vez del número que te ganaste. Ahora muestra el XP real de la jornada, en la compu y en el teléfono. Y en el teléfono las cartelas de stats de la Tabla del Aventurero se acomodan en 2×2 para que se lean sin achicar los ojos',
+          en: 'The Codex Closing read "XP OF THE DAY +NaN" instead of the number you earned. It now shows the day\'s real XP, on the computer and on the phone. And on the phone the stat cards of the Adventurer\'s Table settle into a 2×2 grid so you can read them without squinting',
+        },
+      },
+      {
+        category: 'refactor',
+        scope: 'cauldron',
+        text: {
+          es: 'Una sesión del Caldero se acredita con la hora exacta en que tenía que terminar, no con el momento en que volviste a mirar la app. Si el temporizador cerró a las 15:25, el registro dice 15:25',
+          en: 'A Cauldron session is credited at the exact time it was due to end, not at the moment you looked back at the app. If the timer closed at 15:25, the record says 15:25',
+        },
+      },
+    ],
+  },
+  {
     version: '0.8.2',
     date: '2026-09-01',
     changes: [
