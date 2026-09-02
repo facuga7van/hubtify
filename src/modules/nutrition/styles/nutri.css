@@ -1150,11 +1150,69 @@
   transition: background 200ms ease;
 }
 
-/* La fila en edición lleva otros controles (dos inputs y dos botones): se
+/* La fila en edición lleva otros controles (dos inputs y la botonera): se
    queda con el reparto flexible de siempre. */
 .nutri-meal-row--edit {
-  grid-template-columns: 32px minmax(0, 1fr) 72px auto auto;
+  grid-template-columns: 32px minmax(0, 1fr) 72px auto;
   gap: 8px;
+}
+
+.nutri-meal-edit-input {
+  padding: 4px 8px;
+  font-size: var(--fs-label);
+}
+
+/* Guardar / Cancelar / IA: una sola fila, del alto de los inputs (los dos
+   leen --nutri-control-h). La IA es secundaria: fantasma, con etiqueta. */
+.nutri-meal-edit-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.nutri-meal-edit-actions .nutri-btn {
+  padding: 4px 10px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.nutri-meal-edit-ai {
+  gap: 5px;
+}
+
+/* Confirmación inline de borrado: texto y botonera en una línea en
+   escritorio (mismos valores que llevaba inline), en dos en mobile. */
+.nutri-meal-del-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+  padding: 4px 10px;
+  background: rgba(122, 30, 30, 0.08);
+  border: 1px solid var(--rubric);
+  border-radius: 3px;
+}
+
+.nutri-meal-del-confirm-text {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+}
+
+.nutri-meal-del-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-meal-del-confirm-actions .nutri-btn {
+  padding: 3px 10px;
+  font-size: var(--fs-label);
+}
+
+.nutri-meal-del-confirm-yes {
+  background: var(--rubric);
+  border-color: var(--rubric);
 }
 
 .nutri-meal-row:last-child { border-bottom: none; }
@@ -3166,11 +3224,32 @@
   grid-template-columns: 32px minmax(0, 1fr) 72px;
 }
 
-/* Cinco hijos (FoodLogItem.tsx:160-186: ícono, dos inputs, dos botones): cada
-   botón baja a su propio renglón, a lo ancho, sin caer en la pista de 32 px. */
-[data-shell="mobile"] .nutri-meal-row--edit > .nutri-btn {
+/* La botonera (Guardar / Cancelar / IA) baja a su propio renglón bajo los
+   inputs, a lo ancho: Guardar y Cancelar se reparten el sitio, la IA queda
+   al ancho de su etiqueta (NUT-01). */
+[data-shell="mobile"] .nutri-meal-edit-actions {
   grid-column: 2 / -1;
-  justify-self: start;
+}
+
+[data-shell="mobile"] .nutri-meal-edit-actions .nutri-btn {
+  flex: 1 1 0;
+}
+
+[data-shell="mobile"] .nutri-meal-edit-actions .nutri-meal-edit-ai {
+  flex: 0 0 auto;
+}
+
+/* NUT-04: «Cancelar» caía solo al segundo renglón. Texto arriba, los dos
+   botones juntos debajo, a lo ancho. */
+[data-shell="mobile"] .nutri-meal-del-confirm {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 10px;
+}
+
+[data-shell="mobile"] .nutri-meal-del-confirm-actions .nutri-btn {
+  flex: 1 1 0;
+  justify-content: center;
 }
 
 /* N8 */
@@ -3181,6 +3260,29 @@
 [data-shell="mobile"] .nutri-meal-schedule-times {
   flex-basis: 100%;
   padding-left: 44px;
+}
+
+/* NUT-05: a 90 px el formato de 12 h del teléfono mostraba «10:00 A»: ocho
+   caracteres de Fira Code (≈ 62 px) + padding + la flecha del picker nativo
+   (≈ 20 px) piden 110. Dos inputs y el guion entran de sobra en 366 px. */
+[data-shell="mobile"] .nutri-meal-schedule-time {
+  width: 110px;
+}
+
+/* NUT-03: con el teclado abierto el viewport se achica y la barra sticky
+   «Cerrar el Día» quedaba encima de la fila en edición / del formulario.
+   Mientras un campo de la página tiene el foco (= teclado abierto) la barra
+   no está; vuelve al soltar el foco. `:has()` está en WebView 105+. */
+[data-shell="mobile"] .nutri-page:has(input:focus, textarea:focus, select:focus) .nutri-sticky-footer {
+  display: none;
+}
+
+/* En landscape (≈360 px de alto) la barra sticky tapaba ~15 % de la pantalla:
+   ahí va al final del flujo, como un botón más. */
+@media (max-height: 480px) {
+  [data-shell="mobile"] .nutri-sticky-footer {
+    position: static;
+  }
 }
 
 /* N9: el popup de cerrar el día mide más que la pantalla. */

@@ -921,6 +921,16 @@
   max-width: calc(100vw - 16px);
 }
 
+/* Los spinners ▲▼ de escritorio se comían ~28 px de cada input numérico
+   angosto (Nutrify, Coinify, Recompensas); en touch el teclado numérico
+   ya hace ese trabajo. */
+[data-shell="mobile"] input[type="number"]::-webkit-inner-spin-button,
+[data-shell="mobile"] input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
 /* ── Safe areas en capas fijas (solo shell mobile) ──
    Con edge-to-edge la barra de estado y la de gestos superponen al WebView;
    todo lo `position: fixed; inset: 0` tiene que dejarles su franja. Lista

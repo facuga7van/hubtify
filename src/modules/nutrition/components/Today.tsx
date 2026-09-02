@@ -1075,6 +1075,10 @@ export default function Today() {
     if (result.success && result.breakdown) {
       const b = result.breakdown as typeof dayClosed;
       setCloseResult(b);
+      // The whole page gates on `dayClosed` (`readOnly`, the log form, the
+      // sticky footer): without this the UI stayed editable and every edit
+      // failed with "Cannot modify a closed day" until a reload (NUT-02).
+      setDayClosed(b);
       const xp = b?.xpTotal ?? 0;
       const hp = b?.hpChange ?? 0;
       await window.api.processRpgEvent({
@@ -1792,7 +1796,10 @@ export default function Today() {
 
         {dayClosed ? (
           <div>
-            <p className="nutri-day-status">{t('nutrify.dayClosed', 'Día cerrado')}</p>
+            {/* Just closed in this session: keep the celebration, not the plain label. */}
+            {closeResult
+              ? <p className="nutri-day-status nutri-day-success">{t('nutrify.dayClosedSuccess', '¡Día cerrado exitosamente!')}</p>
+              : <p className="nutri-day-status">{t('nutrify.dayClosed', 'Día cerrado')}</p>}
             <div className="nutri-close-day">
               <CloseDayStats consumed={dayClosed.consumed} target={dayClosed.target} />
               <DayBreakdown data={dayClosed} t={t} />

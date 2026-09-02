@@ -150,7 +150,10 @@ export default function RpgDatePicker({ value, onChange, min, max }: Props) {
               </select>
             </div>
           </div>
-          <button type="button" className="rpg-button" onClick={() => setOpen(false)}
+          {/* OK confirms what is on screen: with an empty value the selects
+              already show a date, and closing without emitting it left the
+              field on "Seleccionar fecha" (GEN-02). */}
+          <button type="button" className="rpg-button" onClick={() => { emit(year, month, day); setOpen(false); }}
             style={{ marginTop: 10, width: '100%', padding: '4px 0', fontSize: 'var(--fs-label)' }}>
             OK
           </button>

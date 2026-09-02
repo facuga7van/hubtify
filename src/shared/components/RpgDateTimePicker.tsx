@@ -184,7 +184,8 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
               </select>
             </div>
           </div>
-          <button type="button" className="rpg-button" onClick={() => setOpen(false)}
+          {/* OK confirms what is on screen (GEN-02): see RpgDatePicker. */}
+          <button type="button" className="rpg-button" onClick={() => { emit(year, month, day, hour, minute); setOpen(false); }}
             style={{ marginTop: 10, width: '100%', padding: '4px 0', fontSize: 'var(--fs-label)' }}>
             OK
           </button>
