@@ -41,9 +41,48 @@ La Task 1 verifica todo esto con `rg` antes de tocar nada. Si algo difiere, se a
 4. **`TitleBar` se guarda sola.** `Layout.tsx` ya no la renderiza en mobile porque monta `MobileShell`, pero `AuthPage.tsx:129` y `Onboarding.tsx:380` también la montan: `TitleBar` devuelve `null` con `isNativeMobile()` y las tres pantallas quedan cubiertas sin duplicar el guard.
 5. **Botón atrás sin registro por componente.** Todos los modales del proyecto (incluido el drawer) pasan por `useModalA11y`, que cierra el diálogo de más arriba con `Escape` en `window`. `native-shell.ts` detecta `[role="dialog"][aria-modal="true"]:not([inert])` y manda un `Escape` sintético; si no hay diálogo, `history.back()` si `canGoBack`, y en la raíz `App.minimizeApp()`. La lógica de decisión es pura (`src/mobile/back-button.ts`) y se testea en Node.
 6. **Selección de shell: `isNativeMobile() || innerWidth < 600`** como dice la spec, en un hook `useShellKind()` con listener de `resize` (en Electron `minWidth` es 700, así que en escritorio nunca cambia; el hook es lo que hace que la regla sea la de la spec y no un `if` suelto). `DesktopShell.tsx` es una extracción 1:1 del JSX que estaba en `Layout.tsx`.
-7. **El padding de página de Coinify y Nutrify se corrige en su propia hoja.** `.coin-book .qb-page` (`coinify.css:2141`) y `.nutri-page` (`nutri.css:28`) pisan a `shell.css` por especificidad/orden de import (`App.tsx` importa las hojas de módulo DESPUÉS de las del hub). Ponerlo en `layout.css` no aplicaría.
+7. **El padding de página de Coinify y Nutrify se corrige en su propia hoja.** `.coin-book .qb-page` (`coinify.css:2141`) y `.nutri-page` (`nutri.css:28`) pisan a `shell.css` por especificidad/orden de import (`App.tsx` importa las hojas de módulo DESPUÉS de las del hub). Ponerlo en `layout.css` no aplicaría. (Al implementarlo apareció que el selector de Coinify es en realidad `.qb-page.coin-book`, las dos clases en el mismo div: ver «Desvíos de implementación» 4.)
 8. **Cuatro retoques JSX, no más.** Donde un `style={{ minWidth }}`/`nowrap` inline hace imposible el arreglo por CSS: `ScrollNotes.tsx:261` (`minWidth: 540` → clase), `TaskForm.tsx:144` (`flexWrap`), `FoodLogItem.tsx:284` (`whiteSpace: 'nowrap'`), `FinanceLayout.tsx` (`scrollIntoView` de la pestaña activa). Todo lo demás es CSS.
 9. **Sin `@media` de ancho para mobile.** El pedido original era un `@media (max-width: 768px)` transversal, pero Electron permite 700 px (`electron/main.ts:205`) y los tests de escritorio bajan a 760 (`NARROW`), 430 (`coinify-installments-recurring`) y 420 px (`castle-chart-size`): cualquier breakpoint de ancho cambiaría el escritorio y rompería «`npm run test:visual` sin cambios» (p. ej. `audit-coin-ledger:154-169` compara las columnas del header con las de la fila). Toda regla mobile lleva el prefijo `[data-shell="mobile"]`, que solo existe cuando `MobileShell` está montado (Android y el arnés `browser-mobile`). `@media (hover: none)` sí se usa para lo que solo se revelaba con el puntero: los tests de escritorio no emulan touch, y en una pantalla táctil de escritorio esas reglas son las correctas; el project `browser-mobile` emula touch (`contextOptions`) para poder verificarlas.
+
+## Desvíos de implementación (los que aparecieron escribiendo el código)
+
+Anotados por los implementadores de las Tasks 2–17; la Task 18 los llevó a
+`DESIGN_SYSTEM.md`, `tests/visual/README.md` y la spec §7 donde correspondía.
+
+1. **`contextOptions` va en el provider, no en `instances[]`.** En vitest 4 el touch
+   emulado del project `browser-mobile` se configura como
+   `playwright: { contextOptions: { hasTouch: true, isMobile: true } }`; por entrada de
+   `instances[]` no se acepta.
+2. **`native-shell.ts` no se importa desde un test de navegador.** Importarlo arrastra
+   `@capacitor/core`, que define `window.Capacitor` y volvería verdadero
+   `hasCapacitorBridge()` para toda la corrida. Las funciones puras de DOM
+   (`hasOpenDialog`, `closeTopDialog`) viven en `src/mobile/dialog-dom.ts` y
+   `native-shell.ts` las reexporta.
+3. **Dos carpetas de capturas.** `shoot()` escribe en
+   `tests/visual/__screenshots__/mobile/` y las capturas de fallo que saca vitest van a
+   `tests/visual/mobile/__screenshots__/`. Las dos están gitignored.
+4. **`.coin-book .qb-page` era selector muerto.** `BookPage.tsx` pone las dos clases en
+   el MISMO div, así que el descendiente no matchea nada (ver `coinify.css:56` y
+   `:2141`, que quedan como estaban). La regla mobile usa
+   `[data-shell="mobile"] .main-content .qb-page.coin-book` (`coinify.css:2907`).
+5. **Regla extra de apilamiento en Questify.** `[data-shell="mobile"]
+   .qb-content:has(.quest-project-modal-overlay), …:has(.quest-notes-overlay)
+   { z-index: auto }` (`quests.css:1626`): sin ella los modales que viven dentro de
+   `.qb-content` quedaban debajo de `.qb-header`.
+6. **`[data-shell="mobile"] .hero-layout > * { min-width: 0 }`** (`character.css:380`):
+   los ítems de grilla no encogían y la Ficha del Héroe desbordaba.
+7. **Capas fijas, valores finales.** `.xp-toast` queda a 12 px del piso más
+   `--safe-bottom` (decisión Q13 de `quests.css:1692`), `.update-chip` a 16 px y
+   `.cauldron-floating-timer` a `calc(20px + var(--safe-bottom))`.
+8. **`mobile-shell.browser.test.tsx` monta el `Layout` real** (no un doble) y hay tests
+   de `hasOpenDialog`/`closeTopDialog` en el project `unit`.
+9. **`styles.xml` no podía citar `--leather-dark` en un comentario.** «--» está
+   prohibido dentro de un comentario XML y Gradle fallaba en `mergeDebugResources`
+   (encontrado en la Task 17, commit `b3ba669`).
+10. **`.qb-cartouche` recortaba su ícono a 412 px** (encontrado en el emulador, Task 17,
+    commit `519d4f1`): tres reglas `[data-shell="mobile"]` en `layout.css` recuperan el
+    espacio dentro del cartucho sin tocar el `repeat(4, 1fr)` inline de `Dashboard.tsx`.
 
 **Follow-ups fuera de esta fase (anotados, no bloquean):** `Tooltip.tsx` y `HelpBubble.tsx` solo abren con hover/focus (en touch no se leen las explicaciones de virtudes y stats de la Ficha del Héroe); anchos inline en px de inputs (`Today.tsx:1456/1465/1928/1932/2018/2255`, `AccountManager.tsx:220/280/319`, `StatementDetail.tsx:195/201`, `Transactions.tsx:558`, `TaskForm.tsx:220/247/271`); `CharacterCanvas.tsx:174` sin tope de resolución con DPR 3; QuickAdd (Ctrl+K) no tiene disparador táctil; el `.tap-target` de la casa es 32 px (Android recomienda 44); `hasCapacitorBridge()` repite el chequeo de `window.Capacitor` que `isNativeMobile()` hace inline (unificar cuando se toque `platform-detect.ts`).
 

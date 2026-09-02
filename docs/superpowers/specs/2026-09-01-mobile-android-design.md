@@ -232,12 +232,12 @@ El `PlatformPort` del worker es un proxy: cada método envía `{ type:'platform'
 
 ## 7. Shell mobile
 
-- **Sin TitleBar**: `Layout.tsx` renderiza `<TitleBar/>` solo si `!isNativeMobile()`. `.sidebar { top: 32px }` pasa a `top: var(--shell-top, 32px)`; mobile setea `--shell-top: 0`.
-- **StatusBar**: `@capacitor/status-bar` `setStyle(Dark)`, `setBackgroundColor(--leather-dark)`, `setOverlaysWebView(false)`.
-- **Safe areas**: `viewport-fit=cover`; `env(safe-area-inset-*)` en header, drawer y modales.
+- **Sin TitleBar**: `TitleBar` devuelve `null` con `isNativeMobile()` (cubre Layout, AuthPage y Onboarding); `Layout.tsx` elige `DesktopShell`/`MobileShell` con `useShellKind()`. `.sidebar { top: 32px }` pasa a `top: var(--shell-top, 32px)`; `<html data-shell="mobile">` setea `--shell-top: 0`.
+- **StatusBar**: iconos claros vía el plugin core `SystemBars` de Capacitor 8 (`plugins.SystemBars.style: 'DARK'` en `capacitor.config.ts`; `plugins.StatusBar` igual). Con targetSdk 36 `setBackgroundColor`/`setOverlaysWebView` no hacen nada: el color lo pinta `.mobile-header` con `--safe-top` (WebView ≥ 140, edge-to-edge) o el `windowBackground` de `styles.xml` (WebView < 140). Ver plan Fase 3, desvíos 1–2.
+- **Safe areas**: `viewport-fit=cover` en el `index.html` compartido; tokens `--safe-top/right/bottom/left` en `theme.css` = `var(--safe-area-inset-*, env(safe-area-inset-*, 0px))` (las variables las inyecta el plugin `SystemBars`), usados en header, drawer, overlays y capas fijas.
 - **Drawer**: `src/hub/MobileShell.tsx`: header 56 px (hamburguesa, título de sección, campana) + `<Sidebar collapsed={false}>` reusado dentro de un drawer (`width: min(300px, 85vw)`, `translateX(-100%)` → `0` con GSAP; backdrop cierra). `Layout.tsx` elige `MobileShell` cuando `isNativeMobile() || viewport < 600`. Sin bottom tabs.
 - **Botón atrás**: `@capacitor/app` `backButton` → cierra drawer/modal; si no, `history.back()`; en la raíz `App.minimizeApp()`.
-- **Arnés visual**: project vitest `browser-mobile` (mismos tests `tests/visual/**`, viewport 390×844, `define __HUBTIFY_PLATFORM__:'"android"'`), screenshots en `tests/visual/__screenshots__/mobile/`.
+- **Arnés visual**: project vitest `browser-mobile` (`tests/visual/mobile/**`, viewport 390×844 con touch emulado en `playwright.contextOptions` —en vitest 4 no va por entrada de `instances[]`—, `define __HUBTIFY_PLATFORM__:'"android"'`; los tests de escritorio fijan su propio viewport y no se reusan), cada página montada dentro de `MobileShell`, screenshots en `tests/visual/__screenshots__/mobile/` (las de fallo de vitest, en `tests/visual/mobile/__screenshots__/`; las dos, gitignored). Las reglas CSS mobile llevan el prefijo `[data-shell="mobile"]`, no un `@media` de ancho (Electron baja a 700 px). Ningún test del project puede importar `src/mobile/native-shell.ts` (arrastra `@capacitor/core` y define `window.Capacitor`): las funciones puras de DOM viven en `src/mobile/dialog-dom.ts`.
 
 ## 8. CI / Release
 
