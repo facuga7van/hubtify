@@ -1,5 +1,5 @@
-import { getDb } from '../ipc/db';
-import { ipcHandle } from '../ipc/ipc-handle';
+import { getDb } from '../db';
+import { registerHandler as ipcHandle } from '../registry';
 
 export interface CharacterData {
   backHairIndex: number;

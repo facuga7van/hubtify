@@ -5,15 +5,15 @@ import { registerQuestsIpcHandlers } from '../modules/quests.ipc';
 import { registerNutritionIpcHandlers } from '../modules/nutrition.ipc';
 import { registerFinanceIpcHandlers } from '../modules/finance.ipc';
 import { registerFinanceImportIpcHandlers } from '../modules/finance-import.ipc';
-import { registerCharacterIpcHandlers } from '../modules/character.ipc';
+import { registerCharacterIpcHandlers } from '../../shared-logic/modules/character.ipc';
 import { registerBackupIpcHandlers } from '../modules/backup.ipc';
 import { registerNotificationIpcHandlers } from '../modules/notifications.ipc';
-import { registerDollarIpcHandlers } from '../modules/dollar.ipc';
-import { registerCryptoIpcHandlers } from '../modules/crypto.ipc';
+import { registerDollarIpcHandlers } from '../../shared-logic/modules/dollar.ipc';
+import { registerCryptoIpcHandlers } from '../../shared-logic/modules/crypto.ipc';
 import { registerSyncIpcHandlers } from '../modules/sync.ipc';
 import { registerCauldronIpcHandlers } from '../modules/cauldron.ipc';
-import { registerFeedbackIpcHandlers } from '../modules/feedback.ipc';
-import { registerSylIpcHandlers } from '../modules/syl.ipc';
+import { registerFeedbackIpcHandlers } from '../../shared-logic/modules/feedback.ipc';
+import { registerSylIpcHandlers } from '../../shared-logic/modules/syl.ipc';
 
 /**
  * Registers every handler in the platform-neutral registry, then binds each

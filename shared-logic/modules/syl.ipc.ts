@@ -1,9 +1,9 @@
-import { app } from 'electron';
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
-import { rolloverVigor } from '../../shared-logic/modules/rpg-stats';
+import { registerHandler as ipcHandle } from '../registry';
+import { getDb } from '../db';
+import { platform } from '../platform';
+import { rolloverVigor } from './rpg-stats';
 import { todayDateString } from '../../shared/date-utils';
-import { buildSylSnapshot } from '../../shared-logic/modules/syl.snapshot';
+import { buildSylSnapshot } from './syl.snapshot';
 import type { SylSnapshot } from '../../shared/types';
 
 export function registerSylIpcHandlers(): void {
@@ -19,7 +19,7 @@ export function registerSylIpcHandlers(): void {
     return buildSylSnapshot(db, {
       now: new Date().toISOString(),      // ISO-8601 UTC
       computedForDate: todayDateString(), // YYYY-MM-DD, local day
-      appVersion: app.getVersion(),
+      appVersion: platform().appVersion(),
     });
   });
 }

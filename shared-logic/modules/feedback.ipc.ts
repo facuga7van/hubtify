@@ -1,6 +1,5 @@
-import { app } from 'electron';
-import os from 'os';
-import { ipcHandle } from '../ipc/ipc-handle';
+import { registerHandler as ipcHandle } from '../registry';
+import { platform } from '../platform';
 
 const FEEDBACK_URL = 'https://wampaland.duckdns.org:7849/api/feedback';
 
@@ -16,8 +15,8 @@ export function registerFeedbackIpcHandlers(): void {
       type: payload.type,
       description: payload.description,
       email: payload.email || undefined,
-      appVersion: app.getVersion(),
-      os: `${process.platform} ${os.release()}`,
+      appVersion: platform().appVersion(),
+      os: platform().osInfo(),
     };
 
     const res = await fetch(FEEDBACK_URL, {

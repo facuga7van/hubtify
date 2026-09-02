@@ -1,5 +1,5 @@
-import { getDb } from '../ipc/db';
-import { ipcHandle } from '../ipc/ipc-handle';
+import { getDb } from '../db';
+import { registerHandler as ipcHandle } from '../registry';
 import {
   DOLLAR_API_URL,
   getCurrentRate,
@@ -8,7 +8,7 @@ import {
   setFxHouse,
   writeDollarRatesCache,
   type DollarApiRate,
-} from '../../shared-logic/modules/finance.balance';
+} from './finance.balance';
 
 export function registerDollarIpcHandlers(): void {
   ipcHandle('dollar:getRates', async () => {
