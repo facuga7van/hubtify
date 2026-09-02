@@ -76,7 +76,7 @@ describe('clean install', () => {
     boot(db);
 
     const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map(t => t.name));
-    // Kept in sync by hand with electron/modules/sync.ipc.ts — a table that leaks
+    // Kept in sync by hand with shared-logic/modules/sync.ipc.ts — a table that leaks
     // between accounts is the exact bug this guards against.
     for (const t of ['finance_import_batches', 'finance_income_sources', 'app_state']) {
       expect(tables.has(t)).toBe(true);

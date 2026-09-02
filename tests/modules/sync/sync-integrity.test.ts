@@ -16,7 +16,7 @@ import {
   clearUserDataInto,
   normStamp,
   isNewerStamp,
-} from '../../../electron/modules/sync.ipc';
+} from '../../../shared-logic/modules/sync.ipc';
 
 /**
  * Scenarios from the adversarial sync review (review-sync.md). Each `describe`

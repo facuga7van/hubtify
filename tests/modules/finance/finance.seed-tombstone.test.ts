@@ -46,7 +46,7 @@ function setupDb(): Database.Database {
 
 // Registration runs a boot-time prune against getDb(); give it a real handle.
 harness.db = setupDb();
-const { registerSyncIpcHandlers } = await import('../../../electron/modules/sync.ipc');
+const { registerSyncIpcHandlers } = await import('../../../shared-logic/modules/sync.ipc');
 registerSyncIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {

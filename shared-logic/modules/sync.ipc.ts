@@ -1,8 +1,8 @@
-import type Database from 'better-sqlite3';
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
-import { recalcSummary } from '../../shared-logic/modules/nutrition.ipc';
-import { weeklyTarget } from '../../shared-logic/modules/quests.habits';
+import type { SqlDatabase } from '../db';
+import { registerHandler as ipcHandle } from '../registry';
+import { getDb } from '../db';
+import { recalcSummary } from './nutrition.ipc';
+import { weeklyTarget } from './quests.habits';
 import { daysAgoDateString } from '../../shared/date-utils';
 
 /**
@@ -69,7 +69,7 @@ function withNormStamps<T>(row: T): T {
  * because the bad row lives in the cloud. Now the bad table's work is
  * discarded (logged) and the rest of the pull still lands.
  */
-function step(db: Database.Database, label: string, fn: () => void): void {
+function step(db: SqlDatabase, label: string, fn: () => void): void {
   const sp = db.transaction(fn);
   try {
     sp();
@@ -298,7 +298,7 @@ const RPG_EVENTS_RETENTION_DAYS = 365;
 // a UTC cutoff was off by one day for anyone west of Greenwich.
 
 /** Drops rpg_events older than the retention window so the log stops growing forever. */
-export function pruneRpgEvents(db: Database.Database): number {
+export function pruneRpgEvents(db: SqlDatabase): number {
   try {
     const info = db.prepare('DELETE FROM rpg_events WHERE created_at < ?')
       .run(daysAgoDateString(RPG_EVENTS_RETENTION_DAYS));
@@ -317,7 +317,7 @@ export function pruneRpgEvents(db: Database.Database): number {
 // Defense-in-depth: an UPSERT makes that conflict structurally harmless — instead of
 // throwing, it reconciles in place. The WHERE on DO UPDATE preserves last-write-wins so
 // a stale remote never clobbers a newer local row.
-export function mergeHabitChecks(db: Database.Database, checks: SyncHabitCheck[]): boolean {
+export function mergeHabitChecks(db: SqlDatabase, checks: SyncHabitCheck[]): boolean {
   let changed = false;
   // `kind` semantics: a remote that never heard of `kind` (old device, Syl before
   // the field existed) carries NO opinion about it — clobbering a local 'skip'
@@ -362,7 +362,7 @@ export function mergeHabitChecks(db: Database.Database, checks: SyncHabitCheck[]
  * tested directly against an in-memory database.
  */
 export function mergeNutritionFoods(
-  db: Database.Database,
+  db: SqlDatabase,
   d: { frequentFoods?: Array<Record<string, any>>; foodLog?: Array<Record<string, any>> },
 ): { changed: boolean; affectedDates: Set<string> } {
   const affectedDates = new Set<string>();
@@ -513,7 +513,7 @@ export function mergeNutritionFoods(
  * subtask or habit check, a null payload, a task with no name — can be tested
  * directly against an in-memory database.
  */
-export function mergeQuestDataInto(db: Database.Database, remote: SyncQuestData): { changed: boolean } {
+export function mergeQuestDataInto(db: SqlDatabase, remote: SyncQuestData): { changed: boolean } {
   let changed = false;
 
   // A null payload, or one missing the expected arrays, used to throw
@@ -1267,7 +1267,7 @@ export function registerSyncIpcHandlers(): void {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Clears every user-scoped row for an account switch / logout. */
-export function clearUserDataInto(db: Database.Database): void {
+export function clearUserDataInto(db: SqlDatabase): void {
   db.pragma('foreign_keys = OFF');
   try {
     const tableExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?");
@@ -1303,7 +1303,7 @@ export function clearUserDataInto(db: Database.Database): void {
 }
 
 /** Merges a remote nutrify payload with last-write-wins, one savepoint per table. */
-export function mergeNutritionDataInto(db: Database.Database, data: Record<string, unknown>): { changed: boolean } {
+export function mergeNutritionDataInto(db: SqlDatabase, data: Record<string, unknown>): { changed: boolean } {
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, any>;
   let changed = false;
 
@@ -1488,7 +1488,7 @@ export function mergeNutritionDataInto(db: Database.Database, data: Record<strin
 }
 
 /** Merges a remote finance payload with last-write-wins, one savepoint per table. */
-export function mergeFinanceDataInto(db: Database.Database, data: Record<string, unknown>): { success: boolean; changed: boolean } {
+export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unknown>): { success: boolean; changed: boolean } {
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
   let changed = false;
   const now = new Date().toISOString();
@@ -1985,7 +1985,7 @@ export function mergeFinanceDataInto(db: Database.Database, data: Record<string,
 }
 
 /** Merges a remote cauldron payload with last-write-wins, one savepoint per table. */
-export function mergeCauldronDataInto(db: Database.Database, data: Record<string, unknown>): { changed: boolean } {
+export function mergeCauldronDataInto(db: SqlDatabase, data: Record<string, unknown>): { changed: boolean } {
   let changed = false;
   if (!data || typeof data !== 'object') return { changed: false };
   const now = new Date().toISOString();

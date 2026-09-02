@@ -22,7 +22,7 @@ import { financeMigrations } from '@modules/finance/finance.schema';
  */
 
 const SYNC_SRC = fs.readFileSync(
-  path.join(__dirname, '../../../electron/modules/sync.ipc.ts'),
+  path.join(__dirname, '../../../shared-logic/modules/sync.ipc.ts'),
   'utf-8',
 );
 

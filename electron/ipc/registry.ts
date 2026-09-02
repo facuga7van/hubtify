@@ -10,7 +10,7 @@ import { registerBackupIpcHandlers } from '../modules/backup.ipc';
 import { registerNotificationIpcHandlers } from '../../shared-logic/modules/notifications.ipc';
 import { registerDollarIpcHandlers } from '../../shared-logic/modules/dollar.ipc';
 import { registerCryptoIpcHandlers } from '../../shared-logic/modules/crypto.ipc';
-import { registerSyncIpcHandlers } from '../modules/sync.ipc';
+import { registerSyncIpcHandlers } from '../../shared-logic/modules/sync.ipc';
 import { registerCauldronIpcHandlers } from '../../shared-logic/modules/cauldron.ipc';
 import { registerFeedbackIpcHandlers } from '../../shared-logic/modules/feedback.ipc';
 import { registerSylIpcHandlers } from '../../shared-logic/modules/syl.ipc';

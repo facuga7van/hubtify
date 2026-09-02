@@ -20,7 +20,7 @@ vi.mock('../../../shared-logic/db', () => ({
   runModuleMigrations: vi.fn(),
 }));
 
-import { registerSyncIpcHandlers } from '../../../electron/modules/sync.ipc';
+import { registerSyncIpcHandlers } from '../../../shared-logic/modules/sync.ipc';
 
 function runMigrations(db: Database.Database) {
   for (const m of nutritionMigrations) {
