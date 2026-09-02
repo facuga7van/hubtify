@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '../../../shared/format-date';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
 import { useMenuKeyboard } from './useMenuKeyboard';
 import { useToast } from '../../../shared/components/useToast';
@@ -69,7 +70,7 @@ function ClockIcon() {
 export default function QuestRowActions({
   task, selected, drawingCount, onEdit, onOpenNotes, onDelete, onToggleSelect, onPostpone,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [postponeOpen, setPostponeOpen] = useState(false);
@@ -154,7 +155,7 @@ export default function QuestRowActions({
             ? t('questify.dueToday')
             : dueStatus === 'overdue'
               ? t('questify.overdueLabel', 'vencida')
-              : new Date(task.dueDate).toLocaleDateString()}
+              : formatDate(task.dueDate, i18n.language)}
         </span>
       )}
 

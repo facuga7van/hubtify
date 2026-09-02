@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatDateTime } from '../../../shared/format-date';
 import { useAuthContext } from '../../../shared/AuthContext';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -927,7 +928,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
   /** True when the list is split into due-date sections: dragging only reorders inside one. */
   grouped?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const [animatingComplete, setAnimatingComplete] = useState(false);
@@ -1073,7 +1074,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
       {expanded && (
         <div className="quest-row-expanded">
           {task.description && <p>{task.description}</p>}
-          {task.dueDate && <p style={{ fontSize: 'var(--fs-label)' }}>{t('questify.dueLabel')} {new Date(task.dueDate).toLocaleString()}</p>}
+          {task.dueDate && <p style={{ fontSize: 'var(--fs-label)' }}>{t('questify.dueLabel')} {formatDateTime(task.dueDate, i18n.language)}</p>}
           <SubtaskList
             taskId={task.id}
             subtasks={subtasks}

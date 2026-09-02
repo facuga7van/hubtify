@@ -16,7 +16,7 @@ interface AuthContextValue {
   logout: (force?: boolean) => Promise<{ success: boolean; pushFailed?: boolean; error?: string }>;
   switchAccount: (appName: string) => Promise<{ success: boolean; expired?: boolean } | undefined>;
   addAccount: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (identifier: string) => Promise<{ success: boolean; error?: string }>;
   getCachedAccounts: () => CachedAccount[];
 }
 
