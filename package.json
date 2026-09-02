@@ -26,7 +26,8 @@
     "mobile:build": "vite build -c vite.mobile.config.ts",
     "mobile:sync": "npm run mobile:build && node scripts/android-version.mjs && cap sync android",
     "mobile:run": "npm run mobile:sync && cap run android",
-    "mobile:apk": "npm run mobile:sync && node scripts/gradle.mjs assembleDebug"
+    "mobile:apk": "npm run mobile:sync && node scripts/gradle.mjs assembleDebug",
+    "mobile:apk:release": "npm run mobile:sync && node scripts/gradle.mjs assembleRelease"
   },
   "author": {
     "name": "facuga7van"
