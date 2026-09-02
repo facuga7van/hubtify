@@ -34,6 +34,22 @@ export const changelog: ChangelogEntry[] = [
       },
       {
         category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Cerrar el día con el campo de Pasos vacío fallaba siempre — y justo era el primer intento de cualquiera que recién empezaba. Ahora podés cerrar la jornada sin cargar pasos; si no los contaste, no pasa nada',
+          en: 'Closing the day with the Steps field empty always failed — and it was precisely the first attempt of anyone just getting started. You can now close the day without logging steps; if you did not count them, no harm done',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'La barra «Cerrar el Día» dejó de ser un rectángulo blanco plano pegado sobre el pergamino. Ahora es solo el botón flotando con su sombra y un velo sutil por detrás, como corresponde',
+          en: 'The "Close the Day" bar is no longer a flat white rectangle slapped onto the parchment. Now it is just the button floating with its shadow and a subtle veil behind it, the way it should be',
+        },
+      },
+      {
+        category: 'fix',
         scope: 'mobile',
         text: {
           es: 'El botón Atrás del teléfono cierra menús y desplegables antes de navegar, cada sección arranca arriba, el menú de cuenta entra en el cajón y el hub se lee en una sola columna. Los widgets ya no muestran controles de arrastre de escritorio, y el Caldero se queda sin el chip flotante encima ni las opciones de ventana que solo tienen sentido en la compu',
@@ -58,6 +74,14 @@ export const changelog: ChangelogEntry[] = [
       },
       {
         category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El botón de pausar/reanudar de Recurrentes tenía el ícono corrido y del mismo color que el fondo — había que adivinar dónde estaba. Ahora está centrado, con contraste, y muestra ‖ o ▶ según el estado del recurrente',
+          en: 'The pause/resume button in Recurring had its icon off-center and in the same color as the background — you had to guess where it was. It is now centered, with proper contrast, and shows ‖ or ▶ depending on the recurring item\'s state',
+        },
+      },
+      {
+        category: 'fix',
         scope: 'auth',
         text: {
           es: 'Recuperar la contraseña ahora acepta tu nombre de usuario, igual que el inicio de sesión. No hace falta acordarse del mail exacto',
@@ -70,6 +94,22 @@ export const changelog: ChangelogEntry[] = [
         text: {
           es: '«1 comida» y «1 día» en singular, fechas y meses en el idioma de la app, las recetas del Caldero con su nombre traducido, y los selectores de fecha aplican el valor visible al tocar OK en vez de cerrarse sin guardar nada',
           en: '"1 meal" and "1 day" in the singular, dates and months in the app\'s language, Cauldron recipes with their translated name, and the date pickers apply the visible value when you tap OK instead of closing without saving anything',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'En la compu las páginas por fin usan todo el ancho de la ventana. El Libro de Misiones, el libro de Coinify y el Caldero ya no dejan un tercio de pantalla vacío a la derecha cuando colapsás la barra lateral',
+          en: 'On the computer the pages finally use the full width of the window. The Quest Book, the Coinify ledger and the Cauldron no longer leave a third of the screen empty on the right when you collapse the sidebar',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Se acabó entrecerrar los ojos: el texto de tablas y filas en toda la app —libro mayor, misiones, comidas, crónica, bitácora— creció al tamaño de lectura del sistema y la tinta secundaria dejó de ser semitransparente. La tinta «apagada» ahora se lee con contraste accesible sobre todas las superficies de pergamino',
+          en: 'No more squinting: the text in tables and rows across the whole app — ledger, quests, meals, chronicle, log — grew to the system\'s reading size and the secondary ink is no longer semi-transparent. The "faded" ink now reads with accessible contrast on every parchment surface',
         },
       },
     ],
