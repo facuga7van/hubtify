@@ -907,6 +907,24 @@
   flex-wrap: wrap;
 }
 
+/* Los cuatro cartuchos de la Tabla son un `repeat(4, 1fr)` inline
+   (Dashboard.tsx:491): a 412 px cada uno mide 86 px de contenido y el rótulo
+   con `letter-spacing: .2em` más el ícono pedían 91-95 px. Como `.qb-cartouche`
+   es `overflow: hidden`, el ícono quedaba cortado por la mitad (visto en el
+   emulador). Se recupera el espacio en el propio cartucho, sin tocar la grilla. */
+[data-shell="mobile"] .main-content .qb-cartouche {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+[data-shell="mobile"] .main-content .qb-cartouche-header {
+  gap: 4px;
+}
+
+[data-shell="mobile"] .main-content .qb-cartouche-label {
+  letter-spacing: 0.06em;
+}
+
 [data-shell="mobile"] .account-dropdown {
   max-width: calc(100vw - 16px);
 }
