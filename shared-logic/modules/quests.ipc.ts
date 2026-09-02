@@ -1,13 +1,9 @@
-import type Database from 'better-sqlite3';
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
-import crypto from 'crypto';
+import type { SqlDatabase } from '../db';
+import { registerHandler as ipcHandle } from '../registry';
+import { getDb } from '../db';
+import { genId } from '../ids';
 import { todayDateString, formatDateString, yesterdayDateString, localTimestamp, nextDateString } from '../../shared/date-utils';
-import { reconcileHabitShields, serializeSpecificDays } from '../../shared-logic/modules/quests.habits';
-
-function genId(): string {
-  return crypto.randomUUID();
-}
+import { reconcileHabitShields, serializeSpecificDays } from './quests.habits';
 
 /**
  * Resolves the new `due_date` for a postponed task.
@@ -32,7 +28,7 @@ export function postponedDueDate(current: string | null | undefined, target: str
  * silently discarded on the other device.
  */
 export function postponeTasks(
-  db: Database.Database,
+  db: SqlDatabase,
   ids: string[],
   target: string,
   now: string = new Date().toISOString(),
@@ -173,7 +169,7 @@ interface RepeatTaskRow {
  * the invariant above still prevents duplicates on the next completion).
  */
 export function spawnNextRepeatInstance(
-  db: Database.Database,
+  db: SqlDatabase,
   taskId: string,
   now: string = new Date().toISOString(),
 ): { nextTaskId: string; nextDueDate: string | null } | null {
@@ -228,7 +224,7 @@ export function spawnNextRepeatInstance(
  * siblings and this is simply false. Sync counts: an instance completed today
  * on another device carries its `completed_at` over and blocks the same way.
  */
-function chainPaidToday(db: Database.Database, taskId: string, today: string): boolean {
+function chainPaidToday(db: SqlDatabase, taskId: string, today: string): boolean {
   const task = db.prepare('SELECT repeat_of AS repeatOf FROM tasks WHERE id = ?')
     .get(taskId) as { repeatOf: string | null } | undefined;
   if (!task) return false;
@@ -266,7 +262,7 @@ export interface SetTaskStatusResult {
  * Returns undefined on un-completion (nothing to pay, nothing spawned).
  */
 export function setTaskStatus(
-  db: Database.Database,
+  db: SqlDatabase,
   taskId: string,
   status: boolean,
   opts: { now?: string; completedAt?: string } = {},
@@ -299,7 +295,7 @@ export function setTaskStatus(
  * again promoted this same soft-deleted row and paid again.
  */
 export function toggleHabitCheck(
-  db: Database.Database,
+  db: SqlDatabase,
   habitId: string,
   date: string,
 ): { checked: boolean; checkId: string; date: string } {

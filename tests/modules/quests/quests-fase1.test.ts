@@ -4,7 +4,7 @@ import { questsMigrations } from '@modules/quests/quests.schema';
 import {
   computeHabits, reconcileHabitShields, parseSpecificDays, serializeSpecificDays, isoWeekday,
 } from '../../../shared-logic/modules/quests.habits';
-import { postponedDueDate, postponeTasks } from '../../../electron/modules/quests.ipc';
+import { postponedDueDate, postponeTasks } from '../../../shared-logic/modules/quests.ipc';
 import { mergeHabitChecks } from '../../../electron/modules/sync.ipc';
 
 // 2026-07-06 is a Monday, so: 06 Mon · 07 Tue · 08 Wed · 09 Thu · 10 Fri · 11 Sat · 12 Sun.
