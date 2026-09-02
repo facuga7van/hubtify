@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { App } from '@capacitor/app';
 import { checkMobileUpdate, openApkDownload } from './updater';
 import { downloadApk, type DownloadHandle } from './apk-downloader';
 import ApkInstaller from './apk-installer';
@@ -65,12 +66,18 @@ export default function AndroidUpdateBanner() {
   // Si la app vuelve a foreground mientras estábamos "installing" (el
   // usuario cerró la hoja del instalador del sistema sin confirmar, o
   // Android simplemente nos pausó), se puede reintentar sin re-descargar.
+  //
+  // BUG REAL encontrado en el emulador: `document.visibilitychange` NO se
+  // dispara cuando el instalador del sistema (otra Activity, no otra
+  // pestaña) tapa el WebView — Chromium-en-WebView no lo trata como
+  // "documento oculto" igual que un browser de escritorio. El evento nativo
+  // correcto es `App.addListener('appStateChange', …)` (@capacitor/app, ya
+  // usado en native-shell.ts para 'backButton').
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') dispatch({ kind: 'INSTALL_CANCELLED' });
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    const handlePromise = App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) dispatch({ kind: 'INSTALL_CANCELLED' });
+    });
+    return () => { handlePromise.then((h) => h.remove()).catch(() => {}); };
   }, []);
 
   const handleStartDownload = useCallback(() => {
