@@ -1616,7 +1616,18 @@
   justify-content: flex-end;
 }
 
-/* Q3 */
+/* Q3: los overlays de Questify se renderizan DENTRO de `.qb-content`, que es
+   un contexto de apilamiento propio (`position: relative; z-index: 2`,
+   codex.css:119): su `z-index: var(--z-modal)` queda atrapado ahí adentro y el
+   `.qb-header` hermano (z-index 10) les pinta ENCIMA. En escritorio no se veía
+   porque el modal queda centrado, lejos del header; acá arranca arriba del
+   todo, justo debajo de él. Sin contexto propio, el 5000 del overlay vuelve a
+   competir con el header y gana. */
+[data-shell="mobile"] .qb-content:has(.quest-project-modal-overlay),
+[data-shell="mobile"] .qb-content:has(.quest-notes-overlay) {
+  z-index: auto;
+}
+
 [data-shell="mobile"] .quest-project-modal-overlay {
   padding: 12px;
   align-items: flex-start;

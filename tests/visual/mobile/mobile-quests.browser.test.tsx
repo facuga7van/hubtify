@@ -83,6 +83,12 @@ describe('Questify a 390×844', () => {
     const r = modal.getBoundingClientRect();
     expect(r.left).toBeGreaterThanOrEqual(0);
     expect(r.right).toBeLessThanOrEqual(window.innerWidth);
+    // …y nada le pinta encima: el modal vive dentro de `.qb-content`, que es un
+    // contexto de apilamiento, y el `.qb-header` le ganaba al arrancar arriba.
+    const firstRow = modal.querySelector('.quest-project-modal-row') as HTMLElement;
+    const rr = firstRow.getBoundingClientRect();
+    const top = document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2);
+    expect(modal.contains(top)).toBe(true);
     await shoot('quests-03-proyectos');
   });
 });
