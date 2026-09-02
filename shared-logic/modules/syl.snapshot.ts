@@ -1,5 +1,5 @@
-import type Database from 'better-sqlite3';
-import { getPlayerStats } from '../ipc/rpg-stats';
+import type { SqlDatabase } from '../db';
+import { getPlayerStats } from './rpg-stats';
 import { computeHabits } from './quests.habits';
 import { computeMonthlyBalance } from './finance.balance';
 import type { SylSnapshot } from '../../shared/types';
@@ -27,7 +27,7 @@ function daysBetween(fromDate: string, toDate: string): number {
   return Math.round((to - from) / 86_400_000);
 }
 
-function buildPlayer(db: Database.Database): SylSnapshot['player'] {
+function buildPlayer(db: SqlDatabase): SylSnapshot['player'] {
   const s = getPlayerStats(db);
   return {
     level: s.level,
@@ -43,7 +43,7 @@ function buildPlayer(db: Database.Database): SylSnapshot['player'] {
   };
 }
 
-function buildQuestify(db: Database.Database, computedForDate: string): SylSnapshot['questify'] {
+function buildQuestify(db: SqlDatabase, computedForDate: string): SylSnapshot['questify'] {
   // ── Habits: reuse the exact same derivation as the UI handler ──
   const habitRows = computeHabits(db, new Date(`${computedForDate}T00:00:00`));
   const habits = habitRows.map((h) => ({
@@ -146,7 +146,7 @@ function buildQuestify(db: Database.Database, computedForDate: string): SylSnaps
   };
 }
 
-function buildNutrify(db: Database.Database, computedForDate: string): SylSnapshot['nutrify'] {
+function buildNutrify(db: SqlDatabase, computedForDate: string): SylSnapshot['nutrify'] {
   const summary = db.prepare(
     'SELECT total_calories_in AS totalCaloriesIn, tdee, balance FROM nutrition_daily_summary WHERE date = ?'
   ).get(computedForDate) as { totalCaloriesIn: number; tdee: number; balance: number } | undefined;
@@ -183,7 +183,7 @@ function buildNutrify(db: Database.Database, computedForDate: string): SylSnapsh
   return { todayCalories, todayTarget, todayBalance, recentFoodLog, profileSummary };
 }
 
-function buildCoinify(db: Database.Database, computedForDate: string): SylSnapshot['coinify'] {
+function buildCoinify(db: SqlDatabase, computedForDate: string): SylSnapshot['coinify'] {
   const month = computedForDate.slice(0, 7);
 
   const emptyCcy = (): { ARS: number; USD: number } => ({ ARS: 0, USD: 0 });
@@ -245,7 +245,7 @@ function buildCoinify(db: Database.Database, computedForDate: string): SylSnapsh
  * rather than reimplementing business rules. All output is camelCase, with
  * `deleted_at != null` rows already filtered out (contract invariants).
  */
-export function buildSylSnapshot(db: Database.Database, opts: BuildSylSnapshotOpts): SylSnapshot {
+export function buildSylSnapshot(db: SqlDatabase, opts: BuildSylSnapshotOpts): SylSnapshot {
   return {
     schemaVersion: 1,
     computedAt: opts.now,

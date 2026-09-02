@@ -3,7 +3,7 @@ import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import crypto from 'crypto';
 import { todayDateString, formatDateString, yesterdayDateString, localTimestamp, nextDateString } from '../../shared/date-utils';
-import { reconcileHabitShields, serializeSpecificDays } from './quests.habits';
+import { reconcileHabitShields, serializeSpecificDays } from '../../shared-logic/modules/quests.habits';
 
 function genId(): string {
   return crypto.randomUUID();

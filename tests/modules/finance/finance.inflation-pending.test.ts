@@ -14,7 +14,7 @@ import {
   convertArsToToday,
   convertTransactionAmount,
 } from '@modules/finance/utils/valuation';
-import { computeValuedView, type IpcSeriesPoint } from '../../../electron/modules/finance.balance';
+import { computeValuedView, type IpcSeriesPoint } from '../../../shared-logic/modules/finance.balance';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

@@ -19,7 +19,7 @@ import {
   historicalRateUrl,
   readHistoricalRateCache,
   computeValuedView,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 

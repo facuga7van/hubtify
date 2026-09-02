@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
-import { buildSylSnapshot } from '../../electron/modules/syl.snapshot';
+import { buildSylSnapshot } from '../../shared-logic/modules/syl.snapshot';
 
 // computedForDate is a Thursday; its Monday-based week is 2026-07-06 .. 2026-07-12.
 const TODAY = '2026-07-09';

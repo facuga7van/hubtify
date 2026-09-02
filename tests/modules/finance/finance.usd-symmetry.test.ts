@@ -32,7 +32,7 @@ import {
   computeValuedView,
   setFxHouse,
   TRANSFER_CATEGORY,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 

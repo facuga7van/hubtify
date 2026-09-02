@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
 import { recalcSummary } from './nutrition.ipc';
-import { weeklyTarget } from './quests.habits';
+import { weeklyTarget } from '../../shared-logic/modules/quests.habits';
 import { daysAgoDateString } from '../../shared/date-utils';
 
 /**

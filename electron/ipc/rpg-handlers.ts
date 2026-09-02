@@ -45,7 +45,7 @@ import {
 } from '../../shared/achievements';
 import type { RpgEvent, RpgEventRecord } from '../../shared/types';
 import { todayDateString, localTimestamp, daysAgoDateString, nextDateString, formatDateString } from '../../shared/date-utils';
-import { getPlayerStats, purchasedPardonExtras, rolloverVigor, type PlayerStatsV2 } from './rpg-stats';
+import { getPlayerStats, purchasedPardonExtras, rolloverVigor, type PlayerStatsV2 } from '../../shared-logic/modules/rpg-stats';
 
 /**
  * Hard bounds for anything arriving from the renderer (or, via sync, from an

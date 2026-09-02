@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { SqlDatabase } from '../db';
 import { xpThreshold, monthKey, pardonsRemaining, getLocalDateString, MAX_VIGOR } from '../../shared/rpg-engine';
 import type { PlayerStats } from '../../shared/types';
 
@@ -30,7 +30,7 @@ export function defaultStats(): PlayerStatsV2 {
  * construction, and the count converges across devices after a sync. Degrades
  * to 0 on a pre-v6 handle — the automatic 2/month never depends on the shop.
  */
-export function purchasedPardonExtras(db: Database.Database, month: string): number {
+export function purchasedPardonExtras(db: SqlDatabase, month: string): number {
   try {
     const row = db.prepare(
       "SELECT COUNT(*) AS c FROM shop_purchases WHERE item_id = 'pardon_extra' AND purchased_at LIKE ?"
@@ -87,7 +87,7 @@ export function rowToStats(
  * NOT called from `getPlayerStats`: the Syl snapshot reads through that path and
  * must stay side-effect free.
  */
-export function rolloverVigor(db: Database.Database, today = getLocalDateString()): void {
+export function rolloverVigor(db: SqlDatabase, today = getLocalDateString()): void {
   db.prepare(
     `UPDATE player_stats SET hp = ?, hp_date = ?
      WHERE user_id = 'default' AND (hp_date IS NULL OR hp_date <> ?)`
@@ -95,7 +95,7 @@ export function rolloverVigor(db: Database.Database, today = getLocalDateString(
 }
 
 /** Reads the single-player stats row (user_id='default'), falling back to defaults. */
-export function getPlayerStats(db: Database.Database): PlayerStatsV2 {
+export function getPlayerStats(db: SqlDatabase): PlayerStatsV2 {
   const row = db.prepare('SELECT * FROM player_stats WHERE user_id = ?').get('default') as Record<string, unknown> | undefined;
   const today = getLocalDateString();
   // Read-only, so the Syl snapshot path stays side-effect free.

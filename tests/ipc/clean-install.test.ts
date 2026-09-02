@@ -5,7 +5,7 @@ import { questsMigrations } from '@modules/quests/quests.schema';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-import { notificationsMigrations } from '../../electron/modules/notifications.schema';
+import { notificationsMigrations } from '../../shared-logic/modules/notifications.schema';
 
 /**
  * Boots a database exactly the way electron/main.ts does, then boots the SAME

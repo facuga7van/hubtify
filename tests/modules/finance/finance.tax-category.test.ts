@@ -12,7 +12,7 @@ import {
   CARD_PAYMENT_CATEGORY,
   CARD_TAX_CATEGORY,
   RESERVED_CATEGORIES,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 import {
   CARD_PAYMENT_CATEGORY as UI_CARD_PAYMENT_CATEGORY,
   CARD_TAX_CATEGORY as UI_CARD_TAX_CATEGORY,

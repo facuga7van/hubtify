@@ -45,7 +45,7 @@ import {
   saveAccount,
   softDeleteAccount,
   transferBetweenAccounts,
-} from './finance.balance';
+} from '../../shared-logic/modules/finance.balance';
 
 function genId(): string {
   return crypto.randomUUID();

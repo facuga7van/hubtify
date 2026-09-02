@@ -1,5 +1,5 @@
-import crypto from 'crypto';
-import type Database from 'better-sqlite3';
+import { genId } from '../ids';
+import type { SqlDatabase } from '../db';
 import type { ExpenseBreakdown, ExpenseBreakdownByCurrency } from '../../shared/types';
 import { todayDateString } from '../../shared/date-utils';
 import {
@@ -283,7 +283,7 @@ export function buildTransactionWhere(f: TransactionFilter): { where: string; pa
 export interface CurrencyTotals { ARS: number; USD: number }
 
 /** SUM(amount) per currency for an arbitrary filter. */
-export function sumByCurrency(db: Database.Database, f: TransactionFilter): CurrencyTotals {
+export function sumByCurrency(db: SqlDatabase, f: TransactionFilter): CurrencyTotals {
   const { where, params } = buildTransactionWhere(f);
   const rows = db.prepare(`
     SELECT currency, COALESCE(SUM(amount), 0) AS total
@@ -306,7 +306,7 @@ export interface MonthlyBalanceByCurrency {
 
 /** income / expenses / balance per currency for an arbitrary filter. */
 export function sumIncomeExpenseByCurrency(
-  db: Database.Database,
+  db: SqlDatabase,
   f: Omit<TransactionFilter, 'type'>,
 ): MonthlyBalanceByCurrency {
   const { where, params } = buildTransactionWhere(f);
@@ -336,7 +336,7 @@ export function sumIncomeExpenseByCurrency(
 export interface CategoryTotals { category: string; ARS: number; USD: number }
 
 /** SUM(amount) grouped by category + currency for an arbitrary filter. */
-export function aggregateByCategory(db: Database.Database, f: TransactionFilter): CategoryTotals[] {
+export function aggregateByCategory(db: SqlDatabase, f: TransactionFilter): CategoryTotals[] {
   const { where, params } = buildTransactionWhere(f);
   const rows = db.prepare(`
     SELECT category, currency, COALESCE(SUM(amount), 0) AS total
@@ -363,7 +363,7 @@ export function aggregateByCategory(db: Database.Database, f: TransactionFilter)
  * Only balance-impacting rows count: credit-card purchases (impacts_balance=0) are
  * excluded until the statement is paid, and soft-deleted rows never count.
  */
-export function computeMonthlyBalance(db: Database.Database, month: string): MonthlyBalanceByCurrency {
+export function computeMonthlyBalance(db: SqlDatabase, month: string): MonthlyBalanceByCurrency {
   const { start, end } = monthRange(month);
   // Transfers between own accounts are not income nor expense — see TRANSFER_CATEGORY.
   return sumIncomeExpenseByCurrency(db, {
@@ -396,7 +396,7 @@ export function categorySpendFilter(range: { start: string; end: string }): Tran
 
 /** Category spend for a range, using {@link categorySpendFilter}. */
 export function computeCategorySpend(
-  db: Database.Database,
+  db: SqlDatabase,
   range: { start: string; end: string },
 ): CategoryTotals[] {
   return aggregateByCategory(db, categorySpendFilter(range));
@@ -407,7 +407,7 @@ export function computeCategorySpend(
  * guess which of the three historical definitions a number came from.
  */
 export function computeExpenseBreakdown(
-  db: Database.Database,
+  db: SqlDatabase,
   range: { start: string; end: string },
 ): ExpenseBreakdownByCurrency {
   const base = { ...range, type: 'expense' as const, excludeCategories: [CARD_PAYMENT_CATEGORY, TRANSFER_CATEGORY] };
@@ -528,7 +528,7 @@ export function isRecurringDueInMonth(
  * Runs inside a single SQLite transaction so a failure halfway leaves nothing behind.
  */
 export function generateRecurringForMonth(
-  db: Database.Database,
+  db: SqlDatabase,
   month: string,
   opts: {
     /** Dollar venta rate to freeze on the generated rows (`fx_rate`).
@@ -646,7 +646,7 @@ const EMPTY_BUDGET_STATUS = (month: string): BudgetStatus => ({
 });
 
 /** Live budgets, cheapest category first is meaningless — alphabetical is stable. */
-export function listBudgets(db: Database.Database): BudgetRow[] {
+export function listBudgets(db: SqlDatabase): BudgetRow[] {
   return db.prepare(`
     SELECT category, monthly_limit AS monthlyLimit,
            created_at AS createdAt, updated_at AS updatedAt
@@ -664,7 +664,7 @@ export function listBudgets(db: Database.Database): BudgetRow[] {
  * duplicate (the category is the primary key, so there can only ever be one).
  */
 export function setBudget(
-  db: Database.Database,
+  db: SqlDatabase,
   category: unknown,
   limit: unknown,
 ): { ok: true; category: string; monthlyLimit: number | null } | { ok: false; reason: string } {
@@ -709,7 +709,7 @@ export function setBudget(
  * ARS only, like the wheel: adding pesos to dollars would mean inventing an
  * exchange rate, and a budget built on an invented rate is worse than none.
  */
-export function computeBudgetStatus(db: Database.Database, month: string): BudgetStatus {
+export function computeBudgetStatus(db: SqlDatabase, month: string): BudgetStatus {
   if (!isValidMonthString(month)) return EMPTY_BUDGET_STATUS(month);
 
   const budgets = listBudgets(db);
@@ -770,7 +770,7 @@ export interface DollarApiRate {
 
 /** Preferred dollar house for freezing rates. Defensive: a missing app_state
  *  table (bare test db) just means the default. */
-export function getFxHouse(db: Database.Database): string {
+export function getFxHouse(db: SqlDatabase): string {
   try {
     const row = db.prepare("SELECT value FROM app_state WHERE key = 'fx_house'").get() as { value: string } | undefined;
     const value = row?.value?.trim();
@@ -780,7 +780,7 @@ export function getFxHouse(db: Database.Database): string {
   }
 }
 
-export function setFxHouse(db: Database.Database, house: unknown): { ok: true; house: string } | { ok: false; reason: string } {
+export function setFxHouse(db: SqlDatabase, house: unknown): { ok: true; house: string } | { ok: false; reason: string } {
   const value = parseNonEmptyString(house);
   if (value === null) return { ok: false, reason: 'invalid_house' };
   db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('fx_house', ?)").run(value.toLowerCase());
@@ -789,7 +789,7 @@ export function setFxHouse(db: Database.Database, house: unknown): { ok: true; h
 
 /** The `dollar_cache` row `dollar:getRates` also uses — one cache, two readers. */
 export function readDollarRatesCache(
-  db: Database.Database,
+  db: SqlDatabase,
 ): { rates: DollarApiRate[]; updatedAt: string } | null {
   try {
     const row = db.prepare('SELECT data, updated_at FROM dollar_cache WHERE id = ?').get('rates') as
@@ -803,7 +803,7 @@ export function readDollarRatesCache(
   }
 }
 
-export function writeDollarRatesCache(db: Database.Database, rates: DollarApiRate[]): void {
+export function writeDollarRatesCache(db: SqlDatabase, rates: DollarApiRate[]): void {
   db.prepare(`
     INSERT OR REPLACE INTO dollar_cache (id, data, updated_at)
     VALUES ('rates', ?, datetime('now'))
@@ -847,7 +847,7 @@ export interface RateFetchOptions {
  * NEVER throws: a missing rate must not block registering a transaction.
  */
 export async function getCurrentRate(
-  db: Database.Database,
+  db: SqlDatabase,
   house: string,
   opts: RateFetchOptions = {},
 ): Promise<number | null> {
@@ -891,7 +891,7 @@ export async function getCurrentRate(
  * `updated_at` is bumped on purpose — without it, last-write-wins sync would
  * never carry the backfilled value to the other devices.
  */
-export function backfillFxRates(db: Database.Database, rate: number, today: string = todayDateString()): number {
+export function backfillFxRates(db: SqlDatabase, rate: number, today: string = todayDateString()): number {
   const parsed = parsePositiveAmount(rate);
   if (parsed === null) return 0;
   const result = db.prepare(`
@@ -916,7 +916,7 @@ function historicalCacheId(house: string, date: string): string {
   return `fxhist:${house}:${date}`;
 }
 
-export function readHistoricalRateCache(db: Database.Database, house: string, date: string): number | null {
+export function readHistoricalRateCache(db: SqlDatabase, house: string, date: string): number | null {
   try {
     const row = db.prepare('SELECT data FROM dollar_cache WHERE id = ?').get(historicalCacheId(house, date)) as
       { data: string } | undefined;
@@ -928,7 +928,7 @@ export function readHistoricalRateCache(db: Database.Database, house: string, da
   }
 }
 
-export function writeHistoricalRateCache(db: Database.Database, house: string, date: string, rate: number): void {
+export function writeHistoricalRateCache(db: SqlDatabase, house: string, date: string, rate: number): void {
   db.prepare(`
     INSERT OR REPLACE INTO dollar_cache (id, data, updated_at)
     VALUES (?, ?, datetime('now'))
@@ -955,7 +955,7 @@ export function parseHistoricalRateResponse(json: unknown): number | null {
  * (404, empty body) is not offline.
  */
 export async function getHistoricalRate(
-  db: Database.Database,
+  db: SqlDatabase,
   house: string,
   date: string,
   opts: RateFetchOptions & { lookback?: number } = {},
@@ -1005,7 +1005,7 @@ export interface HistoricalBackfillResult {
  * every date, no point in 60 timeouts in a row. Never throws.
  */
 export async function backfillFxRatesHistorical(
-  db: Database.Database,
+  db: SqlDatabase,
   opts: RateFetchOptions & {
     house: string;
     /** Today's rate for the fallback pass; `null` = no fallback (rows stay NULL). */
@@ -1084,7 +1084,7 @@ export function parseIpcApiResponse(json: unknown): IpcSeriesPoint[] {
 }
 
 export function readIpcSeriesCache(
-  db: Database.Database,
+  db: SqlDatabase,
 ): { series: IpcSeriesPoint[]; updatedAt: string } | null {
   try {
     const row = db.prepare('SELECT data, updated_at FROM dollar_cache WHERE id = ?').get('ipc') as
@@ -1098,7 +1098,7 @@ export function readIpcSeriesCache(
   }
 }
 
-export function writeIpcSeriesCache(db: Database.Database, series: IpcSeriesPoint[]): void {
+export function writeIpcSeriesCache(db: SqlDatabase, series: IpcSeriesPoint[]): void {
   db.prepare(`
     INSERT OR REPLACE INTO dollar_cache (id, data, updated_at)
     VALUES ('ipc', ?, datetime('now'))
@@ -1111,7 +1111,7 @@ export function writeIpcSeriesCache(db: Database.Database, series: IpcSeriesPoin
  * `null`. Never throws, never blocks anything critical.
  */
 export async function getIpcSeries(
-  db: Database.Database,
+  db: SqlDatabase,
   opts: RateFetchOptions = {},
 ): Promise<IpcSeriesPoint[] | null> {
   const maxAgeMs = opts.maxAgeMs ?? IPC_CACHE_MAX_AGE_MS;
@@ -1221,7 +1221,7 @@ function sumIn(
  * happen before the inflation, never after.
  */
 export function computeValuedView(
-  db: Database.Database,
+  db: SqlDatabase,
   month: string,
   ctx: { currentRate: number | null; house: string; series: IpcSeriesPoint[] | null },
 ): ValuedView {
@@ -1417,7 +1417,7 @@ export function addDaysToDate(dateStr: string, days: number): string {
  *                   silent here.
  */
 export function computeUpcomingTimeline(
-  db: Database.Database,
+  db: SqlDatabase,
   fromDate: string,
   days = 30,
 ): UpcomingTimeline {
@@ -1575,7 +1575,7 @@ export interface AccountsOverview {
 }
 
 /** Live accounts, user order first, then creation order. */
-export function listAccounts(db: Database.Database): FinanceAccount[] {
+export function listAccounts(db: SqlDatabase): FinanceAccount[] {
   return db.prepare(`
     SELECT id, name, kind, currency, initial_balance AS initialBalance,
            account_order AS accountOrder,
@@ -1598,7 +1598,7 @@ export function listAccounts(db: Database.Database): FinanceAccount[] {
  * The JOIN also resolves dangling links on read: a transaction whose account
  * has not synced in yet (or was soft-deleted) belongs to no visible account.
  */
-export function computeAccountDeltas(db: Database.Database): Map<string, number> {
+export function computeAccountDeltas(db: SqlDatabase): Map<string, number> {
   const rows = db.prepare(`
     SELECT t.account_id AS accountId,
            COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE -t.amount END), 0) AS delta
@@ -1612,7 +1612,7 @@ export function computeAccountDeltas(db: Database.Database): Map<string, number>
 
 /** The chest, opened: every live account with its real balance, plus totals per currency. */
 /** Live, balance-impacting rows per account. Same filter as the deltas. */
-export function computeAccountMovements(db: Database.Database): Map<string, number> {
+export function computeAccountMovements(db: SqlDatabase): Map<string, number> {
   const rows = db.prepare(`
     SELECT t.account_id AS accountId, COUNT(*) AS n
     FROM finance_transactions t
@@ -1623,7 +1623,7 @@ export function computeAccountMovements(db: Database.Database): Map<string, numb
   return new Map(rows.map((r) => [r.accountId, r.n]));
 }
 
-export function computeAccountsOverview(db: Database.Database): AccountsOverview {
+export function computeAccountsOverview(db: SqlDatabase): AccountsOverview {
   const deltas = computeAccountDeltas(db);
   const movements = computeAccountMovements(db);
   const accounts: AccountWithBalance[] = listAccounts(db).map((a) => ({
@@ -1659,7 +1659,7 @@ function isAccountKind(value: unknown): value is AccountKind {
  * IGNORE` so a deterministic id arriving twice (seed + sync) stays one row.
  */
 export function saveAccount(
-  db: Database.Database,
+  db: SqlDatabase,
   input: SaveAccountInput,
 ): { ok: true; id: string } | { ok: false; reason: string } {
   const name = parseNonEmptyString(input?.name);
@@ -1673,7 +1673,7 @@ export function saveAccount(
   if (!Number.isInteger(order)) return { ok: false, reason: 'invalid_order' };
 
   const now = nowIso();
-  const id = input.id ?? crypto.randomUUID();
+  const id = input.id ?? genId();
 
   const existing = db.prepare('SELECT id FROM finance_accounts WHERE id = ?').get(id) as { id: string } | undefined;
   if (existing) {
@@ -1699,7 +1699,7 @@ export function saveAccount(
  * balance the moment the account is gone.
  */
 export function softDeleteAccount(
-  db: Database.Database,
+  db: SqlDatabase,
   id: string,
 ): { ok: true } | { ok: false; reason: string } {
   const now = nowIso();
@@ -1735,7 +1735,7 @@ export interface TransferInput {
  *    `src/modules/finance/utils/rpg-events.ts`).
  */
 export function transferBetweenAccounts(
-  db: Database.Database,
+  db: SqlDatabase,
   input: TransferInput,
 ): { ok: true; transferGroupId: string; expenseId: string; incomeId: string } | { ok: false; reason: string } {
   const amount = parsePositiveAmount(input?.amount);
@@ -1755,9 +1755,9 @@ export function transferBetweenAccounts(
   if (from.currency !== to.currency) return { ok: false, reason: 'transfer_currency_mismatch' };
 
   const now = nowIso();
-  const transferGroupId = crypto.randomUUID();
-  const expenseId = crypto.randomUUID();
-  const incomeId = crypto.randomUUID();
+  const transferGroupId = genId();
+  const expenseId = genId();
+  const incomeId = genId();
   const fxRate = typeof input.fxRate === 'number' && Number.isFinite(input.fxRate) && input.fxRate > 0
     ? input.fxRate
     : null;

@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { CARD_TAX_CATEGORY } from '../../../electron/modules/finance.balance';
+import { CARD_TAX_CATEGORY } from '../../../shared-logic/modules/finance.balance';
 import { parseGaliciaLine, type ParsedRow } from '../../../electron/modules/finance-import.ipc';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;

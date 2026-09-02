@@ -1,5 +1,5 @@
-import type Database from 'better-sqlite3';
-import crypto from 'crypto';
+import type { SqlDatabase } from '../db';
+import { genId } from '../ids';
 import {
   addDaysToDate,
   addMonthsToMonth,
@@ -7,8 +7,6 @@ import {
   isRecurringDueInMonth,
   recurringAnchorMonth,
 } from './finance.balance';
-
-const genId = (): string => crypto.randomUUID();
 
 /** Local date string YYYY-MM-DD (avoids UTC offset from toISOString) */
 function localDate(d: Date = new Date()): string {
@@ -92,7 +90,7 @@ export interface NotificationCandidate {
 
 // ── Quest Evaluator ─────────────────────────────────────────
 
-export function evaluateQuestNotifications(db: Database.Database): NotificationCandidate[] {
+export function evaluateQuestNotifications(db: SqlDatabase): NotificationCandidate[] {
   const candidates: NotificationCandidate[] = [];
 
   const dueSoon = db
@@ -169,7 +167,7 @@ export function evaluateQuestNotifications(db: Database.Database): NotificationC
 // ── Habit Evaluator ─────────────────────────────────────────
 
 export function evaluateHabitNotifications(
-  db: Database.Database,
+  db: SqlDatabase,
   reminderTime: string,
 ): NotificationCandidate[] {
   // Gate: only run if current time >= configured reminder time
@@ -243,7 +241,7 @@ export function evaluateHabitNotifications(
 
 // ── Nutrition Evaluator ─────────────────────────────────────
 
-export function evaluateNutritionNotifications(db: Database.Database): NotificationCandidate[] {
+export function evaluateNutritionNotifications(db: SqlDatabase): NotificationCandidate[] {
   const candidates: NotificationCandidate[] = [];
   const hour = new Date().getHours();
 
@@ -297,7 +295,7 @@ export function evaluateNutritionNotifications(db: Database.Database): Notificat
 
 // ── Finance Evaluator ───────────────────────────────────────
 
-export function evaluateFinanceNotifications(db: Database.Database): NotificationCandidate[] {
+export function evaluateFinanceNotifications(db: SqlDatabase): NotificationCandidate[] {
   const candidates: NotificationCandidate[] = [];
 
   // 1. Installment due within 3 days
@@ -450,7 +448,7 @@ export function evaluateFinanceNotifications(db: Database.Database): Notificatio
 // ── Deduplication & Insert ──────────────────────────────────
 
 export function deduplicateAndInsert(
-  db: Database.Database,
+  db: SqlDatabase,
   candidates: NotificationCandidate[]
 ): number {
   const checkStmt = db.prepare(
@@ -488,7 +486,7 @@ interface ActiveNotification {
   ref_id: string;
 }
 
-export function autoResolve(db: Database.Database): number {
+export function autoResolve(db: SqlDatabase): number {
   const active = db
     .prepare(`SELECT id, type, ref_id FROM notifications WHERE status = 'active'`)
     .all() as ActiveNotification[];
@@ -655,7 +653,7 @@ export function autoResolve(db: Database.Database): number {
 
 // ── Cleanup ─────────────────────────────────────────────────
 
-export function cleanupOldNotifications(db: Database.Database): number {
+export function cleanupOldNotifications(db: SqlDatabase): number {
   const result = db
     .prepare(
       `DELETE FROM notifications

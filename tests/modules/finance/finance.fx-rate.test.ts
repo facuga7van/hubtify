@@ -10,7 +10,7 @@ import {
   rateFromRates,
   readDollarRatesCache,
   setFxHouse,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

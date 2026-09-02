@@ -10,7 +10,7 @@ import {
   getFxHouse,
   isValidMonthString,
   nowIso,
-} from './finance.balance';
+} from '../../shared-logic/modules/finance.balance';
 
 // ── Types ───────────────────────────────────────────
 

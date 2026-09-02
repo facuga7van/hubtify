@@ -10,7 +10,7 @@ import {
   purchaseShopItem,
   equipShopItem,
 } from '../../electron/ipc/rpg-handlers';
-import { purchasedPardonExtras } from '../../electron/ipc/rpg-stats';
+import { purchasedPardonExtras } from '../../shared-logic/modules/rpg-stats';
 import { monthKey, pardonsRemaining, PARDONS_PER_MONTH } from '../../shared/rpg-engine';
 import { SHOP_CATALOG, SHOP_CATALOG_BY_ID, PARDON_ITEM_ID } from '../../shared/shop-catalog';
 

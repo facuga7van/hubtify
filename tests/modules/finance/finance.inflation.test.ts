@@ -13,7 +13,7 @@ import {
   parseIpcApiResponse,
   readIpcSeriesCache,
   type IpcSeriesPoint,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 import { vi } from 'vitest';
 
 function setupDb(): Database.Database {

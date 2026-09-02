@@ -1,5 +1,5 @@
-import type Database from 'better-sqlite3';
-import crypto from 'crypto';
+import type { SqlDatabase } from '../db';
+import { genId } from '../ids';
 import { formatDateString } from '../../shared/date-utils';
 
 /** A row in `habit_checks` is one of these. Legacy rows are all 'check'. */
@@ -212,7 +212,7 @@ function walkWeekStreak(
  * `reconcileHabitShields` is the single writer. That keeps the Syl snapshot and
  * the UI handler agreeing on the numbers without the snapshot mutating state.
  */
-export function computeHabits(db: Database.Database, today: Date): HabitWithStreakRow[] {
+export function computeHabits(db: SqlDatabase, today: Date): HabitWithStreakRow[] {
   const todayStr = formatDateString(today);
   const yesterdayStr = addDays(todayStr, -1);
 
@@ -403,7 +403,7 @@ export function computeHabits(db: Database.Database, today: Date): HabitWithStre
  * Every write moves `updated_at` — the merge is last-write-wins on it, and a
  * row that leaves it stale is silently rejected on the other device.
  */
-export function reconcileHabitShields(db: Database.Database, today: Date): HabitWithStreakRow[] {
+export function reconcileHabitShields(db: SqlDatabase, today: Date): HabitWithStreakRow[] {
   const rows = computeHabits(db, today);
 
   const stored = new Map<string, { shield_count: number; last_shield_streak: number }>();
@@ -436,7 +436,7 @@ export function reconcileHabitShields(db: Database.Database, today: Date): Habit
   db.transaction(() => {
     for (const r of dirty) {
       for (const date of r.pendingShieldDates) {
-        insertShield.run(crypto.randomUUID(), r.id, date, now, now);
+        insertShield.run(genId(), r.id, date, now, now);
       }
       updateHabit.run(r.shieldCount, r.lastShieldStreak, now, r.id);
     }

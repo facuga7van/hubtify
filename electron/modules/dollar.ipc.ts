@@ -8,7 +8,7 @@ import {
   setFxHouse,
   writeDollarRatesCache,
   type DollarApiRate,
-} from './finance.balance';
+} from '../../shared-logic/modules/finance.balance';
 
 export function registerDollarIpcHandlers(): void {
   ipcHandle('dollar:getRates', async () => {

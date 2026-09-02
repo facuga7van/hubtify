@@ -8,8 +8,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { notificationsMigrations } from '../../../electron/modules/notifications.schema';
-import { evaluateFinanceNotifications } from '../../../electron/modules/notification-engine';
+import { notificationsMigrations } from '../../../shared-logic/modules/notifications.schema';
+import { evaluateFinanceNotifications } from '../../../shared-logic/modules/notification-engine';
 import {
   addMonthsToMonth,
   computeBudgetStatus,
@@ -19,7 +19,7 @@ import {
   recurringAnchorMonth,
   round2,
   setBudget,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 

@@ -11,7 +11,7 @@ import {
   cleanupOldNotifications,
   setEngineLocale,
   getEngineLocale,
-} from './notification-engine';
+} from '../../shared-logic/modules/notification-engine';
 import type { AppNotification } from '../../shared/types';
 
 let pollingInterval: NodeJS.Timeout | null = null;

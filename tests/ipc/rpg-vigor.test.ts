@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import { processRpgEvent, setInnMode, restorePlayerStats } from '../../electron/ipc/rpg-handlers';
-import { rolloverVigor, getPlayerStats } from '../../electron/ipc/rpg-stats';
+import { rolloverVigor, getPlayerStats } from '../../shared-logic/modules/rpg-stats';
 import { PARDONS_PER_MONTH } from '../../shared/rpg-engine';
 import { pinClockToNoon } from '../helpers/pin-clock';
 

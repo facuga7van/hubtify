@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { computeMonthlyBalance } from '../../../electron/modules/finance.balance';
+import { computeMonthlyBalance } from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 

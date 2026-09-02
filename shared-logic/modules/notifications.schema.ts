@@ -1,4 +1,4 @@
-// Lives in electron/modules/ (not inside a single module folder) because
+// Lives in shared-logic/modules/ (not inside a single module folder) because
 // notifications is a cross-module concern, similar to notifications.ipc.ts.
 import type { Migration } from '../../shared/types';
 

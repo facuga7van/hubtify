@@ -14,7 +14,7 @@ import {
   DEFAULT_CASH_ACCOUNT_ID,
   computeAccountsOverview,
   computeMonthlyBalance,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 

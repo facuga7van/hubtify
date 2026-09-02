@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { DEFAULT_CASH_ACCOUNT_ID, listAccounts } from '../../../electron/modules/finance.balance';
+import { DEFAULT_CASH_ACCOUNT_ID, listAccounts } from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
@@ -34,7 +34,7 @@ vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 // sync.ipc pulls these two in for the nutrition / habits merges; neither is
 // exercised here and both drag Electron-only modules along.
 vi.mock('../../../electron/modules/nutrition.ipc', () => ({ recalcSummary: vi.fn() }));
-vi.mock('../../../electron/modules/quests.habits', () => ({ weeklyTarget: () => 0 }));
+vi.mock('../../../shared-logic/modules/quests.habits', () => ({ weeklyTarget: () => 0 }));
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

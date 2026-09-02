@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import {
   computeHabits, reconcileHabitShields, parseSpecificDays, serializeSpecificDays, isoWeekday,
-} from '../../../electron/modules/quests.habits';
+} from '../../../shared-logic/modules/quests.habits';
 import { postponedDueDate, postponeTasks } from '../../../electron/modules/quests.ipc';
 import { mergeHabitChecks } from '../../../electron/modules/sync.ipc';
 

@@ -1,9 +1,9 @@
 import { app } from 'electron';
 import { ipcHandle } from '../ipc/ipc-handle';
 import { getDb } from '../ipc/db';
-import { rolloverVigor } from '../ipc/rpg-stats';
+import { rolloverVigor } from '../../shared-logic/modules/rpg-stats';
 import { todayDateString } from '../../shared/date-utils';
-import { buildSylSnapshot } from './syl.snapshot';
+import { buildSylSnapshot } from '../../shared-logic/modules/syl.snapshot';
 import type { SylSnapshot } from '../../shared/types';
 
 export function registerSylIpcHandlers(): void {
