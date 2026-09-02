@@ -116,6 +116,29 @@ describe('Nutrify — QA 0.9.0 (NUT-01)', () => {
   });
 });
 
+describe('Nutrify — QA 0.9.0 (NUT-03)', () => {
+  test('NUT-03: la barra «Cerrar el Día» se esconde mientras un input tiene el foco', async () => {
+    installApi(NUTRITION_API);
+    await setMobileViewport();
+    mountInShell(<Today />, '/nutrition');
+    await settle(700);
+    const footer = () => document.querySelector('.nutri-sticky-footer') as HTMLElement;
+    expect(footer()).not.toBeNull();
+    expect(getComputedStyle(footer()).display).not.toBe('none');
+
+    // Con el teclado abierto (= un input enfocado) la barra tapaba la fila en edición.
+    const row = await openFirstEdit();
+    row.querySelector<HTMLInputElement>('input:not([type="number"])')!.focus();
+    await settle(100);
+    expect(getComputedStyle(footer()).display).toBe('none');
+
+    // El foco se va (la fila guarda y se cierra): la barra vuelve.
+    (document.activeElement as HTMLElement).blur();
+    await settle(300);
+    expect(getComputedStyle(footer()).display).not.toBe('none');
+  });
+});
+
 describe('Nutrify — QA 0.9.0 (NUT-02)', () => {
   test('NUT-02: cerrar el día deja la página en solo lectura sin recargar', async () => {
     installApi({

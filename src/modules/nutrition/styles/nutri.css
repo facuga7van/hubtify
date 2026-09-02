@@ -3214,6 +3214,22 @@
   padding-left: 44px;
 }
 
+/* NUT-03: con el teclado abierto el viewport se achica y la barra sticky
+   «Cerrar el Día» quedaba encima de la fila en edición / del formulario.
+   Mientras un campo de la página tiene el foco (= teclado abierto) la barra
+   no está; vuelve al soltar el foco. `:has()` está en WebView 105+. */
+[data-shell="mobile"] .nutri-page:has(input:focus, textarea:focus, select:focus) .nutri-sticky-footer {
+  display: none;
+}
+
+/* En landscape (≈360 px de alto) la barra sticky tapaba ~15 % de la pantalla:
+   ahí va al final del flujo, como un botón más. */
+@media (max-height: 480px) {
+  [data-shell="mobile"] .nutri-sticky-footer {
+    position: static;
+  }
+}
+
 /* N9: el popup de cerrar el día mide más que la pantalla. */
 [data-shell="mobile"] .nutri-popup-overlay {
   place-items: start center;
