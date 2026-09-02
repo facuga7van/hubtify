@@ -6,6 +6,9 @@ import { registerAllIpcHandlers } from './ipc/registry';
 import { ipcHandle } from './ipc/ipc-handle';
 import { closeDb, runModuleMigrations, setDbFactory } from '../shared-logic/db';
 import { openDesktopDb, getDb } from './ipc/db';
+import { setPlatform } from '../shared-logic/platform';
+import { setEventSink } from '../shared-logic/events';
+import { electronPlatform, webContentsSink } from './platform';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
 import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
 import { financeMigrations } from '../src/modules/finance/finance.schema';
@@ -343,6 +346,8 @@ function createCauldronWindow(): void {
 
 app.whenReady().then(() => {
   setDbFactory(openDesktopDb);
+  setPlatform(electronPlatform);
+  setEventSink(webContentsSink);
 
   // Create the window FIRST so the renderer starts loading while the main
   // process is still busy. Everything below runs in the same synchronous tick,
