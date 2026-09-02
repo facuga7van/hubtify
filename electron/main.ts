@@ -15,7 +15,7 @@ import { financeMigrations } from '../src/modules/finance/finance.schema';
 import { characterMigrations } from '../src/modules/character/character.schema';
 import { notificationsMigrations } from '../shared-logic/modules/notifications.schema';
 import { cauldronMigrations } from '../src/modules/cauldron/cauldron.schema';
-import { startNotificationEngine, stopNotificationEngine } from './modules/notifications.ipc';
+import { startNotificationEngine, stopNotificationEngine } from '../shared-logic/modules/notifications.ipc';
 import { generateRecurringForMonth } from '../shared-logic/modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 import { todayDateString } from '../shared/date-utils';

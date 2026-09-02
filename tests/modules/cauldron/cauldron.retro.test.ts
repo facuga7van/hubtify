@@ -40,36 +40,16 @@ const harness = vi.hoisted(() => ({
 }));
 
 import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+import { setEventSink } from '../../../shared-logic/events';
 
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  BrowserWindow: {
-    getAllWindows: () => [
-      {
-        webContents: {
-          send: (channel: string, data: unknown) => {
-            harness.broadcasts.push({ channel, data });
-          },
-        },
-      },
-    ],
-  },
-  Notification: Object.assign(
-    class {
-      show() { /* noop */ }
-    },
-    { isSupported: () => false },
-  ),
-}));
+setEventSink((channel, data) => { harness.broadcasts.push({ channel, data }); });
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
-vi.mock('../../../electron/modules/notifications.ipc', () => ({
+vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));
 
-const { registerCauldronIpcHandlers } = await import('../../../electron/modules/cauldron.ipc');
+const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 registerCauldronIpcHandlers();
 

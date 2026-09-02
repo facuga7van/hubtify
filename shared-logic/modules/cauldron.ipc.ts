@@ -1,7 +1,8 @@
-import { BrowserWindow, Notification } from 'electron';
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
-import crypto from 'crypto';
+import { registerHandler as ipcHandle, registerLifecycle } from '../registry';
+import { getDb } from '../db';
+import { genId } from '../ids';
+import { emit } from '../events';
+import { platform } from '../platform';
 import { getMondayOfWeek, formatDateString } from '../../shared/date-utils';
 import { isModuleNotificationEnabled } from './notifications.ipc';
 import type {
@@ -9,10 +10,6 @@ import type {
   CauldronPreset,
   CauldronSessionEndResult,
 } from '../../shared/types';
-
-function genId(): string {
-  return crypto.randomUUID();
-}
 
 /**
  * Fase 2 del Caldero: la misión vinculada viaja EN EL ESTADO, no se consulta.
@@ -101,12 +98,6 @@ const INTERRUPTED_SESSION_GRACE_MS = 12 * 60 * 60 * 1000;
  */
 const ABANDON_THRESHOLD_MS = 5 * 60 * 1000;
 
-function broadcast(channel: string, data: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(channel, data);
-  }
-}
-
 // ─── Timer State ───────────────────────────────────────────
 
 const IDLE_STATE: CauldronTimerStateEx = {
@@ -129,9 +120,9 @@ const IDLE_STATE: CauldronTimerStateEx = {
 
 let timerState: CauldronTimerStateEx = { ...IDLE_STATE };
 
-let timerInterval: NodeJS.Timeout | null = null;
+let timerInterval: ReturnType<typeof setInterval> | null = null;
 /** Ticks the 5 s auto-start countdown; null whenever no auto-start is armed. */
-let autoStartInterval: NodeJS.Timeout | null = null;
+let autoStartInterval: ReturnType<typeof setInterval> | null = null;
 let targetEndTime = 0;
 let activePreset: {
   workMinutes: number;
@@ -262,7 +253,7 @@ function tick(): void {
   const now = Date.now();
   timerState.remainingMs = Math.max(0, targetEndTime - now);
 
-  broadcast('cauldron:tick', getSnapshotState());
+  emit('cauldron:tick', getSnapshotState());
 
   if (timerState.remainingMs <= 0) {
     onTimeUp();
@@ -306,24 +297,24 @@ function onTimeUp(): void {
     taskName: timerState.taskName,
   };
 
-  broadcast('cauldron:sessionEnd', sessionEndResult);
+  emit('cauldron:sessionEnd', sessionEndResult);
 
-  // OS Notification — texts come from the renderer (cauldron:setLabels); they used
-  // to be hardcoded Spanish regardless of the user's language.
-  if (Notification.isSupported() && isModuleNotificationEnabled('cauldron')) {
+  // Native notification via PlatformPort — texts come from the renderer
+  // (cauldron:setLabels); they used to be hardcoded Spanish regardless of language.
+  if (isModuleNotificationEnabled('cauldron')) {
     const presetLabel = timerState.presetName ? ` (${timerState.presetName})` : '';
     const cycleInfo = `${labels.cycle} ${timerState.currentCycle}/${timerState.totalCycles}`;
     if (cycleComplete || nextSegment === null) {
-      new Notification({
+      void platform().notify({
         title: labels.cycleComplete,
         body: `${labels.cycleCompleteBody}${presetLabel}`,
-      }).show();
+      });
     } else {
       const nextLabel = nextSegment.type === 'work' ? labels.focus : nextSegment.type === 'long_break' ? labels.longBreak : labels.shortBreak;
       const nextMin = Math.round(nextSegment.durationMs / 60000);
       const title = wasWork ? labels.potionDone : labels.breakDone;
       const body = `${cycleInfo} — ${labels.next}: ${nextLabel} (${nextMin} ${labels.minutesShort})${presetLabel}`;
-      new Notification({ title, body }).show();
+      void platform().notify({ title, body });
     }
   }
 
@@ -345,13 +336,13 @@ function onTimeUp(): void {
       remainingMs: 0,
       autoStartAt: auto ? Date.now() + AUTO_START_GRACE_MS : null,
     };
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     if (auto) armAutoStart();
   } else {
     // No recipe loaded — nothing to chain into.
     pendingNextSegment = null;
     timerState = { ...timerState, status: 'idle', remainingMs: 0, autoStartAt: null };
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
   }
 }
 
@@ -373,7 +364,7 @@ function armAutoStart(): void {
       pendingNextSegment = null;
       if (next) startSegment(next.type, next.durationMs, next.resetCycle);
     }
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
   }, 1000);
 }
 
@@ -557,6 +548,22 @@ function readInterruptedSession(): {
 
 export function registerCauldronIpcHandlers(): void {
   cleanupOrphanedSessions();
+
+  // Background (Android): freeze the clocks WITHOUT touching state. targetEndTime
+  // and autoStartAt are wall-clock, so the first tick after resume catches up on
+  // its own (and fires onTimeUp if the deadline passed while suspended).
+  registerLifecycle({
+    suspend: () => {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      if (autoStartInterval) { clearInterval(autoStartInterval); autoStartInterval = null; }
+    },
+    resume: () => {
+      if ((timerState.status === 'work' || timerState.status === 'on_break') && !timerInterval) {
+        timerInterval = setInterval(tick, 1000);
+      }
+      if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null) armAutoStart();
+    },
+  });
 
   // ─── Preset CRUD ───
 
@@ -744,7 +751,7 @@ export function registerCauldronIpcHandlers(): void {
         .run(next, now, targetRow);
     }
 
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -757,7 +764,7 @@ export function registerCauldronIpcHandlers(): void {
       return getSnapshotState();
     }
     clearAutoStart();
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -767,7 +774,7 @@ export function registerCauldronIpcHandlers(): void {
     // cauldron:cancelAutoStart yet.
     if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null) {
       clearAutoStart();
-      broadcast('cauldron:tick', getSnapshotState());
+      emit('cauldron:tick', getSnapshotState());
       return getSnapshotState();
     }
     if (timerState.status !== 'work' && timerState.status !== 'on_break') {
@@ -784,7 +791,7 @@ export function registerCauldronIpcHandlers(): void {
       getDb().prepare('UPDATE cauldron_sessions SET target_end_time = NULL, updated_at = ? WHERE id = ?')
         .run(nowIso, currentSessionDbId);
     }
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -804,7 +811,7 @@ export function registerCauldronIpcHandlers(): void {
         .run(targetEndTime, nowIso, currentSessionDbId);
     }
     timerInterval = setInterval(tick, 1000);
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -832,7 +839,7 @@ export function registerCauldronIpcHandlers(): void {
       completed: false,
       nextType: null,
     };
-    broadcast('cauldron:sessionEnd', sessionEndResult);
+    emit('cauldron:sessionEnd', sessionEndResult);
 
     const nextSegment = getNextSegment();
 
@@ -843,7 +850,7 @@ export function registerCauldronIpcHandlers(): void {
       activePreset = null;
     }
 
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -855,7 +862,7 @@ export function registerCauldronIpcHandlers(): void {
     const next = pendingNextSegment;
     pendingNextSegment = null;
     startSegment(next.type, next.durationMs, next.resetCycle);
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -895,7 +902,7 @@ export function registerCauldronIpcHandlers(): void {
     if (!timerInterval) {
       timerInterval = setInterval(tick, 1000);
     }
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
 
@@ -977,7 +984,7 @@ export function registerCauldronIpcHandlers(): void {
         taskId: timerState.taskId,
         taskName: timerState.taskName,
       };
-      broadcast('cauldron:sessionEnd', abandonResult);
+      emit('cauldron:sessionEnd', abandonResult);
     }
 
     clearTimer();
@@ -987,7 +994,7 @@ export function registerCauldronIpcHandlers(): void {
     // The loop runs until here: `stop` is the only thing that ends it.
     timerState = { ...IDLE_STATE };
     activePreset = null;
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
   });
 
   ipcHandle('cauldron:getState', () => {
@@ -1373,7 +1380,7 @@ export function registerCauldronIpcHandlers(): void {
       .run(targetEndTime, nowIso, session.id);
 
     if (!timerInterval) timerInterval = setInterval(tick, 1000);
-    broadcast('cauldron:tick', getSnapshotState());
+    emit('cauldron:tick', getSnapshotState());
     return { success: true, state: getSnapshotState() };
   });
 

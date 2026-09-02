@@ -7,11 +7,11 @@ import { registerFinanceIpcHandlers } from '../../shared-logic/modules/finance.i
 import { registerFinanceImportIpcHandlers } from '../../shared-logic/modules/finance-import.ipc';
 import { registerCharacterIpcHandlers } from '../../shared-logic/modules/character.ipc';
 import { registerBackupIpcHandlers } from '../modules/backup.ipc';
-import { registerNotificationIpcHandlers } from '../modules/notifications.ipc';
+import { registerNotificationIpcHandlers } from '../../shared-logic/modules/notifications.ipc';
 import { registerDollarIpcHandlers } from '../../shared-logic/modules/dollar.ipc';
 import { registerCryptoIpcHandlers } from '../../shared-logic/modules/crypto.ipc';
 import { registerSyncIpcHandlers } from '../modules/sync.ipc';
-import { registerCauldronIpcHandlers } from '../modules/cauldron.ipc';
+import { registerCauldronIpcHandlers } from '../../shared-logic/modules/cauldron.ipc';
 import { registerFeedbackIpcHandlers } from '../../shared-logic/modules/feedback.ipc';
 import { registerSylIpcHandlers } from '../../shared-logic/modules/syl.ipc';
 

@@ -1,6 +1,7 @@
-import { Notification, BrowserWindow } from 'electron';
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
+import { registerHandler as ipcHandle, registerLifecycle } from '../registry';
+import { getDb } from '../db';
+import { emit } from '../events';
+import { platform } from '../platform';
 import {
   evaluateQuestNotifications,
   evaluateHabitNotifications,
@@ -11,10 +12,12 @@ import {
   cleanupOldNotifications,
   setEngineLocale,
   getEngineLocale,
-} from '../../shared-logic/modules/notification-engine';
+} from './notification-engine';
 import type { AppNotification } from '../../shared/types';
 
-let pollingInterval: NodeJS.Timeout | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
+/** True between startNotificationEngine() and stopNotificationEngine(); resume() re-arms only if set. */
+let engineWanted = false;
 let lastNativeNotificationTime = 0;
 let systemNotificationsEnabled = true;
 const enabledModules: Record<string, boolean> = { quests: true, nutrition: true, finance: true, cauldron: true };
@@ -59,22 +62,13 @@ function runNotificationCheck(): number {
         WHERE status = 'active' AND deleted_at IS NULL
       `).get() as { count: number }).count;
 
-      if (totalActive > 0 && Notification.isSupported()) {
-        const nativeNotif = new Notification({
+      if (totalActive > 0) {
+        void platform().notify({
           title: 'Hubtify',
           body: getEngineLocale() === 'en'
             ? `You have ${totalActive} pending ${totalActive === 1 ? 'item' : 'items'}.`
             : `Tenés ${totalActive} ${totalActive === 1 ? 'cosa pendiente' : 'cosas pendientes'}.`,
         });
-        nativeNotif.on('click', () => {
-          const mainWin = BrowserWindow.getAllWindows()[0];
-          if (mainWin) {
-            if (mainWin.isMinimized()) mainWin.restore();
-            mainWin.show();
-            mainWin.focus();
-          }
-        });
-        nativeNotif.show();
         lastNativeNotificationTime = now;
       }
     }
@@ -82,16 +76,22 @@ function runNotificationCheck(): number {
 
   // Broadcast whenever count changed — new notifications OR resolved ones
   if (newCount > 0 || resolvedCount > 0) {
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      win.webContents.send('notifications:updated');
-    }
+    emit('notifications:updated');
   }
 
   return newCount;
 }
 
+function pausePolling(): void {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
 export function startNotificationEngine(): void {
+  engineWanted = true;
+  if (pollingInterval) return;
   // The callback MUST NOT be allowed to throw: an unhandled throw inside a
   // setInterval callback has no catch frame above it and takes the whole main
   // process down (there is no uncaughtException handler registered).
@@ -105,19 +105,20 @@ export function startNotificationEngine(): void {
 }
 
 export function stopNotificationEngine(): void {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    pollingInterval = null;
-  }
+  engineWanted = false;
+  pausePolling();
 }
 
 export function registerNotificationIpcHandlers(): void {
-  ipcHandle('notifications:send', (_e, title: string, body: string) => {
-    if (Notification.isSupported()) {
-      new Notification({ title, body }).show();
-      return true;
-    }
-    return false;
+  // Background (Android): the polling timer would hit a closed DB. Electron never calls these.
+  registerLifecycle({
+    suspend: pausePolling,
+    resume: () => { if (engineWanted) startNotificationEngine(); },
+  });
+
+  ipcHandle('notifications:send', async (_e, title: string, body: string) => {
+    await platform().notify({ title, body });
+    return true;
   });
 
   ipcHandle('notifications:getAll', () => {
@@ -141,10 +142,7 @@ export function registerNotificationIpcHandlers(): void {
   ipcHandle('notifications:dismiss', (_e, id: string) => {
     const db = getDb();
     db.prepare(`UPDATE notifications SET status = 'dismissed', updated_at = datetime('now') WHERE id = ?`).run(id);
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      win.webContents.send('notifications:updated');
-    }
+    emit('notifications:updated');
   });
 
   ipcHandle('notifications:snooze', (_e, id: string) => {
@@ -154,10 +152,7 @@ export function registerNotificationIpcHandlers(): void {
       SET status = 'snoozed', snoozed_until = datetime('now', '+6 hours'), updated_at = datetime('now')
       WHERE id = ?
     `).run(id);
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      win.webContents.send('notifications:updated');
-    }
+    emit('notifications:updated');
   });
 
   ipcHandle('notifications:runCheck', () => {

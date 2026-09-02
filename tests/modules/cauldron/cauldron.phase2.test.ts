@@ -65,38 +65,18 @@ const harness = vi.hoisted(() => ({
 }));
 
 import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+import { setEventSink } from '../../../shared-logic/events';
 
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  // Una ventana falsa que anota lo que se le manda: así se puede afirmar que el
-  // evento de abandono sale UNA sola vez.
-  BrowserWindow: {
-    getAllWindows: () => [
-      {
-        webContents: {
-          send: (channel: string, data: unknown) => {
-            harness.broadcasts.push({ channel, data });
-          },
-        },
-      },
-    ],
-  },
-  Notification: Object.assign(
-    class {
-      show() { /* noop */ }
-    },
-    { isSupported: () => false },
-  ),
-}));
+// Un sink falso que anota lo que se le manda: así se puede afirmar que el
+// evento de abandono sale UNA sola vez.
+setEventSink((channel, data) => { harness.broadcasts.push({ channel, data }); });
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
-vi.mock('../../../electron/modules/notifications.ipc', () => ({
+vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));
 
-const { registerCauldronIpcHandlers } = await import('../../../electron/modules/cauldron.ipc');
+const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 registerCauldronIpcHandlers();
 

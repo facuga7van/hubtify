@@ -32,26 +32,12 @@ const harness = vi.hoisted(() => ({
 
 import { getHandler, clearHandlers } from '../../../shared-logic/registry';
 
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  BrowserWindow: { getAllWindows: () => [] },
-  // OS notifications are not what is under test — and they would need a display.
-  Notification: Object.assign(
-    class {
-      show() { /* noop */ }
-    },
-    { isSupported: () => false },
-  ),
-}));
-
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
-vi.mock('../../../electron/modules/notifications.ipc', () => ({
+vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));
 
-const { registerCauldronIpcHandlers } = await import('../../../electron/modules/cauldron.ipc');
+const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 registerCauldronIpcHandlers();
 
