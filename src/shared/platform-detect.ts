@@ -14,3 +14,13 @@ export function isNativeMobile(): boolean {
   if (cap?.isNativePlatform) return cap.isNativePlatform() === true;
   return true;
 }
+
+/**
+ * ¿Está el bridge nativo de Capacitor (`window.Capacitor`)? Distingue la app
+ * Android real del mismo bundle 'android' corriendo en el arnés browser-mobile
+ * de vitest, donde no hay plugins que llamar.
+ */
+export function hasCapacitorBridge(): boolean {
+  const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  return cap?.isNativePlatform?.() === true;
+}
