@@ -13,6 +13,68 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.1',
+    date: '2026-09-02',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'La estimación con IA se colgaba con ciertos platos —«una manzana», por ejemplo— hasta rendirse con «IA no disponible». Lo arreglamos del lado del servidor, así que también funciona en la versión anterior sin actualizar, y la app ya no dispara tres consultas por un solo toque',
+          en: 'AI estimation hung on certain dishes — "an apple", for instance — until giving up with "AI unavailable". We fixed it on the server side, so it works on the previous version without updating too, and the app no longer fires three requests for a single tap',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Editar una comida ahora tiene botones de Guardar y Cancelar como corresponde (antes había una sola estrella que en realidad disparaba la IA). Al cerrar el día la pantalla queda en modo lectura al instante, la barra «Cerrar el Día» ya no tapa lo que estás editando con el teclado abierto, y el aviso de peso semanal no salta el mismo día que hiciste el setup',
+          en: 'Editing a meal now has proper Save and Cancel buttons (before there was a lone star that actually triggered the AI). Closing the day switches the screen to read-only right away, the "Close the Day" bar no longer covers what you are editing with the keyboard open, and the weekly weight prompt does not pop up the same day you did the setup',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'mobile',
+        text: {
+          es: 'El botón Atrás del teléfono cierra menús y desplegables antes de navegar, cada sección arranca arriba, el menú de cuenta entra en el cajón y el hub se lee en una sola columna. Los widgets ya no muestran controles de arrastre de escritorio, y el Caldero se queda sin el chip flotante encima ni las opciones de ventana que solo tienen sentido en la compu',
+          en: 'The phone\'s Back button closes menus and dropdowns before navigating, every section opens at the top, the account menu fits inside the drawer and the hub reads in a single column. Widgets no longer show desktop drag controls, and the Cauldron loses the floating chip sitting on top of it and the window options that only make sense on the computer',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'Las notas dibujadas ya se pueden trazar con el dedo: antes el scroll te cortaba el trazo a los pocos milímetros. Una nota vacía ya no queda guardada, y los formularios de misión y hábito tienen el nombre a lo ancho en vez de apretado entre los demás campos',
+          en: 'Drawn notes can finally be traced with your finger: the scroll used to cut the stroke short after a few millimeters. An empty note is no longer saved, and the quest and habit forms give the name its full width instead of squeezing it between the other fields',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El gráfico de reparto con una sola categoría mostraba un anillo vacío aunque la leyenda tuviera el monto. Ahora dibuja el anillo completo, el botón de eliminar grupo de cuotas se ve, y el toggle de préstamo y el eje de la proyección quedaron acomodados en la pantalla del teléfono',
+          en: 'The breakdown chart with a single category showed an empty ring even though the legend had the amount. It now draws the full ring, the delete button for an installment group is visible, and the loan toggle and the projection axis fit properly on the phone screen',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'auth',
+        text: {
+          es: 'Recuperar la contraseña ahora acepta tu nombre de usuario, igual que el inicio de sesión. No hace falta acordarse del mail exacto',
+          en: 'Password recovery now accepts your username, just like login does. No need to remember the exact email',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: '«1 comida» y «1 día» en singular, fechas y meses en el idioma de la app, las recetas del Caldero con su nombre traducido, y los selectores de fecha aplican el valor visible al tocar OK en vez de cerrarse sin guardar nada',
+          en: '"1 meal" and "1 day" in the singular, dates and months in the app\'s language, Cauldron recipes with their translated name, and the date pickers apply the visible value when you tap OK instead of closing without saving anything',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.0',
     date: '2026-09-02',
     changes: [
