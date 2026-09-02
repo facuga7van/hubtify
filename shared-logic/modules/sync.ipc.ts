@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { recalcSummary } from './nutrition.ipc';
 import { weeklyTarget } from './quests.habits';
 import { daysAgoDateString } from '../../shared/date-utils';
+import { FOOD_LOG_TWIN_IDS_SQL } from '../../src/modules/nutrition/nutrition.schema';
 
 /**
  * Guards a remote row before it reaches SQLite: rejects non-objects and any row
@@ -423,14 +424,17 @@ export function mergeNutritionFoods(
   // remote's deleted_at onto whichever unrelated local row shared the number.
   if (Array.isArray(d.foodLog)) step(db, 'foodLog', () => {
     type LocalFood = {
-      id: number; date: string; updated_at: string | null; source: string;
+      id: number; sync_id: string | null; date: string; updated_at: string | null; source: string;
       frequent_food_id: number | null; ai_breakdown: string | null; meal: string | null;
       is_event: number; event_kcal_min: number | null; event_kcal_max: number | null;
       protein_g: number | null; carbs_g: number | null; fat_g: number | null;
     };
-    const LOCAL_COLS = 'id, date, updated_at, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, carbs_g, fat_g';
+    const LOCAL_COLS = 'id, sync_id, date, updated_at, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, carbs_g, fat_g';
     const getFoodBySync = db.prepare(`SELECT ${LOCAL_COLS} FROM food_log WHERE sync_id = ?`);
-    const getFoodByNatural = db.prepare(`SELECT ${LOCAL_COLS} FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ?`);
+    // Prefer the row that already has an identity: when an anonymous twin sits
+    // next to the real row, a sync_id-less payload must land on the real one.
+    const getFoodByNatural = db.prepare(`SELECT ${LOCAL_COLS} FROM food_log WHERE date = ? AND time = ? AND description = ? AND calories = ? ORDER BY (sync_id IS NULL), id LIMIT 1`);
+    const deleteFood = db.prepare('DELETE FROM food_log WHERE id = ?');
     const insertFood = db.prepare('INSERT INTO food_log (sync_id, date, time, description, calories, source, frequent_food_id, ai_breakdown, meal, is_event, event_kcal_min, event_kcal_max, protein_g, carbs_g, fat_g, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     // Full last-write-wins, same shape as the INSERT. This used to write ONLY
     // deleted_at + updated_at: an edit (800 → 1200 kcal, +protein, event → meal)
@@ -439,6 +443,20 @@ export function mergeNutritionFoods(
     const updateFood = db.prepare('UPDATE food_log SET date = ?, time = ?, description = ?, calories = ?, source = ?, frequent_food_id = ?, ai_breakdown = ?, meal = ?, is_event = ?, event_kcal_min = ?, event_kcal_max = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?, deleted_at = ? WHERE id = ?');
     const adoptFoodSync = db.prepare('UPDATE food_log SET sync_id = ? WHERE id = ? AND sync_id IS NULL AND NOT EXISTS (SELECT 1 FROM food_log WHERE sync_id = ?)');
     const freqBySync = db.prepare('SELECT id FROM frequent_foods WHERE sync_id = ?');
+
+    // Sweep the twins an id-keyed client (v0.7.5, still installed on the
+    // owner's desktop) leaves next to the rows this codebase identifies. The v16
+    // repair runs once at boot; this runs on every pull, so a twin never
+    // outlives the next sync. BEFORE the payload lands: a tombstone that reaches
+    // the real row must not leave an anonymous copy behind as the only live one.
+    // The loop below never creates a twin (it neither inserts without sync_id
+    // nor inserts a legacy- row next to a natural-key match), so once is enough.
+    // Hard delete — see FOOD_LOG_TWIN_IDS_SQL.
+    for (const twin of db.prepare(FOOD_LOG_TWIN_IDS_SQL).all() as Array<{ id: number; date: string }>) {
+      deleteFood.run(twin.id);
+      affectedDates.add(twin.date);
+      changed = true;
+    }
 
     for (const raw of d.foodLog!) {
       if (!isUsableRow(raw, 'foodLog', ['date', 'time', 'description', 'calories'])) continue;
@@ -452,7 +470,8 @@ export function mergeNutritionFoods(
         frequentFoodId = ff?.id ?? null;
       }
 
-      const syncId: string = (typeof f.sync_id === 'string' && f.sync_id)
+      const hasRemoteId = typeof f.sync_id === 'string' && !!f.sync_id;
+      const syncId: string = hasRemoteId
         ? f.sync_id
         : `legacy-${f.date}|${f.time}|${f.calories}|${String(f.description).slice(0, 60)}`;
 
@@ -460,6 +479,13 @@ export function mergeNutritionFoods(
       if (!local) {
         const byNatural = getFoodByNatural.get(f.date, f.time, f.description, f.calories) as LocalFood | undefined;
         if (byNatural) {
+          // Same meal, but the payload names it by ANOTHER identity than the one
+          // this device already holds: that is a foreign copy (an id-keyed
+          // client's twin), not an edit. Inserting it would duplicate the meal;
+          // applying its stamps would let a twin's tombstone delete the real row.
+          // A payload with no identity at all (pre-0.8 client) still speaks for
+          // the meal through its natural key, as before.
+          if (hasRemoteId && byNatural.sync_id && byNatural.sync_id !== syncId) continue;
           adoptFoodSync.run(syncId, byNatural.id, syncId);
           local = byNatural;
         }
@@ -1048,12 +1074,16 @@ export function registerSyncIpcHandlers(): void {
 
     const profile = db.prepare('SELECT * FROM nutrition_profile WHERE id = 1').get() || null;
     // sync_id is the cross-device identity for these two AUTOINCREMENT tables.
-    // `id` is still exported for backward compatibility with older clients, but the
-    // merge no longer keys on it.
+    // The device-local `id` is deliberately NOT exported. It used to travel "for
+    // backward compatibility with older clients" — and that is exactly what
+    // hurt them: a v0.7.5 client keys its merge on `id`, so a payload carrying
+    // ANOTHER device's ids made it insert every meal it "did not have" as a new
+    // row (16 twins, doubled totals, 2026-09-02). Without `id` that client falls
+    // back to its natural-key path and duplicates nothing.
     // frequent_food_sync_id resolves food_log.frequent_food_id, which points at the
     // LOCAL frequent_foods.id and means something different on every device.
     const foodLog = db.prepare(`
-      SELECT f.id, f.sync_id, f.date, f.time, f.description, f.calories, f.source,
+      SELECT f.sync_id, f.date, f.time, f.description, f.calories, f.source,
              f.frequent_food_id, ff.sync_id AS frequent_food_sync_id,
              f.ai_breakdown, f.meal, f.is_event, f.event_kcal_min, f.event_kcal_max,
              f.protein_g, f.carbs_g, f.fat_g, f.updated_at, f.deleted_at
@@ -1061,14 +1091,14 @@ export function registerSyncIpcHandlers(): void {
       LEFT JOIN frequent_foods ff ON ff.id = f.frequent_food_id
       ORDER BY f.date DESC, f.time DESC
     `).all();
-    const frequentFoods = db.prepare('SELECT id, sync_id, name, calories, ai_breakdown, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
+    const frequentFoods = db.prepare('SELECT sync_id, name, calories, ai_breakdown, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, deleted_at FROM frequent_foods ORDER BY times_used DESC').all();
     const dailyMetrics = db.prepare('SELECT date, steps, gym, updated_at FROM nutrition_daily_metrics ORDER BY date DESC').all();
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
     const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
     // The user's corrections ONLY. Model rows are a per-device network cache,
-    // reconstructible for free, and stay local (nutrition migration v16).
+    // reconstructible for free, and stay local (nutrition migration v17).
     const aiCorrections = db.prepare(`
       SELECT description_norm AS descriptionNorm, calories, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
              created_at AS createdAt, updated_at AS updatedAt
@@ -1450,7 +1480,7 @@ export function mergeNutritionDataInto(db: SqlDatabase, data: Record<string, unk
 
     // AI cache corrections — keyed by description_norm. A remote USER row beats
     // a local MODEL row outright (a human number over a guess), and beats a
-    // local user row only when newer. Model rows never travel (v16).
+    // local user row only when newer. Model rows never travel (v17).
     if (Array.isArray(d.aiCorrections)) step(db, 'aiCorrections', () => {
       const getCorr = db.prepare('SELECT source, updated_at FROM nutrition_ai_cache WHERE description_norm = ?');
       const insertCorr = db.prepare(`

@@ -1,6 +1,47 @@
 import type { Migration } from '../../../shared/types';
 import { sqlNormalizeExpr } from './normalize';
 
+/**
+ * Live food_log rows that are a COPY of another live row (same date, time,
+ * description and calories) and carry the weaker identity of the pair.
+ *
+ * Where they come from: a client whose merge keys food_log by the device-local
+ * AUTOINCREMENT id (v0.7.5 and earlier) pulling a payload from a device that
+ * minted DIFFERENT ids for the same meals. Every id it did not have was inserted
+ * verbatim — without sync_id, which it does not know — next to the row this
+ * codebase already identified. Seen on 2026-09-02: 16 live twins, every daily
+ * total doubled.
+ *
+ * Who loses, per pair:
+ *   - a row with NO sync_id loses to any identified row, and to an older
+ *     anonymous row (two anonymous copies keep the first);
+ *   - a `legacy-…` row (v12 backfill, or the merge's fallback for a payload
+ *     without sync_id) loses ONLY to a row minted by this codebase (uuid).
+ * Two uuid rows, or two legacy rows the v12 backfill told apart with `#id`, are
+ * genuine repeats and are never touched. Neither is a pair the user already
+ * resolved by deleting one copy: only live rows take part.
+ *
+ * Shared by the v16 repair below and by the sweep at the end of every food_log
+ * merge (sync.ipc.ts), so both answer the same question.
+ */
+export const FOOD_LOG_TWIN_IDS_SQL = `
+  SELECT f.id, f.date
+  FROM food_log f
+  WHERE f.deleted_at IS NULL
+    AND (f.sync_id IS NULL OR f.sync_id LIKE 'legacy-%')
+    AND EXISTS (
+      SELECT 1 FROM food_log o
+      WHERE o.id <> f.id
+        AND o.deleted_at IS NULL
+        AND o.date = f.date AND o.time = f.time
+        AND o.description = f.description AND o.calories = f.calories
+        AND (
+          (f.sync_id IS NULL AND (o.sync_id IS NOT NULL OR o.id < f.id))
+          OR (f.sync_id LIKE 'legacy-%' AND o.sync_id IS NOT NULL AND o.sync_id NOT LIKE 'legacy-%')
+        )
+    )
+`;
+
 export const nutritionMigrations: Migration[] = [
   {
     namespace: 'nutrition',
@@ -417,8 +458,52 @@ export const nutritionMigrations: Migration[] = [
     `,
   },
   {
+    // ── Repair: food_log twins left by an id-keyed merge ──────────────────────
+    // See FOOD_LOG_TWIN_IDS_SQL for the pair rules and where the twins came from.
+    //
+    // HARD delete, not a tombstone, on purpose. A twin has no identity the other
+    // devices share (NULL, or a legacy- id that maps onto THEIR original through
+    // the merge's natural-key fallback), so a tombstone pushed with that id would
+    // be applied to the real meal everywhere else and delete it. Removing the
+    // row locally is enough: the next push replaces nutrify.foodLog wholesale.
+    //
+    // The daily summaries are recomputed here in SQL for the days that lost a
+    // twin (same sums recalcSummary() does; bmr/tdee did not change), with a
+    // fresh ISO stamp so the corrected total wins last-write-wins against the
+    // doubled one this device may already have pushed.
+    //
+    // Runs BEFORE v17/v18 so the corrections backfill (v18) reads a food_log
+    // that is already free of twins.
+    //
+    // Idempotent: with no twins left the temp table is empty and nothing moves.
     namespace: 'nutrition',
     version: 16,
+    up: `
+      CREATE TEMP TABLE IF NOT EXISTS _food_log_twins AS SELECT id, date FROM (${FOOD_LOG_TWIN_IDS_SQL});
+
+      DELETE FROM food_log WHERE id IN (SELECT id FROM _food_log_twins);
+
+      UPDATE nutrition_daily_summary SET
+        total_calories_in = (SELECT COALESCE(SUM(calories), 0) FROM food_log
+                             WHERE food_log.date = nutrition_daily_summary.date AND deleted_at IS NULL),
+        protein_g = (SELECT ROUND(SUM(protein_g), 1) FROM food_log
+                     WHERE food_log.date = nutrition_daily_summary.date AND deleted_at IS NULL),
+        carbs_g = (SELECT ROUND(SUM(carbs_g), 1) FROM food_log
+                   WHERE food_log.date = nutrition_daily_summary.date AND deleted_at IS NULL),
+        fat_g = (SELECT ROUND(SUM(fat_g), 1) FROM food_log
+                 WHERE food_log.date = nutrition_daily_summary.date AND deleted_at IS NULL),
+        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE date IN (SELECT date FROM _food_log_twins);
+
+      UPDATE nutrition_daily_summary SET balance = tdee - total_calories_in
+      WHERE date IN (SELECT date FROM _food_log_twins);
+
+      DROP TABLE _food_log_twins;
+    `,
+  },
+  {
+    namespace: 'nutrition',
+    version: 17,
     up: `
       -- ── nutrition_ai_cache: quien lo dijo y con que prompt ──────────────────
       -- El cache no distinguia "lo dijo el modelo" de "lo corrigio el usuario"
@@ -443,10 +528,10 @@ export const nutritionMigrations: Migration[] = [
   },
   {
     namespace: 'nutrition',
-    version: 17,
+    version: 18,
     up: `
       -- ── Backfill: las correcciones que ya estaban en food_log ────────────────
-      -- Antes de v16 el cache no sabia que el usuario habia corregido. Pero
+      -- Antes de v17 el cache no sabia que el usuario habia corregido. Pero
       -- food_log si lo delata: Today reescala el breakdown para que sume el
       -- total confirmado, y FoodLogItem.handleSave cambia calories sin tocar
       -- ai_breakdown, asi que sum(ai_breakdown) <> calories en una fila

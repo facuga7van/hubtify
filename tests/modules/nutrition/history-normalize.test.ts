@@ -132,7 +132,7 @@ describe('migration v14 — indexes and the generated columns', () => {
     const cols = db.pragma('table_info(nutrition_ai_cache)') as Array<{ name: string; pk: number }>;
     expect(cols.map(c => c.name).sort()).toEqual(
       // Los tres macros: el caché guarda lo mismo que devuelve la estimación.
-      // v16: source ('model' | 'user') y prompt_version.
+      // v17: source ('model' | 'user') y prompt_version.
       ['ai_breakdown', 'calories', 'carbs_g', 'created_at', 'description_norm', 'fat_g', 'hits', 'prompt_version', 'protein_g', 'source', 'updated_at'],
     );
     expect(cols.find(c => c.name === 'description_norm')?.pk).toBe(1);
@@ -140,7 +140,7 @@ describe('migration v14 — indexes and the generated columns', () => {
 
   it('only its USER rows cross the sync layer — model rows are a local network cache', async () => {
     // Losing a model row costs one API call; a user correction is the evidence
-    // the model learns this user's portions from, so it travels (v16).
+    // the model learns this user's portions from, so it travels (v17).
     const syncSource = await import('node:fs').then(fs =>
       fs.readFileSync('shared-logic/modules/sync.ipc.ts', 'utf-8'));
     expect(syncSource).toMatch(/FROM nutrition_ai_cache WHERE source = 'user'/);
