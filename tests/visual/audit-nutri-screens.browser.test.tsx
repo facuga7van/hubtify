@@ -4,6 +4,7 @@ import { page } from 'vitest/browser';
 import { MemoryRouter } from 'react-router-dom';
 import ToastProvider from '@shared/components/ToastProvider';
 import { ConfirmProvider } from '@shared/components/ConfirmDialog';
+import { smallText, tokenPx } from './audit-hub-harness';
 
 import '../../src/i18n';
 import '../../src/hub/styles/theme.css';
@@ -338,6 +339,17 @@ describe('Auditoría visual Nutrify — Today', () => {
     expect(columnSpread('.nutri-meal-time')).toBeLessThanOrEqual(1);
     expect(docOverflowX()).toBeLessThanOrEqual(0);
     expect(clippedElements()).toEqual([]);
+
+    // Ningún texto informativo de la fila de comida baja del piso de 13 px, y
+    // la hora lleva tinta (--ink-soft), no opacidad ni --ink-faded.
+    const rows = [...document.querySelectorAll('.nutri-meal-row')];
+    expect(rows.length).toBeGreaterThan(0);
+    const small = rows.flatMap((r) => smallText(r));
+    expect(small, `texto chico: ${small.map((s) => `${s.sel} «${s.text}» ${s.px}px`).join(', ')}`).toEqual([]);
+    const body = tokenPx('--fs-body');
+    expect(body).toBeGreaterThan(13);
+    expect(parseFloat(getComputedStyle(document.querySelector('.nutri-meal-kcal')!).fontSize)).toBeGreaterThanOrEqual(body - 0.01);
+    expect(getComputedStyle(document.querySelector('.nutri-meal-time')!).color).toBe('rgb(74, 53, 32)');
   });
 
   test('02 — mismo día a 760×640 (mínimo de la app)', async () => {

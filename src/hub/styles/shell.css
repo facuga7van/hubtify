@@ -133,8 +133,12 @@
 
 .player-card__email {
   font-family: 'Fira Code', monospace;
-  font-size: calc(11px * var(--font-scale));
-  color: rgba(245, 231, 192, 0.6);
+  /* Era 11 px al 60 %: dato secundario, pero dato. Piso del sistema y
+     pergamino al 80 % (interlineado apretado para que el sidebar siga
+     entrando a 620 px de alto). */
+  font-size: var(--fs-label);
+  line-height: 1.2;
+  color: rgba(245, 231, 192, 0.8);
   margin-top: 2px;
 }
 
@@ -263,7 +267,6 @@
 .update-dialog__percent {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  opacity: 0.75;
 }
 
 .update-dialog__error {

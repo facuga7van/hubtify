@@ -132,7 +132,7 @@
 
 .rwd-item__times {
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .rwd-item__notice {
@@ -342,7 +342,7 @@
 
 .shop-item__desc {
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .shop-item__notice {

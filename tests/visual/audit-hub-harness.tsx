@@ -278,6 +278,47 @@ export function lowContrastText(root: ParentNode, bg: string, min = 4.5) {
   return out;
 }
 
+/**
+ * Texto INFORMATIVO por debajo del piso del sistema (`--fs-label`, 13 px).
+ * Recorre las hojas con texto dentro de `root` y devuelve las que computan
+ * menos de `minPx`. Los SVG (íconos, glifos ornamentales) no cuentan.
+ * Nació de una captura del usuario: «las letras dentro de la tabla son muy
+ * chicas» — el libro mayor iba a 12.5 px.
+ */
+export function smallText(root: ParentNode, minPx = 13) {
+  return smallTextIn(root, minPx);
+}
+
+/**
+ * Píxeles computados de un token de tamaño (`--fs-body`, `--fs-label`…).
+ * `getPropertyValue` devuelve el `calc(15px * var(--font-scale))` literal,
+ * así que se mide con una sonda en el DOM.
+ */
+export function tokenPx(token: string): number {
+  const probe = document.createElement('span');
+  probe.style.fontSize = `var(${token})`;
+  probe.style.position = 'absolute';
+  probe.textContent = 'x';
+  document.body.appendChild(probe);
+  const px = parseFloat(getComputedStyle(probe).fontSize);
+  probe.remove();
+  return px;
+}
+
+function smallTextIn(root: ParentNode, minPx: number) {
+  const out: Array<{ sel: string; text: string; px: number }> = [];
+  root.querySelectorAll('*').forEach((el) => {
+    if (el.children.length > 0 || el instanceof SVGElement) return;
+    const text = (el.textContent ?? '').trim();
+    if (!text) return;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none') return;
+    const px = parseFloat(cs.fontSize);
+    if (px < minPx - 0.01) out.push({ sel: describe(el), text: text.slice(0, 40), px });
+  });
+  return out;
+}
+
 /** Contraste efectivo de un elemento contra el primer ancestro con fondo opaco. */
 export function contrastOf(el: Element): number {
   const cs = getComputedStyle(el);

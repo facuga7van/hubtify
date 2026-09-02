@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import ToastProvider from '@shared/components/ToastProvider';
 import { ConfirmProvider } from '@shared/components/ConfirmDialog';
 import TaskList from '@modules/quests/components/TaskList';
+import { smallText, tokenPx } from './audit-hub-harness';
 
 import '../../src/i18n';
 import '../../src/hub/styles/theme.css';
@@ -314,6 +315,23 @@ describe('Questify — contraste y tipografía de lo numérico', () => {
     const font = getComputedStyle(el('.quest-row-xp-value')).fontFamily;
     console.log('[audit] fuente del XP de la fila:', font);
     expect(font).not.toMatch(/Unifraktur/i);
+  });
+
+  test('ningún texto de la fila de misión baja del piso de 13 px; el título va en cuerpo', async () => {
+    await page.viewport(1640, 900);
+    mount();
+    await settle();
+    await goTab(/^Pendientes$/i);
+    const rows = all('.quest-row');
+    expect(rows.length).toBeGreaterThan(0);
+    const small = rows.flatMap((r) => smallText(r));
+    expect(small, `texto chico: ${small.map((s) => `${s.sel} «${s.text}» ${s.px}px`).join(', ')}`).toEqual([]);
+    const body = tokenPx('--fs-body');
+    expect(body).toBeGreaterThan(13);
+    expect(parseFloat(getComputedStyle(el('.quest-row-title')).fontSize)).toBeGreaterThanOrEqual(body - 0.01);
+    for (const meta of all('.quest-row-meta span').slice(0, 6)) {
+      expect(getComputedStyle(meta).opacity).toBe('1');
+    }
   });
 
   test('la racha de un hábito es tinta legible, no un fantasma', async () => {

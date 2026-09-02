@@ -327,7 +327,7 @@ export default function Onboarding({ onComplete }: Props) {
                     <span className="onboarding__field-label">{t('nutrify.goalAmount')} (kcal)</span>
                     <input type="number" value={goalAmount} onChange={(e) => setGoalAmount(+e.target.value)}
                       min={100} max={1500} step={50} className="rpg-input" />
-                    <span style={{ fontSize: 'var(--fs-label)', opacity: 0.65 }}>
+                    <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                       {goal === 'deficit' ? t('nutrify.goalAmountDeficitHint') : t('nutrify.goalAmountSurplusHint')}
                     </span>
                   </div>
