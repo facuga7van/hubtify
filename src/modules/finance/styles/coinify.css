@@ -1,8 +1,8 @@
-/* ═════════��════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    coinify.css — Libro del Tesorero (Codex aesthetic)
    All classes prefixed with coin- to avoid collisions.
    Uses codex design tokens: --ink, --parch-*, --rubric, --moss, --gold
-   ═════════════════════════════════��════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 
 /* ── Animations ─────────────────────────────────────────────── */
 
@@ -279,7 +279,7 @@
   color: var(--ink-faded);
 }
 
-/* ── Summary Card (income / expenses) ─��� */
+/* ── Summary Card (income / expenses) ──── */
 
 .coin-summary-card {
   position: relative;
@@ -927,7 +927,7 @@ button.coin-sort-header--amount {
   font-size: var(--fs-label);
 }
 
-/* ── Codex Form (generic parchment form container) ─��� */
+/* ── Codex Form (generic parchment form container) ──── */
 
 .coin-codex-form {
   border: 1px solid rgba(74, 55, 32, 0.5);
@@ -1636,7 +1636,7 @@ button.coin-sort-header--amount {
   flex-wrap: wrap;
 }
 
-/* ── Recurring ───���──────────────────────────────────────────── */
+/* ── Recurring ────────────────────────────────────────────────── */
 
 .coin-recurring-list {
   display: flex;
@@ -1884,7 +1884,7 @@ button.coin-sort-header--amount {
   animation-delay: 0.2s;
 }
 
-/* ── Widget ──────────────────────────────���──────────────────── */
+/* ── Widget ───────────────────────────────────────────────────── */
 
 .coin-widget__number {
   font-family: 'UnifrakturCook', serif;
@@ -1983,7 +1983,7 @@ button.coin-sort-header--amount {
   cursor: not-allowed;
 }
 
-/* ── Empty States ───────��───────────────────────────────────── */
+/* ── Empty States ────────────────────────────────────────────── */
 
 .coin-empty-codex {
   text-align: center;
@@ -2582,19 +2582,31 @@ button.coin-sort-header--amount {
   border-left: none;
 }
 
-/* Which casa freezes onto every new movement (fx_rate). */
+/* Which casa freezes onto every new movement (fx_rate).
+   La casa elegida es el ajuste más consecuente del menú —se congela en CADA
+   movimiento nuevo— y su única señal era un ◈ de 13 px en `--gold` (2.9:1
+   sobre pergamino) contra un ◇ casi idéntico. Ahora la activa es un sello
+   lleno: se distingue de un vistazo, sin tener que comparar dos rombos. */
 .coin-fx-house-pick {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   color: var(--ink-faded);
   font-size: var(--fs-label);
-  padding: 0 2px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   line-height: 1;
+  border-radius: 50%;
 }
 
 .coin-fx-house-pick--active {
-  color: var(--gold);
+  color: var(--ink);
+  background: var(--gold);
+  border-color: var(--gold-dark);
 }
 
 .coin-fx-house-pick:hover,
@@ -2869,4 +2881,14 @@ button.coin-sort-header--amount {
   min-width: 0;
   max-width: 160px;
   text-overflow: ellipsis;
+}
+
+/* ── Casillas nativas del módulo ─────────────────────────────
+   Sin `accent-color` Chromium las pinta azul-sistema: un celeste de Windows
+   en medio del pergamino. El chip del dólar ya lo hacía en línea; el resto
+   (importador, alta de cuotas) quedaba con el azul. */
+.coin-import-table input[type='checkbox'],
+.coin-installment-form input[type='checkbox'],
+.coin-quick-add-form input[type='checkbox'] {
+  accent-color: var(--gold);
 }

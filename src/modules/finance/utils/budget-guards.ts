@@ -58,7 +58,11 @@ export async function checkBudgetOverflow(
   if (readFlag(key)) return null;
 
   const status = await getBudgetStatus(month);
-  const entry = status?.categories.find((c) => c.category === category);
+  // Un main viejo (o un handler que devuelve otra forma) hacía explotar esto
+  // con «Cannot read properties of undefined (reading 'find')».
+  const entry = Array.isArray(status?.categories)
+    ? status.categories.find((c) => c.category === category)
+    : undefined;
   if (!entry || entry.spent <= entry.limit) return null;
 
   writeFlag(key);
@@ -106,7 +110,7 @@ export async function checkBudgetMonthClose(
   // No bridge, or a month with nothing to respect: a month cannot be "kept
   // inside" limits that were never set, and paying 100 XP for an empty
   // configuration would make the reward worthless.
-  if (!status || status.categories.length === 0) return null;
+  if (!status || !Array.isArray(status.categories) || status.categories.length === 0) return null;
   if (!status.categories.every((c) => c.spent <= c.limit)) return null;
 
   writeFlag(MONTH_MET_KEY(closedMonth));

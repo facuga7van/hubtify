@@ -136,11 +136,16 @@ export default function InstallmentAddForm({ onCreated }: Props) {
         </div>
 
         <div className="coin-quick-add-form__row">
-          <select className="rpg-select" value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
+          {/* Los tres controles de esta fila no tenían nombre accesible: un
+              lector de pantalla anunciaba «combo» y nada más. Mismos rótulos
+              que en la carga rápida. */}
+          <select className="rpg-select" value={currency} aria-label="ARS / USD" onChange={(e) => setCurrency(e.target.value as Currency)}>
             <option value="ARS">ARS</option>
             <option value="USD">USD</option>
           </select>
-          <select className="rpg-select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
+          <select className="rpg-select" value={paymentMethod}
+            aria-label={t('coinify.paymentMethod', 'Medio de pago')}
+            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
             <option value="debit">{t('coinify.debit', 'Debito')}</option>
             <option value="credit_card">{t('coinify.creditCard', 'Tarjeta')}</option>
             <option value="transfer">{t('coinify.transfer', 'Transferencia')}</option>
@@ -149,6 +154,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
           <input
             className="rpg-input"
             type="date"
+            aria-label={t('coinify.startDate', 'Fecha de la primera cuota')}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             required
@@ -171,7 +177,11 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             max={120}
             step={1}
             placeholder={t('coinify.installmentCount', 'Cuotas')}
-            style={{ minWidth: 90 }}
+            aria-label={t('coinify.installmentCount', 'Cuotas')}
+            /* `.rpg-number` reserva 26 px de relleno a cada lado para sus
+               flechas: con 90 px el rótulo entraba a los empujones y al número
+               le quedaban ~20 px. */
+            style={{ minWidth: 116 }}
             required
           />
           <RpgNumberInput
@@ -184,6 +194,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
               : customLastAmount
                 ? t('coinify.firstAmount', '1ra cuota $')
                 : t('coinify.installmentAmount', 'Monto cuota $')}
+            aria-label={t('coinify.installmentAmount', 'Monto cuota $')}
             required
           />
         </div>
@@ -224,13 +235,18 @@ export default function InstallmentAddForm({ onCreated }: Props) {
         )}
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--fs-label)' }}>
+          {/* Apagado el riel era `--parch-1` sobre una tarjeta de pergamino:
+              se veía sólo la perilla blanca flotando, sin pista de que fuera
+              un interruptor. */}
           <div style={{
             width: 32, height: 18, borderRadius: 9, position: 'relative',
-            background: customLastAmount ? 'var(--gold)' : 'var(--parch-1)',
+            background: customLastAmount ? 'var(--gold)' : 'var(--parch-3)',
+            border: '1px solid var(--gold-dark)',
+            boxSizing: 'border-box',
             transition: 'background 0.2s ease',
           }}>
             <div style={{
-              position: 'absolute', top: 2, left: customLastAmount ? 16 : 2,
+              position: 'absolute', top: 1, left: customLastAmount ? 15 : 1,
               width: 14, height: 14, borderRadius: '50%',
               background: '#fff',
               transition: 'left 0.2s ease',

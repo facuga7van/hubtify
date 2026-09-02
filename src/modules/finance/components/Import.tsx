@@ -417,7 +417,9 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
                       <input type="checkbox" checked={row.included} onChange={() => toggleRow(idx)}
                         aria-label={`${t('coinify.importColInclude')}: ${row.merchant}`} />
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', opacity: 0.7 }}>{row.date}</td>
+                    {/* Es un dato de la tabla que hay que poder leer para
+                        controlar la importación, no una nota al margen. */}
+                    <td style={{ whiteSpace: 'nowrap', color: 'var(--ink-soft)' }}>{row.date}</td>
                     <td className="coin-import-row__merchant" title={row.merchant}>
                       {row.merchant}
                       {row.isTax && (

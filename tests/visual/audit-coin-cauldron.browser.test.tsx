@@ -69,11 +69,11 @@ const PROJECTS = [
   { id: 'pr2', name: 'Facultad', color: '#556b3c' },
 ];
 
-const IDLE_STATE = { status: 'idle', remainingMs: 0, totalMs: 0, sessionType: 'work', presetId: 'p1', round: 1 };
+const IDLE_STATE = { status: 'idle', remainingMs: 0, totalMs: 0, sessionType: 'work', presetId: 'p1', round: 1, currentCycle: 1, totalCycles: 4 };
 
 const RUNNING_STATE = {
   status: 'work', remainingMs: 14 * 60_000 + 37_000, totalMs: 25 * 60_000,
-  sessionType: 'work', presetId: 'p1', round: 2,
+  sessionType: 'work', presetId: 'p1', round: 2, currentCycle: 2, totalCycles: 4,
   taskId: 't1',
   taskName: 'Cerrar el balance del trimestre y conciliar las cuentas del estudio contable de Vicky',
   taskProjectId: 'pr1', taskProjectColor: '#7a1e1e',
@@ -136,6 +136,17 @@ function el<T extends Element = HTMLElement>(sel: string): T {
   return node;
 }
 
+/** ¿Algún hijo EN EL FLUJO se sale por la derecha de su contenedor? */
+function flowChildSticksOut(node: Element): boolean {
+  const box = node.getBoundingClientRect();
+  for (const child of node.children) {
+    const pos = getComputedStyle(child).position;
+    if (pos === 'absolute' || pos === 'fixed') continue;
+    if (child.getBoundingClientRect().right > box.right + 1) return true;
+  }
+  return false;
+}
+
 function overflowing(root: Element): string[] {
   const bad: string[] = [];
   for (const node of root.querySelectorAll<HTMLElement>('*')) {
@@ -148,6 +159,10 @@ function overflowing(root: Element): string[] {
     const hasBubble = /help-bubble/.test(node.className)
       || node.querySelector('.help-bubble, .help-bubble-inline') !== null;
     if (hasBubble && excess <= 10) continue;
+    // Decoración absoluta (embers, vapor, sellos) dentro de una caja con
+    // `overflow: hidden`: sobresale por diseño y ya está recortada. Sólo
+    // interesa lo que se sale ESTANDO en el flujo.
+    if (node.children.length > 0 && !flowChildSticksOut(node)) continue;
     bad.push(`${node.className || node.tagName} (${node.scrollWidth}>${node.clientWidth})`);
   }
   return bad;
@@ -180,6 +195,20 @@ describe('Caldero — la página entera', () => {
     const bad = overflowing(el('.cauldron-book'));
     expect(bad, `desbordes: ${bad.join(', ')}`).toEqual([]);
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth + 1);
+  });
+
+  test('760×640: «Iniciar Poción» se ve sin scrollear', async () => {
+    stub();
+    await page.viewport(760, 640);
+    wrap(<CauldronPage />);
+    await settle();
+    await page.screenshot({ path: `${SCREENS}/audit-coin-cauldron-14-boton.png` });
+    const start = [...document.querySelectorAll<HTMLButtonElement>('.cauldron-btn--primary')]
+      .find((b) => /poción|potion/i.test(b.textContent ?? ''));
+    expect(start, 'no encontré el botón de encender').toBeTruthy();
+    const r = start!.getBoundingClientRect();
+    expect(r.bottom, 'la acción principal queda abajo del pliegue')
+      .toBeLessThanOrEqual(window.innerHeight);
   });
 
   test('corriendo con misión: el nombre largo no rompe el panel', async () => {
@@ -332,6 +361,12 @@ describe('Caldero — la página entera', () => {
       const style = getComputedStyle(input);
       const inner = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       expect(inner, `campo sin lugar: ${input.className}`).toBeGreaterThan(24);
+    }
+
+    // Las casillas nativas llevan la tinta del códice, no el azul del sistema.
+    for (const box of modal.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+      expect(getComputedStyle(box).accentColor.toLowerCase(), 'casilla con acento del sistema')
+        .not.toBe('auto');
     }
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

@@ -115,6 +115,17 @@ function el<T extends Element = HTMLElement>(sel: string): T {
   return node;
 }
 
+/** ¿Algún hijo EN EL FLUJO se sale por la derecha de su contenedor? */
+function flowChildSticksOut(node: Element): boolean {
+  const box = node.getBoundingClientRect();
+  for (const child of node.children) {
+    const pos = getComputedStyle(child).position;
+    if (pos === 'absolute' || pos === 'fixed') continue;
+    if (child.getBoundingClientRect().right > box.right + 1) return true;
+  }
+  return false;
+}
+
 function overflowing(root: Element): string[] {
   const bad: string[] = [];
   for (const node of root.querySelectorAll<HTMLElement>('*')) {
@@ -127,6 +138,10 @@ function overflowing(root: Element): string[] {
     const hasBubble = /help-bubble/.test(node.className)
       || node.querySelector('.help-bubble, .help-bubble-inline') !== null;
     if (hasBubble && excess <= 10) continue;
+    // Decoración absoluta (embers, vapor, sellos) dentro de una caja con
+    // `overflow: hidden`: sobresale por diseño y ya está recortada. Sólo
+    // interesa lo que se sale ESTANDO en el flujo.
+    if (node.children.length > 0 && !flowChildSticksOut(node)) continue;
     bad.push(`${node.className || node.tagName} (${node.scrollWidth}>${node.clientWidth})`);
   }
   return bad;

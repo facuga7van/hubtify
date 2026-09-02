@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import ToastProvider from '@shared/components/ToastProvider';
 import { ConfirmProvider } from '@shared/components/ConfirmDialog';
 import Transactions from '@modules/finance/components/Transactions';
+import InstallmentAddForm from '@modules/finance/components/shared/InstallmentAddForm';
 
 import '../../src/i18n';
 import '../../src/hub/styles/theme.css';
@@ -82,6 +83,24 @@ function el<T extends Element = HTMLElement>(sel: string): T {
   return node;
 }
 
+/** Escribe en un input CONTROLADO por React: `.value = x` solo no lo entera. */
+function type(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  setter.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** ¿Algún hijo EN EL FLUJO se sale por la derecha de su contenedor? */
+function flowChildSticksOut(node: Element): boolean {
+  const box = node.getBoundingClientRect();
+  for (const child of node.children) {
+    const pos = getComputedStyle(child).position;
+    if (pos === 'absolute' || pos === 'fixed') continue;
+    if (child.getBoundingClientRect().right > box.right + 1) return true;
+  }
+  return false;
+}
+
 function overflowing(root: Element): string[] {
   const bad: string[] = [];
   for (const node of root.querySelectorAll<HTMLElement>('*')) {
@@ -96,6 +115,10 @@ function overflowing(root: Element): string[] {
     const hasBubble = /help-bubble/.test(node.className)
       || node.querySelector('.help-bubble, .help-bubble-inline') !== null;
     if (hasBubble && excess <= 10) continue;
+    // Decoración absoluta (embers, vapor, sellos) dentro de una caja con
+    // `overflow: hidden`: sobresale por diseño y ya está recortada. Sólo
+    // interesa lo que se sale ESTANDO en el flujo.
+    if (node.children.length > 0 && !flowChildSticksOut(node)) continue;
     bad.push(`${node.className || node.tagName} (${node.scrollWidth}>${node.clientWidth})`);
   }
   return bad;
@@ -248,6 +271,20 @@ describe('Libro mayor (Transactions)', () => {
     expect(r.bottom).toBeLessThanOrEqual(window.innerHeight + 1);
   });
 
+  test('las casillas del importador llevan la tinta del códice', async () => {
+    stub();
+    await page.viewport(1640, 900);
+    wrap();
+    await settle();
+    [...document.querySelectorAll<HTMLButtonElement>('.coin-month-nav__btn')]
+      .find((b) => /import/i.test(b.textContent ?? ''))!.click();
+    await settle(400);
+    const boxes = document.querySelectorAll<HTMLInputElement>('.coin-import-modal input[type="checkbox"]');
+    for (const box of boxes) {
+      expect(getComputedStyle(box).accentColor.toLowerCase()).not.toBe('auto');
+    }
+  });
+
   test('mes vacío: mensaje propio, sin claves i18n crudas', async () => {
     stub([]);
     await page.viewport(1640, 900);
@@ -257,5 +294,77 @@ describe('Libro mayor (Transactions)', () => {
     const text = document.body.textContent ?? '';
     expect(text).not.toMatch(/coinify\.[a-zA-Z]/);
     expect(el('.coin-empty-codex').textContent).toBeTruthy();
+  });
+});
+
+describe('Alta de un plan de cuotas', () => {
+  test('1640×900: el toggle cuota/total y sus campos entran y tienen rótulo', async () => {
+    stub();
+    await page.viewport(1640, 900);
+    render(
+      <MemoryRouter><ToastProvider><ConfirmProvider>
+        <div className="qb-page" style={{ padding: 24 }}>
+          <InstallmentAddForm onCreated={() => undefined} />
+        </div>
+      </ConfirmProvider></ToastProvider></MemoryRouter>,
+    );
+    await settle();
+    await page.screenshot({ path: `${SCREENS}/audit-coin-plan-01-1640.png` });
+
+    const form = el('form, .coin-quick-add-form');
+    const bad = overflowing(form);
+    expect(bad, `desbordes: ${bad.join(', ')}`).toEqual([]);
+
+    // Cada campo con flechas tiene lugar para su número detrás de ellas.
+    for (const input of form.querySelectorAll<HTMLInputElement>('.rpg-number input')) {
+      const style = getComputedStyle(input);
+      const inner = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      expect(inner, `campo de ${input.getAttribute('aria-label') ?? input.placeholder}`).toBeGreaterThan(24);
+    }
+    // Y ningún control queda sin nombre accesible.
+    for (const control of form.querySelectorAll<HTMLElement>('input, select')) {
+      if ((control as HTMLInputElement).type === 'hidden') continue;
+      if (getComputedStyle(control).display === 'none') continue;
+      const named = control.getAttribute('aria-label')
+        || (control as HTMLInputElement).placeholder
+        || control.closest('label')
+        || (control.id && document.querySelector(`label[for="${control.id}"]`));
+      expect(named, `control sin rótulo: ${control.tagName}.${control.className}`).toBeTruthy();
+    }
+  });
+
+  test('con el modo «total» la vista previa de la división entra a 760 px', async () => {
+    stub();
+    await page.viewport(760, 640);
+    render(
+      <MemoryRouter><ToastProvider><ConfirmProvider>
+        <div className="qb-page" style={{ padding: 24 }}>
+          <InstallmentAddForm onCreated={() => undefined} />
+        </div>
+      </ConfirmProvider></ToastProvider></MemoryRouter>,
+    );
+    await settle();
+    const totalBtn = [...document.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')]
+      .find((b) => /total/i.test((b.textContent ?? '').trim()));
+    expect(totalBtn, 'no encontré el toggle «Monto total»').toBeTruthy();
+    totalBtn!.click();
+    await settle(200);
+    // Con el modo total, el rótulo del importe cambia y aparece la división.
+    type(el<HTMLInputElement>('input[aria-label="Cuotas"]'), '12');
+    await settle(200);
+    const amount = [...document.querySelectorAll<HTMLInputElement>('.rpg-number input')]
+      .find((i) => /total/i.test(i.placeholder))!;
+    expect(amount, 'el rótulo del importe no cambió a «Monto total»').toBeTruthy();
+    type(amount, '900000');
+    await settle(300);
+    await page.screenshot({ path: `${SCREENS}/audit-coin-plan-02-total-760.png` });
+    const form = el('form, .coin-quick-add-form');
+    const bad = overflowing(form);
+    expect(bad, `desbordes: ${bad.join(', ')}`).toEqual([]);
+    expect(form.textContent).not.toMatch(/coinify\.[a-zA-Z]/);
+    // La vista previa de la división aparece y no imprime valores crudos.
+    const hint = form.querySelector('[role="status"]');
+    expect(hint, 'no apareció la vista previa de la división').toBeTruthy();
+    expect(hint!.textContent).not.toMatch(/NaN|undefined|\{\{/);
   });
 });

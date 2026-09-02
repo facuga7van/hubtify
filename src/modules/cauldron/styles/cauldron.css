@@ -1362,6 +1362,27 @@
 
 /* -- 20. Reduced Motion -------------------------------------- */
 
+/* Ventana baja — el mínimo que permite la app es 650 px de alto.
+   Con el escenario en 440 px de mínimo, un caldero de 340 px y el reloj a
+   64 px, «Iniciar Poción» —la única acción de la pantalla— quedaba 125 px por
+   debajo del pliegue: había que scrollear para encender el fuego. La sala se
+   aprieta; el botón no se esconde. */
+@media (max-height: 780px) {
+  .cauldron-stage {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .cauldron-svg {
+    width: min(100%, 200px);
+  }
+
+  .cauldron-time-remaining {
+    font-size: calc(44px * var(--font-scale));
+    margin: 4px 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cauldron-steam,
   .cauldron-ember,
@@ -1411,9 +1432,19 @@
   gap: 6px;
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  /* Rótulo de un control real, no una nota al pie: `--ink-faded` sobre
+     pergamino texturado no se leía. */
+  color: var(--ink-soft);
   cursor: pointer;
   user-select: none;
+}
+
+/* Las tres casillas nativas del caldero salían azul-sistema de Chromium: un
+   celeste de Windows en medio del pergamino. Misma tinta que las del chip
+   del dólar en Coinify. */
+.cauldron-popout-toggle input[type='checkbox'],
+.cauldron-autostart-toggle input[type='checkbox'] {
+  accent-color: var(--gold);
 }
 
 /* Resume banner for a session the app was killed in the middle of. */
