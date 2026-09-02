@@ -801,7 +801,7 @@
   padding: 5px 12px 6px;
   margin-bottom: 2px;
   border-bottom: 1px dashed var(--ink-faded);
-  font-family: 'Cinzel', serif;
+  font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2671,7 +2671,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-family: 'Crimson Text', serif;
+  font-family: 'IM Fell English', serif;
   font-size: var(--fs-label, 13px);
   color: var(--ink-faded, #6b5535);
   text-decoration: underline;
@@ -3032,60 +3032,12 @@
   background: rgba(168, 138, 60, 0.1);
 }
 
-/* ── Anillo chico de proteína (junto al principal, más discreto) ── */
+/* El anillo chico de proteína se retiró de Today.tsx (dos widgets peleaban por
+   la misma mirada: las MacroBars ya muestran proteína contra su objetivo). Su
+   CSS —`.nutri-protein-*`, `.nutri-est-protein` y el `:has()` que reacomodaba
+   `.nutri-cal-main`— sobrevivía de la otra rama sin nada que lo renderice. */
 
-.nutri-cal-main:has(.nutri-protein-ring) {
-  grid-template-columns: 160px auto 1fr;
-  gap: 16px;
-}
-
-.nutri-protein-ring {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.nutri-protein-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.nutri-protein-val {
-  font-family: 'Fira Code', monospace;
-  font-size: var(--fs-sub);
-  font-weight: 600;
-  color: var(--ink);
-  line-height: 1;
-}
-
-.nutri-protein-unit {
-  font-family: 'Fira Code', monospace;
-  font-size: var(--fs-label);
-  color: var(--ink-faded);
-  margin-top: 2px;
-}
-
-.nutri-protein-label {
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-label);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-faded);
-}
-
-/* ── Proteína en la estimación y en cada comida ── */
-
-.nutri-est-protein {
-  margin-left: 8px;
-  font-family: 'Fira Code', monospace;
-  font-size: var(--fs-label);
-  color: var(--moss);
-  white-space: nowrap;
-}
+/* ── Proteína en cada comida ── */
 
 .nutri-meal-prot {
   display: block;
@@ -3160,9 +3112,3 @@
   color: var(--gold-dark);
 }
 
-/* :has() gana en especificidad al breakpoint de 768px de arriba — reapilar. */
-@media (max-width: 768px) {
-  .nutri-cal-main:has(.nutri-protein-ring) {
-    grid-template-columns: 1fr;
-  }
-}
