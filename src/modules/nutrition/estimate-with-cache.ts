@@ -1,5 +1,5 @@
 import { estimateNutrition } from './estimate-service';
-import { getCachedEstimate } from './history-api';
+import { getCachedEstimate, getSimilarCorrections } from './history-api';
 import type { BreakdownItem } from './breakdown-utils';
 
 export interface ResolvedEstimate {
@@ -49,7 +49,12 @@ export async function resolveEstimate(
     }
   }
 
-  const result = await estimateNutrition(desc, { onRetry });
+  // Only on the network path: the user's corrections for similar dishes ride
+  // along as examples, so "milanesa con pure" corrected to 700 anchors the
+  // next "milanesa con pure y ensalada" (P3). An exact match never gets here
+  // unless the user asked for a fresh opinion, and then it is excluded.
+  const examples = await getSimilarCorrections(desc);
+  const result = await estimateNutrition(desc, { onRetry, examples });
   return {
     origin: 'ai',
     totalCalories: result.calories,

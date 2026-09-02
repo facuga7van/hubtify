@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   buildGenerationConfig,
   buildRequestBody,
+  buildUserTurn,
   parseEstimate,
+  sanitizeExamples,
+  MAX_EXAMPLES,
   promptVersionFor,
   isRetryableOutput,
   GeminiOutputError,
@@ -159,6 +162,61 @@ describe('parseEstimate', () => {
   it('drops items without positive calories and fails when none survive', () => {
     expect(() => parseEstimate(reply('{"items": [{"name": "agua", "grams": 250, "calories": 0}]}')))
       .toThrow(GeminiOutputError);
+  });
+});
+
+/**
+ * P3: the user's own corrections for similar dishes travel as `examples` and
+ * are injected in the USER turn, before the dish. Without them the request
+ * must be byte-identical to before — the benchmark sends none.
+ */
+describe('examples (personal few-shot)', () => {
+  const ex = (description: string, calories: number, extra: Record<string, unknown> = {}) =>
+    ({ description, calories, protein_g: null, carbs_g: null, fat_g: null, ...extra });
+
+  it('sends exactly the trimmed description when there are no examples', () => {
+    const plain = buildRequestBody('  un tostado ', 'PROMPT');
+    expect(buildRequestBody('  un tostado ', 'PROMPT', [])).toEqual(plain);
+    expect((plain as { contents: Array<{ parts: Array<{ text: string }> }> }).contents[0].parts[0].text).toBe('un tostado');
+  });
+
+  it('puts the examples in the user turn, before the dish, never in the system instruction', () => {
+    const body = buildRequestBody('milanesa con pure y ensalada', 'PROMPT', [
+      ex('milanesa con pure', 700, { protein_g: 30, carbs_g: 40, fat_g: 35 }),
+    ]) as { contents: Array<{ parts: Array<{ text: string }> }>; systemInstruction: { parts: Array<{ text: string }> } };
+    const turn = body.contents[0].parts[0].text;
+    expect(turn).toContain('Registros anteriores de ESTE usuario para platos parecidos (priorizá su porción):');
+    expect(turn).toContain('- "milanesa con pure": 700 kcal (P 30 g · C 40 g · G 35 g)');
+    expect(turn.indexOf('Registros anteriores')).toBeLessThan(turn.indexOf('Plato a estimar: milanesa con pure y ensalada'));
+    expect(body.systemInstruction.parts[0].text).toBe('PROMPT');
+  });
+
+  it('renders an unknown macro as "?" instead of inventing a 0', () => {
+    expect(buildUserTurn('x', [ex('guiso', 700)])).toContain('700 kcal (P ? · C ? · G ?)');
+  });
+
+  it('sanitizeExamples keeps at most 3 valid ones and drops the rest silently', () => {
+    const kept = sanitizeExamples([
+      ex('a', 100), ex('b', 200), ex('c', 300), ex('d', 400),
+    ]);
+    expect(kept.map(e => e.description)).toEqual(['a', 'b', 'c']);
+    expect(MAX_EXAMPLES).toBe(3);
+  });
+
+  it('sanitizeExamples rejects bad shapes, implausible kcal, overlong text and negative macros', () => {
+    expect(sanitizeExamples(undefined)).toEqual([]);
+    expect(sanitizeExamples('nope')).toEqual([]);
+    expect(sanitizeExamples([
+      null, 42, { calories: 100 }, ex('', 100), ex('x'.repeat(121), 100),
+      ex('agua', 0), ex('agua', 9), ex('asado x12', 3001), ex('nan', Number.NaN),
+      ex('neg', 300, { protein_g: -1 }), ex('str', 300, { fat_g: '9' }),
+    ])).toEqual([]);
+    expect(sanitizeExamples([ex('ok', 10), ex('ok2', 3000)])).toHaveLength(2);
+  });
+
+  it('sanitizeExamples flattens newlines, trims and rounds', () => {
+    expect(sanitizeExamples([ex('  pan\ncon\tmanteca  ', 200.4, { protein_g: 6.26 })]))
+      .toEqual([{ description: 'pan con manteca', calories: 200, protein_g: 6.3, carbs_g: null, fat_g: null }]);
   });
 });
 

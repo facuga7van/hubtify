@@ -153,7 +153,7 @@ describe('resolveEstimate (renderer) no descarta la proteína', () => {
     vi.resetModules();
     const getCachedEstimate = vi.fn();
     const estimateNutrition = vi.fn();
-    vi.doMock('../../../src/modules/nutrition/history-api', () => ({ getCachedEstimate }));
+    vi.doMock('../../../src/modules/nutrition/history-api', () => ({ getCachedEstimate, getSimilarCorrections: async () => [] }));
     vi.doMock('../../../src/modules/nutrition/estimate-service', () => ({ estimateNutrition }));
     const { resolveEstimate } = await import('../../../src/modules/nutrition/estimate-with-cache');
 

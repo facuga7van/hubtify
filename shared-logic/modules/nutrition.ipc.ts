@@ -578,6 +578,22 @@ export function registerNutritionIpcHandlers(): void {
     return { cached: true };
   });
 
+  /**
+   * The user's corrections, newest first, for the renderer to pick examples
+   * from (src/modules/nutrition/similar-corrections.ts). Keyed by
+   * description_norm, so the sync duplicates in food_log cannot show up here
+   * twice; `description` IS the normalised text, which is what the model sees.
+   */
+  ipcHandle('nutrition:getUserCorrections', (_e, limit?: number) => {
+    const cap = Math.max(1, Math.min(1000, Number.isFinite(limit as number) ? Math.floor(limit as number) : 200));
+    return getDb().prepare(
+      `SELECT description_norm AS description, calories, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
+              updated_at AS updatedAt
+       FROM nutrition_ai_cache WHERE source = 'user'
+       ORDER BY updated_at DESC, description_norm ASC LIMIT ?`,
+    ).all(cap);
+  });
+
   ipcHandle('nutrition:updateFood', (_e, id: number, fields: {
     description?: string; calories?: number; meal?: string; time?: string;
     aiBreakdown?: string; source?: string;

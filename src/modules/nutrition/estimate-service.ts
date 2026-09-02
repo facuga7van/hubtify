@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { getActiveFunctions, getActiveAuth } from '../../shared/firebase';
 import { normalizeDescription } from './normalize';
+import type { EstimateExample } from './similar-corrections';
 import {
   type AiResult,
   type AiEstimationItem,
@@ -17,7 +18,21 @@ export type { AiResult, AiEstimationItem };
 export type EstimateOptions = {
   /** Called before each retry with the upcoming attempt number (2-based). */
   onRetry?: (attempt: number) => void;
+  /**
+   * The user's own corrections for similar dishes (history-api
+   * getSimilarCorrections). Sent as `examples` only when non-empty, so a call
+   * without them is byte-identical to what the benchmark sends.
+   */
+  examples?: EstimateExample[];
 };
+
+/** The payload of the `estimateNutrition` callable. */
+export type EstimateRequest = { description: string; examples?: EstimateExample[] };
+
+/** What goes over the wire for a description and its optional examples. */
+export function buildEstimateRequest(description: string, examples: EstimateExample[] = []): EstimateRequest {
+  return examples.length > 0 ? { description, examples } : { description };
+}
 
 /**
  * One network estimate: timeout, retry on transient failures, normalized result.
@@ -42,14 +57,15 @@ export async function estimateNutrition(
   // is not wired into httpsCallable) — a timeout surfaces as `deadline-exceeded`,
   // which is NOT retried: TIMEOUT_MS outlives the server abort, so by then the
   // server already gave up and a retry would just run the slow prompt again.
-  const fn = httpsCallable<{ description: string }, AiResult>(
+  const fn = httpsCallable<EstimateRequest, AiResult>(
     getActiveFunctions(),
     'estimateNutrition',
     { timeout: TIMEOUT_MS },
   );
+  const request = buildEstimateRequest(description, options.examples);
 
   return withRetry(
-    async () => normalizeResult((await fn({ description })).data),
+    async () => normalizeResult((await fn(request)).data),
     { delays: RETRY_DELAYS_MS, isTransient: isTransientError, onRetry: options.onRetry },
   );
 }

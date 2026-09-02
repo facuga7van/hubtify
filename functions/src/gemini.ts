@@ -279,10 +279,83 @@ export function buildGenerationConfig(): Record<string, unknown> {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Personal examples (P3): what THIS user said similar dishes weigh
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One correction the user made, offered back to the model as an anchor. */
+export interface UserExample {
+  description: string;
+  calories: number;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+}
+
+export const MAX_EXAMPLES = 3;
+export const EXAMPLE_DESCRIPTION_MAX_CHARS = 120;
+export const EXAMPLE_KCAL_MIN = 10;
+export const EXAMPLE_KCAL_MAX = 3000;
+
+/**
+ * Keeps only examples that are safe to put in front of the model: at most
+ * MAX_EXAMPLES, a one-line description of bounded length, a plausible calorie
+ * count and finite non-negative macros (or null). Anything else is dropped,
+ * never "fixed" — the client applies the same rules, so a rejected example is
+ * a bug or a forged payload, and either way silence is the right answer.
+ */
+export function sanitizeExamples(raw: unknown): UserExample[] {
+  if (!Array.isArray(raw)) return [];
+  const out: UserExample[] = [];
+  for (const item of raw) {
+    if (out.length >= MAX_EXAMPLES) break;
+    if (!item || typeof item !== 'object') continue;
+    const ex = item as Record<string, unknown>;
+    if (typeof ex.description !== 'string') continue;
+    const description = ex.description.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    if (!description || description.length > EXAMPLE_DESCRIPTION_MAX_CHARS) continue;
+    const calories = ex.calories;
+    if (typeof calories !== 'number' || !isFinite(calories) || calories < EXAMPLE_KCAL_MIN || calories > EXAMPLE_KCAL_MAX) continue;
+    const m = (v: unknown): number | null | undefined =>
+      v == null ? null : (typeof v === 'number' && isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : undefined);
+    const protein_g = m(ex.protein_g);
+    const carbs_g = m(ex.carbs_g);
+    const fat_g = m(ex.fat_g);
+    if (protein_g === undefined || carbs_g === undefined || fat_g === undefined) continue;
+    out.push({ description, calories: Math.round(calories), protein_g, carbs_g, fat_g });
+  }
+  return out;
+}
+
+/**
+ * The user turn. Without examples it is exactly the trimmed description, so
+ * the benchmark (which sends none) measures the prompt alone. With examples
+ * they go in the USER turn, before the dish, as this user's own records: the
+ * model repeats anchors almost verbatim (2026-09-02 research §2), and a text
+ * in the user turn cannot rewrite the rules in the system instruction.
+ */
+export function buildUserTurn(description: string, examples: UserExample[] = []): string {
+  const dish = description.trim();
+  if (examples.length === 0) return dish;
+  const fmt = (v: number | null) => (v == null ? '?' : `${v} g`);
+  const lines = examples.map(ex =>
+    `- "${ex.description}": ${ex.calories} kcal (P ${fmt(ex.protein_g)} · C ${fmt(ex.carbs_g)} · G ${fmt(ex.fat_g)})`);
+  return [
+    'Registros anteriores de ESTE usuario para platos parecidos (priorizá su porción):',
+    ...lines,
+    '',
+    `Plato a estimar: ${dish}`,
+  ].join('\n');
+}
+
 /** The full `generateContent` body for one description. */
-export function buildRequestBody(description: string, systemPrompt: string): Record<string, unknown> {
+export function buildRequestBody(
+  description: string,
+  systemPrompt: string,
+  examples: UserExample[] = [],
+): Record<string, unknown> {
   return {
-    contents: [{ parts: [{ text: description.trim() }] }],
+    contents: [{ parts: [{ text: buildUserTurn(description, examples) }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
     generationConfig: buildGenerationConfig(),
   };

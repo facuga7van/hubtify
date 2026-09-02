@@ -441,4 +441,34 @@ export const nutritionMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_nutrition_ai_cache_source ON nutrition_ai_cache(source);
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 17,
+    up: `
+      -- ── Backfill: las correcciones que ya estaban en food_log ────────────────
+      -- Antes de v16 el cache no sabia que el usuario habia corregido. Pero
+      -- food_log si lo delata: Today reescala el breakdown para que sume el
+      -- total confirmado, y FoodLogItem.handleSave cambia calories sin tocar
+      -- ai_breakdown, asi que sum(ai_breakdown) <> calories en una fila
+      -- ai_estimate == el humano edito el numero (informe
+      -- 2026-09-02-ai-real-benchmark.md §1). Esas filas entran como 'user'.
+      --
+      -- GROUP BY description_norm + MAX(updated_at): food_log tiene filas
+      -- duplicadas por sync (una con sync_id 'legacy-…', otra NULL/uuid); de
+      -- cada grupo sobrevive la mas reciente y una sola. Los macros quedan
+      -- NULL: son los del modelo, no los corregidos.
+      INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, carbs_g, fat_g, hits, created_at, updated_at, source, prompt_version)
+      SELECT description_norm, calories, NULL, NULL, NULL, NULL, 1,
+             COALESCE(MAX(updated_at), datetime('now')), COALESCE(MAX(updated_at), datetime('now')), 'user', NULL
+      FROM food_log f
+      WHERE deleted_at IS NULL AND source = 'ai_estimate' AND description_norm <> ''
+        AND ai_breakdown IS NOT NULL AND json_valid(ai_breakdown) AND json_type(ai_breakdown) = 'array'
+        AND calories <> (SELECT COALESCE(SUM(json_extract(value, '$.calories')), 0) FROM json_each(f.ai_breakdown))
+      GROUP BY description_norm
+      ON CONFLICT(description_norm) DO UPDATE SET
+        calories = excluded.calories, ai_breakdown = NULL, updated_at = excluded.updated_at,
+        source = 'user', prompt_version = NULL
+      WHERE nutrition_ai_cache.source <> 'user';
+    `,
+  },
 ];

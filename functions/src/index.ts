@@ -7,6 +7,7 @@ import {
   buildRequestBody,
   isRetryableOutput,
   parseEstimate,
+  sanitizeExamples,
   type GeminiResponse,
 } from './gemini';
 
@@ -27,7 +28,10 @@ export const estimateNutrition = functions
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    const body = JSON.stringify(buildRequestBody(description, SYSTEM_PROMPT));
+    // The user's own corrections for similar dishes, chosen client-side and
+    // validated again here (max 3, bounded text, plausible kcal).
+    const examples = sanitizeExamples(data?.examples);
+    const body = JSON.stringify(buildRequestBody(description, SYSTEM_PROMPT, examples));
 
     const askOnce = async (): Promise<ReturnType<typeof parseEstimate>> => {
       const response = await fetch(url, {

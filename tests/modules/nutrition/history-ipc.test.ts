@@ -347,3 +347,94 @@ describe('nutrition_ai_cache — source and prompt_version (v16)', () => {
     expect(rowFor('tarta')).toMatchObject({ source: 'model', promptVersion: PROMPT_VERSION });
   });
 });
+
+/** P3: the corrections the renderer picks personal examples from. */
+describe('nutrition:getUserCorrections', () => {
+  it('returns only user rows, newest first, in the shape similar-corrections expects', async () => {
+    await invoke('nutrition:cacheEstimate', { description: 'Pizza', calories: 300 });
+    await invoke('nutrition:cacheEstimate', { description: 'Guiso de lentejas', calories: 700, corrected: true, proteinG: 22 });
+    harness.db.prepare(`
+      INSERT INTO nutrition_ai_cache (description_norm, calories, source, updated_at, created_at)
+      VALUES ('asado con papa al horno', 850, 'user', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+    `).run();
+    const rows = await invoke<Array<{ description: string; calories: number; proteinG: number | null; updatedAt: string }>>(
+      'nutrition:getUserCorrections');
+    expect(rows.map(r => r.description)).toEqual(['guiso de lentejas', 'asado con papa al horno']);
+    expect(rows[0]).toMatchObject({ calories: 700, proteinG: 22, carbsG: null, fatG: null });
+    expect(typeof rows[0].updatedAt).toBe('string');
+  });
+
+  it('honours the limit and clamps nonsense', async () => {
+    for (let i = 0; i < 5; i++) {
+      await invoke('nutrition:cacheEstimate', { description: `plato ${i}`, calories: 100 + i, corrected: true });
+    }
+    expect(await invoke<unknown[]>('nutrition:getUserCorrections', 2)).toHaveLength(2);
+    expect(await invoke<unknown[]>('nutrition:getUserCorrections', -3)).toHaveLength(1);
+    expect(await invoke<unknown[]>('nutrition:getUserCorrections', Number.NaN)).toHaveLength(5);
+  });
+});
+
+/**
+ * Migration v17: corrections that already lived in food_log (the breakdown no
+ * longer sums to the total the user typed) are promoted to user rows once.
+ */
+describe('nutrition v17 — backfill of pre-existing corrections', () => {
+  function freshDbUpTo(version: number): Database.Database {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    for (const m of nutritionMigrations) if (m.version <= version) db.exec(m.up);
+    return db;
+  }
+  const v17 = nutritionMigrations.find(m => m.version === 17)!;
+  const breakdown = (...cals: number[]) => JSON.stringify(cals.map((c, i) => ({ name: `item ${i}`, calories: c })));
+  function log(db: Database.Database, description: string, calories: number, aiBreakdown: string | null,
+    opts: { source?: string; updatedAt?: string | null; syncId?: string; deleted?: boolean } = {}) {
+    db.prepare(`
+      INSERT INTO food_log (date, time, description, calories, source, ai_breakdown, updated_at, sync_id, deleted_at)
+      VALUES ('2026-04-29', '13:00', ?, ?, ?, ?, ?, ?, ?)
+    `).run(description, calories, opts.source ?? 'ai_estimate', aiBreakdown, opts.updatedAt ?? '2026-04-29T16:00:00.000Z',
+      opts.syncId ?? `s${Math.random()}`, opts.deleted ? '2026-05-01T00:00:00.000Z' : null);
+  }
+  const cache = (db: Database.Database) => db.prepare(
+    'SELECT description_norm AS norm, calories, source, protein_g AS proteinG, updated_at AS updatedAt FROM nutrition_ai_cache ORDER BY description_norm',
+  ).all() as Array<{ norm: string; calories: number; source: string; proteinG: number | null; updatedAt: string }>;
+
+  it('promotes an edited AI entry (breakdown does not sum to the total) and dedupes the sync twins', () => {
+    const db = freshDbUpTo(16);
+    // The real case from the report: 1200+450+300 = 1950 estimated, 1750 kept — twice, thanks to sync.
+    log(db, 'hamburguesa triple con papas', 1750, breakdown(1200, 450, 300), { syncId: 'legacy-x', updatedAt: '2026-04-29T16:00:00.000Z' });
+    log(db, 'Hamburguesa triple con papas', 1750, breakdown(1200, 450, 300), { syncId: 'uuid-x', updatedAt: '2026-04-30T10:00:00.000Z' });
+    // Accepted as estimated: NOT a correction.
+    log(db, 'dos porciones de pastel de papa', 1000, breakdown(500, 500));
+    // Manual entries and deleted rows do not count.
+    log(db, 'tofi', 270, null, { source: 'manual' });
+    log(db, 'asado con papa al horno', 850, breakdown(700, 250), { deleted: true });
+    db.exec(v17.up);
+    expect(cache(db)).toEqual([
+      expect.objectContaining({ norm: 'hamburguesa triple con papas', calories: 1750, source: 'user', proteinG: null, updatedAt: '2026-04-30T10:00:00.000Z' }),
+    ]);
+  });
+
+  it('overwrites a stale model row for the same dish but never an existing user row', () => {
+    const db = freshDbUpTo(16);
+    db.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version) VALUES ('guiso', 980, 'model', 'old')`).run();
+    db.prepare(`INSERT INTO nutrition_ai_cache (description_norm, calories, source) VALUES ('tarta', 500, 'user')`).run();
+    log(db, 'guiso', 700, breakdown(980));
+    log(db, 'tarta', 640, breakdown(400, 300));
+    db.exec(v17.up);
+    expect(cache(db)).toEqual([
+      expect.objectContaining({ norm: 'guiso', calories: 700, source: 'user' }),
+      expect.objectContaining({ norm: 'tarta', calories: 500, source: 'user' }),
+    ]);
+  });
+
+  it('is a no-op on an empty log and idempotent when re-run', () => {
+    const db = freshDbUpTo(16);
+    db.exec(v17.up);
+    expect(cache(db)).toEqual([]);
+    log(db, 'milanesa', 400, breakdown(350));
+    db.exec(v17.up);
+    db.exec(v17.up);
+    expect(cache(db)).toHaveLength(1);
+  });
+});
