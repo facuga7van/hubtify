@@ -71,6 +71,32 @@ describe('Questify a 390×844', () => {
     noOverflow('QUESTS COMPLETADAS');
   });
 
+  test('QST-02: el nombre del hábito y de la misión van a lo ancho', async () => {
+    await setMobileViewport();
+    mountInShell(<TaskList />, '/quests');
+    await settle();
+    await goTab(/^Pendientes$/i);
+    const wide = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      const p = el.parentElement!.getBoundingClientRect();
+      expect(r.width, `${el.className} mide ${r.width}px`).toBeGreaterThanOrEqual(p.width - 2);
+    };
+    await page.getByRole('button', { name: /Nuevo hábito/i }).click();
+    await settle(300);
+    wide(document.querySelector('.quest-habit-form__name') as HTMLElement);
+
+    // El botón va sobre una cinta decorativa que intercepta el click real de
+    // playwright; el click de DOM dispara el mismo handler.
+    (document.querySelector('.quest-add-toggle') as HTMLElement).click();
+    await settle(600);
+    const name = document.querySelector('.quest-form-name') as HTMLElement;
+    const r = name.getBoundingClientRect();
+    expect(r.width).toBeGreaterThanOrEqual(300);
+    // …y los botones caen al renglón siguiente, no al lado.
+    const submit = name.parentElement!.querySelector('button') as HTMLElement;
+    expect(submit.getBoundingClientRect().top).toBeGreaterThanOrEqual(r.bottom);
+  });
+
   test('el gestor de proyectos entra en la pantalla (Q3)', async () => {
     await setMobileViewport();
     mountInShell(<TaskList />, '/quests');

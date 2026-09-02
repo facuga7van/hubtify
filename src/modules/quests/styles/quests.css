@@ -55,6 +55,12 @@
   transition: grid-template-rows 0.35s ease, opacity 0.25s ease;
 }
 
+/* El nombre de la misión: era `flex: 1` inline (TaskForm.tsx), fuera del
+   alcance de cualquier regla mobile. */
+.quest-form-name {
+  flex: 1;
+}
+
 .quest-form-wrapper-inner {
   min-height: 0;
   overflow: hidden;
@@ -961,6 +967,13 @@
   flex-wrap: wrap;
 }
 
+/* El nombre del hábito vivía con `flex: 1; min-width: 100` inline y ninguna
+   regla mobile podía pisarlo. */
+.quest-habit-form__name {
+  flex: 1;
+  min-width: 100px;
+}
+
 .quest-habit-form input,
 .quest-habit-form select {
   padding: 6px 10px;
@@ -1690,6 +1703,14 @@
 /* Q9: el <input> no encoge por debajo de su tamaño intrínseco. */
 [data-shell="mobile"] .quest-form-wrapper .rpg-input {
   min-width: 0;
+}
+
+/* QST-02: el nombre compartía renglón con tier/frecuencia/Guardar y quedaba
+   en 106 px («Nombre del |»); en la misión, con los dos botones, en 137.
+   A lo ancho y solo en su renglón; los botones bajan al siguiente. */
+[data-shell="mobile"] .quest-habit-form__name,
+[data-shell="mobile"] .quest-form-name {
+  flex: 1 1 100%;
 }
 
 /* Q10 */
