@@ -324,24 +324,19 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
         </div>
         {!readOnly ? (
           confirmDelete ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              flexWrap: 'wrap',
-              gridColumn: '1 / -1',
-              padding: '4px 10px', background: 'rgba(122,30,30,0.08)',
-              border: '1px solid var(--rubric)', borderRadius: '3px',
-            }}>
-              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
+            <div className="nutri-meal-del-confirm">
+              <span className="nutri-meal-del-confirm-text">
                 {t('nutrify.deleteConfirm', 'Delete this entry?')}
               </span>
-              <button className="nutri-btn" onClick={() => onDelete(entry.id)}
-                style={{ background: 'var(--rubric)', borderColor: 'var(--rubric)', padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-                {t('common.delete', 'Eliminar')}
-              </button>
-              <button className="nutri-btn nutri-btn-ghost" onClick={() => setConfirmDelete(false)}
-                style={{ padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-                {t('common.cancel', 'Cancelar')}
-              </button>
+              {/* Grouped so that on a phone they wrap together, under the text (NUT-04). */}
+              <div className="nutri-meal-del-confirm-actions">
+                <button type="button" className="nutri-btn nutri-meal-del-confirm-yes" onClick={() => onDelete(entry.id)}>
+                  {t('common.delete', 'Eliminar')}
+                </button>
+                <button type="button" className="nutri-btn nutri-btn-ghost" onClick={() => setConfirmDelete(false)}>
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="nutri-meal-del">

@@ -139,6 +139,30 @@ describe('Nutrify — QA 0.9.0 (NUT-03)', () => {
   });
 });
 
+describe('Nutrify — QA 0.9.0 (NUT-04)', () => {
+  test('NUT-04: confirmación de borrado con el texto arriba y los botones juntos en una fila', async () => {
+    installApi(NUTRITION_API);
+    await setMobileViewport();
+    mountInShell(<Today />, '/nutrition');
+    await settle(700);
+    (document.querySelector('.nutri-food-action[aria-label^="Eliminar"]') as HTMLButtonElement).click();
+    await settle(200);
+    const box = document.querySelector('.nutri-meal-del-confirm') as HTMLElement;
+    expect(box).not.toBeNull();
+    const text = box.querySelector('.nutri-meal-del-confirm-text') as HTMLElement;
+    const [del, cancel] = Array.from(box.querySelectorAll<HTMLButtonElement>('button'));
+    expect(del.textContent).toMatch(/Eliminar/);
+    expect(cancel.textContent).toMatch(/Cancelar/);
+    // Texto arriba; Eliminar y Cancelar en el mismo renglón, ≥ 40 px de alto.
+    expect(text.getBoundingClientRect().bottom).toBeLessThanOrEqual(del.getBoundingClientRect().top + 1);
+    expect(del.offsetTop).toBe(cancel.offsetTop);
+    expect(del.offsetHeight).toBeGreaterThanOrEqual(40);
+    expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 1);
+    box.scrollIntoView({ block: 'center' });
+    await shoot('nutrify-qa-04-delete');
+  });
+});
+
 describe('Nutrify — QA 0.9.0 (NUT-02)', () => {
   test('NUT-02: cerrar el día deja la página en solo lectura sin recargar', async () => {
     installApi({

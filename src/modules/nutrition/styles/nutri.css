@@ -1180,6 +1180,41 @@
   gap: 5px;
 }
 
+/* Confirmación inline de borrado: texto y botonera en una línea en
+   escritorio (mismos valores que llevaba inline), en dos en mobile. */
+.nutri-meal-del-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+  padding: 4px 10px;
+  background: rgba(122, 30, 30, 0.08);
+  border: 1px solid var(--rubric);
+  border-radius: 3px;
+}
+
+.nutri-meal-del-confirm-text {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+}
+
+.nutri-meal-del-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-meal-del-confirm-actions .nutri-btn {
+  padding: 3px 10px;
+  font-size: var(--fs-label);
+}
+
+.nutri-meal-del-confirm-yes {
+  background: var(--rubric);
+  border-color: var(--rubric);
+}
+
 .nutri-meal-row:last-child { border-bottom: none; }
 
 .nutri-meal-row:hover {
@@ -3202,6 +3237,19 @@
 
 [data-shell="mobile"] .nutri-meal-edit-actions .nutri-meal-edit-ai {
   flex: 0 0 auto;
+}
+
+/* NUT-04: «Cancelar» caía solo al segundo renglón. Texto arriba, los dos
+   botones juntos debajo, a lo ancho. */
+[data-shell="mobile"] .nutri-meal-del-confirm {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 10px;
+}
+
+[data-shell="mobile"] .nutri-meal-del-confirm-actions .nutri-btn {
+  flex: 1 1 0;
+  justify-content: center;
 }
 
 /* N8 */
