@@ -61,6 +61,13 @@ describe('Hub a 390×844', () => {
     // eslint-disable-next-line no-console
     console.log('DASH MOBILE CARTELAS', JSON.stringify(widths));
     for (const w of widths) expect(w).toBeGreaterThanOrEqual(150);
+    // HUB-01 / HUB-03: la fila HOY (parte + sello) y Crónica + Bitácora van
+    // en una columna; eran grillas inline `1fr 220px` / `1.2fr 1fr`.
+    for (const sel of ['.dash-row-brief', '.dash-row-chronicle']) {
+      const row = document.querySelector(sel) as HTMLElement;
+      expect(row, sel).not.toBeNull();
+      expect(getComputedStyle(row).gridTemplateColumns.split(' ').length, sel).toBe(1);
+    }
     for (const c of cartouches) {
       const label = c.querySelector('.qb-cartouche-label') as HTMLElement;
       const cs = getComputedStyle(label);

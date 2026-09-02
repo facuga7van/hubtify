@@ -394,7 +394,7 @@ export default function Dashboard() {
       subtitle={t('dashboard.subtitle', 'Primer folio · do se escriben las nuevas del día y se registran los hechos del campeón')}
     >
       {/* ── row 1: today's brief + wax seal ──────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, marginBottom: 16 }}>
+      <div className="dash-row-brief">
         <div>
           <div className="dash-brief">
             <div className="qb-small-caps dash-brief__eyebrow">
@@ -542,7 +542,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── row 4: chronicle + xp ledger ──────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
+      <div className="dash-row-chronicle">
         <Section
           title={t('dashboard.chronicle', 'CRÓNICA RECIENTE')}
           icon={<Scroll width={12} height={12} style={{ color: 'var(--rubric)' }} />}
