@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.3',
+    date: '2026-09-02',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'Actualizar en Android ya no te saca de Hubtify: tocás «Actualizar» y la descarga corre ahí mismo, con la barra de progreso a la vista, hasta que el teléfono te pide confirmar la instalación con un toque. La primera vez te va a pedir permitir instalaciones desde Hubtify, una sola vez y listo',
+          en: 'Updating on Android no longer kicks you out of Hubtify: tap "Update" and the download runs right there, progress bar and all, until your phone asks you to confirm the install with one tap. The first time it will ask you to allow installs from Hubtify — just once, and you are done',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.2',
     date: '2026-09-02',
     changes: [
