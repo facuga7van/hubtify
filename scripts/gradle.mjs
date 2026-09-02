@@ -22,9 +22,17 @@ if (!process.env.JAVA_HOME) {
   console.warn('[gradle] JAVA_HOME no está seteado: Gradle usará el java del PATH (se espera JDK 21).');
 }
 
-const result = spawnSync(isWin ? path.join(androidDir, 'gradlew.bat') : './gradlew', args, {
+// Con `shell: true` (Windows) la ruta viaja por cmd.exe: sin comillas, un repo
+// clonado en `C:\Mis Proyectos\hubtify` se parte en el espacio.
+const gradlew = isWin ? `"${path.join(androidDir, 'gradlew.bat')}"` : './gradlew';
+
+const result = spawnSync(gradlew, args, {
   cwd: androidDir,
   stdio: 'inherit',
   shell: isWin,
 });
+
+// `status` es null si el proceso ni siquiera arrancó (ENOENT, EACCES): sin
+// esto el script saldría 1 sin decir por qué.
+if (result.error) console.error('[gradle]', result.error.message);
 process.exit(result.status ?? 1);

@@ -49,6 +49,20 @@ let poolUtil: SAHPoolUtil | null = null;
 let booted = false;
 let initInfo = { appVersion: APP_VERSION, osInfo: 'android' };
 
+/**
+ * Orden obligatorio (spec §3.5): primero los lifecycles (cauldron y
+ * notifications limpian sus intervals), después la DB, después el VFS —
+ * `pauseVfs()` exige que no haya archivos abiertos.
+ */
+function teardownForSuspend(): void {
+  runSuspend();
+  // `suspendDb()` (shared-logic/db/provider.ts) cierra el singleton Y hace
+  // que el siguiente `getDb()` lance `DbSuspended` hasta `resumeDb()`.
+  suspendDb();
+  poolUtil?.pauseVfs();
+  console.log('[worker] suspended');
+}
+
 const protocol = createWorkerProtocol({
   post,
   getHandler,
@@ -56,18 +70,11 @@ const protocol = createWorkerProtocol({
     initInfo = info;
   },
   suspend() {
-    // Un suspend durante el arranque (< 1 s) no tiene nada que cerrar todavía;
-    // el gate del protocolo ya frena los invokes y `resume` lo levanta.
+    // Un suspend durante el arranque no tiene nada que cerrar todavía; el gate
+    // del protocolo ya frena los invokes, y el final de `boot()` aplica el
+    // teardown sobre la DB/VFS que para entonces sí existen.
     if (!booted) return;
-    // Orden obligatorio (spec §3.5): primero los lifecycles (cauldron y
-    // notifications limpian sus intervals), después la DB, después el VFS —
-    // pauseVfs() exige que no haya archivos abiertos.
-    runSuspend();
-    // `suspendDb()` (shared-logic/db/provider.ts) cierra el singleton Y hace
-    // que el siguiente `getDb()` lance `DbSuspended` hasta `resumeDb()`.
-    suspendDb();
-    poolUtil?.pauseVfs();
-    console.log('[worker] suspended');
+    teardownForSuspend();
   },
   async resume() {
     if (poolUtil?.isPaused()) await poolUtil.unpauseVfs();
@@ -216,6 +223,13 @@ async function boot(): Promise<void> {
   booted = true;
   post({ type: 'ready' });
   console.log('[worker] ready');
+
+  // Si la app se fue a segundo plano DURANTE el arranque, el `suspend` salió
+  // por el early-return de arriba y dejó la DB abierta y el VFS activo con la
+  // app ya oculta. El gate del protocolo sigue cerrado (ningún invoke pasa),
+  // así que el teardown va acá — sin `await` en el medio, no hay ventana para
+  // que llegue un `resume` entre el chequeo y el cierre.
+  if (protocol.isSuspended()) teardownForSuspend();
 }
 
 void boot();

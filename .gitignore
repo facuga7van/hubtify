@@ -29,7 +29,8 @@ android/app/build/
 android/build/
 android/.gradle/
 android/local.properties
-android/keystore.properties
-android/*.jks
+android/**/keystore.properties
+android/**/*.jks
+android/**/*.keystore
 android/capacitor-cordova-android-plugins/build/
 dist/mobile/
