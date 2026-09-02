@@ -1150,11 +1150,34 @@
   transition: background 200ms ease;
 }
 
-/* La fila en edición lleva otros controles (dos inputs y dos botones): se
+/* La fila en edición lleva otros controles (dos inputs y la botonera): se
    queda con el reparto flexible de siempre. */
 .nutri-meal-row--edit {
-  grid-template-columns: 32px minmax(0, 1fr) 72px auto auto;
+  grid-template-columns: 32px minmax(0, 1fr) 72px auto;
   gap: 8px;
+}
+
+.nutri-meal-edit-input {
+  padding: 4px 8px;
+  font-size: var(--fs-label);
+}
+
+/* Guardar / Cancelar / IA: una sola fila, del alto de los inputs (los dos
+   leen --nutri-control-h). La IA es secundaria: fantasma, con etiqueta. */
+.nutri-meal-edit-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.nutri-meal-edit-actions .nutri-btn {
+  padding: 4px 10px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.nutri-meal-edit-ai {
+  gap: 5px;
 }
 
 .nutri-meal-row:last-child { border-bottom: none; }
@@ -3166,11 +3189,19 @@
   grid-template-columns: 32px minmax(0, 1fr) 72px;
 }
 
-/* Cinco hijos (FoodLogItem.tsx:160-186: ícono, dos inputs, dos botones): cada
-   botón baja a su propio renglón, a lo ancho, sin caer en la pista de 32 px. */
-[data-shell="mobile"] .nutri-meal-row--edit > .nutri-btn {
+/* La botonera (Guardar / Cancelar / IA) baja a su propio renglón bajo los
+   inputs, a lo ancho: Guardar y Cancelar se reparten el sitio, la IA queda
+   al ancho de su etiqueta (NUT-01). */
+[data-shell="mobile"] .nutri-meal-edit-actions {
   grid-column: 2 / -1;
-  justify-self: start;
+}
+
+[data-shell="mobile"] .nutri-meal-edit-actions .nutri-btn {
+  flex: 1 1 0;
+}
+
+[data-shell="mobile"] .nutri-meal-edit-actions .nutri-meal-edit-ai {
+  flex: 0 0 auto;
 }
 
 /* N8 */

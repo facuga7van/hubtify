@@ -5,7 +5,7 @@
  * sobre la geometría o el estado que el informe vio roto.
  */
 import { describe, expect, test, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 // Mismo seam que mobile-nutrify: la callable de Firebase no corre en el browser.
 vi.mock('../../../src/modules/nutrition/estimate-service', () => ({
@@ -13,7 +13,7 @@ vi.mock('../../../src/modules/nutrition/estimate-service', () => ({
 }));
 
 import Today from '@modules/nutrition/components/Today';
-import { installApi, mountInShell, setMobileViewport, settle } from './mobile-harness';
+import { installApi, mountInShell, setMobileViewport, settle, shoot } from './mobile-harness';
 import { NUTRITION_API } from './fixtures';
 
 import '../../../src/i18n';
@@ -31,6 +31,90 @@ const BREAKDOWN = {
   xpPrecision: 20, xpSteps: 0, xpGym: 0, xpWeight: 0, xpBonus: 5, xpTotal: 25,
   hpChange: 5, consumed: 3740, target: 2000,
 };
+
+/** Abre la edición de la primera fila y devuelve la fila en edición. */
+async function openFirstEdit(): Promise<HTMLElement> {
+  (document.querySelector('.nutri-food-action[aria-label^="Editar"]') as HTMLButtonElement).click();
+  await settle(200);
+  const row = document.querySelector('.nutri-meal-row--edit') as HTMLElement;
+  expect(row).not.toBeNull();
+  return row;
+}
+
+describe('Nutrify — QA 0.9.0 (NUT-01)', () => {
+  test('NUT-01: Guardar y Cancelar explícitos, en una fila y del alto de los inputs', async () => {
+    installApi(NUTRITION_API);
+    await setMobileViewport();
+    mountInShell(<Today />, '/nutrition');
+    await settle(700);
+    const row = await openFirstEdit();
+
+    const buttons = Array.from(row.querySelectorAll<HTMLButtonElement>('.nutri-meal-edit-actions button'));
+    const save = buttons.find(b => b.textContent?.trim() === 'Guardar');
+    const cancel = buttons.find(b => b.textContent?.trim() === 'Cancelar');
+    expect(save, 'botón Guardar').toBeDefined();
+    expect(cancel, 'botón Cancelar').toBeDefined();
+
+    // La IA es secundaria: etiquetada, y no se confunde con guardar.
+    const ai = row.querySelector('button[aria-label="Re-estimar con IA"]') as HTMLButtonElement;
+    expect(ai).not.toBeNull();
+    expect(ai.textContent?.trim()).not.toBe('');
+    expect(ai.textContent).not.toMatch(/Guardar/);
+
+    // ≥ 40 px de alto, misma fila, y a la altura de los inputs.
+    const inputs = Array.from(row.querySelectorAll<HTMLInputElement>('input'));
+    for (const b of buttons) {
+      expect(b.offsetHeight, b.textContent ?? '').toBeGreaterThanOrEqual(40);
+      expect(b.offsetTop).toBe(save!.offsetTop);
+      expect(Math.abs(b.offsetHeight - inputs[0].offsetHeight)).toBeLessThanOrEqual(2);
+    }
+    expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth + 1);
+    row.scrollIntoView({ block: 'center' });
+    await shoot('nutrify-qa-01-edit-row');
+  });
+
+  test('NUT-01: Enter en cualquier input guarda, Escape cancela, blur afuera guarda', async () => {
+    const update = vi.fn(async () => null);
+    installApi({ ...NUTRITION_API, nutritionUpdateFood: update });
+    await setMobileViewport();
+    mountInShell(<Today />, '/nutrition');
+    await settle(700);
+
+    // Enter en la descripción (antes solo el input de kcal tenía handler).
+    let row = await openFirstEdit();
+    const desc = row.querySelector<HTMLInputElement>('input:not([type="number"])')!;
+    desc.focus();
+    await userEvent.keyboard('{Enter}');
+    await settle(300);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.nutri-meal-row--edit')).toBeNull();
+
+    // Escape cancela sin guardar.
+    row = await openFirstEdit();
+    row.querySelector<HTMLInputElement>('input[type="number"]')!.focus();
+    await userEvent.keyboard('{Escape}');
+    await settle(300);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.nutri-meal-row--edit')).toBeNull();
+
+    // Tocar afuera (el foco se va de la fila) guarda.
+    row = await openFirstEdit();
+    row.querySelector<HTMLInputElement>('input[type="number"]')!.focus();
+    (document.querySelector('.nutri-page') as HTMLElement).click();
+    (document.activeElement as HTMLElement | null)?.blur();
+    await settle(300);
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('.nutri-meal-row--edit')).toBeNull();
+
+    // Cancelar con el botón tampoco guarda, aunque el foco salga del input.
+    row = await openFirstEdit();
+    row.querySelector<HTMLInputElement>('input[type="number"]')!.focus();
+    await page.getByRole('button', { name: /^Cancelar$/ }).click();
+    await settle(300);
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('.nutri-meal-row--edit')).toBeNull();
+  });
+});
 
 describe('Nutrify — QA 0.9.0 (NUT-02)', () => {
   test('NUT-02: cerrar el día deja la página en solo lectura sin recargar', async () => {
