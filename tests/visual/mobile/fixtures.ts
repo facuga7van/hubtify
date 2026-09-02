@@ -145,7 +145,24 @@ export const COIN_LOANS: Row[] = [
   { id: 'l4', personName: 'Juan', direction: 'lent', type: 'single', amount: 1_250, currency: 'USD', date: '2026-08-02', description: '', settled: 0 },
 ];
 
+/** Un grupo de tres cuotas (Installments.tsx InstallmentRow), en el mes corriente. */
+export const COIN_INSTALLMENTS: Row[] = [1, 2, 3].map((n) => ({
+  id: `i${n}`, description: `Heladera (Cuota ${n}/3)`, amount: 10_000, currency: 'ARS', category: 'Hogar',
+  installments: 3, installmentCount: 3, installmentNumber: n, installmentGroupId: 'g1', forThirdParty: 0,
+  date: isoDay(0),
+}));
+
+/** Doce meses a partir del que viene, con el primer rótulo en la primera barra. */
+export const COIN_PROJECTION: Row[] = Array.from({ length: 12 }, (_, i) => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + 1 + i);
+  return { month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, total: i < 2 ? 10_000 : 0 };
+});
+
 export const FINANCE_API: Record<string, unknown> = {
+  financeGetInstallmentsForMonth: () => Promise.resolve(COIN_INSTALLMENTS),
+  financeGetInstallmentProjection: () => Promise.resolve(COIN_PROJECTION),
   financeGetLoans: (opts: { settled?: boolean } = {}) =>
     Promise.resolve(opts.settled ? [] : COIN_LOANS),
   financeGetLoanPayments: () => Promise.resolve([]),

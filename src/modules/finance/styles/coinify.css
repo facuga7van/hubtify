@@ -2362,6 +2362,12 @@ button.coin-sort-header--amount {
 .coin-action-btn--danger:hover {
   opacity: 1;
 }
+/* El aspa de «Eliminar grupo» / «Eliminar»: era `width: .65em` inline en el
+   TSX (≈8 px), fuera del alcance de la regla mobile. */
+.coin-action-btn__icon {
+  width: 0.65em;
+  height: 0.65em;
+}
 
 /* Rótulo + control como una sola pieza: en una fila que envuelve, «Pagar
    desde:» quedaba colgando al final de un renglón y su desplegable arrancaba
@@ -3061,12 +3067,23 @@ button.coin-sort-header--amount {
   display: none;
 }
 
+/* COIN-02: el botón de 40×40 se veía como un cuadrado vacío con un aspa de 8 px. */
+[data-shell="mobile"] .coin-action-btn__icon {
+  width: 18px;
+  height: 18px;
+}
+
 @media (hover: none) {
   /* C4: poner un presupuesto por primera vez era imposible en touch. */
   .coin-budget-pencil {
     opacity: 0.75;
     width: 32px;
     height: 32px;
+  }
+
+  /* COIN-02: el 0.6 → 1 era solo por :hover; en touch no hay hover. */
+  .coin-action-btn--danger {
+    opacity: 1;
   }
 
   /* C13 */

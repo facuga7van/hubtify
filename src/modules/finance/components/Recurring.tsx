@@ -607,7 +607,7 @@ export default function Recurring() {
                 {/* Delete */}
                 <button className="rpg-button coin-action-btn coin-action-btn--danger" onClick={() => handleDelete(item.id)}
                   aria-label={t('coinify.delete', 'Eliminar')}
-                  title={t('coinify.delete', 'Eliminar')}><CrossMark style={{ width: '0.65em', height: '0.65em' }} /></button>
+                  title={t('coinify.delete', 'Eliminar')}><CrossMark className="coin-action-btn__icon" /></button>
               </div>
 
               {/* Amount History Timeline */}
