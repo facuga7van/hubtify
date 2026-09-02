@@ -19,6 +19,7 @@
     "test:watch": "cross-env ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs --project unit",
     "test:visual": "vitest run --project browser",
     "test:visual:watch": "vitest --project browser",
+    "test:visual:mobile": "vitest run --project browser-mobile",
     "test:e2e": "playwright test",
     "typecheck:shared-logic": "tsc -p shared-logic --noEmit",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
