@@ -659,8 +659,10 @@ export function registerNutritionIpcHandlers(): void {
     return row ? { date: row.date, steps: row.steps, gym: !!row.gym } : { date, steps: null, gym: false };
   });
 
-  ipcHandle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number; gym?: boolean }) => {
-    if (metrics.steps !== undefined && (!Number.isFinite(metrics.steps) || metrics.steps < 0)) throw new Error('Invalid steps: must be >= 0');
+  ipcHandle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number | null; gym?: boolean }) => {
+    // The UI sends `steps: null` for an empty input (Today.tsx); null and
+    // undefined both mean "no data" and land as NULL in the nullable column.
+    if (metrics.steps != null && (!Number.isFinite(metrics.steps) || metrics.steps < 0)) throw new Error('Invalid steps: must be >= 0');
     const db = getDb();
     const date = metrics.date ?? nutritionToday(db);
     db.prepare(`
