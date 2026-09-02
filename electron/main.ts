@@ -4,17 +4,11 @@ import fs from 'fs';
 import { spawnSync } from 'child_process';
 import { registerAllIpcHandlers } from './ipc/registry';
 import { ipcHandle } from './ipc/ipc-handle';
-import { closeDb, runModuleMigrations, setDbFactory } from '../shared-logic/db';
-import { openDesktopDb, getDb } from './ipc/db';
+import { closeDb, getDb, runAllModuleMigrations, setDbFactory } from '../shared-logic/db';
+import { openDesktopDb } from './ipc/db';
 import { setPlatform } from '../shared-logic/platform';
 import { setEventSink } from '../shared-logic/events';
 import { electronPlatform, webContentsSink } from './platform';
-import { questsMigrations } from '../src/modules/quests/quests.schema';
-import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
-import { financeMigrations } from '../src/modules/finance/finance.schema';
-import { characterMigrations } from '../src/modules/character/character.schema';
-import { notificationsMigrations } from '../shared-logic/modules/notifications.schema';
-import { cauldronMigrations } from '../src/modules/cauldron/cauldron.schema';
 import { startNotificationEngine, stopNotificationEngine } from '../shared-logic/modules/notifications.ipc';
 import { generateRecurringForMonth } from '../shared-logic/modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
@@ -368,12 +362,7 @@ app.whenReady().then(() => {
 
   // Run module migrations
   getDb();
-  runModuleMigrations(questsMigrations);
-  runModuleMigrations(nutritionMigrations);
-  runModuleMigrations(financeMigrations);
-  runModuleMigrations(characterMigrations);
-  runModuleMigrations(notificationsMigrations);
-  runModuleMigrations(cauldronMigrations);
+  runAllModuleMigrations();
 
   // Auto-generate recurring transactions for current month.
   // Shares the exact implementation used by `finance:generateRecurringForMonth`,

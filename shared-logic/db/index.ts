@@ -4,3 +4,4 @@ export {
   getDb, setDbFactory, closeDb, suspendDb, resumeDb, runModuleMigrations,
   DbSuspended, type DbFactory,
 } from './provider';
+export { runAllModuleMigrations } from './all-migrations';

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import {
   getDb, setDbFactory, closeDb, suspendDb, resumeDb, DbSuspended, runModuleMigrations,
+  runAllModuleMigrations,
 } from '../../shared-logic/db';
 
 beforeEach(() => {
@@ -53,5 +54,12 @@ describe('db provider', () => {
     // Fresh module state is per test FILE, so emulate "no factory" explicitly.
     setDbFactory(undefined as never);
     expect(() => getDb()).toThrow(/setDbFactory/);
+  });
+
+  it('runAllModuleMigrations() applies the six module namespaces', () => {
+    setDbFactory(() => new Database(':memory:'));
+    runAllModuleMigrations();
+    const rows = getDb().prepare('SELECT DISTINCT namespace FROM migrations_applied ORDER BY namespace').all() as Array<{ namespace: string }>;
+    expect(rows.map((r) => r.namespace)).toEqual(['cauldron', 'character', 'core', 'finance', 'notifications', 'nutrition', 'quests']);
   });
 });
