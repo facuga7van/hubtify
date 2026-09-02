@@ -9,7 +9,7 @@
  * hasta que la UI recarga el WebView.
  */
 import { registerHandler, runResume, runSuspend } from '@logic/registry';
-import { closeDb, getDb, suspendDb } from '@logic/db';
+import { closeDb, getDb, resumeDb, suspendDb } from '@logic/db';
 import { EXPORT_DB_CHANNEL, IMPORT_DB_CHANNEL } from './backup-channels';
 import { isSqliteFile } from './host-utils';
 
@@ -44,9 +44,23 @@ export function registerMobileDbHandlers(deps: MobileDbHandlerDeps): void {
 
   registerHandler(IMPORT_DB_CHANNEL, (_e, bytes: unknown) => {
     if (!(bytes instanceof Uint8Array) || !isSqliteFile(bytes)) throw new Error('not_sqlite');
-    if (deps.isBooted()) runSuspend();
+    const booted = deps.isBooted();
+    if (booted) runSuspend();
     suspendDb();
-    const written = deps.pool.importDb(deps.dbFile, bytes);
+    let written: number;
+    try {
+      written = deps.pool.importDb(deps.dbFile, bytes);
+    } catch (err) {
+      // `isSqliteFile` solo mira los 16 bytes de cabecera: un archivo truncado
+      // o con otro page-size la pasa y muere acá. Sin este rescate la DB
+      // quedaba suspendida y los lifecycles parados, y la UI (que ante un
+      // error solo muestra un toast, sin recargar) dejaba todo `getDb()`
+      // lanzando `DbSuspended` hasta que el usuario mataba la app.
+      resumeDb();
+      if (booted) runResume();
+      throw err;
+    }
+    // Camino feliz: la DB queda suspendida a propósito hasta el `location.reload()`.
     return { ok: true as const, bytes: written };
   });
 }

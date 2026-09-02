@@ -4,13 +4,14 @@ vi.mock('../../shared-logic/db', () => ({
   getDb: vi.fn(),
   closeDb: vi.fn(),
   suspendDb: vi.fn(),
+  resumeDb: vi.fn(),
 }));
 vi.mock('../../shared-logic/registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../shared-logic/registry')>();
   return { ...actual, runSuspend: vi.fn(), runResume: vi.fn() };
 });
 
-import { closeDb, getDb, suspendDb } from '../../shared-logic/db';
+import { closeDb, getDb, resumeDb, suspendDb } from '../../shared-logic/db';
 import { clearHandlers, getHandler, runResume, runSuspend } from '../../shared-logic/registry';
 import { registerMobileDbHandlers, type DbPool } from '../../src/mobile/db-backup-handlers';
 import { EXPORT_DB_CHANNEL, IMPORT_DB_CHANNEL } from '../../src/mobile/backup-channels';
@@ -21,7 +22,7 @@ function sqliteBytes(): Uint8Array {
   return bytes;
 }
 
-function setup(booted = true) {
+function setup(booted = true, poolOverrides: Partial<DbPool> = {}) {
   const order: string[] = [];
   const track = (name: string, fn: ReturnType<typeof vi.fn>) => fn.mockImplementation(() => { order.push(name); });
   track('runSuspend', vi.mocked(runSuspend));
@@ -29,10 +30,12 @@ function setup(booted = true) {
   track('closeDb', vi.mocked(closeDb));
   track('getDb', vi.mocked(getDb));
   track('suspendDb', vi.mocked(suspendDb));
+  track('resumeDb', vi.mocked(resumeDb));
   const exported = sqliteBytes();
   const pool: DbPool = {
     exportFile: vi.fn(() => { order.push('exportFile'); return exported; }),
     importDb: vi.fn((_name: string, bytes: Uint8Array | ArrayBuffer) => { order.push('importDb'); return (bytes as Uint8Array).byteLength; }),
+    ...poolOverrides,
   };
   registerMobileDbHandlers({ pool, dbFile: '/hubtify.db', isBooted: () => booted });
   return { order, pool, exported };
@@ -80,5 +83,25 @@ describe('registerMobileDbHandlers', () => {
     expect(order).toEqual(['runSuspend', 'suspendDb', 'importDb']);
     expect(pool.importDb).toHaveBeenCalledWith('/hubtify.db', bytes);
     expect(r).toEqual({ ok: true, bytes: 4096 });
+  });
+
+  // SAHPool valida page-size y tamaño mínimo: un .db truncado pasa isSqliteFile
+  // y muere acá. Sin rescate, la DB quedaba suspendida y los lifecycles
+  // parados, y la UI solo muestra un toast (no recarga): todo getDb() lanzaba
+  // DbSuspended hasta matar la app.
+  it('importDb que falla: propaga el error PERO deja la base usable otra vez', () => {
+    const { order } = setup(true, {
+      importDb: vi.fn(() => { order.push('importDb'); throw new Error('bad page size'); }),
+    });
+    expect(() => getHandler(IMPORT_DB_CHANNEL)!({}, sqliteBytes())).toThrow('bad page size');
+    expect(order).toEqual(['runSuspend', 'suspendDb', 'importDb', 'resumeDb', 'runResume']);
+  });
+
+  it('importDb que falla antes de ready: reanuda la DB sin tocar los lifecycles', () => {
+    const { order } = setup(false, {
+      importDb: vi.fn(() => { order.push('importDb'); throw new Error('bad page size'); }),
+    });
+    expect(() => getHandler(IMPORT_DB_CHANNEL)!({}, sqliteBytes())).toThrow('bad page size');
+    expect(order).toEqual(['suspendDb', 'importDb', 'resumeDb']);
   });
 });
