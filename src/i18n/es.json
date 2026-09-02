@@ -537,6 +537,7 @@
     "importNoCards": "No tenés ninguna tarjeta cargada.",
     "importNoFile": "Ningún archivo seleccionado",
     "importParsing": "Procesando...",
+    "importPdfUnsupportedMobile": "Importar resúmenes PDF no está disponible en Android. Usalo desde la app de escritorio.",
     "importPreview": "Vista previa",
     "importPreviousBatches": "Importaciones anteriores",
     "importSelectFile": "Seleccionar PDF",

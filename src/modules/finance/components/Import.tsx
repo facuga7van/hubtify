@@ -157,6 +157,14 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         setParsing(false);
         return; // user cancelled dialog
       }
+      if ('ok' in result) {
+        // Android: no hay pdf-parse (spec §1). El handler lo dice; acá se explica.
+        toast({
+          type: 'info',
+          message: t('coinify.importPdfUnsupportedMobile', 'Importar resúmenes PDF no está disponible en Android. Usalo desde la app de escritorio.'),
+        });
+        return; // el finally apaga `parsing`
+      }
       setFileName(result.fileName);
       setSkippedLines(result.skippedLines ?? []);
       setSkippedExpanded(false);

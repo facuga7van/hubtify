@@ -537,6 +537,7 @@
     "importNoCards": "You have no credit cards yet.",
     "importNoFile": "No file selected",
     "importParsing": "Parsing...",
+    "importPdfUnsupportedMobile": "Importing PDF statements is not available on Android. Use the desktop app.",
     "importPreview": "Preview",
     "importPreviousBatches": "Previous imports",
     "importSelectFile": "Select PDF",

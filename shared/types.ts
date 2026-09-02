@@ -611,7 +611,11 @@ export interface HubtifyApi {
   financeGetRecurringAmountHistory: (id: string) => Promise<unknown[]>;
 
   // Finance - Import
-  financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
+  financeImportSelectAndParsePDF: () => Promise<
+    | { rows: ParsedRow[]; fileName: string; skippedLines: string[] }
+    | { ok: false; reason: 'unsupported_platform' }
+    | null
+  >;
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null, accountId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
   financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;
   financeGetImportBatches: () => Promise<FinanceImportBatch[]>;
