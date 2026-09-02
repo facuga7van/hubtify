@@ -455,10 +455,10 @@ export interface HubtifyApi {
   nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
   nutritionSearchHistory: (query?: string, limit?: number) => Promise<Array<{
-  nutritionGetEventDays: (start: string, end: string) => Promise<string[]>;
     description: string; calories: number; timesLogged: number;
     lastLogged: string | null; source: 'history' | 'favorite'; proteinG?: number;
   }>>;
+  nutritionGetEventDays: (start: string, end: string) => Promise<string[]>;
   nutritionGetCachedEstimate: (description: string) => Promise<{
     calories: number; aiBreakdown: string | null; proteinG: number | null; hits: number;
   } | null>;
