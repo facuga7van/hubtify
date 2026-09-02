@@ -1542,3 +1542,93 @@
 .cauldron-ft-btn--wait {
   border-color: rgba(196, 168, 78, 0.6);
 }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE — 390 px (Fase 3). Ver docs/superpowers/plans/2026-09-02-mobile-phase3-shell.md, Task 16.
+   ══════════════════════════════════════════════════════ */
+/* K4: dos cartelas de 177 px no sostienen «COMPLETADAS HOY» a .2em. */
+/* K1: las mismas tres reglas de @media (max-height: 780px) (línea ~1370):
+   en un teléfono la sala está igual de apretada aunque mida 844 px de alto. */
+[data-shell="mobile"] .cauldron-stage {
+  min-height: 0;
+  padding: 12px;
+}
+
+[data-shell="mobile"] .cauldron-svg {
+  width: min(100%, 200px);
+}
+
+[data-shell="mobile"] .cauldron-time-remaining {
+  font-size: calc(44px * var(--font-scale));
+  margin: 4px 0;
+}
+
+[data-shell="mobile"] .cauldron-stats-grid {
+  grid-template-columns: 1fr;
+}
+
+/* K5: dentro del modal de 358 px cada campo tenía 145. */
+[data-shell="mobile"] .cauldron-form-grid {
+  grid-template-columns: 1fr;
+}
+
+/* K6 */
+[data-shell="mobile"] .cauldron-mission-popover {
+  min-width: 0;
+  width: calc(100vw - 24px);
+  max-width: none;
+  left: 12px !important;   /* el componente lo posiciona inline */
+}
+
+[data-shell="mobile"] .cauldron-mission-list {
+  max-height: 45vh;
+}
+
+/* K7 */
+[data-shell="mobile"] .cauldron-resume-text {
+  min-width: 100%;
+}
+
+/* K2: el chip flotante medía 448 px con misión (480 con auto-start) anclado
+   a la derecha de una pantalla de 390. Se estira de lado a lado y envuelve;
+   el bottom con safe area lo pone layout.css ([data-shell="mobile"]). */
+[data-shell="mobile"] .cauldron-floating-timer {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+[data-shell="mobile"] .cauldron-ft-mission {
+  max-width: 10ch;
+}
+
+[data-shell="mobile"] .cauldron-ft-controls {
+  margin-left: auto;
+}
+
+@media (hover: none) {
+  /* K3, K9 */
+  .cauldron-ft-btn,
+  .cauldron-edit-btn,
+  .cauldron-collapse-toggle {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .cauldron-ft-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* K8: un frasco es un botón sin rótulo; que no dependa del hover. */
+  .cauldron-jar {
+    transform: none;
+  }
+
+  .cauldron-jar--broken {
+    opacity: 0.75;
+  }
+}
