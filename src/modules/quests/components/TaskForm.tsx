@@ -141,7 +141,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
   return (
     <form onSubmit={handleSubmit} className="rpg-card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+      <div className="quest-form-head" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
         <input
           type="text"
           placeholder={t('questify.questName')}
@@ -153,8 +153,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
               onCancel();
             }
           }}
-          className="rpg-input"
-          style={{ flex: 1 }}
+          className="rpg-input quest-form-name"
           autoFocus={shouldFocus}
         />
         <button type="submit" className="rpg-button">

@@ -36,7 +36,13 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   const lastPosRef = useRef({ x: 0, y: 0 });
   const undoTimerRef = useRef<number | null>(null);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const countRef = useRef(0);
   const [currentIdx, setCurrentIdx] = useState(0);
+  /* QST-03: «Nueva» solía INSERTAR una página en blanco al instante, así que
+     abrir el editor y volver atrás dejaba una nota vacía (badge «1» en la
+     fila). Ahora la página nueva es un borrador que vive solo en el lienzo:
+     la nota se crea recién con el primer guardado. */
+  const [draft, setDraft] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [bgReady, setBgReady] = useState(false);
@@ -69,6 +75,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
   const loadDrawings = useCallback(async () => {
     const result = await window.api.questsGetDrawings(taskId);
+    countRef.current = (result as Drawing[]).length;
     setDrawings(result as Drawing[]);
     setLoaded(true);
   }, [taskId]);
@@ -84,6 +91,9 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   // Paint current drawing onto canvas — wait for both data and bg texture
   useEffect(() => {
     if (!loaded || !bgReady) return;
+    // The draft page only exists on the canvas: repainting from `drawings`
+    // would wipe whatever was just drawn on it.
+    if (draft) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -98,13 +108,26 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
       img.src = drawing.data;
     }
     setDirty(false);
-  }, [currentIdx, drawings, loaded, bgReady, clearCanvas]);
+  }, [currentIdx, drawings, loaded, bgReady, draft, clearCanvas]);
 
   const saveCurrent = useCallback(async () => {
     if (!dirty) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const data = canvas.toDataURL('image/png');
+    if (draft) {
+      // First save of a draft: this is where the note is born. The reload
+      // lands before `draft` drops so the paint effect never sees an
+      // intermediate state and the fresh strokes stay on screen.
+      setSaveState('saving');
+      await window.api.questsSaveDrawing({ taskId, data });
+      await loadDrawings();
+      onCountChanged?.();
+      setDraft(false);
+      setSaveState('saved');
+      setDirty(false);
+      return;
+    }
     const drawing = drawings[currentIdx];
     if (drawing) {
       setSaveState('saving');
@@ -112,22 +135,28 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
       setSaveState('saved');
     }
     setDirty(false);
-  }, [dirty, drawings, currentIdx, taskId]);
+  }, [dirty, draft, drawings, currentIdx, taskId, loadDrawings, onCountChanged]);
 
   // Drawing handlers
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const scaleX = CANVAS_W / rect.width;
     const scaleY = CANVAS_H / rect.height;
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   };
 
-  const onPointerDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  /* QST-01: en el teléfono cada trazo moría a los ~35 px — el scroll se
+     quedaba con el gesto y el pointer se cancelaba. `touch-action: none` (CSS)
+     le niega el gesto al scroll y la captura retiene el trazo aunque el dedo
+     salga del lienzo. La captura tira con un pointerId que el browser no
+     conoce (eventos sintéticos): no es motivo para perder el trazo. */
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDrawingRef.current = true;
     lastPosRef.current = getPos(e);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer sintético */ }
   };
 
-  const onPointerMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
     const pos = getPos(e);
 
@@ -149,28 +178,36 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     setSaveState('idle');
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDrawingRef.current = false;
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch { /* pointer sintético */ }
   };
 
   // Actions
   const handleNewNote = async () => {
     await saveCurrent();
     clearCanvas();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const data = canvas.toDataURL('image/png');
-    await window.api.questsSaveDrawing({ taskId, data });
-    await loadDrawings();
-    onCountChanged?.();
-    setCurrentIdx(Number.MAX_SAFE_INTEGER);
+    setUndoSnapshot(null);
+    setSaveState('idle');
+    setDirty(false);
+    setDraft(true);
+    // `countRef` and not `drawings.length`: if the previous page was itself a
+    // draft that saveCurrent just persisted, the closure's list is stale.
+    setCurrentIdx(countRef.current);
   };
 
+  /** Pages the user can stand on: the saved notes plus, at the end, the draft. */
+  const pageCount = drawings.length + (draft ? 1 : 0);
+  const hasPage = pageCount > 0;
+
   useEffect(() => {
+    if (draft) return;
     if (drawings.length > 0 && currentIdx >= drawings.length) {
       setCurrentIdx(drawings.length - 1);
     }
-  }, [drawings, currentIdx]);
+  }, [drawings, currentIdx, draft]);
 
   /* Clearing used to be one silent click away from an auto-saved blank page.
      Now it asks first, and keeps the previous pixels around for a few seconds. */
@@ -212,6 +249,14 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   };
 
   const handleDelete = async () => {
+    if (draft) {
+      // Nothing persisted yet: dropping the draft IS the deletion.
+      setDraft(false);
+      setDirty(false);
+      setUndoSnapshot(null);
+      setCurrentIdx(Math.max(0, drawings.length - 1));
+      return;
+    }
     const ok = await confirm({ message: t('questify.deleteNoteConfirm'), danger: true, confirmText: t('questify.deleteNote') });
     if (!ok) return;
     const drawing = drawings[currentIdx];
@@ -226,7 +271,10 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
   const goPage = async (delta: number) => {
     await saveCurrent();
     setUndoSnapshot(null);
-    setCurrentIdx((prev) => Math.max(0, Math.min(drawings.length - 1, prev + delta)));
+    // Leaving an untouched draft discards it; a dirty one was just persisted
+    // and `countRef` already counts it.
+    setDraft(false);
+    setCurrentIdx((prev) => Math.max(0, Math.min(countRef.current - 1, prev + delta)));
   };
 
   const handleClose = useCallback(async () => {
@@ -284,7 +332,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingRight: 32 }}>
-          {drawings.length > 1 && (
+          {pageCount > 1 && (
             <button className="rpg-button" onClick={() => goPage(-1)}
               disabled={currentIdx === 0}
               aria-label={t('questify.previousPage', 'Página anterior')}
@@ -297,14 +345,15 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
             fontFamily: "'IM Fell English', serif", fontSize: 'var(--fs-body)',
             color: 'var(--ink-soft)',
           }}>
-            {drawings.length > 0
-              ? t('questify.noteOf', { current: currentIdx + 1, total: drawings.length })
-              : t('questify.noNotes')}
+            {/* One empty state, in the body: the header used to repeat it. */}
+            {hasPage
+              ? t('questify.noteOf', { current: currentIdx + 1, total: pageCount })
+              : t('questify.scrollNotes', 'Notas')}
             {' '}<HelpBubble variant="inline" text={t('questify.scrollNotesHelp', 'Pergaminos: dibujá apuntes a mano alzada para cada misión. Podés crear varias páginas.')} />
           </span>
-          {drawings.length > 1 && (
+          {pageCount > 1 && (
             <button className="rpg-button" onClick={() => goPage(1)}
-              disabled={currentIdx >= drawings.length - 1}
+              disabled={currentIdx >= pageCount - 1}
               aria-label={t('questify.nextPage', 'Página siguiente')}
               style={{ padding: '3px 10px', fontSize: 'var(--fs-quote)' }}>
               &rsaquo;
@@ -319,24 +368,26 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         {/* Canvas */}
         <canvas
           ref={canvasRef}
+          className="quest-notes-canvas"
           width={CANVAS_W}
           height={CANVAS_H}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
           onPointerLeave={onPointerUp}
           style={{
             cursor: 'crosshair',
             borderRadius: 4,
             border: '1px solid rgba(201,168,76,0.4)',
-            display: drawings.length === 0 ? 'none' : 'block',
+            display: hasPage ? 'block' : 'none',
             width: '100%',
             height: 'auto',
           }}
         />
 
         {/* Empty state */}
-        {drawings.length === 0 && (
+        {!hasPage && (
           <div style={{
             width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center',
             opacity: 0.65, fontStyle: 'italic', fontFamily: "'IM Fell English', serif",
@@ -346,7 +397,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
         )}
 
         {/* Toolbar */}
-        {drawings.length > 0 && (
+        {hasPage && (
           <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span className="quest-notes-status" aria-live="polite">{statusText}</span>
 

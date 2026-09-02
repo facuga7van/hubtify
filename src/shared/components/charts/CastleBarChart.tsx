@@ -77,6 +77,18 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
     return longest * 7 + 12 <= barSpacing;
   }, [data, barSpacing, formatValue]);
 
+  /* COIN-04: el rótulo del eje X se centraba en su barra, así que en el
+     teléfono (12 barras en ~340 px) el primero se salía por la izquierda —
+     «CT 26» por «OCT 26» — y el último por la derecha. Cuando centrado no
+     entra, se ancla al borde del viewBox. */
+  const xLabel = (cx: number, label: string): { x: number; anchor: 'start' | 'middle' | 'end' } => {
+    const half = (label.length * 7) / 2;
+    // 1 px adentro: el glifo tiene su propio margen lateral y a x=0 asoma.
+    if (cx - half < 0) return { x: 1, anchor: 'start' };
+    if (cx + half > viewBoxWidth) return { x: viewBoxWidth - 1, anchor: 'end' };
+    return { x: cx, anchor: 'middle' };
+  };
+
   const tallestIdx = useMemo(() => {
     let maxIdx = 0;
     data.forEach((d, i) => {
@@ -169,9 +181,9 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
                 {/* X label — thinned so labels never overlap */}
                 {i % labelStep === 0 && (
                   <text
-                    x={x + barWidth / 2}
+                    x={xLabel(x + barWidth / 2, d.label).x}
                     y={height - 2}
-                    textAnchor="middle"
+                    textAnchor={xLabel(x + barWidth / 2, d.label).anchor}
                     fontFamily="IM Fell English SC"
                     fontSize="12"
                     fontWeight="700"
@@ -415,17 +427,20 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
               })()}
 
               {/* X-axis label — thinned so labels never overlap */}
-              {i % labelStep === 0 && (
-                <text
-                  className="castle-label"
-                  x={tx + barWidth / 2}
-                  y={height - 2}
-                  textAnchor="middle"
-                  fontSize="12"
-                >
-                  {d.label}
-                </text>
-              )}
+              {i % labelStep === 0 && (() => {
+                const { x, anchor } = xLabel(tx + barWidth / 2, d.label);
+                return (
+                  <text
+                    className="castle-label"
+                    x={x}
+                    y={height - 2}
+                    textAnchor={anchor}
+                    fontSize="12"
+                  >
+                    {d.label}
+                  </text>
+                );
+              })()}
             </g>
           );
         })}

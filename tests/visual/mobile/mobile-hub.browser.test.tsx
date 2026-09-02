@@ -100,6 +100,12 @@ describe('Hub a 390×844', () => {
     expect(getComputedStyle(stats).gridTemplateColumns.split(' ').length).toBe(2);
     const virtues = document.querySelector('.hero-virtues-grid') as HTMLElement;
     expect(getComputedStyle(virtues).gridTemplateColumns.split(' ').length).toBe(1);
+    // QA 0.9.0: «Descartar cambios» no se parte en dos renglones.
+    await page.getByRole('button', { name: /Personalizar/i }).click();
+    await settle(400);
+    for (const btn of document.querySelectorAll<HTMLElement>('.hero-customize-actions .rpg-button')) {
+      expect(btn.getBoundingClientRect().height, `«${btn.textContent}» en dos renglones`).toBeLessThanOrEqual(40);
+    }
   });
 
   test('Estante de logros', async () => {
@@ -120,6 +126,10 @@ describe('Hub a 390×844', () => {
     await settle(600);
     await shoot('hub-04-recompensas');
     expectNoHorizontalOverflow('RECOMPENSAS MOBILE');
+    // QA 0.9.0: «Nueva recompensa» no se parte en dos renglones.
+    const add = document.querySelector('.rwd-add') as HTMLElement;
+    expect(add).not.toBeNull();
+    expect(add.getBoundingClientRect().height).toBeLessThanOrEqual(40);
   });
 
   /* SET-01: sin teclado físico no hay atajos; la tarjeta «Atajos de teclado» sobra en Android. */
