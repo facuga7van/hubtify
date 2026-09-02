@@ -277,11 +277,12 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
           confirmDelete ? (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
+              flexWrap: 'wrap',
               gridColumn: '1 / -1',
               padding: '4px 10px', background: 'rgba(122,30,30,0.08)',
               border: '1px solid var(--rubric)', borderRadius: '3px',
             }}>
-              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
                 {t('nutrify.deleteConfirm', 'Delete this entry?')}
               </span>
               <button className="nutri-btn" onClick={() => onDelete(entry.id)}
