@@ -1,6 +1,6 @@
 import type { SqlDatabase } from '../db';
 import { registerHandler as ipcHandle } from '../registry';
-import { getDb } from '../db';
+import { getDb, RPG_EVENTS_TWIN_IDS_SQL } from '../db';
 import { recalcSummary } from './nutrition.ipc';
 import { weeklyTarget } from './quests.habits';
 import { daysAgoDateString } from '../../shared/date-utils';
@@ -797,10 +797,35 @@ export function mergeQuestDataInto(db: SqlDatabase, remote: SyncQuestData): { ch
       // for different events and the old `WHERE id = ?` check silently dropped
       // half of them. `id` is now left to the local sequence entirely.
       const getEvent = db.prepare('SELECT 1 FROM rpg_events WHERE sync_id = ?');
+      // The same event under ANOTHER identity: same content, same second (the
+      // stamp folded to 'YYYY-MM-DD HH:MM:SS', since an id-keyed client stored
+      // the ISO form normStamp() gave it). ref_id is not part of the key — that
+      // client never wrote it. Prefers the identified row over an anonymous one
+      // so a payload lands on the real row when both are still around.
+      const getEventByNatural = db.prepare(`
+        SELECT id, sync_id FROM rpg_events
+        WHERE module_id = ? AND event_type = ? AND xp_gained = ? AND hp_change = ?
+          AND combo_multiplier = ? AND bonus_multiplier = ? AND COALESCE(payload, '') = ?
+          AND substr(replace(created_at, 'T', ' '), 1, 19) = ?
+        ORDER BY (sync_id IS NULL), (sync_id LIKE 'legacy-%'), id LIMIT 1
+      `);
+      const adoptEventSync = db.prepare('UPDATE rpg_events SET sync_id = ? WHERE id = ?');
+      const deleteEvent = db.prepare('DELETE FROM rpg_events WHERE id = ?');
       const insertEvent = db.prepare(`
         INSERT OR IGNORE INTO rpg_events (sync_id, module_id, event_type, xp_gained, hp_change, combo_multiplier, bonus_multiplier, payload, ref_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+
+      // Sweep the twins an id-keyed client (v0.7.5, still installed on the
+      // owner's desktop) leaves next to the rows this codebase identifies. The
+      // core v7 repair runs once at boot; this runs on every pull, so a twin
+      // never outlives the next sync. BEFORE the payload lands, so the natural
+      // key below meets one row per event. Hard delete — see
+      // RPG_EVENTS_TWIN_IDS_SQL.
+      for (const twin of db.prepare(RPG_EVENTS_TWIN_IDS_SQL).all() as Array<{ id: number }>) {
+        deleteEvent.run(twin.id);
+        changed = true;
+      }
 
       for (const re of rows<SyncRpgEvent>(remote.rpgEvents)) {
         // Pre-sync_id payloads carried only the numeric id; there is no way to
@@ -810,6 +835,27 @@ export function mergeQuestDataInto(db: SqlDatabase, remote: SyncQuestData): { ch
         // used to discard the whole 90-day batch, not the row.
         if (!isUsableRow(re, 'rpgEvents', ['syncId', 'moduleId', 'eventType', 'createdAt'])) continue;
         if (getEvent.get(re.syncId)) continue;
+
+        const byNatural = getEventByNatural.get(
+          re.moduleId, re.eventType, re.xpGained ?? 0, re.hpChange ?? 0,
+          re.comboMultiplier ?? 1, re.bonusMultiplier ?? 1, re.payload ?? '',
+          String(re.createdAt).replace('T', ' ').slice(0, 19),
+        ) as { id: number; sync_id: string | null } | undefined;
+        if (byNatural) {
+          // We already hold this event. If ours is the weaker identity (none,
+          // or a legacy- backfill of a twin) it adopts the remote one, so both
+          // devices converge on a single sync_id; otherwise the payload row is
+          // a foreign copy and inserting it would duplicate the event. Two
+          // distinct events never meet here: a different task changes the
+          // payload, a different second changes the stamp.
+          const remoteIsUuid = !re.syncId.startsWith('legacy-');
+          if (byNatural.sync_id === null || (remoteIsUuid && byNatural.sync_id.startsWith('legacy-'))) {
+            adoptEventSync.run(re.syncId, byNatural.id);
+            changed = true;
+          }
+          continue;
+        }
+
         const result = insertEvent.run(
           re.syncId, re.moduleId, re.eventType, re.xpGained ?? 0, re.hpChange ?? 0,
           re.comboMultiplier ?? 1, re.bonusMultiplier ?? 1, re.payload ?? null,
