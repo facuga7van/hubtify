@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
-import { mergeQuestDataInto } from '../../../electron/modules/sync.ipc';
+import { mergeQuestDataInto } from '../../../shared-logic/modules/sync.ipc';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

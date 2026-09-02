@@ -399,6 +399,22 @@ export function Map(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Tres renglones trazados a pluma: el menú del shell mobile. */
+export function MenuLines(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...defaults} {...props}>
+      {/* Three quill strokes, each a touch uneven */}
+      <path d="M4 7.2c5-.5 11-.5 16 .1" strokeWidth={1.5} />
+      <path d="M4 12c5.2-.4 10.6-.4 16 .2" strokeWidth={1.5} />
+      <path d="M4 16.8c4.8-.6 11.2-.5 16 0" strokeWidth={1.5} />
+      {/* Ink pooled where each stroke starts */}
+      <circle cx="4.2" cy="7.2" r=".6" fill="currentColor" fillOpacity=".2" />
+      <circle cx="4.2" cy="12" r=".6" fill="currentColor" fillOpacity=".2" />
+      <circle cx="4.2" cy="16.8" r=".6" fill="currentColor" fillOpacity=".2" />
+    </svg>
+  );
+}
+
 export function MoonCrescent(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...defaults} {...props}>

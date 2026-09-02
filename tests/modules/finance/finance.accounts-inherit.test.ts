@@ -14,7 +14,7 @@ import {
   DEFAULT_CASH_ACCOUNT_ID,
   computeAccountsOverview,
   computeMonthlyBalance,
-} from '../../../electron/modules/finance.balance';
+} from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
@@ -22,6 +22,8 @@ const harness = vi.hoisted(() => ({
   handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
 }));
+
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -32,13 +34,13 @@ vi.mock('electron', () => ({
   BrowserWindow: { getFocusedWindow: () => null },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
-const { registerFinanceIpcHandlers } = await import('../../../electron/modules/finance.ipc');
+const { registerFinanceIpcHandlers } = await import('../../../shared-logic/modules/finance.ipc');
 registerFinanceIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const fn = harness.handlers.get(channel);
+  const fn = getHandler(channel);
   if (!fn) throw new Error(`no handler registered for ${channel}`);
   return (await fn({}, ...args)) as T;
 }

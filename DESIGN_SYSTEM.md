@@ -166,6 +166,20 @@ Viewport (100vh, flex column)
             └── .qb-content (flex: 1)
 ```
 
+Mobile (Android, `useShellKind() === 'mobile'`):
+
+```
+.shell-frame (100dvh, flex column)
+├── .mobile-header (56px + --safe-top: hamburger, section title, bell)
+└── .app-layout--mobile
+    └── .main-content (100% width, scrolls, padding-bottom --safe-bottom)
+.mobile-scrim + .mobile-drawer (fixed, min(300px, 85vw)) → <Sidebar collapsed={false}>
+```
+
+`Layout.tsx` picks the shell with `useShellKind()` (`isNativeMobile() || innerWidth < 600`);
+`DesktopShell` is the tree above, `MobileShell` this one. `TitleBar` returns `null` on
+native mobile, so `AuthPage` and `Onboarding` lose it too.
+
 ### Sidebar
 
 | Property | Expanded | Collapsed |
@@ -747,10 +761,32 @@ For togglable rows (recurring transactions, habits, reminders):
 | Breakpoint | Changes |
 |------------|---------|
 | `> 900px` | Full layout — sidebar 260px, 2-col grids |
-| `700px–900px` | Sidebar 220px, reduced nav padding |
-| `< 700px` | Dashboard single column, quest columns stack, stats 2-col |
-| `< 600px` | Chart responsive adjustments |
-| `< 500px` | Finance narrow mode |
+| `700px–900px` | Sidebar 220px, reduced nav padding (`layout.css`) |
+| `< 880px` | Dashboard grids single column (`components.css`, `dashboard-layouts.css`), character sheet single column (`character.css`) |
+| `< 780px` | Coinify compact ledger, page padding 14/12 (`coinify.css`, `shell.css`) |
+| `< 480px` | Nutrify meal rows drop the time column (`nutri.css`, desktop-era rule; never reached by the window) |
+| `html[data-shell="mobile"]` | **Mobile (Android, 390–412px) — not a width breakpoint:** `MobileShell` sets the attribute; transversal rules in `layout.css` (`.qb-page` padding 12, `.qb-header` wraps, `.page-header__actions` static, `.qb-corner` hidden, `.qb-cartouche` tightened) plus one `[data-shell="mobile"] …` block at the end of each module sheet (`quests.css`, `coinify.css`, `nutri.css`, `cauldron.css`, `character.css`, `codex-seal.css`) |
+| `(hover: none)` | Touch: anything revealed only on hover is shown (`.widget-controls`, `.coin-budget-pencil`, quest postpone, nutri row icons); tap targets grow to 40–44px. `rewards.css` carries only this kind of block, no `[data-shell="mobile"]` one |
+
+The desktop window never goes below 700px (`electron/main.ts` minWidth) and the
+desktop visual tests go down to 420px, so mobile rules are keyed on
+`html[data-shell="mobile"]` (set by `src/hub/MobileShell.tsx`) rather than on a
+width, and verified by `npm run test:visual:mobile` at 390×844 with touch emulated.
+
+### Shell tokens
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--shell-top` | `32px` (desktop) / `0px` (`html[data-shell="mobile"]`) | Where the fixed sidebar starts |
+| `--safe-top` / `--safe-right` / `--safe-bottom` / `--safe-left` | Capacitor-injected `--safe-area-inset-*`, else `env(safe-area-inset-*)`, else `0px` | Status bar / gesture bar insets on Android; `.mobile-header`, `.mobile-drawer`, every fixed overlay |
+
+On Android the value of `--safe-top` depends on the System WebView (see the Fase 3 plan,
+desvíos 1–2): with WebView ≥ 140 the bar overlays the WebView and Capacitor injects the
+real px, so `.mobile-header` paints leather underneath it; with WebView < 140 (the
+emulator's 124) the plugin pads the WebView's parent natively, the injected value is
+`0px`, and the strip behind the status bar is `android:windowBackground` in
+`android/app/src/main/res/values/styles.xml` (`#2a1d0e`). Both paths end with light
+icons on leather and no white strip — there are no runtime `StatusBar` calls.
 
 ### Reduced Motion
 

@@ -376,7 +376,7 @@ export default function CauldronPage() {
       setFlavorIdx(0);
       setInterrupted(null);
       // Opt-in: the external window used to land on top of whatever you were doing.
-      if (popoutOnStart) window.api.cauldronOpenWindow();
+      if (popoutOnStart) window.api.cauldronOpenWindow?.();
     } catch (err) {
       toast({ type: 'warning', message: describeError(err) });
     }
@@ -551,7 +551,7 @@ export default function CauldronPage() {
       setInterrupted(null);
       playCauldronStart();
       setFlavorIdx(0);
-      if (popoutOnStart) window.api.cauldronOpenWindow();
+      if (popoutOnStart) window.api.cauldronOpenWindow?.();
     } catch (err) {
       toast({ type: 'warning', message: describeError(err) });
     }

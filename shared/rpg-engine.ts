@@ -221,7 +221,7 @@ export function xpToNextLevel(totalXp: number): number {
 //
 // The global level becomes a badge of history; what the day-180 player feels
 // is the four per-module bars, each with its own line. Their fuel is the
-// `mastery_xp` accumulator (electron/ipc/db.ts core v6): `rpg_events` is
+// `mastery_xp` accumulator (shared-logic/db/migrate.ts core v6): `rpg_events` is
 // pruned at 365 days, so a mastery can never be recomputed from it — it is
 // summed forward, event by event, and backfilled once from whatever history
 // still exists.

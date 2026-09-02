@@ -1,5 +1,6 @@
 import { dialog, app } from 'electron';
-import { getDb } from '../ipc/db';
+import type Database from 'better-sqlite3';
+import { closeDb, getDb } from '../../shared-logic/db';
 import { ipcHandle } from '../ipc/ipc-handle';
 import fs from 'fs';
 import path from 'path';
@@ -23,7 +24,7 @@ export function registerBackupIpcHandlers(): void {
       // the last checkpoint lives in hubtify.db-wal — which is NOT part of the zip.
       // Copying hubtify.db directly produced a silently stale backup.
       // db.backup() writes a consistent, fully-checkpointed single-file snapshot.
-      const db = getDb();
+      const db = getDb() as unknown as Database.Database;
       const snapshotPath = path.join(app.getPath('temp'), `hubtify-backup-${Date.now()}.db`);
       await db.backup(snapshotPath);
 
@@ -89,7 +90,6 @@ export function registerBackupIpcHandlers(): void {
       if (!dbEntry) return { success: false, error: 'Invalid backup: hubtify.db not found' };
 
       // Close current DB before replacing
-      const { closeDb } = require('../ipc/db');
       closeDb();
 
       const dbPath = path.join(app.getPath('userData'), 'hubtify.db');

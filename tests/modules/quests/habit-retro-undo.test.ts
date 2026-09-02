@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
-import { toggleHabitCheck } from '../../../electron/modules/quests.ipc';
+import { toggleHabitCheck } from '../../../shared-logic/modules/quests.ipc';
 
 vi.mock('../../../src/shared/audio', () => ({ playTaskComplete: vi.fn() }));
 

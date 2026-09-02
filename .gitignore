@@ -16,10 +16,25 @@ designIdeas/
 
 # Visual test screenshots (generated)
 tests/visual/screens/
+# Las de shoot() (incluye tests/visual/__screenshots__/mobile/)
 tests/visual/__screenshots__/
+# Las que saca vitest sola al fallar un test del project browser-mobile
+tests/visual/mobile/__screenshots__/
 .vitest-attachments/
 e2e/screens/
 e2e/.artifacts/
 
 # Claude Code worktrees (local)
 .claude/
+
+# Android (Capacitor) — el scaffold android/ SÍ se commitea; esto es build local
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/**/keystore.properties
+android/**/*.jks
+android/**/*.keystore
+android/keystore/
+android/capacitor-cordova-android-plugins/build/
+dist/mobile/

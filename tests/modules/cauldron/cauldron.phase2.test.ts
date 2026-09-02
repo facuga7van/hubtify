@@ -10,15 +10,13 @@
  *     estante NUNCA se vacía.
  *
  * Como en `cauldron.autostart.test.ts`, esto maneja los handlers REALES
- * (`electron` mockeado + DB inyectada + timers falsos), no una copia a mano de
- * la máquina de estados.
+ * (registro compartido + DB inyectada + sink de eventos + timers falsos), no
+ * una copia a mano de la máquina de estados.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
 import { questsMigrations } from '@modules/quests/quests.schema';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface TimerState {
   status: string;
@@ -59,47 +57,28 @@ interface Broadcast {
 }
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
   broadcasts: [] as Array<{ channel: string; data: unknown }>,
 }));
 
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  // Una ventana falsa que anota lo que se le manda: así se puede afirmar que el
-  // evento de abandono sale UNA sola vez.
-  BrowserWindow: {
-    getAllWindows: () => [
-      {
-        webContents: {
-          send: (channel: string, data: unknown) => {
-            harness.broadcasts.push({ channel, data });
-          },
-        },
-      },
-    ],
-  },
-  Notification: Object.assign(
-    class {
-      show() { /* noop */ }
-    },
-    { isSupported: () => false },
-  ),
-}));
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+import { setEventSink } from '../../../shared-logic/events';
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
-vi.mock('../../../electron/modules/notifications.ipc', () => ({
+// Un sink falso que anota lo que se le manda: así se puede afirmar que el
+// evento de abandono sale UNA sola vez.
+setEventSink((channel, data) => { harness.broadcasts.push({ channel, data }); });
+
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));
 
-const { registerCauldronIpcHandlers } = await import('../../../electron/modules/cauldron.ipc');
+const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 registerCauldronIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const fn = harness.handlers.get(channel);
+  const fn = getHandler(channel);
   if (!fn) throw new Error(`no handler registered for ${channel}`);
   return (await fn({}, ...args)) as T;
 }
@@ -428,6 +407,7 @@ describe('abandono de un enfoque', () => {
     // Volver a registrar los handlers dispara `cleanupOrphanedSessions()`,
     // exactamente como el arranque de la app. Un frasco roto es una fila
     // incompleta sin `target_end_time` — justo el perfil que esa limpieza borra.
+    clearHandlers();
     registerCauldronIpcHandlers();
 
     const jars = (await shelf()).sessions;

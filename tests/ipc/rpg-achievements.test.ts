@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import {
   processRpgEvent,
   backfillAchievements,
   getAchievements,
   evaluateAchievements,
-} from '../../electron/ipc/rpg-handlers';
+} from '../../shared-logic/modules/rpg-handlers';
 import { ACHIEVEMENTS, ACHIEVEMENT_XP, ACHIEVEMENTS_TOTAL } from '../../shared/achievements';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

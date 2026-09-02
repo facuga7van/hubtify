@@ -10,7 +10,7 @@ vi.mock('electron', () => ({
 
 import Database from 'better-sqlite3';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
-import { reopenDayRecord } from '../../../electron/modules/nutrition.ipc';
+import { reopenDayRecord } from '../../../shared-logic/modules/nutrition.ipc';
 
 function runMigrations(db: Database.Database) {
   for (const m of nutritionMigrations) {

@@ -15,7 +15,7 @@ import {
   calculateBMR,
   calculateTDEEWithFactor,
   getDynamicActivityFactor,
-} from '../../../electron/modules/nutrition.ipc';
+} from '../../../shared-logic/modules/nutrition.ipc';
 
 function runMigrations(db: Database.Database) {
   for (const m of nutritionMigrations) {

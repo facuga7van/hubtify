@@ -141,7 +141,7 @@ describe('migration v14 — indexes and the generated columns', () => {
     // Losing this table costs one API call; syncing it would push a per-device
     // performance artefact through Firestore for nothing.
     const syncSource = await import('node:fs').then(fs =>
-      fs.readFileSync('electron/modules/sync.ipc.ts', 'utf-8'));
+      fs.readFileSync('shared-logic/modules/sync.ipc.ts', 'utf-8'));
     expect(syncSource).not.toContain('nutrition_ai_cache');
   });
 });

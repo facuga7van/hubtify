@@ -5,14 +5,12 @@
  * click: get up for water and the break never started. And after the long break
  * `getNextSegment()` returned null, so a working day meant four manual starts.
  *
- * These tests drive the REAL handlers (mocked `electron` + injected DB + fake
+ * These tests drive the REAL handlers (shared registry + injected DB + fake
  * timers) rather than a hand-copied version of the state machine.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface TimerState {
   status: string;
@@ -26,35 +24,22 @@ interface TimerState {
 }
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
 }));
 
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  BrowserWindow: { getAllWindows: () => [] },
-  // OS notifications are not what is under test — and they would need a display.
-  Notification: Object.assign(
-    class {
-      show() { /* noop */ }
-    },
-    { isSupported: () => false },
-  ),
-}));
+import { getHandler } from '../../../shared-logic/registry';
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
-vi.mock('../../../electron/modules/notifications.ipc', () => ({
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));
 
-const { registerCauldronIpcHandlers } = await import('../../../electron/modules/cauldron.ipc');
+const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 registerCauldronIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const fn = harness.handlers.get(channel);
+  const fn = getHandler(channel);
   if (!fn) throw new Error(`no handler registered for ${channel}`);
   return (await fn({}, ...args)) as T;
 }

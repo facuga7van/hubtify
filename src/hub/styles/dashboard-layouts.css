@@ -1,3 +1,13 @@
+/* ── Stat cartouches row (Nivel / XP hoy / Racha / Salud) ── */
+/* Una clase y no un style inline: el shell mobile la pasa a 2×2 desde
+   layout.css, y un inline no se puede pisar desde una hoja. */
+.qb-cartouche-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 /* ── 4-Column Customizable Dashboard Grid ─────── */
 
 .dashboard-grid-4 {
@@ -221,4 +231,12 @@
 }
 .widget-list-flow::-webkit-scrollbar-thumb:hover {
   background: rgba(138, 112, 48, 0.8);
+}
+
+/* Sin puntero no hay hover: los controles de mover/redimensionar (H6) tienen
+   que estar a la vista. */
+@media (hover: none) {
+  .widget-controls {
+    opacity: 1;
+  }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
-import { processRpgEvent, getDaySummary, sealDay, getSeals } from '../../electron/ipc/rpg-handlers';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
+import { processRpgEvent, getDaySummary, sealDay, getSeals } from '../../shared-logic/modules/rpg-handlers';
 import { sealXp, MAX_VIGOR } from '../../shared/rpg-engine';
 import { pinClockToNoon } from '../helpers/pin-clock';
 

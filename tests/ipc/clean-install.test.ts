@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-import { notificationsMigrations } from '../../electron/modules/notifications.schema';
+import { notificationsMigrations } from '../../shared-logic/modules/notifications.schema';
 
 /**
  * Boots a database exactly the way electron/main.ts does, then boots the SAME
@@ -76,7 +76,7 @@ describe('clean install', () => {
     boot(db);
 
     const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map(t => t.name));
-    // Kept in sync by hand with electron/modules/sync.ipc.ts — a table that leaks
+    // Kept in sync by hand with shared-logic/modules/sync.ipc.ts — a table that leaks
     // between accounts is the exact bug this guards against.
     for (const t of ['finance_import_batches', 'finance_income_sources', 'app_state']) {
       expect(tables.has(t)).toBe(true);

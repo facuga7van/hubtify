@@ -3,9 +3,9 @@ import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import {
   computeHabits, reconcileHabitShields, parseSpecificDays, serializeSpecificDays, isoWeekday,
-} from '../../../electron/modules/quests.habits';
-import { postponedDueDate, postponeTasks } from '../../../electron/modules/quests.ipc';
-import { mergeHabitChecks } from '../../../electron/modules/sync.ipc';
+} from '../../../shared-logic/modules/quests.habits';
+import { postponedDueDate, postponeTasks } from '../../../shared-logic/modules/quests.ipc';
+import { mergeHabitChecks } from '../../../shared-logic/modules/sync.ipc';
 
 // 2026-07-06 is a Monday, so: 06 Mon · 07 Tue · 08 Wed · 09 Thu · 10 Fri · 11 Sat · 12 Sun.
 // 2026-07-20 is the Monday two weeks later.

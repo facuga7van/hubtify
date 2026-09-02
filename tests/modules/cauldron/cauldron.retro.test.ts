@@ -8,13 +8,11 @@
  * otro broadcast. Cero recompensa.
  *
  * Como en `cauldron.phase2.test.ts`, esto maneja los handlers REALES
- * (`electron` mockeado + DB inyectada + timers falsos).
+ * (registro compartido + DB inyectada + sink de eventos + timers falsos).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface ShelfSession {
   id: string;
@@ -34,45 +32,26 @@ interface LoggedRow {
 }
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
   broadcasts: [] as Array<{ channel: string; data: unknown }>,
 }));
 
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  BrowserWindow: {
-    getAllWindows: () => [
-      {
-        webContents: {
-          send: (channel: string, data: unknown) => {
-            harness.broadcasts.push({ channel, data });
-          },
-        },
-      },
-    ],
-  },
-  Notification: Object.assign(
-    class {
-      show() { /* noop */ }
-    },
-    { isSupported: () => false },
-  ),
-}));
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+import { setEventSink } from '../../../shared-logic/events';
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
-vi.mock('../../../electron/modules/notifications.ipc', () => ({
+setEventSink((channel, data) => { harness.broadcasts.push({ channel, data }); });
+
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
   isModuleNotificationEnabled: () => false,
 }));
 
-const { registerCauldronIpcHandlers } = await import('../../../electron/modules/cauldron.ipc');
+const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 registerCauldronIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const fn = harness.handlers.get(channel);
+  const fn = getHandler(channel);
   if (!fn) throw new Error(`no handler registered for ${channel}`);
   return (await fn({}, ...args)) as T;
 }
@@ -246,6 +225,7 @@ describe('cleanupOrphanedSessions', () => {
 
     // Re-registrar simula el próximo arranque del main: corre
     // cleanupOrphanedSessions() contra la MISMA base.
+    clearHandlers();
     registerCauldronIpcHandlers();
 
     const row = rowFor(logged.id);

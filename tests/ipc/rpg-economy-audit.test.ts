@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import {
   processRpgEvent,
   setInnMode,
@@ -12,20 +12,14 @@ import {
   backfillMasteryXp,
   buildAchievementContext,
   backfillAchievements,
-} from '../../electron/ipc/rpg-handlers';
+} from '../../shared-logic/modules/rpg-handlers';
 import { sealXp, MAX_VIGOR, isMeaningfulEvent } from '../../shared/rpg-engine';
+import { setEventSink } from '../../shared-logic/events';
 import { pinClockToNoon } from '../helpers/pin-clock';
 
-/** Every broadcast the engine sends, so a test can count them. */
+/** Every event the engine emits, so a test can count them. */
 const broadcasts: Array<{ channel: string; data: unknown }> = [];
-vi.mock('electron', () => ({
-  ipcMain: { handle: () => undefined },
-  BrowserWindow: {
-    getAllWindows: () => [{
-      webContents: { send: (channel: string, data: unknown) => { broadcasts.push({ channel, data }); } },
-    }],
-  },
-}));
+setEventSink((channel, data) => { broadcasts.push({ channel, data }); });
 
 /**
  * Auditoría adversarial de la economía RPG (2026-08) — un test por hallazgo.

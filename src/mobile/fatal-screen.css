@@ -1,0 +1,88 @@
+/* Pantalla de fallo del arranque mobile. Pantalla completa sobre cuero, una
+   tarjeta de pergamino centrada. Sin dependencias de components.css: puede
+   renderizarse antes de que exista window.api. */
+.mobile-fatal {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--leather-dark);
+}
+
+.mobile-fatal__card {
+  width: min(420px, 100%);
+  padding: 24px 20px;
+  border: 2px solid var(--gold-dark);
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%);
+  box-shadow: 0 2px 8px rgba(42, 29, 14, 0.3), inset 0 1px 3px rgba(42, 29, 14, 0.1);
+  color: var(--ink);
+  text-align: center;
+}
+
+.mobile-fatal__title {
+  margin: 0 0 12px;
+  font-family: var(--ff-display);
+  font-size: var(--fs-heading);
+  color: var(--rubric);
+}
+
+.mobile-fatal__reason {
+  margin: 0 0 8px;
+  font-family: var(--ff-body);
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.mobile-fatal__detail {
+  margin: 0 0 8px;
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.mobile-fatal__message {
+  margin: 0 0 16px;
+  padding: 8px;
+  max-height: 30vh;
+  overflow: auto;
+  border-radius: 3px;
+  background: var(--parch-3);
+  color: var(--ink-faded);
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mobile-fatal__button {
+  padding: 8px 16px;
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
+  color: var(--gold);
+  font-family: var(--ff-accent);
+  font-size: var(--fs-body);
+  box-shadow: 0 2px 4px rgba(42, 29, 14, 0.3);
+  cursor: pointer;
+}
+
+.mobile-fatal__button:active {
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: var(--ink);
+}
+
+.mobile-fatal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mobile-fatal__button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

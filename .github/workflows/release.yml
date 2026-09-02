@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # ── Windows installer (unchanged pipeline, now uploads an artifact) ──────
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -29,6 +30,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Typecheck shared-logic (no electron/node/dom)
+        run: npm run typecheck:shared-logic
+
       - name: Test
         run: npm test
 
@@ -38,10 +42,137 @@ jobs:
       - name: Build installers
         run: npm run make
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          retention-days: 3
+          path: |
+            out/make/squirrel.windows/x64/*.exe
+            out/make/squirrel.windows/x64/*.nupkg
+            out/make/squirrel.windows/x64/RELEASES
+            out/make/zip/win32/x64/*.zip
+
+  # ── Signed Android APK ───────────────────────────────────────────────────
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck shared-logic (no electron/node/dom)
+        run: npm run typecheck:shared-logic
+
       - name: Get version from tag
         id: version
-        shell: bash
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      # versionName comes from package.json (scripts/android-version.mjs), the
+      # release name from the tag. They should agree; warn loudly if not.
+      - name: Check package.json version against the tag
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::warning::package.json is $PKG but the tag is v${{ steps.version.outputs.version }}; the APK ships versionName $PKG"
+          fi
+
+      # mobile:sync = vite build (dist/mobile) + versionName/versionCode from
+      # package.json + `cap sync android`.
+      - name: Build web and sync android
+        run: npm run mobile:sync
+
+      # The keystore only ever exists on disk inside this job; it is removed in
+      # the `always()` step below. Nothing here echoes the secret.
+      - name: Decode release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing (see docs/mobile-release.md)"
+            exit 1
+          fi
+          mkdir -p android/keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/keystore/release.jks
+
+      # android/app/build.gradle reads these env vars when keystore.properties
+      # is absent. Gradle prints only the keystore file name, never the alias
+      # or the passwords; do not add --info/--debug here.
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x android/gradlew
+          cd android && ./gradlew assembleRelease --no-daemon
+
+      # A debug-signed APK would install but could never be updated from a
+      # release-signed one: refuse to publish it.
+      - name: Verify signature and rename
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          CERTS="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK")"
+          printf '%s\n' "$CERTS"
+          if printf '%s' "$CERTS" | grep -q 'CN=Android Debug'; then
+            echo "::error::APK is signed with the debug key"
+            exit 1
+          fi
+          mv "$APK" "Hubtify-${{ steps.version.outputs.version }}.apk"
+
+      - name: Remove keystore from the runner
+        if: always()
+        run: rm -rf android/keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          if-no-files-found: error
+          retention-days: 3
+          path: Hubtify-*.apk
+
+  # ── One release with everything ──────────────────────────────────────────
+  publish:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+
+    steps:
+      # The changelog step imports src/shared/changelog.ts: needs the repo + node.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
 
       # `require()` cannot load a .ts file, so this step used to throw, get
       # swallowed by `|| true`, never write RELEASE_NOTES.md, and every release
@@ -101,11 +232,13 @@ jobs:
           prerelease: false
           generate_release_notes: ${{ steps.notes.outputs.has_notes != 'true' }}
           body_path: ${{ steps.notes.outputs.has_notes == 'true' && 'RELEASE_NOTES.md' || '' }}
+          fail_on_unmatched_files: true
           files: |
-            out/make/squirrel.windows/x64/*.exe
-            out/make/squirrel.windows/x64/*.nupkg
-            out/make/squirrel.windows/x64/RELEASES
-            out/make/zip/win32/x64/*.zip
+            artifacts/windows/squirrel.windows/x64/*.exe
+            artifacts/windows/squirrel.windows/x64/*.nupkg
+            artifacts/windows/squirrel.windows/x64/RELEASES
+            artifacts/windows/zip/win32/x64/*.zip
+            artifacts/android/Hubtify-*.apk
 
       # Best-effort: deploying Functions must NOT block the app release. Runs
       # after the release is published and won't fail the workflow if the

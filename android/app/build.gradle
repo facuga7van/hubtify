@@ -1,0 +1,103 @@
+apply plugin: 'com.android.application'
+
+// ── Firma release (Fase 4; docs/mobile-release.md) ──────────────────────────
+// 1) android/keystore/keystore.properties (local, gitignored)
+// 2) variables de entorno ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS /
+//    ANDROID_KEY_PASSWORD + android/keystore/release.jks (CI decodifica el .jks)
+// 3) nada de lo anterior → assembleRelease firma con la clave debug para que el
+//    build no rompa; ese APK NO sirve para publicar (el log lo dice).
+def keystoreDir = rootProject.file('keystore')
+def keystoreProps = new Properties()
+def keystorePropsFile = new File(keystoreDir, 'keystore.properties')
+if (keystorePropsFile.exists()) {
+    // Reader UTF-8: Properties.load(InputStream) asume ISO-8859-1 y rompería
+    // una contraseña con caracteres fuera de Latin-1.
+    keystorePropsFile.withReader('UTF-8') { keystoreProps.load(it) }
+    // Sin storeFile el bloque de abajo caería a la clave debug en silencio.
+    if (!keystoreProps['storeFile']) {
+        throw new GradleException('[hubtify] release signing: keystore.properties found but storeFile missing')
+    }
+} else if (System.getenv('ANDROID_KEYSTORE_PASSWORD') != null) {
+    // `?: ''`: Properties.put(k, null) lanza NullPointerException y taparía el
+    // mensaje legible de abajo cuando falta una de las tres variables.
+    keystoreProps['storeFile'] = 'release.jks'
+    keystoreProps['storePassword'] = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: ''
+    keystoreProps['keyAlias'] = System.getenv('ANDROID_KEY_ALIAS') ?: ''
+    keystoreProps['keyPassword'] = System.getenv('ANDROID_KEY_PASSWORD') ?: ''
+}
+def releaseKeystoreFile = keystoreProps['storeFile'] ? new File(keystoreDir, keystoreProps['storeFile']) : null
+def hasReleaseKeystore = releaseKeystoreFile != null && releaseKeystoreFile.exists()
+if (hasReleaseKeystore) {
+    if (!keystoreProps['keyAlias'] || !keystoreProps['storePassword'] || !keystoreProps['keyPassword']) {
+        throw new GradleException('[hubtify] release signing: keystore found but keyAlias/storePassword/keyPassword missing')
+    }
+    // Solo el nombre del archivo: el alias es un secret en CI y GitHub
+    // enmascararía cada aparición de esa palabra en el log.
+    logger.lifecycle("[hubtify] release signing: ${releaseKeystoreFile.name}")
+} else {
+    logger.lifecycle('[hubtify] release signing: DEBUG key (no keystore found)')
+}
+
+android {
+    namespace = "com.hubtify.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.hubtify.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 900
+        versionName "0.9.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile releaseKeystoreFile
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

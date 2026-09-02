@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../shared-logic/db';
 import {
   processRpgEvent,
   sealDay,
@@ -12,7 +12,7 @@ import {
   saveReward,
   deleteReward,
   redeemReward,
-} from '../../electron/ipc/rpg-handlers';
+} from '../../shared-logic/modules/rpg-handlers';
 import { ACHIEVEMENT_OBOLOS } from '../../shared/achievements';
 
 function setupDb(): Database.Database {

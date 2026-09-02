@@ -14,7 +14,7 @@ export interface SealInvite {
   date: string;
   /** Which day it is, so the copy can say "you left yesterday unsealed". */
   which: 'today' | 'yesterday';
-  xpTotal: number;
+  totalXp: number;
   eventsCount: number;
 }
 
@@ -57,9 +57,9 @@ export function useSealInvite(): State & { reload: () => void } {
       .then(([t, y]) => {
         let invite: SealInvite | null = null;
         if (y && !y.sealed && y.eventsCount > 0) {
-          invite = { date: y.date, which: 'yesterday', xpTotal: y.xpTotal, eventsCount: y.eventsCount };
+          invite = { date: y.date, which: 'yesterday', totalXp: y.totalXp, eventsCount: y.eventsCount };
         } else if (t && !t.sealed && t.eventsCount > 0 && isEveningNow()) {
-          invite = { date: t.date, which: 'today', xpTotal: t.xpTotal, eventsCount: t.eventsCount };
+          invite = { date: t.date, which: 'today', totalXp: t.totalXp, eventsCount: t.eventsCount };
         }
         setState({ available: true, invite, todaySealed: t?.sealed ?? false });
       })

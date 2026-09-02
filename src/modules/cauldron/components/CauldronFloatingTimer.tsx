@@ -278,7 +278,7 @@ export default function CauldronFloatingTimer() {
 
   const handlePopOut = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await window.api.cauldronOpenWindow();
+    await window.api.cauldronOpenWindow?.();
     setHidden(true);
   };
 

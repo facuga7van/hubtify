@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { initCoreTables, applyMigrations, coreMigrations } from '../../../electron/ipc/db';
+import { initCoreTables, applyMigrations, coreMigrations } from '../../../shared-logic/db';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-import { notificationsMigrations } from '../../../electron/modules/notifications.schema';
-import { grantObolos, getObolosBalance, redeemReward, purchaseShopItem } from '../../../electron/ipc/rpg-handlers';
+import { notificationsMigrations } from '../../../shared-logic/modules/notifications.schema';
+import { grantObolos, getObolosBalance, redeemReward, purchaseShopItem } from '../../../shared-logic/modules/rpg-handlers';
 import {
   mergeQuestDataInto,
   mergeNutritionFoods,
@@ -16,7 +16,7 @@ import {
   clearUserDataInto,
   normStamp,
   isNewerStamp,
-} from '../../../electron/modules/sync.ipc';
+} from '../../../shared-logic/modules/sync.ipc';
 
 /**
  * Scenarios from the adversarial sync review (review-sync.md). Each `describe`

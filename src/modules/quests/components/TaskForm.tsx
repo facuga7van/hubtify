@@ -141,7 +141,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
   return (
     <form onSubmit={handleSubmit} className="rpg-card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
         <input
           type="text"
           placeholder={t('questify.questName')}

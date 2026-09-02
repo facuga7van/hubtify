@@ -1,3 +1,5 @@
+import type { ShopItemKind } from './shop-catalog';
+
 // ── RPG Types ──────────────────────────────────────────────
 
 export interface PlayerStats {
@@ -91,6 +93,52 @@ export interface ObolosBalance { balance: number; earned: number; spent: number 
 export type RedeemResult =
   | { ok: true; balance: number }
   | { ok: false; reason: 'insufficient' | 'not_found' };
+
+// ── La Tienda + maestrías (Fase 4) ─────────────────────────
+// Mismas formas que devuelven los handlers de shared-logic/modules/rpg-handlers.ts;
+// el renderer (src/hub/codex/codexApi.ts) deriva sus tipos de HubtifyApi, así
+// que un campo que cambie acá o allá rompe la compilación en vez de pintar NaN.
+
+export interface ShopEquipped {
+  sealStyle: string | null;
+  frame: string | null;
+  background: string | null;
+}
+export interface ShopCatalogEntry {
+  id: string;
+  kind: ShopItemKind;
+  cost: number;
+  /** `rpg.shop.items.<id>` — `.name` and `.desc` underneath. */
+  i18nKey: string;
+  /** Pardon: purchased THIS month (= monthly cap reached). Others: ever bought. */
+  owned: boolean;
+  equipped: boolean;
+  purchasedAt: string | null;
+}
+export interface ShopCatalogResult {
+  items: ShopCatalogEntry[];
+  balance: number;
+  equipped: ShopEquipped;
+}
+export type PurchaseShopResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' };
+export type EquipShopResult =
+  | { ok: true; equipped: ShopEquipped }
+  | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' };
+export interface MasteryState {
+  moduleId: string;
+  xp: number;
+  level: number;
+  /** Untranslated (Spanish) rank name; translate via `levelKey`. */
+  levelName: string;
+  /** i18n key: `rpg.mastery.ranks.<rank>`. */
+  levelKey: string;
+  /** Cumulative XP that opens the next level; null at level 10. */
+  nextLevelXp: number | null;
+  /** 0..1 within the current level. */
+  progress: number;
+}
 
 // ── Module Types ───────────────────────────────────────────
 
@@ -385,19 +433,11 @@ export interface HubtifyApi {
   rpgSaveReward: (input: Record<string, unknown>) => Promise<Reward | null>;
   rpgDeleteReward: (id: string) => Promise<{ ok: boolean }>;
   rpgRedeemReward: (id: string) => Promise<RedeemResult>;
-  rpgGetShopCatalog: () => Promise<{
-    items: Array<{ id: string; kind: string; cost: number; i18nKey: string; owned: boolean; equipped: boolean; purchasedAt: string | null }>;
-    balance: number;
-    equipped: { sealStyle: string | null; frame: string | null; background: string | null };
-  }>;
-  rpgPurchaseShopItem: (itemId: string) => Promise<
-    { ok: true; balance: number } | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' }>;
-  rpgEquipShopItem: (itemId: string | null, kind?: 'seal_style' | 'frame' | 'background') => Promise<
-    { ok: true; equipped: Record<string, string | null> } | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' }>;
-  rpgGetMasteries: () => Promise<Array<{
-    moduleId: string; xp: number; level: number; levelName: string; levelKey: string;
-    nextLevelXp: number | null; progress: number;
-  }>>;
+  rpgGetShopCatalog: () => Promise<ShopCatalogResult>;
+  rpgPurchaseShopItem: (itemId: string) => Promise<PurchaseShopResult>;
+  /** `itemId` null + `kind` = unequip. The handler validates the kind itself. */
+  rpgEquipShopItem: (itemId: string | null, kind?: ShopItemKind) => Promise<EquipShopResult>;
+  rpgGetMasteries: () => Promise<MasteryState[]>;
   onRpgAchievementUnlocked: (callback: (id: string) => void) => () => void;
   onRpgAchievementsBackfilled: (callback: (ids: string[]) => void) => () => void;
   onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => () => void;
@@ -455,10 +495,10 @@ export interface HubtifyApi {
   nutritionLogFood: (entry: Record<string, unknown>) => Promise<void>;
   nutritionGetFoodByDate: (date: string) => Promise<unknown[]>;
   nutritionSearchHistory: (query?: string, limit?: number) => Promise<Array<{
-  nutritionGetEventDays: (start: string, end: string) => Promise<string[]>;
     description: string; calories: number; timesLogged: number;
     lastLogged: string | null; source: 'history' | 'favorite'; proteinG?: number;
   }>>;
+  nutritionGetEventDays: (start: string, end: string) => Promise<string[]>;
   nutritionGetCachedEstimate: (description: string) => Promise<{
     calories: number; aiBreakdown: string | null; proteinG: number | null; hits: number;
   } | null>;
@@ -526,9 +566,9 @@ export interface HubtifyApi {
   syncMergeCauldronData: (data: Record<string, unknown>) => Promise<{ changed: boolean }>;
 
   // Backup
-  backupExport: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
-  backupPickImportFile: () => Promise<{ canceled: boolean; path?: string; name?: string }>;
-  backupImport: (filePath?: string) => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
+  backupExport?: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
+  backupPickImportFile?: () => Promise<{ canceled: boolean; path?: string; name?: string }>;
+  backupImport?: (filePath?: string) => Promise<{ success: boolean; canceled?: boolean; error?: string }>;
 
   // Character
   characterSave: (data: Record<string, unknown>) => Promise<void>;
@@ -611,7 +651,11 @@ export interface HubtifyApi {
   financeGetRecurringAmountHistory: (id: string) => Promise<unknown[]>;
 
   // Finance - Import
-  financeImportSelectAndParsePDF: () => Promise<{ rows: ParsedRow[]; fileName: string; skippedLines: string[] } | null>;
+  financeImportSelectAndParsePDF: () => Promise<
+    | { rows: ParsedRow[]; fileName: string; skippedLines: string[] }
+    | { ok: false; reason: 'unsupported_platform' }
+    | null
+  >;
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null, accountId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
   financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;
   financeGetImportBatches: () => Promise<FinanceImportBatch[]>;
@@ -688,8 +732,8 @@ export interface HubtifyApi {
   cauldronSetLabels: (labels: Record<string, string>) => Promise<void>;
   onCauldronTick: (callback: (state: CauldronTimerState) => void) => () => void;
   onCauldronSessionEnd: (callback: (result: CauldronSessionEndResult) => void) => () => void;
-  cauldronOpenWindow: () => Promise<void>;
-  cauldronCloseWindow: () => Promise<void>;
+  cauldronOpenWindow?: () => Promise<void>;
+  cauldronCloseWindow?: () => Promise<void>;
   onCauldronWindowOpened: (callback: () => void) => () => void;
   onCauldronWindowClosed: (callback: () => void) => () => void;
 
@@ -700,9 +744,9 @@ export interface HubtifyApi {
   sylBuildSnapshot: () => Promise<SylSnapshot>;
 
   // Updater
-  updaterCheck: () => Promise<{ available: boolean; version?: string }>;
-  updaterDownload: () => Promise<string>;
-  updaterRestart: () => Promise<void>;
+  updaterCheck?: () => Promise<{ available: boolean; version?: string }>;
+  updaterDownload?: () => Promise<string>;
+  updaterRestart?: () => Promise<void>;
   onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
   onUpdateDownloaded: (callback: () => void) => () => void;
   onDownloadProgress: (callback: (info: { percent: number }) => void) => () => void;

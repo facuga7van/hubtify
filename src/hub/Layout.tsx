@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import TitleBar from '../shared/components/TitleBar';
-import Sidebar from './Sidebar';
+import DesktopShell from './DesktopShell';
+import MobileShell from './MobileShell';
+import { useShellKind } from './useShellKind';
 import UpdateNotification from './UpdateNotification';
 import UpdateBanner from './UpdateBanner';
 import type { PlayerStats } from '../../shared/types';
@@ -36,22 +37,20 @@ import {
   onAchievementUnlocked,
 } from './codex/codexApi';
 import { createParticleBurst } from '../shared/animations/particles';
+import { isNewerVersion } from '../shared/semver';
 
-/** Below this window width the sidebar collapses on its own. */
-const AUTO_COLLAPSE_WIDTH = 820;
 /** Never pull+push more often than this on window focus (ms). */
 const FOCUS_SYNC_MIN_INTERVAL_MS = 3 * 60_000;
 const LAST_PULL_KEY = 'hubtify_last_pull_at';
 
-function isNewerVersion(a: string, b: string): boolean {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return true;
-    if ((pa[i] || 0) < (pb[i] || 0)) return false;
-  }
-  return false;
-}
+/**
+ * Plegado a `false` por `define` en el renderer de Electron. OJO: esbuild solo
+ * elimina un `import()` cuando la condición es la comparación LITERAL en el
+ * mismo sitio, no a través de este const — los dos `import('../mobile/updater')`
+ * de abajo repiten la comparación entera a propósito. Este const es para los
+ * usos que NO guardan un import dinámico.
+ */
+const IS_ANDROID_BUILD = typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android';
 
 /**
  * Sync push failures were completely silent: the data simply never left the
@@ -233,6 +232,9 @@ export default function Layout() {
 
   const { shortcutModalOpen, setShortcutModalOpen } = useKeyboardShortcuts();
 
+  const shellKind = useShellKind();
+  const Shell = shellKind === 'mobile' ? MobileShell : DesktopShell;
+
   // Apply font scale from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('hubtify_font_scale');
@@ -268,11 +270,28 @@ export default function Layout() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
+  // Android: URL del APK del último release (src/mobile/updater.ts). Sin
+  // descarga in-app: «Descargar» abre el navegador. Es un ref y no un state a
+  // propósito: como state, `handleUpdate` → `considerUpdate` → el `useEffect`
+  // del updater se re-ejecutarían y harían un segundo `check()` al montar.
+  const apkUrlRef = useRef<string | null>(null);
+
   const handleUpdate = useCallback(async () => {
+    if (typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android') {
+      const apkUrl = apkUrlRef.current;
+      if (apkUrl) {
+        const { openApkDownload } = await import('../mobile/updater');
+        await openApkDownload(apkUrl).catch((err: unknown) => setUpdateError(err instanceof Error ? err.message : String(err)));
+      }
+      // Sin apkUrl no hay nada que abrir, pero tampoco se cae al camino
+      // desktop: `updaterDownload` no existe en `window.api` de mobile y el
+      // banner quedaría clavado en «Descargando…».
+      return;
+    }
     setUpdateState('downloading');
     setUpdateError(null);
     try {
-      await window.api.updaterDownload();
+      await window.api.updaterDownload?.();
       setUpdateState('ready'); // staged — user chooses when to restart
     } catch { setUpdateState('idle'); }
   }, []);
@@ -298,7 +317,7 @@ export default function Layout() {
     if (mode === 'off') return;
     if (localStorage.getItem('hubtify_update_dismissed_version') === version) return;
     setUpdateAvailable({ version });
-    if (mode === 'auto') handleUpdate();
+    if (mode === 'auto' && !IS_ANDROID_BUILD) handleUpdate();
   }, [handleUpdate]);
 
   useEffect(() => {
@@ -308,6 +327,17 @@ export default function Layout() {
     const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
 
     const check = () => {
+      if (typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android') {
+        import('../mobile/updater')
+          .then((m) => m.checkMobileUpdate())
+          .then((update) => {
+            if (!update) return;
+            apkUrlRef.current = update.apkUrl;
+            considerUpdate(update.version);
+          })
+          .catch(() => { /* sin red o rate limit: silencio, igual que en dev */ });
+        return;
+      }
       window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
         if (res?.available && res.version) considerUpdate(res.version);
       }).catch(() => { /* not available in dev */ });
@@ -363,32 +393,6 @@ export default function Layout() {
     }
     return entries.length > 0 ? entries : changelog.slice(0, 1);
   }, [lastSeenVersion]);
-
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (localStorage.getItem('hubtify_sidebar_collapsed') === 'true') return true;
-    // Below ~820px the expanded rail leaves the content unusable and the 20px
-    // toggle is basically undiscoverable, so start compact.
-    return window.innerWidth < AUTO_COLLAPSE_WIDTH;
-  });
-
-  // Collapse automatically when the window shrinks past the threshold; leave the
-  // user's own choice alone once they are back above it.
-  useEffect(() => {
-    const onResize = () => {
-      if (window.innerWidth < AUTO_COLLAPSE_WIDTH) {
-        setSidebarCollapsed(prev => (prev ? prev : true));
-      }
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('hubtify_sidebar_collapsed', String(next));
-      return next;
-    });
-  }, []);
 
   const handleToggleInn = useCallback(async () => {
     const current = stats?.innSince ?? null;
@@ -600,40 +604,24 @@ export default function Layout() {
     <SyncPushFailedWatcher />
     <RpgMomentsWatcher />
     <TourProvider>
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <TitleBar />
-      <div className="app-layout" style={{ flex: 1, height: 0 }}>
-        <div className={`sidebar-wrapper ${sidebarCollapsed ? 'sidebar-wrapper--collapsed' : ''}`}>
-          <Sidebar stats={stats} collapsed={sidebarCollapsed} onBellClick={() => setShowNotifications(true)} onToggleInn={handleToggleInn} />
-          <button onClick={toggleSidebar} className={`sidebar-toggle tap-target ${sidebarCollapsed ? 'sidebar-toggle--collapsed' : ''}`}
-            title={sidebarCollapsed ? t('hub.expand', 'Expandir') : t('hub.collapse', 'Colapsar')}
-            aria-expanded={!sidebarCollapsed}
-            aria-controls="main-sidebar"
-            aria-label={t('hub.toggleSidebar', 'Alternar barra lateral')}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-              style={{ transition: 'transform 0.25s ease', transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-              <path d="M9 2L4 7l5 5"/>
-            </svg>
-          </button>
-        </div>
-        <main className="main-content">
-          {syncError && (
-            <div role="alert" style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-              padding: '10px 16px', background: 'rgba(248, 113, 113, 0.15)',
-              border: '1px solid rgba(248, 113, 113, 0.3)', borderRadius: '6px',
-              margin: '8px 16px 0', color: '#f87171', fontSize: 'var(--fs-label)',
-            }}>
-              <span>{t('auth.syncPullFailed')}</span>
-              <button className="rpg-button" onClick={retrySyncPull}
-                style={{ padding: '4px 12px', fontSize: 'var(--fs-label)', flexShrink: 0 }}>
-                {t('auth.syncRetry')}
-              </button>
-            </div>
-          )}
-          <AnimatedOutlet ref={outletHandleRef} />
-        </main>
-      </div>
+    <div className="shell-frame">
+      <Shell stats={stats} onBellClick={() => setShowNotifications(true)} onToggleInn={handleToggleInn}>
+        {syncError && (
+          <div role="alert" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            padding: '10px 16px', background: 'rgba(248, 113, 113, 0.15)',
+            border: '1px solid rgba(248, 113, 113, 0.3)', borderRadius: '6px',
+            margin: '8px 16px 0', color: '#f87171', fontSize: 'var(--fs-label)',
+          }}>
+            <span>{t('auth.syncPullFailed')}</span>
+            <button className="rpg-button" onClick={retrySyncPull}
+              style={{ padding: '4px 12px', fontSize: 'var(--fs-label)', flexShrink: 0 }}>
+              {t('auth.syncRetry')}
+            </button>
+          </div>
+        )}
+        <AnimatedOutlet ref={outletHandleRef} />
+      </Shell>
 
       {/* Level-up epic overlay — always in DOM when levelUp != null, hidden via display:none until GSAP shows it */}
       {levelUp !== null && (

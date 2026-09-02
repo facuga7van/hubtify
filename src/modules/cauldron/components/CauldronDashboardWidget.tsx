@@ -136,11 +136,11 @@ export default function CauldronDashboardWidget() {
         // feel dead by comparison.
         playCauldronStart();
         // Popping the external window open is opt-in, same preference as the page.
-        if (shouldPopOutOnStart()) window.api.cauldronOpenWindow();
+        if (shouldPopOutOnStart()) window.api.cauldronOpenWindow?.();
       }
     } catch {
       // Timer already active — surface it instead of failing silently.
-      window.api.cauldronOpenWindow();
+      window.api.cauldronOpenWindow?.();
     }
   };
 

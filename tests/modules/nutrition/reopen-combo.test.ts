@@ -24,24 +24,26 @@ const harness = vi.hoisted(() => ({
   db: null as unknown as Database.Database,
 }));
 
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn) },
   app: { getPath: () => '.' },
   BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
 }));
 
-vi.mock('../../../electron/ipc/db', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../electron/ipc/db')>()),
+vi.mock('../../../shared-logic/db', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../shared-logic/db')>()),
   getDb: () => harness.db,
 }));
 
-const { initCoreTables, applyMigrations, coreMigrations } = await import('../../../electron/ipc/db');
-const { processRpgEvent } = await import('../../../electron/ipc/rpg-handlers');
-const { registerNutritionIpcHandlers } = await import('../../../electron/modules/nutrition.ipc');
+const { initCoreTables, applyMigrations, coreMigrations } = await import('../../../shared-logic/db');
+const { processRpgEvent } = await import('../../../shared-logic/modules/rpg-handlers');
+const { registerNutritionIpcHandlers } = await import('../../../shared-logic/modules/nutrition.ipc');
 registerNutritionIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const fn = harness.handlers.get(channel);
+  const fn = getHandler(channel);
   if (!fn) throw new Error(`no handler registered for ${channel}`);
   return (await fn({}, ...args)) as T;
 }

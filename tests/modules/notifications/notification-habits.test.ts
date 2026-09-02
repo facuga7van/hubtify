@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { notificationsMigrations } from '../../../electron/modules/notifications.schema';
+import { notificationsMigrations } from '../../../shared-logic/modules/notifications.schema';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import {
   evaluateHabitNotifications,
   deduplicateAndInsert,
   autoResolve,
-} from '../../../electron/modules/notification-engine';
+} from '../../../shared-logic/modules/notification-engine';
 
 function runMigrations(db: Database.Database, migrations: { up: string }[]) {
   for (const m of migrations) {

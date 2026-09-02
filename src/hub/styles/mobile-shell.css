@@ -1,0 +1,133 @@
+/* ══════════════════════════════════════════════════════
+   MOBILE SHELL — cabecera + drawer (Android; spec §7).
+   Lo monta Layout cuando useShellKind() da 'mobile'. El drawer REUSA
+   <Sidebar>: acá solo se le quita el `position: fixed; top: var(--shell-top)`
+   del riel de escritorio. Tokens: theme.css (--safe-*, --z-*, --ff-*, --fs-*).
+   ══════════════════════════════════════════════════════ */
+
+/* ── Cabecera ────────────────────────────────────── */
+.mobile-header {
+  flex-shrink: 0;
+  /* Sin contexto propio el box-shadow lo pinta encima el .main-content, que es
+     el hermano siguiente y tiene fondo opaco. */
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* Con WebView >= 140 la barra de estado superpone al WebView y este padding
+     (--safe-top = --safe-area-inset-top) es la franja de cuero que pinta la
+     cabecera debajo de ella; con WebView < 140 vale 0 y la franja es el
+     windowBackground de styles.xml. */
+  height: calc(56px + var(--safe-top));
+  padding: var(--safe-top) 6px 0 6px;
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  border-bottom: 2px solid var(--gold);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  color: var(--parch-0);
+  user-select: none;
+}
+
+.mobile-header__btn {
+  background: none;
+  border: none;
+  color: var(--gold);
+  cursor: pointer;
+  border-radius: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-header__btn:active {
+  background: rgba(168, 138, 60, 0.25);
+}
+
+.mobile-header__btn:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: -2px;
+}
+
+.mobile-header__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--ff-display);
+  font-size: var(--fs-heading);
+  letter-spacing: 0.03em;
+  color: var(--gold-light);   /* 6.21:1 sobre cuero, el mismo que .title-bar-text */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-header__actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.mobile-header__actions .notif-bell {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* ── Contenido ───────────────────────────────────── */
+.app-layout--mobile {
+  flex: 1;
+  height: 0;
+  width: 100%;
+}
+
+.app-layout--mobile .main-content {
+  width: 100%;
+  min-width: 0;
+  overscroll-behavior: contain;
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ── Scrim ───────────────────────────────────────── */
+.mobile-scrim {
+  position: fixed;
+  inset: 0;
+  display: none;
+  opacity: 0;
+  background: rgba(42, 29, 14, 0.55);
+  z-index: var(--z-overlay);
+}
+
+/* ── Drawer ──────────────────────────────────────── */
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(300px, 85vw);
+  transform: translateX(-100%);
+  z-index: var(--z-drawer);
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  background: var(--leather-dark);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.6);
+  outline: none;
+}
+
+/* El riel de escritorio es fixed / 260px (220 bajo 900px) / top --shell-top:
+   dentro del drawer ocupa todo el ancho y el alto disponibles. La
+   especificidad (0,3,0) gana a `.sidebar:not(.sidebar--collapsed)` del
+   @media de layout.css. */
+.mobile-drawer .sidebar,
+.mobile-drawer .sidebar:not(.sidebar--collapsed) {
+  position: relative;
+  top: auto;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  box-shadow: none;
+  transition: none;
+}

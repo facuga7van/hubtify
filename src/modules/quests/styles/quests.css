@@ -1135,6 +1135,12 @@
   justify-content: center;
 }
 
+/* El pergamino de notas: 500 px de lienzo + 40 de marco. Vivía inline en
+   ScrollNotes.tsx y el @media de abajo no podía tocarlo. */
+.quest-notes-dialog {
+  min-width: 540px;
+}
+
 .quest-notes-status {
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label);
@@ -1570,5 +1576,153 @@
 
   .quest-row-actions {
     margin-left: auto;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   MOBILE — 390 px (Fase 3). Ver docs/superpowers/plans/2026-09-02-mobile-phase3-shell.md, Task 13.
+   ══════════════════════════════════════════════════════ */
+/* Q1: cuatro pistas con un piso de 170 px más ~220 px de badges no entran
+   en 366. Los badges bajan a un renglón propio bajo el nombre. */
+[data-shell="mobile"] .quest-habit-row {
+  grid-template-columns: minmax(0, 1fr) 24px 40px;
+}
+
+/* Orden DOM (HabitTracker.tsx:412-514): name, right, tick, actions. Sin
+   posiciones explícitas el autoplacement mandaba tilde y menú a un TERCER
+   renglón. */
+[data-shell="mobile"] .quest-habit-name { grid-row: 1; grid-column: 1; }
+[data-shell="mobile"] .quest-habit-tick { grid-row: 1; grid-column: 2; }
+[data-shell="mobile"] .quest-habit-actions { grid-row: 1; grid-column: 3; }
+
+[data-shell="mobile"] .quest-habit-right {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+/* Q2: el segundo renglón de la fila (container query de arriba) pedía
+   62 + 90 + 228 px; sin el desplazamiento ni «XP BASE» entra en 338. */
+[data-shell="mobile"] .quest-row-xp {
+  margin-left: 0;
+}
+
+[data-shell="mobile"] .quest-row-xp-label {
+  display: none;
+}
+
+[data-shell="mobile"] .quest-row-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Q3: los overlays de Questify se renderizan DENTRO de `.qb-content`, que es
+   un contexto de apilamiento propio (`position: relative; z-index: 2`,
+   codex.css:119): su `z-index: var(--z-modal)` queda atrapado ahí adentro y el
+   `.qb-header` hermano (z-index 10) les pinta ENCIMA. En escritorio no se veía
+   porque el modal queda centrado, lejos del header; acá arranca arriba del
+   todo, justo debajo de él. Sin contexto propio, el 5000 del overlay vuelve a
+   competir con el header y gana. */
+[data-shell="mobile"] .qb-content:has(.quest-project-modal-overlay),
+[data-shell="mobile"] .qb-content:has(.quest-notes-overlay) {
+  z-index: auto;
+}
+
+[data-shell="mobile"] .quest-project-modal-overlay {
+  padding: 12px;
+  align-items: flex-start;
+}
+
+[data-shell="mobile"] .quest-project-modal {
+  width: 100%;
+  max-width: 100%;
+  max-height: 92vh;
+  padding: 14px;
+}
+
+/* Q4 */
+[data-shell="mobile"] .quest-notes-overlay {
+  padding: 12px;
+}
+
+[data-shell="mobile"] .quest-notes-dialog {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Q5, Q6, Q7, Q8: la barra de pestañas y sus controles */
+[data-shell="mobile"] .quest-tabs {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+[data-shell="mobile"] .quest-tab-bar-spacer {
+  display: none;
+}
+
+[data-shell="mobile"] .quest-search-input {
+  max-width: none;
+  flex: 1 1 100%;
+}
+
+[data-shell="mobile"] .quest-filter-select,
+[data-shell="mobile"] .quest-project-select {
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 140px;
+}
+
+[data-shell="mobile"] .quest-delete-bar,
+[data-shell="mobile"] .quest-project-modal-row {
+  flex-wrap: wrap;
+}
+
+/* Q9: el <input> no encoge por debajo de su tamaño intrínseco. */
+[data-shell="mobile"] .quest-form-wrapper .rpg-input {
+  min-width: 0;
+}
+
+/* Q10 */
+[data-shell="mobile"] .quest-row-expanded {
+  padding-left: 12px;
+}
+
+/* Q13 */
+[data-shell="mobile"] .xp-toast {
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  align-items: center;
+}
+
+/* Q14 */
+[data-shell="mobile"] .quest-row-menu,
+[data-shell="mobile"] .quest-postpone-menu {
+  max-width: calc(100vw - 24px);
+}
+
+@media (hover: none) {
+  /* Q11: siete toggles de 22 px */
+  .quest-habit-day {
+    width: 34px;
+    height: 34px;
+  }
+
+  .subtask-cell--action {
+    width: 32px;
+    min-height: 32px;
+  }
+
+  /* Q12: el nombre del hábito ES el botón; el subrayado que lo decía solo
+     aparecía en hover. Y el pulso del vínculo al Caldero solo se apagaba
+     en hover: en touch latía para siempre. */
+  .quest-habit-name {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
+
+  .quest-cauldron-link {
+    animation: none;
   }
 }

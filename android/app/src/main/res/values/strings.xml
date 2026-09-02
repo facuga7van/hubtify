@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Hubtify</string>
+    <string name="title_activity_main">Hubtify</string>
+    <string name="package_name">com.hubtify.app</string>
+    <string name="custom_url_scheme">com.hubtify.app</string>
+</resources>

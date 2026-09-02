@@ -6,24 +6,35 @@ Four modules: **Questify** (tasks), **Coinify** (finance), **Nutrify** (nutritio
 ## Architecture
 
 ```
-electron/          Main process: IPC handlers, SQLite, RPG engine
-  modules/         Module-specific IPC (finance.ipc.ts, quests.ipc.ts, etc.)
-  ipc/             Core: db.ts, rpg-handlers.ts, registry.ts
-  preload.ts       Context bridge (~180 methods)
+shared-logic/      Business logic shared by desktop and Android. Pure TS, sync, NO electron/node/dom
+  registry.ts      registerHandler (alias `ipcHandle`) · getHandler · lifecycle hooks
+  register-all.ts  registerAllHandlers() — the 13 platform-neutral register*IpcHandlers
+  db/              SqlDatabase interface, getDb()/setDbFactory(), core + module migrations
+  modules/         All IPC handlers (finance.ipc.ts, quests.ipc.ts, rpg-handlers.ts, …)
+  platform.ts      PlatformPort (dialogs, files, notifications, app/os info) — injected
+  events.ts        emit(channel, payload) main → renderer — sink injected
+  ids.ts           genId()
+electron/          Desktop binding only
+  main.ts          Windows, tray, startup order: setDbFactory → setPlatform → setEventSink → registerAllIpcHandlers → getDb → runAllModuleMigrations
+  platform.ts      PlatformPort with dialog/fs/Notification/pdf-parse
+  ipc/db.ts        openDesktopDb() (better-sqlite3 + WAL)
+  ipc/registry.ts  registerAllIpcHandlers(): shared handlers + backup, then bind to ipcMain
+  modules/         backup.ipc.ts, updater.ts (desktop-only)
+  preload.ts       Generated from shared/api-channels.ts via shared/build-api.ts
 src/               Renderer: React + Vite
   modules/         Feature modules (finance/, quests/, nutrition/, character/)
   shared/          Shared components, hooks, animations
   hub/             Shell: Layout, Sidebar, PlayerCard, Auth
   i18n/            es.json, en.json
   core/            `ModuleDefinition` type only (module contract — no runtime registry)
-shared/            Types shared between main & renderer (types.ts)
+shared/            Types + the window.api channel table (types.ts, api-channels.ts, build-api.ts)
 ```
 
 ## Critical Conventions
 
 ### Multi-Account Sync (MANDATORY for any data-related feature)
 
-Every table with user data MUST be in `USER_DATA_TABLES` array in `electron/modules/sync.ipc.ts`. If you create a new table:
+Every table with user data MUST be in `USER_DATA_TABLES` array in `shared-logic/modules/sync.ipc.ts`. If you create a new table:
 
 1. Add it to `USER_DATA_TABLES`
 2. Include it in the appropriate `sync:getAll*Data` handler
@@ -48,16 +59,20 @@ This event fires on: account switch, add account, logout (auto-switch to next ac
 ### IPC Pattern
 
 - **Channels**: `module:action` (e.g., `finance:addTransaction`, `quests:getTasks`)
-- **Handler**: Use `ipcHandle()` wrapper from `electron/ipc/ipc-handle.ts`
-- **IDs**: `crypto.randomUUID()` via `genId()` helper
+- **Handler**: `ipcHandle(channel, (_e, ...args) => …)` imported as `import { registerHandler as ipcHandle } from '../registry'` inside `shared-logic/modules/`. Handlers live in `shared-logic/modules/*.ipc.ts` and MUST NOT import `electron`, `fs`, `path`, `os`, `crypto` or `better-sqlite3` (`npm run typecheck:shared-logic` enforces it)
+- **IDs**: `genId()` from `shared-logic/ids.ts`
+- **DB**: `getDb()` from `shared-logic/db` (type `SqlDatabase`, never `better-sqlite3`'s `Database`)
+- **OS access** (dialogs, files, native notifications, app version): `platform()` from `shared-logic/platform.ts`. Implement new methods in `electron/platform.ts` (and later `src/mobile/platform-host.ts`)
+- **main → renderer events**: `emit(channel, payload)` from `shared-logic/events.ts`
 - **DB naming**: snake_case in SQL, camelCase in JS via aliases (`created_at AS createdAt`)
-- **Preload**: Expose in `electron/preload.ts`, type in `shared/types.ts` HubtifyApi interface
-- **Complex params**: Use `Record<string, unknown>` in preload, typed in IPC handler
+- **Exposing to the renderer**: add ONE entry to `shared/api-channels.ts` + its type in `shared/types.ts` `HubtifyApi`. `preload.ts` is generated — never edit it by hand. Desktop-only methods get `platforms: 'desktop'` and are optional (`?:`) in `HubtifyApi`
+- **Complex params**: Use `Record<string, unknown>` in `HubtifyApi`, typed in the handler
+- **Tests**: register the module's handlers, then `getHandler(channel)!({}, ...args)` from `shared-logic/registry`; `clearHandlers()` in `beforeEach` if you re-register; mock the DB with `vi.mock('.../shared-logic/db', () => ({ getDb: () => db }))`
 
 ### Database
 
 - SQLite with WAL, foreign_keys ON
-- Migrations: `{ namespace, version, up }` in `module.schema.ts`, run via `runModuleMigrations()`
+- Migrations: `{ namespace, version, up }` in `module.schema.ts`, wired in `shared-logic/db/all-migrations.ts` (`runAllModuleMigrations()`)
 - Use `INSERT OR IGNORE` for any data that could come from sync
 - Soft deletes: Use `deleted_at` column (quests module pattern) for sync support
 
@@ -133,12 +148,14 @@ the type survives in `src/core/module-registry.ts`.
 
 Where wiring actually happens — change these when you add a module:
 
-| Concern           | Real location                                                    |
-| ----------------- | ---------------------------------------------------------------- |
-| Migrations        | called directly from `electron/main.ts` via `runModuleMigrations()` |
-| Dashboard widgets | imported directly in `src/hub/widgets/widget-registry.ts`          |
-| Routes            | hardcoded JSX `<Route>` elements in `src/App.tsx`                  |
-| RPG events        | `electron/ipc/rpg-handlers.ts`                                     |
+| Concern           | Real location                                                        |
+| ----------------- | -------------------------------------------------------------------- |
+| Migrations        | `shared-logic/db/all-migrations.ts` (`runAllModuleMigrations()`)      |
+| IPC handlers      | `shared-logic/register-all.ts` (`registerAllHandlers()`)              |
+| Dashboard widgets | imported directly in `src/hub/widgets/widget-registry.ts`             |
+| Routes            | hardcoded JSX `<Route>` elements in `src/App.tsx`                     |
+| RPG events        | `shared-logic/modules/rpg-handlers.ts`                                |
+| `window.api`      | `shared/api-channels.ts` (+ `HubtifyApi` in `shared/types.ts`)        |
 
 ## Don't
 
@@ -150,3 +167,5 @@ Where wiring actually happens — change these when you add a module:
 - Don't forget to add new tables to `USER_DATA_TABLES` and sync handlers
 - Don't use `window.confirm()` or `window.alert()` — use `useConfirm()` from `shared/components/ConfirmDialog` for in-app RPG-themed dialogs
 - Don't use emojis/Unicode emoji characters in the UI — use inline SVG icons from `src/shared/components/icons/` instead. Medieval RPG theme requires hand-crafted vector icons, not emojis
+- Don't import `electron`, `fs`, `path`, `os`, `crypto`, `better-sqlite3` or anything under `electron/` from `shared-logic/` — that code also runs inside the Android worker
+- Don't edit `electron/preload.ts` by hand — add the entry to `shared/api-channels.ts`

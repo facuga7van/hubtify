@@ -3,15 +3,14 @@ import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 import { registerAllIpcHandlers } from './ipc/registry';
-import { closeDb, getDb, runModuleMigrations } from './ipc/db';
-import { questsMigrations } from '../src/modules/quests/quests.schema';
-import { nutritionMigrations } from '../src/modules/nutrition/nutrition.schema';
-import { financeMigrations } from '../src/modules/finance/finance.schema';
-import { characterMigrations } from '../src/modules/character/character.schema';
-import { notificationsMigrations } from './modules/notifications.schema';
-import { cauldronMigrations } from '../src/modules/cauldron/cauldron.schema';
-import { startNotificationEngine, stopNotificationEngine } from './modules/notifications.ipc';
-import { generateRecurringForMonth } from './modules/finance.balance';
+import { ipcHandle } from './ipc/ipc-handle';
+import { closeDb, getDb, runAllModuleMigrations, setDbFactory } from '../shared-logic/db';
+import { openDesktopDb } from './ipc/db';
+import { setPlatform } from '../shared-logic/platform';
+import { setEventSink } from '../shared-logic/events';
+import { electronPlatform, webContentsSink } from './platform';
+import { startNotificationEngine, stopNotificationEngine } from '../shared-logic/modules/notifications.ipc';
+import { generateRecurringForMonth } from '../shared-logic/modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 import { todayDateString } from '../shared/date-utils';
 
@@ -340,29 +339,30 @@ function createCauldronWindow(): void {
 }
 
 app.whenReady().then(() => {
+  setDbFactory(openDesktopDb);
+  setPlatform(electronPlatform);
+  setEventSink(webContentsSink);
+
   // Create the window FIRST so the renderer starts loading while the main
   // process is still busy. Everything below runs in the same synchronous tick,
   // so no IPC call can be serviced before its handler is registered.
   createWindow();
 
-  registerAllIpcHandlers();
+  // Desktop-only handlers go through the same registry; they MUST be registered
+  // before registerAllIpcHandlers(), which is what binds the registry to ipcMain.
   registerUpdaterIpcHandlers();
-
-  ipcMain.handle('cauldron:openWindow', () => createCauldronWindow());
-  ipcMain.handle('cauldron:closeWindow', () => {
+  ipcHandle('cauldron:openWindow', () => createCauldronWindow());
+  ipcHandle('cauldron:closeWindow', () => {
     if (cauldronWindow && !cauldronWindow.isDestroyed()) {
       cauldronWindow.close();
     }
   });
 
+  registerAllIpcHandlers();
+
   // Run module migrations
   getDb();
-  runModuleMigrations(questsMigrations);
-  runModuleMigrations(nutritionMigrations);
-  runModuleMigrations(financeMigrations);
-  runModuleMigrations(characterMigrations);
-  runModuleMigrations(notificationsMigrations);
-  runModuleMigrations(cauldronMigrations);
+  runAllModuleMigrations();
 
   // Auto-generate recurring transactions for current month.
   // Shares the exact implementation used by `finance:generateRecurringForMonth`,

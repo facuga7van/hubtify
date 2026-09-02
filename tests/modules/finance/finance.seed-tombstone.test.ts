@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { DEFAULT_CASH_ACCOUNT_ID, listAccounts } from '../../../electron/modules/finance.balance';
+import { DEFAULT_CASH_ACCOUNT_ID, listAccounts } from '../../../shared-logic/modules/finance.balance';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
@@ -18,6 +18,8 @@ const harness = vi.hoisted(() => ({
   handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
 }));
+
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -28,11 +30,11 @@ vi.mock('electron', () => ({
   BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({ getDb: () => harness.db }));
+vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 // sync.ipc pulls these two in for the nutrition / habits merges; neither is
 // exercised here and both drag Electron-only modules along.
-vi.mock('../../../electron/modules/nutrition.ipc', () => ({ recalcSummary: vi.fn() }));
-vi.mock('../../../electron/modules/quests.habits', () => ({ weeklyTarget: () => 0 }));
+vi.mock('../../../shared-logic/modules/nutrition.ipc', () => ({ recalcSummary: vi.fn() }));
+vi.mock('../../../shared-logic/modules/quests.habits', () => ({ weeklyTarget: () => 0 }));
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');
@@ -44,11 +46,11 @@ function setupDb(): Database.Database {
 
 // Registration runs a boot-time prune against getDb(); give it a real handle.
 harness.db = setupDb();
-const { registerSyncIpcHandlers } = await import('../../../electron/modules/sync.ipc');
+const { registerSyncIpcHandlers } = await import('../../../shared-logic/modules/sync.ipc');
 registerSyncIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
-  const fn = harness.handlers.get(channel);
+  const fn = getHandler(channel);
   if (!fn) throw new Error(`no handler registered for ${channel}`);
   return (await fn({}, ...args)) as T;
 }

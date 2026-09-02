@@ -5,9 +5,9 @@ import {
   addDaysToDate,
   addMonthsToMonth,
   computeUpcomingTimeline,
-} from '../../../electron/modules/finance.balance';
-import { evaluateFinanceNotifications } from '../../../electron/modules/notification-engine';
-import { notificationsMigrations } from '../../../electron/modules/notifications.schema';
+} from '../../../shared-logic/modules/finance.balance';
+import { evaluateFinanceNotifications } from '../../../shared-logic/modules/notification-engine';
+import { notificationsMigrations } from '../../../shared-logic/modules/notifications.schema';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

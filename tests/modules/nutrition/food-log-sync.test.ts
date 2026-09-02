@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
-import { mergeNutritionFoods } from '../../../electron/modules/sync.ipc';
+import { mergeNutritionFoods } from '../../../shared-logic/modules/sync.ipc';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

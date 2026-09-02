@@ -7,18 +7,20 @@ let testDb: Database.Database;
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
   },
 }));
 
-vi.mock('../../../electron/ipc/db', () => ({
+vi.mock('../../../shared-logic/db', () => ({
   getDb: () => testDb,
   runModuleMigrations: vi.fn(),
 }));
 
-import { registerSyncIpcHandlers } from '../../../electron/modules/sync.ipc';
+import { registerSyncIpcHandlers } from '../../../shared-logic/modules/sync.ipc';
 
 function runMigrations(db: Database.Database) {
   for (const m of nutritionMigrations) {
@@ -39,7 +41,7 @@ function setupDb(): Database.Database {
 }
 
 async function merge(data: Record<string, unknown>): Promise<any> {
-  return await handlers.get('sync:mergeNutritionData')!({}, data);
+  return await getHandler('sync:mergeNutritionData')!({}, data);
 }
 
 const OLD = '2026-05-01 08:00:00';
@@ -53,7 +55,7 @@ const NEW_STORED = '2026-05-01T20:00:00.000Z';
 
 beforeEach(() => {
   testDb = setupDb();
-  handlers.clear();
+  clearHandlers();
   registerSyncIpcHandlers();
 });
 

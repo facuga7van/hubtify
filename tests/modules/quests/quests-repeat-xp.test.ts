@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
-import { setTaskStatus } from '../../../electron/modules/quests.ipc';
+import { setTaskStatus } from '../../../shared-logic/modules/quests.ipc';
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:');

@@ -86,7 +86,7 @@ export default function CauldronFloatingWindow() {
   // Auto-close window when timer goes idle
   useEffect(() => {
     if (timerState && timerState.status === 'idle') {
-      window.api.cauldronCloseWindow();
+      window.api.cauldronCloseWindow?.();
     }
   }, [timerState]);
 
@@ -164,7 +164,7 @@ export default function CauldronFloatingWindow() {
   };
 
   const handleClose = () => {
-    window.api.cauldronCloseWindow();
+    window.api.cauldronCloseWindow?.();
   };
 
   return (

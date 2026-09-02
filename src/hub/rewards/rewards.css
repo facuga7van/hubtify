@@ -426,3 +426,20 @@
     gap: 4px;
   }
 }
+
+/* ── Touch (Fase 3) ─────────────────────────────────
+   Los iconos de editar/borrar solo mostraban su borde en :hover: en touch
+   parecían adorno. */
+@media (hover: none) {
+  .rwd-item__tool {
+    width: 40px;
+    height: 40px;
+    border-color: rgba(74, 55, 32, 0.4);
+    color: var(--ink-soft);
+  }
+
+  .rwd-form__icon {
+    width: 40px;
+    height: 40px;
+  }
+}

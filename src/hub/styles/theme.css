@@ -59,6 +59,20 @@
   --z-confirm:      10001;  /* Confirm dialog (must sit above modals + tour) */
   --z-system-toast: 10003;  /* System toast container (topmost) */
 
+  /* ── Shell geometry y safe areas ───────────────────
+     --shell-top: alto de la barra de título de Electron; el sidebar arranca
+     debajo (layout.css). El shell mobile no tiene TitleBar y lo pone en 0
+     vía <html data-shell="mobile">.
+     --safe-*: insets del sistema en Android. Capacitor 8 (plugin core
+     SystemBars, insetsHandling 'css') inyecta --safe-area-inset-* en <html>
+     con los píxeles reales de la barra de estado y de gestos; env() cubre el
+     WebView >= 140 con viewport-fit=cover; en Electron y en vitest son 0. */
+  --shell-top: 32px;
+  --safe-top:    var(--safe-area-inset-top,    env(safe-area-inset-top, 0px));
+  --safe-right:  var(--safe-area-inset-right,  env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left:   var(--safe-area-inset-left,   env(safe-area-inset-left, 0px));
+
   /* ── Compatibility aliases ─────────────────────────
      These names are referenced across module CSS/TSX but were never defined.
      An undefined var() without a fallback invalidates the whole declaration,

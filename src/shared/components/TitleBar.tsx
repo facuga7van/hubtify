@@ -1,4 +1,10 @@
+import { isNativeMobile } from '../platform-detect';
+
 export default function TitleBar() {
+  // Android no tiene ventana propia que minimizar/cerrar y la barra de estado
+  // es del sistema (spec §7). Se guarda acá y no en cada caller: Layout,
+  // AuthPage y Onboarding la montan las tres.
+  if (isNativeMobile()) return null;
   return (
     <div className="title-bar">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

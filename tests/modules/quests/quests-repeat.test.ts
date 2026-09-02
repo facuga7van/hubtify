@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import {
   parseRepeatRule, nextRepeatDueDate, spawnNextRepeatInstance,
-} from '../../../electron/modules/quests.ipc';
+} from '../../../shared-logic/modules/quests.ipc';
 
 // Calendar cheatsheet (matches quests-fase1.test.ts):
 // 2026-07-06 is a Monday → 06 Mon · 07 Tue · 08 Wed · 09 Thu · 10 Fri · 11 Sat · 12 Sun.
