@@ -48,6 +48,22 @@ export const changelog: ChangelogEntry[] = [
           en: 'If you had duplicate meals in your history — and daily totals at twice the real amount — it fixes itself when you open the app. It was a mix-up between an old desktop version and the phone, and it cannot happen again',
         },
       },
+      {
+        category: 'fix',
+        scope: 'mobile',
+        text: {
+          es: 'Al abrir la app en Android ya no hay un flash blanco entre el splash y la pantalla. La espera ahora es sobre el mismo cuero del splash, de punta a punta',
+          en: 'Opening the app on Android no longer shows a white flash between the splash and the screen. The wait now stays on the same leather as the splash, end to end',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'character',
+        text: {
+          es: 'La Bitácora de XP y el resumen del Códice mostraban el doble de eventos en algunos días —el mismo cruce con la versión vieja de escritorio. Tu XP y tu nivel siempre estuvieron bien: lo que se duplicaba era el registro, y se limpia solo al abrir la app',
+          en: 'The XP Log and the Codex summary showed twice the events on some days — the same mix-up with the old desktop version. Your XP and level were always right: it was the record that got duplicated, and it cleans itself up when you open the app',
+        },
+      },
     ],
   },
   {
