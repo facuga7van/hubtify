@@ -245,7 +245,8 @@
 /* task title text */
 .quest-row-title {
   font-family: 'IM Fell English', serif;
-  font-size: calc(14.5px * var(--font-scale));
+  /* Dato primario de la fila: cuerpo de texto (era 14.5 px). */
+  font-size: var(--fs-body);
   color: var(--ink);
   min-width: 0;
   overflow: hidden;
@@ -278,11 +279,13 @@
   flex-wrap: wrap;
 }
 
+/* Meta de fila (proyecto, vencimiento, subtareas): --ink-soft, no
+   --ink-faded, sobre el pergamino texturado de la fila. */
 .quest-row-meta span {
   font-family: 'Cormorant Garamond', 'IM Fell English', serif;
   font-style: italic;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 /* (dead CSS removed: .quest-row-subtasks, .quest-row-subtask-*) */
@@ -316,7 +319,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.12em;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 /* ── Quest row actions (due badge, overflow menu, selection) ── */
@@ -654,7 +657,7 @@
 }
 
 .quest-habit-name--done {
-  opacity: 0.7;
+  color: var(--ink-faded);
   text-decoration: line-through;
   font-weight: normal;
 }
@@ -691,14 +694,14 @@
   padding: 2px 6px;
   border: 1px solid rgba(74, 55, 32, 0.35);
   background: rgba(245, 231, 192, 0.4);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .quest-habit-progress {
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.08em;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .quest-habit-streak {
@@ -707,7 +710,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .quest-habit-streak--hot {
@@ -800,7 +803,7 @@
 }
 
 .xp-toast__xp { font-size: 1.2rem; font-weight: bold; }
-.xp-toast__combo { font-size: var(--fs-label); opacity: 0.8; }
+.xp-toast__combo { font-size: var(--fs-label); color: var(--ink-soft); }
 .xp-toast__bonus { font-size: var(--fs-quote); color: var(--gold); }
 .xp-toast__streak { font-size: var(--fs-label); color: var(--moss-light); }
 
@@ -834,7 +837,8 @@
 
 .subtask-item:hover { background: rgba(74, 55, 32, 0.08); }
 
-.subtask-item--completed { opacity: 0.65; }
+/* Hecha: tinta apagada y tachado, no media opacidad sobre toda la fila. */
+.subtask-item--completed { color: var(--ink-faded); text-decoration: line-through; }
 
 .subtask-toggle-completed {
   background: none;
@@ -1286,8 +1290,7 @@
   font-size: var(--fs-label);
   line-height: 1;
   padding: 2px 3px;
-  color: var(--ink-faded);
-  opacity: 0.75;
+  color: var(--ink-soft);
 }
 
 /* Today's letter is the only one that asks anything of you right now. */
@@ -1438,7 +1441,6 @@
 
 .quest-qa-hint {
   font-style: italic;
-  opacity: 0.75;
 }
 
 /* ── «Hoy» — the execution list ────────────────────
