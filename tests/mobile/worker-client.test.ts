@@ -105,6 +105,13 @@ describe('worker-client: invoke', () => {
     expect(worker.sent[0].transfer).toEqual([bytes.buffer]);
   });
 
+  it('el mismo Uint8Array en dos args viaja UNA vez en la transfer list', () => {
+    const { worker, client } = setup();
+    const bytes = new Uint8Array([1]);
+    void client.transport.invoke('backup:import', bytes, { copy: bytes });
+    expect(worker.sent[0].transfer).toEqual([bytes.buffer]);
+  });
+
   it('send es no-op en mobile', () => {
     const { worker, client } = setup();
     client.transport.send('window:minimize');

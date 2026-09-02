@@ -114,6 +114,19 @@ describe('worker-protocol: suspend / resume', () => {
     expect(posted[0].msg).toEqual({ type: 'fatal', reason: 'open', message: 'unpause failed' });
     expect(p.isSuspended()).toBe(true);
   });
+
+  it('si resume falla rechaza los platform en vuelo con el mismo error', async () => {
+    const { host } = makeHost();
+    (host.resume as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('unpause failed'));
+    const p = createWorkerProtocol(host);
+    // La UI ya no va a contestar este platform-result: el worker quedó muerto.
+    const call = p.callPlatform('notify', [{ title: 't', body: 'b' }]);
+    await p.onMessage({ type: 'suspend' });
+    await p.onMessage({ type: 'resume' });
+    await expect(call).rejects.toMatchObject({ message: 'unpause failed' });
+    // Un platform-result tardío del mismo id ya no encuentra pendiente.
+    await p.onMessage({ id: 1, type: 'platform-result', ok: true, value: undefined });
+  });
 });
 
 describe('worker-protocol: platform proxy e init', () => {

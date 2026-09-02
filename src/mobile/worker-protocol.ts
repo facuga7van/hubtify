@@ -8,6 +8,7 @@
  */
 import {
   collectTransferables,
+  collectTransferablesFrom,
   serializeError,
   type InitMsg,
   type InvokeMsg,
@@ -87,8 +88,13 @@ export function createWorkerProtocol(host: WorkerHost): WorkerProtocol {
     } catch (err) {
       host.log('[worker] resume falló', err);
       // El gate queda cerrado: la UI trata un fatal post-ready como crash y
-      // rechaza los invokes pendientes con WorkerCrashed.
-      host.post({ type: 'fatal', reason: 'open', message: err instanceof Error ? err.message : String(err) });
+      // rechaza los invokes pendientes con WorkerCrashed. Los `platform` en
+      // vuelo NO los cubre ese camino (la UI ya no va a contestar): se rechazan
+      // acá o el handler que los espera queda colgado para siempre.
+      const error = err instanceof Error ? err : new Error(String(err));
+      for (const pending of pendingPlatform.values()) pending.reject(error);
+      pendingPlatform.clear();
+      host.post({ type: 'fatal', reason: 'open', message: error.message });
       return;
     }
     suspended = false;
@@ -132,10 +138,7 @@ export function createWorkerProtocol(host: WorkerHost): WorkerProtocol {
       const id = nextPlatformId++;
       return new Promise((resolve, reject) => {
         pendingPlatform.set(id, { resolve, reject });
-        host.post(
-          { id, type: 'platform', method, args },
-          args.flatMap((a) => collectTransferables(a)),
-        );
+        host.post({ id, type: 'platform', method, args }, collectTransferablesFrom(args));
       });
     },
 

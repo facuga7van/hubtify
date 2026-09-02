@@ -34,7 +34,7 @@ export default function FatalScreen({ reason, message, namespace, version }: Pro
       <div className="mobile-fatal__card">
         <h1 className="mobile-fatal__title">{t('mobile.fatal.title', 'El grimorio no se pudo abrir')}</h1>
         <p className="mobile-fatal__reason">{t(`mobile.fatal.${reason}`, FALLBACK[reason])}</p>
-        {reason === 'migration' && namespace && (
+        {reason === 'migration' && namespace && version !== undefined && (
           <p className="mobile-fatal__detail">
             {t('mobile.fatal.migrationDetail', 'Migración {{namespace}} v{{version}}', { namespace, version })}
           </p>

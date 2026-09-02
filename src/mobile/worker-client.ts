@@ -11,6 +11,7 @@
  */
 import {
   collectTransferables,
+  collectTransferablesFrom,
   serializeError,
   MobileFatal,
   WorkerCrashed,
@@ -159,7 +160,7 @@ export function createWorkerClient(
       if (crashed) return Promise.reject(crashed);
       const id = nextId++;
       const msg: InvokeMsg = { id, type: 'invoke', channel, args };
-      const transfer = args.flatMap((a) => collectTransferables(a));
+      const transfer = collectTransferablesFrom(args);
       return new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
         if (suspended) queued.push({ msg, transfer });

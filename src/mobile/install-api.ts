@@ -6,7 +6,34 @@
 import { App } from '@capacitor/app';
 import { buildApi } from '../../shared/build-api';
 import { createWorkerClient } from './worker-client';
-import { createPlatformHost, readOsInfo } from './platform-host';
+import { createPlatformHost, readOsInfo, OS_INFO_FALLBACK } from './platform-host';
+
+/** Techo para el bridge nativo: `osInfo` es cosmético, el arranque no lo es. */
+const OS_INFO_TIMEOUT_MS = 2000;
+
+/**
+ * `Device.getInfo()` cruza el bridge de Capacitor: si el plugin no contesta,
+ * la promesa nunca resuelve y `installMobileApi()` cuelga ANTES de `ready`, con
+ * lo cual `main.tsx` no monta ni <App/> ni <FatalScreen/> (spec §3.5 exige
+ * pantalla terminal ante cualquier fallo de arranque). Se corta a los 2 s con
+ * el mismo fallback que usa `readOsInfo()` ante un error.
+ */
+async function readOsInfoOrFallback(): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      readOsInfo(),
+      new Promise<string>((resolve) => {
+        timer = setTimeout(() => {
+          console.warn(`[mobile] Device.getInfo no respondió en ${OS_INFO_TIMEOUT_MS}ms`);
+          resolve(OS_INFO_FALLBACK);
+        }, OS_INFO_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function installMobileApi(): Promise<void> {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), {
@@ -24,7 +51,7 @@ export async function installMobileApi(): Promise<void> {
 
   // `init` sale ANTES de esperar ready: el orden de mensajes garantiza que el
   // worker lo tenga antes de cualquier invoke.
-  client.init({ appVersion: APP_VERSION, osInfo: await readOsInfo() });
+  client.init({ appVersion: APP_VERSION, osInfo: await readOsInfoOrFallback() });
   await client.ready;
 
   // `buildApi(transport, 'mobile')` ya omite los canales desktop-only de

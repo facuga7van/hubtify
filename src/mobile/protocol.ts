@@ -87,6 +87,10 @@ export function serializeError(err: unknown): SerializedError {
  * `Uint8Array` de backup/pickBinaryFile viajan sin copia). Mira el valor, sus
  * propiedades y las de éstas (2 niveles: `{ ok, file: { name, bytes } }`);
  * no entra en arrays porque ningún payload binario es una lista.
+ *
+ * El resultado va deduplicado: dos vistas del mismo `ArrayBuffer` (o el mismo
+ * `Uint8Array` referenciado dos veces) lo repetirían en la transfer list y
+ * `postMessage` tira `DataCloneError`.
  */
 export function collectTransferables(value: unknown, depth = 0): Transferable[] {
   if (value instanceof Uint8Array) {
@@ -98,5 +102,10 @@ export function collectTransferables(value: unknown, depth = 0): Transferable[] 
   for (const v of Object.values(value as Record<string, unknown>)) {
     out.push(...collectTransferables(v, depth + 1));
   }
-  return out;
+  return [...new Set(out)];
+}
+
+/** `collectTransferables` sobre una lista de args, deduplicando entre ellos. */
+export function collectTransferablesFrom(values: unknown[]): Transferable[] {
+  return [...new Set(values.flatMap((v) => collectTransferables(v)))];
 }

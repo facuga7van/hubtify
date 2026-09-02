@@ -11,13 +11,16 @@
 import { Device } from '@capacitor/device';
 import type { PlatformHostFns } from './worker-client';
 
+/** Lo que reporta `osInfo()` si el plugin falla o no contesta a tiempo. */
+export const OS_INFO_FALLBACK = 'android';
+
 export async function readOsInfo(): Promise<string> {
   try {
     const info = await Device.getInfo();
     return `${info.platform} ${info.osVersion}`;
   } catch (err) {
     console.warn('[mobile] Device.getInfo falló:', err);
-    return 'android';
+    return OS_INFO_FALLBACK;
   }
 }
 

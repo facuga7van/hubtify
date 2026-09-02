@@ -24,6 +24,16 @@ describe('collectTransferables', () => {
     expect(collectTransferables([bytes])).toEqual([]);
   });
 
+  it('deduplica: el mismo Uint8Array repetido o dos vistas del mismo buffer dan UN solo buffer', () => {
+    // postMessage tira DataCloneError si un ArrayBuffer aparece dos veces en la
+    // transfer list.
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const view = new Uint8Array(bytes.buffer, 0, 2);
+    expect(collectTransferables({ a: bytes, b: bytes })).toEqual([bytes.buffer]);
+    expect(collectTransferables({ a: bytes, b: view })).toEqual([bytes.buffer]);
+    expect(collectTransferables({ ok: true, file: { bytes }, copy: bytes })).toEqual([bytes.buffer]);
+  });
+
   it('devuelve [] para primitivas, null y objetos sin binarios', () => {
     expect(collectTransferables(null)).toEqual([]);
     expect(collectTransferables(42)).toEqual([]);
