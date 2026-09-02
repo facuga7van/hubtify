@@ -9,7 +9,10 @@ vi.mock('@capacitor/local-notifications', () => ({
   },
 }));
 vi.mock('@capacitor/filesystem', () => ({
-  Filesystem: { writeFile: vi.fn(async () => ({ uri: 'file:///cache/share/x' })) },
+  Filesystem: {
+    writeFile: vi.fn(async () => ({ uri: 'file:///cache/share/x' })),
+    deleteFile: vi.fn(async () => undefined),
+  },
   Directory: { Cache: 'CACHE' },
   Encoding: { UTF8: 'utf8' },
 }));
@@ -70,6 +73,19 @@ describe('notify', () => {
     expect(LocalNotifications.requestPermissions).toHaveBeenCalledTimes(1);
     expect(LocalNotifications.schedule).not.toHaveBeenCalled();
   });
+
+  // Los callers son fire-and-forget (`void platform().notify(...)` en
+  // notifications.ipc.ts y cauldron.ipc.ts): un reject acá sería un unhandled
+  // rejection que tumba el worker, y una notificación no vale eso.
+  it('nunca rechaza: un plugin que lanza queda en un warn', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    m(LocalNotifications.schedule).mockRejectedValueOnce(new Error('no channel'));
+    await expect(host().notify({ title: 'T', body: 'B' })).resolves.toBeUndefined();
+    m(LocalNotifications.checkPermissions).mockRejectedValueOnce(new Error('bridge down'));
+    await expect(host().notify({ title: 'T', body: 'B' })).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
 });
 
 describe('archivos', () => {
@@ -94,6 +110,27 @@ describe('archivos', () => {
     await expect(host().saveTextFile('x.csv', '')).resolves.toBe(false);
     m(Share.share).mockRejectedValueOnce(new Error('No activity found'));
     await expect(host().saveTextFile('x.csv', '')).rejects.toThrow('No activity found');
+  });
+
+  // Cache/share es el staging del share sheet: una vez que el destino copió el
+  // archivo, dejarlo ahí sería un .db entero (o un CSV) acumulándose en disco.
+  it('borra el archivo de staging después de compartir, también si se cancela o falla', async () => {
+    const del = { path: 'share/x.csv', directory: 'CACHE' };
+    await host().saveTextFile('x.csv', '');
+    expect(Filesystem.deleteFile).toHaveBeenCalledWith(del);
+
+    m(Share.share).mockRejectedValueOnce(new Error('Share canceled'));
+    await expect(host().saveTextFile('x.csv', '')).resolves.toBe(false);
+    expect(Filesystem.deleteFile).toHaveBeenCalledTimes(2);
+
+    m(Share.share).mockRejectedValueOnce(new Error('No activity found'));
+    await expect(host().saveTextFile('x.csv', '')).rejects.toThrow('No activity found');
+    expect(Filesystem.deleteFile).toHaveBeenCalledTimes(3);
+  });
+
+  it('si el borrado del staging falla, el share igual cuenta como hecho', async () => {
+    m(Filesystem.deleteFile).mockRejectedValueOnce(new Error('ENOENT'));
+    await expect(host().saveTextFile('x.csv', '')).resolves.toBe(true);
   });
 
   it('pickTextFile → { name, content } con el accept de los filtros; null si cancela', async () => {

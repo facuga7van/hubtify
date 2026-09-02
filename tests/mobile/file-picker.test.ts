@@ -56,6 +56,20 @@ describe('pickFile', () => {
     await expect(p).resolves.toBeNull();
   });
 
+  // Volver al chooser y salir otra vez disparaba `focus` de nuevo y agendaba
+  // otro timer con el mismo período: el primero ya decide, los demás sobran.
+  it('varios focus agendan un solo timer', async () => {
+    const { env, focus, timers, hasFocusListener } = makeEnv();
+    const p = pickFile('', env);
+    focus();
+    expect(hasFocusListener()).toBe(false);
+    focus();
+    focus();
+    expect(timers).toHaveLength(1);
+    timers[0].fn();
+    await expect(p).resolves.toBeNull();
+  });
+
   it('si change llega dentro del período de gracia gana el archivo', async () => {
     const { env, input, fire, focus, timers } = makeEnv();
     const p = pickFile('', env);

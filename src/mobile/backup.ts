@@ -70,6 +70,11 @@ export function canExportDb(client: WorkerClient | null = getWorkerClient()): bo
 
 let instance: MobileBackup | null = null;
 
+/**
+ * El singleton captura el `WorkerClient` de la primera llamada y no lo vuelve a
+ * leer; es correcto porque el worker nunca se recrea dentro de una misma sesión
+ * (tras importar se hace `location.reload()`, y un crash lleva a FatalScreen).
+ */
 export function mobileBackup(): MobileBackup {
   if (!instance) {
     const client = getWorkerClient();

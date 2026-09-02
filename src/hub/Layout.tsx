@@ -282,8 +282,11 @@ export default function Layout() {
       if (apkUrl) {
         const { openApkDownload } = await import('../mobile/updater');
         await openApkDownload(apkUrl).catch((err: unknown) => setUpdateError(err instanceof Error ? err.message : String(err)));
-        return;
       }
+      // Sin apkUrl no hay nada que abrir, pero tampoco se cae al camino
+      // desktop: `updaterDownload` no existe en `window.api` de mobile y el
+      // banner quedaría clavado en «Descargando…».
+      return;
     }
     setUpdateState('downloading');
     setUpdateError(null);

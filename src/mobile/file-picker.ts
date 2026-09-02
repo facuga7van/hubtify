@@ -63,6 +63,9 @@ export function pickFile(accept: string, env: PickerEnv = domPickerEnv()): Promi
     input.addEventListener('cancel', () => finish(null));
     offFocus = env.onWindowFocus(() => {
       env.setTimeout(() => finish(chosen()), FOCUS_CANCEL_GRACE_MS);
+      // El primer `focus` ya decide: sin esto, volver al chooser y salir otra
+      // vez agendaba un timer más por cada ida y vuelta.
+      offFocus();
     });
 
     env.mount(input);
