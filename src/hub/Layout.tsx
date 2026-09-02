@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import DesktopShell from './DesktopShell';
 import MobileShell from './MobileShell';
@@ -46,11 +46,23 @@ const LAST_PULL_KEY = 'hubtify_last_pull_at';
 /**
  * Plegado a `false` por `define` en el renderer de Electron. OJO: esbuild solo
  * elimina un `import()` cuando la condición es la comparación LITERAL en el
- * mismo sitio, no a través de este const — los dos `import('../mobile/updater')`
- * de abajo repiten la comparación entera a propósito. Este const es para los
- * usos que NO guardan un import dinámico.
+ * mismo sitio, no a través de este const — el `import('../mobile/AndroidUpdateBanner')`
+ * de abajo repite la comparación entera a propósito. Este const es para los
+ * usos que NO guardan un import dinámico (por ejemplo, elegir qué banner
+ * renderizar más abajo).
  */
 const IS_ANDROID_BUILD = typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android';
+
+/**
+ * Update in-app de Android (AndroidUpdateBanner.tsx): autocontenido, baja el
+ * APK con progreso y abre el instalador nativo en vez del flujo viejo de
+ * abrir Chrome. El `lazy(() => import(...))` queda condicionado al literal
+ * de arriba para que esbuild pueda eliminar todo el módulo — y con él
+ * `@capacitor/filesystem` y el plugin `ApkInstaller` — del bundle desktop.
+ */
+const AndroidUpdateBanner = typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android'
+  ? lazy(() => import('../mobile/AndroidUpdateBanner'))
+  : null;
 
 /**
  * Sync push failures were completely silent: the data simply never left the
@@ -270,24 +282,10 @@ export default function Layout() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
-  // Android: URL del APK del último release (src/mobile/updater.ts). Sin
-  // descarga in-app: «Descargar» abre el navegador. Es un ref y no un state a
-  // propósito: como state, `handleUpdate` → `considerUpdate` → el `useEffect`
-  // del updater se re-ejecutarían y harían un segundo `check()` al montar.
-  const apkUrlRef = useRef<string | null>(null);
-
+  // Desktop-only: Android ya no pasa por acá — tiene su propio flujo
+  // autocontenido en AndroidUpdateBanner.tsx (descarga in-app + instalador
+  // nativo, en vez de abrir Chrome). Ver el render más abajo.
   const handleUpdate = useCallback(async () => {
-    if (typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android') {
-      const apkUrl = apkUrlRef.current;
-      if (apkUrl) {
-        const { openApkDownload } = await import('../mobile/updater');
-        await openApkDownload(apkUrl).catch((err: unknown) => setUpdateError(err instanceof Error ? err.message : String(err)));
-      }
-      // Sin apkUrl no hay nada que abrir, pero tampoco se cae al camino
-      // desktop: `updaterDownload` no existe en `window.api` de mobile y el
-      // banner quedaría clavado en «Descargando…».
-      return;
-    }
     setUpdateState('downloading');
     setUpdateError(null);
     try {
@@ -312,12 +310,13 @@ export default function Layout() {
   // Decide whether to surface an update given the user's preference + snooze.
   // 'off' suppresses everything; a dismissed version stays hidden; 'auto' starts
   // the download right away so only the banner's 'ready' state is shown.
+  // Desktop-only now (see handleUpdate comment above).
   const considerUpdate = useCallback((version: string) => {
     const mode = localStorage.getItem('hubtify_update_mode') || 'notify';
     if (mode === 'off') return;
     if (localStorage.getItem('hubtify_update_dismissed_version') === version) return;
     setUpdateAvailable({ version });
-    if (mode === 'auto' && !IS_ANDROID_BUILD) handleUpdate();
+    if (mode === 'auto') handleUpdate();
   }, [handleUpdate]);
 
   useEffect(() => {
@@ -326,18 +325,10 @@ export default function Layout() {
     const c3 = window.api.onUpdateError((info) => setUpdateError(info.message));
     const c4 = window.api.onUpdateDownloaded(() => setUpdateState('ready'));
 
+    // Desktop-only: on Android `updaterCheck` doesn't exist on window.api and
+    // this resolves to undefined right away, so it's a silent no-op there —
+    // AndroidUpdateBanner runs its own check independently.
     const check = () => {
-      if (typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android') {
-        import('../mobile/updater')
-          .then((m) => m.checkMobileUpdate())
-          .then((update) => {
-            if (!update) return;
-            apkUrlRef.current = update.apkUrl;
-            considerUpdate(update.version);
-          })
-          .catch(() => { /* sin red o rate limit: silencio, igual que en dev */ });
-        return;
-      }
       window.api.updaterCheck?.().then((res: { available?: boolean; version?: string }) => {
         if (res?.available && res.version) considerUpdate(res.version);
       }).catch(() => { /* not available in dev */ });
@@ -739,29 +730,38 @@ export default function Layout() {
         entries={patchEntries}
       />
 
-      {/* Discreet banner — always shown while an update is available */}
-      {updateAvailable && (
-        <UpdateBanner
-          version={updateAvailable.version}
-          state={updateState}
-          percent={downloadPercent}
-          error={updateError}
-          onViewDetails={() => setShowUpdateDetails(true)}
-          onRestart={handleRestart}
-          onDismiss={handleDismissUpdate}
-        />
-      )}
-      {/* Full changelog modal — opened from the banner's "View what's new" */}
-      {updateAvailable && showUpdateDetails && (
-        <UpdateNotification
-          version={updateAvailable.version}
-          state={updateState}
-          percent={downloadPercent}
-          error={updateError}
-          onDownload={() => { handleUpdate(); setShowUpdateDetails(false); }}
-          onRestart={handleRestart}
-          onDismiss={() => setShowUpdateDetails(false)}
-        />
+      {/* Android: banner autocontenido (descarga in-app + instalador nativo).
+          Desktop: banner discreto + modal de novedades de siempre. */}
+      {IS_ANDROID_BUILD && AndroidUpdateBanner ? (
+        <Suspense fallback={null}>
+          <AndroidUpdateBanner />
+        </Suspense>
+      ) : (
+        <>
+          {updateAvailable && (
+            <UpdateBanner
+              version={updateAvailable.version}
+              state={updateState}
+              percent={downloadPercent}
+              error={updateError}
+              onViewDetails={() => setShowUpdateDetails(true)}
+              onRestart={handleRestart}
+              onDismiss={handleDismissUpdate}
+            />
+          )}
+          {/* Full changelog modal — opened from the banner's "View what's new" */}
+          {updateAvailable && showUpdateDetails && (
+            <UpdateNotification
+              version={updateAvailable.version}
+              state={updateState}
+              percent={downloadPercent}
+              error={updateError}
+              onDownload={() => { handleUpdate(); setShowUpdateDetails(false); }}
+              onRestart={handleRestart}
+              onDismiss={() => setShowUpdateDetails(false)}
+            />
+          )}
+        </>
       )}
 
     </div>
