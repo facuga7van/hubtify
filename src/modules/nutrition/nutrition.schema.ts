@@ -416,4 +416,29 @@ export const nutritionMigrations: Migration[] = [
       -- con targets configurables para los tres: gana la version completa.
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 16,
+    up: `
+      -- ── nutrition_ai_cache: quien lo dijo y con que prompt ──────────────────
+      -- El cache no distinguia "lo dijo el modelo" de "lo corrigio el usuario"
+      -- y no sabia con que prompt se estimo, asi que una mejora del prompt
+      -- quedaba enterrada bajo el numero viejo para justo los platos mas
+      -- repetidos (informe 2026-09-02-ai-estimation-research.md, P4).
+      --
+      -- source: 'model' | 'user'. Una fila 'model' con prompt_version distinta
+      -- a la actual (functions/src/gemini.ts PROMPT_VERSION) se ignora y se
+      -- re-estima; una fila 'user' es la correccion del humano y se sirve
+      -- SIEMPRE. Las filas previas a esta migracion quedan 'model' con
+      -- prompt_version NULL: se re-estiman una vez con el prompt nuevo.
+      --
+      -- Desde aca las filas 'user' SI viajan por sync (getAll/mergeNutritionData
+      -- exportan solo source = 'user'): son la evidencia con la que el modelo
+      -- aprende la porcion de ESTE usuario, y valen mas que una llamada.
+      -- Las filas 'model' siguen siendo locales: se reconstruyen gratis.
+      ALTER TABLE nutrition_ai_cache ADD COLUMN source TEXT NOT NULL DEFAULT 'model';
+      ALTER TABLE nutrition_ai_cache ADD COLUMN prompt_version TEXT;
+      CREATE INDEX IF NOT EXISTS idx_nutrition_ai_cache_source ON nutrition_ai_cache(source);
+    `,
+  },
 ];

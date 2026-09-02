@@ -23,6 +23,8 @@ export interface CachedEstimate {
   carbsG: number | null;
   fatG: number | null;
   hits: number;
+  /** 'user' when the number is a correction the human typed; 'model' otherwise. */
+  source: 'model' | 'user';
 }
 
 interface NutritionPhase2Api {

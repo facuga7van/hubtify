@@ -500,7 +500,8 @@ export interface HubtifyApi {
   }>>;
   nutritionGetEventDays: (start: string, end: string) => Promise<string[]>;
   nutritionGetCachedEstimate: (description: string) => Promise<{
-    calories: number; aiBreakdown: string | null; proteinG: number | null; hits: number;
+    calories: number; aiBreakdown: string | null; proteinG: number | null;
+    carbsG: number | null; fatG: number | null; hits: number; source: 'model' | 'user';
   } | null>;
   nutritionCacheEstimate: (entry: Record<string, unknown>) => Promise<{ cached: boolean }>;
   nutritionCopyDay: (opts?: { from?: string; to?: string }) => Promise<{ success: boolean; reason?: string; copied: number; from?: string; to?: string }>;

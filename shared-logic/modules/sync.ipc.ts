@@ -249,6 +249,10 @@ const USER_DATA_TABLES = [
   'nutrition_daily_summary',
   'nutrition_daily_closed',
   'favorite_foods',
+  // Only its source = 'user' rows are exported/merged (they are the user's
+  // corrections); listing it here also clears it on an account switch, so
+  // one account's cache never answers for another.
+  'nutrition_ai_cache',
   'dollar_cache',
   'crypto_cache',
   'finance_recurring',
@@ -1063,8 +1067,15 @@ export function registerSyncIpcHandlers(): void {
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
     const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
+    // The user's corrections ONLY. Model rows are a per-device network cache,
+    // reconstructible for free, and stay local (nutrition migration v16).
+    const aiCorrections = db.prepare(`
+      SELECT description_norm AS descriptionNorm, calories, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG,
+             created_at AS createdAt, updated_at AS updatedAt
+      FROM nutrition_ai_cache WHERE source = 'user' ORDER BY updated_at DESC
+    `).all();
 
-    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods };
+    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods, aiCorrections };
   });
 
   // ── Nutrition bulk import (merge from Firestore) ──
@@ -1432,6 +1443,41 @@ export function mergeNutritionDataInto(db: SqlDatabase, data: Record<string, unk
             c.xp_total ?? 0, c.hp_change ?? 0, c.consumed ?? 0, c.target ?? 0,
             c.closed_at ?? null, c.updated_at ?? null, c.deleted_at ?? null, c.date,
           );
+          changed = true;
+        }
+      }
+    });
+
+    // AI cache corrections — keyed by description_norm. A remote USER row beats
+    // a local MODEL row outright (a human number over a guess), and beats a
+    // local user row only when newer. Model rows never travel (v16).
+    if (Array.isArray(d.aiCorrections)) step(db, 'aiCorrections', () => {
+      const getCorr = db.prepare('SELECT source, updated_at FROM nutrition_ai_cache WHERE description_norm = ?');
+      const insertCorr = db.prepare(`
+        INSERT INTO nutrition_ai_cache (description_norm, calories, ai_breakdown, protein_g, carbs_g, fat_g, hits, created_at, updated_at, source, prompt_version)
+        VALUES (?, ?, NULL, ?, ?, ?, 1, ?, ?, 'user', NULL)`);
+      const updateCorr = db.prepare(`
+        UPDATE nutrition_ai_cache SET calories = ?, ai_breakdown = NULL, protein_g = ?, carbs_g = ?, fat_g = ?,
+          updated_at = ?, source = 'user', prompt_version = NULL WHERE description_norm = ?`);
+      const macro = (row: Record<string, unknown>, camel: string, snake: string): number | null => {
+        const v = row[camel] ?? row[snake];
+        return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
+      };
+      for (const raw of d.aiCorrections) {
+        if (!isUsableRow(raw, 'aiCorrections', ['calories'])) continue;
+        const c = withNormStamps(raw as Record<string, unknown>) as Record<string, unknown>;
+        const norm = String(c.descriptionNorm ?? c.description_norm ?? '').trim();
+        const calories = Number(c.calories);
+        if (!norm || !Number.isFinite(calories) || calories <= 0) continue;
+        const remoteUpdated = (c.updatedAt ?? c.updated_at ?? null) as string | null;
+        const local = getCorr.get(norm) as { source: string; updated_at: string | null } | undefined;
+        if (!local) {
+          insertCorr.run(norm, Math.round(calories), macro(c, 'proteinG', 'protein_g'), macro(c, 'carbsG', 'carbs_g'), macro(c, 'fatG', 'fat_g'),
+            (c.createdAt ?? c.created_at ?? remoteUpdated ?? new Date().toISOString()) as string, remoteUpdated);
+          changed = true;
+        } else if (local.source !== 'user' || isNewerStamp(remoteUpdated, local.updated_at)) {
+          updateCorr.run(Math.round(calories), macro(c, 'proteinG', 'protein_g'), macro(c, 'carbsG', 'carbs_g'), macro(c, 'fatG', 'fat_g'),
+            remoteUpdated, norm);
           changed = true;
         }
       }

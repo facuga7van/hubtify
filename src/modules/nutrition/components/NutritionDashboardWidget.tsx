@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
 import { useToast } from '../../../shared/components/useToast';
-import { estimateNutrition } from '../estimate-service';
+// resolveEstimate = the SQLite estimate cache in front of estimateNutrition.
+// The widget used to call the model directly, so a dish logged from the
+// dashboard neither benefited from a correction nor left one behind.
+import { resolveEstimate } from '../estimate-with-cache';
+import { cacheEstimate } from '../history-api';
 import { resolveMealType } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
@@ -24,7 +28,11 @@ export default function NutritionDashboardWidget() {
   const [foodInput, setFoodInput] = useState('');
   const [estimating, setEstimating] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const [estimation, setEstimation] = useState<{ totalCalories: number; items: Array<{ name: string; calories: number }> } | null>(null);
+  const [estimation, setEstimation] = useState<{
+    totalCalories: number;
+    items: Array<{ name: string; calories: number }>;
+    proteinG: number | null; carbsG: number | null; fatG: number | null;
+  } | null>(null);
   const [showManualFallback, setShowManualFallback] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
   const [mealSchedule, setMealSchedule] = useState<MealSchedule | null>(null);
@@ -79,8 +87,14 @@ export default function NutritionDashboardWidget() {
     setEstimation(null);
     setShowManualFallback(false);
     try {
-      const result = await estimateNutrition(foodInput.trim(), { onRetry: () => setRetrying(true) });
-      setEstimation({ totalCalories: result.calories, items: result.items });
+      const result = await resolveEstimate(foodInput.trim(), { onRetry: () => setRetrying(true) });
+      setEstimation({
+        totalCalories: result.totalCalories,
+        items: result.items,
+        proteinG: result.proteinG,
+        carbsG: result.carbsG,
+        fatG: result.fatG,
+      });
       // A later success has to close the fallback, otherwise it stays open forever.
       setShowManualFallback(false);
     } catch {
@@ -124,7 +138,21 @@ export default function NutritionDashboardWidget() {
         calories: estimation.totalCalories,
         source: 'ai_estimate',
         aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : undefined,
+        proteinG: estimation.proteinG,
+        carbsG: estimation.carbsG,
+        fatG: estimation.fatG,
         meal: resolveNowMeal(),
+      });
+      // Same rule as Today: what the user confirmed is worth remembering. The
+      // widget has no per-item editing, so the number is never a correction.
+      await cacheEstimate({
+        description: foodInput.trim(),
+        calories: estimation.totalCalories,
+        aiBreakdown: estimation.items.length > 1 ? JSON.stringify(estimation.items) : null,
+        proteinG: estimation.proteinG,
+        carbsG: estimation.carbsG,
+        fatG: estimation.fatG,
+        corrected: false,
       });
       await window.api.processRpgEvent({
         type: 'MEAL_LOGGED',

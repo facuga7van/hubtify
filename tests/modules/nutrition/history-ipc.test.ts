@@ -15,6 +15,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+import { PROMPT_VERSION } from '../../../functions/src/gemini';
 
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn) },
@@ -283,5 +284,66 @@ describe('nutrition:getCachedEstimate / nutrition:cacheEstimate', () => {
       .toEqual({ cached: false });
     const count = harness.db.prepare('SELECT COUNT(*) AS c FROM nutrition_ai_cache').get() as { c: number };
     expect(count.c).toBe(0);
+  });
+});
+
+/**
+ * Migration v16: the cache knows WHO wrote a row and with WHICH prompt, so a
+ * better prompt is not buried under the old number for the dishes the user
+ * repeats most, while a human correction survives every prompt change.
+ */
+describe('nutrition_ai_cache — source and prompt_version (v16)', () => {
+  const rowFor = (norm: string) => harness.db.prepare(
+    'SELECT source, prompt_version AS promptVersion, hits FROM nutrition_ai_cache WHERE description_norm = ?',
+  ).get(norm) as { source: string; promptVersion: string | null; hits: number };
+
+  it('stamps a model answer with the current prompt version and a correction as user', async () => {
+    await invoke('nutrition:cacheEstimate', { description: 'Pizza', calories: 300 });
+    await invoke('nutrition:cacheEstimate', { description: 'Guiso', calories: 700, corrected: true });
+    expect(rowFor('pizza')).toMatchObject({ source: 'model', promptVersion: PROMPT_VERSION });
+    expect(rowFor('guiso')).toMatchObject({ source: 'user' });
+  });
+
+  it('ignores a model hit from an older prompt (and does not count it as a hit)', async () => {
+    harness.db.prepare(`
+      INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version, created_at)
+      VALUES ('tostado', 238, 'model', '2026-01-01-a.deadbeef', '2026-08-01T00:00:00.000Z')
+    `).run();
+    expect(await invoke('nutrition:getCachedEstimate', 'tostado')).toBeNull();
+    expect(rowFor('tostado').hits).toBe(1);
+  });
+
+  it('re-estimates rows that predate v16 (NULL prompt_version)', async () => {
+    harness.db.prepare(`
+      INSERT INTO nutrition_ai_cache (description_norm, calories, created_at) VALUES ('manzana', 78, '2026-08-01T00:00:00.000Z')
+    `).run();
+    expect(rowFor('manzana')).toMatchObject({ source: 'model', promptVersion: null });
+    expect(await invoke('nutrition:getCachedEstimate', 'manzana')).toBeNull();
+  });
+
+  it('serves a user correction regardless of prompt version', async () => {
+    harness.db.prepare(`
+      INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version, created_at)
+      VALUES ('asado con papa al horno', 850, 'user', '2026-01-01-a.deadbeef', '2026-08-01T00:00:00.000Z')
+    `).run();
+    const hit = await invoke<{ calories: number; source: string; hits: number }>(
+      'nutrition:getCachedEstimate', 'Asado con papa al horno');
+    expect(hit).toMatchObject({ calories: 850, source: 'user', hits: 2 });
+  });
+
+  it('a fresh model write over a stale one becomes a hit again', async () => {
+    harness.db.prepare(`
+      INSERT INTO nutrition_ai_cache (description_norm, calories, source, prompt_version, created_at)
+      VALUES ('choripan', 458, 'model', 'old', '2026-08-01T00:00:00.000Z')
+    `).run();
+    expect(await invoke('nutrition:getCachedEstimate', 'choripán')).toBeNull();
+    await invoke('nutrition:cacheEstimate', { description: 'choripán', calories: 480 });
+    expect(await invoke<{ calories: number }>('nutrition:getCachedEstimate', 'choripán')).toMatchObject({ calories: 480, source: 'model' });
+  });
+
+  it('a confirmed model number after a correction is the user overruling himself (last write wins)', async () => {
+    await invoke('nutrition:cacheEstimate', { description: 'tarta', calories: 500, corrected: true });
+    await invoke('nutrition:cacheEstimate', { description: 'tarta', calories: 430 });
+    expect(rowFor('tarta')).toMatchObject({ source: 'model', promptVersion: PROMPT_VERSION });
   });
 });
