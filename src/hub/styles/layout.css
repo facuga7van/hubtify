@@ -1,4 +1,23 @@
 
+/* El marco de la ventana: barra de título (o cabecera mobile) arriba y el
+   .app-layout llenando el resto. Vivía inline en Layout.tsx. */
+.shell-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* El shell mobile (MobileShell.tsx) marca <html data-shell="mobile">: sin
+   barra de título y con el alto dinámico del WebView. */
+:root[data-shell="mobile"] {
+  --shell-top: 0px;
+}
+
+:root[data-shell="mobile"] .shell-frame {
+  height: 100dvh;
+}
+
 .app-layout {
   display: flex;
   width: 100vw;
@@ -9,7 +28,7 @@
    ══════════════════════════════════════════════════════ */
 .sidebar {
   position: fixed;
-  top: 32px; bottom: 0; left: 0;
+  top: var(--shell-top, 32px); bottom: 0; left: 0;
   width: 260px;
   background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
   border-right: 2px solid var(--gold);
