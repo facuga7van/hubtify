@@ -8,6 +8,10 @@
 /* ── Cabecera ────────────────────────────────────── */
 .mobile-header {
   flex-shrink: 0;
+  /* Sin contexto propio el box-shadow lo pinta encima el .main-content, que es
+     el hermano siguiente y tiene fondo opaco. */
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 4px;

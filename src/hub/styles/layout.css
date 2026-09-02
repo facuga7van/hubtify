@@ -929,17 +929,23 @@
   padding-bottom: var(--safe-bottom);
 }
 
-/* Lo que está pegado abajo sube por encima de la barra de gestos. */
+/* Lo que está pegado abajo sube por encima de la barra de gestos. El sumando
+   es el `bottom` que ya tenía cada capa, para que con --safe-bottom = 0
+   (WebView < 140: el contenido no va edge-to-edge) queden donde estaban. */
+/* 12px, no los 24 del escritorio: en mobile el toast va de borde a borde y a
+   12px del piso (`[data-shell="mobile"] .xp-toast` en quests.css:1692, Q13). */
 :root[data-shell="mobile"] .xp-toast {
   bottom: calc(12px + var(--safe-bottom));
 }
 
+/* .update-chip: 16px (shell.css:293). */
 :root[data-shell="mobile"] .update-chip {
   bottom: calc(16px + var(--safe-bottom));
 }
 
+/* .cauldron-floating-timer: 20px (cauldron.css:729). */
 :root[data-shell="mobile"] .cauldron-floating-timer {
-  bottom: calc(8px + var(--safe-bottom));
+  bottom: calc(20px + var(--safe-bottom));
 }
 
 /* Los toasts del sistema (top: 96px) caen debajo de la cabecera de 56 px:
