@@ -81,7 +81,7 @@ describe('AuthPage — visual states', () => {
   test('forgot password — link sent', async () => {
     renderAuth({ forgotPassword: async () => ({ success: true }) });
     await page.getByRole('button', { name: '¿Olvidaste tu contraseña?' }).click();
-    await page.getByPlaceholder('Ingresá tu correo electrónico').fill('test@hubtify.app');
+    await page.getByPlaceholder('Email o nombre de usuario').fill('test@hubtify.app');
     await page.getByRole('button', { name: 'Enviar enlace' }).click();
     await expect.element(page.getByText(/Te enviamos un enlace/i)).toBeVisible();
     await page.screenshot({ path: `${SCREENS}/05-forgot-sent.png` });
