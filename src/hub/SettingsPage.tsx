@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, useRef, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../shared/components/PageHeader';
 import { useAuthContext } from '../shared/AuthContext';
@@ -16,6 +16,19 @@ import { SHORTCUTS } from '../shared/shortcuts';
 import './styles/shell.css';
 
 const LAST_PULL_KEY = 'hubtify_last_pull_at';
+
+/**
+ * Plegado a `null` por `define` en el renderer de Electron: el chunk mobile no
+ * entra al bundle desktop. La comparación va LITERAL (no por un const
+ * intermedio) para que esbuild borre el `import()` ya en el transform: si
+ * Rollup llega a resolver `../mobile/MobileBackupButtons` → backup → install-api,
+ * el plugin de workers emite el bundle del worker (sqlite-wasm entero) aunque
+ * después el código muerto se elimine.
+ */
+const MobileBackupButtons =
+  typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android'
+    ? lazy(() => import('../mobile/MobileBackupButtons'))
+    : null;
 
 /* ── little building blocks ──────────────────────────────── */
 
@@ -444,8 +457,15 @@ export default function SettingsPage() {
         >
           <div className="settings-row settings-row--stack settings-row--last">
             <div className="settings-row__desc">
-              {t('settings.backupDesc', 'Exportar guarda un archivo con toda tu base local. Importar la reemplaza por la del archivo.')}
+              {MobileBackupButtons
+                ? t('settings.backupDescMobile', 'Exportar comparte un archivo .db con toda tu base local (guardalo en Drive, Telegram, donde quieras). Importar la reemplaza por la del archivo.')
+                : t('settings.backupDesc', 'Exportar guarda un archivo con toda tu base local. Importar la reemplaza por la del archivo.')}
             </div>
+            {MobileBackupButtons ? (
+              <Suspense fallback={null}>
+                <MobileBackupButtons />
+              </Suspense>
+            ) : (
             <div className="settings-row__buttons">
               <button className="rpg-button" onClick={async () => {
                 const result = await window.api.backupExport?.();
@@ -479,6 +499,7 @@ export default function SettingsPage() {
                 {t('settings.importBackup')}
               </button>
             </div>
+            )}
           </div>
         </SettingsCard>
 

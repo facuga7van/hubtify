@@ -74,3 +74,15 @@
   background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
   color: var(--ink);
 }
+
+.mobile-fatal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mobile-fatal__button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
