@@ -22,6 +22,7 @@
     "test:visual:mobile": "vitest run --project browser-mobile",
     "test:e2e": "playwright test",
     "typecheck:shared-logic": "tsc -p shared-logic --noEmit",
+    "ai:bench": "node --experimental-strip-types scripts/ai-benchmark.mjs",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "mobile:build": "vite build -c vite.mobile.config.ts",
     "mobile:sync": "npm run mobile:build && node scripts/android-version.mjs && cap sync android",
