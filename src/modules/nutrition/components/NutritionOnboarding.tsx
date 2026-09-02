@@ -103,7 +103,7 @@ export default function NutritionOnboarding({ onComplete, onSkip }: Props) {
         </button>
       )}
       <h3 style={{ marginBottom: 4, textAlign: 'center' }}>{t('nutrify.nutritionSetup')}</h3>
-      <p style={{ textAlign: 'center', fontSize: 'var(--fs-label)', opacity: 0.75, marginBottom: 16 }}>
+      <p style={{ textAlign: 'center', fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', marginBottom: 16 }}>
         {step === 0 ? t('nutrify.setupStep1') : t('nutrify.setupStep2')}
       </p>
 
@@ -190,7 +190,7 @@ export default function NutritionOnboarding({ onComplete, onSkip }: Props) {
               {t('nutrify.goalAmount')} (kcal)
               <input type="number" value={goalAmount} onChange={(e) => setGoalAmount(+e.target.value)}
                 min={100} max={1500} step={50} className="rpg-input" />
-              <span style={{ fontSize: 'var(--fs-label)', opacity: 0.65 }}>
+              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                 {goal === 'deficit' ? t('nutrify.goalAmountDeficitHint') : t('nutrify.goalAmountSurplusHint')}
               </span>
             </label>
@@ -200,7 +200,7 @@ export default function NutritionOnboarding({ onComplete, onSkip }: Props) {
             <div className="nutri-tdee-preview">
               <p>{t('nutrify.tdeeEstimateLabel', 'Estimación inicial (TDEE)')}: <strong>{tdee} kcal/{t('nutrify.perDay', 'day')}</strong></p>
               <p>{t('nutrify.dailyTarget', 'Daily target')}: <strong>{dailyTarget} kcal/{t('nutrify.perDay', 'day')}</strong></p>
-              <p style={{ fontSize: 'var(--fs-label)', opacity: 0.75, margin: '4px 0 0' }}>
+              <p style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', margin: '4px 0 0' }}>
                 {t('nutrify.tdeeEstimateNote', 'Es sólo una estimación de arranque: el objetivo real se ajusta con tu actividad de los últimos 14 días.')}
               </p>
             </div>

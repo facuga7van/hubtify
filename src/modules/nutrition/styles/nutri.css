@@ -178,7 +178,7 @@
 }
 
 .nutri-btn-sm {
-  font-size: calc(var(--fs-label) * 0.85) !important;
+  font-size: var(--fs-label) !important;
   padding: 3px 8px !important;
   letter-spacing: 0.04em !important;
   min-height: 26px;
@@ -542,7 +542,7 @@
 }
 
 .nutri-macro-pct {
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-weight: 400;
 }
 
@@ -659,7 +659,7 @@
   margin-left: auto;
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   letter-spacing: 0;
   font-weight: 400;
   text-transform: none;
@@ -847,7 +847,7 @@
 .nutri-suggest-meta {
   flex-shrink: 0;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -908,7 +908,7 @@
 .nutri-food-kcal {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-weight: 600;
 }
 
@@ -1286,16 +1286,18 @@
   white-space: nowrap;
 }
 
+/* Meta de fila: --ink-soft sobre la fila texturada, nunca --ink-faded. */
 .nutri-meal-time {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   text-align: right;
 }
 
+/* Las calorías son dato primario de la fila: cuerpo de texto. */
 .nutri-meal-kcal {
   font-family: 'Fira Code', monospace;
-  font-size: var(--fs-label);
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--ink);
   text-align: right;
@@ -2032,7 +2034,7 @@
 }
 
 .nutri-target-breakdown {
-  opacity: 0.75;
+  color: var(--ink-soft);
   font-size: var(--fs-label);
   margin-left: 6px;
 }
@@ -2156,7 +2158,6 @@
 }
 
 .nutri-adaptive-apply-target {
-  opacity: 0.85;
   font-weight: 400;
 }
 
