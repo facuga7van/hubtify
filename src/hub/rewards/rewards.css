@@ -427,6 +427,12 @@
   }
 }
 
+/* ── Mobile (QA 0.9.0) ──────────────────────────────
+   «Nueva recompensa» partía en dos renglones al lado del título de sección. */
+[data-shell="mobile"] .rwd-add {
+  white-space: nowrap;
+}
+
 /* ── Touch (Fase 3) ─────────────────────────────────
    Los iconos de editar/borrar solo mostraban su borde en :hover: en touch
    parecían adorno. */
