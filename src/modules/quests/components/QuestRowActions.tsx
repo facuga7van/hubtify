@@ -74,8 +74,8 @@ export default function QuestRowActions({
   const [open, setOpen] = useState(false);
   const [postponeOpen, setPostponeOpen] = useState(false);
   // Portaled so the menu is never clipped by a row/column with overflow hidden.
-  const { anchorRef, popupRef, pos, reposition } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
   const closeMenu = useCallback(() => setOpen(false), []);
+  const { anchorRef, popupRef, pos, reposition } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open, 4, { onClose: closeMenu });
   // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
   useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
 

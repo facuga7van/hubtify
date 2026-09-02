@@ -1,6 +1,9 @@
-import { beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TaskList from '@modules/quests/components/TaskList';
+import { handleBackButton } from '../../../src/mobile/back-button';
+// De dialog-dom y no de native-shell: ese importa @capacitor/app (ver mobile-shell.browser.test).
+import { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover } from '../../../src/mobile/dialog-dom';
 import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes } from './mobile-harness';
 import { QUESTS_API } from './fixtures';
 
@@ -90,5 +93,45 @@ describe('Questify a 390×844', () => {
     const top = document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2);
     expect(modal.contains(top)).toBe(true);
     await shoot('quests-03-proyectos');
+  });
+
+  /* GEN-01: el menú ⋯ de un hábito no es un `role="dialog"`, así que el botón
+     atrás de Android no lo veía y navegaba. Ahora useAnchoredPopup lo anota
+     como popover abierto y el primer Atrás lo cierra; el segundo navega. */
+  test('el botón atrás cierra el menú de un hábito antes de navegar (GEN-01)', async () => {
+    await setMobileViewport();
+    mountInShell(<TaskList />, '/quests');
+    await settle();
+    await goTab(/^Pendientes$/i);
+    await page.getByRole('button', { name: /Acciones del hábito/i }).first().click();
+    await settle(300);
+    expect(document.querySelector('.quest-row-menu[data-popover-open]')).not.toBeNull();
+    expect(hasOpenPopover()).toBe(true);
+    expect(hasOpenDialog(document)).toBe(false);
+
+    const back = () => {
+      const goBack = vi.fn();
+      const outcome = handleBackButton({
+        openPopover: hasOpenPopover(),
+        closePopover: () => { closeTopPopover(); },
+        openDialog: hasOpenDialog(document),
+        closeDialog: closeTopDialog,
+        canGoBack: true,
+        goBack,
+        minimize: vi.fn(),
+      });
+      return { outcome, goBack };
+    };
+
+    const first = back();
+    await settle(300);
+    expect(first.outcome).toBe('popover');
+    expect(first.goBack).not.toHaveBeenCalled();
+    expect(document.querySelector('.quest-row-menu')).toBeNull();
+    expect(hasOpenPopover()).toBe(false);
+
+    const second = back();
+    expect(second.outcome).toBe('history');
+    expect(second.goBack).toHaveBeenCalledTimes(1);
   });
 });

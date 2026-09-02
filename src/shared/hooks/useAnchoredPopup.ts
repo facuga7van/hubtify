@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { registerOpenPopover } from '../popover-registry';
 
 export interface AnchoredPopupPos {
   top: number;
   left: number;
+}
+
+export interface AnchoredPopupOptions<A extends HTMLElement = HTMLElement> {
+  /**
+   * Cierra el popup. Lo llama el botón atrás de Android (popover-registry.ts)
+   * cuando este popup es el abierto de más arriba. Sin él se despacha un
+   * Escape desde el propio popup (burbujea a document y window), que es lo
+   * que todos los consumidores ya escuchan.
+   */
+  onClose?: () => void;
+  /** Ancla externa, para un disparador que vive en otro componente (AccountDropdown). */
+  anchorRef?: React.RefObject<A | null>;
 }
 
 /**
@@ -15,8 +28,12 @@ export interface AnchoredPopupPos {
  *
  * Same pattern already used by HelpBubble and Tooltip.
  *
+ * While open, the popup is also registered as an open popover
+ * (popover-registry.ts) and its root carries `data-popover-open`: that is what
+ * lets the Android back button close it instead of navigating away.
+ *
  * Usage:
- *   const { anchorRef, popupRef, pos } = useAnchoredPopup(open);
+ *   const { anchorRef, popupRef, pos } = useAnchoredPopup(open, 4, { onClose });
  *   <div ref={anchorRef}>…trigger…</div>
  *   {open && createPortal(
  *      <div ref={popupRef} style={{ position:'fixed', top: pos.top, left: pos.left }}/>,
@@ -25,8 +42,11 @@ export interface AnchoredPopupPos {
 export function useAnchoredPopup<A extends HTMLElement = HTMLDivElement, P extends HTMLElement = HTMLDivElement>(
   open: boolean,
   gap = 4,
+  options: AnchoredPopupOptions<A> = {},
 ) {
-  const anchorRef = useRef<A>(null);
+  const { onClose, anchorRef: externalAnchorRef } = options;
+  const ownAnchorRef = useRef<A>(null);
+  const anchorRef = externalAnchorRef ?? ownAnchorRef;
   const popupRef = useRef<P>(null);
   // Off-screen until measured, so the first paint never flashes at 0,0.
   const [pos, setPos] = useState<AnchoredPopupPos>({ top: -9999, left: -9999 });
@@ -65,7 +85,7 @@ export function useAnchoredPopup<A extends HTMLElement = HTMLDivElement, P exten
     if (left < edge) left = edge;
 
     setPos({ top, left });
-  }, [gap]);
+  }, [gap, anchorRef]);
 
   useLayoutEffect(() => {
     if (open) reposition();
@@ -82,6 +102,24 @@ export function useAnchoredPopup<A extends HTMLElement = HTMLDivElement, P exten
       window.removeEventListener('scroll', handler, true);
     };
   }, [open, reposition]);
+
+  // Anotado como popover abierto mientras dure `open` (botón atrás de Android).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    if (!open) return;
+    const popup = popupRef.current;
+    popup?.setAttribute('data-popover-open', '');
+    const off = registerOpenPopover(() => {
+      const close = onCloseRef.current;
+      if (close) { close(); return; }
+      (popupRef.current ?? window).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    return () => {
+      off();
+      popup?.removeAttribute('data-popover-open');
+    };
+  }, [open]);
 
   return { anchorRef, popupRef, pos, reposition };
 }

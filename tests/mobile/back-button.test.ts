@@ -3,6 +3,8 @@ import { handleBackButton, type BackContext } from '../../src/mobile/back-button
 
 function ctx(over: Partial<BackContext> = {}): BackContext {
   return {
+    openPopover: false,
+    closePopover: vi.fn(),
     openDialog: false,
     closeDialog: vi.fn(),
     canGoBack: false,
@@ -13,10 +15,20 @@ function ctx(over: Partial<BackContext> = {}): BackContext {
 }
 
 describe('handleBackButton (spec §7)', () => {
+  it('con un popover abierto lo cierra antes que nada: ni diálogo ni historial', () => {
+    const c = ctx({ openPopover: true, openDialog: true, canGoBack: true });
+    expect(handleBackButton(c)).toBe('popover');
+    expect(c.closePopover).toHaveBeenCalledTimes(1);
+    expect(c.closeDialog).not.toHaveBeenCalled();
+    expect(c.goBack).not.toHaveBeenCalled();
+    expect(c.minimize).not.toHaveBeenCalled();
+  });
+
   it('con un diálogo abierto lo cierra y no navega', () => {
     const c = ctx({ openDialog: true, canGoBack: true });
     expect(handleBackButton(c)).toBe('dialog');
     expect(c.closeDialog).toHaveBeenCalledTimes(1);
+    expect(c.closePopover).not.toHaveBeenCalled();
     expect(c.goBack).not.toHaveBeenCalled();
     expect(c.minimize).not.toHaveBeenCalled();
   });

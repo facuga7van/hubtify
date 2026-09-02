@@ -103,7 +103,8 @@ export default function MissionPicker({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLButtonElement, HTMLDivElement>(open);
+  const closePicker = useCallback(() => setOpen(false), []);
+  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLButtonElement, HTMLDivElement>(open, 4, { onClose: closePicker });
   const searchRef = useRef<HTMLInputElement>(null);
 
   const showSearch = missions.length > SEARCH_THRESHOLD;
