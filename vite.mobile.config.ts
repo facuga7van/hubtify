@@ -17,8 +17,23 @@ const alias = {
 // - worker.format 'es': el worker es un módulo (import de sqlite-wasm).
 // - base './': Capacitor sirve el webDir desde https://localhost/ y los assets
 //   se referencian relativos al index.
+// - leatherBeforeMount: el index.html es compartido con Electron, así que la
+//   regla crítica se inyecta solo acá. theme.css pinta <body> con --parch-0 y,
+//   mientras main.tsx espera `installMobileApi()` (worker + VFS + migraciones,
+//   ~2 s), #root está vacío y ese pergamino se propaga al viewport: se veía
+//   claro entre el splash de cuero y la app. Con fondo en <html>, el de <body>
+//   deja de propagarse y el viewport queda cuero hasta que .shell-frame
+//   (100dvh) lo cubre. Mismo color que el splash y que capacitor.config.ts.
+const leatherBeforeMount = {
+  name: 'hubtify:leather-before-mount',
+  transformIndexHtml: () => [
+    { tag: 'style', injectTo: 'head' as const, children: 'html { background: #2a1d0e; }' },
+  ],
+};
+
 export default defineConfig({
   base: './',
+  plugins: [leatherBeforeMount],
   define: {
     APP_VERSION: JSON.stringify(pkg.version),
     __HUBTIFY_PLATFORM__: '"android"',
