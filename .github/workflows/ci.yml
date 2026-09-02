@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Typecheck shared-logic (no electron/node/dom)
+        run: npm run typecheck:shared-logic
+
       - name: Test
         run: npm test
 

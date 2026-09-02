@@ -10,6 +10,7 @@ const alias = {
   '@hub': r('./src/hub'),
   '@shared': r('./src/shared'),
   '@modules': r('./src/modules'),
+  '@logic': r('./shared-logic'),
 };
 
 export default defineConfig({

@@ -17,8 +17,9 @@
       "@core/*": ["src/core/*"],
       "@hub/*": ["src/hub/*"],
       "@shared/*": ["src/shared/*"],
-      "@modules/*": ["src/modules/*"]
+      "@modules/*": ["src/modules/*"],
+      "@logic/*": ["shared-logic/*"]
     }
   },
-  "include": ["src/**/*", "electron/**/*", "shared/**/*"]
+  "include": ["src/**/*", "electron/**/*", "shared/**/*", "shared-logic/**/*"]
 }
