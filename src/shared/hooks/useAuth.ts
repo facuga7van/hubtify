@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -10,6 +9,7 @@ import {
   type AuthError,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { resolveIdentifierToEmail, requestPasswordReset, USERNAME_NOT_FOUND } from '../auth-identifier';
 import {
   getOrCreateApp,
   getActiveAuth,
@@ -51,7 +51,7 @@ function getErrorKey(err: unknown): string {
   const code = (err as AuthError)?.code;
   if (code) return firebaseErrorMap[code] ?? 'auth.errors.generic';
   const msg = (err as Error)?.message;
-  if (msg === 'usernameNotFound') return 'auth.errors.usernameNotFound';
+  if (msg === USERNAME_NOT_FOUND) return 'auth.errors.usernameNotFound';
   return 'auth.errors.generic';
 }
 
@@ -77,18 +77,7 @@ export function useAuth() {
 
   const login = useCallback(async (identifier: string, password: string) => {
     try {
-      let email = identifier;
-
-      // If identifier doesn't contain @, treat as username
-      if (!identifier.includes('@')) {
-        const db = getActiveFirestore();
-        const usernameDoc = await getDoc(doc(db, 'usernames', identifier.toLowerCase()));
-        if (!usernameDoc.exists()) {
-          throw new Error('usernameNotFound');
-        }
-        email = usernameDoc.data().email;
-      }
-
+      const email = await resolveIdentifierToEmail(identifier);
       const auth = getActiveAuth();
       const cred = await signInWithEmailAndPassword(auth, email, password);
       addCachedAccount({
@@ -307,15 +296,11 @@ export function useAuth() {
   }, [user]);
 
   const addAccount = useCallback(async (identifier: string, password: string) => {
-    // Resolve username to email if needed
-    let email = identifier;
-    if (!identifier.includes('@')) {
-      const db = getActiveFirestore();
-      const usernameDoc = await getDoc(doc(db, 'usernames', identifier.toLowerCase()));
-      if (!usernameDoc.exists()) {
-        return { success: false, error: 'auth.errors.usernameNotFound' };
-      }
-      email = usernameDoc.data().email;
+    let email: string;
+    try {
+      email = await resolveIdentifierToEmail(identifier);
+    } catch (err: unknown) {
+      return { success: false, error: getErrorKey(err) };
     }
 
     // Create a new Firebase app instance for this account
@@ -386,10 +371,10 @@ export function useAuth() {
     }
   }, [user]);
 
-  const forgotPassword = useCallback(async (email: string) => {
+  /** Accepts an email OR a username, like `login` does. */
+  const forgotPassword = useCallback(async (identifier: string) => {
     try {
-      const auth = getActiveAuth();
-      await sendPasswordResetEmail(auth, email);
+      await requestPasswordReset(identifier);
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: getErrorKey(err) };
