@@ -203,7 +203,7 @@ export default function NutritionDashboardWidget() {
         {weekCalories.length >= 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <SparklineChart data={weekCalories} width={80} height={24} color="var(--rpg-hp-red)" showArea />
-            <span className="qb-hand" style={{ fontSize: 'calc(var(--fs-label) * 0.85)', color: 'var(--ink-faded)' }}>
+            <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
               {t('nutrify.weekTrend', '7d trend')}
             </span>
           </div>

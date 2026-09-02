@@ -91,7 +91,7 @@ export default function UpdateNotification({ version, state, percent, error, onD
             <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 4 }}>
               <div style={{ height: '100%', background: 'var(--moss)', width: `${percent}%`, transition: 'width 0.3s ease' }} />
             </div>
-            <span style={{ fontSize: 'var(--fs-label)', opacity: 0.75 }}>{percent}%</span>
+            <span style={{ fontSize: 'var(--fs-label)' }}>{percent}%</span>
           </div>
         )}
 

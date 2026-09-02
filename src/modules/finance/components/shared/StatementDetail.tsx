@@ -131,24 +131,24 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
 
         <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <div>
-            <span style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>{t('coinify.calculated')}</span>
+            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>{t('coinify.calculated')}</span>
             <div style={{ fontWeight: 'bold', fontSize: 'var(--fs-nav)' }}>
               {formatCurrency(statement.calculatedAmount, { currency: 'ARS' })}
             </div>
             {(statement.calculatedAmountUsd ?? 0) > 0 && (
-              <div style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>
+              <div style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                 {formatCurrency(statement.calculatedAmountUsd ?? 0, { currency: 'USD' })}
               </div>
             )}
           </div>
           {statement.status === 'paid' && statement.paidAmount != null && (
             <div>
-              <span style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>{t('coinify.paid')}</span>
+              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>{t('coinify.paid')}</span>
               <div style={{ fontWeight: 'bold', fontSize: 'var(--fs-nav)' }}>
                 {formatCurrency(statement.paidAmount, { currency: 'ARS' })}
               </div>
               {(statement.paidAmountUsd ?? 0) > 0 && (
-                <div style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                   {formatCurrency(statement.paidAmountUsd ?? 0, { currency: 'USD' })}
                 </div>
               )}
@@ -216,7 +216,7 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
         )}
 
         {statement.status === 'paid' && (
-          <div style={{ marginTop: 12, textAlign: 'center', opacity: 0.8, fontStyle: 'italic' }}>
+          <div style={{ marginTop: 12, textAlign: 'center', color: 'var(--ink-soft)', fontStyle: 'italic' }}>
             {t('coinify.statementPaid')}{statement.paidDate ? ` — ${statement.paidDate}` : ''}
           </div>
         )}

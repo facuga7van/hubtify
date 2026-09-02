@@ -72,7 +72,7 @@ export default function SubtaskInlineForm({ editing, onSave, onCancel }: Props) 
             onClick={() => setTier(tierVal)}
           >
             <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
-            <span style={{ opacity: 0.7, fontSize: '0.85em', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>
+            <span style={{ fontSize: 'var(--fs-label)', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>
           </button>
         ))}
       </div>

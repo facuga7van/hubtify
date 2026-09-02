@@ -28,7 +28,13 @@
   /* ── Codex palette ─────────────────────────────────── */
   --ink: #2a1d0e;
   --ink-soft: #4a3520;
-  --ink-faded: #6b5535;   /* distinct 3rd level; ~6:1 on parchment */
+  /* Tercer nivel de tinta. Era #6b5535 («~6:1 on parchment»), cierto sólo sobre
+     --parch-0: sobre --parch-2, donde termina el degradé de cada tarjeta, daba
+     3.80:1 y fallaba AA. #5a4428 cumple en las tres superficies de texto
+     (7.45 / 6.32 / 4.94 sobre --parch-0/1/2) y conserva escalón con --ink-soft.
+     --parch-3 no es superficie de texto (barra de scroll, pista de gauge).
+     tests/shared/theme-contrast.test.ts vigila estos ratios. */
+  --ink-faded: #5a4428;
   --rubric: #7a1e1e;
   --rubric-light: #a43030;
   --moss: #40522c;        /* darkened for WCAG AA across the parchment gradient */

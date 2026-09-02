@@ -164,7 +164,7 @@ function SealButton({ level }: { level: number }) {
       aria-label={`Level ${level}`}
     >
       <div style={{ textAlign: 'center', lineHeight: 1 }}>
-        <div style={{ fontSize: 'var(--fs-label)', letterSpacing: '.1em', fontFamily: "'IM Fell English SC', serif", opacity: 0.85 }}>
+        <div style={{ fontSize: 'var(--fs-label)', letterSpacing: '.1em', fontFamily: "'IM Fell English SC', serif" }}>
           LVL
         </div>
         <div style={{ fontSize: 'var(--fs-hero)' }}>{level}</div>
@@ -549,7 +549,9 @@ export default function Dashboard() {
         >
           <HelpBubble text={t('dashboard.chronicleHelp', 'Últimos eventos que otorgaron XP: misiones, nutrición, finanzas y logros.')} />
           {recentEvents.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-label)', fontFamily: "'IM Fell English', serif" }}>
+            // El hecho es el dato primario de la fila: cuerpo de texto. XP y
+            // hora quedan en --fs-label como meta.
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-body)', fontFamily: "'IM Fell English', serif" }}>
               {recentEvents.map((ev) => {
                 let description = '';
                 try {

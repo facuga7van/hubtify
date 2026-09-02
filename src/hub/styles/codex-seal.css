@@ -133,7 +133,7 @@
 
 .codex-marginalia__count {
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .codex-marginalia__list {
@@ -153,8 +153,9 @@
   border-bottom: 1px dotted rgba(74, 55, 32, 0.28);
 }
 
+/* Meta de fila de la bitácora: --ink-soft sobre el pergamino. */
 .codex-marginalia__time {
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-size: var(--fs-label);
 }
 
@@ -650,7 +651,7 @@
    se leía. */
 .ach-filter__count {
   font-family: 'Fira Code', monospace;
-  font-size: 0.85em;
+  font-size: var(--fs-label);
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }

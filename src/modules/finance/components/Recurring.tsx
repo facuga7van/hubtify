@@ -359,13 +359,13 @@ export default function Recurring() {
             {/* Tenía 70 px de ancho con 72 px de padding interno (las dos
                 flechas): el número directamente no se veía. */}
             <label htmlFor="coin-recurring-add-day"
-              style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
+              style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{t('coinify.billingDay')}</label>
             <RpgNumberInput id="coin-recurring-add-day"
               aria-label={t('coinify.billingDayAria', 'Día de cobro, del 1 al 31')}
               value={String(formBillingDay)}
               onChange={(v) => setFormBillingDay(Math.min(31, Math.max(1, parseInt(v) || 1)))}
               style={{ width: 110 }} min={1} max={31} step={1} />
-            <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.frequencyLabel', 'Frecuencia')}</label>
+            <label style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{t('coinify.frequencyLabel', 'Frecuencia')}</label>
             {/* The aguinaldo at last: semiannual, annual and everything between.
                 First charge lands the month the template is created. */}
             <select className="rpg-select" value={formFrequency} onChange={(e) => setFormFrequency(e.target.value)}
@@ -380,11 +380,11 @@ export default function Recurring() {
               cadences — the month the cadence counts from: an annual insurance
               due in March, loaded in September, must anchor on March. */}
           <div className="coin-quick-add-form__row">
-            <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}>{t('coinify.accountLabel', 'Cuenta')}</label>
+            <label style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{t('coinify.accountLabel', 'Cuenta')}</label>
             <AccountSelect value={formAccount} onChange={setFormAccount} onSupported={setAccountsSupported} />
             {formFrequency !== 'monthly' && (
               <>
-                <label style={{ fontSize: 'var(--fs-label)', opacity: 0.7, whiteSpace: 'nowrap' }}
+                <label style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}
                   htmlFor="coin-recurring-anchor"
                   title={t('coinify.anchorMonthHint', 'Mes desde el que cuenta la cadencia: la primera cuota cae en ese mes y después cada N meses.')}>
                   {t('coinify.anchorMonthLabel', 'Mes ancla')}
@@ -424,7 +424,9 @@ export default function Recurring() {
                 >
                   {/* The icon is the ACTION, not the state: an active recurring
                       shows a pause glyph because that is what clicking does. */}
-                  {isActive(item) ? <PauseIcon style={{ width: '0.7em', height: '0.7em' }} /> : <PlayIcon style={{ width: '0.7em', height: '0.7em' }} />}
+                  {isActive(item)
+                    ? <PauseIcon className="coin-recurring-card__toggle-icon" aria-hidden="true" />
+                    : <PlayIcon className="coin-recurring-card__toggle-icon" aria-hidden="true" />}
                 </button>
 
                 {/* Name, Type, Category, Billing Day */}
@@ -474,7 +476,7 @@ export default function Recurring() {
                         aria-label={t('coinify.billingDayAria', 'Día de cobro, del 1 al 31')}
                         value={String(editRecurringFields.billingDay)}
                         onChange={(v) => setEditRecurringFields((f) => ({ ...f, billingDay: Math.min(31, Math.max(1, parseInt(v) || 1)) }))}
-                        style={{ width: '100%' }} fontSize="0.8rem" min={1} max={31} step={1} />
+                        style={{ width: '100%' }} fontSize="var(--fs-label)" min={1} max={31} step={1} />
                     </div>
 
                     <div className="coin-field coin-field--freq">
@@ -621,10 +623,10 @@ export default function Recurring() {
                     <div>
                       {history[item.id].map((h) => (
                         <div key={h.id} className="coin-recurring-card__timeline-item">
-                          <span style={{ color: 'var(--rubric)', textDecoration: 'line-through', opacity: 0.6 }}>
+                          <span style={{ color: 'var(--rubric)', textDecoration: 'line-through' }}>
                             {formatCurrency(h.previousAmount, { currency: item.currency })}
                           </span>
-                          <span style={{ opacity: 0.5 }}>{'\u2192'}</span>
+                          <span aria-hidden="true">{'\u2192'}</span>
                           <span style={{ color: 'var(--moss)' }}>
                             {formatCurrency(h.newAmount, { currency: item.currency })}
                           </span>

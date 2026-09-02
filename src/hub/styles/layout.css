@@ -309,7 +309,10 @@
 
 .sidebar-bar__val {
   font-family: 'Fira Code', monospace;
-  font-size: calc(12px * var(--font-scale));
+  /* Era 12 px, bajo el piso. Al crecer, el interlineado se aprieta para que
+     el sidebar siga entrando sin scroll en la ventana más baja (620 px). */
+  font-size: var(--fs-label);
+  line-height: 1.15;
   color: var(--parch-0);
   text-align: right;
 }

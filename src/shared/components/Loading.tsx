@@ -33,7 +33,7 @@ export default function Loading({ text, size = 'md' }: Props) {
         <span style={{
           fontFamily: "'IM Fell English', serif",
           fontStyle: 'italic',
-          fontSize: size === 'sm' ? '0.8rem' : '0.9rem',
+          fontSize: size === 'sm' ? 'var(--fs-label)' : 'var(--fs-body)',
           color: 'var(--ink-faded)',
           letterSpacing: '0.03em',
         }}>
