@@ -6,6 +6,7 @@ import { nutritionMigrations } from '@modules/nutrition/nutrition.schema';
 import { financeMigrations } from '@modules/finance/finance.schema';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
 import { notificationsMigrations } from '../../shared-logic/modules/notifications.schema';
+import { mergeQuestDataInto } from '../../shared-logic/modules/sync.ipc';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The bug, as found in the owner's database on 2026-09-02 (136 rows, 51 with
@@ -80,6 +81,9 @@ function insert(db: Database.Database, r: Row): number {
 
 const ids = (db: Database.Database): number[] =>
   (db.prepare('SELECT id FROM rpg_events ORDER BY id').all() as Array<{ id: number }>).map(r => r.id);
+
+const syncIds = (db: Database.Database): Array<string | null> =>
+  (db.prepare('SELECT sync_id FROM rpg_events ORDER BY id').all() as Array<{ sync_id: string | null }>).map(r => r.sync_id);
 
 const TASK_PAYLOAD = '{"xp":15,"hp":0,"taskId":"f7622878-bfce-4dd0-9f43-7439c797d2fc"}';
 const MEAL_PAYLOAD = '{"xp":10,"hp":0}';
@@ -178,5 +182,55 @@ describe(`core v${REPAIR_VERSION} — repairs rpg_events twins left by an id-key
     insert(db, { syncId: null, moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01T21:22:31.000Z' });
     db.exec(repairMigration());
     expect(ids(db)).toHaveLength(8);
+  });
+});
+
+describe('mergeQuestDataInto — rpg_events: a copy of an event we already hold under another identity', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = bootAll(); });
+
+  const remoteMeal = (syncId: string, createdAt = '2026-09-01T16:16:29.000Z') => ({
+    syncId, moduleId: 'nutrition', eventType: 'MEAL_LOGGED', xpGained: 10, hpChange: 0,
+    comboMultiplier: 1, bonusMultiplier: 1, payload: MEAL_PAYLOAD, refId: null, createdAt,
+  });
+
+  it('does not insert a row whose sync_id differs from the natural-key match', () => {
+    insert(db, { syncId: 'c1a48730-81f3-4a88-b50f-e473210a63a8', moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01 16:16:29' });
+    // The legacy- twin another device backfilled and pushed.
+    const r = mergeQuestDataInto(db, { rpgEvents: [remoteMeal('legacy-2026-09-01T16:16:29.000Z-MEAL_LOGGED--10.0')] } as never);
+    expect(syncIds(db)).toEqual(['c1a48730-81f3-4a88-b50f-e473210a63a8']);
+    expect(r.changed).toBe(false);
+  });
+
+  it('lets an anonymous local copy adopt the remote identity instead of inserting a second row', () => {
+    const twin = insert(db, { syncId: null, moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01T16:16:29.000Z' });
+    const r = mergeQuestDataInto(db, { rpgEvents: [remoteMeal('c1a48730-81f3-4a88-b50f-e473210a63a8')] } as never);
+    expect(db.prepare('SELECT id, sync_id FROM rpg_events').all()).toEqual([{ id: twin, sync_id: 'c1a48730-81f3-4a88-b50f-e473210a63a8' }]);
+    expect(r.changed).toBe(true);
+  });
+
+  it('lets a legacy- local copy adopt the uuid of the same event, so both devices converge on one identity', () => {
+    const backfilled = insert(db, { syncId: 'legacy-2026-09-01T16:16:29.000Z-MEAL_LOGGED--10.0', moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01T16:16:29.000Z' });
+    mergeQuestDataInto(db, { rpgEvents: [remoteMeal('c1a48730-81f3-4a88-b50f-e473210a63a8')] } as never);
+    expect(db.prepare('SELECT id, sync_id FROM rpg_events').all()).toEqual([{ id: backfilled, sync_id: 'c1a48730-81f3-4a88-b50f-e473210a63a8' }]);
+  });
+
+  it('keeps the union semantics for distinct events: same type and second but another task, or one second apart', () => {
+    insert(db, { syncId: 'u-a', type: 'TASK_COMPLETED', xp: 10, payload: '{"xp":5,"hp":0,"taskId":"a"}', refId: 'a', createdAt: '2026-09-01 16:29:45' });
+    insert(db, { syncId: 'u-m', moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01 21:22:30' });
+    mergeQuestDataInto(db, { rpgEvents: [
+      { syncId: 'u-b', moduleId: 'quests', eventType: 'TASK_COMPLETED', xpGained: 10, hpChange: 0, comboMultiplier: 1, bonusMultiplier: 1, payload: '{"xp":5,"hp":0,"taskId":"b"}', refId: 'b', createdAt: '2026-09-01T16:29:45.000Z' },
+      remoteMeal('u-n', '2026-09-01T21:22:31.000Z'),
+      remoteMeal('u-m', '2026-09-01T21:22:30.000Z'), // already here, by sync_id
+    ] } as never);
+    expect(syncIds(db)).toEqual(['u-a', 'u-m', 'u-b', 'u-n']);
+  });
+
+  it('sweeps the twins an old client left behind before the payload lands', () => {
+    const real = insert(db, { syncId: 'c1a48730-81f3-4a88-b50f-e473210a63a8', moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01 16:16:29' });
+    insert(db, { syncId: null, moduleId: 'nutrition', type: 'MEAL_LOGGED', xp: 10, payload: MEAL_PAYLOAD, createdAt: '2026-09-01T16:16:29.000Z' });
+    const r = mergeQuestDataInto(db, { rpgEvents: [] } as never);
+    expect(ids(db)).toEqual([real]);
+    expect(r.changed).toBe(true);
   });
 });
