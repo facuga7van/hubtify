@@ -27,16 +27,13 @@
 
 .nutri-page {
   padding: 24px 28px 32px;
-  /* Medida cómoda de lectura. A 1640 px la página se desparramaba: el rótulo
-     contra el borde izquierdo y el número contra el derecho, con 800 px de
-     pergamino vacío en el medio. Misma cura que Cuotas y el Tablero. */
-  --nutri-measure: 980px;
-}
-
-/* La crónica son gráficos: respira más ancho que un formulario. */
-.nutri-page:has(.nutri-charts-grid),
-.nutri-page:has(.nutri-kpi-strip) {
-  --nutri-measure: 1180px;
+  /* Medida cómoda de lectura, centrada. A 1640 px la página se desparramaba:
+     el rótulo contra el borde izquierdo y el número contra el derecho, con
+     800 px de pergamino vacío en el medio. Misma cura que Cuotas. 1280 y no
+     980: con la barra lateral plegada 980 dejaba un tercio de la ventana en
+     blanco a cada lado; la crónica (gráficos) y el registro (formulario +
+     lista) comparten la medida, antes la crónica tenía 1180 aparte. */
+  --nutri-measure: 1280px;
 }
 
 .nutri-page > .nutri-page-head,
@@ -1747,19 +1744,38 @@
 .nutri-red { color: var(--rubric); }
 
 
-/* ── Sticky close-day footer ── */
+/* ── Sticky close-day footer ──
+   Era una franja de todo el ancho con `linear-gradient(transparent,
+   --rpg-parchment 30%)`: un color LISO pegado bajo la tarjeta «Cierre del
+   Día», sobre un fondo que es una TEXTURA de pergamino (layout.css:
+   `.main-content` con bg.jpg). Se veía como un rectángulo blanco de bordes
+   duros. Ahora no hay franja: el contenedor mide lo que mide el botón
+   (`width: fit-content`, centrado por el `margin: auto` de `.nutri-page >`),
+   con un velo de pergamino al 40 % y un desenfoque leve de lo que pasa por
+   debajo, y el botón lleva sombra de elevación media para despegarse de la
+   lista mientras flota. Al final del scroll se apoya en su lugar del flujo,
+   debajo de la tarjeta, así que no tapa la última fila. `pointer-events:
+   none` en el contenedor: lo que no es el botón no bloquea la lista. */
 
 .nutri-sticky-footer {
   position: sticky;
   bottom: 0;
   z-index: 10;
-  padding: 12px 16px;
-  background: linear-gradient(transparent, var(--rpg-parchment) 30%);
-  text-align: center;
+  width: fit-content;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  /* --parch-0 (#f5e7c0) al 40 %: no hay token con alfa. */
+  background: rgba(245, 231, 192, 0.4);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   pointer-events: none;
 }
 .nutri-sticky-footer .nutri-close-day-btn {
   pointer-events: auto;
+  box-shadow:
+    0 2px 4px rgba(42, 29, 14, 0.3),
+    0 4px 16px rgba(42, 29, 14, 0.35);
 }
 
 

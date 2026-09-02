@@ -240,7 +240,12 @@ describe('Questify — la lista a pantalla completa', () => {
     expect(gaps.length).toBeGreaterThan(0);
     const worst = Math.max(...gaps);
     console.log('[audit] hueco máximo título→XP a 1640px:', Math.round(worst));
-    expect(worst).toBeLessThan(500);
+    // 700 y no 500: el tablero de dos columnas ya no tiene tope de 1180 px
+    // (dejaba ~400 px de pergamino vacío a la derecha con la barra plegada) y
+    // usa todo el ancho a propósito, así que a 1640 con la barra de 260 el
+    // hueco ronda los 530 px. El guardián sigue cazando el desierto original
+    // de 1.200 px de una grilla sin columnas.
+    expect(worst).toBeLessThan(700);
   });
 
   test('760x640 (mínimo de la app): una columna, sin desborde', async () => {

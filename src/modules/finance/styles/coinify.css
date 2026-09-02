@@ -481,9 +481,12 @@
 /* La columna de lectura de Coinify. Cada pantalla nació pensada para una
    tarjeta angosta y maximizada se desarmaba: el concepto contra el borde
    izquierdo y el importe contra el derecho, con casi mil píxeles de pergamino
-   vacío en el medio. Mismo ancho que ya tenía la lista de cuotas. */
+   vacío en el medio. Mismo ancho que la lista de cuotas y la de recurrentes.
+   1100 y no 940: con la barra lateral plegada 940 dejaba un tercio de la
+   ventana en blanco; el libro, las tarjetas y los préstamos son listas de
+   lectura, así que conservan medida, pero una más generosa y centrada. */
 .coin-page-column {
-  max-width: 940px;
+  max-width: 1100px;
   margin-inline: auto;
 }
 
@@ -1331,9 +1334,10 @@ button.coin-sort-header--amount {
 
 /* ── Installments ───────────────────────────────────────────── */
 
-/* Ancho máximo centrado para toda la pantalla de cuotas. Ver Installments.tsx. */
+/* Ancho máximo centrado para toda la pantalla de cuotas (una lista de lectura
+   con su formulario; ver Installments.tsx). Misma medida que `.coin-page-column`. */
 .coin-installments {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -1673,9 +1677,9 @@ button.coin-sort-header--amount {
 /* Misma cura que en Cuotas: a 1640 px el nombre quedaba contra el borde
    izquierdo y categoría/día/cuenta/monto/botones apelotonados contra el
    derecho, con un vacío enorme en el medio. Ancho máximo centrado y el nombre
-   deja de estirarse sin límite. */
+   deja de estirarse sin límite. Misma medida que `.coin-page-column`. */
 .coin-recurring-list {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 .coin-recurring-card__main {
