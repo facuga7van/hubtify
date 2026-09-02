@@ -38,6 +38,11 @@ import { useAuthContext } from './shared/AuthContext';
 const AchievementsPage = lazy(() => import('./hub/AchievementsPage'));
 const RewardsPage = lazy(() => import('./hub/rewards/RewardsPage'));
 
+// Solo se carga si el worker mobile muere después de `ready` (spec §3.5).
+// Aceptado: el bundle desktop emite este chunk (FatalScreen + su CSS, unos KB)
+// aunque nunca lo pida; `protocol.ts` no entra porque solo se importan tipos.
+const FatalScreen = lazy(() => import('./mobile/FatalScreen'));
+
 function AuthPageWrapper() {
   const navigate = useNavigate();
   return <AuthPage onAuth={() => navigate('/')} />;
@@ -76,6 +81,23 @@ export default function App() {
     if (!shellVisible) return;
     return prefetchRoutes();
   }, [shellVisible]);
+
+  // Android: el worker de datos murió. Sin recreación silenciosa: pantalla
+  // terminal con «Reiniciar» (spec §3.5).
+  const [workerCrash, setWorkerCrash] = useState<string | null>(null);
+  useEffect(() => {
+    const onCrash = (e: Event) => setWorkerCrash((e as CustomEvent<string>).detail || 'Worker crashed');
+    window.addEventListener('mobile:workerCrashed', onCrash);
+    return () => window.removeEventListener('mobile:workerCrashed', onCrash);
+  }, []);
+
+  if (workerCrash !== null) {
+    return (
+      <Suspense fallback={null}>
+        <FatalScreen reason="crash" message={workerCrash} />
+      </Suspense>
+    );
+  }
 
   // Show loading while Firebase checks auth state
   if (loading) return null;

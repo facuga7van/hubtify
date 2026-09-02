@@ -897,6 +897,17 @@
     "settingsNavigation": "Configuración",
     "toggleSidebar": "Alternar barra lateral"
   },
+  "mobile": {
+    "fatal": {
+      "crash": "El motor de datos se detuvo de forma inesperada.",
+      "migration": "No se pudo actualizar la base de datos.",
+      "migrationDetail": "Migración {{namespace}} v{{version}}",
+      "open": "No se pudo abrir la base de datos.",
+      "restart": "Reiniciar",
+      "title": "El grimorio no se pudo abrir",
+      "vfs": "El almacenamiento local no está disponible en este dispositivo."
+    }
+  },
   "nav": {
     "achievements": "Logros",
     "cauldron": "Caldero",

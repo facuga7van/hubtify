@@ -897,6 +897,17 @@
     "settingsNavigation": "Settings",
     "toggleSidebar": "Toggle sidebar"
   },
+  "mobile": {
+    "fatal": {
+      "crash": "The data engine stopped unexpectedly.",
+      "migration": "The database could not be updated.",
+      "migrationDetail": "Migration {{namespace}} v{{version}}",
+      "open": "The database could not be opened.",
+      "restart": "Restart",
+      "title": "The grimoire could not be opened",
+      "vfs": "Local storage is not available on this device."
+    }
+  },
   "nav": {
     "achievements": "Achievements",
     "cauldron": "Cauldron",
