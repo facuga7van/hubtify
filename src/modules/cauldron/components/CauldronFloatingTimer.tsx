@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { isNativeMobile } from '../../../shared/platform-detect';
 import { useAnimatedNavigate } from '../../../shared/components/AnimatedOutlet';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
@@ -26,6 +28,8 @@ export default function CauldronFloatingTimer() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const animatedNavigate = useAnimatedNavigate();
+  const { pathname } = useLocation();
+  const onCauldronPage = pathname === '/cauldron' || pathname.startsWith('/cauldron/');
   const [timerState, setTimerState] = useState<CauldronTimerStateEx | null>(null);
   const [hidden, setHidden] = useState(false);
   const warningFiredRef = useRef(false);
@@ -192,6 +196,10 @@ export default function CauldronFloatingTimer() {
 
   if (!timerState || timerState.status === 'idle') return null;
   if (hidden) return null;
+  // En el teléfono el chip va de borde a borde: sobre la propia página del
+  // Caldero tapaba las stat cards y duplicaba los controles (CAU-01). En
+  // escritorio se queda: la página lo deja ver a un costado.
+  if (isNativeMobile() && onCauldronPage) return null;
 
   const isRunning = timerState.status === 'work' || timerState.status === 'on_break';
   const isPaused = timerState.status === 'work_paused' || timerState.status === 'break_paused';
@@ -381,14 +389,17 @@ export default function CauldronFloatingTimer() {
             </button>
           </>
         )}
-        <button
-          className="cauldron-ft-btn cauldron-ft-btn--popout"
-          onClick={handlePopOut}
-          title={t('cauldron.popOut', 'Floating window')}
-          aria-label={t('cauldron.popOut', 'Floating window')}
-        >
-          <PopOutIcon width={12} height={12} />
-        </button>
+        {/* La ventana flotante es una BrowserWindow de Electron: en Android no existe. */}
+        {!isNativeMobile() && (
+          <button
+            className="cauldron-ft-btn cauldron-ft-btn--popout"
+            onClick={handlePopOut}
+            title={t('cauldron.popOut', 'Floating window')}
+            aria-label={t('cauldron.popOut', 'Floating window')}
+          >
+            <PopOutIcon width={12} height={12} />
+          </button>
+        )}
         <button
           className="cauldron-ft-btn cauldron-ft-btn--hide"
           onClick={handleHide}

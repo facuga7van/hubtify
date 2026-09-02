@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
+import { isNativeMobile } from '../../../shared/platform-detect';
 import { ambientOrbs, brewComplete, statsShimmer } from '../../../shared/animations/cauldron';
 import {
   playCauldronStart,
@@ -913,17 +914,20 @@ export default function CauldronPage() {
                   />
                 </div>
               )}
-              <label className="cauldron-popout-toggle">
-                <input
-                  type="checkbox"
-                  checked={popoutOnStart}
-                  onChange={(e) => {
-                    setPopoutOnStart(e.target.checked);
-                    try { localStorage.setItem(POPOUT_ON_START_KEY, String(e.target.checked)); } catch { /* private mode */ }
-                  }}
-                />
-                {t('cauldron.popOutOnStart', 'Abrir ventana flotante al iniciar')}
-              </label>
+              {/* La ventana flotante es una BrowserWindow de Electron: en Android no existe (CAU-02). */}
+              {!isNativeMobile() && (
+                <label className="cauldron-popout-toggle">
+                  <input
+                    type="checkbox"
+                    checked={popoutOnStart}
+                    onChange={(e) => {
+                      setPopoutOnStart(e.target.checked);
+                      try { localStorage.setItem(POPOUT_ON_START_KEY, String(e.target.checked)); } catch { /* private mode */ }
+                    }}
+                  />
+                  {t('cauldron.popOutOnStart', 'Abrir ventana flotante al iniciar')}
+                </label>
+              )}
             </div>
           )}
         </div>
