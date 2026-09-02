@@ -33,7 +33,13 @@ Medieval RPG Codex theme. Gamified life hub built with Electron + React + TypeSc
 |----------|-----|--------|-------|
 | `--ink` | `#2a1d0e` | ![](https://via.placeholder.com/16/2a1d0e/2a1d0e) | Primary text |
 | `--ink-soft` | `#4a3520` | ![](https://via.placeholder.com/16/4a3520/4a3520) | Secondary text |
-| `--ink-faded` | `#4a3520` | ![](https://via.placeholder.com/16/4a3520/4a3520) | Tertiary/disabled text |
+| `--ink-faded` | `#5a4428` | ![](https://via.placeholder.com/16/5a4428/5a4428) | Tertiary/disabled text — AA on `--parch-0/1/2` (7.45 / 6.32 / 4.94) |
+
+`--parch-3` is a depth surface (scrollbar thumb, gauge track), never a text
+background: even `--ink-soft` only reaches 4.32:1 on it. Inside a data row
+(ledger, quest, meal) secondary metadata uses `--ink-soft`; `--ink-faded` is
+for hints, empty states and disabled text. `tests/shared/theme-contrast.test.ts`
+enforces the ink/parchment ratios.
 
 ### Accent Colors
 
