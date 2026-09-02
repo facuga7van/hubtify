@@ -11,6 +11,7 @@ import HelpBubble from '../../../shared/components/HelpBubble';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { formatCurrency, formatCurrencyCompact, currencyPrefix } from '../utils/format';
 import { sliceAngles, sliceShape, ringArc } from '../utils/wheel-paths';
+import { projectionCoords } from '../utils/projection-scale';
 import {
   getExpenseBreakdown,
   getExpenseBreakdownForRange,
@@ -395,15 +396,11 @@ function ProjectionChart({ data }: { data: ProjectionMonth[] }) {
   if (data.length === 0) return null;
 
   const pts = data.map((d) => d.total);
-  const max = Math.max(...pts) * 1.15;
-  const min = Math.min(...pts) * 0.85;
   const w = 280, h = 100;
 
-  const coords = pts.map((v, i) => {
-    const x = (i / (pts.length - 1)) * w;
-    const y = h - ((v - min) / (max - min)) * h;
-    return [x, y];
-  });
+  // Pure (projection-scale.ts): a flat series — every month at 0 for a user
+  // without movements — used to normalise as 0/0 and paint NaN into the SVG.
+  const coords = projectionCoords(pts, w, h);
   const d = coords.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ' ' + p[1]).join(' ');
 
   return (
