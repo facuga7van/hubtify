@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: { alias: { '@logic': path.resolve(__dirname, 'shared-logic') } },
   define: {
     APP_VERSION: JSON.stringify(pkg.version),
+    __HUBTIFY_PLATFORM__: '"desktop"',
   },
   esbuild: {
     jsx: 'automatic',

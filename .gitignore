@@ -23,3 +23,13 @@ e2e/.artifacts/
 
 # Claude Code worktrees (local)
 .claude/
+
+# Android (Capacitor) — el scaffold android/ SÍ se commitea; esto es build local
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/keystore.properties
+android/*.jks
+android/capacitor-cordova-android-plugins/build/
+dist/mobile/
