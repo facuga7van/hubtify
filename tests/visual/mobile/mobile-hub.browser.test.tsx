@@ -48,11 +48,13 @@ describe('Hub a 390×844', () => {
     await settle();
     await shoot('hub-01-dashboard');
     expectNoHorizontalOverflow('DASH MOBILE');
-    // Los controles de los widgets no pueden depender del hover en touch (H6);
-    // el project emula touch, así que (hover: none) aplica.
+    // HUB-02: los cuatro controles de escritorio (arrastrar, ancho, alto) no
+    // sirven en el teléfono y robaban la cabecera de cada widget. La regla
+    // (hover: none) que los mostraba queda para escritorio táctil; bajo el
+    // shell mobile van ocultos.
     const controls = document.querySelector('.widget-controls');
     expect(controls).not.toBeNull();
-    expect(getComputedStyle(controls!).opacity).toBe('1');
+    expect(getComputedStyle(controls!).display).toBe('none');
     // Las cuatro cartelas (Nivel / XP hoy / Racha / Salud) van 2×2, no en
     // cuatro columnas de ~95 px donde «XP HOY» partía en tres renglones.
     const cartouches = [...document.querySelectorAll('.qb-cartouche')] as HTMLElement[];

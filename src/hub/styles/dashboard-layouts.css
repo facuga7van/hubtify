@@ -241,6 +241,15 @@
   }
 }
 
+/* En el teléfono esos controles no sirven: arrastrar es HTML5 drag & drop
+   (no hay evento touch que lo dispare), y el ancho/alto de un widget en una
+   grilla de una columna no cambia nada. La regla (hover: none) de arriba
+   queda para escritorio con pantalla táctil (HUB-02). */
+[data-shell="mobile"] .widget-controls,
+[data-shell="mobile"] .widget-drag-handle {
+  display: none;
+}
+
 /* ── Filas de dos columnas de la Tabla ──────────────
    Eran grillas inline en Dashboard.tsx y ninguna regla de mobile podía
    pisarlas (HUB-01, HUB-03). Mismos valores que tenían. */
