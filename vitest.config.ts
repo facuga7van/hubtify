@@ -60,11 +60,13 @@ export default defineConfig({
           include: ['tests/visual/mobile/**/*.test.tsx'],
           browser: {
             enabled: true,
-            provider: playwright(),
-            headless: true,
             // Touch emulado: así `(hover: none)` matchea y las reglas de
-            // touch de cada módulo se pueden verificar en el arnés.
-            instances: [{ browser: 'chromium', contextOptions: { hasTouch: true, isMobile: true } }],
+            // touch de cada módulo se pueden verificar en el arnés. Las
+            // contextOptions van en el provider (BrowserInstanceOption no las
+            // acepta: solo `provider`, ver @vitest/browser-playwright).
+            provider: playwright({ contextOptions: { hasTouch: true, isMobile: true } }),
+            headless: true,
+            instances: [{ browser: 'chromium' }],
             viewport: { width: 390, height: 844 },
           },
         },

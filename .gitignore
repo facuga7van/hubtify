@@ -17,6 +17,7 @@ designIdeas/
 # Visual test screenshots (generated)
 tests/visual/screens/
 tests/visual/__screenshots__/
+tests/visual/mobile/__screenshots__/
 .vitest-attachments/
 e2e/screens/
 e2e/.artifacts/
