@@ -446,7 +446,7 @@ export default function Loans() {
                 </select>
                 {formType === 'installments' && (
                   <>
-                    <label style={{ fontSize: 'var(--fs-label)', opacity: 0.6, whiteSpace: 'nowrap' }}>{t('coinify.installments')}</label>
+                    <label style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{t('coinify.installments')}</label>
                     <RpgNumberInput value={String(formInstallments)}
                       onChange={(v) => setFormInstallments(Math.max(1, parseInt(v) || 1))}
                       style={{ width: 60 }} min={1} />
@@ -514,7 +514,8 @@ export default function Loans() {
           {settledLoans.length > 0 && ` (${settledLoans.length})`}
         </button>
         {showSettled && (
-          <div style={{ opacity: 0.6 }}>
+          // Saldados: son historial, no fantasmas — se leen enteros.
+          <div>
             {renderLoanGroups(settledLoans)}
           </div>
         )}

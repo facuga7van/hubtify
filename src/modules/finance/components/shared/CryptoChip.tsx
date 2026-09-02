@@ -121,7 +121,7 @@ export function CryptoChip() {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: 4, paddingBottom: 4, borderBottom: '1px solid var(--gold-dark)',
           }}>
-            <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, opacity: 0.7 }}>
+            <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--ink-soft)' }}>
               {configMode
                 ? t('coinify.cryptoConfigTitle', 'Configurar cryptos')
                 : t('coinify.cryptoRatesTitle', 'Cotizaciones crypto')}
@@ -176,7 +176,7 @@ export function CryptoChip() {
                       />
                       <img src={rate.image} alt="" width={14} height={14} style={{ borderRadius: '50%' }} />
                       <span style={{ flex: 1 }}>{rate.name}</span>
-                      <span style={{ opacity: 0.5, textTransform: 'uppercase', fontSize: '0.85em' }}>
+                      <span style={{ color: 'var(--ink-soft)', textTransform: 'uppercase', fontSize: 'var(--fs-label)' }}>
                         {rate.symbol}
                       </span>
                     </label>
@@ -194,7 +194,7 @@ export function CryptoChip() {
                   fontSize: 'var(--fs-label)', borderBottom: '1px solid var(--parch-1)',
                 }}>
                   <img src={rate.image} alt="" width={14} height={14} style={{ borderRadius: '50%' }} />
-                  <span style={{ flex: 1, opacity: 0.8 }}>
+                  <span style={{ flex: 1, color: 'var(--ink-soft)' }}>
                     {rate.symbol.toUpperCase()}
                   </span>
                   <span style={{ fontFamily: "'Fira Code', monospace", fontWeight: 600 }}>
@@ -203,7 +203,7 @@ export function CryptoChip() {
                   {change != null && (
                     <span style={{
                       fontFamily: "'Fira Code', monospace",
-                      fontSize: '0.85em',
+                      fontSize: 'var(--fs-label)',
                       color: change >= 0 ? 'var(--rpg-xp-green)' : 'var(--rpg-hp-red)',
                       minWidth: 52,
                       textAlign: 'right',

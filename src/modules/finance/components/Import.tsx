@@ -495,7 +495,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
               </div>
               {skippedExpanded && (
                 <div style={{ marginTop: 8 }}>
-                  <p style={{ fontSize: 'var(--fs-label)', color: 'var(--leather)', opacity: 0.8, margin: '0 0 6px' }}>
+                  <p style={{ fontSize: 'var(--fs-label)', color: 'var(--leather)', margin: '0 0 6px' }}>
                     {t('coinify.importSkippedLinesHint')}
                   </p>
                   <ul style={{ margin: 0, padding: '0 0 0 8px', listStyle: 'none' }}>
