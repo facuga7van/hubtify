@@ -36,7 +36,9 @@ beforeAll(() => {
   document.body.style.margin = '0';
   installApi({
     rpgGetDaySummary: () => Promise.resolve({
-      date: today, sealed: false, xpTotal: 148, eventsCount: 7, maxCombo: 3,
+      // Mismos nombres que devuelve el handler real (`rpg:getDaySummary`):
+      // el stub no puede inventar campos que el main process no manda.
+      date: today, sealed: false, totalXp: 148, eventsCount: 7, maxCombo: 3,
       modules: ['quests', 'nutrition', 'cauldron'], vigor: 84, streak: 9,
       events: [
         { moduleId: 'quests', eventType: 'TASK_COMPLETED', xpGained: 15, time: '09:12' },
@@ -214,6 +216,12 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       fitCapture();
       await page.screenshot({ path: `${SCREENS}/audit-hub-codex-01-${name}.png` });
       resetCapture();
+
+      // «XP DEL DÍA» pinta un número, no «+NaN» (el modal leía un campo que
+      // el handler no devuelve).
+      const xpValue = dlg.querySelector('.codex-cartouches .qb-cartouche-value') as HTMLElement;
+      expect(xpValue.textContent).toBe('+148');
+      expect(dlg.textContent).not.toMatch(/NaN/);
 
       const box = insideViewport(dlg);
       expect(box.offTop).toBeLessThanOrEqual(1);

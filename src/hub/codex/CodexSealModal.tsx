@@ -296,6 +296,8 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
         return t('rpg.codexEmptyDay', 'El códice registra días vividos. Volvé cuando haya algo que anotar.');
       case 'too_old':
         return t('rpg.codexTooOld', 'Esta página ya se encuadernó. Los días viejos se quedan como quedaron, y está bien.');
+      case 'future':
+        return t('rpg.codexFuture', 'Ese día todavía no se vivió. El códice se cierra al final, no antes.');
       case 'unavailable':
         return t('rpg.codexUnavailable', 'El cierre del códice todavía no está disponible en esta versión.');
       default:
@@ -336,7 +338,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
         <div className="codex-cartouches">
           <Cartouche
             label={t('rpg.codexXpToday', 'XP DEL DÍA')}
-            value={`+${Math.round(summary.xpTotal)}`}
+            value={`+${Math.round(summary.totalXp)}`}
             foot={t('rpg.codexXpFoot', 'anotados al margen')}
             icon={<Sword width={14} height={14} />}
             tone="sage"

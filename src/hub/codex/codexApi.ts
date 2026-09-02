@@ -1,99 +1,40 @@
 /**
- * Codex (day sealing) + Achievements — renderer-side contract.
+ * Codex (day sealing) + Achievements — renderer-side access to the RPG API.
  *
  * The handlers live in the main process and reach the renderer through
  * `electron/preload.ts` + the `HubtifyApi` interface in `shared/types.ts`.
- * That wiring lands in a separate pass, so until then `window.api` carries
- * none of these methods and `shared/types.ts` declares none of them.
+ * Every Codex call in the UI goes through this module: it feature-detects each
+ * method on `window.api`, so a build whose bridge does not carry one of them
+ * (an older mobile shell, a test harness) runs degraded, never crashing.
  *
- * Every Codex call in the UI therefore goes through this module. It casts
- * `window.api` to a LOCAL copy of the agreed contract and feature-detects each
- * method, so the renderer compiles and runs — degraded, never crashing —
- * both before and after the preload is wired. Once the real types land nothing
- * here has to change: the shapes already match.
- *
- * Contract (main process):
- *   rpgGetDaySummary(date?) -> DaySummary
- *   rpgSealDay(date?)       -> SealResult
- *   rpgGetSeals(from, to)   -> DaySeal[]
- *   rpgGetAchievements()    -> AchievementState[]
- *   onRpgAchievementUnlocked(cb) -> unsubscribe
- *
- * Phase 4 additions (same wiring rules):
- *   rpgGetShopCatalog()                -> ShopCatalogResult
- *   rpgPurchaseShopItem(itemId)        -> PurchaseShopResult
- *   rpgEquipShopItem(itemId, kind?)    -> EquipShopResult   (itemId null + kind = unequip)
- *   rpgGetMasteries()                  -> MasteryState[]
+ * The TYPES are not declared here. They are derived from `HubtifyApi` — what a
+ * method promises to return is, by construction, what the UI gets. A local copy
+ * once drifted from the handler (`xpTotal` vs `totalXp`) and the codex painted
+ * «XP DEL DÍA +NaN» with zero compiler complaints; deriving makes that class
+ * of bug a type error at the consumer.
  */
 
-/* ── contract types ───────────────────────────────── */
+import type { HubtifyApi } from '../../../shared/types';
 
-export interface DaySummaryEvent {
-  moduleId: string;
-  eventType: string;
-  xpGained: number;
-  /** ISO timestamp or HH:mm — both are rendered. */
-  time: string;
-}
+/* ── contract types (derived, never copied) ───────── */
 
-export interface DaySummary {
-  /** Local YYYY-MM-DD. */
-  date: string;
-  sealed: boolean;
-  xpTotal: number;
-  eventsCount: number;
-  maxCombo: number;
-  modules: string[];
-  vigor: number;
-  streak: number;
-  events: DaySummaryEvent[];
-}
+type ApiResult<K extends keyof HubtifyApi> =
+  HubtifyApi[K] extends (...args: never[]) => Promise<infer R> ? R : never;
 
-export type SealFailReason = 'too_old' | 'already_sealed' | 'empty_day';
-
-export type SealResult =
-  | {
-      ok: true;
-      xpAwarded: number;
-      vigor: number;
-      achievementIds: string[];
-      /** Óbolos minted by this seal. Absent/0 on builds without the ledger. */
-      obolosGranted?: number;
-    }
-  | { ok: false; reason: SealFailReason };
-
-export interface DaySeal {
-  date: string;
-  sealedAt: string;
-  xpAwarded: number;
-}
-
-export interface AchievementState {
-  id: string;
-  hidden: boolean;
-  unlocked: boolean;
-  unlockedAt?: string;
-}
+export type DaySummary = ApiResult<'rpgGetDaySummary'>;
+export type DaySummaryEvent = DaySummary['events'][number];
+export type SealResult = ApiResult<'rpgSealDay'>;
+export type SealFailReason = Extract<SealResult, { ok: false }>['reason'];
+export type DaySeal = ApiResult<'rpgGetSeals'>[number];
+export type AchievementState = ApiResult<'rpgGetAchievements'>[number];
 
 /* ── óbolos + recompensas (phase 3) ───────────────── */
 
-export interface ObolosBalance {
-  balance: number;
-  earned: number;
-  spent: number;
-}
+export type ObolosBalance = ApiResult<'rpgGetObolosBalance'>;
+export type Reward = ApiResult<'rpgGetRewards'>[number];
+export type RedeemResult = ApiResult<'rpgRedeemReward'>;
 
-export interface Reward {
-  id: string;
-  name: string;
-  cost: number;
-  /** Name of an icon from the app's own SVG set — never an emoji. */
-  icon: string | null;
-  createdAt: string;
-  updatedAt: string;
-  redeemedCount: number;
-}
-
+/** What the UI sends to `rpgSaveReward` (the handler takes a loose record). */
 export interface RewardInput {
   id?: string;
   name: string;
@@ -101,76 +42,33 @@ export interface RewardInput {
   icon?: string | null;
 }
 
-export type RedeemResult =
-  | { ok: true; balance: number }
-  | { ok: false; reason: 'insufficient' | 'not_found' };
-
 /* ── la tienda + maestrías (phase 4) ──────────────── */
 
-export type ShopItemKind = 'seal_style' | 'pardon' | 'frame' | 'background';
+export type ShopCatalogResult = ApiResult<'rpgGetShopCatalog'>;
+export type ShopCatalogEntry = ShopCatalogResult['items'][number];
+export type ShopEquipped = ShopCatalogResult['equipped'];
+export type ShopItemKind = ShopCatalogEntry['kind'];
+export type PurchaseShopResult = ApiResult<'rpgPurchaseShopItem'>;
+export type EquipShopResult = ApiResult<'rpgEquipShopItem'>;
+export type MasteryState = ApiResult<'rpgGetMasteries'>[number];
 
-export interface ShopCatalogEntry {
-  id: string;
-  kind: ShopItemKind;
-  cost: number;
-  /** `rpg.shop.items.<id>` — `.name` and `.desc` underneath. */
-  i18nKey: string;
-  /** Pardon: purchased THIS month (= monthly cap reached). Others: ever bought. */
-  owned: boolean;
-  equipped: boolean;
-  purchasedAt: string | null;
-}
-
-export interface ShopEquipped {
-  sealStyle: string | null;
-  frame: string | null;
-  background: string | null;
-}
-
-export interface ShopCatalogResult {
-  items: ShopCatalogEntry[];
-  balance: number;
-  equipped: ShopEquipped;
-}
-
-export type PurchaseShopResult =
-  | { ok: true; balance: number }
-  | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' };
-
-export type EquipShopResult =
-  | { ok: true; equipped: ShopEquipped }
-  | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' };
-
-export interface MasteryState {
-  moduleId: string;
-  xp: number;
-  level: number;
-  /** Untranslated (Spanish) rank name; translate via `levelKey`. */
-  levelName: string;
-  /** i18n key: `rpg.mastery.ranks.<rank>`. */
-  levelKey: string;
-  /** Cumulative XP that opens the next level; null at level 10. */
-  nextLevelXp: number | null;
-  /** 0..1 within the current level. */
-  progress: number;
-}
-
-interface CodexApiShape {
-  rpgGetDaySummary?: (date?: string) => Promise<DaySummary>;
-  rpgSealDay?: (date?: string) => Promise<SealResult>;
-  rpgGetSeals?: (from: string, to: string) => Promise<DaySeal[]>;
-  rpgGetAchievements?: () => Promise<AchievementState[]>;
-  onRpgAchievementUnlocked?: (cb: (id: string) => void) => () => void;
-  rpgGetObolosBalance?: () => Promise<ObolosBalance>;
-  rpgGetRewards?: () => Promise<Reward[]>;
-  rpgSaveReward?: (input: Record<string, unknown>) => Promise<Reward | null>;
-  rpgDeleteReward?: (id: string) => Promise<{ ok: boolean }>;
-  rpgRedeemReward?: (id: string) => Promise<RedeemResult>;
-  rpgGetShopCatalog?: () => Promise<ShopCatalogResult>;
-  rpgPurchaseShopItem?: (itemId: string) => Promise<PurchaseShopResult>;
-  rpgEquipShopItem?: (itemId: string | null, kind?: string) => Promise<EquipShopResult>;
-  rpgGetMasteries?: () => Promise<MasteryState[]>;
-}
+/** The slice of `window.api` this module uses; every member may be missing. */
+type CodexApiShape = Partial<Pick<HubtifyApi,
+  | 'rpgGetDaySummary'
+  | 'rpgSealDay'
+  | 'rpgGetSeals'
+  | 'rpgGetAchievements'
+  | 'onRpgAchievementUnlocked'
+  | 'rpgGetObolosBalance'
+  | 'rpgGetRewards'
+  | 'rpgSaveReward'
+  | 'rpgDeleteReward'
+  | 'rpgRedeemReward'
+  | 'rpgGetShopCatalog'
+  | 'rpgPurchaseShopItem'
+  | 'rpgEquipShopItem'
+  | 'rpgGetMasteries'
+>>;
 
 function api(): CodexApiShape {
   if (typeof window === 'undefined') return {};

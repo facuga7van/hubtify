@@ -1,3 +1,5 @@
+import type { ShopItemKind } from './shop-catalog';
+
 // ── RPG Types ──────────────────────────────────────────────
 
 export interface PlayerStats {
@@ -91,6 +93,52 @@ export interface ObolosBalance { balance: number; earned: number; spent: number 
 export type RedeemResult =
   | { ok: true; balance: number }
   | { ok: false; reason: 'insufficient' | 'not_found' };
+
+// ── La Tienda + maestrías (Fase 4) ─────────────────────────
+// Mismas formas que devuelven los handlers de shared-logic/modules/rpg-handlers.ts;
+// el renderer (src/hub/codex/codexApi.ts) deriva sus tipos de HubtifyApi, así
+// que un campo que cambie acá o allá rompe la compilación en vez de pintar NaN.
+
+export interface ShopEquipped {
+  sealStyle: string | null;
+  frame: string | null;
+  background: string | null;
+}
+export interface ShopCatalogEntry {
+  id: string;
+  kind: ShopItemKind;
+  cost: number;
+  /** `rpg.shop.items.<id>` — `.name` and `.desc` underneath. */
+  i18nKey: string;
+  /** Pardon: purchased THIS month (= monthly cap reached). Others: ever bought. */
+  owned: boolean;
+  equipped: boolean;
+  purchasedAt: string | null;
+}
+export interface ShopCatalogResult {
+  items: ShopCatalogEntry[];
+  balance: number;
+  equipped: ShopEquipped;
+}
+export type PurchaseShopResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' };
+export type EquipShopResult =
+  | { ok: true; equipped: ShopEquipped }
+  | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' };
+export interface MasteryState {
+  moduleId: string;
+  xp: number;
+  level: number;
+  /** Untranslated (Spanish) rank name; translate via `levelKey`. */
+  levelName: string;
+  /** i18n key: `rpg.mastery.ranks.<rank>`. */
+  levelKey: string;
+  /** Cumulative XP that opens the next level; null at level 10. */
+  nextLevelXp: number | null;
+  /** 0..1 within the current level. */
+  progress: number;
+}
 
 // ── Module Types ───────────────────────────────────────────
 
@@ -385,19 +433,11 @@ export interface HubtifyApi {
   rpgSaveReward: (input: Record<string, unknown>) => Promise<Reward | null>;
   rpgDeleteReward: (id: string) => Promise<{ ok: boolean }>;
   rpgRedeemReward: (id: string) => Promise<RedeemResult>;
-  rpgGetShopCatalog: () => Promise<{
-    items: Array<{ id: string; kind: string; cost: number; i18nKey: string; owned: boolean; equipped: boolean; purchasedAt: string | null }>;
-    balance: number;
-    equipped: { sealStyle: string | null; frame: string | null; background: string | null };
-  }>;
-  rpgPurchaseShopItem: (itemId: string) => Promise<
-    { ok: true; balance: number } | { ok: false; reason: 'insufficient' | 'already_owned' | 'not_found' | 'monthly_cap' }>;
-  rpgEquipShopItem: (itemId: string | null, kind?: 'seal_style' | 'frame' | 'background') => Promise<
-    { ok: true; equipped: Record<string, string | null> } | { ok: false; reason: 'not_found' | 'not_owned' | 'not_equippable' }>;
-  rpgGetMasteries: () => Promise<Array<{
-    moduleId: string; xp: number; level: number; levelName: string; levelKey: string;
-    nextLevelXp: number | null; progress: number;
-  }>>;
+  rpgGetShopCatalog: () => Promise<ShopCatalogResult>;
+  rpgPurchaseShopItem: (itemId: string) => Promise<PurchaseShopResult>;
+  /** `itemId` null + `kind` = unequip. The handler validates the kind itself. */
+  rpgEquipShopItem: (itemId: string | null, kind?: ShopItemKind) => Promise<EquipShopResult>;
+  rpgGetMasteries: () => Promise<MasteryState[]>;
   onRpgAchievementUnlocked: (callback: (id: string) => void) => () => void;
   onRpgAchievementsBackfilled: (callback: (ids: string[]) => void) => () => void;
   onRpgDaySealed: (callback: (info: { date: string; xpAwarded: number }) => void) => () => void;

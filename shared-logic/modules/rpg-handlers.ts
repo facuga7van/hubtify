@@ -43,7 +43,22 @@ import {
   type AchievementEventContext,
   type AchievementStatsContext,
 } from '../../shared/achievements';
-import type { RpgEvent, RpgEventRecord } from '../../shared/types';
+import type {
+  RpgEvent, RpgEventRecord,
+  // The renderer-facing contract (HubtifyApi). The codex handlers below are
+  // annotated with THESE so a field renamed on either side fails to compile
+  // instead of reaching the UI as `undefined` (the «XP DEL DÍA +NaN» bug).
+  DaySummary as DaySummaryContract,
+  SealResult as SealResultContract,
+  DaySeal as DaySealContract,
+  ObolosBalance as ObolosBalanceContract,
+  Reward as RewardContract,
+  RedeemResult as RedeemResultContract,
+  ShopCatalogResult as ShopCatalogResultContract,
+  PurchaseShopResult as PurchaseShopResultContract,
+  EquipShopResult as EquipShopResultContract,
+  MasteryState as MasteryStateContract,
+} from '../../shared/types';
 import { todayDateString, localTimestamp, daysAgoDateString, nextDateString, formatDateString } from '../../shared/date-utils';
 import { getPlayerStats, purchasedPardonExtras, rolloverVigor, type PlayerStatsV2 } from './rpg-stats';
 
@@ -1959,44 +1974,44 @@ export function registerRpgHandlers(): void {
   const asDay = (value: unknown, today: string): string =>
     typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : today;
 
-  ipcHandle('rpg:getDaySummary', (_e, date?: string | null): DaySummary => {
+  ipcHandle('rpg:getDaySummary', (_e, date?: string | null): DaySummaryContract => {
     const db = getDb();
     const today = getLocalDateString();
     rolloverVigor(db, today);
     return getDaySummary(db, asDay(date, today), today);
   });
 
-  ipcHandle('rpg:sealDay', (_e, date?: string | null): SealResult => {
+  ipcHandle('rpg:sealDay', (_e, date?: string | null): SealResultContract => {
     const db = getDb();
     const today = getLocalDateString();
     return sealDay(db, asDay(date, today), today);
   });
 
-  ipcHandle('rpg:getSeals', (_e, fromDate: string, toDate: string): DaySeal[] =>
+  ipcHandle('rpg:getSeals', (_e, fromDate: string, toDate: string): DaySealContract[] =>
     getSeals(getDb(), fromDate, toDate));
 
   // ── Óbolos + recompensas propias ──
-  ipcHandle('rpg:getObolosBalance', (): ObolosBalance => getObolosBalance(getDb()));
+  ipcHandle('rpg:getObolosBalance', (): ObolosBalanceContract => getObolosBalance(getDb()));
 
-  ipcHandle('rpg:getRewards', (): Reward[] => getRewards(getDb()));
+  ipcHandle('rpg:getRewards', (): RewardContract[] => getRewards(getDb()));
 
-  ipcHandle('rpg:saveReward', (_e, input: Record<string, unknown>): Reward | null =>
+  ipcHandle('rpg:saveReward', (_e, input: Record<string, unknown>): RewardContract | null =>
     saveReward(getDb(), input ?? {}));
 
   ipcHandle('rpg:deleteReward', (_e, id: string): { ok: boolean } => deleteReward(getDb(), id));
 
-  ipcHandle('rpg:redeemReward', (_e, id: string): RedeemResult => redeemReward(getDb(), id));
+  ipcHandle('rpg:redeemReward', (_e, id: string): RedeemResultContract => redeemReward(getDb(), id));
 
   // ── La Tienda + maestrías (phase 4) ──
-  ipcHandle('rpg:getShopCatalog', (): ShopCatalogResult => getShopCatalog(getDb()));
+  ipcHandle('rpg:getShopCatalog', (): ShopCatalogResultContract => getShopCatalog(getDb()));
 
-  ipcHandle('rpg:purchaseShopItem', (_e, itemId: string): PurchaseResult =>
+  ipcHandle('rpg:purchaseShopItem', (_e, itemId: string): PurchaseShopResultContract =>
     purchaseShopItem(getDb(), itemId));
 
-  ipcHandle('rpg:equipShopItem', (_e, itemId: string | null, kind?: string): EquipResult =>
+  ipcHandle('rpg:equipShopItem', (_e, itemId: string | null, kind?: string): EquipShopResultContract =>
     equipShopItem(getDb(), itemId, kind as ShopItemKind | undefined));
 
-  ipcHandle('rpg:getMasteries', (): MasteryState[] => {
+  ipcHandle('rpg:getMasteries', (): MasteryStateContract[] => {
     const db = getDb();
     // Self-heal for handles whose v6 migration ran against an empty log (a
     // fresh install that then pulled history via sync): fills only modules
