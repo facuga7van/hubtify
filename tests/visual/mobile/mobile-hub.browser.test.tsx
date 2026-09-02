@@ -53,6 +53,29 @@ describe('Hub a 390×844', () => {
     const controls = document.querySelector('.widget-controls');
     expect(controls).not.toBeNull();
     expect(getComputedStyle(controls!).opacity).toBe('1');
+    // Las cuatro cartelas (Nivel / XP hoy / Racha / Salud) van 2×2, no en
+    // cuatro columnas de ~95 px donde «XP HOY» partía en tres renglones.
+    const cartouches = [...document.querySelectorAll('.qb-cartouche')] as HTMLElement[];
+    expect(cartouches.length).toBe(4);
+    const widths = cartouches.map((c) => Math.round(c.getBoundingClientRect().width));
+    // eslint-disable-next-line no-console
+    console.log('DASH MOBILE CARTELAS', JSON.stringify(widths));
+    for (const w of widths) expect(w).toBeGreaterThanOrEqual(150);
+    for (const c of cartouches) {
+      const label = c.querySelector('.qb-cartouche-label') as HTMLElement;
+      const cs = getComputedStyle(label);
+      // `line-height: normal` no se puede parsear: se mide un renglón real.
+      let lineHeight = parseFloat(cs.lineHeight);
+      if (!Number.isFinite(lineHeight)) {
+        const probe = document.createElement('span');
+        probe.textContent = 'X';
+        label.appendChild(probe);
+        lineHeight = probe.getBoundingClientRect().height;
+        probe.remove();
+      }
+      expect(label.scrollHeight, `«${label.textContent}» en más de 2 renglones`)
+        .toBeLessThanOrEqual(lineHeight * 2 + 1);
+    }
   });
 
   test('Ficha del Héroe', async () => {

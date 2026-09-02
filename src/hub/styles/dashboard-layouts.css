@@ -1,3 +1,13 @@
+/* ── Stat cartouches row (Nivel / XP hoy / Racha / Salud) ── */
+/* Una clase y no un style inline: el shell mobile la pasa a 2×2 desde
+   layout.css, y un inline no se puede pisar desde una hoja. */
+.qb-cartouche-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 /* ── 4-Column Customizable Dashboard Grid ─────── */
 
 .dashboard-grid-4 {

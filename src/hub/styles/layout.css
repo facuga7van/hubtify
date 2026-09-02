@@ -907,22 +907,14 @@
   flex-wrap: wrap;
 }
 
-/* Los cuatro cartuchos de la Tabla son un `repeat(4, 1fr)` inline
-   (Dashboard.tsx:491): a 412 px cada uno mide 86 px de contenido y el rótulo
-   con `letter-spacing: .2em` más el ícono pedían 91-95 px. Como `.qb-cartouche`
-   es `overflow: hidden`, el ícono quedaba cortado por la mitad (visto en el
-   emulador). Se recupera el espacio en el propio cartucho, sin tocar la grilla. */
-[data-shell="mobile"] .main-content .qb-cartouche {
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
-[data-shell="mobile"] .main-content .qb-cartouche-header {
-  gap: 4px;
-}
-
-[data-shell="mobile"] .main-content .qb-cartouche-label {
-  letter-spacing: 0.06em;
+/* Los cuatro cartuchos de la Tabla (`.qb-cartouche-row`, dashboard-layouts.css)
+   son `repeat(4, 1fr)` en desktop: a 390-412 px eso da ~85-95 px por cartucho
+   y «XP HOY» partía en tres renglones (visto en el emulador). En mobile van
+   2×2: cada cartucho recupera ~170 px y conserva su padding y su rótulo
+   espaciado tal cual el pergamino de escritorio. `minmax(0, 1fr)` para que
+   un valor largo no ensanche la columna y desborde el folio. */
+[data-shell="mobile"] .main-content .qb-cartouche-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 [data-shell="mobile"] .account-dropdown {
