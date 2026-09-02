@@ -961,7 +961,7 @@
     "aiEstimate": "AI Estimation",
     "aiMode": "AI Estimate",
     "aiPlaceholder": "Describe what you ate...",
-    "aiUnavailable": "We couldn't estimate the calories right now (offline or service busy). Enter the calories manually.",
+    "aiUnavailable": "The AI took too long or is unavailable. Try again or enter the calories by hand.",
     "aiUnavailableShort": "AI estimate unavailable — enter manually",
     "allSaved": "All saved",
     "autoSuggested": "Auto-suggested",

@@ -40,7 +40,8 @@ export async function estimateNutrition(
 
   // Firebase callable honours its own `timeout` option (an external AbortController
   // is not wired into httpsCallable) — a timeout surfaces as `deadline-exceeded`,
-  // which the retry policy treats as transient.
+  // which is NOT retried: TIMEOUT_MS outlives the server abort, so by then the
+  // server already gave up and a retry would just run the slow prompt again.
   const fn = httpsCallable<{ description: string }, AiResult>(
     getActiveFunctions(),
     'estimateNutrition',

@@ -380,7 +380,7 @@ export default function Today() {
       // and no silent jump to Manual mode: the user decides. (Upstream forced
       // Manual and toasted; the notice keeps its calmer wording, the forcing goes.)
       console.error('[Nutrition]', err);
-      setEstimateNotice(t('nutrify.aiUnavailable', 'No pudimos estimar las calorías ahora (sin conexión o servicio ocupado). Ingresá las calorías manualmente.'));
+      setEstimateNotice(t('nutrify.aiUnavailable', 'La IA tardó demasiado o no está disponible. Probá de nuevo o cargá las calorías a mano.'));
     } finally {
       setEstimating(false);
       setRetrying(false);

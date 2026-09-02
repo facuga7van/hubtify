@@ -961,7 +961,7 @@
     "aiEstimate": "Estimación IA",
     "aiMode": "Estimación IA",
     "aiPlaceholder": "Describe lo que comiste...",
-    "aiUnavailable": "No pudimos estimar las calorías ahora (sin conexión o servicio ocupado). Ingresá las calorías manualmente.",
+    "aiUnavailable": "La IA tardó demasiado o no está disponible. Probá de nuevo o cargá las calorías a mano.",
     "aiUnavailableShort": "Estimación IA no disponible — ingresá manual",
     "allSaved": "Todo guardado",
     "autoSuggested": "Sugerido automáticamente",
