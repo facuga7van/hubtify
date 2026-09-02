@@ -27,16 +27,13 @@
 
 .nutri-page {
   padding: 24px 28px 32px;
-  /* Medida cómoda de lectura. A 1640 px la página se desparramaba: el rótulo
-     contra el borde izquierdo y el número contra el derecho, con 800 px de
-     pergamino vacío en el medio. Misma cura que Cuotas y el Tablero. */
-  --nutri-measure: 980px;
-}
-
-/* La crónica son gráficos: respira más ancho que un formulario. */
-.nutri-page:has(.nutri-charts-grid),
-.nutri-page:has(.nutri-kpi-strip) {
-  --nutri-measure: 1180px;
+  /* Medida cómoda de lectura, centrada. A 1640 px la página se desparramaba:
+     el rótulo contra el borde izquierdo y el número contra el derecho, con
+     800 px de pergamino vacío en el medio. Misma cura que Cuotas. 1280 y no
+     980: con la barra lateral plegada 980 dejaba un tercio de la ventana en
+     blanco a cada lado; la crónica (gráficos) y el registro (formulario +
+     lista) comparten la medida, antes la crónica tenía 1180 aparte. */
+  --nutri-measure: 1280px;
 }
 
 .nutri-page > .nutri-page-head,
