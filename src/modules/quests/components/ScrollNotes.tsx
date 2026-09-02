@@ -250,6 +250,7 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
     <div className="quest-notes-overlay" onClick={handleClose}>
       <div
         {...dialogProps}
+        className="quest-notes-dialog"
         aria-label={t('questify.scrollNotes', 'Notas')}
         style={{
           backgroundImage: `url(${bgUrl})`,
@@ -258,7 +259,6 @@ export default function ScrollNotes({ taskId, onClose, onCountChanged }: Props) 
           borderRadius: 6, padding: '16px 20px',
           boxShadow: '0 12px 40px rgba(44,24,16,0.6), 0 0 0 1px rgba(201,168,76,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
           border: '3px solid var(--gold-dark)',
-          minWidth: CANVAS_W + 40,
           position: 'relative',
         }}
         onClick={stopPropagation}
