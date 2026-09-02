@@ -10,15 +10,13 @@
  *     estante NUNCA se vacía.
  *
  * Como en `cauldron.autostart.test.ts`, esto maneja los handlers REALES
- * (`electron` mockeado + DB inyectada + timers falsos), no una copia a mano de
- * la máquina de estados.
+ * (registro compartido + DB inyectada + sink de eventos + timers falsos), no
+ * una copia a mano de la máquina de estados.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
 import { questsMigrations } from '@modules/quests/quests.schema';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface TimerState {
   status: string;
@@ -59,7 +57,6 @@ interface Broadcast {
 }
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
   broadcasts: [] as Array<{ channel: string; data: unknown }>,
 }));

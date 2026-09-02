@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import {
   getDb, setDbFactory, closeDb, suspendDb, resumeDb, DbSuspended, runModuleMigrations,
@@ -8,6 +8,15 @@ import {
 beforeEach(() => {
   resumeDb();
   closeDb();
+});
+
+// The provider is module-global: a case that suspends it or clears the factory
+// would otherwise decide whether the NEXT one passes. Every case installs its
+// own factory, so hand the file back a working default after each.
+afterEach(() => {
+  resumeDb();
+  closeDb();
+  setDbFactory(() => new Database(':memory:'));
 });
 
 describe('db provider', () => {

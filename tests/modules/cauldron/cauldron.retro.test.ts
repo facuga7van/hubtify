@@ -8,13 +8,11 @@
  * otro broadcast. Cero recompensa.
  *
  * Como en `cauldron.phase2.test.ts`, esto maneja los handlers REALES
- * (`electron` mockeado + DB inyectada + timers falsos).
+ * (registro compartido + DB inyectada + sink de eventos + timers falsos).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface ShelfSession {
   id: string;
@@ -34,7 +32,6 @@ interface LoggedRow {
 }
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
   broadcasts: [] as Array<{ channel: string; data: unknown }>,
 }));

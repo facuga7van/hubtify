@@ -5,14 +5,12 @@
  * click: get up for water and the break never started. And after the long break
  * `getNextSegment()` returned null, so a working day meant four manual starts.
  *
- * These tests drive the REAL handlers (mocked `electron` + injected DB + fake
+ * These tests drive the REAL handlers (shared registry + injected DB + fake
  * timers) rather than a hand-copied version of the state machine.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { cauldronMigrations } from '@modules/cauldron/cauldron.schema';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface TimerState {
   status: string;
@@ -26,11 +24,10 @@ interface TimerState {
 }
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
 }));
 
-import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+import { getHandler } from '../../../shared-logic/registry';
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
