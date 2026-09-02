@@ -108,4 +108,20 @@ describe('MobileShell — cabecera y drawer', () => {
     expect(btn.getBoundingClientRect().top).toBeGreaterThanOrEqual(24);
     document.documentElement.style.removeProperty('--safe-area-inset-top');
   });
+
+  test('con insets, drawer y capas fijas no quedan debajo de las barras del sistema', async () => {
+    await setMobileViewport();
+    document.documentElement.style.setProperty('--safe-area-inset-top', '24px');
+    document.documentElement.style.setProperty('--safe-area-inset-bottom', '20px');
+    mountInShell(<Page />);
+    await settle();
+    await openDrawer();
+    const side = document.querySelector('.mobile-drawer .sidebar') as HTMLElement;
+    expect(side.getBoundingClientRect().top).toBeGreaterThanOrEqual(24);
+    expect(window.innerHeight - side.getBoundingClientRect().bottom).toBeGreaterThanOrEqual(20);
+    const main = document.querySelector('.main-content') as HTMLElement;
+    expect(parseFloat(getComputedStyle(main).paddingBottom)).toBe(20);
+    document.documentElement.style.removeProperty('--safe-area-inset-top');
+    document.documentElement.style.removeProperty('--safe-area-inset-bottom');
+  });
 });

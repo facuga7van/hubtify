@@ -910,3 +910,40 @@
 [data-shell="mobile"] .account-dropdown {
   max-width: calc(100vw - 16px);
 }
+
+/* ── Safe areas en capas fijas (solo shell mobile) ──
+   Con edge-to-edge la barra de estado y la de gestos superponen al WebView;
+   todo lo `position: fixed; inset: 0` tiene que dejarles su franja. Lista
+   explícita: son los overlays del proyecto a la fecha (Fase 3). */
+:root[data-shell="mobile"] .notif-drawer,
+:root[data-shell="mobile"] .codex-overlay,
+:root[data-shell="mobile"] .update-dialog-overlay,
+:root[data-shell="mobile"] .changelog-overlay,
+:root[data-shell="mobile"] .quest-project-modal-overlay,
+:root[data-shell="mobile"] .quest-notes-overlay,
+:root[data-shell="mobile"] .coin-modal-overlay,
+:root[data-shell="mobile"] .coin-import-overlay,
+:root[data-shell="mobile"] .nutri-popup-overlay,
+:root[data-shell="mobile"] .cauldron-modal-overlay {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* Lo que está pegado abajo sube por encima de la barra de gestos. */
+:root[data-shell="mobile"] .xp-toast {
+  bottom: calc(12px + var(--safe-bottom));
+}
+
+:root[data-shell="mobile"] .update-chip {
+  bottom: calc(16px + var(--safe-bottom));
+}
+
+:root[data-shell="mobile"] .cauldron-floating-timer {
+  bottom: calc(8px + var(--safe-bottom));
+}
+
+/* Los toasts del sistema (top: 96px) caen debajo de la cabecera de 56 px:
+   los corremos por el inset para que no se metan bajo la barra de estado. */
+:root[data-shell="mobile"] .system-toast-container {
+  top: calc(64px + var(--safe-top));
+}
