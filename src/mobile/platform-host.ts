@@ -97,7 +97,12 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
     async notify(n: { title: string; body: string; tag?: string }) {
       if (!(await notificationsReady())) return;
       await LocalNotifications.schedule({
-        notifications: [{ id: notificationIdFor(n.tag), title: n.title, body: n.body, channelId: NOTIFICATION_CHANNEL_ID }],
+        // `isExactNotification: false` NO es cosmético: el plugin lo asume
+        // `true` y entonces, en Android 12+ sin SCHEDULE_EXACT_ALARM, en vez de
+        // notificar abre la pantalla de sistema «Alarmas y recordatorios» y deja
+        // la promesa colgada hasta que el usuario vuelve. Ninguna notificación
+        // de Hubtify lleva `schedule`: todas son inmediatas y no usan alarma.
+        notifications: [{ id: notificationIdFor(n.tag), title: n.title, body: n.body, channelId: NOTIFICATION_CHANNEL_ID, isExactNotification: false }],
       });
     },
 

@@ -46,7 +46,11 @@ describe('notify', () => {
     const calls = m(LocalNotifications.schedule).mock.calls;
     expect(calls).toHaveLength(2);
     const [first, second] = calls.map((c) => c[0].notifications[0]);
-    expect(first).toEqual({ id: expect.any(Number), title: 'T', body: 'B', channelId: NOTIFICATION_CHANNEL_ID });
+    // `isExactNotification: false` es obligatorio: es `true` por defecto y el
+    // plugin, en Android 12+ y sin SCHEDULE_EXACT_ALARM, abre la pantalla de
+    // sistema «Alarmas y recordatorios» en vez de notificar. Ninguna
+    // notificación de Hubtify usa alarma: todas son inmediatas.
+    expect(first).toEqual({ id: expect.any(Number), title: 'T', body: 'B', channelId: NOTIFICATION_CHANNEL_ID, isExactNotification: false });
     expect(first.id).toBe(second.id); // mismo tag → reemplaza
     expect(first).not.toHaveProperty('schedule');
   });
