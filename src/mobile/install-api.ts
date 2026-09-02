@@ -5,7 +5,7 @@
  */
 import { App } from '@capacitor/app';
 import { buildApi } from '../../shared/build-api';
-import { createWorkerClient } from './worker-client';
+import { createWorkerClient, type WorkerClient } from './worker-client';
 import { createPlatformHost, readOsInfo, OS_INFO_FALLBACK } from './platform-host';
 
 /** Techo para el bridge nativo: `osInfo` es cosmético, el arranque no lo es. */
@@ -35,6 +35,16 @@ async function readOsInfoOrFallback(): Promise<string> {
   }
 }
 
+let currentClient: WorkerClient | null = null;
+
+/**
+ * El cliente del worker desde que se crea — también si `ready` falló (fatal de
+ * migración): FatalScreen lo usa para exportar el .db antes de reiniciar.
+ */
+export function getWorkerClient(): WorkerClient | null {
+  return currentClient;
+}
+
 export async function installMobileApi(): Promise<void> {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), {
     type: 'module',
@@ -48,6 +58,7 @@ export async function installMobileApi(): Promise<void> {
       window.dispatchEvent(new CustomEvent('mobile:workerCrashed', { detail: err.message }));
     },
   });
+  currentClient = client;
 
   // `init` sale ANTES de esperar ready: el orden de mensajes garantiza que el
   // worker lo tenga antes de cualquier invoke.
