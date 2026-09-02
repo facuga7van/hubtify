@@ -22,8 +22,13 @@ export default function AccountDropdown({ activeUser, cachedAccounts, onSwitch, 
 
   /* Posicionado con el mismo hook que los demás popovers anclados: lo anota
      como popover abierto para el botón atrás de Android y lo sujeta al
-     viewport. */
-  const { popupRef, pos } = useAnchoredPopup<HTMLElement, HTMLDivElement>(true, 4, { onClose, anchorRef });
+     viewport. En el shell mobile el disparador es el ícono del extremo
+     derecho del PlayerCard, dentro de un drawer de 300 px: alineado al borde
+     izquierdo el menú (200 px mínimo) salía del drawer y se cortaba contra el
+     borde de la pantalla (DRW-01); alineado a su borde derecho queda adentro.
+     En escritorio conserva la alineación izquierda de siempre. */
+  const align = document.documentElement.dataset.shell === 'mobile' ? 'end' : 'start';
+  const { popupRef, pos } = useAnchoredPopup<HTMLElement, HTMLDivElement>(true, 4, { onClose, anchorRef, align });
 
   // Return focus to trigger on close
   useEffect(() => {

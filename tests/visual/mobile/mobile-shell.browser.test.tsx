@@ -175,6 +175,33 @@ describe('MobileShell — cabecera y drawer', () => {
     document.documentElement.style.removeProperty('--safe-area-inset-bottom');
   });
 
+  /* DRW-01: el dropdown de cuenta se abría alineado al borde izquierdo del
+     ícono y, con 200 px de mínimo, salía del drawer y se cortaba contra el
+     borde derecho de la pantalla. */
+  test('el menú de cuenta se abre dentro del drawer, alineado a la derecha del ícono', async () => {
+    await setMobileViewport();
+    mountInShell(<Page />);
+    await settle();
+    await openDrawer();
+    const trigger = page.getByRole('button', { name: /Menú de cuenta/i });
+    await trigger.click();
+    await expect.element(page.getByRole('menu')).toBeVisible();
+    await settle(200);
+
+    const menu = document.querySelector('.account-dropdown') as HTMLElement;
+    const m = menu.getBoundingClientRect();
+    const d = drawer().getBoundingClientRect();
+    const tr = (trigger.element() as HTMLElement).getBoundingClientRect();
+    // eslint-disable-next-line no-console
+    console.log('ACCOUNT MENU MOBILE', JSON.stringify({ menu: m.toJSON(), drawer: d.toJSON(), trigger: tr.toJSON() }));
+    expect(m.width).toBeGreaterThanOrEqual(200);
+    expect(Math.round(m.right)).toBeLessThanOrEqual(Math.round(d.right));
+    expect(Math.round(m.left)).toBeGreaterThanOrEqual(Math.round(d.left));
+    expect(Math.abs(m.right - tr.right)).toBeLessThanOrEqual(1);
+    expect(menu.scrollWidth).toBeLessThanOrEqual(menu.clientWidth + 1);
+    await shoot('shell-02-menu-cuenta');
+  });
+
   /* GEN-03: el scroll de `.main-content` se heredaba de una ruta a la otra
      (Caldero abría a mitad de página con el scroll de Coinify). */
   test('cambiar de ruta vuelve el scroll arriba; un re-render de la página no', async () => {

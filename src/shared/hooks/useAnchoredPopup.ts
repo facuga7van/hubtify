@@ -16,6 +16,12 @@ export interface AnchoredPopupOptions<A extends HTMLElement = HTMLElement> {
   onClose?: () => void;
   /** Ancla externa, para un disparador que vive en otro componente (AccountDropdown). */
   anchorRef?: React.RefObject<A | null>;
+  /**
+   * Borde del ancla al que se alinea el popup: `start` = borde izquierdo (por
+   * defecto), `end` = borde derecho, para un disparador pegado al margen
+   * derecho de su contenedor. En los dos casos se sujeta al viewport.
+   */
+  align?: 'start' | 'end';
 }
 
 /**
@@ -44,7 +50,7 @@ export function useAnchoredPopup<A extends HTMLElement = HTMLDivElement, P exten
   gap = 4,
   options: AnchoredPopupOptions<A> = {},
 ) {
-  const { onClose, anchorRef: externalAnchorRef } = options;
+  const { onClose, anchorRef: externalAnchorRef, align = 'start' } = options;
   const ownAnchorRef = useRef<A>(null);
   const anchorRef = externalAnchorRef ?? ownAnchorRef;
   const popupRef = useRef<P>(null);
@@ -80,12 +86,12 @@ export function useAnchoredPopup<A extends HTMLElement = HTMLDivElement, P exten
       top = fitsAbove ? above : Math.max(edge, vh - ph - edge);
     }
 
-    let left = r.left;
+    let left = align === 'end' ? r.right - pw : r.left;
     if (left + pw > vw - edge) left = vw - pw - edge;
     if (left < edge) left = edge;
 
     setPos({ top, left });
-  }, [gap, anchorRef]);
+  }, [gap, align, anchorRef]);
 
   useLayoutEffect(() => {
     if (open) reposition();
