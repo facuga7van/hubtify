@@ -13,6 +13,10 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Con WebView < 140 el contenido web arranca debajo de la barra de
+             estado y esta franja muestra el fondo de la ventana: cuero
+             (theme.css --leather-dark), no el blanco/negro del tema. -->
+        <item name="android:windowBackground">#2a1d0e</item>
     </style>
 
 
