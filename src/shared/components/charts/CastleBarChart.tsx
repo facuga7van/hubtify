@@ -384,7 +384,12 @@ export const CastleBarChart: React.FC<CastleBarChartProps> = ({
               {(showAllValues || isTallest || i === 0 || i === barCount - 1) && (() => {
                 const label = formatValue(d.value);
                 const badgeW = Math.max(barWidth + 4, label.length * 7 + 8);
-                const badgeX = tx + barWidth / 2 - badgeW / 2;
+                // Sujeto a los bordes: el chip de la primera barra se salía por
+                // la izquierda y se leía «,700» en vez de «1,700».
+                const badgeX = Math.min(
+                  Math.max(0, tx + barWidth / 2 - badgeW / 2),
+                  viewBoxWidth - badgeW,
+                );
                 return (
                   <>
                     <rect
@@ -490,29 +495,37 @@ const GoalBanner: React.FC<{
       points={`0,${y - 6} 0,${y + 6} 6,${y}`}
       fill="#8B2020"
     />
-    {label && (
+    {label && (() => {
+      /* La cinta medía 62 px fijos y el banderín derecho se dibujaba en
+         `width + 4`, o sea FUERA del viewBox: el rótulo salía cortado
+         («1,70» por «1,700») y la punta derecha directamente no se veía.
+         Ahora la cinta se dimensiona según el rótulo y todo termina adentro. */
+      const ribbonW = Math.max(48, label.length * 7 + 16);
+      const right = width - 8;
+      const left = right - ribbonW;
+      return (
       <>
         {/* Banner ribbon for label */}
         <rect
-          x={width - 65}
+          x={left}
           y={y - 14}
-          width="62"
+          width={ribbonW}
           height="14"
           fill="#8B2020"
           stroke="#3B2314"
         />
         <polygon
-          points={`${width - 65},${y - 14} ${width - 72},${y - 7} ${width - 65},${y}`}
+          points={`${left},${y - 14} ${left - 7},${y - 7} ${left},${y}`}
           fill="#8B2020"
           stroke="#3B2314"
         />
         <polygon
-          points={`${width - 3},${y - 14} ${width + 4},${y - 7} ${width - 3},${y}`}
+          points={`${right},${y - 14} ${right + 7},${y - 7} ${right},${y}`}
           fill="#8B2020"
           stroke="#3B2314"
         />
         <text
-          x={width - 34}
+          x={left + ribbonW / 2}
           y={y - 3}
           textAnchor="middle"
           fontFamily="IM Fell English SC"
@@ -524,7 +537,8 @@ const GoalBanner: React.FC<{
           {label}
         </text>
       </>
-    )}
+      );
+    })()}
   </g>
 );
 

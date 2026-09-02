@@ -120,7 +120,13 @@
 /* ── Tap target ────────────────────────────────────────────
    The seal is a 22px (18px inline) decorative circle; blowing it up to 32px
    would dominate every card corner. Instead an invisible pseudo-element
-   extends the *hit area* to 32x32 while the visual stays the same size. */
+   extends the *hit area* to 32x32 while the visual stays the same size.
+
+   OJO al auditar: al ser absoluto y sobresalir 7px por lado, este pseudo SUMA
+   al `scrollWidth` de cualquier caja que lo contenga. No se ve nada, pero
+   derrota las aserciones de «no hay desborde horizontal» y parece un bug de
+   layout. Es deliberado y vale más que una medición prolija: un blanco de
+   toque de 18px es demasiado chico. Al medir desborde, descontalo. */
 .help-bubble::after,
 .help-bubble-inline::after {
   content: '';

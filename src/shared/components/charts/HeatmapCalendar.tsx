@@ -69,7 +69,7 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
   return (
     <div className={`heatmap-calendar ${themeClass}`}>
       {/* Day-of-week headers */}
-      <div className="heatmap-header" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+      <div className="heatmap-header" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 22px))`, justifyContent: 'center' }}>
         {DAY_LABELS.map((d) => (
           <span key={d} className="heatmap-day-label">{d}</span>
         ))}
@@ -79,7 +79,7 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
 
       <div
         className="heatmap-grid"
-        style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 22px))`, justifyContent: 'center' }}
       >
         {Array.from({ length: offset }, (_, i) => (
           <div key={`pad-${i}`} className="heatmap-cell heatmap-cell--empty" />
