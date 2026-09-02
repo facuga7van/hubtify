@@ -263,6 +263,12 @@ function tick(): void {
 function onTimeUp(): void {
   const db = getDb();
   const now = new Date().toISOString();
+  // La sesión terminó en `targetEndTime`, no cuando corrió este callback. En
+  // desktop es lo mismo (el tick corre ≤ 1 s después del target); en Android el
+  // worker se congela en segundo plano y el tick puede llegar minutos tarde —
+  // sin esto una sesión reanudada 40 min después quedaba registrada 40 min
+  // después (spec §6).
+  const endedAt = new Date(targetEndTime).toISOString();
   const wasWork = timerState.sessionType === 'work';
   const wasExtension = currentSessionIsExtension;
 
@@ -270,7 +276,7 @@ function onTimeUp(): void {
   if (currentSessionDbId) {
     db.prepare(
       'UPDATE cauldron_sessions SET completed = 1, completed_at = ?, updated_at = ?, target_end_time = NULL WHERE id = ?',
-    ).run(now, now, currentSessionDbId);
+    ).run(endedAt, now, currentSessionDbId);
     // Un enfoque real acaba de depositar su frasco: es la fila que
     // `cauldron:setSessionTask` va a etiquetar si el usuario elige la misión
     // recién ahora. Una prórroga NO lo mueve — no es otro frasco.
@@ -560,8 +566,15 @@ export function registerCauldronIpcHandlers(): void {
     resume: () => {
       if ((timerState.status === 'work' || timerState.status === 'on_break') && !timerInterval) {
         timerInterval = setInterval(tick, 1000);
+        // El tick inmediato importa: si la sesión venció mientras estábamos
+        // congelados se completa AHORA (con `completed_at = targetEndTime`) en
+        // vez de un segundo después.
+        tick();
+        return;
       }
-      if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null) armAutoStart();
+      if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null && !autoStartInterval) {
+        armAutoStart();
+      }
     },
   });
 
