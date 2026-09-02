@@ -62,6 +62,10 @@
   background: linear-gradient(135deg, var(--parch-1) 0%, var(--parch-2) 100%);
   padding: 0;
   margin-left: 4px;
+  /* El área táctil de abajo sobresale 7px por lado. Reservándolos como margen,
+     la caja contenedora los tiene en cuenta y el sello deja de asomar fuera del
+     marco de su sección (y de inflar el scrollWidth de todo lo que lo rodea). */
+  margin-right: 7px;
   cursor: pointer;
   color: var(--ink-soft);
   opacity: 1;

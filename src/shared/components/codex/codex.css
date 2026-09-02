@@ -176,9 +176,12 @@
 }
 
 .qb-rune--gold {
-  border-color: rgba(168, 138, 60, 0.45);
-  color: var(--gold);
-  background: rgba(168, 138, 60, 0.12);
+  /* El oro sobre pergamino da 2.27:1 — la runa se leía fantasmal, como si
+     estuviera deshabilitada. El marco y el tinte siguen siendo dorados (de ahí
+     el nombre); el TEXTO va en tinta, que es lo que hay que poder leer. */
+  border-color: rgba(168, 138, 60, 0.55);
+  color: var(--ink-soft);
+  background: rgba(168, 138, 60, 0.14);
 }
 
 .qb-rune--ink {
@@ -420,7 +423,11 @@
 
 .qb-cartouche-header {
   display: flex;
-  justify-content: space-between;
+  /* El ícono acompaña al rótulo; con `space-between` se iban a bordes opuestos
+     y en una tarjeta ancha quedaban 230 px de pergamino entre una palabra y su
+     propio símbolo. */
+  justify-content: flex-start;
+  gap: 8px;
   align-items: center;
 }
 
@@ -428,7 +435,9 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.2em;
-  color: var(--ink-faded);
+  /* `--ink-faded` promete ~6:1 «sobre pergamino», pero eso vale sobre
+     `--parch-0`: en un cartucho, que termina en `--parch-2`, baja a 3.8:1. */
+  color: var(--ink-soft);
 }
 
 .qb-cartouche-icon {

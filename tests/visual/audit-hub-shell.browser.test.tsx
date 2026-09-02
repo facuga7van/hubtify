@@ -6,6 +6,8 @@ import Sidebar from '@hub/Sidebar';
 import ToastProvider from '@shared/components/ToastProvider';
 import { ConfirmProvider } from '@shared/components/ConfirmDialog';
 import { AuthContext } from '@shared/AuthContext';
+import type { PlayerStats } from '../../shared/types';
+import { TITLE_THRESHOLDS } from '../../shared/types';
 import {
   installApi, SCREENS, WIDE, NARROW, stats, fitCapture, resetCapture,
   contrastOf, unlabelledButtons, clippedText,
@@ -43,14 +45,25 @@ beforeAll(() => {
   installApi();
 });
 
-function mount(collapsed: boolean) {
+/**
+ * El PEOR caso del catálogo, no «Escudero»: el título más largo de
+ * TITLE_THRESHOLDS, con el nivel que lo desbloquea. En castellano son
+ * «Campesino» y «Caballero», nueve caracteres.
+ */
+function worstCaseLevel(): number {
+  // [umbral, clave, fallback] — el fallback es el nombre en castellano.
+  const worst = [...TITLE_THRESHOLDS].sort((a, b) => b[2].length - a[2].length)[0];
+  return worst[0];
+}
+
+function mount(collapsed: boolean, over: Partial<PlayerStats> = {}) {
   return render(
     <MemoryRouter>
       <AuthContext.Provider value={baseAuth}>
         <ToastProvider><ConfirmProvider>
           <div id="audit-root" className="app-layout" style={{ height: '100vh' }}>
             <div className={`sidebar-wrapper ${collapsed ? 'sidebar-wrapper--collapsed' : ''}`}>
-              <Sidebar stats={stats} collapsed={collapsed} onBellClick={() => {}} onToggleInn={() => {}} />
+              <Sidebar stats={{ ...stats, ...over }} collapsed={collapsed} onBellClick={() => {}} onToggleInn={() => {}} />
             </div>
             <main className="main-content" style={{ background: 'var(--parch-0)' }} />
           </div>
@@ -140,6 +153,51 @@ describe('Shell — sidebar, ficha de jugador y menú de cuenta', () => {
     // El botón de cuenta y la campana viven fuera de __ident justamente para
     // sobrevivir al colapso: si miden 0 el colapso los borró.
     expect(accountBtn.getBoundingClientRect().width).toBeGreaterThan(10);
+  });
+
+  /**
+   * El reclamo del dueño: «se lee "Nv.6 · Es…" en vez de "Escudero"; para algo
+   * desbloqueás un título nuevo». El título ES la recompensa de subir de
+   * nivel, así que no puede ser lo que se ellipsiza. Se mide con el nombre más
+   * largo del catálogo y con el preset de fuente más grande (1.3), en las dos
+   * medidas de riel.
+   */
+  describe('El título del héroe se lee entero', () => {
+    for (const [name, size] of [['maximizada', WIDE], ['angosta', NARROW]] as const) {
+      for (const scale of ['1', '1.3']) {
+        test(`${name}, fuente ×${scale}`, async () => {
+          await page.viewport(...size);
+          resetCapture();
+          document.documentElement.style.setProperty('--font-scale', scale);
+          mount(false, { level: worstCaseLevel() });
+          await settle();
+
+          const eyebrow = document.querySelector('.player-card__eyebrow') as HTMLElement;
+          const nameEl = document.querySelector('.player-card__name') as HTMLElement;
+          const badge = document.querySelector('.player-card__level-badge') as HTMLElement;
+          // eslint-disable-next-line no-console
+          console.log(`TÍTULO ${name} x${scale}`, JSON.stringify({
+            texto: eyebrow.textContent,
+            recorteTitulo: eyebrow.scrollWidth - eyebrow.clientWidth,
+            recorteNombre: nameEl.scrollWidth - nameEl.clientWidth,
+            anchoIdent: Math.round((document.querySelector('.player-card__ident') as HTMLElement).clientWidth),
+            medallon: badge.textContent,
+            medallonAria: badge.getAttribute('aria-label'),
+          }, null, 1));
+
+          fitCapture();
+          await page.screenshot({ path: `${SCREENS}/audit-hub-shell-05-titulo-${name}-${scale.replace('.', '_')}.png` });
+          resetCapture();
+          document.documentElement.style.removeProperty('--font-scale');
+
+          // Ni un píxel: el premio se lee entero.
+          expect(eyebrow.scrollWidth - eyebrow.clientWidth).toBeLessThanOrEqual(0);
+          // Y el nivel no se perdió — sigue acuñado en el medallón.
+          expect(badge.textContent).toBe(String(worstCaseLevel()));
+          expect(badge.getAttribute('aria-label')).toMatch(/Campesino|Caballero/);
+        });
+      }
+    }
   });
 
   test('menú de cuenta abierto — cae dentro de la pantalla y se cierra', async () => {

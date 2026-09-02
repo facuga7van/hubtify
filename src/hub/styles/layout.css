@@ -219,13 +219,16 @@
   overflow: hidden;
 }
 
-/* Eyebrow text.
-   `.22em` de letter-spacing sobre «Nv.12 · Guerrero» son ~45 px de aire en una
-   columna que ya venía corta: el rango se cortaba en «Nv.12 · Gu…». */
+/* El rango, solo en su renglón (PlayerCard.tsx sacó de acá el «Nv.N ·», que ya
+   está acuñado en el medallón). Con la línea entera para él vuelve a tener el
+   espaciado de una placa —es un título, no un dato— sin volver a cortarse:
+   «CAMPESINO», el más largo del catálogo, pide ~79 px de los ~136 que le
+   quedan a la columna en el riel angosto, y ~103 con el preset de fuente más
+   grande. */
 .player-card__eyebrow {
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
-  letter-spacing: .1em;
+  letter-spacing: .14em;
   color: var(--rubric-light);
 }
 
