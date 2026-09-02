@@ -93,6 +93,18 @@ export function nutritionToday(db: ReturnType<typeof getDb>): string {
   return nutritionDayString(new Date(), getDayCutoffHour(db));
 }
 
+/**
+ * The nutritional day a profile stamp (`nutrition_profile.updated_at`, an ISO
+ * or legacy 'YYYY-MM-DD HH:MM:SS' string) falls on; null when there is none
+ * or it does not parse.
+ */
+export function profileSavedOn(updatedAt: string | null | undefined, cutoffHour: number): string | null {
+  if (!updatedAt) return null;
+  const d = new Date(updatedAt);
+  if (isNaN(d.getTime())) return null;
+  return nutritionDayString(d, cutoffHour);
+}
+
 /** True si el día tiene al menos un evento vivo (asado, cumpleaños…). */
 export function dayHasEvent(db: ReturnType<typeof getDb>, date: string): boolean {
   return !!db.prepare(
@@ -647,8 +659,10 @@ export function registerNutritionIpcHandlers(): void {
     return row ? { date: row.date, steps: row.steps, gym: !!row.gym } : { date, steps: null, gym: false };
   });
 
-  ipcHandle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number; gym?: boolean }) => {
-    if (metrics.steps !== undefined && (!Number.isFinite(metrics.steps) || metrics.steps < 0)) throw new Error('Invalid steps: must be >= 0');
+  ipcHandle('nutrition:saveDailyMetrics', (_e, metrics: { date?: string; steps?: number | null; gym?: boolean }) => {
+    // The UI sends `steps: null` for an empty input (Today.tsx); null and
+    // undefined both mean "no data" and land as NULL in the nullable column.
+    if (metrics.steps != null && (!Number.isFinite(metrics.steps) || metrics.steps < 0)) throw new Error('Invalid steps: must be >= 0');
     const db = getDb();
     const date = metrics.date ?? nutritionToday(db);
     db.prepare(`
@@ -1006,7 +1020,12 @@ export function registerNutritionIpcHandlers(): void {
 
   ipcHandle('nutrition:shouldAskWeight', () => {
     const db = getDb();
-    const profile = db.prepare('SELECT weight_check_day, weight_popup_enabled FROM nutrition_profile WHERE id = 1').get() as { weight_check_day: number; weight_popup_enabled: number } | undefined;
+    const profile = db.prepare(
+      'SELECT weight_check_day, weight_popup_enabled, initial_weight_kg, updated_at FROM nutrition_profile WHERE id = 1',
+    ).get() as {
+      weight_check_day: number; weight_popup_enabled: number;
+      initial_weight_kg: number | null; updated_at: string | null;
+    } | undefined;
     if (!profile) return { shouldAsk: false };
     if (!profile.weight_popup_enabled) return { shouldAsk: false };
 
@@ -1029,8 +1048,15 @@ export function registerNutritionIpcHandlers(): void {
       'SELECT weight_kg FROM nutrition_weekly_metrics WHERE weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1'
     ).get() as { weight_kg: number } | undefined;
 
-    const fallbackWeight = lastWeight?.weight_kg
-      ?? (db.prepare('SELECT initial_weight_kg FROM nutrition_profile WHERE id = 1').get() as { initial_weight_kg: number } | undefined)?.initial_weight_kg;
+    // The setup form asked for the weight minutes ago: a reminder on the same
+    // nutritional day asks for what the user just typed (NUT-06). Only while
+    // the profile weight is the only one on record — later a settings save
+    // (which re-sends the stored weight) must not eat the weekly reminder.
+    if (!lastWeight && profileSavedOn(profile.updated_at, getDayCutoffHour(db)) === today) {
+      return { shouldAsk: false };
+    }
+
+    const fallbackWeight = lastWeight?.weight_kg ?? profile.initial_weight_kg ?? undefined;
 
     return { shouldAsk: true, lastWeight: fallbackWeight };
   });

@@ -4,6 +4,8 @@ import {
   getErrorCode,
   withRetry,
   normalizeResult,
+  RETRY_DELAYS_MS,
+  TIMEOUT_MS,
   type AiResult,
 } from '@modules/nutrition/estimate-core';
 // normalizeDescription now comes from `normalize.ts` — the SAME algorithm the
@@ -51,11 +53,16 @@ describe('error classification', () => {
     expect(getErrorCode(new Error('boom'))).toBeNull();
   });
 
-  it('retries transient codes (network/5xx/timeout)', () => {
-    for (const code of ['deadline-exceeded', 'unavailable', 'internal', 'resource-exhausted', 'aborted', 'cancelled']) {
+  it('retries transient codes (network/5xx)', () => {
+    for (const code of ['unavailable', 'internal', 'resource-exhausted', 'aborted', 'cancelled']) {
       expect(isTransientError(fbError(code))).toBe(true);
       expect(isTransientError(fbError(`functions/${code}`))).toBe(true);
     }
+  });
+
+  it('does NOT retry a server deadline-exceeded (the model was slow; it will be slow again)', () => {
+    expect(isTransientError(fbError('deadline-exceeded'))).toBe(false);
+    expect(isTransientError(fbError('functions/deadline-exceeded'))).toBe(false);
   });
 
   it('does NOT retry permanent validation/auth codes', () => {
@@ -66,6 +73,16 @@ describe('error classification', () => {
 
   it('treats codeless errors (offline TypeError) as transient', () => {
     expect(isTransientError(new TypeError('Failed to fetch'))).toBe(true);
+  });
+});
+
+describe('timeout policy', () => {
+  it('outlives the Cloud Function abort (30 s) so deadline-exceeded is always the server giving up', () => {
+    expect(TIMEOUT_MS).toBeGreaterThanOrEqual(35000);
+  });
+
+  it('retries at most once', () => {
+    expect(RETRY_DELAYS_MS).toHaveLength(1);
   });
 });
 
@@ -82,7 +99,7 @@ describe('withRetry', () => {
   it('retries transient failures then succeeds, reporting each retry attempt', async () => {
     const fn = vi
       .fn()
-      .mockRejectedValueOnce(fbError('deadline-exceeded'))
+      .mockRejectedValueOnce(fbError('unavailable'))
       .mockRejectedValueOnce(fbError('internal'))
       .mockResolvedValue('ok');
     const onRetry = vi.fn();
@@ -100,6 +117,24 @@ describe('withRetry', () => {
     ).rejects.toHaveProperty('code', 'invalid-argument');
     expect(fn).toHaveBeenCalledTimes(1);
     expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it('calls the function exactly ONCE on deadline-exceeded (no concurrent server work)', async () => {
+    const fn = vi.fn().mockRejectedValue(fbError('functions/deadline-exceeded'));
+    const onRetry = vi.fn();
+    await expect(
+      withRetry(fn, { delays: RETRY_DELAYS_MS, isTransient: isTransientError, onRetry, sleep: noSleep }),
+    ).rejects.toHaveProperty('code', 'functions/deadline-exceeded');
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it('retries unavailable/network once with the production policy (2 attempts total)', async () => {
+    const fn = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(
+      withRetry(fn, { delays: RETRY_DELAYS_MS, isTransient: isTransientError, sleep: noSleep }),
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 
   it('gives up after exhausting all attempts and rethrows the last error', async () => {

@@ -1,6 +1,7 @@
 # Auditoría visual — decisiones abiertas
 
-Estado: **pendiente**. Anotado el 2026-09-01, después de publicar la v0.8.2.
+Estado: **la 1 resuelta (2026-09-02); 2–6 pendientes**. Anotado el 2026-09-01,
+después de publicar la v0.8.2.
 
 Lo que sigue NO son bugs sin arreglar: son las seis cosas que la auditoría visual
 dejó sobre la mesa porque la decisión es de diseño, no técnica, y tomarla solo
@@ -32,6 +33,28 @@ token a mano, en cada lugar, de a uno.
 
 Lo que NO se puede dejar es el estado actual, donde el token promete una cosa y
 la mitad de las superficies cobra otra.
+
+**RESUELTA (2026-09-02): se oscureció el token.** `--ink-faded: #5a4428`.
+Ratios WCAG medidos (fórmula 2.x, script en el scratchpad de la sesión):
+
+| sobre | `--parch-0` | `--parch-1` | `--parch-2` | `--parch-3` |
+|---|---|---|---|---|
+| `--ink-faded` viejo `#6b5535` | 5.74 | 4.86 | **3.80** | 2.64 |
+| `--ink-faded` nuevo `#5a4428` | 7.45 | 6.32 | **4.94** | 3.43 |
+| `--ink-soft` `#4a3520` (sin cambios) | 9.37 | 7.95 | 6.21 | 4.32 |
+
+Por qué oscurecer y no techar: techar era barrer cada degradé de cada módulo y
+seguir dependiendo de que nadie vuelva a usar `--parch-2` de fondo; el token es
+una línea y el test `tests/shared/theme-contrast.test.ts` lo vigila. El costo
+que la tabla anticipaba —el tercer nivel se acerca al segundo— se pagó: la
+distancia con `--ink-soft` bajó de 1.63:1 a 1.26:1. Se eligió el valor MÁS
+CLARO que cumple 4.5:1 sobre `--parch-2` con margen, justamente para conservar
+el escalón. `--parch-3` no pasa ni con `--ink-soft`: queda documentado como
+superficie de profundidad (scrollbar, pista de gauge), no de texto.
+
+Además, dentro de una fila de datos (libro mayor, misión, comida) la meta
+secundaria pasó a `--ink-soft`; `--ink-faded` queda para pistas, vacíos y
+deshabilitados.
 
 ## 2. `.rpg-button` está al filo de AA
 

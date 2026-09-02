@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import ToastProvider from '@shared/components/ToastProvider';
 import { ConfirmProvider } from '@shared/components/ConfirmDialog';
 import TaskList from '@modules/quests/components/TaskList';
+import { smallText, tokenPx } from './audit-hub-harness';
 
 import '../../src/i18n';
 import '../../src/hub/styles/theme.css';
@@ -240,7 +241,12 @@ describe('Questify — la lista a pantalla completa', () => {
     expect(gaps.length).toBeGreaterThan(0);
     const worst = Math.max(...gaps);
     console.log('[audit] hueco máximo título→XP a 1640px:', Math.round(worst));
-    expect(worst).toBeLessThan(500);
+    // 700 y no 500: el tablero de dos columnas ya no tiene tope de 1180 px
+    // (dejaba ~400 px de pergamino vacío a la derecha con la barra plegada) y
+    // usa todo el ancho a propósito, así que a 1640 con la barra de 260 el
+    // hueco ronda los 530 px. El guardián sigue cazando el desierto original
+    // de 1.200 px de una grilla sin columnas.
+    expect(worst).toBeLessThan(700);
   });
 
   test('760x640 (mínimo de la app): una columna, sin desborde', async () => {
@@ -314,6 +320,23 @@ describe('Questify — contraste y tipografía de lo numérico', () => {
     const font = getComputedStyle(el('.quest-row-xp-value')).fontFamily;
     console.log('[audit] fuente del XP de la fila:', font);
     expect(font).not.toMatch(/Unifraktur/i);
+  });
+
+  test('ningún texto de la fila de misión baja del piso de 13 px; el título va en cuerpo', async () => {
+    await page.viewport(1640, 900);
+    mount();
+    await settle();
+    await goTab(/^Pendientes$/i);
+    const rows = all('.quest-row');
+    expect(rows.length).toBeGreaterThan(0);
+    const small = rows.flatMap((r) => smallText(r));
+    expect(small, `texto chico: ${small.map((s) => `${s.sel} «${s.text}» ${s.px}px`).join(', ')}`).toEqual([]);
+    const body = tokenPx('--fs-body');
+    expect(body).toBeGreaterThan(13);
+    expect(parseFloat(getComputedStyle(el('.quest-row-title')).fontSize)).toBeGreaterThanOrEqual(body - 0.01);
+    for (const meta of all('.quest-row-meta span').slice(0, 6)) {
+      expect(getComputedStyle(meta).opacity).toBe('1');
+    }
   });
 
   test('la racha de un hábito es tinta legible, no un fantasma', async () => {

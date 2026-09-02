@@ -141,7 +141,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
   return (
     <form onSubmit={handleSubmit} className="rpg-card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+      <div className="quest-form-head" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
         <input
           type="text"
           placeholder={t('questify.questName')}
@@ -153,8 +153,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
               onCancel();
             }
           }}
-          className="rpg-input"
-          style={{ flex: 1 }}
+          className="rpg-input quest-form-name"
           autoFocus={shouldFocus}
         />
         <button type="submit" className="rpg-button">
@@ -181,7 +180,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
           </svg>
           <span>
             {t('questify.quickDateHint', 'Se agenda para')} <strong>{quickParts.join(' · ')}</strong>
-            <span style={{ opacity: 0.6 }}>{` · "${quick.title}"`}</span>
+            <span style={{ color: 'var(--ink-soft)' }}>{` · "${quick.title}"`}</span>
           </span>
           <button
             type="button"
@@ -205,7 +204,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
               className={`quest-tier-btn${tier === tierVal ? ' quest-tier-btn--active' : ''}`}
             >
               <TierBadge tier={tierVal} size={14} active={tier === tierVal} /> {t(TIER_LABEL[tierVal])}
-              <span style={{ opacity: 0.7, fontSize: '0.85em', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>
+              <span style={{ fontSize: 'var(--fs-label)', marginLeft: 2 }}>({XP_MAP[tierVal]})</span>
             </button>
           ))}
         </div>

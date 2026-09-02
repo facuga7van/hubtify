@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../hooks/useAnchoredPopup';
@@ -32,7 +32,8 @@ export default function RpgDatePicker({ value, onChange, min, max }: Props) {
   const [day, setDay] = useState(parsed.day);
   const [open, setOpen] = useState(false);
   // Portalled to <body>: overflow:hidden parents used to clip the popup away.
-  const { anchorRef: ref, popupRef, pos: popupPos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
+  const closePopup = useCallback(() => setOpen(false), []);
+  const { anchorRef: ref, popupRef, pos: popupPos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open, 4, { onClose: closePopup });
 
   const maxDay = daysInMonth(year, month);
 
@@ -150,7 +151,10 @@ export default function RpgDatePicker({ value, onChange, min, max }: Props) {
               </select>
             </div>
           </div>
-          <button type="button" className="rpg-button" onClick={() => setOpen(false)}
+          {/* OK confirms what is on screen: with an empty value the selects
+              already show a date, and closing without emitting it left the
+              field on "Seleccionar fecha" (GEN-02). */}
+          <button type="button" className="rpg-button" onClick={() => { emit(year, month, day); setOpen(false); }}
             style={{ marginTop: 10, width: '100%', padding: '4px 0', fontSize: 'var(--fs-label)' }}>
             OK
           </button>

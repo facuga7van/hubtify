@@ -33,7 +33,13 @@ Medieval RPG Codex theme. Gamified life hub built with Electron + React + TypeSc
 |----------|-----|--------|-------|
 | `--ink` | `#2a1d0e` | ![](https://via.placeholder.com/16/2a1d0e/2a1d0e) | Primary text |
 | `--ink-soft` | `#4a3520` | ![](https://via.placeholder.com/16/4a3520/4a3520) | Secondary text |
-| `--ink-faded` | `#4a3520` | ![](https://via.placeholder.com/16/4a3520/4a3520) | Tertiary/disabled text |
+| `--ink-faded` | `#5a4428` | ![](https://via.placeholder.com/16/5a4428/5a4428) | Tertiary/disabled text — AA on `--parch-0/1/2` (7.45 / 6.32 / 4.94) |
+
+`--parch-3` is a depth surface (scrollbar thumb, gauge track), never a text
+background: even `--ink-soft` only reaches 4.32:1 on it. Inside a data row
+(ledger, quest, meal) secondary metadata uses `--ink-soft`; `--ink-faded` is
+for hints, empty states and disabled text. `tests/shared/theme-contrast.test.ts`
+enforces the ink/parchment ratios.
 
 ### Accent Colors
 
@@ -766,7 +772,7 @@ For togglable rows (recurring transactions, habits, reminders):
 | `< 780px` | Coinify compact ledger, page padding 14/12 (`coinify.css`, `shell.css`) |
 | `< 480px` | Nutrify meal rows drop the time column (`nutri.css`, desktop-era rule; never reached by the window) |
 | `html[data-shell="mobile"]` | **Mobile (Android, 390–412px) — not a width breakpoint:** `MobileShell` sets the attribute; transversal rules in `layout.css` (`.qb-page` padding 12, `.qb-header` wraps, `.page-header__actions` static, `.qb-corner` hidden, `.qb-cartouche` tightened) plus one `[data-shell="mobile"] …` block at the end of each module sheet (`quests.css`, `coinify.css`, `nutri.css`, `cauldron.css`, `character.css`, `codex-seal.css`) |
-| `(hover: none)` | Touch: anything revealed only on hover is shown (`.widget-controls`, `.coin-budget-pencil`, quest postpone, nutri row icons); tap targets grow to 40–44px. `rewards.css` carries only this kind of block, no `[data-shell="mobile"]` one |
+| `(hover: none)` | Touch: anything revealed only on hover is shown (`.widget-controls`, `.coin-budget-pencil`, quest postpone, nutri row icons); tap targets grow to 40–44px |
 
 The desktop window never goes below 700px (`electron/main.ts` minWidth) and the
 desktop visual tests go down to 420px, so mobile rules are keyed on

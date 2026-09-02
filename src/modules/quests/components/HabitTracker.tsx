@@ -576,8 +576,7 @@ export default function HabitTracker({ onXpGained }: Props) {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder={t('questify.habitName')}
-            className="rpg-input"
-            style={{ flex: 1, minWidth: 100 }}
+            className="rpg-input quest-habit-form__name"
             autoFocus
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAdding(false); }}
           />

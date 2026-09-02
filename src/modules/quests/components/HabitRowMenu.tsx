@@ -25,8 +25,8 @@ interface Props {
 export default function HabitRowMenu({ skipped, historyOpen, onHistory, onEdit, onSkip, onDelete }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
   const closeMenu = useCallback(() => setOpen(false), []);
+  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open, 4, { onClose: closeMenu });
   // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
   useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
 

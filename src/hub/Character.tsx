@@ -145,7 +145,7 @@ export default function Character({ size = 100, canCustomize = false }: Props) {
 
       {/* Customize button */}
       {canCustomize && (
-        <div style={{ textAlign: 'center', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <div className="hero-customize-actions" style={{ textAlign: 'center', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <button className="rpg-button" onClick={() => (showCustomizer ? setShowCustomizer(false) : openCustomizer())}
             style={{ fontSize: 'var(--fs-label)', padding: '6px 16px' }}>
             {showCustomizer ? t('character.done') : t('character.customize')}

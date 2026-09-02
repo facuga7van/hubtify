@@ -6,6 +6,7 @@ import ToastProvider from '@shared/components/ToastProvider';
 import { ConfirmProvider } from '@shared/components/ConfirmDialog';
 import Transactions from '@modules/finance/components/Transactions';
 import InstallmentAddForm from '@modules/finance/components/shared/InstallmentAddForm';
+import { smallText, tokenPx } from './audit-hub-harness';
 
 import '../../src/i18n';
 import '../../src/hub/styles/theme.css';
@@ -166,6 +167,29 @@ describe('Libro mayor (Transactions)', () => {
     const header = getComputedStyle(el('.coin-ledger-header')).gridTemplateColumns;
     const row = getComputedStyle(el('.coin-ledger-row')).gridTemplateColumns;
     expect(header).toBe(row);
+  });
+
+  test('ningún texto de la fila baja del piso de 13 px, y el concepto va en cuerpo', async () => {
+    stub();
+    await page.viewport(1640, 900);
+    wrap();
+    await settle();
+    const rows = [...document.querySelectorAll('.coin-ledger-row')];
+    expect(rows.length).toBeGreaterThan(0);
+    const small = rows.flatMap((r) => smallText(r));
+    expect(small, `texto chico: ${small.map((s) => `${s.sel} «${s.text}» ${s.px}px`).join(', ')}`).toEqual([]);
+
+    // El dato primario (concepto e importe) va en --fs-body, no en el mínimo.
+    const body = tokenPx('--fs-body');
+    expect(body).toBeGreaterThan(13);
+    for (const row of rows.slice(0, 5)) {
+      expect(parseFloat(getComputedStyle(row.querySelector('.coin-ledger-row__desc')!).fontSize)).toBeGreaterThanOrEqual(body - 0.01);
+      expect(parseFloat(getComputedStyle(row.querySelector('.coin-ledger-row__amount')!).fontSize)).toBeGreaterThanOrEqual(body - 0.01);
+    }
+    // Y nada de la fila va con opacidad: la meta lleva tinta, no transparencia.
+    for (const el of rows[0].querySelectorAll<HTMLElement>('.coin-ledger-row__day, .coin-ledger-row__payment, .coin-ledger-row__cat')) {
+      expect(getComputedStyle(el).opacity).toBe('1');
+    }
   });
 
   test('cada acción de fila tiene aria-label y área táctil', async () => {

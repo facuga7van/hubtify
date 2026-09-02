@@ -406,6 +406,16 @@
   width: max-content;
 }
 
+/* QA 0.9.0: «Descartar cambios» partía en dos renglones al lado de «Listo»
+   dentro del marco de 260 px. El botón no se parte; si no entra, baja entero. */
+[data-shell="mobile"] .hero-customize-actions {
+  flex-wrap: wrap;
+}
+
+[data-shell="mobile"] .hero-customize-actions .rpg-button {
+  white-space: nowrap;
+}
+
 @media (hover: none) {
   /* El texto completo vivía solo en `title`, que en touch no existe. */
   .hero-chronicle-text {

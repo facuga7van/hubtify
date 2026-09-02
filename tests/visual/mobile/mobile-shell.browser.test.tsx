@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from 'vitest';
+import { useState } from 'react';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 import { MemoryRouter } from 'react-router-dom';
@@ -27,6 +28,17 @@ beforeAll(() => {
 
 function Page() {
   return <div className="qb-page"><h1 className="qb-title">Página de prueba</h1></div>;
+}
+
+/** Más alta que el viewport y con estado propio: para separar «cambio de ruta» de «re-render». */
+function TallPage() {
+  const [n, setN] = useState(0);
+  return (
+    <div className="qb-page" style={{ minHeight: 3000 }}>
+      <h1 className="qb-title">Página larga</h1>
+      <button type="button" onClick={() => setN((v) => v + 1)}>contador {n}</button>
+    </div>
+  );
 }
 
 const drawer = () => document.getElementById('mobile-drawer') as HTMLElement;
@@ -161,6 +173,59 @@ describe('MobileShell — cabecera y drawer', () => {
     expect(parseFloat(getComputedStyle(main).paddingBottom)).toBe(20);
     document.documentElement.style.removeProperty('--safe-area-inset-top');
     document.documentElement.style.removeProperty('--safe-area-inset-bottom');
+  });
+
+  /* DRW-01: el dropdown de cuenta se abría alineado al borde izquierdo del
+     ícono y, con 200 px de mínimo, salía del drawer y se cortaba contra el
+     borde derecho de la pantalla. */
+  test('el menú de cuenta se abre dentro del drawer, alineado a la derecha del ícono', async () => {
+    await setMobileViewport();
+    mountInShell(<Page />);
+    await settle();
+    await openDrawer();
+    const trigger = page.getByRole('button', { name: /Menú de cuenta/i });
+    await trigger.click();
+    await expect.element(page.getByRole('menu')).toBeVisible();
+    await settle(200);
+
+    const menu = document.querySelector('.account-dropdown') as HTMLElement;
+    const m = menu.getBoundingClientRect();
+    const d = drawer().getBoundingClientRect();
+    const tr = (trigger.element() as HTMLElement).getBoundingClientRect();
+    // eslint-disable-next-line no-console
+    console.log('ACCOUNT MENU MOBILE', JSON.stringify({ menu: m.toJSON(), drawer: d.toJSON(), trigger: tr.toJSON() }));
+    expect(m.width).toBeGreaterThanOrEqual(200);
+    expect(Math.round(m.right)).toBeLessThanOrEqual(Math.round(d.right));
+    expect(Math.round(m.left)).toBeGreaterThanOrEqual(Math.round(d.left));
+    expect(Math.abs(m.right - tr.right)).toBeLessThanOrEqual(1);
+    expect(menu.scrollWidth).toBeLessThanOrEqual(menu.clientWidth + 1);
+    await shoot('shell-02-menu-cuenta');
+  });
+
+  /* GEN-03: el scroll de `.main-content` se heredaba de una ruta a la otra
+     (Caldero abría a mitad de página con el scroll de Coinify). */
+  test('cambiar de ruta vuelve el scroll arriba; un re-render de la página no', async () => {
+    await setMobileViewport();
+    mountInShell(<TallPage />, '/');
+    await settle();
+    const main = document.querySelector('.main-content') as HTMLElement;
+    main.scrollTop = 500;
+    expect(main.scrollTop).toBe(500);
+
+    // Cambio de estado: mismo pathname, el scroll se queda donde estaba.
+    // Click de DOM y no de Playwright: ese scrollea el botón a la vista y
+    // movería el contenedor él mismo.
+    (page.getByRole('button', { name: /^contador 0$/ }).element() as HTMLElement).click();
+    await settle(200);
+    await expect.element(page.getByRole('button', { name: /^contador 1$/ })).toBeInTheDocument();
+    expect(main.scrollTop).toBe(500);
+
+    // Cambio de ruta desde el drawer: arranca arriba.
+    await openDrawer();
+    await page.getByRole('button', { name: /Questify$/i }).click();
+    await settle(400);
+    await expect.element(page.getByRole('heading', { name: /^Questify$/i })).toBeVisible();
+    expect(main.scrollTop).toBe(0);
   });
 
   /* Lo que ve el botón atrás de Android (native-shell.ts:22-29): el selector

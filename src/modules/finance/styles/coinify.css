@@ -321,7 +321,7 @@
 .coin-as-of {
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
-  opacity: 0.7;
+  color: var(--ink-soft);
 }
 
 .coin-section-slot {
@@ -373,14 +373,14 @@
   /* Gana a `.qb-numeral`: UnifrakturCook a 13 px sobre pergamino texturado no
      se lee. Lo numérico va en Fira Code (misma regla que en Cuotas). */
   font-family: 'Fira Code', monospace;
-  font-size: calc(12px * var(--font-scale));
+  font-size: var(--fs-label);
   color: var(--ink);
 }
 
 .coin-category-legend__pct {
   font-size: var(--fs-label);
   text-align: right;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 /* ── Bottom Grid ── */
@@ -441,7 +441,7 @@
 
 .coin-loan-mini__usd {
   font-size: var(--fs-label);
-  opacity: 0.75;
+  color: var(--ink-soft);
 }
 
 /* ── Projection Labels ── */
@@ -481,16 +481,21 @@
 /* La columna de lectura de Coinify. Cada pantalla nació pensada para una
    tarjeta angosta y maximizada se desarmaba: el concepto contra el borde
    izquierdo y el importe contra el derecho, con casi mil píxeles de pergamino
-   vacío en el medio. Mismo ancho que ya tenía la lista de cuotas. */
+   vacío en el medio. Mismo ancho que la lista de cuotas y la de recurrentes.
+   1100 y no 940: con la barra lateral plegada 940 dejaba un tercio de la
+   ventana en blanco; el libro, las tarjetas y los préstamos son listas de
+   lectura, así que conservan medida, pero una más generosa y centrada. */
 .coin-page-column {
-  max-width: 940px;
+  max-width: 1100px;
   margin-inline: auto;
 }
 
 .coin-ledger-header,
 .coin-ledger-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 110px 96px 104px 68px;
+  /* La columna del importe creció con la cifra: a --fs-body en Fira Code un
+     monto de nueve dígitos con signo y «~» mide 126 px. */
+  grid-template-columns: 44px minmax(0, 1fr) 110px 96px 132px 68px;
   gap: 6px;
 }
 
@@ -555,7 +560,9 @@ button.coin-sort-header--amount {
   align-items: center;
   padding: 7px 2px;
   border-bottom: 1px dotted rgba(74, 55, 32, 0.4);
-  font-size: calc(12.5px * var(--font-scale));
+  /* Era 12.5 px: por debajo del mínimo del sistema (--fs-label, 13 px) para
+     el dato PRIMARIO de la fila. El concepto va en cuerpo de texto. */
+  font-size: var(--fs-body);
   transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -580,8 +587,10 @@ button.coin-sort-header--amount {
   transition: opacity 0.3s, transform 0.3s;
 }
 
+/* Meta de fila (día, tercero, medio de pago): --fs-label como piso y
+   --ink-soft, nunca --ink-faded ni opacidad, sobre el pergamino texturado. */
 .coin-ledger-row__day {
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-size: var(--fs-label);
 }
 
@@ -595,8 +604,8 @@ button.coin-sort-header--amount {
 
 .coin-ledger-row__third-party {
   font-size: var(--fs-label);
-  opacity: 0.5;
-  color: var(--gold);
+  font-style: italic;
+  color: var(--ink-soft);
 }
 
 .coin-ledger-row__cat {
@@ -635,7 +644,7 @@ button.coin-sort-header--amount {
 
 .coin-ledger-row__payment {
   font-size: var(--fs-label);
-  opacity: 0.6;
+  color: var(--ink-soft);
   font-family: 'IM Fell English SC', serif;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -650,9 +659,13 @@ button.coin-sort-header--amount {
   flex-shrink: 0;
 }
 
-.coin-ledger-row__amount {
+/* El importe es dato primario: cuerpo de texto y Fira Code (gana a
+   `.qb-numeral`: una cifra en gótico a 13 px sobre textura no se lee). */
+.coin-ledger-row .coin-ledger-row__amount {
   text-align: right;
-  font-size: var(--fs-label);
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-body);
   white-space: nowrap;
 }
 
@@ -757,7 +770,7 @@ button.coin-sort-header--amount {
 
 .coin-ledger-section-header__count {
   font-size: var(--fs-label);
-  opacity: 0.4;
+  color: var(--ink-soft);
   font-family: 'UnifrakturCook', serif;
 }
 
@@ -1060,7 +1073,7 @@ button.coin-sort-header--amount {
 
 .coin-import-drop__filename {
   font-size: var(--fs-label);
-  opacity: 0.6;
+  color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1121,7 +1134,7 @@ button.coin-sort-header--amount {
   border: 1px solid rgba(122, 30, 30, 0.4);
   border-radius: 2px;
   font-family: 'IM Fell English SC', serif;
-  font-size: 0.72em;
+  font-size: var(--fs-label);
   letter-spacing: 0.08em;
   color: var(--rubric);
   vertical-align: middle;
@@ -1142,11 +1155,11 @@ button.coin-sort-header--amount {
 }
 
 .coin-import-row__currency {
-  opacity: 0.5;
+  color: var(--ink-soft);
 }
 
 .coin-import-row__installment {
-  opacity: 0.5;
+  color: var(--ink-soft);
 }
 
 .coin-import-card {
@@ -1162,7 +1175,7 @@ button.coin-sort-header--amount {
 
 .coin-import-card__label {
   font-size: var(--fs-label);
-  opacity: 0.6;
+  color: var(--ink-soft);
   font-family: 'IM Fell English SC', serif;
 }
 
@@ -1189,7 +1202,6 @@ button.coin-sort-header--amount {
   margin: 2px 0 0;
   font-size: var(--fs-label);
   line-height: 1.4;
-  opacity: 0.75;
   color: var(--leather);
 }
 
@@ -1209,13 +1221,13 @@ button.coin-sort-header--amount {
 
 .coin-import-confirm-row__month-label {
   font-size: var(--fs-label);
-  opacity: 0.5;
+  color: var(--ink-soft);
   font-family: 'IM Fell English SC', serif;
 }
 
 .coin-import-preview-count {
   font-size: var(--fs-label);
-  opacity: 0.6;
+  color: var(--ink-soft);
   margin-bottom: 12px;
   font-family: 'Cormorant Garamond', serif;
 }
@@ -1304,7 +1316,7 @@ button.coin-sort-header--amount {
 }
 
 .coin-import-batches__meta {
-  opacity: 0.6;
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -1331,9 +1343,10 @@ button.coin-sort-header--amount {
 
 /* ── Installments ───────────────────────────────────────────── */
 
-/* Ancho máximo centrado para toda la pantalla de cuotas. Ver Installments.tsx. */
+/* Ancho máximo centrado para toda la pantalla de cuotas (una lista de lectura
+   con su formulario; ver Installments.tsx). Misma medida que `.coin-page-column`. */
 .coin-installments {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -1489,6 +1502,13 @@ button.coin-sort-header--amount {
 .coin-loan-tabs {
   display: flex;
   gap: 4px;
+}
+
+/* Prestado / Tomado prestado del formulario: un solo control de dos botones,
+   con el mismo hueco que la fila que lo contiene. */
+.coin-loan-form__direction {
+  display: flex;
+  gap: 6px;
 }
 
 .coin-loan-tab {
@@ -1658,17 +1678,24 @@ button.coin-sort-header--amount {
   border-left-color: var(--moss);
 }
 
+/* Pausado: se nota por el borde, el fondo y el nombre en cursiva — no por
+   apagar la tarjeta ENTERA (`opacity: .6` dejaba nombre y monto en ~3:1). */
 .coin-recurring-card--paused {
   border-left-color: var(--ink-faded);
-  opacity: 0.6;
+  background: rgba(245, 231, 192, 0.2);
+}
+
+.coin-recurring-card--paused .coin-recurring-card__name {
+  color: var(--ink-soft);
+  font-style: italic;
 }
 
 /* Misma cura que en Cuotas: a 1640 px el nombre quedaba contra el borde
    izquierdo y categoría/día/cuenta/monto/botones apelotonados contra el
    derecho, con un vacío enorme en el medio. Ancho máximo centrado y el nombre
-   deja de estirarse sin límite. */
+   deja de estirarse sin límite. Misma medida que `.coin-page-column`. */
 .coin-recurring-list {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 .coin-recurring-card__main {
@@ -1678,21 +1705,39 @@ button.coin-sort-header--amount {
   flex-wrap: wrap;
 }
 
+/* Pausar / reanudar. Era un `.rpg-button` de 28 px en bloque con un SVG de
+   0.7em (~9 px) que caía al borde izquierdo, pintado en --moss sobre cuero
+   (1.3:1): un cuadrado marrón con una mancha. Ahora centra su ícono con flex,
+   y cada estado se ve distinto: activo = cuero con tinta de pergamino (ofrece
+   PAUSAR, 8.2:1); pausado = dorado con tinta oscura (ofrece REANUDAR, 5:1). */
 .coin-recurring-card__toggle {
-  width: 28px;
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   padding: 0;
-  font-size: var(--fs-label);
-  transition: all 0.3s ease;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.coin-recurring-card__toggle-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .coin-recurring-card__toggle--active {
-  color: var(--moss);
-  opacity: 1;
+  color: var(--parch-0);
 }
 
 .coin-recurring-card__toggle--paused {
-  opacity: 0.3;
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  color: var(--leather-dark);
+  border-color: var(--gold-dark);
+  text-shadow: none;
 }
 
 .coin-recurring-card__name {
@@ -1728,7 +1773,7 @@ button.coin-sort-header--amount {
   align-items: center;
   gap: 8px;
   font-size: var(--fs-label);
-  opacity: 0.7;
+  color: var(--ink-soft);
   margin-bottom: 4px;
   padding-left: 12px;
   position: relative;
@@ -1991,7 +2036,6 @@ button.coin-sort-header--amount {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   color: var(--ink-faded);
-  opacity: 0.6;
 }
 
 /* ── Shared: DollarChip ─────────────────────────────────────── */
@@ -2162,7 +2206,7 @@ button.coin-sort-header--amount {
   .coin-ledger-header,
   .coin-ledger-row {
     /* The action column keeps room for two 32px tap targets. */
-    grid-template-columns: 28px minmax(0, 1fr) 96px 88px 68px;
+    grid-template-columns: 28px minmax(0, 1fr) 96px 132px 68px;
   }
 
   /* 0.14em de espaciado hacía que «CATEGORÍA» midiera más que su columna. */
@@ -2317,7 +2361,7 @@ button.coin-sort-header--amount {
 
 .coin-dollar-menu__rate-label {
   flex: 1;
-  opacity: 0.8;
+  color: var(--ink-soft);
 }
 
 .coin-dollar-menu__rate-value {
@@ -2361,6 +2405,12 @@ button.coin-sort-header--amount {
 }
 .coin-action-btn--danger:hover {
   opacity: 1;
+}
+/* El aspa de «Eliminar grupo» / «Eliminar»: era `width: .65em` inline en el
+   TSX (≈8 px), fuera del alcance de la regla mobile. */
+.coin-action-btn__icon {
+  width: 0.65em;
+  height: 0.65em;
 }
 
 /* Rótulo + control como una sola pieza: en una fila que envuelve, «Pagar
@@ -2514,7 +2564,7 @@ button.coin-sort-header--amount {
   /* Gastado / límite es el dato que hace falta leer: Fira Code y tinta plena,
      no gótica desvaída a 13 px. */
   font-family: 'Fira Code', monospace;
-  font-size: calc(11px * var(--font-scale));
+  font-size: var(--fs-label);
 }
 
 .coin-budget-bar {
@@ -2986,6 +3036,16 @@ button.coin-sort-header--amount {
   white-space: nowrap;
 }
 
+/* COIN-03: el par Prestado / Tomado prestado baja entero a su propio renglón. */
+[data-shell="mobile"] .coin-loan-form__direction {
+  flex: 1 1 100%;
+}
+
+[data-shell="mobile"] .coin-loan-form__direction .rpg-button {
+  flex: 1;
+  white-space: nowrap;
+}
+
 /* C6 */
 [data-shell="mobile"] .coin-loan-card__row {
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3042,7 +3102,7 @@ button.coin-sort-header--amount {
 }
 
 [data-shell="mobile"] .coin-month-nav__label {
-  font-size: calc(12px * var(--font-scale));
+  font-size: var(--fs-label);
   letter-spacing: 0.04em;
 }
 
@@ -3061,12 +3121,24 @@ button.coin-sort-header--amount {
   display: none;
 }
 
+/* COIN-02: el botón de 40×40 se veía como un cuadrado vacío con un aspa de 8 px. */
+[data-shell="mobile"] .coin-action-btn__icon,
+[data-shell="mobile"] .coin-recurring-card__toggle-icon {
+  width: 18px;
+  height: 18px;
+}
+
 @media (hover: none) {
   /* C4: poner un presupuesto por primera vez era imposible en touch. */
   .coin-budget-pencil {
     opacity: 0.75;
     width: 32px;
     height: 32px;
+  }
+
+  /* COIN-02: el 0.6 → 1 era solo por :hover; en touch no hay hover. */
+  .coin-action-btn--danger {
+    opacity: 1;
   }
 
   /* C13 */

@@ -23,6 +23,7 @@ import { resolveMealType, MEAL_ORDER as SHARED_MEAL_ORDER, DEFAULT_MEAL_SCHEDULE
 import type { MealSchedule, MealType } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import { usePopoverRegistration } from '../../../shared/hooks/usePopoverRegistration';
 import { useFoodSuggestions } from '../useFoodSuggestions';
 import { cacheEstimate } from '../history-api';
 import { notifyNutritionChanged } from '../notify';
@@ -187,6 +188,10 @@ export default function Today() {
     try { return localStorage.getItem(FAVORITES_OPEN_KEY) !== 'false'; } catch { return true; }
   });
   const [logMenuOpen, setLogMenuOpen] = useState(false);
+  // No usa useAnchoredPopup (vive en flujo, no en portal): se anota a mano
+  // para que el botón atrás de Android lo cierre en vez de navegar.
+  const closeLogMenu = useCallback(() => setLogMenuOpen(false), []);
+  usePopoverRegistration(logMenuOpen, closeLogMenu);
   const [reopening, setReopening] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
   const [manualMode, setManualMode] = useState(false);
@@ -236,7 +241,7 @@ export default function Today() {
   // offline. Only the AI-mode input offers it; Manual already asks for a number.
   const suggest = useFoodSuggestions(foodInput, !dayClosed && !manualMode);
   const { anchorRef: suggestAnchorRef, popupRef: suggestPopupRef, pos: suggestPos } =
-    useAnchoredPopup<HTMLDivElement, HTMLDivElement>(suggest.open, 2);
+    useAnchoredPopup<HTMLDivElement, HTMLDivElement>(suggest.open, 2, { onClose: suggest.close });
   const [suggestWidth, setSuggestWidth] = useState(0);
 
   // Match the dropdown to the input row so the two read as one control.
@@ -380,7 +385,7 @@ export default function Today() {
       // and no silent jump to Manual mode: the user decides. (Upstream forced
       // Manual and toasted; the notice keeps its calmer wording, the forcing goes.)
       console.error('[Nutrition]', err);
-      setEstimateNotice(t('nutrify.aiUnavailable', 'No pudimos estimar las calorías ahora (sin conexión o servicio ocupado). Ingresá las calorías manualmente.'));
+      setEstimateNotice(t('nutrify.aiUnavailable', 'La IA tardó demasiado o no está disponible. Probá de nuevo o cargá las calorías a mano.'));
     } finally {
       setEstimating(false);
       setRetrying(false);
@@ -1075,6 +1080,10 @@ export default function Today() {
     if (result.success && result.breakdown) {
       const b = result.breakdown as typeof dayClosed;
       setCloseResult(b);
+      // The whole page gates on `dayClosed` (`readOnly`, the log form, the
+      // sticky footer): without this the UI stayed editable and every edit
+      // failed with "Cannot modify a closed day" until a reload (NUT-02).
+      setDayClosed(b);
       const xp = b?.xpTotal ?? 0;
       const hp = b?.hpChange ?? 0;
       await window.api.processRpgEvent({
@@ -1680,7 +1689,7 @@ export default function Today() {
           <HelpBubble variant="inline" text={t('nutrify.foodLogHelp', 'Comidas del día agrupadas por momento. Tocá el ícono para cambiar categoría. Podés editar o eliminar.')} />
           {foods.length > 0 && (
             <span className="nutri-card-meta">
-              {foods.length} {t('nutrify.meals', 'comidas')} {'\u00B7'} {consumed} kcal
+              {t('nutrify.meals', { count: foods.length, defaultValue: '{{count}} comidas' })} {'\u00B7'} {consumed} kcal
             </span>
           )}
           {foods.length > 0 && !dayClosed && (
@@ -1792,7 +1801,10 @@ export default function Today() {
 
         {dayClosed ? (
           <div>
-            <p className="nutri-day-status">{t('nutrify.dayClosed', 'Día cerrado')}</p>
+            {/* Just closed in this session: keep the celebration, not the plain label. */}
+            {closeResult
+              ? <p className="nutri-day-status nutri-day-success">{t('nutrify.dayClosedSuccess', '¡Día cerrado exitosamente!')}</p>
+              : <p className="nutri-day-status">{t('nutrify.dayClosed', 'Día cerrado')}</p>}
             <div className="nutri-close-day">
               <CloseDayStats consumed={dayClosed.consumed} target={dayClosed.target} />
               <DayBreakdown data={dayClosed} t={t} />
@@ -2172,7 +2184,7 @@ export function RepeatDayPicker({
                 <button key={day.date} type="button" className="nutri-repeat-day" onClick={() => onPick(day.date)}>
                   <span className="nutri-repeat-day-name">{dayLabel(day.date)}</span>
                   <span className="nutri-repeat-day-meta">
-                    {day.meals} {t('nutrify.meals', 'comidas')} {'·'} {day.calories.toLocaleString(locale)} kcal
+                    {t('nutrify.meals', { count: day.meals, defaultValue: '{{count}} comidas' })} {'·'} {day.calories.toLocaleString(locale)} kcal
                   </span>
                 </button>
               ))}

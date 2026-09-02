@@ -172,20 +172,18 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
               </div>
             )}
             <div className="auth-card__field">
+              {/* "Forgot" resolves usernames like login does — so it takes the
+                  same free-text input, not an email-typed one. */}
               <input
-                type={isForgot ? 'email' : isLogin || mode === 'addAccount' ? 'text' : 'email'}
+                type={isRegistering ? 'email' : 'text'}
                 name="email"
-                autoComplete={isSignup ? 'email' : isForgot ? 'email' : 'username'}
-                placeholder={isForgot
-                  ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
-                  : isLogin || mode === 'addAccount'
-                    ? t('auth.emailOrUsername', 'Email o nombre de usuario')
-                    : t('auth.email')}
-                aria-label={isForgot
-                  ? t('auth.enterEmail', 'Ingresá tu correo electrónico')
-                  : isLogin || mode === 'addAccount'
-                    ? t('auth.emailOrUsername', 'Email o nombre de usuario')
-                    : t('auth.email')}
+                autoComplete={isRegistering ? 'email' : 'username'}
+                placeholder={isRegistering
+                  ? t('auth.email')
+                  : t('auth.emailOrUsername', 'Email o nombre de usuario')}
+                aria-label={isRegistering
+                  ? t('auth.email')
+                  : t('auth.emailOrUsername', 'Email o nombre de usuario')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="rpg-input auth-card__input"

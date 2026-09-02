@@ -7,6 +7,7 @@ import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
 import { estimateNutrition } from '../estimate-service';
 import { cacheEstimate } from '../history-api';
+import { usePopoverRegistration } from '../../../shared/hooks/usePopoverRegistration';
 
 interface BreakdownItem {
   name: string;
@@ -71,6 +72,11 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
   const [mealDropdown, setMealDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  // Mirrors of state the blur handler must read synchronously: a blur can fire
+  // in the same tick that closes the row (Enter, Cancel) or while the model is
+  // still answering, and neither of those may turn into a second save.
+  const editClosedRef = useRef(false);
+  const estimatingRef = useRef(false);
 
   const currentMeal = getMealForEntry(entry, mealSchedule, dayCutoffHour);
 
@@ -106,10 +112,29 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
     return () => document.removeEventListener('mousedown', handler);
   }, [mealDropdown]);
 
+  const openEdit = () => {
+    setEditCals(String(entry.calories));
+    setEditDesc(entry.description);
+    editClosedRef.current = false;
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    editClosedRef.current = true;
+    setEditing(false);
+  };
+
+  // A row in edit mode is "something open": the Android back button cancels
+  // it (the draft is discarded, openEdit reseeds from the entry) instead of
+  // leaving the page (NUT-01 d, QA 0.9.1).
+  usePopoverRegistration(editing, cancelEdit);
+
   const handleSave = () => {
+    if (editClosedRef.current) return;
     const newCals = parseInt(editCals);
     if (isNaN(newCals) || newCals <= 0) return;
     const desc = editDesc.trim() || entry.description;
+    editClosedRef.current = true;
     onUpdate(entry.id, { description: desc, calories: newCals });
     // A hand-typed correction is the best number this description will ever
     // have — better than the estimate it replaces — so the cache takes it
@@ -119,6 +144,28 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
       cacheEstimate({ description: desc, calories: newCals, corrected: true });
     }
     setEditing(false);
+  };
+
+  /** Enter on EITHER input saves; Escape cancels. IME composition is left alone. */
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+  };
+
+  /**
+   * Focus leaving the row (tap outside, Tab away) SAVES — on a phone that is
+   * the natural "done" gesture, and losing a typed correction to a stray tap
+   * is worse than keeping it. Moving between the row's own controls is not a
+   * leave. The action buttons cancel the focus change on pointerdown, so
+   * Cancel is never pre-empted by a blur-save; an invalid kcal value keeps the
+   * row open (handleSave refuses it) with Cancel still at hand.
+   */
+  const handleRowBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (editClosedRef.current || estimatingRef.current) return;
+    const next = e.relatedTarget as Node | null;
+    if (next && rowRef.current?.contains(next)) return;
+    handleSave();
   };
 
   /**
@@ -132,6 +179,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
     const desc = editDesc.trim();
     if (!desc) return;
     setEstimating(true);
+    estimatingRef.current = true;
     try {
       const result = await estimateNutrition(desc);
       setEditCals(String(result.calories));
@@ -146,44 +194,51 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
         calories: result.calories,
         aiBreakdown: JSON.stringify(result.items),
       });
+      editClosedRef.current = true;
       setEditing(false);
     } catch {
       toast({ type: 'warning', message: t('nutrify.estimationFailed', 'Estimation failed — edit manually') });
     } finally {
       setEstimating(false);
+      estimatingRef.current = false;
     }
   };
 
   if (editing) {
     return (
-      <div ref={rowRef} className={`nutri-meal-row nutri-meal-row--edit nutri-pulse-gold ${className || ''}`}>
+      <div ref={rowRef} className={`nutri-meal-row nutri-meal-row--edit nutri-pulse-gold ${className || ''}`} onBlur={handleRowBlur}>
         <div className="nutri-meal-ico">{MEAL_ICON_MAP[currentMeal] ?? <Platter width={16} height={16} />}</div>
         <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
           aria-label={t('nutrify.editDescriptionLabel', 'Descripción de la comida')}
-          className="nutri-text-input" style={{ padding: '4px 6px', fontSize: 'var(--fs-label)' }} />
-        <input type="number" value={editCals} onChange={(e) => setEditCals(e.target.value)}
+          className="nutri-text-input nutri-meal-edit-input" onKeyDown={handleEditKeyDown} />
+        <input type="number" inputMode="numeric" value={editCals} onChange={(e) => setEditCals(e.target.value)}
           aria-label={t('nutrify.calories', 'Calorías')}
-          className="nutri-text-input" style={{ width: '100%', padding: '4px 6px', fontSize: 'var(--fs-label)' }}
-          onKeyDown={(e) => e.key === 'Enter' && handleSave()} />
-        <button className="nutri-btn" onClick={handleReEstimate} disabled={estimating || !editDesc.trim()} title={t('nutrify.reEstimate', 'Re-estimar con IA')}
-          style={{ padding: '4px 10px', fontSize: 'var(--fs-body)', opacity: estimating ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-          {estimating ? (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-              <circle cx="7" cy="7" r="5.5" opacity="0.3"/><path d="M7 1.5a5.5 5.5 0 0 1 4.76 2.75" strokeWidth="1.5"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" stroke="none">
-              <path d="M7 0l.9 2.8h2.9l-2.4 1.7.9 2.8L7 5.6 4.7 7.3l.9-2.8L3.2 2.8h2.9z"/>
-              <path d="M11.5 5l.5 1.6h1.7l-1.4 1 .5 1.6-1.3-1-1.4 1 .5-1.6-1.3-1h1.7z" opacity="0.7"/>
-              <path d="M2.5 8l.4 1.2h1.3l-1 .8.4 1.2-1.1-.8-1 .8.4-1.2-1.1-.8h1.3z" opacity="0.5"/>
-            </svg>
-          )}
-        </button>
-        <button className="nutri-btn nutri-btn-ghost" onClick={() => setEditing(false)} disabled={estimating}
-          aria-label={t('common.cancel', 'Cancelar')} title={t('common.cancel', 'Cancelar')}
-          style={{ padding: '3px 8px', fontSize: 'var(--fs-label)' }}>
-          <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg>
-        </button>
+          className="nutri-text-input nutri-meal-edit-input" onKeyDown={handleEditKeyDown} />
+        {/* pointerdown is cancelled so the inputs keep focus: no blur-save races the button's own click. */}
+        <div className="nutri-meal-edit-actions" onPointerDown={(e) => e.preventDefault()}>
+          <button type="button" className="nutri-btn" onClick={handleSave} disabled={estimating}>
+            {t('common.save', 'Guardar')}
+          </button>
+          <button type="button" className="nutri-btn nutri-btn-ghost" onClick={cancelEdit} disabled={estimating}>
+            {t('common.cancel', 'Cancelar')}
+          </button>
+          <button type="button" className="nutri-btn nutri-btn-ghost nutri-meal-edit-ai" onClick={handleReEstimate}
+            disabled={estimating || !editDesc.trim()}
+            aria-label={t('nutrify.reEstimate', 'Re-estimar con IA')} title={t('nutrify.reEstimate', 'Re-estimar con IA')}>
+            {estimating ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" opacity="0.3"/><path d="M7 1.5a5.5 5.5 0 0 1 4.76 2.75" strokeWidth="1.5"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" stroke="none" aria-hidden="true">
+                <path d="M7 0l.9 2.8h2.9l-2.4 1.7.9 2.8L7 5.6 4.7 7.3l.9-2.8L3.2 2.8h2.9z"/>
+                <path d="M11.5 5l.5 1.6h1.7l-1.4 1 .5 1.6-1.3-1-1.4 1 .5-1.6-1.3-1h1.7z" opacity="0.7"/>
+                <path d="M2.5 8l.4 1.2h1.3l-1 .8.4 1.2-1.1-.8-1 .8.4-1.2-1.1-.8h1.3z" opacity="0.5"/>
+              </svg>
+            )}
+            <span>{t('nutrify.reEstimateShort', 'IA')}</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -275,24 +330,19 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
         </div>
         {!readOnly ? (
           confirmDelete ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              flexWrap: 'wrap',
-              gridColumn: '1 / -1',
-              padding: '4px 10px', background: 'rgba(122,30,30,0.08)',
-              border: '1px solid var(--rubric)', borderRadius: '3px',
-            }}>
-              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
+            <div className="nutri-meal-del-confirm">
+              <span className="nutri-meal-del-confirm-text">
                 {t('nutrify.deleteConfirm', 'Delete this entry?')}
               </span>
-              <button className="nutri-btn" onClick={() => onDelete(entry.id)}
-                style={{ background: 'var(--rubric)', borderColor: 'var(--rubric)', padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-                {t('common.delete', 'Eliminar')}
-              </button>
-              <button className="nutri-btn nutri-btn-ghost" onClick={() => setConfirmDelete(false)}
-                style={{ padding: '3px 10px', fontSize: 'var(--fs-label)' }}>
-                {t('common.cancel', 'Cancelar')}
-              </button>
+              {/* Grouped so that on a phone they wrap together, under the text (NUT-04). */}
+              <div className="nutri-meal-del-confirm-actions">
+                <button type="button" className="nutri-btn nutri-meal-del-confirm-yes" onClick={() => onDelete(entry.id)}>
+                  {t('common.delete', 'Eliminar')}
+                </button>
+                <button type="button" className="nutri-btn nutri-btn-ghost" onClick={() => setConfirmDelete(false)}>
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="nutri-meal-del">
@@ -303,7 +353,7 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
                   <Heart width={14} height={14} stroke="var(--rubric)" />
                 </button>
               )}
-              <button type="button" className="nutri-food-action" onClick={() => setEditing(true)}
+              <button type="button" className="nutri-food-action" onClick={openEdit}
                 aria-label={t('nutrify.editEntryLabel', 'Editar «{{name}}»', { name: entry.description })}
                 title={t('nutrify.editEntry', 'Editar')}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"

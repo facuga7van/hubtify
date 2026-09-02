@@ -164,7 +164,7 @@ function SealButton({ level }: { level: number }) {
       aria-label={`Level ${level}`}
     >
       <div style={{ textAlign: 'center', lineHeight: 1 }}>
-        <div style={{ fontSize: 'var(--fs-label)', letterSpacing: '.1em', fontFamily: "'IM Fell English SC', serif", opacity: 0.85 }}>
+        <div style={{ fontSize: 'var(--fs-label)', letterSpacing: '.1em', fontFamily: "'IM Fell English SC', serif" }}>
           LVL
         </div>
         <div style={{ fontSize: 'var(--fs-hero)' }}>{level}</div>
@@ -394,7 +394,7 @@ export default function Dashboard() {
       subtitle={t('dashboard.subtitle', 'Primer folio · do se escriben las nuevas del día y se registran los hechos del campeón')}
     >
       {/* ── row 1: today's brief + wax seal ──────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, marginBottom: 16 }}>
+      <div className="dash-row-brief">
         <div>
           <div className="dash-brief">
             <div className="qb-small-caps dash-brief__eyebrow">
@@ -542,14 +542,16 @@ export default function Dashboard() {
       </div>
 
       {/* ── row 4: chronicle + xp ledger ──────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
+      <div className="dash-row-chronicle">
         <Section
           title={t('dashboard.chronicle', 'CRÓNICA RECIENTE')}
           icon={<Scroll width={12} height={12} style={{ color: 'var(--rubric)' }} />}
         >
           <HelpBubble text={t('dashboard.chronicleHelp', 'Últimos eventos que otorgaron XP: misiones, nutrición, finanzas y logros.')} />
           {recentEvents.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-label)', fontFamily: "'IM Fell English', serif" }}>
+            // El hecho es el dato primario de la fila: cuerpo de texto. XP y
+            // hora quedan en --fs-label como meta.
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-body)', fontFamily: "'IM Fell English', serif" }}>
               {recentEvents.map((ev) => {
                 let description = '';
                 try {

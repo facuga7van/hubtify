@@ -13,6 +13,108 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.1',
+    date: '2026-09-02',
+    changes: [
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'La estimación con IA se colgaba con ciertos platos —«una manzana», por ejemplo— hasta rendirse con «IA no disponible». Lo arreglamos del lado del servidor, así que también funciona en la versión anterior sin actualizar, y la app ya no dispara tres consultas por un solo toque',
+          en: 'AI estimation hung on certain dishes — "an apple", for instance — until giving up with "AI unavailable". We fixed it on the server side, so it works on the previous version without updating too, and the app no longer fires three requests for a single tap',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Editar una comida ahora tiene botones de Guardar y Cancelar como corresponde (antes había una sola estrella que en realidad disparaba la IA). Al cerrar el día la pantalla queda en modo lectura al instante, la barra «Cerrar el Día» ya no tapa lo que estás editando con el teclado abierto, y el aviso de peso semanal no salta el mismo día que hiciste el setup',
+          en: 'Editing a meal now has proper Save and Cancel buttons (before there was a lone star that actually triggered the AI). Closing the day switches the screen to read-only right away, the "Close the Day" bar no longer covers what you are editing with the keyboard open, and the weekly weight prompt does not pop up the same day you did the setup',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'Cerrar el día con el campo de Pasos vacío fallaba siempre — y justo era el primer intento de cualquiera que recién empezaba. Ahora podés cerrar la jornada sin cargar pasos; si no los contaste, no pasa nada',
+          en: 'Closing the day with the Steps field empty always failed — and it was precisely the first attempt of anyone just getting started. You can now close the day without logging steps; if you did not count them, no harm done',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'nutrify',
+        text: {
+          es: 'La barra «Cerrar el Día» dejó de ser un rectángulo blanco plano pegado sobre el pergamino. Ahora es solo el botón flotando con su sombra y un velo sutil por detrás, como corresponde',
+          en: 'The "Close the Day" bar is no longer a flat white rectangle slapped onto the parchment. Now it is just the button floating with its shadow and a subtle veil behind it, the way it should be',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'mobile',
+        text: {
+          es: 'El botón Atrás del teléfono cierra menús y desplegables antes de navegar, cada sección arranca arriba, el menú de cuenta entra en el cajón y el hub se lee en una sola columna. Los widgets ya no muestran controles de arrastre de escritorio, y el Caldero se queda sin el chip flotante encima ni las opciones de ventana que solo tienen sentido en la compu',
+          en: 'The phone\'s Back button closes menus and dropdowns before navigating, every section opens at the top, the account menu fits inside the drawer and the hub reads in a single column. Widgets no longer show desktop drag controls, and the Cauldron loses the floating chip sitting on top of it and the window options that only make sense on the computer',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'Las notas dibujadas ya se pueden trazar con el dedo: antes el scroll te cortaba el trazo a los pocos milímetros. Una nota vacía ya no queda guardada, y los formularios de misión y hábito tienen el nombre a lo ancho en vez de apretado entre los demás campos',
+          en: 'Drawn notes can finally be traced with your finger: the scroll used to cut the stroke short after a few millimeters. An empty note is no longer saved, and the quest and habit forms give the name its full width instead of squeezing it between the other fields',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El gráfico de reparto con una sola categoría mostraba un anillo vacío aunque la leyenda tuviera el monto. Ahora dibuja el anillo completo, el botón de eliminar grupo de cuotas se ve, y el toggle de préstamo y el eje de la proyección quedaron acomodados en la pantalla del teléfono',
+          en: 'The breakdown chart with a single category showed an empty ring even though the legend had the amount. It now draws the full ring, the delete button for an installment group is visible, and the loan toggle and the projection axis fit properly on the phone screen',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El botón de pausar/reanudar de Recurrentes tenía el ícono corrido y del mismo color que el fondo — había que adivinar dónde estaba. Ahora está centrado, con contraste, y muestra ‖ o ▶ según el estado del recurrente',
+          en: 'The pause/resume button in Recurring had its icon off-center and in the same color as the background — you had to guess where it was. It is now centered, with proper contrast, and shows ‖ or ▶ depending on the recurring item\'s state',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'auth',
+        text: {
+          es: 'Recuperar la contraseña ahora acepta tu nombre de usuario, igual que el inicio de sesión. No hace falta acordarse del mail exacto',
+          en: 'Password recovery now accepts your username, just like login does. No need to remember the exact email',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: '«1 comida» y «1 día» en singular, fechas y meses en el idioma de la app, las recetas del Caldero con su nombre traducido, y los selectores de fecha aplican el valor visible al tocar OK en vez de cerrarse sin guardar nada',
+          en: '"1 meal" and "1 day" in the singular, dates and months in the app\'s language, Cauldron recipes with their translated name, and the date pickers apply the visible value when you tap OK instead of closing without saving anything',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'En la compu las páginas por fin usan todo el ancho de la ventana. El Libro de Misiones, el libro de Coinify y el Caldero ya no dejan un tercio de pantalla vacío a la derecha cuando colapsás la barra lateral',
+          en: 'On the computer the pages finally use the full width of the window. The Quest Book, the Coinify ledger and the Cauldron no longer leave a third of the screen empty on the right when you collapse the sidebar',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Se acabó entrecerrar los ojos: el texto de tablas y filas en toda la app —libro mayor, misiones, comidas, crónica, bitácora— creció al tamaño de lectura del sistema y la tinta secundaria dejó de ser semitransparente. La tinta «apagada» ahora se lee con contraste accesible sobre todas las superficies de pergamino',
+          en: 'No more squinting: the text in tables and rows across the whole app — ledger, quests, meals, chronicle, log — grew to the system\'s reading size and the secondary ink is no longer semi-transparent. The "faded" ink now reads with accessible contrast on every parchment surface',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.0',
     date: '2026-09-02',
     changes: [

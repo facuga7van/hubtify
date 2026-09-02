@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { formatMonthYear } from '../../../../shared/format-date';
 
 interface MonthNavigatorProps {
   month: string;
@@ -6,6 +8,7 @@ interface MonthNavigatorProps {
 }
 
 export function MonthNavigator({ month, onChange, compact }: MonthNavigatorProps) {
+  const { i18n } = useTranslation();
 
   const navigate = (delta: number) => {
     const [y, m] = month.split('-').map(Number);
@@ -16,10 +19,7 @@ export function MonthNavigator({ month, onChange, compact }: MonthNavigatorProps
   const label = (() => {
     const [y, m] = month.split('-').map(Number);
     if (compact) return `${String(m).padStart(2, '0')}/${y}`;
-    return new Date(y, m - 1).toLocaleDateString(undefined, {
-      month: 'long',
-      year: 'numeric',
-    });
+    return formatMonthYear(month, i18n.language);
   })();
 
   return (

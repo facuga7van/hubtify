@@ -14,14 +14,16 @@
  */
 import { App } from '@capacitor/app';
 import { handleBackButton } from './back-button';
-import { hasOpenDialog, closeTopDialog } from './dialog-dom';
+import { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover } from './dialog-dom';
 
-export { hasOpenDialog, closeTopDialog };
+export { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover };
 
 /** Devuelve la función que suelta el listener (MobileShell la llama al desmontar). */
 export async function bindNativeShell(): Promise<() => void> {
   const handle = await App.addListener('backButton', ({ canGoBack }) => {
     handleBackButton({
+      openPopover: hasOpenPopover(),
+      closePopover: () => { closeTopPopover(); },
       openDialog: hasOpenDialog(),
       closeDialog: closeTopDialog,
       canGoBack,

@@ -1,6 +1,9 @@
-import { beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TaskList from '@modules/quests/components/TaskList';
+import { handleBackButton } from '../../../src/mobile/back-button';
+// De dialog-dom y no de native-shell: ese importa @capacitor/app (ver mobile-shell.browser.test).
+import { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover } from '../../../src/mobile/dialog-dom';
 import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes } from './mobile-harness';
 import { QUESTS_API } from './fixtures';
 
@@ -71,6 +74,32 @@ describe('Questify a 390×844', () => {
     noOverflow('QUESTS COMPLETADAS');
   });
 
+  test('QST-02: el nombre del hábito y de la misión van a lo ancho', async () => {
+    await setMobileViewport();
+    mountInShell(<TaskList />, '/quests');
+    await settle();
+    await goTab(/^Pendientes$/i);
+    const wide = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      const p = el.parentElement!.getBoundingClientRect();
+      expect(r.width, `${el.className} mide ${r.width}px`).toBeGreaterThanOrEqual(p.width - 2);
+    };
+    await page.getByRole('button', { name: /Nuevo hábito/i }).click();
+    await settle(300);
+    wide(document.querySelector('.quest-habit-form__name') as HTMLElement);
+
+    // El botón va sobre una cinta decorativa que intercepta el click real de
+    // playwright; el click de DOM dispara el mismo handler.
+    (document.querySelector('.quest-add-toggle') as HTMLElement).click();
+    await settle(600);
+    const name = document.querySelector('.quest-form-name') as HTMLElement;
+    const r = name.getBoundingClientRect();
+    expect(r.width).toBeGreaterThanOrEqual(300);
+    // …y los botones caen al renglón siguiente, no al lado.
+    const submit = name.parentElement!.querySelector('button') as HTMLElement;
+    expect(submit.getBoundingClientRect().top).toBeGreaterThanOrEqual(r.bottom);
+  });
+
   test('el gestor de proyectos entra en la pantalla (Q3)', async () => {
     await setMobileViewport();
     mountInShell(<TaskList />, '/quests');
@@ -90,5 +119,45 @@ describe('Questify a 390×844', () => {
     const top = document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2);
     expect(modal.contains(top)).toBe(true);
     await shoot('quests-03-proyectos');
+  });
+
+  /* GEN-01: el menú ⋯ de un hábito no es un `role="dialog"`, así que el botón
+     atrás de Android no lo veía y navegaba. Ahora useAnchoredPopup lo anota
+     como popover abierto y el primer Atrás lo cierra; el segundo navega. */
+  test('el botón atrás cierra el menú de un hábito antes de navegar (GEN-01)', async () => {
+    await setMobileViewport();
+    mountInShell(<TaskList />, '/quests');
+    await settle();
+    await goTab(/^Pendientes$/i);
+    await page.getByRole('button', { name: /Acciones del hábito/i }).first().click();
+    await settle(300);
+    expect(document.querySelector('.quest-row-menu[data-popover-open]')).not.toBeNull();
+    expect(hasOpenPopover()).toBe(true);
+    expect(hasOpenDialog(document)).toBe(false);
+
+    const back = () => {
+      const goBack = vi.fn();
+      const outcome = handleBackButton({
+        openPopover: hasOpenPopover(),
+        closePopover: () => { closeTopPopover(); },
+        openDialog: hasOpenDialog(document),
+        closeDialog: closeTopDialog,
+        canGoBack: true,
+        goBack,
+        minimize: vi.fn(),
+      });
+      return { outcome, goBack };
+    };
+
+    const first = back();
+    await settle(300);
+    expect(first.outcome).toBe('popover');
+    expect(first.goBack).not.toHaveBeenCalled();
+    expect(document.querySelector('.quest-row-menu')).toBeNull();
+    expect(hasOpenPopover()).toBe(false);
+
+    const second = back();
+    expect(second.outcome).toBe('history');
+    expect(second.goBack).toHaveBeenCalledTimes(1);
   });
 });

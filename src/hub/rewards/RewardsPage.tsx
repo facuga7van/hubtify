@@ -402,7 +402,7 @@ export default function RewardsPage() {
           icon={<Scroll width={12} height={12} style={{ color: 'var(--rubric)' }} />}
           rightSlot={
             form.id === null ? (
-              <button type="button" className="rpg-button rpg-btn-sm" onClick={openCreate}>
+              <button type="button" className="rpg-button rpg-btn-sm rwd-add" onClick={openCreate}>
                 {t('rpg.rwdAdd', 'Nueva recompensa')}
               </button>
             ) : undefined

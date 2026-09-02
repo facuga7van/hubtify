@@ -171,11 +171,11 @@ export default function SubtaskList({ taskId, subtasks, onShowToast, onSubtaskCh
                 <Checkbox checked onChange={() => handleComplete(subtask)} />
               </div>
               <span className="subtask-cell--drag" aria-hidden="true" />
-              <span className="subtask-name" style={{ textDecoration: 'line-through', opacity: 0.7, flex: 1, minWidth: 0 }} title={subtask.name}>
+              <span className="subtask-name" style={{ textDecoration: 'line-through', flex: 1, minWidth: 0 }} title={subtask.name}>
                 {subtask.name}
               </span>
               <TierBadge tier={subtask.tier} />
-              <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.7 }}>
+              <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                 +{tierXp(subtask.tier)}
               </span>
               <span className="subtask-cell--action" aria-hidden="true" />
@@ -226,7 +226,7 @@ function SortableSubtaskItem({ subtask, onComplete, onEdit, onDelete }: {
         {subtask.name}
       </button>
       <TierBadge tier={subtask.tier} />
-      <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', opacity: 0.7 }}>
+      <span className="subtask-xp-hint" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
         +{tierXp(subtask.tier)}
       </span>
       <button

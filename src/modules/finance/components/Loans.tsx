@@ -407,17 +407,22 @@ export default function Loans() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="coin-loan-form__who" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <input type="text" value={formPerson} onChange={(e) => setFormPerson(e.target.value)}
                   placeholder={t('coinify.personName')} className="rpg-input" style={{ flex: 1 }} required />
-                <button type="button" onClick={() => setFormDirection('lent')}
-                  className={`rpg-button ${formDirection === 'lent' ? 'rpg-btn-active' : ''}`}>
-                  {t('coinify.lent')}
-                </button>
-                <button type="button" onClick={() => setFormDirection('borrowed')}
-                  className={`rpg-button ${formDirection === 'borrowed' ? 'rpg-btn-active' : ''}`}>
-                  {t('coinify.borrowed')}
-                </button>
+                {/* COIN-03: the two directions are one control; grouped, they wrap
+                    together instead of «Prestado» staying next to the input and
+                    «Tomado prestado» dropping alone to the next line. */}
+                <div className="coin-loan-form__direction">
+                  <button type="button" onClick={() => setFormDirection('lent')}
+                    className={`rpg-button ${formDirection === 'lent' ? 'rpg-btn-active' : ''}`}>
+                    {t('coinify.lent')}
+                  </button>
+                  <button type="button" onClick={() => setFormDirection('borrowed')}
+                    className={`rpg-button ${formDirection === 'borrowed' ? 'rpg-btn-active' : ''}`}>
+                    {t('coinify.borrowed')}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: 6 }}>
@@ -441,7 +446,7 @@ export default function Loans() {
                 </select>
                 {formType === 'installments' && (
                   <>
-                    <label style={{ fontSize: 'var(--fs-label)', opacity: 0.6, whiteSpace: 'nowrap' }}>{t('coinify.installments')}</label>
+                    <label style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{t('coinify.installments')}</label>
                     <RpgNumberInput value={String(formInstallments)}
                       onChange={(v) => setFormInstallments(Math.max(1, parseInt(v) || 1))}
                       style={{ width: 60 }} min={1} />
@@ -509,7 +514,8 @@ export default function Loans() {
           {settledLoans.length > 0 && ` (${settledLoans.length})`}
         </button>
         {showSettled && (
-          <div style={{ opacity: 0.6 }}>
+          // Saldados: son historial, no fantasmas — se leen enteros.
+          <div>
             {renderLoanGroups(settledLoans)}
           </div>
         )}

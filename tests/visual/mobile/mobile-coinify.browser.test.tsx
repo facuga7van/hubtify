@@ -5,6 +5,7 @@ import FinanceLayout from '@modules/finance/components/FinanceLayout';
 import FinanceDashboard from '@modules/finance/components/Dashboard';
 import Transactions from '@modules/finance/components/Transactions';
 import Loans from '@modules/finance/components/Loans';
+import Installments from '@modules/finance/components/Installments';
 import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes } from './mobile-harness';
 import { FINANCE_API } from './fixtures';
 
@@ -39,6 +40,7 @@ function Finance() {
         <Route index element={<FinanceDashboard />} />
         <Route path="transactions" element={<Transactions />} />
         <Route path="loans" element={<Loans />} />
+        <Route path="installments" element={<Installments />} />
       </Route>
     </Routes>
   );
@@ -87,6 +89,51 @@ describe('Coinify a 390×844', () => {
     expect(a.left).toBeGreaterThanOrEqual(n.left - 1);
     expect(a.right).toBeLessThanOrEqual(n.right + 1);
     expect(active.getBoundingClientRect().height).toBeGreaterThanOrEqual(38);
+  });
+
+  test('COIN-03: Prestado / Tomado prestado van juntos en su propia fila', async () => {
+    await setMobileViewport();
+    mountInShell(<Finance />, '/finance/loans');
+    await settle(700);
+    await page.getByRole('button', { name: /Agregar préstamo/i }).click();
+    await settle(400);
+    const group = document.querySelector('.coin-loan-form__direction') as HTMLElement;
+    expect(group).not.toBeNull();
+    const [lent, borrowed] = [...group.querySelectorAll<HTMLElement>('button')].map((b) => b.getBoundingClientRect());
+    const input = (group.parentElement!.querySelector('input') as HTMLElement).getBoundingClientRect();
+    expect(Math.abs(lent.top - borrowed.top)).toBeLessThanOrEqual(1);
+    expect(lent.top).toBeGreaterThanOrEqual(input.bottom);
+    expect(input.width).toBeGreaterThanOrEqual(300);
+    noOverflow('COIN LOAN FORM');
+  });
+
+  test('COIN-02: «Eliminar grupo» se ve sin hover y con un aspa legible', async () => {
+    await setMobileViewport();
+    mountInShell(<Finance />, '/finance/installments');
+    await expect.element(page.getByText(/Heladera/i).first()).toBeVisible();
+    await settle(500);
+    await shoot('coinify-03-cuotas');
+    noOverflow('COIN INSTALLMENTS');
+    const btn = document.querySelector('.coin-action-btn--danger') as HTMLElement;
+    expect(btn).not.toBeNull();
+    expect(parseFloat(getComputedStyle(btn).opacity)).toBe(1);
+    const icon = btn.querySelector('svg') as SVGElement;
+    const r = icon.getBoundingClientRect();
+    expect(r.width).toBeGreaterThanOrEqual(16);
+    expect(r.width).toBeLessThanOrEqual(18);
+
+    // COIN-04: ningún rótulo del eje X de la proyección se sale del gráfico
+    // («CT 26» por «OCT 26» en el primero).
+    const svg = document.querySelector('.castle-chart-svg') as SVGSVGElement;
+    expect(svg).not.toBeNull();
+    const box = svg.getBoundingClientRect();
+    const labels = [...svg.querySelectorAll<SVGTextElement>('.castle-label')];
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+    for (const label of labels) {
+      const lr = label.getBoundingClientRect();
+      expect(lr.left, `«${label.textContent}» se sale por la izquierda`).toBeGreaterThanOrEqual(box.left - 0.5);
+      expect(lr.right, `«${label.textContent}» se sale por la derecha`).toBeLessThanOrEqual(box.right + 0.5);
+    }
   });
 
   test('el lápiz de presupuesto existe sin hover (C4)', async () => {

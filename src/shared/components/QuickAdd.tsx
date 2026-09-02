@@ -227,7 +227,7 @@ export default function QuickAdd({ onClose }: Props) {
       }} onClick={stopPropagation}>
 
         <div style={{
-          fontSize: 'var(--fs-label)', opacity: 0.65, marginBottom: 8,
+          fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', marginBottom: 8,
           fontFamily: "'IM Fell English', serif", textAlign: 'center',
         }}>
           {t('questify.quickAdd')} — {QUICK_ADD_KEYS}

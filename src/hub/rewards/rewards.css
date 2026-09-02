@@ -132,7 +132,7 @@
 
 .rwd-item__times {
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .rwd-item__notice {
@@ -342,7 +342,7 @@
 
 .shop-item__desc {
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
 }
 
 .shop-item__notice {
@@ -425,6 +425,12 @@
     grid-template-columns: 1fr;
     gap: 4px;
   }
+}
+
+/* ── Mobile (QA 0.9.0) ──────────────────────────────
+   «Nueva recompensa» partía en dos renglones al lado del título de sección. */
+[data-shell="mobile"] .rwd-add {
+  white-space: nowrap;
 }
 
 /* ── Touch (Fase 3) ─────────────────────────────────

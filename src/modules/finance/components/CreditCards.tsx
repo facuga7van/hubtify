@@ -96,7 +96,7 @@ export default function CreditCards() {
                         {formatCurrency(stmt.calculatedAmount, { currency: 'ARS' })}
                       </span>
                       {(stmt.calculatedAmountUsd ?? 0) > 0 && (
-                        <span className="qb-numeral" style={{ fontSize: 'var(--fs-label)', opacity: 0.8 }}>
+                        <span className="qb-numeral" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }}>
                           {formatCurrency(stmt.calculatedAmountUsd ?? 0, { currency: 'USD' })}
                         </span>
                       )}

@@ -240,3 +240,39 @@
     opacity: 1;
   }
 }
+
+/* En el teléfono esos controles no sirven: arrastrar es HTML5 drag & drop
+   (no hay evento touch que lo dispare), y el ancho/alto de un widget en una
+   grilla de una columna no cambia nada. La regla (hover: none) de arriba
+   queda para escritorio con pantalla táctil (HUB-02). */
+[data-shell="mobile"] .widget-controls,
+[data-shell="mobile"] .widget-drag-handle {
+  display: none;
+}
+
+/* ── Filas de dos columnas de la Tabla ──────────────
+   Eran grillas inline en Dashboard.tsx y ninguna regla de mobile podía
+   pisarlas (HUB-01, HUB-03). Mismos valores que tenían. */
+
+/* Fila HOY: el parte del día (+ «Empezá por acá») y el sello LVL. */
+.dash-row-brief {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+/* Crónica reciente + Bitácora de XP. */
+.dash-row-chronicle {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+}
+
+/* A 390-412 px dos columnas dejan los nombres de la crónica en «Lo…» y la
+   caja «Empezá por acá» en una columna angosta con los botones partidos.
+   `minmax(0, 1fr)`: un nombre largo no ensancha la columna ni desborda. */
+[data-shell="mobile"] .dash-row-brief,
+[data-shell="mobile"] .dash-row-chronicle {
+  grid-template-columns: minmax(0, 1fr);
+}

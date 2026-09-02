@@ -25,24 +25,35 @@ export type AiResult = {
   items: AiEstimationItem[];
 };
 
-/** Hard cap so a hung call never leaves the UI spinning forever. */
-export const TIMEOUT_MS = 15000;
 /**
- * Backoff before each retry (ms). Two entries → up to 3 total attempts.
+ * Hard cap so a hung call never leaves the UI spinning forever.
+ *
+ * MUST stay above the Cloud Function's own abort (30 s in functions/src/index.ts)
+ * plus network margin. With 15 s the client gave up and retried while the server
+ * was still working on the previous attempt — every click could fan out into
+ * three concurrent Gemini calls. Now a `deadline-exceeded` is always the SERVER
+ * giving up, and the server has already stopped by the time we see it.
+ */
+export const TIMEOUT_MS = 35000;
+/**
+ * Backoff before each retry (ms). One entry → at most 2 total attempts.
  * Short on purpose: the user is waiting on a single interactive estimate.
  */
-export const RETRY_DELAYS_MS = [400, 1200];
+export const RETRY_DELAYS_MS = [800];
 
 /**
  * Firebase callable error codes worth retrying.
  * `internal` is intentionally included: the Cloud Function collapses transient
  * Gemini 5xx/network failures into `internal`, so retrying recovers from those.
  * The downside is that a genuinely deterministic `internal` (e.g. an unparseable
- * model response) costs ~1.6s of wasted retries before failing — an acceptable
+ * model response) costs ~0.8s of a wasted retry before failing — an acceptable
  * trade for recovering the common transient case.
+ *
+ * `deadline-exceeded` is deliberately NOT here: it means the model took longer
+ * than the server allows, and the same prompt will very likely take just as
+ * long again. Retrying it only doubled the Gemini spend and the wait.
  */
 const TRANSIENT_CODES = new Set([
-  'deadline-exceeded',
   'unavailable',
   'internal',
   'resource-exhausted',

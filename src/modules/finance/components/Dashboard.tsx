@@ -10,6 +10,8 @@ import { useToast } from '../../../shared/components/useToast';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { formatCurrency, formatCurrencyCompact, currencyPrefix } from '../utils/format';
+import { sliceAngles, sliceShape, ringArc } from '../utils/wheel-paths';
+import { projectionCoords } from '../utils/projection-scale';
 import {
   getExpenseBreakdown,
   getExpenseBreakdownForRange,
@@ -324,53 +326,41 @@ function CategoryWheel({
 }) {
   if (data.length === 0 || total === 0) return null;
 
-  let acc = 0;
   const r = 54, cx = 70, cy = 70;
+  const geom = { cx, cy, r };
   const ringR = 62;
   const centreLabel = formatCurrencyCompact(total, currency);
   // The hole is 56px across; shrink the type once the label outgrows it.
   const centreFontSize = centreLabel.length <= 8 ? 16 : centreLabel.length <= 11 ? 13 : 11;
-
-  /** Stroke-only arc between two angles (radians, 0 = 3 o'clock). */
-  const arc = (radius: number, a0: number, a1: number): string => {
-    const x1 = cx + Math.cos(a0) * radius, y1 = cy + Math.sin(a0) * radius;
-    const x2 = cx + Math.cos(a1) * radius, y2 = cy + Math.sin(a1) * radius;
-    const large = (a1 - a0) > Math.PI ? 1 : 0;
-    return `M${x1} ${y1} A${radius} ${radius} 0 ${large} 1 ${x2} ${y2}`;
-  };
+  // COIN-01: the geometry lives in utils/wheel-paths — a single 100 % slice
+  // used to be an arc whose ends met, which SVG draws as nothing.
+  const angles = sliceAngles(data.map((d) => d.value), total);
 
   return (
     <svg viewBox="0 0 140 140" style={{ width: '100%', maxWidth: 160, display: 'block', margin: '0 auto' }}>
       {data.map((d, i) => {
-        const pct = (d.value / total) * 100;
-        const start = (acc / 100) * Math.PI * 2 - Math.PI / 2;
-        acc += pct;
-        const end = (acc / 100) * Math.PI * 2 - Math.PI / 2;
-        const x1 = cx + Math.cos(start) * r, y1 = cy + Math.sin(start) * r;
-        const x2 = cx + Math.cos(end) * r, y2 = cy + Math.sin(end) * r;
-        const large = (end - start) > Math.PI ? 1 : 0;
+        const { start, end } = angles[i];
+        const shape = sliceShape(geom, start, end);
+        if (shape.kind === 'empty') return null;
 
         const bPct = budgetPct?.get(d.label);
         const hasBudget = bPct !== undefined;
         const filled = hasBudget ? Math.min(bPct, 100) / 100 : 0;
         const over = hasBudget && bPct > 100;
+        const sliceAttrs = { fill: d.color, opacity: '.75', stroke: 'var(--parch-1)', strokeWidth: '1.5' };
 
         return (
           <g key={i}>
-            <path
-              d={`M${cx} ${cy} L${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
-              fill={d.color}
-              opacity=".75"
-              stroke="var(--parch-1)"
-              strokeWidth="1.5"
-            />
+            {shape.kind === 'circle'
+              ? <circle cx={shape.cx} cy={shape.cy} r={shape.r} {...sliceAttrs} />
+              : <path d={shape.d} {...sliceAttrs} />}
             {hasBudget && (
               <>
                 {/* Track: how much of this slice's ring is "the limit". */}
-                <path d={arc(ringR, start, end)} fill="none" stroke="var(--ink-faded)" strokeWidth="2" opacity=".35" strokeLinecap="butt" />
+                <path d={ringArc(geom, ringR, start, end)} fill="none" stroke="var(--ink-faded)" strokeWidth="2" opacity=".35" strokeLinecap="butt" />
                 {filled > 0 && (
                   <path
-                    d={arc(ringR, start, start + (end - start) * filled)}
+                    d={ringArc(geom, ringR, start, start + (end - start) * filled)}
                     fill="none"
                     stroke={over ? 'var(--rubric)' : 'var(--moss)'}
                     strokeWidth="2.5"
@@ -406,15 +396,11 @@ function ProjectionChart({ data }: { data: ProjectionMonth[] }) {
   if (data.length === 0) return null;
 
   const pts = data.map((d) => d.total);
-  const max = Math.max(...pts) * 1.15;
-  const min = Math.min(...pts) * 0.85;
   const w = 280, h = 100;
 
-  const coords = pts.map((v, i) => {
-    const x = (i / (pts.length - 1)) * w;
-    const y = h - ((v - min) / (max - min)) * h;
-    return [x, y];
-  });
+  // Pure (projection-scale.ts): a flat series — every month at 0 for a user
+  // without movements — used to normalise as 0/0 and paint NaN into the SVG.
+  const coords = projectionCoords(pts, w, h);
   const d = coords.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ' ' + p[1]).join(' ');
 
   return (

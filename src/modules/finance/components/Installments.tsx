@@ -248,7 +248,7 @@ export default function Installments() {
                     aria-label={t('coinify.deleteGroup', 'Eliminar grupo')}
                     title={t('coinify.deleteInstallmentGroup', 'Eliminar grupo de cuotas')}
                   >
-                    <CrossMark style={{ width: '0.65em', height: '0.65em' }} />
+                    <CrossMark className="coin-action-btn__icon" />
                   </button>
                 </div>
                 {group.rows.map((row) => {

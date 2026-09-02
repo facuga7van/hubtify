@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../hooks/useAnchoredPopup';
@@ -43,7 +43,8 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
   // The popup is portalled to <body>: several parent forms are overflow:hidden
   // and used to clip the whole calendar away.
-  const { anchorRef: ref, popupRef, pos: popupPos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
+  const closePopup = useCallback(() => setOpen(false), []);
+  const { anchorRef: ref, popupRef, pos: popupPos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open, 4, { onClose: closePopup });
 
   const maxDay = daysInMonth(year, month);
 
@@ -184,7 +185,8 @@ export default function RpgDateTimePicker({ value, onChange }: Props) {
               </select>
             </div>
           </div>
-          <button type="button" className="rpg-button" onClick={() => setOpen(false)}
+          {/* OK confirms what is on screen (GEN-02): see RpgDatePicker. */}
+          <button type="button" className="rpg-button" onClick={() => { emit(year, month, day, hour, minute); setOpen(false); }}
             style={{ marginTop: 10, width: '100%', padding: '4px 0', fontSize: 'var(--fs-label)' }}>
             OK
           </button>

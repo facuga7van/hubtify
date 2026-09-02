@@ -27,16 +27,13 @@
 
 .nutri-page {
   padding: 24px 28px 32px;
-  /* Medida cómoda de lectura. A 1640 px la página se desparramaba: el rótulo
-     contra el borde izquierdo y el número contra el derecho, con 800 px de
-     pergamino vacío en el medio. Misma cura que Cuotas y el Tablero. */
-  --nutri-measure: 980px;
-}
-
-/* La crónica son gráficos: respira más ancho que un formulario. */
-.nutri-page:has(.nutri-charts-grid),
-.nutri-page:has(.nutri-kpi-strip) {
-  --nutri-measure: 1180px;
+  /* Medida cómoda de lectura, centrada. A 1640 px la página se desparramaba:
+     el rótulo contra el borde izquierdo y el número contra el derecho, con
+     800 px de pergamino vacío en el medio. Misma cura que Cuotas. 1280 y no
+     980: con la barra lateral plegada 980 dejaba un tercio de la ventana en
+     blanco a cada lado; la crónica (gráficos) y el registro (formulario +
+     lista) comparten la medida, antes la crónica tenía 1180 aparte. */
+  --nutri-measure: 1280px;
 }
 
 .nutri-page > .nutri-page-head,
@@ -178,7 +175,7 @@
 }
 
 .nutri-btn-sm {
-  font-size: calc(var(--fs-label) * 0.85) !important;
+  font-size: var(--fs-label) !important;
   padding: 3px 8px !important;
   letter-spacing: 0.04em !important;
   min-height: 26px;
@@ -542,7 +539,7 @@
 }
 
 .nutri-macro-pct {
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-weight: 400;
 }
 
@@ -659,7 +656,7 @@
   margin-left: auto;
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   letter-spacing: 0;
   font-weight: 400;
   text-transform: none;
@@ -847,7 +844,7 @@
 .nutri-suggest-meta {
   flex-shrink: 0;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -908,7 +905,7 @@
 .nutri-food-kcal {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   font-weight: 600;
 }
 
@@ -1150,11 +1147,69 @@
   transition: background 200ms ease;
 }
 
-/* La fila en edición lleva otros controles (dos inputs y dos botones): se
+/* La fila en edición lleva otros controles (dos inputs y la botonera): se
    queda con el reparto flexible de siempre. */
 .nutri-meal-row--edit {
-  grid-template-columns: 32px minmax(0, 1fr) 72px auto auto;
+  grid-template-columns: 32px minmax(0, 1fr) 72px auto;
   gap: 8px;
+}
+
+.nutri-meal-edit-input {
+  padding: 4px 8px;
+  font-size: var(--fs-label);
+}
+
+/* Guardar / Cancelar / IA: una sola fila, del alto de los inputs (los dos
+   leen --nutri-control-h). La IA es secundaria: fantasma, con etiqueta. */
+.nutri-meal-edit-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.nutri-meal-edit-actions .nutri-btn {
+  padding: 4px 10px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.nutri-meal-edit-ai {
+  gap: 5px;
+}
+
+/* Confirmación inline de borrado: texto y botonera en una línea en
+   escritorio (mismos valores que llevaba inline), en dos en mobile. */
+.nutri-meal-del-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+  padding: 4px 10px;
+  background: rgba(122, 30, 30, 0.08);
+  border: 1px solid var(--rubric);
+  border-radius: 3px;
+}
+
+.nutri-meal-del-confirm-text {
+  font-size: var(--fs-label);
+  color: var(--rubric);
+}
+
+.nutri-meal-del-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-meal-del-confirm-actions .nutri-btn {
+  padding: 3px 10px;
+  font-size: var(--fs-label);
+}
+
+.nutri-meal-del-confirm-yes {
+  background: var(--rubric);
+  border-color: var(--rubric);
 }
 
 .nutri-meal-row:last-child { border-bottom: none; }
@@ -1228,16 +1283,18 @@
   white-space: nowrap;
 }
 
+/* Meta de fila: --ink-soft sobre la fila texturada, nunca --ink-faded. */
 .nutri-meal-time {
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   text-align: right;
 }
 
+/* Las calorías son dato primario de la fila: cuerpo de texto. */
 .nutri-meal-kcal {
   font-family: 'Fira Code', monospace;
-  font-size: var(--fs-label);
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--ink);
   text-align: right;
@@ -1689,19 +1746,38 @@
 .nutri-red { color: var(--rubric); }
 
 
-/* ── Sticky close-day footer ── */
+/* ── Sticky close-day footer ──
+   Era una franja de todo el ancho con `linear-gradient(transparent,
+   --rpg-parchment 30%)`: un color LISO pegado bajo la tarjeta «Cierre del
+   Día», sobre un fondo que es una TEXTURA de pergamino (layout.css:
+   `.main-content` con bg.jpg). Se veía como un rectángulo blanco de bordes
+   duros. Ahora no hay franja: el contenedor mide lo que mide el botón
+   (`width: fit-content`, centrado por el `margin: auto` de `.nutri-page >`),
+   con un velo de pergamino al 40 % y un desenfoque leve de lo que pasa por
+   debajo, y el botón lleva sombra de elevación media para despegarse de la
+   lista mientras flota. Al final del scroll se apoya en su lugar del flujo,
+   debajo de la tarjeta, así que no tapa la última fila. `pointer-events:
+   none` en el contenedor: lo que no es el botón no bloquea la lista. */
 
 .nutri-sticky-footer {
   position: sticky;
   bottom: 0;
   z-index: 10;
-  padding: 12px 16px;
-  background: linear-gradient(transparent, var(--rpg-parchment) 30%);
-  text-align: center;
+  width: fit-content;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  /* --parch-0 (#f5e7c0) al 40 %: no hay token con alfa. */
+  background: rgba(245, 231, 192, 0.4);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   pointer-events: none;
 }
 .nutri-sticky-footer .nutri-close-day-btn {
   pointer-events: auto;
+  box-shadow:
+    0 2px 4px rgba(42, 29, 14, 0.3),
+    0 4px 16px rgba(42, 29, 14, 0.35);
 }
 
 
@@ -1974,7 +2050,7 @@
 }
 
 .nutri-target-breakdown {
-  opacity: 0.75;
+  color: var(--ink-soft);
   font-size: var(--fs-label);
   margin-left: 6px;
 }
@@ -2098,7 +2174,6 @@
 }
 
 .nutri-adaptive-apply-target {
-  opacity: 0.85;
   font-weight: 400;
 }
 
@@ -3166,11 +3241,32 @@
   grid-template-columns: 32px minmax(0, 1fr) 72px;
 }
 
-/* Cinco hijos (FoodLogItem.tsx:160-186: ícono, dos inputs, dos botones): cada
-   botón baja a su propio renglón, a lo ancho, sin caer en la pista de 32 px. */
-[data-shell="mobile"] .nutri-meal-row--edit > .nutri-btn {
+/* La botonera (Guardar / Cancelar / IA) baja a su propio renglón bajo los
+   inputs, a lo ancho: Guardar y Cancelar se reparten el sitio, la IA queda
+   al ancho de su etiqueta (NUT-01). */
+[data-shell="mobile"] .nutri-meal-edit-actions {
   grid-column: 2 / -1;
-  justify-self: start;
+}
+
+[data-shell="mobile"] .nutri-meal-edit-actions .nutri-btn {
+  flex: 1 1 0;
+}
+
+[data-shell="mobile"] .nutri-meal-edit-actions .nutri-meal-edit-ai {
+  flex: 0 0 auto;
+}
+
+/* NUT-04: «Cancelar» caía solo al segundo renglón. Texto arriba, los dos
+   botones juntos debajo, a lo ancho. */
+[data-shell="mobile"] .nutri-meal-del-confirm {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 10px;
+}
+
+[data-shell="mobile"] .nutri-meal-del-confirm-actions .nutri-btn {
+  flex: 1 1 0;
+  justify-content: center;
 }
 
 /* N8 */
@@ -3181,6 +3277,29 @@
 [data-shell="mobile"] .nutri-meal-schedule-times {
   flex-basis: 100%;
   padding-left: 44px;
+}
+
+/* NUT-05: a 90 px el formato de 12 h del teléfono mostraba «10:00 A»: ocho
+   caracteres de Fira Code (≈ 62 px) + padding + la flecha del picker nativo
+   (≈ 20 px) piden 110. Dos inputs y el guion entran de sobra en 366 px. */
+[data-shell="mobile"] .nutri-meal-schedule-time {
+  width: 110px;
+}
+
+/* NUT-03: con el teclado abierto el viewport se achica y la barra sticky
+   «Cerrar el Día» quedaba encima de la fila en edición / del formulario.
+   Mientras un campo de la página tiene el foco (= teclado abierto) la barra
+   no está; vuelve al soltar el foco. `:has()` está en WebView 105+. */
+[data-shell="mobile"] .nutri-page:has(input:focus, textarea:focus, select:focus) .nutri-sticky-footer {
+  display: none;
+}
+
+/* En landscape (≈360 px de alto) la barra sticky tapaba ~15 % de la pantalla:
+   ahí va al final del flujo, como un botón más. */
+@media (max-height: 480px) {
+  [data-shell="mobile"] .nutri-sticky-footer {
+    position: static;
+  }
 }
 
 /* N9: el popup de cerrar el día mide más que la pantalla. */

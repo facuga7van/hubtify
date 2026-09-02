@@ -87,8 +87,8 @@ export function PostponeOptions({ onPick }: { onPick: (target: string) => void }
 export default function PostponeMenu({ onPick, children, className, title, disabled }: Props) {
   const [open, setOpen] = useState(false);
   // Portaled so a row with overflow hidden can never clip it.
-  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open);
   const closeMenu = useCallback(() => setOpen(false), []);
+  const { anchorRef, popupRef, pos } = useAnchoredPopup<HTMLDivElement, HTMLDivElement>(open, 4, { onClose: closeMenu });
   // Focus into the menu, arrow keys, Escape/Tab, focus back to the trigger.
   useMenuKeyboard({ open, popupRef, anchorRef, onClose: closeMenu });
 

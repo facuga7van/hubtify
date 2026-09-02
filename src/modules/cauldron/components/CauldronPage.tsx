@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
+import { isNativeMobile } from '../../../shared/platform-detect';
 import { ambientOrbs, brewComplete, statsShimmer } from '../../../shared/animations/cauldron';
 import {
   playCauldronStart,
@@ -24,7 +25,7 @@ import CauldronSVG from './CauldronSVG';
 import MissionPicker, { useOpenMissions } from './MissionPicker';
 import PotionShelf from './PotionShelf';
 import { formatTime } from '../utils';
-import { useCauldronLabels, usePresetName, rememberLastPreset, POPOUT_ON_START_KEY } from '../hooks';
+import { useCauldronLabels, usePresetName, useTimerPresetName, rememberLastPreset, POPOUT_ON_START_KEY } from '../hooks';
 import {
   cancelAutoStart,
   getWeekByProject,
@@ -144,6 +145,7 @@ export default function CauldronPage() {
     try { return localStorage.getItem(POPOUT_ON_START_KEY) === 'true'; } catch { return false; }
   });
   const presetLabel = usePresetName();
+  const timerPresetName = useTimerPresetName();
 
   // System notification copy comes from the renderer now — keep it in sync with i18n.
   useCauldronLabels();
@@ -739,7 +741,7 @@ export default function CauldronPage() {
           <Flame width={16} height={16} />
           <span className="cauldron-resume-text">
             {t('cauldron.interrupted.prompt', 'Quedó una poción a medio preparar: {{name}}.', {
-              name: interrupted.presetName ?? t('cauldron.history.unknownPreset', 'Receta desconocida'),
+              name: timerPresetName(interrupted.presetId, interrupted.presetName) ?? t('cauldron.history.unknownPreset', 'Receta desconocida'),
             })}{' '}
             {resumeBlocked ? (
               t('cauldron.interrupted.presetMissing', 'La receta de esta poción ya no existe, así que no se puede retomar. Podés descartarla.')
@@ -913,17 +915,20 @@ export default function CauldronPage() {
                   />
                 </div>
               )}
-              <label className="cauldron-popout-toggle">
-                <input
-                  type="checkbox"
-                  checked={popoutOnStart}
-                  onChange={(e) => {
-                    setPopoutOnStart(e.target.checked);
-                    try { localStorage.setItem(POPOUT_ON_START_KEY, String(e.target.checked)); } catch { /* private mode */ }
-                  }}
-                />
-                {t('cauldron.popOutOnStart', 'Abrir ventana flotante al iniciar')}
-              </label>
+              {/* La ventana flotante es una BrowserWindow de Electron: en Android no existe (CAU-02). */}
+              {!isNativeMobile() && (
+                <label className="cauldron-popout-toggle">
+                  <input
+                    type="checkbox"
+                    checked={popoutOnStart}
+                    onChange={(e) => {
+                      setPopoutOnStart(e.target.checked);
+                      try { localStorage.setItem(POPOUT_ON_START_KEY, String(e.target.checked)); } catch { /* private mode */ }
+                    }}
+                  />
+                  {t('cauldron.popOutOnStart', 'Abrir ventana flotante al iniciar')}
+                </label>
+              )}
             </div>
           )}
         </div>
@@ -962,7 +967,7 @@ export default function CauldronPage() {
                 <div className="cauldron-kv-row">
                   <span className="cauldron-kv-key">{t('cauldron.recipe', 'Recipe')}</span>
                   <span className="cauldron-kv-value">
-                    {timerState.presetName ?? presetLabel(selectedPreset)}
+                    {timerPresetName(timerState.presetId, timerState.presetName) ?? presetLabel(selectedPreset)}
                   </span>
                 </div>
                 {/* La misión vinculada, visible durante el foco Y en

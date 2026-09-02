@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '../../../shared/format-date';
 import { Tick } from '../../../shared/components/codex/CodexPrimitives';
 import { NoonSun, Sparkle } from '../../../shared/components/icons/CodexIcons';
 import QuillCheckbox from '../../../shared/components/QuillCheckbox';
@@ -251,7 +252,7 @@ function TodayRow({ task, project, overdue, onComplete, onPostpone }: {
   onComplete: () => void | Promise<boolean>;
   onPostpone?: (target: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [ticking, setTicking] = useState(false);
   const time = dueTimeOf(task.dueDate);
 
@@ -285,7 +286,7 @@ function TodayRow({ task, project, overdue, onComplete, onPostpone }: {
               )}
               {overdue && task.dueDate && (
                 <span className="quest-due--overdue">
-                  {new Date(`${task.dueDate.slice(0, 10)}T00:00:00`).toLocaleDateString()}
+                  {formatDate(`${task.dueDate.slice(0, 10)}T00:00:00`, i18n.language)}
                 </span>
               )}
               {project && (

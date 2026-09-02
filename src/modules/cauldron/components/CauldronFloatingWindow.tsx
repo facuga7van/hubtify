@@ -15,11 +15,13 @@ import {
   type CauldronSessionEndResultEx,
 } from '../types';
 import { cancelAutoStart } from '../api';
+import { useTimerPresetName } from '../hooks';
 import { formatTime } from '../utils';
 import '../styles/cauldron-window.css';
 
 export default function CauldronFloatingWindow() {
   const { t } = useTranslation();
+  const timerPresetName = useTimerPresetName();
   const [timerState, setTimerState] = useState<CauldronTimerStateEx | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   const warningFiredRef = useRef(false);
@@ -93,6 +95,7 @@ export default function CauldronFloatingWindow() {
   if (!timerState || timerState.status === 'idle') {
     return <div className="cfw" />;
   }
+  const presetLabel = timerPresetName(timerState.presetId, timerState.presetName);
 
   const isRunning = timerState.status === 'work' || timerState.status === 'on_break';
   const isPaused = timerState.status === 'work_paused' || timerState.status === 'break_paused';
@@ -177,8 +180,8 @@ export default function CauldronFloatingWindow() {
               {t('cauldron.autoStart.short', 'auto {{seconds}}s', { seconds: autoSeconds })}
             </span>
           )}
-          {timerState.presetName && (
-            <span className="cfw__preset">{timerState.presetName}</span>
+          {presetLabel && (
+            <span className="cfw__preset">{presetLabel}</span>
           )}
         </div>
         {/* La misión vinculada. Esta ventana es de solo-mirar: se cambia en la

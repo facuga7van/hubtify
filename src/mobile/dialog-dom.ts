@@ -1,10 +1,18 @@
 /**
- * Las dos consultas al DOM que usa el botón atrás de Android, separadas de
- * `native-shell.ts` porque ese archivo importa `@capacitor/app`: cargarlo
- * define `globalThis.Capacitor` con `isNativePlatform() === false`, y eso
- * volvería `false` a `isNativeMobile()` en todo el arnés browser-mobile. Acá
- * no hay import nativo, así que se pueden testear en el navegador.
+ * Las consultas que usa el botón atrás de Android para saber qué hay abierto,
+ * separadas de `native-shell.ts` porque ese archivo importa `@capacitor/app`:
+ * cargarlo define `globalThis.Capacitor` con `isNativePlatform() === false`, y
+ * eso volvería `false` a `isNativeMobile()` en todo el arnés browser-mobile.
+ * Acá no hay import nativo, así que se pueden testear en el navegador.
+ *
+ * Dos capas, en este orden:
+ *  1. Popovers (menús de fila, dropdown de cuenta, pickers, sugerencias): no
+ *     tienen contrato de DOM común, así que se anotan en popover-registry.ts
+ *     (useAnchoredPopup lo hace solo) y se cierran por callback.
+ *  2. Diálogos modales: todos pasan por useModalA11y (role + aria-modal) y se
+ *     cierran con un Escape en window, que solo atiende el de más arriba.
  */
+export { hasOpenPopover, closeTopPopover } from '../shared/popover-registry';
 
 /** Un modal abierto: todos pasan por useModalA11y (role + aria-modal); el drawer cerrado lleva `inert`. */
 const OPEN_DIALOG =

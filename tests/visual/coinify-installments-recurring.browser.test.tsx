@@ -131,8 +131,8 @@ describe('Cuotas: se lee de un vistazo a pantalla completa', () => {
     await settle();
     await page.screenshot({ path: `${SCREENS}/coinify-01-cuotas-1640.png` });
 
-    // La lista no se estira con la ventana.
-    expect(box('.coin-installment-list').width).toBeLessThanOrEqual(940);
+    // La lista no se estira con la ventana (medida de `.coin-installments`).
+    expect(box('.coin-installment-list').width).toBeLessThanOrEqual(1100);
 
     // Nombre ↔ importe: el hueco entre el contador y la cifra tiene que ser
     // legible de un salto de ojo, no el ancho de la pantalla.
@@ -235,4 +235,68 @@ describe('Recurrentes: acciones y fila de edición', () => {
     const bar = document.querySelector('.coin-recurring__actions') as HTMLElement;
     expect(bar.scrollWidth).toBeLessThanOrEqual(bar.clientWidth + 1);
   });
+
+  test('pausar / reanudar: ícono centrado, legible y distinto en cada estado', async () => {
+    await page.viewport(1640, 900);
+    wrap(<Recurring />);
+    await settle();
+
+    const toggles = [...document.querySelectorAll<HTMLButtonElement>('.coin-recurring-card__toggle')];
+    expect(toggles).toHaveLength(3);
+    const active = toggles.filter((b) => b.classList.contains('coin-recurring-card__toggle--active'));
+    const paused = toggles.filter((b) => b.classList.contains('coin-recurring-card__toggle--paused'));
+    expect(active).toHaveLength(2);
+    expect(paused).toHaveLength(1);
+
+    for (const btn of toggles) {
+      const isActive = btn.classList.contains('coin-recurring-card__toggle--active');
+      // Rótulo traducido y acorde a la ACCIÓN que ofrece.
+      expect(btn.getAttribute('aria-label')).toBe(isActive ? 'Pausar' : 'Reanudar');
+      expect(btn.getAttribute('title')).toBe(btn.getAttribute('aria-label'));
+
+      // El SVG (‖ o ▶) está CENTRADO en el botón: era un glifo de 9 px caído
+      // al borde izquierdo de un cuadrado de 28.
+      const icon = btn.querySelector('svg')!;
+      const b = btn.getBoundingClientRect();
+      const i = icon.getBoundingClientRect();
+      expect(i.width).toBeGreaterThanOrEqual(12);
+      expect(Math.abs((i.left + i.width / 2) - (b.left + b.width / 2))).toBeLessThanOrEqual(1.5);
+      expect(Math.abs((i.top + i.height / 2) - (b.top + b.height / 2))).toBeLessThanOrEqual(1.5);
+      expect(b.width).toBeGreaterThanOrEqual(32);
+      expect(b.height).toBeGreaterThanOrEqual(32);
+
+      // Contraste del ícono contra la parada MÁS OSCURA / MÁS CLARA del
+      // degradé del botón: activo = pergamino sobre cuero; pausado = tinta
+      // sobre dorado. Ninguno de los dos «del mismo tono que el fondo».
+      const color = getComputedStyle(btn).color;
+      const stops = getComputedStyle(btn).backgroundImage.match(/rgba?\([^)]+\)/g) ?? [];
+      expect(stops.length).toBeGreaterThan(0);
+      const worst = Math.min(...stops.map((s) => contrast(color, s)));
+      expect(worst, `${isActive ? 'activo' : 'pausado'}: ${color} sobre ${stops.join(' / ')}`).toBeGreaterThanOrEqual(4.5);
+      expect(getComputedStyle(btn).opacity).toBe('1');
+    }
+
+    // Los dos estados NO se ven iguales: el fondo cambia.
+    expect(getComputedStyle(active[0]).backgroundImage).not.toBe(getComputedStyle(paused[0]).backgroundImage);
+
+    // La tarjeta pausada sigue legible: nombre y monto no van apagados.
+    const pausedCard = paused[0].closest('.coin-recurring-card')!;
+    expect(getComputedStyle(pausedCard).opacity).toBe('1');
+  });
 });
+
+/** Relación de contraste WCAG entre dos colores `rgb(...)` computados. */
+function contrast(fg: string, bg: string): number {
+  const parse = (c: string): [number, number, number] => {
+    const m = c.match(/rgba?\(([^)]+)\)/);
+    if (!m) return [0, 0, 0];
+    const [r, g, b] = m[1].split(',').map((n) => parseFloat(n));
+    return [r, g, b];
+  };
+  const lum = ([r, g, b]: [number, number, number]) => {
+    const f = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const a = lum(parse(fg)), b = lum(parse(bg));
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
