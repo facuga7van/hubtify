@@ -44,8 +44,20 @@ export function useAnchoredPopup<A extends HTMLElement = HTMLDivElement, P exten
 
     let top = r.bottom + gap;
     if (top + ph > vh - edge) {
+      /*
+       * Voltear hacia arriba SÓLO si arriba entra entero.
+       *
+       * Antes se miraba únicamente el borde superior (`above >= edge`): con un
+       * disparador por debajo del pliegue el popup se colocaba arriba y se
+       * salía por abajo. Medido con el picker de misión del Caldero: ancla en
+       * y=755 con ventana de 640 lo dejaba terminando en 731, y como es
+       * `position: fixed` no scrollea — las últimas opciones quedaban
+       * literalmente inalcanzables. Si no entra ni abajo ni arriba, se sujeta
+       * al viewport, que al menos deja ver el principio.
+       */
       const above = r.top - ph - gap;
-      top = above >= edge ? above : Math.max(edge, vh - ph - edge);
+      const fitsAbove = above >= edge && above + ph <= vh - edge;
+      top = fitsAbove ? above : Math.max(edge, vh - ph - edge);
     }
 
     let left = r.left;
