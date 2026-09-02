@@ -1680,7 +1680,7 @@ export default function Today() {
           <HelpBubble variant="inline" text={t('nutrify.foodLogHelp', 'Comidas del día agrupadas por momento. Tocá el ícono para cambiar categoría. Podés editar o eliminar.')} />
           {foods.length > 0 && (
             <span className="nutri-card-meta">
-              {foods.length} {t('nutrify.meals', 'comidas')} {'\u00B7'} {consumed} kcal
+              {t('nutrify.meals', { count: foods.length, defaultValue: '{{count}} comidas' })} {'\u00B7'} {consumed} kcal
             </span>
           )}
           {foods.length > 0 && !dayClosed && (
@@ -2172,7 +2172,7 @@ export function RepeatDayPicker({
                 <button key={day.date} type="button" className="nutri-repeat-day" onClick={() => onPick(day.date)}>
                   <span className="nutri-repeat-day-name">{dayLabel(day.date)}</span>
                   <span className="nutri-repeat-day-meta">
-                    {day.meals} {t('nutrify.meals', 'comidas')} {'·'} {day.calories.toLocaleString(locale)} kcal
+                    {t('nutrify.meals', { count: day.meals, defaultValue: '{{count}} comidas' })} {'·'} {day.calories.toLocaleString(locale)} kcal
                   </span>
                 </button>
               ))}

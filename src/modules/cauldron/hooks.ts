@@ -61,6 +61,24 @@ export function usePresetName() {
 }
 
 /**
+ * Same idea for a running/interrupted session, which only carries the
+ * `presetId` + the name persisted at start time. Built-in recipes were stored
+ * with their English default name ("Quick Sprint"), so the label is rebuilt
+ * from the id; custom recipes keep whatever the user typed.
+ */
+export function useTimerPresetName() {
+  const { t } = useTranslation();
+  return useCallback(
+    (presetId: string | null | undefined, presetName: string | null | undefined): string | null => {
+      const key = presetId ? DEFAULT_PRESET_KEYS[presetId] : undefined;
+      if (key) return presetName ? t(key, presetName) : t(key);
+      return presetName ?? null;
+    },
+    [t],
+  );
+}
+
+/**
  * The main process builds OS notifications for the cauldron, and its copy used
  * to be hardcoded Spanish. Push the translated strings down on mount and on
  * every language change so the notification speaks the user's language.

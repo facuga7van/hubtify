@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '../../../shared/format-date';
 import { CategorySelect } from './shared/CategorySelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit } from './shared/AccountSelect';
 import { useToast } from '../../../shared/components/useToast';
@@ -71,7 +72,7 @@ function daysUntilBilling(billingDay: number): number {
 }
 
 export default function Recurring() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -628,7 +629,7 @@ export default function Recurring() {
                             {formatCurrency(h.newAmount, { currency: item.currency })}
                           </span>
                           <span style={{ marginLeft: 'auto', opacity: 0.5 }}>
-                            {new Date(h.changedAt).toLocaleDateString()}
+                            {formatDate(h.changedAt, i18n.language)}
                           </span>
                         </div>
                       ))}

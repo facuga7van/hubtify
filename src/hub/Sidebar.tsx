@@ -178,7 +178,7 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                       : t('rpg.streak', 'RACHA').toUpperCase()}
                   </span>
                   <span className="sidebar-bar__val">
-                    {stats.streak} {t('rpg.days', 'días')}
+                    {t('rpg.days', { count: stats.streak, defaultValue: '{{count}} días' })}
                   </span>
                 </div>
                 <div className="sidebar-bar__track">
