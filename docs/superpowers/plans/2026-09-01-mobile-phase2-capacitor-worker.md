@@ -102,12 +102,12 @@ java -version 2>&1 | head -1     # esperado: openjdk version "21.0.5" ...
 
 **Files:** ninguno (solo lectura).
 
-- [ ] **Step 1: Confirmar rama y estado limpio**
+- [x] **Step 1: Confirmar rama y estado limpio**
 
 Run: `git branch --show-current && git status --short | head -5`
 Expected: `feature/mobile` y ninguna línea de status.
 
-- [ ] **Step 2: Verificar los símbolos de `shared-logic` que usa este plan**
+- [x] **Step 2: Verificar los símbolos de `shared-logic` que usa este plan**
 
 Run:
 ```bash
@@ -123,7 +123,7 @@ rg -n "__HUBTIFY_PLATFORM__" vite.renderer.config.ts src/global.d.ts src/shared/
 ```
 Expected: cada comando imprime al menos una línea con el símbolo buscado. Anotar los que difieran: son los únicos imports que hay que adaptar en las tareas 8–13.
 
-- [ ] **Step 3: Confirmar que la suite base está verde antes de tocar nada**
+- [x] **Step 3: Confirmar que la suite base está verde antes de tocar nada**
 
 Run: `npm test 2>&1 | tail -5`
 Expected: `Test Files  N passed (N)` y `Tests  M passed (M)` (sin `failed`). Anotar N y M: al final de este plan deben ser N+7 archivos y M+69 tests.
@@ -135,7 +135,7 @@ No hay commit en esta tarea.
 **Files:**
 - Modify: `package.json` (`dependencies`, `devDependencies`)
 
-- [ ] **Step 1: Instalar runtime deps con versión exacta**
+- [x] **Step 1: Instalar runtime deps con versión exacta**
 
 Run:
 ```bash
@@ -143,12 +143,12 @@ npm install --save-exact @capacitor/core@8.5.1 @capacitor/android@8.5.1 @capacit
 ```
 Expected: termina con `added K packages` sin `ERR!`. (Versiones verificadas con `npm view` el 2026-09-01: `@capacitor/core|cli|android` 8.5.1, `@capacitor/app` 8.1.1, `@capacitor/device` 8.0.3, `@capacitor/status-bar` 8.0.3, `@sqlite.org/sqlite-wasm` 3.53.0-build1.)
 
-- [ ] **Step 2: Instalar la CLI como devDependency**
+- [x] **Step 2: Instalar la CLI como devDependency**
 
 Run: `npm install --save-dev --save-exact @capacitor/cli@8.5.1`
 Expected: `added K packages`.
 
-- [ ] **Step 3: Verificar el mapa `exports` de sqlite-wasm (lo que este plan asume)**
+- [x] **Step 3: Verificar el mapa `exports` de sqlite-wasm (lo que este plan asume)**
 
 Run: `node -p "JSON.stringify(require('./node_modules/@sqlite.org/sqlite-wasm/package.json').exports, null, 1)"`
 Expected:
@@ -161,12 +161,12 @@ Expected:
 ```
 La condición `node` (vitest) resuelve `dist/node.mjs`, que carga el `.wasm` con `fs.readFileSync` y funciona sin globals de browser; `import`/`browser` (worker en Vite) resuelven `dist/index.mjs`.
 
-- [ ] **Step 4: Confirmar que la suite sigue verde (better-sqlite3 no se rompió con el install)**
+- [x] **Step 4: Confirmar que la suite sigue verde (better-sqlite3 no se rompió con el install)**
 
 Run: `npm test 2>&1 | tail -3`
 Expected: mismos N/M que en Task 1. Si aparece `NODE_MODULE_VERSION` mismatch: `npm run rebuild` y repetir.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json package-lock.json
@@ -181,7 +181,7 @@ git commit -m "chore(mobile): dependencias de capacitor 8.5 y sqlite-wasm 3.53"
 - Modify: `.gitignore`
 - Verify/Modify: `src/global.d.ts`, `src/shared/platform-detect.ts` (creados por Fase 1)
 
-- [ ] **Step 1: Crear `capacitor.config.ts`**
+- [x] **Step 1: Crear `capacitor.config.ts`**
 
 ```ts
 import type { CapacitorConfig } from '@capacitor/cli';
@@ -201,7 +201,7 @@ const config: CapacitorConfig = {
 export default config;
 ```
 
-- [ ] **Step 2: Crear `vite.mobile.config.ts`**
+- [x] **Step 2: Crear `vite.mobile.config.ts`**
 
 ```ts
 import { defineConfig } from 'vite';
@@ -244,7 +244,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Agregar entradas a `.gitignore`** (al final del archivo, después de `.claude/`)
+- [x] **Step 3: Agregar entradas a `.gitignore`** (al final del archivo, después de `.claude/`)
 
 ```gitignore
 
@@ -261,7 +261,7 @@ dist/mobile/
 
 (`dist/` ya está ignorado globalmente; `dist/mobile/` se lista igual porque la spec §5 lo pide explícito y así sobrevive si alguien afina `dist/` más adelante.)
 
-- [ ] **Step 4: Verificar/ajustar `src/global.d.ts`**
+- [x] **Step 4: Verificar/ajustar `src/global.d.ts`**
 
 El contenido final debe ser exactamente este (la Fase 1 agrega la declaración; si falta, agregarla):
 
@@ -280,7 +280,7 @@ declare global {
 export {};
 ```
 
-- [ ] **Step 5: Verificar/ajustar `src/shared/platform-detect.ts`**
+- [x] **Step 5: Verificar/ajustar `src/shared/platform-detect.ts`**
 
 Contenido final (spec §5: `define` primero, `Capacitor.isNativePlatform()` como confirmación en runtime). La confirmación solo se exige si el runtime de Capacitor está presente: así el arnés visual `browser-mobile` de la Fase 3 (define `android`, sin Capacitor) también obtiene `true`.
 
@@ -303,12 +303,12 @@ export function isNativeMobile(): boolean {
 }
 ```
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `npx tsc --noEmit 2>&1 | tail -3`
 Expected: sin salida (exit 0). Si `capacitor.config.ts` marca `Cannot find module '@capacitor/cli'`, la Task 2 Step 2 no corrió.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add capacitor.config.ts vite.mobile.config.ts .gitignore src/global.d.ts src/shared/platform-detect.ts
@@ -323,7 +323,7 @@ git commit -m "feat(mobile): configuración de capacitor y build vite para andro
 
 Spec §3.5 define los mensajes. Este módulo NO importa nada de `@logic` ni de Capacitor: lo comparten worker y UI.
 
-- [ ] **Step 1: Escribir el test**
+- [x] **Step 1: Escribir el test**
 
 ```ts
 // tests/mobile/protocol.test.ts
@@ -388,12 +388,12 @@ describe('errores', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/mobile/protocol.test.ts 2>&1 | tail -5`
 Expected: `Error: Failed to resolve import "../../src/mobile/protocol"` (o `Cannot find module`).
 
-- [ ] **Step 3: Crear `src/mobile/protocol.ts`**
+- [x] **Step 3: Crear `src/mobile/protocol.ts`**
 
 ```ts
 /**
@@ -500,12 +500,12 @@ export function collectTransferables(value: unknown, depth = 0): Transferable[] 
 }
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/mobile/protocol.test.ts 2>&1 | tail -5`
 Expected: `Tests  8 passed (8)`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/mobile/protocol.ts tests/mobile/protocol.test.ts
@@ -529,7 +529,7 @@ API real de sqlite-wasm que se usa (doc `api-oo1.md`, tipos `dist/index.d.mts` 3
 - `sqlite3.capi.sqlite3_last_insert_rowid(db.pointer): bigint`, `sqlite3.capi.sqlite3_get_autocommit(db.pointer): number` (0 = dentro de una transacción).
 - Enteros en rango seguro vuelven como `number` (el build tiene BigInt habilitado y convierte cuando cabe en 2^53), igual que better-sqlite3 por defecto.
 
-- [ ] **Step 1: Escribir el test**
+- [x] **Step 1: Escribir el test**
 
 ```ts
 // tests/mobile/wasm-database.test.ts
@@ -708,14 +708,14 @@ describe('WasmDatabase (shim better-sqlite3 sobre sqlite3.oo1.DB)', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/mobile/wasm-database.test.ts 2>&1 | tail -5`
 Expected: `Failed to resolve import "../../src/mobile/db/wasm-database"`.
 
 Si en cambio falla al cargar `@sqlite.org/sqlite-wasm` (p. ej. `fetch is not defined` o intenta `instantiateStreaming`), vitest no resolvió la condición `node`: agregar `resolve: { conditions: ['node'] }` al project `unit` en `vitest.config.ts` y repetir.
 
-- [ ] **Step 3: Crear `src/mobile/db/wasm-database.ts`**
+- [x] **Step 3: Crear `src/mobile/db/wasm-database.ts`**
 
 ```ts
 /**
@@ -967,17 +967,17 @@ export class WasmDatabase {
 }
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/mobile/wasm-database.test.ts 2>&1 | tail -5`
 Expected: `Tests  16 passed (16)`.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `npx tsc --noEmit 2>&1 | tail -3`
 Expected: sin salida. Si `Database`/`PreparedStatement` no existen como export de tipos, abrir `node_modules/@sqlite.org/sqlite-wasm/dist/index.d.mts` y usar los nombres que exporte (`rg -n "^export (declare )?(class|interface|type) " node_modules/@sqlite.org/sqlite-wasm/dist/index.d.mts`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/mobile/db/wasm-database.ts tests/mobile/wasm-database.test.ts
@@ -999,7 +999,7 @@ Comportamiento (spec §3.2, §3.5):
 - `platform` (worker→UI) con `id`; `platform-result` resuelve/rechaza.
 - `init` → `host.onInit({ appVersion, osInfo })`.
 
-- [ ] **Step 1: Escribir el test**
+- [x] **Step 1: Escribir el test**
 
 ```ts
 // tests/mobile/worker-protocol.test.ts
@@ -1166,12 +1166,12 @@ describe('worker-protocol: platform proxy e init', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/mobile/worker-protocol.test.ts 2>&1 | tail -5`
 Expected: `Failed to resolve import "../../src/mobile/worker-protocol"`.
 
-- [ ] **Step 3: Crear `src/mobile/worker-protocol.ts`**
+- [x] **Step 3: Crear `src/mobile/worker-protocol.ts`**
 
 ```ts
 /**
@@ -1320,12 +1320,12 @@ export function createWorkerProtocol(host: WorkerHost): WorkerProtocol {
 }
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/mobile/worker-protocol.test.ts 2>&1 | tail -5`
 Expected: `Tests  13 passed (13)`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/mobile/worker-protocol.ts tests/mobile/worker-protocol.test.ts
@@ -1343,7 +1343,7 @@ git commit -m "feat(mobile): protocolo del worker con gate de suspend y proxy de
 
 Es el `Transport { invoke, send, on, off }` que `shared/build-api.ts` convierte en `window.api` (spec §3.1). Además: espera `ready`/`fatal` (§3.5), atiende los `platform` del worker con el host de la UI, encola invokes durante `suspend`, y ante `error`/`messageerror` rechaza todo con `WorkerCrashed` y avisa (`onCrash`).
 
-- [ ] **Step 1: Escribir el test**
+- [x] **Step 1: Escribir el test**
 
 ```ts
 // tests/mobile/worker-client.test.ts
@@ -1580,12 +1580,12 @@ describe('worker-client: crash', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/mobile/worker-client.test.ts 2>&1 | tail -5`
 Expected: `Failed to resolve import "../../src/mobile/worker-client"`.
 
-- [ ] **Step 3: Crear `src/mobile/worker-client.ts`**
+- [x] **Step 3: Crear `src/mobile/worker-client.ts`**
 
 ```ts
 /**
@@ -1795,12 +1795,12 @@ export function createWorkerClient(
 }
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/mobile/worker-client.test.ts 2>&1 | tail -5`
 Expected: `Tests  17 passed (17)`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/mobile/worker-client.ts tests/mobile/worker-client.test.ts
@@ -1815,7 +1815,7 @@ git commit -m "feat(mobile): transport del worker con cola en suspend y WorkerCr
 
 Requiere Fase 1 (`shared/api-channels.ts`, `shared/build-api.ts`). No hay test unitario propio: `install-api.ts` es cableado (Worker real + Capacitor) y se verifica en el emulador (Task 14); la lógica está testeada en `worker-client`.
 
-- [ ] **Step 1: Crear `src/mobile/platform-host.ts`**
+- [x] **Step 1: Crear `src/mobile/platform-host.ts`**
 
 ```ts
 /**
@@ -1861,7 +1861,7 @@ export function createPlatformHost(): PlatformHostFns {
 }
 ```
 
-- [ ] **Step 2: Crear `src/mobile/install-api.ts`**
+- [x] **Step 2: Crear `src/mobile/install-api.ts`**
 
 ```ts
 /**
@@ -1917,14 +1917,14 @@ export async function installMobileApi(): Promise<void> {
 
 Si `buildApi` de la Fase 1 acepta un filtro de plataforma (p. ej. `buildApi(transport, { platform: 'android' })`), usarlo y borrar el bucle `delete`.
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `npx tsc --noEmit 2>&1 | tail -5`
 Expected: sin salida. Errores esperables y su arreglo:
 - `Argument of type 'WorkerTransport' is not assignable to parameter of type 'Transport'` → la forma de `Transport` en `shared/build-api.ts` difiere; ajustar `WorkerTransport` en `worker-client.ts` a esa forma (no al revés).
 - `Cannot find module './worker'` → todavía no existe (Task 12); es aceptable hasta esa tarea SOLO si tsc no lo marca (Vite resuelve `new URL('./worker.ts', import.meta.url)` como string, tsc no la valida). Si tsc lo marca, crear `src/mobile/worker.ts` vacío con `export {};` y seguir.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/mobile/platform-host.ts src/mobile/install-api.ts
@@ -1939,7 +1939,7 @@ git commit -m "feat(mobile): install-api arma window.api desde api-channels sobr
 - Modify: `src/main.tsx`
 - Modify: `src/App.tsx`
 
-- [ ] **Step 1: Agregar la sección `mobile` a `src/i18n/es.json`**
+- [x] **Step 1: Agregar la sección `mobile` a `src/i18n/es.json`**
 
 Insertar entre el cierre de `"hub": { … },` (línea ~899) y `"nav": {` (línea ~900):
 
@@ -1957,7 +1957,7 @@ Insertar entre el cierre de `"hub": { … },` (línea ~899) y `"nav": {` (línea
   },
 ```
 
-- [ ] **Step 2: Agregar la sección `mobile` a `src/i18n/en.json`** (misma posición, entre `hub` y `nav`)
+- [x] **Step 2: Agregar la sección `mobile` a `src/i18n/en.json`** (misma posición, entre `hub` y `nav`)
 
 ```json
   "mobile": {
@@ -1976,7 +1976,7 @@ Insertar entre el cierre de `"hub": { … },` (línea ~899) y `"nav": {` (línea
 Run: `node -e "for (const l of ['es','en']) { const j = require('./src/i18n/'+l+'.json'); console.log(l, Object.keys(j.mobile.fatal).join(',')) }"`
 Expected: dos líneas `es crash,migration,migrationDetail,open,restart,title,vfs` y `en …` idénticas.
 
-- [ ] **Step 3: Crear `src/mobile/fatal-screen.css`** (tokens de `src/hub/styles/theme.css`; ver `DESIGN_SYSTEM.md` §RPG Card)
+- [x] **Step 3: Crear `src/mobile/fatal-screen.css`** (tokens de `src/hub/styles/theme.css`; ver `DESIGN_SYSTEM.md` §RPG Card)
 
 ```css
 /* Pantalla de fallo del arranque mobile. Pantalla completa sobre cuero, una
@@ -2057,7 +2057,7 @@ Expected: dos líneas `es crash,migration,migrationDetail,open,restart,title,vfs
 }
 ```
 
-- [ ] **Step 4: Crear `src/mobile/FatalScreen.tsx`**
+- [x] **Step 4: Crear `src/mobile/FatalScreen.tsx`**
 
 ```tsx
 /**
@@ -2111,7 +2111,7 @@ export default function FatalScreen({ reason, message, namespace, version }: Pro
 }
 ```
 
-- [ ] **Step 5: Reescribir `src/main.tsx`**
+- [x] **Step 5: Reescribir `src/main.tsx`**
 
 Contenido completo nuevo (el árbol de render no cambia; se envuelve en `bootstrap()` porque `await installMobileApi()` debe correr antes de `createRoot`, y el renderer desktop no tiene `build.target` para top-level await):
 
@@ -2196,7 +2196,7 @@ async function bootstrap(): Promise<void> {
 void bootstrap();
 ```
 
-- [ ] **Step 6: Modificar `src/App.tsx`**
+- [x] **Step 6: Modificar `src/App.tsx`**
 
 (a) Junto a los otros `lazy` (después de `const RewardsPage = …`, línea ~39):
 
@@ -2228,19 +2228,19 @@ const FatalScreen = lazy(() => import('./mobile/FatalScreen'));
   }
 ```
 
-- [ ] **Step 7: Typecheck, lint y suite**
+- [x] **Step 7: Typecheck, lint y suite**
 
 Run: `npx tsc --noEmit 2>&1 | tail -3 && npm run lint 2>&1 | tail -3 && npm test 2>&1 | tail -3`
 Expected: tsc sin salida; lint sin errores; `Test Files  N+4 passed`, todos `passed`.
 
-- [ ] **Step 8: Verificar que el bundle desktop NO arrastra el binding mobile**
+- [x] **Step 8: Verificar que el bundle desktop NO arrastra el binding mobile**
 
 Run: `npx vite build -c vite.renderer.config.ts --outDir dist/renderer-check 2>&1 | tail -3 && rg --files --no-ignore dist/renderer-check | rg -i "sqlite3|worker-|install-api|capacitor"; echo "(sin líneas arriba = ok)"`
 Expected: el build termina con `✓ built in Xs` y el `rg` no imprime nada. Si aparece `sqlite3-*.wasm` o un chunk `worker-*`, el guard de `bootstrap()` no se plegó: confirmar que `vite.renderer.config.ts` define `__HUBTIFY_PLATFORM__: '"desktop"'` (Fase 1).
 
 Run: `node -e "require('fs').rmSync('dist/renderer-check', { recursive: true, force: true })"`
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/mobile/FatalScreen.tsx src/mobile/fatal-screen.css src/i18n/es.json src/i18n/en.json src/main.tsx src/App.tsx
@@ -2260,7 +2260,7 @@ Estas dos tareas tocan `shared-logic/` (Fase 1 mergeada). Los tests siguen el pa
 
 Contexto (spec §6 «Background» y §3.2): hoy `onTimeUp()` escribe `completed_at = new Date().toISOString()` — la hora en que corrió el callback. En Android el worker se congela en segundo plano; al reanudar, el tick recalcula `remainingMs = targetEndTime - Date.now()` y dispara `onTimeUp()` quizá 40 minutos tarde. Pasa a `completed_at = new Date(targetEndTime).toISOString()`. Y como el worker cierra la DB al suspender, los 2 intervals del caldero (`timerInterval`, `autoStartInterval`) se limpian en `suspend` y se rearman en `resume`.
 
-- [ ] **Step 1: Escribir el test**
+- [x] **Step 1: Escribir el test**
 
 ```ts
 // tests/modules/cauldron/cauldron.suspend.test.ts
@@ -2465,12 +2465,12 @@ describe('lifecycle: runSuspend / runResume', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/modules/cauldron/cauldron.suspend.test.ts 2>&1 | tail -15`
 Expected: `Tests  4 failed | 2 passed (6)`. El primero falla con `expected "2026-09-01T15:41:01.000Z" to be "2026-09-01T15:01:00.000Z"` (completed_at 40 min tarde); los de lifecycle fallan con `expected 1 to be 0` en `getTimerCount` (el interval sigue vivo tras `runSuspend`), salvo «sesión vencida durante la suspensión», que falla con `expected [] to have a length of 1` (sin lifecycle nada tickea al reanudar). Si en cambio falla el import de `shared-logic/registry` o `shared-logic/events`, la Fase 1 no está: parar.
 
-- [ ] **Step 3: Cambiar `onTimeUp` en `shared-logic/modules/cauldron.ipc.ts`**
+- [x] **Step 3: Cambiar `onTimeUp` en `shared-logic/modules/cauldron.ipc.ts`**
 
 Buscar (`rg -n "function onTimeUp" shared-logic/modules/cauldron.ipc.ts`) y reemplazar el inicio de la función:
 
@@ -2496,7 +2496,7 @@ function onTimeUp(): void {
 
 (El resto de la función no cambia: `updated_at` sigue siendo `now`.)
 
-- [ ] **Step 4: Agregar `suspendTimers`/`resumeTimers` y registrar el lifecycle**
+- [x] **Step 4: Agregar `suspendTimers`/`resumeTimers` y registrar el lifecycle**
 
 Import (junto a los otros de `../`):
 
@@ -2546,17 +2546,17 @@ Al final de `registerCauldronIpcHandlers()` (antes de su `}` de cierre):
   registerLifecycle({ suspend: suspendTimers, resume: resumeTimers });
 ```
 
-- [ ] **Step 5: Correr el test y verificar que pasa**
+- [x] **Step 5: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/modules/cauldron/cauldron.suspend.test.ts 2>&1 | tail -5`
 Expected: `Tests  6 passed (6)`.
 
-- [ ] **Step 6: Correr toda la suite del caldero**
+- [x] **Step 6: Correr toda la suite del caldero**
 
 Run: `npm test -- tests/modules/cauldron 2>&1 | tail -5`
 Expected: todos `passed`. (`cauldron.autostart.test.ts` y `cauldron.phase2.test.ts` afirman sobre `completed_at` solo indirectamente; si alguno compara `completed_at` con `new Date().toISOString()` tras `advanceTimersByTime` exacto, sigue pasando porque en ese caso `now === targetEndTime`.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared-logic/modules/cauldron.ipc.ts tests/modules/cauldron/cauldron.suspend.test.ts
@@ -2571,7 +2571,7 @@ git commit -m "fix(cauldron): completed_at es la hora del target y los intervals
 
 `pollingInterval` (cada 30 min) llama `runNotificationCheck()`, que toca la DB. Con la DB cerrada durante suspend, reventaría. `startNotificationEngine()` además pasa a ser idempotente (hoy un segundo start filtraría un interval).
 
-- [ ] **Step 1: Escribir el test**
+- [x] **Step 1: Escribir el test**
 
 ```ts
 // tests/modules/notifications/notification-lifecycle.test.ts
@@ -2637,12 +2637,12 @@ describe('notification engine lifecycle', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/modules/notifications/notification-lifecycle.test.ts 2>&1 | tail -8`
 Expected: `Tests  2 failed | 2 passed (4)` — «idempotente» falla con `expected 2 to be 1`; «suspend detiene» falla con `expected 1 to be 0`.
 
-- [ ] **Step 3: Modificar `shared-logic/modules/notifications.ipc.ts`**
+- [x] **Step 3: Modificar `shared-logic/modules/notifications.ipc.ts`**
 
 Import:
 
@@ -2691,17 +2691,17 @@ Al final de `registerNotificationIpcHandlers()`:
   });
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/modules/notifications/notification-lifecycle.test.ts 2>&1 | tail -5`
 Expected: `Tests  4 passed (4)`.
 
-- [ ] **Step 5: Suite completa + typecheck**
+- [x] **Step 5: Suite completa + typecheck**
 
 Run: `npx tsc --noEmit 2>&1 | tail -3 && npx tsc -p shared-logic --noEmit 2>&1 | tail -3 && npm test 2>&1 | tail -3`
 Expected: ambos tsc sin salida; `Test Files  N+6 passed`, todos `passed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared-logic/modules/notifications.ipc.ts tests/modules/notifications/notification-lifecycle.test.ts
@@ -2720,7 +2720,7 @@ Requiere Fase 1. Sin test unitario propio (necesita OPFS, que solo existe en un 
 
 API real de sqlite-wasm usada (doc `persistence.md`, tipos `dist/index.d.mts`): `sqlite3.installOpfsSAHPoolVfs({ name, initialCapacity, forceReinitIfPreviouslyFailed }): Promise<SAHPoolUtil>` (lanza si el VFS «is already active in another browsing context in the same origin with the same directory»; requiere Worker + contexto seguro; sin SharedArrayBuffer ni COOP/COEP). **El resultado se cachea, éxito o fallo**: «future calls to `installOpfsSAHPoolVfs()` return consistent results» — sin `forceReinitIfPreviouslyFailed: true` (≥ 3.47) un segundo intento devuelve al instante el mismo error cacheado, así que los reintentos DEBEN pasar ese flag. `poolUtil.OpfsSAHPoolDb` (subclase de `oo1.DB`), `poolUtil.vfsName`, `poolUtil.getFileNames()`, `poolUtil.pauseVfs()` (no debe haber archivos abiertos), `poolUtil.unpauseVfs(): Promise`, `poolUtil.isPaused()`.
 
-- [ ] **Step 1: Crear `src/mobile/worker.ts`**
+- [x] **Step 1: Crear `src/mobile/worker.ts`**
 
 ```ts
 /**
@@ -2960,12 +2960,12 @@ Notas de compatibilidad con la Fase 1:
   - el provider expone un API de suspensión (p. ej. `suspendDb()`/`resumeDb()`, o `closeDb({ suspend: true })`) → llamarla en `suspend()`/`resume()` de arriba (en lugar del `closeDb()` pelado y ANTES del `getDb()` del resume) y dejar la factory sin el `throw` (el provider ya lanza);
   - el provider no tiene nada de eso → queda tal como está: `closeDb()` + siguiente `getDb()` reabre (así lo usa `backup.ipc.ts`) y el «lanza mientras está suspendido» lo aporta la factory.
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `npx tsc --noEmit 2>&1 | tail -5`
 Expected: sin salida. Si `'@sqlite.org/sqlite-wasm/sqlite3.wasm?url'` no resuelve: `src/vite-env.d.ts` (`/// <reference types="vite/client" />`) ya existe y declara `*?url`; confirmar que sigue en `src/`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/mobile/worker.ts
@@ -2980,7 +2980,7 @@ git commit -m "feat(mobile): worker con sqlite-wasm sobre opfs-sahpool, suspend/
 - Modify: `package.json` (scripts)
 - Create: `android/` (generado por `npx cap add android`)
 
-- [ ] **Step 1: Escribir el test del script de versión**
+- [x] **Step 1: Escribir el test del script de versión**
 
 ```ts
 // tests/mobile/android-version.test.ts
@@ -3025,12 +3025,12 @@ describe('android-version', () => {
 });
 ```
 
-- [ ] **Step 2: Correr el test y verificar que falla**
+- [x] **Step 2: Correr el test y verificar que falla**
 
 Run: `npm test -- tests/mobile/android-version.test.ts 2>&1 | tail -5`
 Expected: `Failed to resolve import "../../scripts/android-version.mjs"`.
 
-- [ ] **Step 3: Crear `scripts/android-version.mjs`**
+- [x] **Step 3: Crear `scripts/android-version.mjs`**
 
 ```js
 #!/usr/bin/env node
@@ -3081,12 +3081,12 @@ if (isMain) {
 }
 ```
 
-- [ ] **Step 4: Correr el test y verificar que pasa**
+- [x] **Step 4: Correr el test y verificar que pasa**
 
 Run: `npm test -- tests/mobile/android-version.test.ts 2>&1 | tail -5`
 Expected: `Tests  5 passed (5)`.
 
-- [ ] **Step 5: Crear `scripts/gradle.mjs`**
+- [x] **Step 5: Crear `scripts/gradle.mjs`**
 
 ```js
 #!/usr/bin/env node
@@ -3121,7 +3121,7 @@ const result = spawnSync(isWin ? path.join(androidDir, 'gradlew.bat') : './gradl
 process.exit(result.status ?? 1);
 ```
 
-- [ ] **Step 6: Agregar los scripts a `package.json`** (después de `"rebuild"`)
+- [x] **Step 6: Agregar los scripts a `package.json`** (después de `"rebuild"`)
 
 ```json
     "rebuild": "electron-rebuild -f -w better-sqlite3",
@@ -3131,7 +3131,7 @@ process.exit(result.status ?? 1);
     "mobile:apk": "npm run mobile:sync && node scripts/gradle.mjs assembleDebug"
 ```
 
-- [ ] **Step 7: Build web mobile**
+- [x] **Step 7: Build web mobile**
 
 Run: `npm run mobile:build 2>&1 | tail -15`
 Expected: termina con `✓ built in Xs`, y entre las líneas `dist/mobile/...` aparecen `dist/mobile/index.html`, `dist/mobile/assets/sqlite3-<hash>.wasm` (~865 kB) y `dist/mobile/assets/worker-<hash>.js`. Confirmar:
@@ -3143,7 +3143,7 @@ Errores esperables:
 - `Top-level await is not available in the configured target` → `build.target` no es `es2022`; revisar `vite.mobile.config.ts`.
 - `Could not resolve "@logic/..."` → falta el alias en `vite.mobile.config.ts` o la Fase 1 no está.
 
-- [ ] **Step 8: Generar el scaffold Android**
+- [x] **Step 8: Generar el scaffold Android**
 
 Run: `npx cap add android 2>&1 | tail -8`
 Expected:
@@ -3160,7 +3160,7 @@ Expected: `applicationId "com.hubtify.app"`, `namespace "com.hubtify.app"`, `ver
 
 No tocar `android/variables.gradle` (minSdk 24, compile/target 36 en el template de Capacitor 8).
 
-- [ ] **Step 9: Sync (copia `dist/mobile` + plugins + versión)**
+- [x] **Step 9: Sync (copia `dist/mobile` + plugins + versión)**
 
 Run: `npm run mobile:sync 2>&1 | tail -12`
 Expected, en orden: el build de Vite, `[android-version] versionName 0.8.2 versionCode 802`, y de `cap sync`:
@@ -3178,7 +3178,7 @@ Expected, en orden: el build de Vite, `[android-version] versionName 0.8.2 versi
 Run: `rg -n "versionCode|versionName" android/app/build.gradle`
 Expected: `versionCode 802` y `versionName "0.8.2"`.
 
-- [ ] **Step 10: Verificar qué entra en git del scaffold**
+- [x] **Step 10: Verificar qué entra en git del scaffold**
 
 Run: `git check-ignore -v android/app/src/main/assets/public android/app/build android/.gradle android/local.properties 2>&1`
 Expected: las cuatro rutas listadas como ignoradas (el `android/.gitignore` del template cubre `app/src/main/assets/public`, `build/`, `.gradle`, `local.properties`; el raíz cubre el resto). Si `assets/public` NO aparece, agregar `android/app/src/main/assets/public/` al `.gitignore` raíz.
@@ -3186,7 +3186,7 @@ Expected: las cuatro rutas listadas como ignoradas (el `android/.gitignore` del 
 Run: `git status --short | rg -v "^\?\? android/" | head`
 Expected: solo `package.json`, `package-lock.json` (si cambió) y los `scripts/`/`tests/` nuevos; `android/` entero aparece como untracked (`?? android/`).
 
-- [ ] **Step 11: Compilar el APK debug**
+- [x] **Step 11: Compilar el APK debug**
 
 En una shell con el «Entorno» exportado:
 
@@ -3206,12 +3206,12 @@ Errores esperables:
 - `Unsupported class file major version` / `Your build is currently configured to use incompatible Java 24` → `JAVA_HOME` sigue apuntando al 24/25.
 - `Could not resolve all files for configuration ':app:debugRuntimeClasspath'` → sin red para Maven; reintentar.
 
-- [ ] **Step 12: Suite, lint, typecheck**
+- [x] **Step 12: Suite, lint, typecheck**
 
 Run: `npx tsc --noEmit 2>&1 | tail -3 && npm run lint 2>&1 | tail -3 && npm test 2>&1 | tail -3`
 Expected: sin errores; `Test Files  N+7 passed`.
 
-- [ ] **Step 13: Commit (scripts + scaffold)**
+- [x] **Step 13: Commit (scripts + scaffold)**
 
 ```bash
 git add package.json package-lock.json scripts/android-version.mjs scripts/gradle.mjs tests/mobile/android-version.test.ts android
@@ -3226,7 +3226,7 @@ git commit -m "feat(mobile): scaffold android, scripts mobile:* y versionado des
 
 Emulador AVD `hubtify` ya booteado (`emulator-5554`, WebView Chromium 124). Criterios de aceptación de la spec §11 fila 2.
 
-- [ ] **Step 1: Instalar y arrancar**
+- [x] **Step 1: Instalar y arrancar**
 
 ```bash
 export ADB="D:/android-sdk/platform-tools/adb.exe"
@@ -3237,7 +3237,7 @@ export ADB="D:/android-sdk/platform-tools/adb.exe"
 ```
 Expected: `emulator-5554   device`; `Success`; `Starting: Intent { cmp=com.hubtify.app/.MainActivity }`.
 
-- [ ] **Step 2: Verificar el log del worker**
+- [x] **Step 2: Verificar el log del worker**
 
 Esperar ~10 s y:
 
@@ -3251,7 +3251,7 @@ Puede aparecer una línea `[sqlite] Ignoring inability to install OPFS sqlite3_v
 
 Si aparece `fatal vfs`: el WebView no expone OPFS (`navigator.storage.getDirectory` / `createSyncAccessHandle`). Verificar la versión del WebView: `"$ADB" shell dumpsys package com.google.android.webview | rg versionName` (se espera ≥ 108). Es el riesgo #1 de la spec §12; el fallback (Filesystem + export periódico) está documentado en §4 y NO se implementa en esta fase.
 
-- [ ] **Step 3: Anotar el resultado del MIME `.wasm`**
+- [x] **Step 3: Anotar el resultado del MIME `.wasm`**
 
 Run: `"$ADB" logcat -d | rg -c "falling back to ArrayBuffer instantiation"`
 - `0` → el WebView sirvió `application/wasm` e `instantiateStreaming` funcionó.
@@ -3259,7 +3259,7 @@ Run: `"$ADB" logcat -d | rg -c "falling back to ArrayBuffer instantiation"`
 
 Escribir el resultado en la sección «Resultado MIME `.wasm`» al final de este plan (reemplazar «_pendiente_») con: fecha, versión del WebView, y cuál de los dos casos fue.
 
-- [ ] **Step 4: Persistencia (el criterio que importa)**
+- [x] **Step 4: Persistencia (el criterio que importa)**
 
 Manual, en el emulador:
 1. Login con la cuenta de prueba (Firebase Auth, el emulador tiene red).
@@ -3273,7 +3273,7 @@ Evidencia objetiva además del ojo: en el segundo arranque el log dice `files=["
 Run: `"$ADB" logcat -d | rg "\[worker\] vfs"`
 Expected: la última línea contiene `files=["/hubtify.db"]`.
 
-- [ ] **Step 5: Suspend/resume**
+- [x] **Step 5: Suspend/resume**
 
 1. Con la app abierta, ir a Cauldron y arrancar una sesión.
 2. Home del emulador (app a segundo plano) → `"$ADB" logcat -d | rg "\[worker\] (suspended|resumed)"` muestra `suspended`.
@@ -3283,7 +3283,7 @@ Expected: las dos líneas, en ese orden, sin `fatal` ni `DbSuspended` en el log.
 
 Para inspeccionar con DevTools: abrir `chrome://inspect` en Chrome de escritorio con el emulador conectado; el WebView de `com.hubtify.app` aparece (los builds debug de Capacitor habilitan `setWebContentsDebuggingEnabled`).
 
-- [ ] **Step 6: Commit de la anotación**
+- [x] **Step 6: Commit de la anotación**
 
 ```bash
 git add docs/superpowers/plans/2026-09-01-mobile-phase2-capacitor-worker.md
@@ -3292,21 +3292,21 @@ git commit -m "docs(mobile): resultado del MIME .wasm y smoke de persistencia en
 
 ### Task 15: Cierre de la fase
 
-- [ ] **Step 1: Verificación final completa**
+- [x] **Step 1: Verificación final completa**
 
 Run: `npx tsc --noEmit && npx tsc -p shared-logic --noEmit && npm run lint && npm test 2>&1 | tail -4`
 Expected: sin errores; `Test Files  N+7 passed`, `Tests  M+69 passed` (7 archivos nuevos: protocol 8, wasm-database 16, worker-protocol 13, worker-client 17, android-version 5, cauldron.suspend 6, notification-lifecycle 4 = 69 tests).
 
-- [ ] **Step 2: Checklist de aceptación (spec §11, fila 2)**
+- [x] **Step 2: Checklist de aceptación (spec §11, fila 2)**
 
-- [ ] `npm run mobile:apk` produce `android/app/build/outputs/apk/debug/app-debug.apk`
-- [ ] existe `dist/mobile/assets/sqlite3-*.wasm`
-- [ ] el worker loguea `vfs: opfs-sahpool`
-- [ ] emulador: login, crear tarea, matar app, reabrir → persiste
-- [ ] resultado del MIME `.wasm` anotado abajo
-- [ ] `npm test` verde, `tsc` (raíz y `shared-logic`) verde, lint verde
+- [x] `npm run mobile:apk` produce `android/app/build/outputs/apk/debug/app-debug.apk`
+- [x] existe `dist/mobile/assets/sqlite3-*.wasm`
+- [x] el worker loguea `vfs: opfs-sahpool`
+- [x] emulador: login, crear tarea, matar app, reabrir → persiste
+- [x] resultado del MIME `.wasm` anotado abajo
+- [x] `npm test` verde, `tsc` (raíz y `shared-logic`) verde, lint verde
 
-- [ ] **Step 3: Estado de la rama**
+- [x] **Step 3: Estado de la rama**
 
 Run: `git log --oneline master..feature/mobile | head -20 && git status --short`
 Expected: los commits de este plan (más los de la Fase 1) y working tree limpio.
