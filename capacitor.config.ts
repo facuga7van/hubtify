@@ -9,6 +9,11 @@ const config: CapacitorConfig = {
   appName: 'Hubtify',
   webDir: 'dist/mobile',
   server: { androidScheme: 'https' },
+  // Fondo del WebView NATIVO (Bridge.java: webView.setBackgroundColor). Sin
+  // esto queda el default de Android, blanco, y se ve entre el splash y el
+  // primer paint de la web. Mismo cuero (leather-dark) que el splash y que el
+  // windowBackground de styles.xml.
+  backgroundColor: '#2a1d0e',
   android: { allowMixedContent: false },
   plugins: {
     // Iconos claros en la barra de estado y en la de gestos, sobre el cuero de
