@@ -3670,6 +3670,66 @@ Expected: los commits de este plan (Tasks 2–18) encima de los de las Fases 1 y
 
 ## Resultado del smoke (se completa en Task 17 Step 6)
 
-_pendiente_
+`2026-09-02 — Android 15 — WebView 124.0.6367.219 (camino b) — --safe-area-inset-top: 0px — drawer OK | atrás: drawer/historial/minimizar OK | desborde: 9/9 OK`
 
-Formato: `YYYY-MM-DD — Android <release> — WebView <versionName> (camino a|b) — --safe-area-inset-top: <px> — drawer OK | atrás: drawer/historial/minimizar OK | desborde: 9/9 OK` (o qué falló y el commit que lo arregló).
+Emulador `emulator-5554` (AVD `hubtify`, Pixel 7). El WebView reporta 412×~880 CSS px,
+no 390: el viewport del arnés `browser-mobile` es el caso más estrecho, no el del AVD.
+
+**Step 1 — build/install.** `npm run mobile:apk` falló la primera vez:
+`:app:mergeDebugResources` → `styles.xml:18:27: la cadena "--" no está permitida en los
+comentarios`. El comentario que la Task 9 dejó sobre `windowBackground` citaba el token
+`--leather-dark` literal. Arreglado en `b3ba669`; después `BUILD SUCCESSFUL`, `Success`,
+`Starting: Intent { cmp=com.hubtify.app/.MainActivity }`.
+
+**Step 2 — barra de estado y safe areas.** WebView 124 < 140 → **camino (b)**, como
+preveía el desvío 1. Medido por CDP con la app abierta:
+
+```
+--safe-area-inset-top : 0px      (inyectada por SystemBars, no vacía)
+--safe-top            : 0px
+.mobile-header paddingTop : 0px  ·  altura: 56px
+--shell-top           : 0px      ·  document.documentElement.dataset.shell: "mobile"
+.title-bar en el DOM  : false
+```
+
+Los iconos de la barra (hora, batería, red) salen **claros sobre el cuero** del
+`windowBackground` de `styles.xml`; la cabecera queda pegada a la barra, sin franja
+blanca ni negra. El centro de notificaciones (`.notif-drawer`) abre con `top = 0`, es
+decir el borde del WebView, ya debajo de la barra del sistema; el Cierre del Códice
+(`.codex-modal`) abre con `top = 34`. Ninguno empieza debajo de la barra de estado.
+
+**Step 3 — drawer.** Hamburguesa → `aria-expanded="true"`, drawer sin `inert`,
+`transform: matrix(1,0,0,1,0,0)`, scrim `display: block`; se ve la ficha del jugador,
+VIGOR, XP, «4 niveles para Escudero» y los siete ítems (Inicio, Questify, Nutrify,
+Coinify, Caldero, Logros, Recompensas) más Personaje/Ajustes y la versión.
+Tocar la scrim → `aria-expanded="false"`, `inert`, `transform: …(-300, 0)`, scrim
+`display: none`. Tocar «Questify» → se cierra y la cabecera dice «Questify».
+
+**Step 4 — botón atrás.** Los cuatro casos, verificados por CDP y `dumpsys`:
+
+1. Drawer abierto + atrás → drawer cerrado, `location.hash` sin cambios.
+2. `#/finance/transactions` → atrás → `#/finance` → atrás → `#/settings` (`history.back()`).
+3. Arranque limpio + atrás en la raíz → el foco pasa a `NexusLauncherActivity`, la tarea
+   de `com.hubtify.app` queda `visible=false` con `mLastPausedActivity` y el proceso vivo
+   (pid 7719): **minimizada, no cerrada**. Al reabrir: `Activity not started, its current
+   task has been brought to the front`, sigue logueada y en la Tabla del Aventurero.
+4. Centro de notificaciones abierto + atrás → cerrado, ruta sin cambios.
+
+`"$ADB" logcat -d | rg -i "native shell|Uncaught"` → ninguna línea.
+
+**Step 5 — sin desborde horizontal.** `document.documentElement.scrollWidth <= innerWidth`
+(412 ≤ 412) en las nueve: Tabla, Questify, Nutrify, Coinify, libro mayor de Coinify
+(`#/finance/transactions`), Caldero, Personaje, Logros, Recompensas y Ajustes. Los dos
+`.coin-tab-link` que se pasan de 412 px viven dentro de la tira de pestañas con
+`overflow-x: auto` y son el afford de scroll, no un desborde de la página.
+
+**Lo que sí encontró el emulador:** los cuatro cartuchos de la Tabla salen de un
+`repeat(4, 1fr)` inline (`Dashboard.tsx:491`), 86 px de contenido cada uno; el rótulo
+con `letter-spacing: .2em` más el ícono pedían 91-95 px y `.qb-cartouche` es
+`overflow: hidden`, así que la corona, la llama y el corazón salían cortados.
+Arreglado en `519d4f1` con tres reglas `[data-shell="mobile"]` en `layout.css`;
+reconstruido, reinstalado y vuelto a medir: cero elementos recortados.
+
+Capturas del emulador (APK de este HEAD), en este mismo directorio:
+`2026-09-02-mobile-phase3-hub.png`, `-questify.png`, `-coinify.png`, `-nutrify.png`,
+`-cauldron.png`, `-drawer.png`.
