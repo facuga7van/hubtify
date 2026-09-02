@@ -20,6 +20,7 @@
     "test:visual": "vitest run --project browser",
     "test:visual:watch": "vitest --project browser",
     "test:e2e": "playwright test",
+    "typecheck:shared-logic": "tsc -p shared-logic --noEmit",
     "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "author": {
