@@ -84,3 +84,40 @@ describe('botón atrás con un menú de fila abierto (GEN-01)', () => {
     expect(c.goBack).not.toHaveBeenCalled();
   });
 });
+
+/* NUT-01 (d), QA 0.9.1: una fila de comida en edición (FoodLogItem) también se
+   anota como popover. Atrás la saca de edición SIN guardar (el callback es
+   cancelEdit: restaura el borrador) y no navega; el siguiente Atrás sí. */
+describe('botón atrás con una fila de comida en edición (NUT-01 d)', () => {
+  function makeEditingRow(original: number) {
+    const row = { editing: true, draft: original + 150 };
+    registerOpenPopover(() => { row.editing = false; row.draft = original; });
+    return row;
+  }
+
+  function ctx(): BackContext {
+    return {
+      openPopover: hasOpenPopover(),
+      closePopover: () => { closeTopPopover(); },
+      openDialog: false,
+      closeDialog: vi.fn(),
+      canGoBack: true,
+      goBack: vi.fn(),
+      minimize: vi.fn(),
+    };
+  }
+
+  it('Atrás cancela la edición (valor original) y no navega; el segundo navega', () => {
+    const row = makeEditingRow(120);
+    expect(row.draft).toBe(270);
+    const first = ctx();
+    expect(handleBackButton(first)).toBe('popover');
+    expect(row.editing).toBe(false);
+    expect(row.draft).toBe(120);
+    expect(first.goBack).not.toHaveBeenCalled();
+
+    const second = ctx();
+    expect(handleBackButton(second)).toBe('history');
+    expect(second.goBack).toHaveBeenCalledTimes(1);
+  });
+});

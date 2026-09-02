@@ -7,6 +7,7 @@ import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
 import { estimateNutrition } from '../estimate-service';
 import { cacheEstimate } from '../history-api';
+import { usePopoverRegistration } from '../../../shared/hooks/usePopoverRegistration';
 
 interface BreakdownItem {
   name: string;
@@ -122,6 +123,11 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
     editClosedRef.current = true;
     setEditing(false);
   };
+
+  // A row in edit mode is "something open": the Android back button cancels
+  // it (the draft is discarded, openEdit reseeds from the entry) instead of
+  // leaving the page (NUT-01 d, QA 0.9.1).
+  usePopoverRegistration(editing, cancelEdit);
 
   const handleSave = () => {
     if (editClosedRef.current) return;

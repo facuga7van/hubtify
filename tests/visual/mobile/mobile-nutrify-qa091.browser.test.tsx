@@ -16,6 +16,8 @@ import Today from '@modules/nutrition/components/Today';
 import NutritionSettings from '@modules/nutrition/components/NutritionSettings';
 import { installApi, mountInShell, setMobileViewport, settle, shoot } from './mobile-harness';
 import { NUTRITION_API } from './fixtures';
+import { handleBackButton } from '../../../src/mobile/back-button';
+import { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover } from '../../../src/mobile/dialog-dom';
 
 import '../../../src/i18n';
 import '../../../src/hub/styles/theme.css';
@@ -218,5 +220,48 @@ describe('Nutrify — QA 0.9.0 (NUT-02)', () => {
     // Banner + tarjeta de cierre: dos «Reabrir día», como tras un reload.
     await expect.element(page.getByRole('button', { name: /Reabrir/i }).first()).toBeVisible();
     expect(document.querySelectorAll('.nutri-day-success').length).toBe(1);
+  });
+});
+
+describe('Nutrify — QA 0.9.1 (NUT-01 d)', () => {
+  test('NUT-01 (d): Atrás de Android con una fila en edición cancela sin guardar y no navega', async () => {
+    const update = vi.fn(async () => null);
+    installApi({ ...NUTRITION_API, nutritionUpdateFood: update });
+    await setMobileViewport();
+    mountInShell(<Today />, '/nutrition');
+    await settle(700);
+
+    const row = await openFirstEdit();
+    const kcal = row.querySelector<HTMLInputElement>('input[type="number"]')!;
+    const original = kcal.value;
+    kcal.focus();
+    await userEvent.clear(kcal);
+    await userEvent.type(kcal, '999');
+    expect(kcal.value).toBe('999');
+    // Teclado cerrado con Atrás: en el WebView el input conserva el foco y la
+    // fila sigue en edición; el siguiente Atrás sí llega a la app.
+
+    // Lo mismo que cablea native-shell.ts en el evento backButton.
+    const hashBefore = window.location.hash;
+    const goBack = vi.fn();
+    const outcome = handleBackButton({
+      openPopover: hasOpenPopover(),
+      closePopover: () => { closeTopPopover(); },
+      openDialog: hasOpenDialog(),
+      closeDialog: closeTopDialog,
+      canGoBack: true,
+      goBack,
+      minimize: vi.fn(),
+    });
+    await settle(300);
+
+    expect(outcome).toBe('popover');
+    expect(goBack).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe(hashBefore);
+    expect(update).not.toHaveBeenCalled();
+    expect(document.querySelector('.nutri-meal-row--edit')).toBeNull();
+    // Al reabrir, el borrador descartado no quedó: vuelve el valor original.
+    const again = await openFirstEdit();
+    expect(again.querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe(original);
   });
 });
