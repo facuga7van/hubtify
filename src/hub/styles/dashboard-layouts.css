@@ -222,3 +222,11 @@
 .widget-list-flow::-webkit-scrollbar-thumb:hover {
   background: rgba(138, 112, 48, 0.8);
 }
+
+/* Sin puntero no hay hover: los controles de mover/redimensionar (H6) tienen
+   que estar a la vista. */
+@media (hover: none) {
+  .widget-controls {
+    opacity: 1;
+  }
+}

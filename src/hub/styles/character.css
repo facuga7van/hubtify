@@ -371,3 +371,46 @@
 }
 
 
+
+/* ── Mobile (390 px; Fase 3) ────────────────────────
+   Ninguna de estas grillas tenía breakpoint por debajo de 880 px. */
+/* Las columnas de `.hero-layout` son `1fr` = `minmax(auto, 1fr)`: su mínimo
+   automático es el min-content del ítem, y la senda de títulos (456 px) lo
+   estiraba aunque scrollee de costado. */
+[data-shell="mobile"] .hero-layout > * {
+  min-width: 0;
+}
+
+[data-shell="mobile"] .hero-stats-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+[data-shell="mobile"] .hero-virtues-grid {
+  grid-template-columns: 1fr;
+}
+
+[data-shell="mobile"] .hero-chronicle-grid {
+  grid-template-columns: 1fr;
+  column-gap: 0;
+}
+
+/* Siete nodos en 366 px son 52 px cada uno; «Campesino» mide ~62. La senda
+   scrollea de costado en vez de apilar tres renglones por rótulo. */
+[data-shell="mobile"] .hero-title-trail {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+[data-shell="mobile"] .hero-title-trail-grid {
+  grid-template-columns: repeat(7, 64px);
+  width: max-content;
+}
+
+@media (hover: none) {
+  /* El texto completo vivía solo en `title`, que en touch no existe. */
+  .hero-chronicle-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}

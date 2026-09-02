@@ -855,3 +855,58 @@
   color: var(--gold-light);
   border-color: var(--gold-light);
 }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE — reglas transversales (Fase 3, spec §7)
+   Prefijo [data-shell="mobile"]: lo pone MobileShell en <html>; Electron
+   nunca lo tiene. El .main-content extra en cada selector es para ganarle por
+   especificidad a codex.css, components.css y shell.css (780 px) sin depender
+   del orden de import (App.tsx carga las hojas de módulo DESPUÉS de las del hub).
+   ══════════════════════════════════════════════════════ */
+[data-shell="mobile"] .main-content .qb-page,
+[data-shell="mobile"] .main-content .settings-page {
+  padding: 12px 12px 20px;
+}
+
+/* Ornamentos de 44 px a 4 px del borde: con 12 px de padding pisan el texto. */
+[data-shell="mobile"] .main-content .qb-corner {
+  display: none;
+}
+
+/* El header del códice no envolvía y `.qb-header-extra` no encogía: los
+   chips de Coinify o el contador de Logros dejaban 60–230 px al título. */
+[data-shell="mobile"] .main-content .qb-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-shell="mobile"] .main-content .qb-header-extra {
+  flex: 1 1 100%;
+  flex-shrink: 1;
+  justify-content: flex-start;
+}
+
+[data-shell="mobile"] .main-content .qb-title {
+  font-size: var(--fs-hero);
+}
+
+/* Estaba `position: absolute; right: 0; bottom: 0`: encima del título. */
+[data-shell="mobile"] .main-content .page-header__actions {
+  position: static;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+[data-shell="mobile"] .main-content .settings-row {
+  flex-wrap: wrap;
+}
+
+[data-shell="mobile"] .main-content .settings-row__buttons {
+  width: 100%;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+[data-shell="mobile"] .account-dropdown {
+  max-width: calc(100vw - 16px);
+}
