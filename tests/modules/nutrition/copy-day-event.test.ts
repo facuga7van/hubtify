@@ -25,7 +25,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
-const { registerNutritionIpcHandlers } = await import('../../../electron/modules/nutrition.ipc');
+const { registerNutritionIpcHandlers } = await import('../../../shared-logic/modules/nutrition.ipc');
 registerNutritionIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {

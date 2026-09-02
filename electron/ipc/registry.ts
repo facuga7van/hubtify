@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { getHandler, listChannels } from '../../shared-logic/registry';
 import { registerRpgHandlers } from '../../shared-logic/modules/rpg-handlers';
 import { registerQuestsIpcHandlers } from '../../shared-logic/modules/quests.ipc';
-import { registerNutritionIpcHandlers } from '../modules/nutrition.ipc';
+import { registerNutritionIpcHandlers } from '../../shared-logic/modules/nutrition.ipc';
 import { registerFinanceIpcHandlers } from '../modules/finance.ipc';
 import { registerFinanceImportIpcHandlers } from '../modules/finance-import.ipc';
 import { registerCharacterIpcHandlers } from '../../shared-logic/modules/character.ipc';

@@ -1,5 +1,6 @@
-import { ipcHandle } from '../ipc/ipc-handle';
-import { getDb } from '../ipc/db';
+import { registerHandler as ipcHandle } from '../registry';
+import { getDb } from '../db';
+import { genId } from '../ids';
 
 import { formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
 import {
@@ -13,10 +14,6 @@ import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adapt
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
-
-function genId(): string {
-  return crypto.randomUUID();
-}
 
 /** Normalize a macro gram value to a finite, non-negative number rounded to 0.1, or null. */
 function normMacro(v: unknown): number | null {

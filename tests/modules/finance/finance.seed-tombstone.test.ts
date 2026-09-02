@@ -33,7 +33,7 @@ vi.mock('electron', () => ({
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 // sync.ipc pulls these two in for the nutrition / habits merges; neither is
 // exercised here and both drag Electron-only modules along.
-vi.mock('../../../electron/modules/nutrition.ipc', () => ({ recalcSummary: vi.fn() }));
+vi.mock('../../../shared-logic/modules/nutrition.ipc', () => ({ recalcSummary: vi.fn() }));
 vi.mock('../../../shared-logic/modules/quests.habits', () => ({ weeklyTarget: () => 0 }));
 
 function setupDb(): Database.Database {

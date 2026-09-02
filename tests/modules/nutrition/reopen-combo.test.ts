@@ -39,7 +39,7 @@ vi.mock('../../../shared-logic/db', async (importOriginal) => ({
 
 const { initCoreTables, applyMigrations, coreMigrations } = await import('../../../shared-logic/db');
 const { processRpgEvent } = await import('../../../shared-logic/modules/rpg-handlers');
-const { registerNutritionIpcHandlers } = await import('../../../electron/modules/nutrition.ipc');
+const { registerNutritionIpcHandlers } = await import('../../../shared-logic/modules/nutrition.ipc');
 registerNutritionIpcHandlers();
 
 async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
