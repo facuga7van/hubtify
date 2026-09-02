@@ -1,17 +1,34 @@
 /**
  * Lado UI del `PlatformPort` (spec §6, columna «Mobile»). El worker manda
- * `{ type:'platform', method, args }` y esto lo atiende con plugins de
- * Capacitor. Fase 2 solo necesita `notify` (no-op) y `pickPdfText`
- * (`{ unsupported:true }`); el resto es no-op / `null` / `false` hasta la
- * Fase 5 (`@capacitor/browser`, `@capacitor/filesystem`, `@capacitor/share`).
+ * `{ type:'platform', method, args }` (worker-client.ts lo despacha acá) y
+ * esto lo resuelve con plugins de Capacitor:
+ *
+ *   notify          → @capacitor/local-notifications (schedule inmediato)
+ *   openExternal    → @capacitor/browser
+ *   saveTextFile /
+ *   saveBinaryFile  → @capacitor/filesystem (Directory.Cache) + @capacitor/share
+ *   pickTextFile /
+ *   pickBinaryFile  → <input type="file"> (file-picker.ts)
+ *   pickPdfText     → { unsupported: true } (sin pdf-parse; spec §1)
  *
  * `appVersion()` y `osInfo()` son síncronos en la interfaz y no pueden hacer
- * round-trip: la UI los manda una vez con `{ type:'init' }` (ver install-api).
+ * round-trip: la UI los manda una vez con `{ type:'init' }` (install-api.ts).
  */
+import { Browser } from '@capacitor/browser';
 import { Device } from '@capacitor/device';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Share } from '@capacitor/share';
+import type { FileFilter } from '@logic/platform';
+import { pickFile } from './file-picker';
+import { acceptFor, bytesToBase64, notificationIdFor } from './host-utils';
 import type { PlatformHostFns } from './worker-client';
 
-/** Lo que reporta `osInfo()` si el plugin falla o no contesta a tiempo. */
+export const NOTIFICATION_CHANNEL_ID = 'hubtify';
+/** Subcarpeta de Directory.Cache; el FileProvider del template permite todo el cache. */
+const SHARE_DIR = 'share';
+
+/** Lo importa install-api.ts (Fase 2) para el timeout de `readOsInfo`. */
 export const OS_INFO_FALLBACK = 'android';
 
 export async function readOsInfo(): Promise<string> {
@@ -24,21 +41,94 @@ export async function readOsInfo(): Promise<string> {
   }
 }
 
-export function createPlatformHost(): PlatformHostFns {
+/** El plugin rechaza con "Share canceled" cuando el usuario cierra el share sheet. */
+export function isShareCanceled(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /cancel/i.test(message);
+}
+
+export interface PlatformHostDeps {
+  pickFile: (accept: string) => Promise<File | null>;
+}
+
+export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): PlatformHostFns {
+  // Android 13+ pide POST_NOTIFICATIONS en runtime. Se pregunta una vez por
+  // sesión; si el usuario dice que no, no se insiste hasta el próximo arranque.
+  let permission: 'unknown' | 'granted' | 'denied' = 'unknown';
+  let channelReady = false;
+
+  async function notificationsReady(): Promise<boolean> {
+    if (permission === 'unknown') {
+      let status = await LocalNotifications.checkPermissions();
+      if (status.display !== 'granted') status = await LocalNotifications.requestPermissions();
+      permission = status.display === 'granted' ? 'granted' : 'denied';
+    }
+    if (permission !== 'granted') return false;
+    if (!channelReady) {
+      await LocalNotifications.createChannel({
+        id: NOTIFICATION_CHANNEL_ID,
+        name: 'Hubtify',
+        description: 'Recordatorios, rachas y Cauldron',
+        importance: 4,
+      });
+      channelReady = true;
+    }
+    return true;
+  }
+
+  async function writeAndShare(name: string, data: string, encoding?: Encoding): Promise<boolean> {
+    const { uri } = await Filesystem.writeFile({
+      path: `${SHARE_DIR}/${name}`,
+      data,
+      directory: Directory.Cache,
+      recursive: true,
+      ...(encoding ? { encoding } : {}),
+    });
+    try {
+      await Share.share({ title: name, files: [uri], dialogTitle: name });
+      return true;
+    } catch (err) {
+      if (isShareCanceled(err)) return false;
+      throw err;
+    }
+  }
+
   return {
-    // Fase 5: @capacitor/local-notifications con schedule inmediato.
-    notify: async () => undefined,
-    // Fase 5: @capacitor/browser (`window.open` en el WebView de Capacitor no
-    // garantiza abrir el navegador del sistema). Hasta entonces, no-op (spec §6).
-    openExternal: async (url: string) => {
-      console.warn('[mobile] openExternal no implementado hasta Fase 5:', url);
+    async notify(n: { title: string; body: string; tag?: string }) {
+      if (!(await notificationsReady())) return;
+      await LocalNotifications.schedule({
+        notifications: [{ id: notificationIdFor(n.tag), title: n.title, body: n.body, channelId: NOTIFICATION_CHANNEL_ID }],
+      });
     },
-    pickTextFile: async () => null,
+
+    async openExternal(url: string) {
+      await Browser.open({ url });
+    },
+
+    async pickTextFile(filters: FileFilter[]) {
+      const file = await deps.pickFile(acceptFor(filters));
+      if (!file) return null;
+      return { name: file.name, content: await file.text() };
+    },
+
     // Import de resúmenes PDF: fuera de alcance en mobile (spec §1). El handler
     // de finance-import responde { ok:false, reason:'unsupported_platform' }.
-    pickPdfText: async () => ({ unsupported: true as const }),
-    pickBinaryFile: async () => null,
-    saveTextFile: async () => false,
-    saveBinaryFile: async () => false,
+    async pickPdfText() {
+      return { unsupported: true as const };
+    },
+
+    async pickBinaryFile(filters: FileFilter[]) {
+      const file = await deps.pickFile(acceptFor(filters));
+      if (!file) return null;
+      return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
+    },
+
+    async saveTextFile(name: string, content: string) {
+      return writeAndShare(name, content, Encoding.UTF8);
+    },
+
+    async saveBinaryFile(name: string, bytes: Uint8Array) {
+      return writeAndShare(name, bytesToBase64(bytes));
+    },
   };
 }
