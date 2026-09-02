@@ -4,13 +4,12 @@
 
 /* -- 1. BookPage overrides for cauldron ---------------------- */
 
-/* `max-width: none` era además un no-op (`.qb-page` no acota nada), y a 1640 px
-   la sala se deformaba: el panel derecho estiraba «ENFOQUE» contra un borde y
-   «25:00» contra el otro con casi medio metro de pergamino en el medio, y la
-   mitad de abajo de esa tarjeta quedaba vacía. La cámara sigue siendo amplia. */
+/* La cámara ocupa todo el ancho del hueco (`.qb-page` no acota nada y este
+   contenedor tampoco). Tuvo un tope de 1280 px centrado; se fue junto con los
+   demás topes de página: la sala es la página entera —recetas, escenario,
+   registro y enfoque semanal—, no una lista de lectura, y lo que se estira a
+   1640 px es el escenario del caldero y la grilla de stats, que lo aguantan. */
 .cauldron-book {
-  max-width: 1280px;
-  margin-inline: auto;
   width: 100%;
 }
 
