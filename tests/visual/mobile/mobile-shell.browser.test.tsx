@@ -106,6 +106,34 @@ describe('MobileShell — cabecera y drawer', () => {
     await expect.element(page.getByRole('heading', { name: /^Questify$/i })).toBeVisible();
   });
 
+  /* El efecto de `pathname` no alcanza: tocar la sección en la que YA estás no
+     cambia la ruta, así que el drawer se quedaba abierto tapando la página. */
+  test('tocar la sección actual cierra el drawer aunque la ruta no cambie', async () => {
+    await setMobileViewport();
+    mountInShell(<Page />);
+    await settle();
+    await openDrawer();
+    expect(drawer().hasAttribute('inert')).toBe(false);
+
+    // Estamos en «/»: «Inicio» es la sección actual y no navega a ningún lado.
+    await page.getByRole('button', { name: /^Inicio$/i }).click();
+    await settle(400);
+    expect(drawer().hasAttribute('inert')).toBe(true);
+    await expect.element(page.getByRole('heading', { name: /Tabla del Aventurero/i })).toBeVisible();
+  });
+
+  test('la campana del drawer NO lo cierra: no es un ítem de navegación', async () => {
+    await setMobileViewport();
+    mountInShell(<Page />);
+    await settle();
+    await openDrawer();
+    const bell = drawer().querySelector('.notif-bell') as HTMLElement;
+    expect(bell).not.toBeNull();
+    bell.click();
+    await settle(400);
+    expect(drawer().hasAttribute('inert')).toBe(false);
+  });
+
   test('un inset de barra de estado empuja la cabecera, no la tapa', async () => {
     await setMobileViewport();
     // Lo que inyecta el plugin SystemBars de Capacitor en el WebView real.

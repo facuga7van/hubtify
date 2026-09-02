@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BookPage } from '../../../shared/components/codex/BookPage';
+import { isNativeMobile } from '../../../shared/platform-detect';
 import { DollarChip } from './shared/DollarChip';
 import { CryptoChip } from './shared/CryptoChip';
 
@@ -23,6 +24,11 @@ export default function FinanceLayout() {
   // directo a la sexta, la activa quedaba fuera de vista y la primera parecía
   // la elegida. `nearest` no mueve nada cuando ya se ve.
   useEffect(() => {
+    // Solo el shell mobile: en escritorio angosto esto movería el scroll de
+    // .main-content al cambiar de pestaña. `data-shell` lo pone MobileShell en
+    // un efecto PADRE, que corre después del de este hijo: en el primer montaje
+    // todavía no está, así que hay que preguntarle también a la plataforma.
+    if (!isNativeMobile() && document.documentElement.dataset.shell !== 'mobile') return;
     const active = navRef.current?.querySelector<HTMLElement>('.coin-tab-link--active');
     active?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [location.pathname]);

@@ -121,12 +121,20 @@ export default function MobileShell({ stats, onBellClick, onToggleInn, children 
       </div>
 
       <div ref={scrimRef} className="mobile-scrim" data-testid="mobile-scrim" onClick={closeDrawer} aria-hidden="true" />
+      {/* Tocar un ítem del menú cierra el drawer. El efecto de `pathname` de
+          arriba solo cubre el CAMBIO de ruta: tocar la sección en la que ya
+          estás no navega y dejaba el menú abierto tapando la página. Solo los
+          `.sidebar-nav-item`: la campana (`.notif-bell`) y el selector de
+          cuenta del PlayerCard viven acá adentro y se usan con el menú abierto. */}
       <div
         {...dialogProps}
         id="mobile-drawer"
         className="mobile-drawer"
         aria-label={t('hub.mainNavigation', 'Navegación principal')}
         inert={!open}
+        onClickCapture={(e) => {
+          if ((e.target as HTMLElement).closest?.('.sidebar-nav-item')) closeDrawer();
+        }}
       >
         <Sidebar stats={stats} collapsed={false} onBellClick={onBellClick} onToggleInn={onToggleInn} />
       </div>
