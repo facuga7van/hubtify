@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 import { registerAllIpcHandlers } from './ipc/registry';
+import { ipcHandle } from './ipc/ipc-handle';
 import { closeDb, runModuleMigrations, setDbFactory } from '../shared-logic/db';
 import { openDesktopDb, getDb } from './ipc/db';
 import { questsMigrations } from '../src/modules/quests/quests.schema';
@@ -348,15 +349,17 @@ app.whenReady().then(() => {
   // so no IPC call can be serviced before its handler is registered.
   createWindow();
 
-  registerAllIpcHandlers();
+  // Desktop-only handlers go through the same registry; they MUST be registered
+  // before registerAllIpcHandlers(), which is what binds the registry to ipcMain.
   registerUpdaterIpcHandlers();
-
-  ipcMain.handle('cauldron:openWindow', () => createCauldronWindow());
-  ipcMain.handle('cauldron:closeWindow', () => {
+  ipcHandle('cauldron:openWindow', () => createCauldronWindow());
+  ipcHandle('cauldron:closeWindow', () => {
     if (cauldronWindow && !cauldronWindow.isDestroyed()) {
       cauldronWindow.close();
     }
   });
+
+  registerAllIpcHandlers();
 
   // Run module migrations
   getDb();

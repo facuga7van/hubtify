@@ -1,20 +1,6 @@
-import { ipcMain } from 'electron';
-
 /**
- * Wrapper around ipcMain.handle that adds labeled error logging.
- * Errors are logged with the channel name and re-thrown so the
- * renderer still receives the rejection.
+ * Alias kept so the 15 modules that call `ipcHandle(channel, fn)` need no body
+ * changes. Registration is platform-neutral (shared-logic/registry.ts);
+ * `registerAllIpcHandlers()` in ./registry.ts binds every channel to ipcMain.
  */
-export function ipcHandle(
-  channel: string,
-  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => unknown,
-): void {
-  ipcMain.handle(channel, async (event, ...args) => {
-    try {
-      return await handler(event, ...args);
-    } catch (err) {
-      console.error(`[${channel}]`, err);
-      throw err;
-    }
-  });
-}
+export { registerHandler as ipcHandle } from '../../shared-logic/registry';

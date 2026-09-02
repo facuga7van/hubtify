@@ -7,6 +7,8 @@ let testDb: Database.Database;
 // Capture handlers registered via ipcMain.handle so we can invoke them directly.
 const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
@@ -39,7 +41,7 @@ function setupDb(): Database.Database {
 }
 
 function process(event: Record<string, unknown>) {
-  const handler = handlers.get('rpg:processEvent')!;
+  const handler = getHandler('rpg:processEvent')!;
   return handler({}, event);
 }
 
@@ -56,7 +58,7 @@ function achievementXp(): number {
 describe('DAY_REOPENED reverts the close exactly', () => {
   beforeEach(() => {
     testDb = setupDb();
-    handlers.clear();
+    clearHandlers();
     registerRpgHandlers();
   });
 

@@ -9,6 +9,8 @@ let testDb: Database.Database;
 // invoke nutrition:closeDay directly and read its XP/HP breakdown.
 const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
+import { getHandler, clearHandlers } from '../../../shared-logic/registry';
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
@@ -64,12 +66,12 @@ function setMetrics(steps: number | null, gym: boolean) {
 }
 
 async function closeDay(): Promise<any> {
-  return await handlers.get('nutrition:closeDay')!({}, DATE);
+  return await getHandler('nutrition:closeDay')!({}, DATE);
 }
 
 beforeEach(() => {
   testDb = setupDb();
-  handlers.clear();
+  clearHandlers();
   registerNutritionIpcHandlers();
 });
 
