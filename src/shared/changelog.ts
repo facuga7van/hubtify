@@ -13,6 +13,84 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.8.2',
+    date: '2026-09-01',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'Un ingreso en dólares ya se puede cargar en dólares. Elegís la casa de cambio —oficial, blue, MEP, cripto— y Coinify lo pasa a pesos con la cotización que trae la API, sin que tengas que abrir la calculadora',
+          en: 'Income in dollars can finally be entered in dollars. You pick the exchange house — official, blue, MEP, crypto — and Coinify converts it to pesos with the rate from the API, no calculator needed',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'Una compra en cuotas se piensa por el total, no por la cuota. Ahora ponés los 900 mil de la heladera y las 12 cuotas, y Coinify saca cuánto te queda por mes — repartiendo los centavos para que la suma dé exacto',
+          en: 'You think about a financed purchase by its total, not by the monthly payment. Enter the 900k for the fridge and the 12 installments, and Coinify works out the monthly amount — spreading the cents so the sum comes out exact',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'Completar una misión fallaba antes de poder avisar de nada: la lista no se refrescaba, la racha no se movía y el XP no aparecía hasta recargar. Era un error nuestro de la versión anterior y ya está corregido',
+          en: 'Completing a quest crashed before it could announce anything: the list did not refresh, the streak did not move, and the XP did not show until you reloaded. That was ours from the previous version, and it is fixed',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'El gráfico de proyección crecía con la ventana: maximizada se dibujaba de mil píxeles de alto con las cifras pisándose. Ahora mide su tarjeta y se queda del alto que le corresponde, con los números legibles',
+          en: 'The projection chart grew with the window: maximized, it drew a thousand pixels tall with the figures overlapping. It now measures its card and stays the height it should be, with readable numbers',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Al asignarle una categoría a una cuota el desplegable salía vacío, y borrar una categoría en uso tiraba un error en inglés. Ahora el desplegable muestra todas las categorías hasta que empezás a escribir, y si la categoría está en uso te dice cuántos movimientos la tienen',
+          en: 'Assigning a category to an installment showed an empty dropdown, and deleting a category in use threw a raw English error. The dropdown now shows every category until you start typing, and if the category is in use it tells you how many movements have it',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Las flechitas de los campos numéricos eran una placa de cuero pegada encima del número y se veían mal en toda la app. Ahora son parte del campo, discretas, y no se meten en el camino cuando tabulás',
+          en: 'The little arrows on numeric fields were a leather slab glued on top of the number and looked wrong across the whole app. They are now part of the field, discreet, and stay out of the way when you tab',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Las pantallas de Cuotas y Recurrentes estaban diseñadas para una tarjeta angosta y a pantalla completa quedaban con el nombre contra un borde y el monto contra el otro. Se rearmaron para que se lean como una planilla, con los botones a la vista',
+          en: 'The Installments and Recurring screens were laid out for a narrow card, so at full width the name sat against one edge and the amount against the other. They were rebuilt to read like a ledger, with the buttons in plain sight',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'El título que desbloqueás al subir de nivel se cortaba en la ficha del jugador —«Nv.6 · Es…»—, justo la parte que es el premio. El nivel ahora vive en el medallón y el título se lee entero',
+          en: 'The title you unlock on levelling up was cut off on the player card — "Lv.6 · Sq…" — precisely the part that is the reward. The level now lives on the medallion and the title reads in full',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Repasamos la app entera pantalla por pantalla: textos que no se llegaban a leer sobre el pergamino, botones de borrar invisibles, carteles que quedaban debajo del pliegue, ventanitas de ayuda que se abrían fuera de la pantalla y rótulos que se pisaban entre sí. Un montón de arreglos chicos que se notan todos juntos',
+          en: 'We went over the whole app screen by screen: text you could not quite read on the parchment, invisible delete buttons, notices sitting below the fold, help popups opening off-screen, and labels colliding with each other. A pile of small fixes you feel all at once',
+        },
+      },
+    ],
+  },
+  {
     version: '0.8.1',
     date: '2026-09-01',
     changes: [
