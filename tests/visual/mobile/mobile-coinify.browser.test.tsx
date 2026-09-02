@@ -121,6 +121,19 @@ describe('Coinify a 390×844', () => {
     const r = icon.getBoundingClientRect();
     expect(r.width).toBeGreaterThanOrEqual(16);
     expect(r.width).toBeLessThanOrEqual(18);
+
+    // COIN-04: ningún rótulo del eje X de la proyección se sale del gráfico
+    // («CT 26» por «OCT 26» en el primero).
+    const svg = document.querySelector('.castle-chart-svg') as SVGSVGElement;
+    expect(svg).not.toBeNull();
+    const box = svg.getBoundingClientRect();
+    const labels = [...svg.querySelectorAll<SVGTextElement>('.castle-label')];
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+    for (const label of labels) {
+      const lr = label.getBoundingClientRect();
+      expect(lr.left, `«${label.textContent}» se sale por la izquierda`).toBeGreaterThanOrEqual(box.left - 0.5);
+      expect(lr.right, `«${label.textContent}» se sale por la derecha`).toBeLessThanOrEqual(box.right + 0.5);
+    }
   });
 
   test('el lápiz de presupuesto existe sin hover (C4)', async () => {
