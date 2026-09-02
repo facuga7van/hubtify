@@ -1,6 +1,5 @@
 import * as functions from 'firebase-functions/v1';
-
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+import { GEMINI_MODEL, GeminiOutputError, buildRequestBody, parseEstimate, type GeminiResponse } from './gemini';
 
 const SYSTEM_PROMPT = `Sos un nutricionista que estima calorías de comida argentina con precisión. Pensá en GRAMOS primero, después calculá calorías.
 
@@ -97,35 +96,7 @@ export const estimateNutrition = functions
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: description.trim() }] }],
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                items: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      name: { type: 'STRING', description: 'Ingredient name with portion context' },
-                      grams: { type: 'INTEGER', description: 'Estimated weight in grams' },
-                      calories: { type: 'INTEGER', description: 'Calories calculated from grams × kcal/100g' },
-                      protein_g: { type: 'NUMBER', description: 'Protein in grams for this item (0 if unknown)' },
-                      carbs_g: { type: 'NUMBER', description: 'Carbohydrates in grams for this item (0 if unknown)' },
-                      fat_g: { type: 'NUMBER', description: 'Fat in grams for this item (0 if unknown)' },
-                    },
-                    required: ['name', 'grams', 'calories'],
-                  },
-                },
-              },
-              required: ['items'],
-            },
-          },
-        }),
+        body: JSON.stringify(buildRequestBody(description, SYSTEM_PROMPT)),
         signal: controller.signal,
       });
 
@@ -135,59 +106,16 @@ export const estimateNutrition = functions
         throw new functions.https.HttpsError('internal', 'AI estimation failed');
       }
 
-      const data = await response.json() as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) {
-        throw new functions.https.HttpsError('internal', 'No response from AI');
-      }
-
-      const parsed = JSON.parse(text) as {
-        items?: Array<{ name: string; calories: number; protein_g?: unknown; carbs_g?: unknown; fat_g?: unknown }>;
-      };
-      if (!parsed.items || !Array.isArray(parsed.items) || parsed.items.length === 0) {
-        throw new functions.https.HttpsError('internal', 'Could not parse AI response');
-      }
-
-      // Coerce a macro value: keep null when absent/invalid so it never fakes a 0.
-      const macro = (v: unknown): number | null =>
-        typeof v === 'number' && isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
-
-      const items = parsed.items
-        .filter(it => typeof it.name === 'string' && typeof it.calories === 'number' && it.calories > 0)
-        .map(it => ({
-          name: it.name.trim(),
-          calories: Math.round(it.calories),
-          proteinG: macro(it.protein_g),
-          carbsG: macro(it.carbs_g),
-          fatG: macro(it.fat_g),
-        }));
-
-      if (items.length === 0) {
-        throw new functions.https.HttpsError('internal', 'No valid items in AI response');
-      }
-
-      const calories = items.reduce((sum, it) => sum + it.calories, 0);
-
-      // Sum only the items that reported a given macro; null if none did (backward compatible).
-      const sumMacro = (key: 'proteinG' | 'carbsG' | 'fatG'): number | null => {
-        const present = items.map(it => it[key]).filter((v): v is number => v != null);
-        return present.length > 0 ? Math.round(present.reduce((a, b) => a + b, 0) * 10) / 10 : null;
-      };
-
-      return {
-        calories,
-        proteinG: sumMacro('proteinG'),
-        carbsG: sumMacro('carbsG'),
-        fatG: sumMacro('fatG'),
-        items,
-      };
+      const data = await response.json() as GeminiResponse;
+      return parseEstimate(data);
     } catch (err) {
       if (err instanceof functions.https.HttpsError) throw err;
       if ((err as Error).name === 'AbortError') {
         throw new functions.https.HttpsError('deadline-exceeded', 'AI request timed out');
+      }
+      if (err instanceof GeminiOutputError) {
+        console.error('[gemini] Bad output:', err.reason, err.message);
+        throw new functions.https.HttpsError('internal', err.message);
       }
       console.error('[gemini] Error:', err);
       throw new functions.https.HttpsError('internal', 'AI estimation failed');
