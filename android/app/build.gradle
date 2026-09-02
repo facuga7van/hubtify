@@ -13,6 +13,10 @@ if (keystorePropsFile.exists()) {
     // Reader UTF-8: Properties.load(InputStream) asume ISO-8859-1 y rompería
     // una contraseña con caracteres fuera de Latin-1.
     keystorePropsFile.withReader('UTF-8') { keystoreProps.load(it) }
+    // Sin storeFile el bloque de abajo caería a la clave debug en silencio.
+    if (!keystoreProps['storeFile']) {
+        throw new GradleException('[hubtify] release signing: keystore.properties found but storeFile missing')
+    }
 } else if (System.getenv('ANDROID_KEYSTORE_PASSWORD') != null) {
     // `?: ''`: Properties.put(k, null) lanza NullPointerException y taparía el
     // mensaje legible de abajo cuando falta una de las tres variables.

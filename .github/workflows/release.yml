@@ -126,10 +126,17 @@ jobs:
           chmod +x android/gradlew
           cd android && ./gradlew assembleRelease --no-daemon
 
+      # A debug-signed APK would install but could never be updated from a
+      # release-signed one: refuse to publish it.
       - name: Verify signature and rename
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK"
+          CERTS="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK")"
+          printf '%s\n' "$CERTS"
+          if printf '%s' "$CERTS" | grep -q 'CN=Android Debug'; then
+            echo "::error::APK is signed with the debug key"
+            exit 1
+          fi
           mv "$APK" "Hubtify-${{ steps.version.outputs.version }}.apk"
 
       - name: Remove keystore from the runner
@@ -225,6 +232,7 @@ jobs:
           prerelease: false
           generate_release_notes: ${{ steps.notes.outputs.has_notes != 'true' }}
           body_path: ${{ steps.notes.outputs.has_notes == 'true' && 'RELEASE_NOTES.md' || '' }}
+          fail_on_unmatched_files: true
           files: |
             artifacts/windows/squirrel.windows/x64/*.exe
             artifacts/windows/squirrel.windows/x64/*.nupkg
