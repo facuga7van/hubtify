@@ -53,6 +53,15 @@ enforces the ink/parchment ratios.
 | `--gold-light` | `#c4a84e` | ![](https://via.placeholder.com/16/c4a84e/c4a84e) | Active/focus |
 | `--gold-dark` | `#8a7030` | ![](https://via.placeholder.com/16/8a7030/8a7030) | Borders, shadows |
 
+**Gold is not ink.** `--gold` on parchment is 2.68 / 2.27 / 1.78 (`--parch-0/1/2`)
+and `--gold-dark` is 3.84 / 3.26 / 2.55 — neither reaches AA, and the point on
+the gold ramp that does is an olive brown indistinguishable from `--ink-soft`.
+Gold is for **borders, icons and ornament**; gold-*coloured text* on parchment
+uses `--ink-soft`. The reverse also holds: on a gold surface the worst stop of
+`--gold → --gold-dark` is `--gold-dark` (3.47:1 against `--ink`), so gold
+surfaces that carry text run `--gold-light → --gold` (4.97:1). On leather,
+`--gold-light` is the only readable gold (6.23:1 on `--leather`).
+
 ### Parchment Scale
 
 | Variable | Hex | Swatch | Usage |
@@ -111,6 +120,13 @@ Responsive via `--font-scale` multiplier (presets: `0.85`, `1`, `1.15`, `1.3`).
 | `--fs-body` | 15px | Standard body text |
 | `--fs-quote` | 16px | Epigraphs, secondary |
 | `--fs-label` | 13px | Labels, hints (**minimum**) |
+
+### Reading measure and touch target
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--measure` | `68ch` | `max-width` of any running-text block (subtitles, hints, descriptions). At 1640px an untethered subtitle reached 166 characters per line |
+| `--touch-min` | `44px` | Minimum control box. **Only used inside `[data-shell="mobile"]` blocks** — on desktop the codex density wins |
 
 ### Typography Utility Classes
 
@@ -281,8 +297,9 @@ native mobile, so `AuthPage` and `Onboarding` lose it too.
 | Name | CSS | Usage |
 |------|-----|-------|
 | Parchment Card | `linear-gradient(135deg, var(--parch-0) 0%, var(--parch-1) 60%, var(--parch-2) 100%)` | Cards, panels |
-| Leather Button | `linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%)` | Buttons |
-| Gold Accent | `linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%)` | Active states |
+| Leather Button | `linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%)` | Buttons (with `--gold-light` text) |
+| Gold Accent | `linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%)` | Active / hover states (with `--ink` text) |
+| Gold Ornament | `linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%)` | Gold surfaces **without text** (bars, rules, seals) |
 | Sidebar | `linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%)` | Navigation |
 | Wax Seal | `radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%)` | Seal elements |
 | HP Bar | `repeating-linear-gradient(135deg, var(--rubric) 0 4px, #5a1414 4px 8px)` | Health bar fill |
@@ -324,19 +341,23 @@ Primary action button with leather texture.
 
 ```css
 .rpg-button {
-  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
-  color: var(--gold);
+  /* Starts on --leather, not --leather-light: the worst stop of the gradient is
+     what the eye reads, and --gold-light on --leather-light was 4.36:1. The
+     relief comes back as a 1px inset highlight, which is an edge, not a text
+     background. */
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  color: var(--gold-light);   /* 6.23:1 on --leather, 7.07:1 on --leather-dark */
   border: 1px solid var(--gold-dark);
   padding: 8px 16px;
   border-radius: 6px;
   font-family: 'IM Fell English SC', serif;
-  box-shadow: 0 2px 4px rgba(42, 29, 14, 0.3);
+  box-shadow: inset 0 1px 0 rgba(245, 231, 192, 0.14), 0 2px 4px rgba(42, 29, 14, 0.3);
   transition: all 0.2s ease;
 }
 
 .rpg-button:hover {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
-  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  color: var(--ink);          /* 4.97:1 on --gold, the worst stop */
   transform: translateY(-1px);
 }
 ```
@@ -825,6 +846,19 @@ icons on leather and no white strip — there are no runtime `StatusBar` calls.
   outline-offset: -2px;
 }
 ```
+
+### Touch Targets
+
+Every base control gets `min-height: var(--touch-min)` (44px) inside the
+`[data-shell="mobile"]` block of its sheet — `components.css` for `.rpg-button`,
+`.rpg-btn-sm`, `.rpg-input`, `.rpg-select` and `.settings-toggle`; `codex.css`
+for `.qb-rune` and `.qb-check`; `layout.css` for the drawer's nav rows and
+header buttons; each module sheet for its own pills and icon buttons.
+
+Icon-only buttons also take `min-width`. Glyph-sized controls (native
+checkboxes, `.qb-check`) keep their drawing and borrow the 44px through a
+`::before` that takes no layout space. Desktop is untouched: the codex density
+is deliberate, and the desktop floor is the 32px `.tap-target` helper.
 
 ### Font Scale
 

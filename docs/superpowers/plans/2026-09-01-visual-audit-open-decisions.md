@@ -1,7 +1,7 @@
 # Auditoría visual — decisiones abiertas
 
-Estado: **la 1 resuelta (2026-09-02); 2–6 pendientes**. Anotado el 2026-09-01,
-después de publicar la v0.8.2.
+Estado: **la 1 resuelta (2026-09-02), la 2 resuelta (2026-09-03); 3–6
+pendientes**. Anotado el 2026-09-01, después de publicar la v0.8.2.
 
 Lo que sigue NO son bugs sin arreglar: son las seis cosas que la auditoría visual
 dejó sobre la mesa porque la decisión es de diseño, no técnica, y tomarla solo
@@ -67,6 +67,51 @@ porque el fondo es un degradé y la **parada peor** es `--leather-light`, arriba
 Arrancar el degradé en `--leather` da 7.07:1, y le saca el brillo al botón firma
 de la app. **Decisión estética.** Alternativa intermedia: mover la primera parada
 apenas, hasta cruzar 4.5:1 sin apagar el relieve.
+
+**RESUELTA (2026-09-03): el degradé arranca en `--leather` y el relieve vuelve
+por el filo, no por el fondo.**
+
+```css
+background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+color: var(--gold-light);
+box-shadow: inset 0 1px 0 rgba(245, 231, 192, 0.14), 0 2px 4px rgba(42,29,14,.3);
+```
+
+Ratios WCAG 2.x medidos sobre CADA parada del degradé, que es lo que ve el ojo:
+
+| `--gold-light` `#c4a84e` sobre | ratio | veredicto |
+|---|---|---|
+| `--leather-light` `#5c3a1e` (parada vieja) | **4.36** | fallaba |
+| `--leather` `#3a2513` (parada nueva, la peor) | **6.23** | cumple |
+| `--leather-dark` `#2a1d0e` (parada de abajo) | **7.07** | cumple |
+
+Por qué no la «alternativa intermedia»: se midió. El punto MÁS CLARO de la
+rampa `--leather → --leather-light` que cruza 4.5:1 es `#59381d` con **4.511:1**
+— 92.6 % del camino hacia `--leather-light`, indistinguible a ojo del valor que
+fallaba y con 0.011 de margen. Un token nuevo para eso es deuda, no diseño.
+
+El relieve —lo que la decisión temía perder— no vivía en la parada clara del
+degradé: vive en el filo de arriba. Un `inset 0 1px 0` de pergamino al 14 % lo
+devuelve, y no es fondo de texto (el texto tiene 8 px de padding), así que no
+entra en la cuenta del contraste. El `:hover` y el `:active` pisan el
+`box-shadow` completo, o sea que el filo se apaga al apretar: el botón se hunde.
+
+Mismo tratamiento en `.rpg-btn-sm`, `.player-card__level-badge` y
+`.notif-action-go`, que copiaban el degradé viejo.
+
+**Vigilado por** `tests/shared/theme-contrast.test.ts`: lee el degradé real de
+`.rpg-button` y de `.rpg-btn-sm` en `components.css`, resuelve cada `var()`
+contra `theme.css` y exige 4.5:1 en TODAS las paradas. Si alguien vuelve a
+arrancar en `--leather-light`, el test lo caza.
+
+Corolario que salió de la misma medición: **el oro no es tinta.** `--gold` sobre
+pergamino da 2.68 / 2.27 / 1.78 (`--parch-0/1/2`) y `--gold-dark` 3.84 / 3.26 /
+2.55; el punto de la rampa dorada que cumple sobre `--parch-2` ya es un marrón
+oliva indistinguible de `--ink-soft`. El oro queda para bordes, íconos y
+ornamento; el texto usa `--ink-soft` o `--ink-faded`. Y al revés: sobre oro, la
+parada peor de `--gold → --gold-dark` es `--gold-dark` (3.47:1 con `--ink`), así
+que las superficies doradas CON texto arrancan en `--gold-light` y terminan en
+`--gold` (4.97:1).
 
 ## 3. ¿Ajustes centrado, o pegado a la izquierda como el resto?
 

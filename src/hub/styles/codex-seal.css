@@ -258,7 +258,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 45%, #5a0e0e 100%);
   clip-path: inset(calc(100% - var(--codex-hold)) 0 0 0);
 }
 
@@ -561,7 +561,7 @@
   height: 24px;
   border-radius: 50%;
   color: rgba(245, 231, 192, 0.9);
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 50%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 50%, #5a0e0e 100%);
   box-shadow: 0 0 0 0 rgba(196, 168, 78, 0.55);
   animation: codex-wax-pulse 2.8s ease-in-out infinite;
 }
@@ -846,7 +846,7 @@
 
 .codex-link__count {
   font-family: 'Fira Code', monospace;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre pergamino */
 }
 
 /* Dashboard brief: the seal call-to-action reads as a line, not a banner. */
@@ -1139,4 +1139,14 @@
 [data-shell="mobile"] .codex-sealed__exit {
   width: 100%;
   padding: 12px 20px;
+}
+
+/* ── Teléfono: área de toque ──────────────────────── */
+[data-shell="mobile"] .ach-filter__btn,
+[data-shell="mobile"] .codex-link {
+  min-height: var(--touch-min);
+}
+
+[data-shell="mobile"] .dash-brief__seal {
+  min-height: var(--touch-min);
 }

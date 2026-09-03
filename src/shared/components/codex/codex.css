@@ -325,8 +325,12 @@
   background: linear-gradient(180deg, var(--moss) 0%, var(--moss-dark) 100%);
 }
 
+/* El único banderín con fondo claro: hereda `color: var(--parch-0)` del base,
+   que sobre oro no llega ni a 2.5:1. Tinta oscura y el degradé una parada más
+   arriba (--gold-light → --gold): --ink da 7.07 / 4.97. */
 .qb-banner--gold {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  color: var(--ink);
 }
 
 .qb-banner--ink {
@@ -339,7 +343,7 @@
   height: 78px;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%);
+    radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 45%, #5a0e0e 100%);
   box-shadow:
     inset -4px -6px 10px rgba(0, 0, 0, 0.45),
     inset 4px 6px 10px rgba(255, 255, 255, 0.15),
@@ -668,4 +672,42 @@
   justify-content: center;
   padding: 4px 0;
   opacity: 0.6;
+}
+
+/* ══════════════════════════════════════════════════════
+   TELÉFONO
+   ══════════════════════════════════════════════════════
+   `codex.css` no tenía bloque mobile. Las runas hacen de tira de pestañas en
+   varias páginas y median 48×24: la mitad del pulgar. Sólo crecen a lo alto,
+   así que la tira sigue entrando en 390 px. */
+[data-shell="mobile"] button.qb-rune,
+[data-shell="mobile"] .qb-rune[role="tab"],
+[data-shell="mobile"] .qb-rune[role="button"] {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+}
+
+/* La casilla del códice: 16 px es el dibujo de escritorio. En el teléfono el
+   cuadro sube a 24 y el ::before le presta los 44 px del pulgar sin ocupar
+   layout (no empuja la fila ni desalinea el renglón). */
+[data-shell="mobile"] .qb-check {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+[data-shell="mobile"] .qb-check::before {
+  content: '';
+  position: absolute;
+  inset: calc((24px - var(--touch-min)) / 2);
+}
+
+/* La flecha de la tarjeta de módulo es un <a>: 22×22 en el teléfono. */
+[data-shell="mobile"] .qb-module-card-nav {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

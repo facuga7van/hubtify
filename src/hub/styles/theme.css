@@ -25,6 +25,16 @@
   --fs-quote:   calc(16px * var(--font-scale));   /* Epigraphs, quotes, secondary */
   --fs-label:   calc(13px * var(--font-scale));   /* Labels, hints, metadata — MINIMUM */
 
+  /* ── Medida de lectura ─────────────────────────────
+     Caracteres por renglón de un bloque de texto corrido. A 1640 px un
+     subtítulo sin techo llegaba a 198 ch (C5 de la rúbrica): el ojo pierde el
+     renglón al volver. 68 ch es el centro del rango tipográfico clásico
+     (45–80). Va en `ch`, así que escala solo con --font-scale. */
+  --measure: 68ch;
+  /* Área de toque mínima del teléfono (WCAG 2.5.5 / Material). Sólo la usan los
+     bloques [data-shell="mobile"]: en escritorio la densidad manda. */
+  --touch-min: 44px;
+
   /* ── Codex palette ─────────────────────────────────── */
   --ink: #2a1d0e;
   --ink-soft: #4a3520;
@@ -153,11 +163,14 @@ h4 {
   color: var(--ink);
 }
 
+/* El subtítulo de página es texto corrido: a 1640 px llegaba a 166 ch en cinco
+   pantallas. Con --measure vuelve al rango de lectura (45–80 ch). */
 .qb-subtitle {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   font-size: var(--fs-quote);
   color: var(--ink-faded);
+  max-width: var(--measure);
 }
 
 .qb-hand {

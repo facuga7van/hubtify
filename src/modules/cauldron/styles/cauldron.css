@@ -337,9 +337,12 @@
   color: var(--ink);
 }
 
-.cauldron-kv-value.rubric { color: var(--rubric); }
-.cauldron-kv-value.sage { color: var(--moss); }
-.cauldron-kv-value.gold { color: var(--gold); }
+.cauldron-kv-value.rubric { color: var(--rubric); }  /* 8.40 / 7.12 / 5.57 sobre --parch-0/1/2 */
+.cauldron-kv-value.sage { color: var(--moss); }      /* --moss ya viene oscurecido para AA */
+/* --gold sobre pergamino es 2.68 / 2.27 / 1.78: no hay tinta dorada legible en
+   el sistema (ni --gold-dark llega: 3.84 / 3.26 / 2.55). El oro queda para
+   bordes y ornamento; el tercer valor del trío usa la tinta neutra. */
+.cauldron-kv-value.gold { color: var(--ink-soft); }
 
 /* Ingredients checklist */
 .cauldron-ingredients {
@@ -1216,14 +1219,18 @@
 /* La respuesta a «¿en qué se me fue el foco?», en una línea y sin un gráfico. */
 .cauldron-shelf-summary {
   margin: 0 0 10px;
+  max-width: var(--measure);
   font-family: 'IM Fell English', serif;
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-soft);
 }
 
+/* Un estante es un mueble, no una regla de 1640 px: los frascos entran en el
+   ancho de la repisa y el resto de la página queda para la página. */
 .cauldron-shelf-row {
   margin-bottom: 14px;
+  max-width: 640px;
 }
 
 .cauldron-shelf-jars {
@@ -1244,13 +1251,18 @@
   box-shadow: 0 2px 4px rgba(44, 24, 16, 0.35);
 }
 
+/* El rótulo del día. Vivía en `position:absolute` colgado del borde derecho de
+   la repisa, con --ink-faded: el arnés lo medía sobre el tablón oscuro y daba
+   1.21:1 — el peor contraste de toda la app. Ahora es un rótulo de renglón, en
+   el flujo y a la izquierda, sobre pergamino: --ink-soft da 9.37 / 7.95 / 6.21
+   sobre --parch-0/1/2. Además deja de estar a 1580 px de sus frascos. */
 .cauldron-shelf-day {
-  position: absolute;
-  right: 6px;
-  top: 12px;
+  display: block;
+  margin-bottom: 3px;
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
-  color: var(--ink-faded);
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -1629,4 +1641,12 @@
   .cauldron-jar--broken {
     opacity: 0.75;
   }
+}
+
+/* ── Teléfono: área de toque de los controles chicos ── */
+[data-shell="mobile"] .cauldron-mission-trigger,
+[data-shell="mobile"] .cauldron-preset-pill,
+[data-shell="mobile"] .cauldron-collapse-toggle,
+[data-shell="mobile"] .cauldron-edit-btn {
+  min-height: var(--touch-min);
 }

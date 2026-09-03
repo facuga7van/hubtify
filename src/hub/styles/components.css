@@ -84,10 +84,16 @@
 }
 
 /* ── RPG Button ───────────────────────────────────── */
+/* Decisión abierta nº2 (2026-09-01), RESUELTA el 2026-09-03.
+   El degradé arrancaba en --leather-light: la parada PEOR daba 4.36:1 con
+   --gold-light y el botón firma de la app fallaba AA en las diez pantallas.
+   Arranca en --leather (6.23:1) y termina en --leather-dark (7.07:1). El
+   relieve NO se pierde: lo devuelve el filo claro de 1 px de arriba
+   (inset box-shadow), que es un borde, no un fondo de texto. */
 .rpg-button {
   padding: 8px 16px;
-  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
-  color: var(--gold-light);   /* 6.21:1 on leather; --gold was 3.06:1 */
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  color: var(--gold-light);   /* 6.23:1 sobre --leather (parada peor) */
   border: 1px solid var(--gold-dark);
   border-radius: 6px;
   cursor: pointer;
@@ -97,7 +103,9 @@
   letter-spacing: 0.04em;
   transition: all 0.2s ease;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  box-shadow: 0 2px 4px rgba(42, 29, 14, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(245, 231, 192, 0.14),
+    0 2px 4px rgba(42, 29, 14, 0.3);
 }
 
 .rpg-button:hover {
@@ -130,10 +138,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(to bottom, var(--leather-light), var(--leather));
+  /* Mismo arreglo que .rpg-button: la parada clara del degradé dejaba el
+     rótulo en 4.36:1. Arranca en --leather (6.23:1). */
+  background: linear-gradient(to bottom, var(--leather), var(--leather-dark));
   color: var(--gold-light);
   border: 1px solid var(--gold-dark);
   border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(245, 231, 192, 0.14);
   font-family: 'IM Fell English SC', serif;
   font-weight: 600;
   font-size: var(--fs-label);
@@ -141,14 +152,17 @@
   transition: all 0.2s ease;
 }
 .rpg-btn-sm:hover {
-  background: linear-gradient(to bottom, var(--gold-dark), var(--gold));
-  color: var(--leather);
+  background: linear-gradient(to bottom, var(--gold-light), var(--gold));
+  color: var(--ink);  /* --leather sobre --gold (parada peor) daba 4.38:1 */
 }
 
 /* ── Button Active State ─────────────────────────── */
+/* «Gasto» seleccionado en el libro mayor medía 3.05:1 —el segundo peor de
+   escritorio— porque --leather se leía contra la parada clara del oro.
+   --ink da 6.60:1 sobre --gold-dark y 4.97:1 sobre --gold. */
 .rpg-button.rpg-btn-active {
-  background: linear-gradient(to bottom, var(--gold-dark), var(--gold));
-  color: var(--leather);
+  background: linear-gradient(to bottom, var(--gold-light), var(--gold));
+  color: var(--ink);
   border-color: var(--gold-light);
 }
 
@@ -851,7 +865,7 @@ textarea:focus-visible {
 }
 
 .onboarding__dot--active {
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 55%, #5a0e0e 100%);
   border-color: rgba(194, 58, 58, 0.6);
   box-shadow: 0 0 6px rgba(194, 58, 58, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
   transform: scale(1.15);
@@ -1118,6 +1132,7 @@ textarea:focus-visible {
   font-size: var(--fs-label);
   color: var(--ink-faded);
   margin-top: 2px;
+  max-width: var(--measure);  /* llegaba a 118 ch en cinco filas de Ajustes */
 }
 
 .settings-row__buttons {
@@ -1314,4 +1329,66 @@ textarea:focus-visible {
   font-size: var(--fs-label);
   color: var(--ink-faded);
   margin-left: 3px;
+}
+
+/* ══════════════════════════════════════════════════════
+   TELÉFONO — área de toque de las bases
+   ══════════════════════════════════════════════════════
+   `components.css` era la única hoja sin bloque [data-shell="mobile"], y acá
+   viven `.rpg-button`, `.rpg-input`, `.rpg-select` y `.settings-toggle`: las
+   piezas que aparecen en las once pantallas. Con 26–32 px de alto, el 84–100 %
+   de los controles del teléfono quedaban por debajo del pulgar (C11 = 3).
+   `--touch-min` (44 px, WCAG 2.5.5) sólo se aplica bajo el shell mobile: en
+   escritorio la densidad del códice manda y no se toca nada.
+   El alto es lo que importa —un botón de 390×26 falla sólo por alto—, así que
+   va `min-height`, no `height`: nada se estira ni se recorta. */
+[data-shell="mobile"] .rpg-button,
+[data-shell="mobile"] .rpg-btn-sm,
+[data-shell="mobile"] .rpg-input,
+[data-shell="mobile"] .rpg-select,
+[data-shell="mobile"] .rpg-stepper-btn,
+[data-shell="mobile"] .settings-toggle {
+  min-height: var(--touch-min);
+}
+
+/* Los que ya venían con `height` fija le ganaban al `min-height`. */
+[data-shell="mobile"] .rpg-btn-sm {
+  height: auto;
+}
+
+/* El interruptor es un botón sin caja propia (padding 0, riel de 38×20): el
+   alto se lo da el bloque de arriba y el riel se queda centrado, así que el
+   dibujo no cambia — sólo crece la zona que responde al dedo. */
+[data-shell="mobile"] .settings-toggle {
+  align-items: center;
+}
+
+/* Un textarea con 44 px de piso sigue siendo un textarea: el `min-height` no
+   le impide crecer. */
+[data-shell="mobile"] textarea.rpg-input {
+  min-height: calc(var(--touch-min) * 2);
+}
+
+/* `.tap-target` ya existía con 32 px: es el piso del ESCRITORIO. En el teléfono
+   el mismo helper sube a 44. */
+[data-shell="mobile"] .tap-target {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+}
+
+/* Las casillas nativas miden 13–16 px en cualquier navegador. No se agrandan a
+   44 (dejarían de parecer casillas): se les da un tamaño legible de teléfono y
+   la zona que responde al dedo la pone el ::before, que no ocupa layout. */
+[data-shell="mobile"] input[type="checkbox"],
+[data-shell="mobile"] input[type="radio"] {
+  position: relative;
+  width: 22px;
+  height: 22px;
+}
+
+[data-shell="mobile"] input[type="checkbox"]::before,
+[data-shell="mobile"] input[type="radio"]::before {
+  content: '';
+  position: absolute;
+  inset: calc((22px - var(--touch-min)) / 2);
 }

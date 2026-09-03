@@ -44,7 +44,10 @@
   min-width: 0;
 }
 
-.rwd-purse__label { color: var(--gold-dark); }
+/* --gold-dark sobre pergamino es 3.84 / 3.26 / 2.55 (--parch-0/1/2): el oro no
+   es tinta. El rótulo pasa a --ink-soft (9.37 / 7.95 / 6.21); el oro sigue
+   siendo el color del ícono de la bolsa y de los bordes. */
+.rwd-purse__label { color: var(--ink-soft); }
 
 .rwd-purse__value {
   display: inline-flex;
@@ -146,7 +149,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   font-size: var(--fs-sub);
   white-space: nowrap;
 }
@@ -165,13 +168,15 @@
   gap: 4px;
 }
 
+/* Editar / borrar: 24×24 quedaban por debajo del piso de control (32 px) y a
+   --ink-faded casi no se veían en la captura de la auditoría. */
 .rwd-item__tool {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -213,7 +218,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* ídem .rwd-item__cost */
 }
 
 .rwd-form__cost-input { width: 110px; }
@@ -448,4 +453,11 @@
     width: 40px;
     height: 40px;
   }
+}
+
+/* ── Teléfono: área de toque ──────────────────────── */
+[data-shell="mobile"] .rwd-tab,
+[data-shell="mobile"] .rwd-item__tool {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
 }

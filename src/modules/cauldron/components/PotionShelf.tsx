@@ -138,6 +138,10 @@ export default function PotionShelf({ sessions, week, hasMore, onLoadMore }: Pro
 
       {shelves.map(([day, jars]) => (
         <div key={day} className="cauldron-shelf-row">
+          {/* El día encabeza su renglón, como el rótulo de una fila de libro
+              mayor. Antes colgaba del borde derecho de la repisa, sobre madera
+              oscura y a 1580 px de sus propios frascos. */}
+          <span className="cauldron-shelf-day">{dayLabel(day)}</span>
           <div className="cauldron-shelf-jars">
             {jars.map((s) => (
               <PotionJar
@@ -151,9 +155,7 @@ export default function PotionShelf({ sessions, week, hasMore, onLoadMore }: Pro
             ))}
           </div>
           {/* La repisa: la tabla de madera sobre la que se apoyan los frascos. */}
-          <div className="cauldron-shelf-plank">
-            <span className="cauldron-shelf-day">{dayLabel(day)}</span>
-          </div>
+          <div className="cauldron-shelf-plank" />
         </div>
       ))}
 
