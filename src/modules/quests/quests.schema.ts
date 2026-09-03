@@ -269,4 +269,40 @@ export const questsMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tasks_repeat_chain ON tasks(repeat_of, status, deleted_at);
     `,
   },
+  {
+    namespace: 'quests',
+    version: 14,
+    up: `
+      -- ── Recurrence, second pass: interval + completion anchor ─────────────
+      --
+      -- INTERVAL lives INSIDE repeat_rule, not in a column: it is part of the
+      -- rule, and putting it in the JSON keeps the whole cadence in one place
+      -- that travels through sync as a single opaque string. The key is
+      -- OPTIONAL and absent means 1, so every rule written before this
+      -- migration keeps its exact meaning with no data rewrite:
+      --   {"freq":"daily"}              → every day        (interval 1)
+      --   {"freq":"weekly","interval":2} → every 2 weeks
+      -- Range 1..30, clamped on parse. A client that predates intervals reads
+      -- {"freq":"weekly","interval":2} as plain "weekly" — it degrades to a
+      -- shorter cadence instead of crashing or losing the rule.
+      --
+      -- NOT supported: an interval on freq "days" (specific weekdays). "Every
+      -- 2 weeks on Mon and Thu" needs a notion of which weeks are "on", and
+      -- this model has no week-parity anchor to hang that on — the chain root
+      -- can be soft-deleted or missing after a partial sync, which is exactly
+      -- when the parity would silently flip. Rather than ship an ambiguous
+      -- answer, the parser forces interval 1 for "days" and the form hides the
+      -- control for it.
+      --
+      -- repeat_anchor: WHERE the next due date is measured FROM.
+      --   NULL (or anything unknown) → the v13 behaviour, unchanged and still
+      --     the default: advance from the completed instance's own DUE date, so
+      --     rent due the 1st and paid the 3rd is still due the 1st next month.
+      --   'completion' → advance from the date the instance was actually ticked
+      --     ("water the plants every 3 days from when I watered them").
+      -- Nullable on purpose: no backfill, and a client that never writes the
+      -- column keeps producing fixed-date chains.
+      ALTER TABLE tasks ADD COLUMN repeat_anchor TEXT DEFAULT NULL;
+    `,
+  },
 ];

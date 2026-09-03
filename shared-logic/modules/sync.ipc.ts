@@ -105,6 +105,8 @@ interface SyncTask {
   completedAt: string | null;
   repeatRule?: string | null;
   repeatOf?: string | null;
+  /** quests v14: NULL/absent = the fixed-due-date cadence, 'completion' = from the tick. */
+  repeatAnchor?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -599,15 +601,15 @@ export function mergeQuestDataInto(db: SqlDatabase, remote: SyncQuestData): { ch
 
     // ── Merge tasks ──
     step(db, 'tasks', () => {
-      const getTask = db.prepare('SELECT id, updated_at, repeat_rule, repeat_of FROM tasks WHERE id = ?');
+      const getTask = db.prepare('SELECT id, updated_at, repeat_rule, repeat_of, repeat_anchor FROM tasks WHERE id = ?');
       const insertTask = db.prepare(`
-        INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, repeat_rule, repeat_of, created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (id, name, description, status, tier, category, project_id, due_date, task_order, completed_at, repeat_rule, repeat_of, repeat_anchor, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const updateTask = db.prepare(`
         UPDATE tasks SET name = ?, description = ?, status = ?, tier = ?, category = ?,
                project_id = ?, due_date = ?, task_order = ?, completed_at = ?,
-               repeat_rule = ?, repeat_of = ?, updated_at = ?, deleted_at = ?
+               repeat_rule = ?, repeat_of = ?, repeat_anchor = ?, updated_at = ?, deleted_at = ?
         WHERE id = ?
       `);
       // tasks.project_id REFERENCES projects(id): a task pointing at a project this
@@ -619,11 +621,14 @@ export function mergeQuestDataInto(db: SqlDatabase, remote: SyncQuestData): { ch
         // took the whole pull down with it.
         if (!isUsableRow(rt, 'tasks', ['id', 'name'])) continue;
         const projectId = rt.projectId && projectExists.get(rt.projectId) ? rt.projectId : null;
-        const local = getTask.get(rt.id) as { id: string; updated_at: string; repeat_rule: string | null; repeat_of: string | null } | undefined;
+        const local = getTask.get(rt.id) as { id: string; updated_at: string; repeat_rule: string | null; repeat_of: string | null; repeat_anchor: string | null } | undefined;
+        // Only 'completion' is a real anchor; anything else stores as NULL so a
+        // corrupt remote cannot invent a third mode nobody knows how to read.
+        const remoteAnchor = rt.repeatAnchor === 'completion' ? 'completion' : null;
         if (!local) {
           insertTask.run(rt.id, rt.name, rt.description ?? '', rt.status ?? 0, rt.tier ?? 2, rt.category ?? '',
             projectId, rt.dueDate ?? null, rt.order ?? 0, normCompletedAt(rt.completedAt),
-            rt.repeatRule ?? null, rt.repeatOf ?? null, rt.createdAt, rt.updatedAt, rt.deletedAt);
+            rt.repeatRule ?? null, rt.repeatOf ?? null, remoteAnchor, rt.createdAt, rt.updatedAt, rt.deletedAt);
           changed = true;
         } else if (isNewerStamp(rt.updatedAt, local.updated_at)) {
           // A remote written by a client that predates repeat rules carries no
@@ -631,9 +636,12 @@ export function mergeQuestDataInto(db: SqlDatabase, remote: SyncQuestData): { ch
           // rule. An explicit null ("never") from a new client DOES win.
           const repeatRule = 'repeatRule' in rt ? rt.repeatRule ?? null : local.repeat_rule;
           const repeatOf = 'repeatOf' in rt ? rt.repeatOf ?? null : local.repeat_of;
+          // Same rule for quests v14: a client that never heard of the anchor
+          // sends no key at all, and that is silence, not "back to fixed".
+          const repeatAnchor = 'repeatAnchor' in rt ? remoteAnchor : local.repeat_anchor;
           updateTask.run(rt.name, rt.description ?? '', rt.status ?? 0, rt.tier ?? 2, rt.category ?? '',
             projectId, rt.dueDate ?? null, rt.order ?? 0, normCompletedAt(rt.completedAt),
-            repeatRule, repeatOf, rt.updatedAt, rt.deletedAt, rt.id);
+            repeatRule, repeatOf, repeatAnchor, rt.updatedAt, rt.deletedAt, rt.id);
           changed = true;
         }
       }
@@ -1023,7 +1031,7 @@ export function registerSyncIpcHandlers(): void {
       SELECT id, name, description, status, tier, category,
              project_id AS projectId, due_date AS dueDate, task_order AS "order",
              completed_at AS completedAt,
-             repeat_rule AS repeatRule, repeat_of AS repeatOf,
+             repeat_rule AS repeatRule, repeat_of AS repeatOf, repeat_anchor AS repeatAnchor,
              created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
       FROM tasks
     `).all();

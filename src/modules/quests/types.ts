@@ -83,6 +83,12 @@ export interface Task {
   repeatRule?: string | null;
   /** Root (template) task id of the recurring chain; null/absent on the root. */
   repeatOf?: string | null;
+  /**
+   * Where the chain measures its next due date from (quests migration v14):
+   * null/absent = from the due date (the default), 'completion' = from the day
+   * the instance was actually ticked.
+   */
+  repeatAnchor?: string | null;
   createdAt: string;
   updatedAt: string;
 }

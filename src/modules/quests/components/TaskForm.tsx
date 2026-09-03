@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XP_MAP, PROJECT_COLORS, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
-import { parseRepeatRule, buildRepeatRule, jsToIsoDay, type RepeatFreq } from '../repeat';
+import {
+  parseRepeatRule, buildRepeatRule, jsToIsoDay, parseRepeatAnchor, serializeRepeatAnchor,
+  clampRepeatInterval, repeatUnitLabel, MAX_REPEAT_INTERVAL,
+  type RepeatFreq, type RepeatAnchor,
+} from '../repeat';
 // One parser for the whole app: `quickadd-parser` is a superset of the old
 // `parseQuickTask` (dates + time + !tier + #project, with an escape hatch), so
 // the form and the Ctrl+Q modal understand exactly the same language.
@@ -36,6 +40,13 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   const [repeatFreq, setRepeatFreq] = useState<RepeatFreq | 'never'>('never');
   /** Chosen weekdays for freq 'days', in the picker's ISO numbering (1 = Monday). */
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  /**
+   * The interval box holds TEXT, not a number: a number state forces the field
+   * back to 1 the instant you clear it to type "12", which makes it unusable.
+   * It is clamped to 1..30 on blur and again on save.
+   */
+  const [repeatInterval, setRepeatInterval] = useState('1');
+  const [repeatAnchor, setRepeatAnchor] = useState<RepeatAnchor>('due');
   const [dismissedQuick, setDismissedQuick] = useState(false);
   /**
    * El proyecto que sugiere el historial, SOLO como respaldo.
@@ -115,12 +126,14 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       const rule = parseRepeatRule(editingTask.repeatRule);
       setRepeatFreq(rule?.freq ?? 'never');
       setRepeatDays(rule?.days ? rule.days.map(jsToIsoDay).sort((a, b) => a - b) : []);
+      setRepeatInterval(String(rule?.interval ?? 1));
+      setRepeatAnchor(parseRepeatAnchor(editingTask.repeatAnchor));
     } else {
       // Suggested, never imposed: the picker opens already on today, so putting
       // a quest in "Hoy" costs one tick and zero typing — but the checkbox stays
       // off, so nothing gets a date the user did not ask for.
       setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(todayDateString()); setUseDate(false);
-      setRepeatFreq('never'); setRepeatDays([]);
+      setRepeatFreq('never'); setRepeatDays([]); setRepeatInterval('1'); setRepeatAnchor('due');
       // El contexto explícito gana; el historial sólo contesta cuando no hay.
       setProjectId(activeProjectId ?? inferredProjectId.current);
     }
@@ -149,6 +162,8 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     }
     if (quickActive && quick.projectId) resolvedProjectId = quick.projectId;
 
+    const resolvedRule = buildRepeatRule(repeatFreq, repeatDays, clampRepeatInterval(repeatInterval));
+
     const task = {
       id: editingTask?.id,
       name: resolvedName,
@@ -159,7 +174,10 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       dueDate: resolvedDueDate,
       order: editingTask?.order ?? 0,
       status: editingTask?.status ?? false,
-      repeatRule: buildRepeatRule(repeatFreq, repeatDays),
+      repeatRule: resolvedRule,
+      // No rule → no anchor; the backend enforces the same, this just keeps the
+      // payload honest.
+      repeatAnchor: resolvedRule ? serializeRepeatAnchor(repeatAnchor) : null,
     };
 
     await window.api.questsUpsertTask(task as Record<string, unknown>);
@@ -167,7 +185,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     // No `questsEnsureCategory` call any more: categories are derived from
     // `tasks.category` (the handler is a no-op), so saving the task registers it.
     setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(todayDateString()); setUseDate(false);
-    setRepeatFreq('never'); setRepeatDays([]);
+    setRepeatFreq('never'); setRepeatDays([]); setRepeatInterval('1'); setRepeatAnchor('due');
     setDismissedQuick(false);
     setProjectId(activeProjectId ?? inferredProjectId.current);
     onSaved();
@@ -318,7 +336,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
         )}
 
         {/* Recurrence: completing spawns the next instance with the due date
-            shifted by the rule (backend, quests migration v13). */}
+            shifted by the rule (backend, quests migrations v13 and v14). */}
         <div className="quest-repeat-field">
           <label className="quest-repeat-label" htmlFor="quest-repeat-select">
             {t('questify.repeatLabel', 'Repetir')}
@@ -335,8 +353,48 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
             <option value="monthly">{t('questify.repeatMonthly', 'Mensual')}</option>
             <option value="days">{t('questify.repeatDays', 'Días específicos')}</option>
           </select>
+          {/* Interval. Deliberately absent for "specific days": "every 2 weeks
+              on Mon and Thu" has no unambiguous meaning in this model — see the
+              DECISION note in repeat.ts and quests migration v14. */}
+          {repeatFreq !== 'never' && repeatFreq !== 'days' && (
+            <>
+              <label className="quest-repeat-label" htmlFor="quest-repeat-interval">
+                {t('questify.repeatEvery', 'cada')}
+              </label>
+              <input
+                id="quest-repeat-interval"
+                type="number"
+                min={1}
+                max={MAX_REPEAT_INTERVAL}
+                step={1}
+                className="rpg-input quest-repeat-interval"
+                value={repeatInterval}
+                onChange={(e) => setRepeatInterval(e.target.value)}
+                onBlur={() => setRepeatInterval(String(clampRepeatInterval(repeatInterval)))}
+              />
+              <span className="quest-repeat-unit">
+                {repeatUnitLabel(repeatFreq, clampRepeatInterval(repeatInterval), t)}
+              </span>
+            </>
+          )}
           {repeatFreq === 'days' && (
             <HabitDayPicker value={repeatDays} onChange={setRepeatDays} />
+          )}
+          {/* Anchor. Off = the default: the next date is measured from THIS
+              due date (rent due the 1st, paid the 3rd, is due the 1st again). */}
+          {repeatFreq !== 'never' && (
+            <div
+              className="quest-repeat-anchor"
+              onClick={() => setRepeatAnchor(repeatAnchor === 'completion' ? 'due' : 'completion')}
+              title={t('questify.repeatFromCompletionHelp', 'Cuenta el próximo vencimiento desde el día en que la marco, no desde el vencimiento anterior')}
+            >
+              <Checkbox
+                checked={repeatAnchor === 'completion'}
+                onChange={() => setRepeatAnchor(repeatAnchor === 'completion' ? 'due' : 'completion')}
+                size={16}
+              />
+              <span>{t('questify.repeatFromCompletion', 'Desde que la completo')}</span>
+            </div>
           )}
         </div>
       </div>
