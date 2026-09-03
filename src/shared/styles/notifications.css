@@ -210,15 +210,16 @@
   background: rgba(168, 138, 60, 0.25);
 }
 
+/* Mismo arreglo que .rpg-button: --gold sobre --leather-light no llegaba a AA. */
 .notif-item-actions button.notif-action-go {
-  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
-  color: var(--gold);
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  color: var(--gold-light);
   border-color: var(--gold-dark);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .notif-item-actions button.notif-action-go:hover {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
   color: var(--ink);
   text-shadow: none;
 }

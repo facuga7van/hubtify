@@ -190,7 +190,9 @@
   bottom: -3px; right: -6px;
   min-width: 20px; height: 20px;
   padding: 0 4px;
-  background: linear-gradient(160deg, var(--leather-light) 0%, var(--leather-dark) 100%);
+  /* Arrancaba en --leather-light: 4.36:1 con --gold-light. Ahora --leather
+     (6.23:1), igual que .rpg-button. */
+  background: linear-gradient(160deg, var(--leather) 0%, var(--leather-dark) 100%);
   border: 1.5px solid var(--gold);
   border-radius: 50%;
   font-family: 'IM Fell English SC', serif;
@@ -207,10 +209,12 @@
   transition: all .28s cubic-bezier(.4,.1,.2,1);
 }
 
+/* El medallón del riel abierto lleva un número que hay que LEER: sube al piso
+   tipográfico del sistema (13 px) y la caja crece para acompañarlo. */
 .sidebar:not(.sidebar--collapsed) .player-card__level-badge {
-  min-width: 24px; height: 24px;
-  font-size: 11px;
-  line-height: 21px;
+  min-width: 26px; height: 26px;
+  font-size: var(--fs-label);
+  line-height: 23px;
   bottom: -4px; right: -8px;
 }
 
@@ -244,11 +248,14 @@
    «CAMPESINO», el más largo del catálogo, pide ~79 px de los ~136 que le
    quedan a la columna en el riel angosto, y ~103 con el preset de fuente más
    grande. */
+/* --rubric-light sobre cuero daba 2.09:1 — el peor contraste del cajón, y el
+   cajón está en las once pantallas del teléfono. --gold-light da 6.23:1 y es
+   además el color con el que la app ya escribe sobre cuero. */
 .player-card__eyebrow {
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: .14em;
-  color: var(--rubric-light);
+  color: var(--gold-light);
 }
 
 /* The profile block (player card + stat bars) must never be squeezed. */
@@ -481,17 +488,20 @@
   z-index: 1;
 }
 
+/* La insignia de pendientes es un DATO, no un adorno: 9 px la dejaban por
+   debajo del piso del sistema (--fs-label, 13 px). La caja sube de 14 a 18 px
+   para que el número no toque el borde. --parch-0 sobre --rubric: 8.40:1. */
 .sidebar-badge--count {
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: 7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
   background: var(--rubric);
   color: var(--parch-0);
   font-family: 'Fira Code', monospace;
-  font-size: 9px;
+  font-size: var(--fs-label);
   font-weight: 700;
-  line-height: 14px;
+  line-height: 18px;
   text-align: center;
   box-shadow: 0 1px 3px rgba(0,0,0,.5);
 }
@@ -566,10 +576,12 @@
   background: rgba(0,0,0,.2);
 }
 
+/* Ídem la ceja: 2.09:1 sobre cuero. El combo se sigue distinguiendo por su
+   Fraktur y su tamaño, no por un rojo que no se lee. */
 .sidebar-footer__combo-num {
   font-family: 'UnifrakturCook', serif;
   font-size: var(--fs-nav);
-  color: var(--rubric-light);
+  color: var(--gold-light);
   line-height: 1;
 }
 
@@ -975,4 +987,22 @@
    los corremos por el inset para que no se metan bajo la barra de estado. */
 :root[data-shell="mobile"] .system-toast-container {
   top: calc(64px + var(--safe-top));
+}
+
+/* ── Área de toque del cajón lateral ──────────────────
+   El cajón no es una pantalla, pero se abre en las ONCE del teléfono, así que
+   sus controles arrastraban el C11 de todas. Las filas de navegación median
+   286×32 y los tres botones del encabezado 30–32 px. `min-height` sobre el
+   riel expandido (el cajón siempre monta `<Sidebar collapsed={false}>`), para
+   no tocar el riel de 56 px del escritorio. */
+:root[data-shell="mobile"] .sidebar:not(.sidebar--collapsed) .sidebar-nav-item {
+  min-height: var(--touch-min);
+}
+
+:root[data-shell="mobile"] .sidebar .notif-bell,
+:root[data-shell="mobile"] .sidebar .player-card__account-btn,
+:root[data-shell="mobile"] .sidebar .sidebar-streak__inn,
+:root[data-shell="mobile"] .sidebar .sidebar-settings-area .sidebar-nav-item {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
 }
