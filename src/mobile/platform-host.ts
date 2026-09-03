@@ -20,6 +20,7 @@ import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Share } from '@capacitor/share';
 import type { FileFilter, NotificationPlan } from '@logic/platform';
+import { markVirtualDevice } from '../shared/platform-detect';
 import { pickFile } from './file-picker';
 import { acceptFor, bytesToBase64, notificationIdFor } from './host-utils';
 import type { PlatformHostFns } from './worker-client';
@@ -41,6 +42,10 @@ export const OS_INFO_FALLBACK = 'android';
 export async function readOsInfo(): Promise<string> {
   try {
     const info = await Device.getInfo();
+    // De paso: el emulador rasteriza por software y no aguanta las animaciones
+    // continuas del Caldero (CAU-03). Este es el único lugar donde ya cruzamos
+    // el bridge al arrancar, así que el flag sale gratis.
+    markVirtualDevice(info.isVirtual === true);
     return `${info.platform} ${info.osVersion}`;
   } catch (err) {
     console.warn('[mobile] Device.getInfo falló:', err);

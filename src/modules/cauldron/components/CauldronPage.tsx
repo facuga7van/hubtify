@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
-import { isNativeMobile } from '../../../shared/platform-detect';
+import { usePrefersReducedMotion } from '../../../shared/hooks/usePrefersReducedMotion';
+import { isNativeMobile, isVirtualDevice } from '../../../shared/platform-detect';
 import { ambientOrbs, brewComplete, statsShimmer } from '../../../shared/animations/cauldron';
 import {
   playCauldronStart,
@@ -96,6 +97,13 @@ export default function CauldronPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const clipId = useId();
+  /**
+   * El caldero se queda quieto cuando el sistema pidió menos movimiento — y en
+   * el emulador, que rasteriza por software y se cae entero con las 20
+   * animaciones SMIL corriendo (CAU-03). El emulador es el único que se cae;
+   * en un teléfono esto es solo batería.
+   */
+  const stillCauldron = usePrefersReducedMotion() || isVirtualDevice();
 
   /* -- State -- */
   const [presets, setPresets] = useState<CauldronPreset[]>([]);
@@ -822,6 +830,7 @@ export default function CauldronPage() {
               sessionType={sessionType}
               paused={!!isPaused}
               clipId={clipId}
+              animated={!stillCauldron}
             />
 
             {/* Embers float up from under cauldron */}
