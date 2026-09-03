@@ -1,0 +1,119 @@
+/* ══════════════════════════════════════════════════════
+   MODO INVITADO
+   ══════════════════════════════════════════════════════
+   Hoja propia (importada desde AuthPage.tsx y PlayerCard.tsx) para no tocar
+   `src/hub/styles/`, que en esta tanda está en manos de otros pases.
+   Solo tokens de DESIGN_SYSTEM.md. */
+
+/* ── AuthPage: la puerta sin muro ─────────────────────── */
+
+.auth-card__guest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(168, 138, 60, 0.28);
+}
+
+/* Se lee como acción, no como link secundario: es el camino corto al producto.
+   Cuero + oro, la misma familia que `.rpg-button`, pero en fantasma para que no
+   compita con «Entrar al Reino». */
+.auth-card__guest-btn {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--gold-dark);
+  border-radius: 4px;
+  color: var(--ink);
+  font-family: var(--ff-accent);
+  font-size: var(--fs-body);
+  letter-spacing: 0.04em;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.auth-card__guest-btn:hover {
+  background: rgba(168, 138, 60, 0.14);
+  border-color: var(--gold);
+  color: var(--ink);
+}
+
+.auth-card__guest-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* El costo, dicho entero y sin eufemismos. `--ink-soft` y no `--ink-faded`:
+   esto es un dato, no un adorno (la auditoría ya cazó `--ink-faded` a 3.80:1
+   sobre `--parch-2`). */
+.auth-card__guest-note {
+  margin: 0;
+  max-width: 34ch;
+  text-align: center;
+  font-family: var(--ff-body);
+  font-size: var(--fs-label);
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+/* ── PlayerCard: el aviso de «no hay respaldo» ─────────── */
+
+/* Ocupa el renglón que en una cuenta lleva el mail. Hereda el recorte con
+   elipsis de `.player-card__email` a mano: la regla de `shell.css` lista sus
+   hermanos por nombre y esta clase no está ahí. */
+.player-card__ident > .player-card__guest-tag {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-card__guest-tag {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 2px;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  /* Pergamino sobre cuero, como el mail — pero en oro claro, que es el color
+     con el que el sidebar señala «esto se toca». */
+  color: var(--gold-light);
+  border-bottom: 1px dotted rgba(201, 168, 76, 0.5);
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.player-card__guest-tag:hover {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.player-card__guest-tag:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Colapsado el riel mide ~56 px: el renglón entero sobra. */
+.player-card--collapsed .player-card__guest-tag {
+  display: none;
+}
+
+/* ── Teléfono ──────────────────────────────────────────
+   44 px de alto (WCAG 2.5.5). El aviso del PlayerCard vive dentro del drawer,
+   donde el pulgar también manda. */
+[data-shell="mobile"] .auth-card__guest-btn,
+[data-shell="mobile"] .player-card__guest-tag {
+  min-height: var(--touch-min);
+}
+
+[data-shell="mobile"] .auth-card__guest-note {
+  max-width: 100%;
+}
