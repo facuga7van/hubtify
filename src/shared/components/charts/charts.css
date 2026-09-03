@@ -382,6 +382,9 @@
 }
 
 /* Themed ornament on l4 cells */
+/* contrast-ok: ornamento sobre la celda de intensidad maxima; no transmite
+   informacion (el nivel lo dice el color de la celda) y lleva su propio
+   resplandor. Cambiarlo por tinta apagaria el remate dorado. */
 .heatmap-calendar--themed .heatmap-cell--l4 .heatmap-ornament {
   color: var(--gold);
   font-size: var(--fs-label);

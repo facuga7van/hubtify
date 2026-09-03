@@ -21,8 +21,25 @@ export interface EntryDefaults {
   currency: 'ARS' | 'USD';
   /** La cuenta más usada, o `null` si nunca se eligió ninguna. */
   accountId: string | null;
+  /**
+   * La categoría más usada. En la base real es un caso degenerado —58 de 60
+   * altas manuales están en «Otros»—, así que el `'Otros'` que hardcodeaban los
+   * formularios acierta hoy por accidente. Lo que cambia es que deja de ser una
+   * constante: el día que la persona separe «Comida» de «Transporte», el
+   * formulario la sigue.
+   */
+  category: string;
   /** Cuántas filas sostienen la inferencia — 0 = se usó el fallback. */
   sampleSize: number;
+  /**
+   * El medio de pago de un PLAN EN CUOTAS, que es otra pregunta que la de un
+   * gasto suelto. En la base real hay 4 planes cargados a mano: 3 con tarjeta,
+   * 1 por transferencia, **cero en débito** — que es justo con lo que arrancaba
+   * `InstallmentAddForm`. Y la moda general tampoco sirve acá: da `transfer`.
+   */
+  installmentPaymentMethod: InferredPaymentMethod;
+  /** Cuántos PLANES (no filas) sostienen `installmentPaymentMethod`. */
+  installmentSampleSize: number;
 }
 
 const VALID_METHODS: readonly InferredPaymentMethod[] = ['cash', 'debit', 'transfer', 'credit_card'];
@@ -38,8 +55,24 @@ const VALID_METHODS: readonly InferredPaymentMethod[] = ['cash', 'debit', 'trans
  */
 export const FALLBACK_PAYMENT_METHOD: InferredPaymentMethod = 'transfer';
 
+/**
+ * Con cero planes previos, un plan en cuotas se paga con tarjeta.
+ *
+ * Otra decisión de producto explícita: financiar en cuotas es, en Argentina, lo
+ * que hace una tarjeta de crédito. El débito —el valor con el que arrancaba el
+ * formulario— es el único medio con el que NO se puede comprar en cuotas, y en
+ * la base real tiene cero planes.
+ */
+export const FALLBACK_INSTALLMENT_METHOD: InferredPaymentMethod = 'credit_card';
+
+/** La categoría de arranque cuando no hay ni una alta manual de la que aprender. */
+export const FALLBACK_CATEGORY = 'Otros';
+
 /** Cuántos movimientos mira la moda. Suficiente para un mes y medio de uso. */
 const SAMPLE = 50;
+
+/** Cuántos PLANES mira la moda de cuotas. Son eventos raros: la ventana es larga. */
+const INSTALLMENT_SAMPLE = 20;
 
 /**
  * La moda del medio de pago sobre las últimas altas MANUALES de gasto.
@@ -65,7 +98,7 @@ export function getEntryDefaults(
 ): EntryDefaults {
   const placeholders = reservedCategories.map(() => '?').join(', ');
   const rows = db.prepare(`
-    SELECT payment_method AS paymentMethod, currency, account_id AS accountId
+    SELECT payment_method AS paymentMethod, currency, account_id AS accountId, category
     FROM finance_transactions
     WHERE deleted_at IS NULL AND source = 'manual' AND type = 'expense'
       AND category NOT IN (${placeholders})
@@ -75,10 +108,20 @@ export function getEntryDefaults(
     paymentMethod: string | null;
     currency: string | null;
     accountId: string | null;
+    category: string | null;
   }>;
 
+  const installment = getInstallmentDefaults(db, reservedCategories);
+
   if (rows.length === 0) {
-    return { paymentMethod: FALLBACK_PAYMENT_METHOD, currency: 'ARS', accountId: null, sampleSize: 0 };
+    return {
+      paymentMethod: FALLBACK_PAYMENT_METHOD,
+      currency: 'ARS',
+      accountId: null,
+      category: FALLBACK_CATEGORY,
+      sampleSize: 0,
+      ...installment,
+    };
   }
 
   const method = mode(
@@ -98,7 +141,61 @@ export function getEntryDefaults(
       .filter((a): a is string => typeof a === 'string' && a !== ''),
   ) ?? null;
 
-  return { paymentMethod: method, currency, accountId, sampleSize: rows.length };
+  // Las reservadas ya quedaron fuera por SQL, así que acá sólo se descartan los
+  // vacíos: una fila sin categoría no vota.
+  const category = mode(
+    rows.map((r) => r.category).filter((c): c is string => typeof c === 'string' && c !== ''),
+  ) ?? FALLBACK_CATEGORY;
+
+  return {
+    paymentMethod: method,
+    currency,
+    accountId,
+    category,
+    sampleSize: rows.length,
+    ...installment,
+  };
+}
+
+/**
+ * La moda del medio de pago sobre los últimos PLANES EN CUOTAS cargados a mano.
+ *
+ * Se cuenta por `installment_group_id`, no por fila, y ahí está el detalle que
+ * importa: en la base real un solo plan por transferencia de 36 cuotas produce
+ * 36 filas, contra 18 de los tres planes con tarjeta. Contar filas daría
+ * `transfer` por goleada; contar planes da `credit_card` 3 a 1, que es lo que la
+ * persona efectivamente eligió tres veces de cuatro.
+ *
+ * Mismos filtros que la moda del gasto suelto y por las mismas razones: sólo
+ * `manual` (las filas de `import` traen el medio del resumen, no una elección) y
+ * sin categorías reservadas.
+ */
+function getInstallmentDefaults(
+  db: SqlDatabase,
+  reservedCategories: readonly string[],
+): Pick<EntryDefaults, 'installmentPaymentMethod' | 'installmentSampleSize'> {
+  const placeholders = reservedCategories.map(() => '?').join(', ');
+  const groups = db.prepare(`
+    SELECT payment_method AS paymentMethod
+    FROM finance_transactions
+    WHERE deleted_at IS NULL AND source = 'manual' AND type = 'expense'
+      AND installments > 1 AND installment_group_id IS NOT NULL
+      AND category NOT IN (${placeholders})
+    GROUP BY installment_group_id
+    ORDER BY MAX(date) DESC, MAX(created_at) DESC
+    LIMIT ${INSTALLMENT_SAMPLE}
+  `).all(...reservedCategories) as Array<{ paymentMethod: string | null }>;
+
+  if (groups.length === 0) {
+    return { installmentPaymentMethod: FALLBACK_INSTALLMENT_METHOD, installmentSampleSize: 0 };
+  }
+
+  const method = mode(
+    groups.map((g) => g.paymentMethod).filter((m): m is InferredPaymentMethod =>
+      typeof m === 'string' && (VALID_METHODS as readonly string[]).includes(m)),
+  ) ?? FALLBACK_INSTALLMENT_METHOD;
+
+  return { installmentPaymentMethod: method, installmentSampleSize: groups.length };
 }
 
 /** La moda; con empate gana el que apareció primero (= el más reciente). */

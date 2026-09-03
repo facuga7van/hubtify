@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import PageHeader from '../shared/components/PageHeader';
+import { BookPage } from '../shared/components/codex';
+import { Sparkle } from '../shared/components/icons';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull } from '../shared/sync';
 import { useConfirm } from '../shared/components/ConfirmDialog';
@@ -215,9 +216,16 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="settings-page">
-      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
-
+    /* Ajustes era la ÚNICA página que abandonaba el cromo del códice: sin ceja,
+       sin regla ornamental y sin escuadras, con un `<PageHeader>` propio del que
+       era el último consumidor de toda la app. Ahora usa el mismo `BookPage` que
+       Personaje (TOMO V), Coinify (TOMO IV) y el resto — TOMO VI estaba libre. */
+    <BookPage
+      className="settings-page"
+      eyebrow={<><Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {t('settings.eyebrowText', 'TOMO VI')} <Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {'—'} {t('settings.eyebrowSub', 'ORDINATIO CODICIS')}</>}
+      title={t('settings.title')}
+      subtitle={t('settings.subtitle')}
+    >
       {/* ═══ APARIENCIA ═══════════════════════════════════ */}
       <SettingsGroup title={t('settings.groupAppearance', 'Apariencia')}>
         {/* Language + font size — two one-line button rows used to be two cards */}
@@ -349,7 +357,7 @@ export default function SettingsPage() {
 
           <div className="settings-subhead">{t('settings.notifModules', 'Por módulo')}</div>
           {([
-            { key: 'quests', state: notifQuests, setter: setNotifQuests, label: t('settings.notifQuests', 'Questify'), desc: t('settings.notifQuestsDesc', 'Tareas vencidas, atrasadas y estancadas') },
+            { key: 'quests', state: notifQuests, setter: setNotifQuests, label: t('settings.notifQuests', 'Questify'), desc: t('settings.notifQuestsDesc', 'Misiones vencidas, atrasadas y estancadas') },
             { key: 'nutrition', state: notifNutrition, setter: setNotifNutrition, label: t('settings.notifNutrition', 'Nutrify'), desc: t('settings.notifNutritionDesc', 'Días sin cerrar, comidas sin registrar y peso semanal') },
             { key: 'finance', state: notifFinance, setter: setNotifFinance, label: t('settings.notifFinance', 'Coinify'), desc: t('settings.notifFinanceDesc', 'Cuotas por vencer, cierres de tarjeta y préstamos') },
             // The Cauldron had no toggle at all: its system notifications could
@@ -673,6 +681,6 @@ export default function SettingsPage() {
         title={t('settings.patchNotes', 'Notas del Parche')}
         entries={currentVersionEntries}
       />
-    </div>
+    </BookPage>
   );
 }

@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Rune } from '../../../shared/components/codex';
+import Skeleton from '../../../shared/components/Skeleton';
+import ErrorState from '../../../shared/components/ErrorState';
+import { useToast } from '../../../shared/components/useToast';
 import type {
   CauldronStats,
   CauldronTimerState,
@@ -9,7 +13,7 @@ import type {
 import { statsShimmer } from '../../../shared/animations/cauldron';
 import { playCauldronStart } from '../../../shared/audio';
 import { formatTime } from '../utils';
-import { shouldPopOutOnStart, usePresetName } from '../hooks';
+import { shouldPopOutOnStart, usePresetName, rememberLastPreset, resolveDefaultPresetId } from '../hooks';
 
 function getSessionLabel(sessionType: string, t: (key: string, fallback: string) => string): string {
   switch (sessionType) {
@@ -56,49 +60,69 @@ function CauldronGlyph() {
 
 export default function CauldronDashboardWidget() {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  /**
+   * Los ceros de `useState` se pintaban desde el primer frame como si fueran el
+   * registro real: «Caldero en reposo · 0 esta semana» era indistinguible de un
+   * caldero que efectivamente no se usó, y de uno cuya consulta se cayó. Con
+   * estos dos flags las tres cosas se dicen distinto.
+   */
+  const [loading, setLoading] = useState(true);
+  /** «Alguna vez cargó bien»: sólo entonces los números son dato de verdad. */
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
-  const [firstPreset, setFirstPreset] = useState<CauldronPreset | null>(null);
+  /**
+   * La receta que va a arrancar el botón. Era `p[0]` —o sea «Classic», porque
+   * `cauldron:getPresets` ordena `is_default DESC, name ASC`— y el tooltip decía
+   * «Inicia Classic» aunque el historial mostrara 30 sesiones de una receta
+   * propia contra 11 de la clásica. Ahora es la última usada, y el tooltip dice
+   * la verdad porque se arma con este mismo objeto.
+   */
+  const [defaultPreset, setDefaultPreset] = useState<CauldronPreset | null>(null);
   const countRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
   const presetLabel = usePresetName();
 
-  const loadStats = useCallback(() => {
-    window.api.cauldronGetStats().then((s) => setStats(s));
-  }, []);
+  const loadStats = useCallback(() => window.api.cauldronGetStats().then((s) => setStats(s)), []);
 
-  const loadState = useCallback(() => {
-    window.api.cauldronGetState().then((s) => setTimerState(s));
-  }, []);
+  const loadState = useCallback(() => window.api.cauldronGetState().then((s) => setTimerState(s)), []);
 
-  const loadFirstPreset = useCallback(() => {
-    window.api.cauldronGetPresets()
-      .then((p) => setFirstPreset(p[0] ?? null))
-      .catch(() => setFirstPreset(null));
-  }, []);
+  const loadDefaultPreset = useCallback(() => window.api.cauldronGetPresets()
+    .then(async (p) => {
+      const id = await resolveDefaultPresetId(p);
+      setDefaultPreset(p.find((preset) => preset.id === id) ?? p[0] ?? null);
+    }), []);
 
-  useEffect(() => {
-    loadStats();
-    loadState();
-    loadFirstPreset();
-  }, [loadStats, loadState, loadFirstPreset]);
+  /** Las tres consultas del cuadro, con UN solo estado de carga y de fallo. */
+  const loadAll = useCallback(() => {
+    setLoadError(false);
+    setLoading(true);
+    return Promise.all([loadStats(), loadState(), loadDefaultPreset()])
+      .then(() => { setLoadedOnce(true); })
+      .catch((err) => {
+        console.error('[Caldero] el cuadro del tablero no pudo leer sus datos', err);
+        setLoadError(true);
+      })
+      .finally(() => setLoading(false));
+  }, [loadStats, loadState, loadDefaultPreset]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   // Reload on account switch and after a sync pull brought cauldron rows in
   // (Layout fires `sync:cauldronUpdated`; nobody listened, so the widget showed
   // stale stats until the next navigation).
   useEffect(() => {
-    const handler = () => {
-      loadStats();
-      loadState();
-      loadFirstPreset();
-    };
+    const handler = () => { loadAll(); };
     window.addEventListener('account:switched', handler);
     window.addEventListener('sync:cauldronUpdated', handler);
     return () => {
       window.removeEventListener('account:switched', handler);
       window.removeEventListener('sync:cauldronUpdated', handler);
     };
-  }, [loadStats, loadState, loadFirstPreset]);
+  }, [loadAll]);
 
   // Subscribe to tick events
   useEffect(() => {
@@ -111,8 +135,8 @@ export default function CauldronDashboardWidget() {
   // Subscribe to session end events — reload both stats and timer state
   useEffect(() => {
     const cleanup = window.api.onCauldronSessionEnd(() => {
-      loadStats();
-      loadState();
+      loadStats().catch(() => setLoadError(true));
+      loadState().catch(() => setLoadError(true));
     });
     return cleanup;
   }, [loadStats, loadState]);
@@ -130,8 +154,13 @@ export default function CauldronDashboardWidget() {
   const handleQuickStart = async () => {
     try {
       const presets = (await window.api.cauldronGetPresets()) as CauldronPreset[];
-      if (presets.length > 0) {
-        await window.api.cauldronStart(presets[0].id);
+      // Se relee la lista en vez de confiar en el estado: entre que se pintó el
+      // botón y el click pudo entrar una sync. Y se resuelve el default acá
+      // mismo para que el arranque sea EXACTAMENTE el que anuncia el tooltip.
+      const presetId = await resolveDefaultPresetId(presets);
+      if (presetId) {
+        await window.api.cauldronStart(presetId);
+        rememberLastPreset(presetId);
         // Same start feedback as the Cauldron page — starting from here used to
         // feel dead by comparison.
         playCauldronStart();
@@ -139,10 +168,31 @@ export default function CauldronDashboardWidget() {
         if (shouldPopOutOnStart()) window.api.cauldronOpenWindow?.();
       }
     } catch {
-      // Timer already active — surface it instead of failing silently.
-      window.api.cauldronOpenWindow?.();
+      /* Ya hay un timer activo. En escritorio la ventana flotante ES la
+         respuesta: te MUESTRA la sesión en curso. En Android ese canal no
+         existe (`platforms: 'desktop'` en `shared/api-channels.ts`), el `?.`
+         se tragaba la llamada y no pasaba absolutamente nada: tocabas el botón
+         y el tablero se quedaba mudo. Sin canal nuevo: se dice y se lleva. */
+      if (window.api.cauldronOpenWindow) {
+        window.api.cauldronOpenWindow();
+      } else {
+        toast({ type: 'info', message: t('cauldron.errors.timerActive', 'Ya hay una poción al fuego.') });
+        navigate('/cauldron');
+      }
     }
   };
+
+  if (loading && !loadedOnce) return <Skeleton variant="line" count={3} />;
+
+  if (loadError) {
+    return (
+      <ErrorState
+        compact
+        message={t('cauldron.loadFailed', 'No se pudo leer el caldero.')}
+        onRetry={loadAll}
+      />
+    );
+  }
 
   return (
     <div>
@@ -180,8 +230,8 @@ export default function CauldronDashboardWidget() {
                   className="rpg-button"
                   onClick={(e) => { e.stopPropagation(); handleQuickStart(); }}
                   style={{ fontSize: 'var(--fs-label)', padding: '4px 10px' }}
-                  title={firstPreset
-                    ? t('cauldron.quickStartTitle', 'Inicia "{{name}}"', { name: presetLabel(firstPreset) })
+                  title={defaultPreset
+                    ? t('cauldron.quickStartTitle', 'Inicia "{{name}}"', { name: presetLabel(defaultPreset) })
                     : undefined}
                 >
                   {t('cauldron.startBrew', 'Quick Brew')}

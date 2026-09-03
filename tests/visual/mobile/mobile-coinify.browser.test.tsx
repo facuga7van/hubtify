@@ -10,8 +10,9 @@ import Commitments from '@modules/finance/components/Commitments';
 import Import from '@modules/finance/components/Import';
 import Recurring from '@modules/finance/components/Recurring';
 import CreditCards from '@modules/finance/components/CreditCards';
+import CoinDashboardWidget from '@modules/finance/components/DashboardWidget';
 import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes } from './mobile-harness';
-import { FINANCE_API } from './fixtures';
+import { FINANCE_API, COIN_ACCOUNTS } from './fixtures';
 
 import '../../../src/i18n';
 import '../../../src/hub/styles/theme.css';
@@ -97,7 +98,11 @@ describe('Coinify a 390×844', () => {
   test('Panel: la página respira y nada desborda (C1)', async () => {
     await setMobileViewport();
     mountInShell(<Finance />, '/finance');
-    await expect.element(page.getByText(/Libro del Tesorero/i)).toBeVisible();
+    // `.first()` —igual que mobile-hub con «Tabla del Aventurero»—: el título
+    // de la página ya no es el único nodo con ese texto, porque el ítem del
+    // cajón ahora declara su función («…— el Libro del Tesorero», nav.coinifyDesc)
+    // para que el menú y el encabezado dejen de llamarse distinto.
+    await expect.element(page.getByText(/Libro del Tesorero/i).first()).toBeVisible();
     await settle(700);
     await shoot('coinify-01-panel');
     noOverflow('COIN PANEL');
@@ -253,5 +258,54 @@ describe('Coinify a 390×844', () => {
     const pencil = document.querySelector('.coin-budget-pencil') as HTMLElement;
     expect(pencil).not.toBeNull();
     expect(parseFloat(getComputedStyle(pencil).opacity)).toBeGreaterThan(0.5);
+  });
+
+  /**
+   * El atajo del tablero del hub: dos clics y el monto, el camino más corto
+   * para cargar un gasto. Acaba de aprender a inferir sus defaults del
+   * historial (`finance:getEntryDefaults`), y la fila del monto pasó a tener
+   * dos controles: a 390 px es justo donde algo se desborda o queda por debajo
+   * del pulgar. Se monta el widget solo —el tablero entero ya lo mide
+   * `mobile-hub`— dentro del MobileShell real, que es lo que hace valer las
+   * reglas `[data-shell="mobile"]`.
+   */
+  test('la carga rápida del widget del arca entra a 390 px y bajo el pulgar', async () => {
+    await setMobileViewport();
+    installApi({
+      ...FINANCE_API,
+      financeGetEntryDefaults: () => Promise.resolve({
+        paymentMethod: 'transfer', currency: 'ARS', accountId: COIN_ACCOUNTS[1]?.id ?? null,
+        category: 'Comida', sampleSize: 50,
+        installmentPaymentMethod: 'credit_card', installmentSampleSize: 4,
+      }),
+      financeGetMonthlyTotal: () => Promise.resolve(0),
+      financeGetActiveLoansCount: () => Promise.resolve(0),
+      financeGetCategoryMappings: () => Promise.resolve([]),
+    });
+    mountInShell(<div className="rpg-card" style={{ padding: 12 }}><CoinDashboardWidget /></div>, '/');
+    await settle(400);
+
+    const toggle = document.querySelector('.coin-dash-quick__toggle') as HTMLButtonElement;
+    expect(toggle, 'el widget del arca no montó').not.toBeNull();
+    toggle.click();
+    await settle(400);
+
+    const form = document.querySelector('.coin-dash-quick') as HTMLElement;
+    expect(form, 'la carga rápida no abrió').not.toBeNull();
+    noOverflow('COIN WIDGET QUICKADD');
+    // Ni el propio formulario se desborda hacia adentro.
+    expect(form.scrollWidth - form.clientWidth).toBeLessThanOrEqual(1);
+
+    // WCAG 2.5.5: cada control del formulario, con 44 px de piso.
+    const controls = [...form.querySelectorAll('input, select, button')] as HTMLElement[];
+    expect(controls.length).toBeGreaterThan(5);
+    for (const c of controls) {
+      const h = Math.round(c.getBoundingClientRect().height);
+      expect(h, `«${c.getAttribute('aria-label') ?? c.className}» mide ${h}px de alto`).toBeGreaterThanOrEqual(44);
+    }
+
+    // Y lo que muestra sale del historial, no de constantes.
+    expect((form.querySelector('select[aria-label="Medio de pago"]') as HTMLSelectElement).value).toBe('transfer');
+    expect((form.querySelector('.coin-category-autocomplete__input') as HTMLInputElement).value).toBe('Comida');
   });
 });

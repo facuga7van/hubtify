@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../../shared/components/useToast';
 import type { Currency, PaymentMethod } from '../../types';
@@ -30,13 +30,25 @@ export default function InstallmentAddForm({ onCreated }: Props) {
   const today = todayDateString();
 
   const [description, setDescription] = useState('');
+  /** Semilla hasta que conteste `finance:getEntryDefaults` con la moda real. */
   const [category, setCategory] = useState('Otros');
   const [currency, setCurrency] = useState<Currency>('ARS');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('debit');
+  /**
+   * Arrancaba en `'debit'` — constante, y el único medio con el que NO se puede
+   * comprar en cuotas. En la base real hay 4 planes cargados a mano: **3 con
+   * tarjeta, 1 por transferencia, cero en débito**. Ahora lo dice el historial
+   * de PLANES (`installmentPaymentMethod`), que es otra pregunta que la moda del
+   * gasto suelto: esa da `transfer`, y sobre planes es la minoritaria.
+   */
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit_card');
+  /** El usuario ya tocó el select: la inferencia no le pisa la elección. */
+  const methodTouched = useRef(false);
+  const userOverrodeCategory = useRef(false);
   const [creditCardId, setCreditCardId] = useState('');
   // Pocket every instalment leaves (non-card plans). '' = unresolved default;
   // hidden and unsent while the accounts bridge is not wired.
   const [accountValue, setAccountValue] = useState('');
+  const [seedAccountId, setSeedAccountId] = useState<string | null>(null);
   const [accountsSupported, setAccountsSupported] = useState(false);
   const [startDate, setStartDate] = useState(today);
   const [installmentCount, setInstallmentCount] = useState('');
@@ -52,6 +64,43 @@ export default function InstallmentAddForm({ onCreated }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const amountPlaceholder = useAmountModePlaceholder(amountMode, customLastAmount);
+
+  /**
+   * Los defaults del alta, inferidos del historial. Este formulario ni siquiera
+   * llamaba al canal, que ya existía y ya lo usaba la carga rápida.
+   */
+  const loadEntryDefaults = useCallback(() => {
+    // Canal nuevo: en un binding viejo simplemente no está, y el fallback vale.
+    const api = window.api as Partial<typeof window.api>;
+    if (typeof api.financeGetEntryDefaults !== 'function') return;
+    api.financeGetEntryDefaults()
+      .then((defaults) => {
+        if (!defaults) return;
+        if (!methodTouched.current) {
+          const method = defaults.installmentPaymentMethod;
+          if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
+            setPaymentMethod(method);
+          }
+          if (defaults.currency === 'ARS' || defaults.currency === 'USD') setCurrency(defaults.currency);
+        }
+        setSeedAccountId(defaults.accountId ?? null);
+        if (!userOverrodeCategory.current && defaults.category) setCategory(defaults.category);
+      })
+      .catch(() => { /* el fallback ya está puesto */ });
+  }, []);
+
+  useEffect(() => { loadEntryDefaults(); }, [loadEntryDefaults]);
+
+  useEffect(() => {
+    // Otra cuenta, otro historial: lo que el usuario tocó acá ya no aplica.
+    const handler = () => {
+      methodTouched.current = false;
+      userOverrodeCategory.current = false;
+      loadEntryDefaults();
+    };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadEntryDefaults]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +178,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             onChange={(e) => setDescription(e.target.value)}
             required
           />
-          <CategorySelect value={category} onChange={setCategory} />
+          <CategorySelect value={category} onChange={(c) => { userOverrodeCategory.current = true; setCategory(c); }} />
         </div>
 
         <div className="coin-quick-add-form__row">
@@ -142,7 +191,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
           </select>
           <select className="rpg-select" value={paymentMethod}
             aria-label={t('coinify.paymentMethod', 'Medio de pago')}
-            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
+            onChange={(e) => { methodTouched.current = true; setPaymentMethod(e.target.value as PaymentMethod); }}>
             <option value="debit">{t('coinify.debit', 'Debito')}</option>
             <option value="credit_card">{t('coinify.creditCard', 'Tarjeta')}</option>
             <option value="transfer">{t('coinify.transfer', 'Transferencia')}</option>
@@ -162,7 +211,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
           <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />
         ) : (
           <div className="coin-quick-add-form__row">
-            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />
           </div>
         )}
 

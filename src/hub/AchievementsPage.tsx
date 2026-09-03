@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { BookPage } from '../shared/components/codex';
 import { Section, QBDividerSection } from '../shared/components/codex/CodexPrimitives';
 import { Chalice, Sparkle, Scroll, Padlock } from '../shared/components/icons';
 import { Medallion, SealRosette } from './codex/CodexSealIcons';
-import Loading from '../shared/components/Loading';
+import Skeleton from '../shared/components/Skeleton';
+import EmptyState from '../shared/components/EmptyState';
+import ErrorState from '../shared/components/ErrorState';
 import {
   type AchievementGroup,
   GROUP_ORDER,
@@ -96,17 +99,30 @@ function AchievementCard({ item, locale, t }: { item: Shelved; locale: string; t
 
 export default function AchievementsPage() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const locale = i18n.language === 'en' ? 'en-US' : 'es-AR';
   const [items, setItems] = useState<AchievementState[] | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * Sin `.catch` el rechazo dejaba `items` en `null` y la página caía en «Todavía
+   * no hay nada en el estante»: le decía al usuario que no había ganado nada
+   * cuando en realidad la consulta se había caído. Un vacío y un fallo son dos
+   * cosas distintas y se dicen distinto.
+   */
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<AchFilter>('all');
 
   const available = codexApiReady();
 
   const load = useCallback(() => {
     setLoading(true);
-    getAchievements()
-      .then(setItems)
+    setLoadError(false);
+    getAchievements({ strict: true })
+      .then((list) => { setItems(list); })
+      .catch((err) => {
+        console.error('[Logros] no se pudo leer el estante', err);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -163,17 +179,35 @@ export default function AchievementsPage() {
   const body = (() => {
     if (!available) {
       return (
-        <p className="ach-empty">
-          {t('rpg.achUnavailable', 'Los logros todavía no están disponibles en esta versión.')}
-        </p>
+        <EmptyState
+          icon={<Padlock width={32} height={32} />}
+          message={t('rpg.achUnavailable', 'Los logros todavía no están disponibles en esta versión.')}
+        />
       );
     }
-    if (loading && !items) return <Loading />;
+    /* Un esqueleto con la forma de la estantería en vez de la brújula: el ojo
+       ya sabe dónde van a caer los medallones antes de que lleguen. */
+    if (loading && !items) {
+      return <Skeleton variant="card" count={4} label={t('rpg.achEyebrow', 'ESTANTE DE LOS LOGROS')} />;
+    }
+    if (loadError) {
+      return (
+        <ErrorState
+          message={t('rpg.achLoadFailed', 'No se pudo abrir el estante de los logros.')}
+          onRetry={load}
+        />
+      );
+    }
     if (!items || items.length === 0) {
       return (
-        <p className="ach-empty">
-          {t('rpg.achEmpty', 'Todavía no hay nada en el estante. Se llena solo, jugando.')}
-        </p>
+        <EmptyState
+          icon={<Chalice width={32} height={32} />}
+          message={t('rpg.achEmpty', 'Todavía no hay nada en el estante. Se llena solo, jugando.')}
+          action={{
+            label: t('rpg.achGoPlay', 'Ir al tablero'),
+            onClick: () => navigate('/'),
+          }}
+        />
       );
     }
     return (
@@ -205,12 +239,19 @@ export default function AchievementsPage() {
           </div>
         </div>
 
+        {/* El hueco del filtro tenía el filtro JUSTO ARRIBA y no ofrecía
+            volver: la salida ahora vive dentro del hueco, como manda C8. */}
         {shelves.length === 0 && (
-          <p className="ach-empty">
-            {filter === 'unlocked'
+          <EmptyState
+            icon={<Sparkle width={32} height={32} />}
+            message={filter === 'unlocked'
               ? t('rpg.achNoneUnlocked', 'Todavía no ganaste ninguno. El estante espera.')
               : t('rpg.achAllUnlocked', 'No queda ninguno pendiente. Los tenés todos.')}
-          </p>
+            action={{
+              label: t('rpg.achClearFilter', 'Ver todos'),
+              onClick: () => setFilter('all'),
+            }}
+          />
         )}
 
         {shelves.map(({ group, items: groupItems }, i) => (

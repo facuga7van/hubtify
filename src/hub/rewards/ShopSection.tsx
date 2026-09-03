@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Section, QBDividerSection } from '../../shared/components/codex/CodexPrimitives';
-import { Flame, Scroll, Sparkle } from '../../shared/components/icons';
-import Loading from '../../shared/components/Loading';
+import { Flame, Scroll, Sparkle, Bag } from '../../shared/components/icons';
+import Skeleton from '../../shared/components/Skeleton';
+import EmptyState from '../../shared/components/EmptyState';
+import ErrorState from '../../shared/components/ErrorState';
 import { useConfirm } from '../../shared/components/ConfirmDialog';
 import { sealStyleIcon } from '../codex/SealStyleIcons';
 import {
@@ -43,14 +45,19 @@ export default function ShopSection({ balance, onCelebrate }: ShopSectionProps) 
 
   const [catalog, setCatalog] = useState<ShopCatalogResult | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Una tienda que no se pudo leer no es una tienda sin nada para vender. */
+  const [loadError, setLoadError] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
   const available = shopApiReady();
 
   const load = useCallback(() => {
     if (!available) { setLoading(false); return; }
-    getShopCatalog()
+    setLoading(true);
+    setLoadError(false);
+    getShopCatalog({ strict: true })
       .then(setCatalog)
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, [available]);
 
@@ -222,12 +229,21 @@ export default function ShopSection({ balance, onCelebrate }: ShopSectionProps) 
 
   if (!available) {
     return (
-      <p className="rwd-empty">
-        {t('rpg.shopUnavailable', 'La tienda todavía no está disponible en esta versión.')}
-      </p>
+      <EmptyState
+        icon={<Bag width={32} height={32} />}
+        message={t('rpg.shopUnavailable', 'La tienda todavía no está disponible en esta versión.')}
+      />
     );
   }
-  if (loading && !catalog) return <Loading />;
+  if (loading && !catalog) return <Skeleton variant="block" count={4} />;
+  if (loadError) {
+    return (
+      <ErrorState
+        message={t('rpg.shopLoadFailed', 'No se pudo abrir la tienda.')}
+        onRetry={load}
+      />
+    );
+  }
 
   const items = catalog?.items ?? [];
   const seals = items.filter((i) => i.kind === 'seal_style');

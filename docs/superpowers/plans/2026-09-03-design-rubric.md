@@ -288,3 +288,681 @@ atajo de «el rótulo no se parte en dos renglones» se volvieron falsos: con el
 piso de toque, un botón de un solo renglón mide 44. Pasaron a contar las **cajas
 de línea** del texto (`Range.getClientRects().length === 1`), que es lo que la
 prueba siempre quiso decir, y ahora además exigen los 44 px.
+
+---
+
+# Tercera medición — 2026-09-03, rama `feat/iteration-2`
+
+Sobre `release/0.9.5`, 17 commits. **Mismo método, mismo arnés, mismos umbrales**:
+las 10 pantallas montadas a 1640×900 y las 11 a 390×844 (el cajón incluido), la
+fórmula WCAG 2.x contra la **parada peor** del degradé (`lowContrastText`),
+`smallText(root, 13)`, `ancho_px / (font_px × 0.5)` para la longitud de línea y
+`getBoundingClientRect()` para la caja de cada control. Cada pantalla se montó
+**con el `mount()` de su propia suite** —`audit-hub-dashboard`, `audit-hub-pages`,
+`audit-hub-settings`, `audit-quests-tasklist`, `audit-nutri-screens`,
+`audit-coin-dashboard`, `audit-coin-ledger`, `audit-coin-cauldron` y, del lado
+del teléfono, `mobile-harness` + `mobile/fixtures.ts`— para no inventar montajes
+nuevos. El arnés de medición es **temporal**, igual que en las dos vueltas
+anteriores: se montó (`tests/visual/zz-tercera-medicion.browser.test.tsx` y
+`tests/visual/mobile/zz-tercera-medicion-mobile.browser.test.tsx`), se leyó y se
+**borró**. Corrió con `--testTimeout=60000`.
+
+Dos correcciones de método que hay que decir antes de los números, porque
+cambian cómo se leen las columnas:
+
+1. **La columna «2ª» no es la base de esta rama.** La segunda medición se
+   commiteó en `198ec21`, sobre `feat/design-improvements`. Después de eso y
+   antes de `release/0.9.5` entraron dos ramas más (`feat/coinify-redesign` y
+   `feat/journey-improvements`). Verificado corriendo el mismo contador de CSS
+   sobre los dos árboles: en `198ec21` da **534/562 de `font-size` tokenizado**,
+   exactamente el número publicado en la segunda medición; en `release/0.9.5` da
+   **574/602**. Así que cuando abajo aparece «2ª → 3ª», hay una base intermedia
+   que no es de esta vuelta, y donde importa está separada en su propia columna.
+2. **El censo de controles de C11 no es el mismo.** Mi arnés cuenta sólo
+   controles **visibles** (descarta `display:none` / `visibility:hidden`); el de
+   la segunda vuelta contaba 379 controles en el teléfono y el mío cuenta 240 —
+   la diferencia son cosas como `.widget-controls`, que el shell móvil oculta.
+   **El porcentaje no es comparable; el número absoluto de fallos sí**, y da 31
+   en las dos.
+
+Como control de que el arnés es el mismo: C2 devuelve **exactamente los tres
+mismos nodos** que la segunda medición (`.nutri-day-btn` 2.19, `.nutri-btn`
+«Estimar» 2.59, `.rwd-item__redeem` 3.62), con los mismos ratios al centésimo.
+
+### Revisión del 04:45 — tres commits después de medir
+
+Después de cerrar la medición entraron tres commits, y **volví a montar el arnés
+entero** (las 10 + las 11 pantallas) sobre el árbol nuevo en vez de razonar sobre
+el diff:
+
+| Commit | Qué toca | Efecto medido |
+|---|---|---|
+| `90a0632` | merge de `release/0.9.5` (reduce-motion del Caldero) | Contadores de CSS **idénticos** (596/624, 135 hex, 894 `rgba()`, 258 bloques móviles) |
+| `55aea72` | `DashboardWidget.tsx` de Coinify: select de moneda ARS/USD + `finance:getEntryDefaults` | **C4, C7 y C11 sin mover**, byte por byte: escritorio 3/0/4 y 327/335, teléfono 3/0/0 y 31/240. El control nuevo vive **dentro del formulario plegado**, que en el primer render está cerrado |
+| `528b294` | vocabulario en `es.json`/`en.json` y en los respaldos `t()` | **Cierra el hallazgo de C12** (censo propio abajo) |
+
+Del formulario abierto, lo que sí verifiqué del commit `55aea72`: el select de
+moneda mide **72×44** y el de medio de pago **129×44** — los dos pasan el piso
+de toque, y de los 22 controles del widget abierto **ninguno de los nuevos**
+cae bajo 44 px (los 3 que fallan son los mismos de siempre: dos `.qb-check` y
+el `toggle`). Cero desborde, `doc` y `main` en 0. La afirmación se sostiene.
+
+Y al abrir ese mismo formulario —cosa que ninguna de las tres mediciones había
+hecho— **apareció un fallo de contraste real que ninguna había visto**. Está en
+C2, abajo, y me obliga a bajarme una nota a mí mismo.
+
+### Revisión del 05:25 — el arreglo de C2, y el barrido que faltaba
+
+Entró `0ee0540`, que corrige los tres hallazgos que había levantado (el gemelo
+del par Gasto/Ingreso, el `.then()` sin `.catch()` de `CategorySelect`, y de
+paso el censo de selectores muertos). **Volví a montar el arnés**, esta vez con
+la disciplina que el propio hallazgo pedía: abrir lo plegado en las **diez**
+pantallas, no sólo en la que se acababa de arreglar. Resultado en C2, abajo: el
+arreglo se verifica, y el barrido ancho encuentra otros siete. Verifiqué también
+por mi cuenta el censo de selectores muertos (12 + `.coin-stat-card`) y la
+deriva de `DESIGN_SYSTEM.md`.
+
+Gates de la rama, corridos para este informe **después de borrar el arnés**:
+`npx tsc --noEmit` **0** · `npm run typecheck:shared-logic` **0** ·
+`npm test` **1985/1985** (167 archivos) · `npm run test:visual` **327/327** (43)
+· `npm run test:visual:mobile` **66/66** (13) · `npm run lint` **0 errores**
+(13 avisos).
+
+## Los números duros, antes → después
+
+### C2 — fallos de contraste por pantalla
+
+| Escritorio | base | 2ª | **3ª** | | Teléfono | base | 2ª | **3ª** |
+|---|---|---|---|---|---|---|---|---|
+| Nutrify Hoy | 13 | 2 ᵈ | **2** ᵈ | | Ajustes | 16 | 0 | **0** |
+| Ajustes | 12 | 0 | **0** | | Nutrify Hoy | 16 | 2 ᵈ | **2** ᵈ |
+| Libro mayor | 8 | 0 | **0** | | Libro mayor | 11 | 0 | **0** |
+| Recompensas | 6 | 1 ᵈ | **1** ᵈ | | Recompensas | 9 | 1 ᵈ | **1** ᵈ |
+| Panel Coinify | 6 | 0 | **0** | | Panel Coinify | 9 | 0 | **0** |
+| Personaje | 5 | 0 | **0** | | Personaje | 8 | 0 | **0** |
+| Caldero | 5 | 0 | **0** | | Caldero | 8 | 0 | **0** |
+| Hub | 3 | 0 | **0** | | Hub | 6 | 0 | **0** |
+| Questify | 1 | 0 | **0** | | Questify | 4 | 0 | **0** |
+| Logros | 0 | 0 | **0** | | Logros / Cajón | 3 / 3 | 0 / 0 | **0 / 0** |
+| **Total** | **59** | **3** | **3** | | **Total** | **93** | **3** | **3** |
+
+ᵈ Los tres son **controles deshabilitados**, y esta vez está verificado en el
+DOM en vez de deducido: `.rwd-item__redeem` `disabled=true opacity=0.5`,
+`.nutri-day-btn` «›» `disabled=true opacity=0.3`, `.nutri-btn` «Estimar»
+`disabled=true opacity=0.4`. WCAG los excepta. **Contraste real de texto
+habilitado: 0 fallos en las 21 pantallas.**
+
+**En estado por defecto C2 no se movió, y no podía moverse: ya estaba en el
+piso.** Esa tabla sigue siendo comparable con las dos vueltas anteriores porque
+mide lo mismo que ellas.
+
+#### Y ahí está el problema: las tres mediciones midieron sólo el estado por defecto
+
+Al revisar el commit `55aea72` abrí el formulario plegado del widget de Coinify
+en el tablero —el único sitio donde se renderiza el control nuevo— y el arnés
+devolvió **dos fallos que ninguna de las tres vueltas había visto**:
+
+| Nodo | Ratio | `disabled` | `opacity` | ¿Excusable? |
+|---|---|---|---|---|
+| `.rpg-button` «Registrar» | 3.09:1 | **true** | 0.4 | Sí — deshabilitado, WCAG lo excepta |
+| `.coin-dash-quick__type-btn` «Ingreso» | **3.62:1** | **false** | 0.5 | **No.** Está habilitado y es clickeable |
+
+«Ingreso» es la mitad no elegida del par Gasto/Ingreso: `coinify.css:2036` la
+apaga con `opacity: 0.5` y nada la deshabilita. Es **texto habilitado por debajo
+de AA**, y el umbral de 9 de esta misma rúbrica pide «≤1 fallo por pantalla y
+**ninguno <4.0:1**».
+
+Consecuencias, sin maquillar:
+
+1. **La frase «0 fallos de texto habilitado en las 21 pantallas» era cierta sólo
+   para el estado por defecto.** Con formularios y desplegables abiertos hay más.
+2. **Bajo C2 de 9 a 8 en las dos plataformas**, y el 9 de la segunda medición
+   también estaba sobrevaluado: el control existe desde antes de esta rama, y
+   esa vuelta tampoco abrió el formulario. No es una regresión de estos commits;
+   es un agujero del método que arrastramos tres veces.
+3. La tabla por pantalla de arriba **se queda como está**, con su alcance
+   declarado: es lo único comparable con las vueltas anteriores.
+
+#### Barrido de estados desplegados — el que faltaba
+
+Con el fallo de «Ingreso» ya arreglado en `0ee0540` (verificado: **desaparece**,
+y el Hub desplegado queda en **0 fallos habilitados**), rehice el barrido pero
+**abriendo, en las diez pantallas, todo lo que se despliega**: formularios
+plegados, menús de acciones, pestañas no activas, el popup de evento, el picker
+de misión, el editor de recetas, el cofre y la comparativa. Cada fallo se
+clasifica buscando el nodo hoja que lo produjo —el de **menor opacidad
+efectiva**, porque tres «Canjear» comparten clase y texto y sólo el apagado
+falla— y mirando si cuelga de un `[disabled]`/`[aria-disabled]`.
+
+| Fase | Fallos habilitados |
+|---|---|
+| Estado por defecto, 10 pantallas | **0** |
+| Estados desplegados, 10 pantallas | **7** |
+
+Los 7, con su regla:
+
+| Pantalla | Nodo | Ratio | Regla |
+|---|---|---|---|
+| Recompensas → Tienda | `.shop-item__state` «en uso» | 3.84:1 | `rewards.css:405` `color: var(--gold-dark)` |
+| Recompensas → Tienda | `.qb-numeral` «40» (precio) | 3.84:1 | hereda `--gold-dark` del bloque de precio |
+| Questify | `.quest-project-header-name` «Hoy» | 3.84:1 | `quests.css:546` |
+| Questify | `.quest-due--today` «Hoy» ×2 | 3.84:1 | `quests.css:444`, `--parch-0` sobre chip `--gold-dark` |
+| Nutrify Hoy → evento | `.nutri-event-midpoint` | 3.26:1 | `nutri.css:3242` `color: var(--gold-dark)` |
+| Nutrify Hoy → evento | `.nutri-btn-primary` «Registrar evento» | 3.50:1 | `nutri.css:143`, degradé que arranca en `--ink-soft` |
+
+**Los siete son enfermedades ya diagnosticadas y curadas en otro lado**: cinco
+son `--gold-dark` sobre pergamino (3.84 / 3.26) y uno es el `--gold` sobre
+`--ink-soft` de **3.50 exacto** que la segunda medición nombró como «el fallo
+real de Nutrify» y arregló en `.nutri-btn`, `.nutri-action-bar` y
+`.nutri-day-btn` — pero no en `.nutri-btn-primary`. Detalle en hallazgos.
+
+**Por eso C2 se queda en 8 y no vuelve a 9**, aunque el arreglo de `0ee0540`
+sea correcto y esté verificado. Lo que lo clava, concretamente: **Questify
+muestra tres chips «Hoy» a 3.84:1 en una sola pantalla**, y el umbral de 9 pide
+«≤1 fallo por pantalla y ninguno <4.0:1». Ninguno de los siete está en el
+teléfono por separado: son reglas de color sin bloque `[data-shell="mobile"]`
+que las pise, así que la misma cuenta vale para las dos plataformas.
+
+#### Nota de método para la cuarta vuelta
+
+**Medir sólo el primer render deja fuera la mitad de la app.** El arnés de la
+próxima vuelta tiene que, en cada pantalla: (1) abrir todo formulario plegado,
+menú y pestaña no activa; (2) clasificar cada fallo por el nodo de **menor
+opacidad efectiva** y descartar sólo los que cuelgan de `[disabled]`; (3)
+reportar «por defecto» y «desplegado» como dos columnas, no como una. Con esta
+disciplina el estado por defecto da 0 y el desplegado da 7 — un criterio que se
+puntuaba con la primera cifra estaba puntuando la mitad del trabajo.
+
+### C1 — piso tipográfico
+
+| | base | 2ª (`198ec21`) | base rama (`release/0.9.5`) | **3ª** |
+|---|---|---|---|---|
+| Escritorio, nodos <13 px (10 pantallas) | 0 | 0 | — | **0** |
+| Teléfono, nodos <13 px (11 pantallas) | 2 | 0 | — | **0** |
+| `font-size` vía `--fs-*` | 531/561 (94.7 %) | 534/562 (95.0 %) | 574/602 (95.3 %) | **596/624 (95.5 %)** |
+| Hardcodes `font-size` <13 px en CSS | 11 | 9 | 9 | **9** |
+
+Los 22 `font-size` que agregó esta rama están **los 22 tokenizados**: por eso el
+porcentaje sube sin que nadie haya tocado una regla vieja. Los 9 hardcodes son
+línea por línea los mismos de la segunda vuelta: `layout.css:199` (10 px),
+`nutri.css:1274` (10 px), `charts.css:282` (10 px) y seis en
+`cauldron-window.css` (56, 70, 89, 127, 272, 280), que es la ventanita flotante
+y va aparte.
+
+### C5 — longitud de línea
+
+| | base | 2ª | **3ª** |
+|---|---|---|---|
+| Escritorio, nodos ≥90 ch en las 10 pantallas | 17 | 3 | **4** |
+| Teléfono, nodos ≥60 ch en las 11 pantallas | 0 | 0 | **0** |
+
+**Subió uno, y hay que decirlo.** Los cuatro son:
+
+| Nodo | ch | ¿texto corrido? |
+|---|---|---|
+| `.quest-today-habit-name` | 119 | no — `white-space: nowrap` + `text-overflow: ellipsis` (`quests.css:1560-1562`) |
+| `.nutri-meal-name` | 116 | no — ídem (`nutri.css:1290-1292`) |
+| `.quest-row-title` | 114 | no — ídem (`quests.css:249-251`) |
+| `.coin-category-legend__usd-note` | 95 | **sí**, y es el único |
+
+El cuarto (`.quest-row-title`) **no es una regresión del CSS**: es un rótulo de
+fila con puntos suspensivos, de la misma familia que los otros dos, que la
+métrica cuenta igual porque mide la caja y no el renglón. Aparece ahora y no en
+la vuelta anterior por un detalle del censo, no por un cambio de estilo: la
+regla que lo gobierna es idéntica en `release/0.9.5` y en `HEAD`. El único
+offensor real de texto corrido sigue siendo el de Coinify, sin tocar.
+
+### C11 — área de toque en el teléfono (controles bajo 44 px)
+
+| Pantalla | base | 2ª | **3ª (censo propio)** |
+|---|---|---|---|
+| Ajustes | 41 / 45 | 0 / 45 | **0 / 31** |
+| Libro mayor | 59 / 67 | 6 / 67 | **6 / 52** |
+| Nutrify Hoy | 59 / 70 | 5 / 70 | **5 / 56** |
+| Questify | 30 / 32 | 3 / 32 | **9 / 27** |
+| Hub | 30 / 33 | 9 / 33 | **3 / 14** |
+| Panel Coinify | 26 / 36 | 7 / 36 | **7 / 20** |
+| Recompensas | 24 / 26 | 0 / 26 | **0 / 12** |
+| Caldero | 18 / 24 | 1 / 24 | **1 / 10** |
+| Personaje | 15 / 17 | 0 / 17 | **0 / 3** |
+| Logros | 15 / 17 | 0 / 17 | **0 / 3** |
+| Cajón lateral | 12 / 12 | 0 / 12 | **0 / 12** |
+| **Total** | **329 / 379** | **31 / 379** | **31 / 240** |
+
+**El total de fallos es idéntico: 31.** El reparto por pantalla se movió
+(Questify 3→9, Hub 9→3) pero **eso es el censo, no la app**: verifiqué con
+`git grep` sobre `release/0.9.5` que **los 31 controles ya existían en la base
+de la rama**, ninguno lo introdujo esta vuelta. Desglosados por causa:
+
+| Causa | n | Detalle |
+|---|---|---|
+| Falso positivo del `::before` | 11 | 7 `input[type=checkbox]` (16–24 px) y 4 `.qb-check` (24 px). El blanco de 44 lo pone un `::before` que no ocupa layout (`components.css:1333-1338`, `codex.css:700-704`) y `getBoundingClientRect()` no lo ve. Ya estaba anotado al final de la segunda medición |
+| Falla **sólo de ancho** (alto ≥44) | 9 | 5 `.nutri-pill-portion` (26–27 × 44/49) y 4 `.coin-month-nav__btn` (30 × 44). El alto es lo que importa para el pulgar |
+| Falla de alto — **fallos reales** | 11 | `.coin-budget-pencil` ×5 (32×32), `.rpg-number__arrow` ×2 (23×21-22), `.coin-quick-add-form__repeat` (101×24), `.coin-quick-add-form__toggle` (82×28), `.coin-dash-quick__toggle` (104×24) y `.quest-project-header-btn` (346×**20**) |
+
+De los 11 fallos reales, **10 son de Coinify** (o del `RpgNumberInput` dentro
+del alta de Coinify, o de su widget en el tablero) y **1 es de Questify**: el
+botón que pliega la sección de hábitos en «Hoy», 20 px de alto.
+
+### C4 — densidad: `inkSpan` por pantalla a 1640×900
+
+`inkSpan` = extensión horizontal de la tinta (nodos hoja con texto o SVG)
+dividida por el ancho del contenedor. **Es la primera vuelta que lo publica por
+pantalla**: las anteriores lo citaron sólo en prosa y para casos sueltos, así
+que la columna «2ª» de abajo son los valores que esa medición nombró, no una
+tabla completa.
+
+| Pantalla | 2ª (lo que se dijo) | **3ª (medido)** |
+|---|---|---|
+| Hub | hueco de ~250 px en la crónica | **1369 / 1380 = 99 %** |
+| Personaje | — | **1369 / 1380 = 99 %** |
+| Logros | — | **1369 / 1380 = 99 %** |
+| Recompensas | «al 55 %» | **1369 / 1380 = 99 %** |
+| Questify | dos ejes a 1640 | **1629 / 1640 = 99 %** |
+| Caldero | tablones 1640→640 | **1629 / 1640 = 99 %** |
+| Panel Coinify | tarjetas estiradas | **1592 / 1640 = 97 %** |
+| Nutrify Hoy | franja centrada | **1264 / 1380 = 92 %** |
+| Libro mayor | ~390 px entre concepto y chip | **1086 / 1640 = 66 %** |
+| Ajustes | — | **849 / 1380 = 62 %** |
+
+Y las cuatro sondas puntuales sobre lo que los ejecutores dijeron haber movido:
+
+| Sonda | Afirmación | **Medido a 1640** |
+|---|---|---|
+| Eje de Questify «Hoy» | desvío 312 px → 0 | tira de pestañas, tira de stats, lista, formulario y `.quest-columns--single` **todos en x=340, ancho 960, derecha 1300**. Desvío **0**. «Agregar Quest» fuera del flujo, a la derecha del encabezado (x=1463) |
+| Tarjetas INGRESO/GASTO | 238 px → 127 | `.coin-summary-card` **462×127**, contra `.coin-chest-panel` **647×238**. Dejaron de estirarse |
+| Crónica del hub | hueco 278–491 px → puntillado | `.dash-chronicle__row` de 713 px, **hueco máximo entre hijos = 8 px**, con `.dash-chronicle__leader` de 264 px cubriendo lo que era vacío. **0 estilos en línea** en la fila |
+| Mostrador de Recompensas | techo de 880 px eliminado | `.rwd-page` `max-width: none`; `ul.rwd-list` de **1324 px** en `648px 648px` |
+
+### C6 — tokens, hex, `rgba()`, `var()` indefinidos
+
+| | base | 2ª (`198ec21`) | base rama (`release/0.9.5`) | **3ª (HEAD)** |
+|---|---|---|---|---|
+| `font-size` vía `--fs-*` | 531/561 (94.7 %) | 534/562 (95.0 %) | 574/602 (95.3 %) | **596/624 (95.5 %)** |
+| Hex fuera de `theme.css` | 143 | 133 | 134 | **135** |
+| `rgba()` crudos | 866 | 868 | 886 | **894** |
+| `var(--rpg-*)` legacy fuera de `theme.css` | 2 | 2 | 2 | **2** |
+| `var()` usados sin definir | 0 | 0 | 0 | **0** |
+
+Nota sobre los hex: la segunda medición publicó **128** y mi contador da **133**
+sobre el mismo árbol; la diferencia es de regex, no del CSS (yo cuento
+`#[0-9a-fA-F]{3,8}\b` en todo el archivo, comentarios incluidos). Lo que importa
+es el delta con la misma regla, y con la misma regla **esta rama suma un (1)
+solo hex**: `#f5e7c0` en `states.css:15`, **dentro de un comentario** que
+documenta que los `rgba(245,231,192,…)` del shimmer son `--parch-0`. **No hay ni
+una declaración nueva con color literal.**
+
+Los 8 `rgba()` nuevos: 6 en `states.css` (las alfas del shimmer y del borde —
+una alfa no se puede expresar con el token, que es un color sólido), 3 en
+`guest-mode.css`, 1 en `shell.css`, 2 en `dashboard-layouts.css`, y −4 en
+`components.css`. Los 6 `var()` que figuran «sin definir» son los cuatro
+`--safe-area-inset-*` que inyecta Capacitor —los cuatro **con respaldo**— y dos
+que pone el JS de los gráficos: los mismos de siempre, ninguno rompe una
+declaración.
+
+### C10 — bloques `[data-shell="mobile"]` por hoja
+
+| | base | 2ª (`198ec21`) | base rama | **3ª** |
+|---|---|---|---|---|
+| Total de bloques | 164 | **218** | 244 | **258** |
+
+**Ojo con este número: 164 y la lista de «hojas sin bloque» de la baseline están
+mal contados.** El `rg 'data-shell="mobile"'` original sólo veía la comilla
+doble, y hay hojas que usan comilla simple. Con la regex agnóstica
+(`\[data-shell=['"]mobile['"]\]`) el árbol de la segunda medición da 218, no lo
+que se publicó. Las tres hojas que nacieron en esta rama tienen su bloque:
+
+| Hoja nueva | Bloques | Comillas |
+|---|---|---|
+| `src/shared/styles/states.css` | 2 | dobles |
+| `src/hub/guest-mode.css` | 3 | dobles |
+| `src/shared/styles/sync-status-chip.css` | **6** | **simples** — invisible para la regex vieja |
+
+Siguen **sin ningún bloque**: `charts.css`, `notifications.css`,
+`help-bubble.css`, `tour.css`, `ChangelogModal.css` y `cauldron-window.css`
+(esta última corre en su propia ventana y no aplica). `shell.css` tiene 1 (la
+baseline decía 0). Y en las 11 pantallas del teléfono:
+**`docOverflowX = 0` y `mainOverflowX = 0`, las once.**
+
+## La rúbrica, tercera medición
+
+| # | Criterio | Escritorio | Teléfono | Qué cambió (evidencia) |
+|---|---|---|---|---|
+| C1 | Piso tipográfico | 9 → 9 → **9** | 6 → 9 → **9** | 0 nodos <13 px en las 21 pantallas. 95.0 → **95.5 %** de `font-size` tokenizado: los 22 `font-size` nuevos de la rama son **los 22** con `var(--fs-*)`. Los 9 hardcodes <13 px son los mismos 9, línea por línea |
+| C2 | Contraste real | 4 → 9 → **8** | 3 → 9 → **8** | **Baja, y no por estos commits.** Estado por defecto intacto: 3 y 3 fallos, los seis **deshabilitados**, y **0 fallos habilitados** en las 10 pantallas. `0ee0540` arregla «Ingreso» del widget (3.62 → 7.95) y lo verifiqué: desaparece. Pero al abrir **todo lo plegado** de las diez pantallas aparecen **7 fallos habilitados** que ninguna vuelta había visto, cinco de ellos `--gold-dark` sobre pergamino (3.84:1) y uno el `--gold`/`--ink-soft` de 3.50 que la 2ª ya había curado en sus hermanos. Lo que clava el 8: **tres chips «Hoy» a 3.84:1 en la misma pantalla de Questify** contra un umbral de «≤1 por pantalla y ninguno <4.0» |
+| C3 | Jerarquía | 6 → 7 → **8** | 7 → 7 → **7** | Questify «Hoy» dejó de tener dos ejes: token `--quest-today-measure: 960px` (`quests.css:1639-1651`) tomado por tira de stats, tira de pestañas, formulario y lista — **medido: los cinco en x=340, ancho 960**. `.quest-add-toggle-wrapper` borrada; el botón vive en `headerExtra` (`TaskList.tsx:564-576`). Ajustes recuperó el cromo del códice, así que las 8 páginas se enmarcan igual. En teléfono no se movió nada medible, y encima apareció un roce nuevo (ver C12) |
+| C4 | Densidad / ancho | 3 → 5 → **7** | 8 → 8 → **8** | 8 de 10 pantallas con `inkSpan` ≥92 %. `.coin-summary-card` 238→**127 px**; Recompensas sin el techo de 880 (`rwd-list` de 1324 px en dos columnas de 648); la crónica con hueco máximo de **8 px** y puntillado guía de 264 px, y **0 estilos en línea**. Quedan Ajustes al 62 % y el libro mayor al 66 % |
+| C5 | Longitud de línea | 2 → 8 → **8** | 10 → 10 → **10** | 3 → **4** nodos ≥90 ch. El cuarto es `.quest-row-title`, `nowrap` + `ellipsis` como los otros dos falsos positivos; su regla es idéntica en la base. El único texto corrido largo sigue siendo `.coin-category-legend__usd-note` (95 ch), sin tocar |
+| C6 | Consistencia | 7 → 8 → **8** | 7 → 8 → **8** | 95.5 % tokenizado, 0 `var()` indefinidos, 2 `--rpg-*` legacy (los mismos: `nutri.css:313` y `:1269`). Pero hex 134→**135** y `rgba()` 886→**894**. El hex nuevo está en un comentario y las alfas del shimmer no se pueden tokenizar — así que no es una regresión real, pero **tampoco es una mejora**: el ítem 19 (los 135 hex sueltos) sigue entero |
+| C7 | Affordances | 5 → 6 → **7** | 4 → 5 → **6** | La casilla de lote de la fila de misión pasó de rectángulo con tilde a **disco** (`QuestRowActions.tsx:293-295`, `quests.css:375-390`): aro de tinta en reposo, oro macizo con aro `--gold-dark` al marcar. Era la ambigüedad que la baseline nombró («dos checkboxes en la misma fila sin distinguir cuál completa») y está cerrada por FORMA. Ver en hallazgos por qué la justificación escrita en el CSS no se sostiene |
+| C8 | Estados | 5 → 5 → **8** | 5 → 5 → **8** | El movimiento grande de la vuelta. `Skeleton`/`EmptyState`/`ErrorState` + `states.css`; `ErrorBoundary` con `fallbackRender` y **uno por widget** (`DashboardWidgetWrapper.tsx:141-157`); **11 archivos** consumen las primitivas en **34 sitios de render**; los 3 casos de «error disfrazado de vacío» separados en tres ramas distintas (`HabitsDashboardWidget`, `AchievementsPage`, `CauldronPage` con sus 7 `.catch`). No es 9 por dos razones duras, abajo |
+| C9 | Feedback | 8 → 8 → **8** | 7 → 7 → **8** | Nadie lo tocó en esta rama. Sube el teléfono porque **el ítem 16 ya estaba hecho y las dos mediciones anteriores lo arrastraron sin volver a mirar**: `layout.css:1043-1044` clava `bottom: calc(12px + var(--safe-bottom))` en `.xp-toast` desde el commit `bee2841`, anterior incluso a `198ec21`. El crédito no es de esta vuelta; el número sí es el que corresponde |
+| C10 | Paridad | 6 → 7 → **7** | 6 → 7 → **7** | 0 desborde horizontal en las 11 pantallas del teléfono, y las 3 hojas nuevas nacieron con su bloque móvil (218 → 244 → **258**). No sube porque **la brecha es la misma**: `charts.css`, `notifications.css`, `help-bubble.css`, `tour.css` y `ChangelogModal.css` siguen sin un solo bloque |
+| C11 | Accesibilidad | 7 → 7 → **8** | 3 → 8 → **8** | **`aria-modal` cerrado: 23 de 23 diálogos lo tienen, 0 faltantes** — era el techo que la segunda medición nombró. 22 llegan por el spread de `useModalA11y` (19 archivos, 22 sitios) y 1 a mano en `TourOverlay.tsx:197`. 0 botones sin nombre accesible en las 21 pantallas. El toque del teléfono **no se movió**: 31 fallos, los 31 preexistentes |
+| C12 | Metáfora | 7 → 8 → **8** | 7 → 8 → **8** | Cerró el cromo (Ajustes con `BookPage` + ceja **TOMO VI — ORDINATIO CODICIS**, `qb-rule` y escuadras; `PageHeader.tsx` **borrado** con 0 consumidores) **y ahora también el vocabulario**: `528b294` cierra el hallazgo que yo había levantado, verificado con censo propio —`tarea/subtarea` 12→**0**, `task/subtask` 14→**0**, «ritual» en respaldos 9→**0**, `SALUD`/`VITA` 3→**0**, «meta» 10→**0**— y queda vigilado por `tests/i18n/vocabulario-unico.test.ts`. **Sigue en 8 igual**, porque el tope nunca fue el vocabulario: Nutrify es la única superficie de ruta sin `BookPage`, y «una sola convención» es literalmente lo que pide el 9 |
+| C13 | Animación | 8 → 8 → **8** | 8 → 8 → **8** | Sin tocar. `prefers-reduced-motion` en CSS 14→16, `infinite` 22→**24**: los dos loops nuevos (el shimmer del esqueleto y la brújula del chip de sync) traen su propia guarda (`states.css:59-64`, `sync-status-chip.css` dentro de `@media (prefers-reduced-motion: no-preference)`). `outline: none` 3→4, pero el cuarto es `.update-dialog:focus` (`shell.css:234-236`) sobre un contenedor con `tabIndex={-1}`: es el patrón correcto para el foco programático de un modal, no un control sin anillo |
+| | **Promedio** | **5.9 → 7.3 → 7.8** | **6.2 → 7.6 → 7.9** | |
+
+El escritorio sube 0.5 por **C8** (+3), **C4** (+2) y **C3/C11** (+1 cada uno),
+y devuelve 0.1 por la corrección de **C2** (−1). El teléfono sube 0.3: **C8**
+(+3), **C7** (+1), un **C9** (+1) que ya correspondía desde antes, y el mismo
+**C2** (−1). **Ocho de los trece criterios no se movieron**, y el único que se
+movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
+
+## Qué NO subió, y por qué
+
+- **C2 (contraste) — BAJÓ, de 9 a 8 en las dos plataformas, y se queda en 8
+  aunque el fallo que la bajó ya esté arreglado.** En estado por defecto está
+  intacto: 3 fallos y 3, los seis deshabilitados, **0 habilitados**, ni una
+  regresión. `0ee0540` corrigió el `.coin-dash-quick__type-btn` «Ingreso» que yo
+  había encontrado (3.62 → 7.95, verificado: desaparece del barrido). Pero al
+  abrir **todo lo plegado** de las diez pantallas —y no sólo el formulario que
+  se acababa de arreglar— aparecieron **otros 7 fallos habilitados**. Volver a
+  9 con ese barrido incompleto habría sido repetir el error por cuarta vez. Lo
+  que lo clava, textual: **`.quest-due--today` y `.quest-project-header-name`
+  ponen tres chips «Hoy» a 3.84:1 en la misma pantalla de Questify**, y el
+  umbral de 9 pide «≤1 fallo por pantalla y ninguno <4.0:1». Para llegar a 9
+  hay que mover los cinco `--gold-dark` a `--ink-soft` y el degradé de
+  `.nutri-btn-primary` a `--gold-light`, que es exactamente lo que ya se hizo
+  en sus hermanos.
+
+- **C6 (consistencia) — no subió, y esta vez sí es una deuda.** El ítem 19 de la
+  lista de mejoras («reemplazar los hex sueltos que duplican un token») es una
+  **L** y sigue entero: 135 ocurrencias, con `#8a7030` (=`--gold-dark`) trece
+  veces, `#2a1d0e` once y `#f5e7c0` (=`--parch-0`) siete. Los `rgba()` crudos
+  pasaron de 886 a 894. Es verdad que los 6 nuevos son alfas del shimmer y que
+  una alfa no se puede escribir con un token de color sólido — pero eso es un
+  argumento para **inventar el token de alfa**, no para dejar el literal. Y los
+  2 `var(--rpg-*)` legacy de `nutri.css` (líneas 313 y 1269) llevan tres
+  mediciones ahí.
+
+- **C10 (paridad) — no subió.** Las hojas nuevas hicieron lo correcto, pero el
+  agujero que la primera medición señaló como causa raíz sigue abierto en cinco
+  archivos: `charts.css`, `notifications.css`, `help-bubble.css`, `tour.css` y
+  `ChangelogModal.css`, **cero bloques `[data-shell="mobile"]` entre los cinco**.
+  Para llegar a 9 hace falta que cada hoja tenga el suyo; nadie las tocó.
+
+- **C11 en el teléfono — no subió, aunque el escritorio sí.** Cerrar `aria-modal`
+  en los 23 diálogos vale un punto de escritorio, pero el teléfono está limitado
+  por el toque y **el toque no se movió: 31 fallos antes, 31 ahora, y los 31
+  ya estaban en `release/0.9.5`** (verificado uno por uno con `git grep`). De
+  los 11 fallos reales de alto, **10 son de Coinify** —que se rediseñó en la
+  rama anterior y no volvió a mirar el piso de 44— y 1 es
+  `.quest-project-header-btn`, un botón de **20 px de alto** que pliega la
+  sección de hábitos en la pantalla que esta misma vuelta reordenó. Se le
+  arreglaron los ejes y se le pasó por al lado el blanco de toque.
+
+- **C12 (metáfora) — no subió, pero ahora el motivo es OTRO, y hay que decirlo
+  con el mismo énfasis con que lo acusé.** En la primera pasada de esta medición
+  escribí que la afirmación del commit `b8bc72f` —«una sola palabra por
+  concepto»— no se sostenía, y di los números. El commit `528b294` la hizo
+  cierta. Lo verifiqué con un censo propio (no con los números que me pasaron),
+  aplanando `es.json`/`en.json` y extrayendo el 2.º argumento literal de cada
+  `t()` bajo `src/`:
+
+  | Regla | `50fd042` (es / en / respaldos) | **HEAD** |
+  |---|---|---|
+  | `tarea` / `subtarea` | 12 / 0 / 3 | **0 / 0 / 0** |
+  | `task` / `subtask` | 1 / 13 / 1 | **0 / 0 / 0** |
+  | «ritual» | 1 / 1 / 9 | **1 / 1 / 0** ᵃ |
+  | `SALUD` / `VITA` (rótulo) | 0 / 0 / 3 | **0 / 0 / 0** |
+  | «meta» (rótulo) | 7 / 0 / 3 | **0 / 0 / 0** |
+  | `HP` | 11 / 11 / 5 | **7 / 7 / 3** ᵇ |
+
+  ᵃ El único «ritual» que queda es `rpg.achievements.ritualist.title`
+  («Ritualista»): nombre propio con id persistido en la base y en la sync.
+  Excepción legítima. ᵇ Leí **los siete** enteros: los siete son el par
+  abreviado «XP y HP» de los textos de cierre de Nutrify, donde «HP» no es
+  rótulo suelto sino la mitad de un par. Los cuatro que **sí** eran rótulo
+  suelto (`hpExplanation`, `scoringBands`, `status.deficit.over`,
+  `tour.playerCard.desc`) pasaron a Vigor. Y el respaldo `'VITA'` de
+  `Dashboard.tsx` ya no existe.
+
+  De yapa, dos contradicciones que había señalado y que también cerraron:
+  `first_quest.desc` ahora dice «Completaste tu primera **misión**» (su título
+  siempre fue «Primera Misión»), y `onboarding.questifyDesc` pasó a «Misiones y
+  hábitos», igual que `nav.questifyDesc`. La sub-unidad `subtarea` es ahora
+  «paso». Todo vigilado por `tests/i18n/vocabulario-unico.test.ts`.
+
+  **Entonces, ¿por qué sigue en 8?** Porque el vocabulario nunca fue el tope —
+  era el argumento que yo había puesto para no subirlo, y el tope es otro:
+  **Nutrify es la única superficie de ruta sin `BookPage`** (0 archivos bajo
+  `src/modules/nutrition/components/` lo usan; las otras ocho superficies sí),
+  y el 9 pide literalmente «**una sola** convención». Queda además, más chico:
+  la cabecera del teléfono sigue diciendo **«Tabla del Aventurero»**
+  (`MobileShell.tsx:16-30`, sin entrada para `'/'` en `SECTION_TITLES`) donde el
+  cajón dice **«Inicio»** — aunque eso se atenuó, porque `nav.homeDesc` («Tu día
+  de un vistazo — la Tabla del Aventurero») ahora se **pinta** como segundo
+  renglón en el cajón, así que en el teléfono el puente se ve; en escritorio
+  sigue viviendo sólo en `aria-label`/`title`. Y sobrevive la clave duplicada
+  `rpg.vita` = `"VIGOR"` junto a `rpg.vigor` = `"Vigor"`: interna, sin efecto
+  visible, pero son dos claves para una barra.
+
+- **C8 no llegó a 9, y le faltó poco.** Dos razones, las dos duras:
+  1. **La ficha de Personaje sigue con la brújula.** `CharacterPage.tsx:178`
+     hace `if (!stats) return <Loading />;` y `Loading.tsx` es una rosa de los
+     vientos que gira (`animation: spin 2s linear infinite`). De las cinco
+     pantallas que la baseline marcó sin esqueleto (hub, personaje, logros,
+     recompensas, caldero) se cerraron **cuatro**. La quinta, no.
+  2. **Ahora hay CINCO dialectos de esqueleto, no uno.** Los cuatro viejos
+     siguen definidos y **siguen usados en 37 elementos repartidos en 13
+     archivos**: `.nutri-skeleton` 20 usos en 4 archivos, `.coin-skeleton` 11 en
+     6, `.codex-skeleton` 4 en 1, `.quest-skeleton` 2 en 2. Nada de finance,
+     nutrition, `TaskList` ni la página de Personaje importa las primitivas
+     nuevas. El propio `states.css:9-10` lo admite («los cuatro dialectos siguen
+     donde están»), y es una decisión defendible de alcance — pero la rúbrica
+     pide esqueleto en todos los módulos **con una convención**, y hoy hay cinco.
+
+- **C13 (animación) — no subió y no bajó.** La regla global y `gsap.matchMedia()`
+  ya estaban; lo único que cambió es que hay dos animaciones `infinite` más
+  (22 → 24), las dos con guarda propia. Para llegar a 9 habría que bajar el
+  número de loops simultáneos, no agregarlos.
+
+- **C5 — el número empeoró (3 → 4) y no es una regresión.** Está explicado
+  arriba: el cuarto nodo es un rótulo con puntos suspensivos que la métrica
+  cuenta mal, y su CSS es idéntico al de la base. Lo dejo con el número peor
+  a la vista en vez de filtrarlo, porque el día que la métrica se arregle hay
+  que poder ver que eran tres falsos positivos y no uno.
+
+## Hallazgos nuevos
+
+1. **La regex de C10 estaba mal desde la primera medición.** `rg
+   'data-shell="mobile"'` no ve `[data-shell='mobile']` con comilla simple, y
+   `sync-status-chip.css` usa comilla simple en sus **6** bloques. El total real
+   nunca fue 164: con la regex agnóstica el árbol de la baseline da otro número
+   y el de la segunda medición da **218**. Todas las cuentas de C10 publicadas
+   hasta hoy están por debajo del valor real. La regex correcta es
+   `\[data-shell=['"]mobile['"]\]`.
+
+2. **`.coin-stat-card` ya era una regla muerta en `release/0.9.5`, no la mató
+   esta rama.** La vuelta anterior escribió `align-self: start` sobre un
+   selector que **ningún TSX renderiza** — y en el mismo commit el
+   `Dashboard.tsx` ya usaba `.coin-summary-card`. La clase aparece hoy en un
+   solo lugar de todo el árbol: el comentario que explica el error
+   (`coinify.css:3534`). Es el precedente de esta lista repitiéndose: **una
+   mejora medida por su diff y no por su efecto**. Ahora sí está sobre la clase
+   real (`coinify.css:3540`) y se mide: 238 → 127 px.
+
+3. **El arreglo del par Gasto/Ingreso se aplicó a uno de los dos gemelos.**
+   `components.css:159-167` corrige `.rpg-btn-active` con un comentario que
+   nombra el defecto exacto: «"Gasto" seleccionado en el libro mayor medía
+   3.05:1». Su gemelo en el widget del tablero,
+   `.coin-dash-quick__type-btn` (`coinify.css:2032-2052`), hace lo mismo con
+   otra técnica —apaga la mitad no elegida con `opacity: 0.5`— y **nadie lo
+   tocó**: «Ingreso» quedaba a **3.62:1, habilitado y clickeable**. Es la misma
+   clase de error que el punto 2: **el arreglo se hizo donde la medición miraba,
+   no donde estaba el patrón.** Dos sitios que pintan el mismo control con dos
+   técnicas distintas es, además, lo que hace que un arreglo no se propague.
+   **CERRADO en `0ee0540`**: los tres estados pasaron de `opacity` a superficie
+   opaca + tinta (apagado `--ink-soft`/`--parch-1` = **7.95:1**, gasto
+   `--rubric`/`--parch-0` = 8.40, ingreso `--moss`/`--parch-0` = 6.94), y lo
+   verifiqué remontando el arnés: el nodo desaparece del barrido y el Hub
+   desplegado queda en 0 fallos habilitados. Vigilado por 5 tests de
+   `theme-contrast.test.ts` y 7 de `audit-coin-widget-open.browser.test.tsx`,
+   que **abre el formulario antes de medir** — la nota de método de esta vuelta
+   ahora tiene un guardián.
+
+4. **«Se arregla donde mira la medición» es un patrón, no tres casualidades — y
+   ésta es la cuarta vez.** Los siete fallos del barrido desplegado no son
+   colores nuevos: son **las dos mismas familias** que las vueltas anteriores ya
+   diagnosticaron y curaron en otros nodos.
+   - `--gold-dark` sobre pergamino (3.84 / 3.26 / 2.55): la segunda medición lo
+     arregló en `.rwd-purse__label`, `.rwd-item__cost` y `.codex-link__count`.
+     Sobrevive en `.shop-item__state`, `.quest-due--today`,
+     `.quest-project-header-name` y `.nutri-event-midpoint`. **El caso más
+     desnudo está dentro del mismo archivo**: `rewards.css:69-72` escribe la
+     regla —«`--gold-dark` sobre pergamino es 3.84 / 3.26 / 2.55: **el oro no es
+     tinta**»— y la aplica a `.rwd-purse__label`; 333 líneas más abajo,
+     `rewards.css:405`, `.shop-item__state` sigue en `var(--gold-dark)`. La
+     regla y su violación conviven en la misma hoja.
+   - `--gold` sobre `--ink-soft` = **3.50:1**: la segunda medición lo llamó «el
+     fallo real de Nutrify» y lo movió a `--gold-light` en `.nutri-btn`,
+     `.nutri-action-bar` y `.nutri-day-btn`. `.nutri-btn-primary`
+     (`nutri.css:143`) quedó con el degradé viejo y mide 3.50 clavado.
+
+   La causa mecánica es siempre la misma: **el arreglo se aplica a los nodos que
+   la captura mostraba, no a la regla que los produce.** Mientras la unidad de
+   trabajo sea el selector y no el token, cada vuelta va a encontrar hermanos.
+
+5. **13 reglas de `coinify.css` apuntan a selectores que no existen.** Crucé las
+   **360** clases `.coin-*` de la hoja (descontando comentarios) contra todos los
+   `.tsx` de `src/`: **12 no aparecen en ningún JSX** —`.coin-as-of`,
+   `.coin-section-slot`, `.coin-widget__number`, `.coin-widget__label`,
+   `.coin-dollar-chip`, `.coin-dollar-chip__value`, `.coin-category-select`,
+   `.coin-installment-form`, `.coin-quick-add-form__field`,
+   `.coin-quick-add-form__installment-row`, `.coin-skeleton--number`,
+   `.coin-import-preview-count`— más `.coin-stat-card`, que hoy sólo sobrevive
+   en el comentario que documenta su propia muerte: **13 en total**. Revisé las
+   doce una por una y **ninguna esconde un arreglo de legibilidad sin aplicar**:
+   las cuatro que declaran color usan `--ink`, `--ink-soft` o `--ink-faded` para
+   elementos que no se dibujan. Son restos de layout y tipografía, no deuda de
+   contraste. Aparte, **tres que parecen muertas están vivas**:
+   `.coin-upcoming__row--recurring/--installment/--card_due` se componen por
+   template (`` `coin-upcoming__row--${kind}` ``), así que un censo por texto
+   plano las mataría por error.
+
+6. **`CategorySelect` tiene un `.then()` sin `.catch()`** —
+   `src/modules/finance/components/shared/CategorySelect.tsx:35-39`:
+   `window.api.financeGetCategories().then((cats) => setCategories(cats.filter(…)))`.
+   Si el canal falla o devuelve `null`, es una promesa rechazada sin manejar y
+   el selector se queda vacío sin decir nada. Lo levantó el propio arnés
+   (`TypeError: Cannot read properties of null (reading 'filter')`) al abrir el
+   formulario. Duele especialmente porque **es exactamente la clase de defecto
+   que esta vuelta salió a cazar** en C8 (las 7 promesas sin `catch` del
+   Caldero): quedó viva en un componente compartido de finance que el widget del
+   tablero monta. **CERRADO en `0ee0540`**: `.catch()` + guarda
+   `Array.isArray` (el fallo real era `null`, no un rechazo) y degradación a
+   lista vacía con aviso `toast({ type: 'warning' })`.
+
+7. **La justificación escrita del disco de selección (C7) no se sostiene, aunque
+   el cambio sí sirva.** El comentario de `quests.css:364-365` dice que la
+   casilla de lote tenía «el mismo dibujo y **los mismos colores**» que el
+   `QuillCheckbox`. Los colores nunca fueron los mismos: el `QuillCheckbox` va
+   en `--parch-0`/`--gold` con tilde `--ink-soft` (`QuillCheckbox.tsx:215-232`)
+   y la casilla vieja iba `fill:none` con trazo `--ink-faded` y tilde
+   `--rubric`. La confusión era **de forma**, y de forma se arregló. Segundo, el
+   comentario le atribuye al aro en reposo «7.95:1 sobre el pergamino»: eso es
+   el ratio de `--ink-soft` a alfa 1, pero `.quest-icon-btn` le clava
+   `opacity: 0.6` (`quests.css:339`) y la regla nueva sólo la sube a 1 cuando
+   está marcado. El contraste real del aro sin marcar es ≈**5.2:1** — sigue muy
+   por encima del 3:1 que WCAG le pide a un gráfico, así que el control pasa,
+   pero el número escrito en el archivo es falso.
+
+8. **El `gap: 8px` de la crónica no es nuevo.** El comentario de la vuelta lo
+   presenta como parte del arreglo; en realidad es un port literal del
+   `gap: 8` que ya estaba en el `style={{}}` en línea de `release/0.9.5`. Lo
+   que cierra el hueco de 278–491 px es el puntillado
+   (`dashboard-layouts.css:329-335`) y el `gap: 6px` de
+   `.dash-chronicle__fact`. El mérito es real; la atribución no.
+
+9. **`.quest-columns--single` quedó fuera del token que la gobierna.** En
+   `quests.css:1643-1651` el selector se lista **sin** el prefijo
+   `.quest-page--today`, así que fuera de «Hoy» no toma
+   `--quest-today-measure` sino el respaldo literal `960px`. Y quedó un bloque
+   duplicado y muerto: `.quest-columns--single { grid-template-columns: 1fr }`
+   aparece dos veces, en `:1506-1508` y en `:1653-1655`.
+
+10. **Los comentarios nuevos de `coinify.css` citan líneas que ya no existen.**
+   `coinify.css:3536` remite a «líneas 1127 y 1144» de `Dashboard.tsx` y
+   `:3544` a la 1139 — son los números de `release/0.9.5`; hoy son 1158, 1175 y
+   1170. Un comentario que apunta a una línea equivocada envejece peor que no
+   tener comentario.
+
+11. **`useModalA11y` es, de hecho, la razón por la que C11 cerró — y también por
+   la que la métrica de `aria-modal` es invisible a `grep`.** De los 23
+   diálogos, **22 reciben `role` y `aria-modal` por el spread `{...dialogProps}`**
+   (`useModalA11y.ts:171-176`) y uno solo lo escribe literal. Un `grep
+   'role="dialog"'` sobre `src/` devuelve **2** resultados, uno de ellos dentro
+   de un comentario. Cualquier auditoría futura que cuente por texto va a
+   reportar un desastre que no existe.
+
+12. **`DESIGN_SYSTEM.md` documenta un token que ya no existe con ese valor.**
+    La tabla de color dice `--moss` = `#556b3c` (`DESIGN_SYSTEM.md:50`), pero
+    `theme.css:50` lo tiene en `#40522c` («darkened for WCAG AA across the
+    parchment gradient»). El valor documentado es el viejo, el que no cumplía —
+    la misma trampa que el respaldo `var(--ink-faded, #6b5535)` que la segunda
+    vuelta borró, sólo que ahora en la documentación en vez de en el CSS.
+    Cualquiera que copie el hex del doc reintroduce el fallo.
+
+13. **La segunda medición dejó C9 del teléfono en 7 sin volver a medirlo.** El
+   ítem 16 («toast con `bottom: calc(20px + var(--safe-bottom))`») ya estaba
+   implementado —`layout.css:1043-1044`, commit `bee2841`— antes incluso del
+   árbol que esa medición auditó. Es el riesgo del formato: un criterio que
+   nadie tocó se copia con su número viejo. De acá en más conviene volver a
+   medir **los trece**, aunque la vuelta no los haya tocado.
+
+---
+
+## Addendum — 2026-09-03, después de `d27dfcb`
+
+**Esto no es una cuarta medición: no remonté el arnés.** Es la constancia de qué
+pasó con lo que esta sección dejó abierto, verificado leyendo el código y
+corriendo los gates.
+
+**Los tres chips «Hoy» que clavaban C2 están arreglados**, y con ellos los otros
+seis del barrido. Verificado en la hoja: `.quest-due--today` pasó a
+`background: var(--gold-light); color: var(--ink)`; `.shop-item__state` y
+`.nutri-event-midpoint` a `--ink-soft`; `.nutri-btn-primary` a `--gold-light`
+sobre su degradé, con el comentario que nombra a los tres hermanos que la
+segunda vuelta ya había curado. Los ratios que publica el informe del ejecutor
+(7,12 / 9,37 / 4,98) me dan **7,07 / 9,19 / 4,87** con la fórmula WCAG sobre los
+mismos tokens: **un 1–2 % más bajos, sin consecuencia** —todos siguen holgados
+sobre AA— pero conviene saber que las dos cuentas no coinciden al centésimo.
+
+**El barrido estático encontró 70 pares, no 7. Eso liquida mi propia nota de
+método.** Yo había escrito que medir sólo el primer render deja fuera la mitad
+de la app; es peor que eso. Un arnés sólo ve lo que un montaje concreto llega a
+dibujar: con datos de prueba, en una ruta, en un estado. `css-ink-contrast.test.ts`
+lee las 24 hojas y mide **cada declaración contra cada superficie que le puede
+tocar**, exista o no un montaje que la produzca — y donde yo vi 7, hay 70. De
+esos, 50 arreglados con tokens y 20 amnistiados por 19 escapes `contrast-ok:`
+con razón obligatoria. **La lección para la cuarta vuelta cambia**: el arnés de
+navegador sirve para lo que sólo existe en runtime (cajas, desbordes, opacidad
+heredada, estados desplegados); para el contraste, la unidad correcta es la
+**declaración**, no el nodo, y eso se barre en estático.
+
+**C2 se queda publicado en 8, y quiero ser explícito de por qué.** Todo indica
+que hoy daría 9 —los seis nodos que yo nombré están arreglados y hay un test que
+impide que vuelvan—, pero **no lo re-medí con el arnés**, y el 8 de esta tabla
+es un número medido, no inferido. No voy a escribir un 9 que no medí. Para
+cerrarlo hace falta exactamente esto: volver a correr el barrido de estados
+desplegados sobre las 10 pantallas de escritorio y las 11 del teléfono; si
+devuelve 0 fallos habilitados, C2 es 9 y los promedios pasan a **7,9 / 8,0**.
+Mientras tanto, **los promedios publicados siguen siendo 7,8 (escritorio) y
+7,9 (teléfono)**.
+
+**Corrección a un dato mío.** Atribuí a `.quest-project-header-name` un fallo de
+3,84:1. Es falso: en el mismo árbol que medí (`2b5f948`) esa clase ya declaraba
+`color: var(--ink)` (#2a1d0e), única regla que la toca, ~13:1 sobre pergamino.
+El fallo era de otro elemento de la fila y mi clasificador se lo colgó a esa
+clase. **No cambia el veredicto**: los otros dos «Hoy» (`.quest-due--today` ×2)
+eran reales, y dos fallos en una pantalla ya rompen el «≤1 por pantalla» que
+pide el 9. Queda como recordatorio de que identificar un nodo por
+`clase + texto` no alcanza cuando la fila repite ambos.
+
+**Gates, corridos por mí:** tsc 0 · shared-logic 0 · `npm test` **2001/2001**
+(169 archivos) · `test:visual` **327/327**. `test:visual:mobile` **66/66**,
+pero **sólo con `--testTimeout=60000`**: con el default de 15 s me dio 8 y
+después 1 fallo, todos por `Test timed out`, la contención que la nota de método
+de la primera vuelta ya había señalado. No es una regresión; es una trampa del
+comando corto que conviene no repetir en un informe.

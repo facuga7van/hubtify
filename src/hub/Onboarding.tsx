@@ -207,10 +207,15 @@ export default function Onboarding({ onComplete }: Props) {
               {/* Font scale */}
               <div className="onboarding__pref-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
                 <span className="onboarding__pref-label">{t('onboarding.fontScale')}</span>
+                {/* Decisión abierta nº5, cerrada: el tamaño de fuente elegido se
+                    marcaba con «pergamino tostado» y el idioma —diez centímetros
+                    más arriba— con cuero. Dos convenciones de «elegido» en la
+                    misma tarjeta. Gana el cuero, que es lo que usa el resto de la
+                    app (y lo que ya resolvió Ajustes con este mismo par). */}
                 <div className="onboarding__font-options">
                   {FONT_OPTIONS.map(({ value, key }) => (
                     <button key={value}
-                      className={`onboarding__font-btn${fontScale === value ? ' onboarding__font-btn--active' : ''}`}
+                      className={`rpg-button onboarding__font-btn${fontScale === value ? '' : ' onboarding__btn-dim'}`}
                       onClick={() => applyFontScale(value)}>
                       {t(key)}
                     </button>

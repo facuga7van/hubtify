@@ -519,6 +519,12 @@ export interface HubtifyApi {
   questsGetPendingCount: () => Promise<number>;
   questsGetCompletedTodayCount: () => Promise<number>;
   questsGetOverdueCount: () => Promise<number>;
+  /** El default del alta rápida, inferido del historial (no una constante). */
+  questsGetEntryDefaults: () => Promise<{
+    projectId: string | null;
+    tier: 1 | 2 | 3;
+    sampleSize: number;
+  }>;
 
   // Nutrition
   nutritionGetProfile: () => Promise<unknown>;
@@ -752,7 +758,11 @@ export interface HubtifyApi {
     paymentMethod: 'cash' | 'debit' | 'transfer' | 'credit_card';
     currency: 'ARS' | 'USD';
     accountId: string | null;
+    category: string;
     sampleSize: number;
+    /** El medio de un PLAN en cuotas: otra pregunta, otra moda (contada por plan). */
+    installmentPaymentMethod: 'cash' | 'debit' | 'transfer' | 'credit_card';
+    installmentSampleSize: number;
   }>;
 
   // Finance - Dashboard
@@ -792,6 +802,8 @@ export interface HubtifyApi {
 
   // Cauldron
   cauldronGetPresets: () => Promise<CauldronPreset[]>;
+  /** La última receta encendida según el historial — respaldo del `localStorage`. */
+  cauldronGetLastUsedPreset: () => Promise<{ presetId: string | null; sampleSize: number }>;
   cauldronUpsertPreset: (preset: Record<string, unknown>) => Promise<string>;
   cauldronDeletePreset: (id: string) => Promise<void>;
   cauldronStart: (presetId: string, taskId?: string | null) => Promise<CauldronTimerState>;

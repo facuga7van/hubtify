@@ -20,6 +20,14 @@ export function rememberLastPreset(id: string): void {
   try { localStorage.setItem(LAST_PRESET_KEY, id); } catch { /* private mode */ }
 }
 
+/** La última receta recordada EN ESTE dispositivo, si todavía existe. */
+export function rememberedPresetId(presets: Array<Pick<CauldronPreset, 'id'>>): string | null {
+  if (presets.length === 0) return null;
+  let last: string | null = null;
+  try { last = localStorage.getItem(LAST_PRESET_KEY); } catch { /* private mode */ }
+  return last && presets.some((p) => p.id === last) ? last : null;
+}
+
 /**
  * Qué receta usar en un arranque de UN CLICK — el botón de la fila de misión en
  * Questify, por ejemplo, donde no hay dónde elegir.
@@ -30,9 +38,39 @@ export function rememberLastPreset(id: string): void {
  */
 export function quickStartPresetId(presets: Array<Pick<CauldronPreset, 'id'>>): string | null {
   if (presets.length === 0) return null;
-  let last: string | null = null;
-  try { last = localStorage.getItem(LAST_PRESET_KEY); } catch { /* private mode */ }
-  if (last && presets.some((p) => p.id === last)) return last;
+  return rememberedPresetId(presets) ?? presets[0].id;
+}
+
+/**
+ * La misma pregunta, pero pudiendo esperar al disco.
+ *
+ * `cauldron:getPresets` ordena `is_default DESC, name ASC`, así que `presets[0]`
+ * es SIEMPRE «Classic» y las recetas propias quedan al final. En la base real
+ * del usuario eso convertía al default en el valor menos frecuente: 30 de sus
+ * 41 sesiones son de una receta propia (16 de las últimas 20), y el caldero
+ * abría igual en «Classic» todas las veces.
+ *
+ * Orden de preferencia:
+ *   1. lo recordado en ESTE dispositivo (instantáneo, sin red ni disco),
+ *   2. la última receta encendida según el historial —que sí sincroniza—, para
+ *      que el teléfono y una instalación nueva no arranquen de cero,
+ *   3. la primera de la lista, que es lo único que queda cuando no hay historia.
+ */
+export async function resolveDefaultPresetId(
+  presets: Array<Pick<CauldronPreset, 'id'>>,
+): Promise<string | null> {
+  if (presets.length === 0) return null;
+  const local = rememberedPresetId(presets);
+  if (local) return local;
+
+  // Canal nuevo: en un binding viejo simplemente no está, y el fallback vale.
+  const api = window.api as Partial<typeof window.api>;
+  if (typeof api.cauldronGetLastUsedPreset === 'function') {
+    try {
+      const { presetId } = await api.cauldronGetLastUsedPreset();
+      if (presetId && presets.some((p) => p.id === presetId)) return presetId;
+    } catch { /* el fallback ya está puesto */ }
+  }
   return presets[0].id;
 }
 

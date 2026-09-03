@@ -145,7 +145,10 @@
   padding: 10px 16px;
   background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
   border-color: var(--gold);
-  color: var(--gold);
+  /* Mismo defecto que ya se curo en .nutri-btn, .nutri-action-bar y
+     .nutri-day-btn: --gold sobre --ink-soft da 3.50:1 clavado. Este hermano
+     quedo sin tocar. --gold-light da 4.98:1. */
+  color: var(--gold-light);
 }
 
 .nutri-btn-primary:hover {
@@ -448,7 +451,7 @@
 .nutri-cal-val.red   { color: var(--rubric); }
 
 .nutri-cal-pct {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 .nutri-cal-hint {
@@ -1352,13 +1355,45 @@
   outline-offset: 1px;
 }
 
+/* El hueco de Nutrify ya traía ícono + frase + botón en el JSX (es el mejor de
+   la app), pero la clase no los ordenaba: quedaban apilados por el flujo normal
+   y el ícono pegado al texto. Columna centrada, como `.notif-empty`. */
 .nutri-empty {
-  font-family: 'IM Fell English', serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--ff-body);
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-faded);
   text-align: center;
-  padding: 12px 0;
+  padding: 16px 0;
+}
+
+.nutri-empty > svg {
+  /* contrast-ok: sello decorativo del estado vacio; el mensaje esta en el <p>
+     de al lado. Ornamento, no informacion. */
+  color: var(--gold-dark);
+  opacity: 0.55;
+}
+
+.nutri-empty > p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+.nutri-empty .nutri-btn {
+  font-style: normal;
+}
+
+/* El widget del hub reusa `.nutri-empty` para «falta la meta»: ahí adentro de
+   una fila de 68 px el bloque va a la izquierda y sin aire propio. */
+.nutri-dash-setup.nutri-empty {
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
 }
 
 /* ── Meal group headers (N5) ── */
@@ -1595,9 +1630,11 @@
   font-size: var(--fs-label) !important;
 }
 
+/* --parch-0 sobre --gold daba 2.68:1. Sobre una superficie dorada la tinta es
+   --ink (4.97:1), no el pergamino. */
 .nutri-portion-preset.active {
   background: var(--gold) !important;
-  color: var(--parch-0) !important;
+  color: var(--ink) !important;
   border-color: var(--gold) !important;
 }
 
@@ -1644,9 +1681,9 @@
 
 .nutri-cs-val.green { color: var(--moss); }
 .nutri-cs-val.red { color: var(--rubric); }
-.nutri-cs-val.gold { color: var(--gold-dark); }
+.nutri-cs-val.gold { color: var(--ink-soft); }/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 
-.nutri-cs-pct { color: var(--gold-dark); }
+.nutri-cs-pct { color: var(--ink-soft); }/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 
 .nutri-cs-sub {
   font-family: 'IM Fell English', serif;
@@ -2151,7 +2188,7 @@
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-heading);
   font-weight: 600;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 .nutri-adaptive-unit {
@@ -2170,7 +2207,7 @@
   font-weight: 600;
 }
 
-.nutri-adaptive-diff.pos { color: var(--gold-dark); }
+.nutri-adaptive-diff.pos { color: var(--ink-soft); }/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 .nutri-adaptive-diff.neg { color: var(--rubric); }
 
 .nutri-adaptive-explain {
@@ -2236,17 +2273,19 @@
 
 .nutri-goal-opt .opt-ico {
   font-size: var(--fs-quote);
+  /* contrast-ok: pictograma del objetivo, no texto; el rotulo va al lado en
+     tinta y el dibujo da 3.84:1 sobre el pergamino (3:1) */
   color: var(--gold-dark);
 }
 
 .nutri-goal-opt.active {
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold sobre el degrade de tinta daba 3.50:1; --gold-light da 4.98:1 */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(168, 138, 60, 0.25);
   border: 1px solid var(--gold);
 }
 
-.nutri-goal-opt.active .opt-ico { color: var(--gold); }
+.nutri-goal-opt.active .opt-ico { color: var(--gold-light); }
 
 .nutri-goal-desc {
   text-align: center;
@@ -2370,7 +2409,7 @@
   display: grid;
   place-items: center;
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold sobre el degrade de tinta daba 3.50:1; --gold-light da 4.98:1 */
   border: 1px solid var(--gold);
   font-size: var(--fs-quote);
 }
@@ -2422,7 +2461,7 @@
 }
 
 .nutri-streak-note--pending {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 .nutri-streak-note--grace {
@@ -2463,7 +2502,7 @@
 
 .nutri-range-tab.active {
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold sobre el degrade de tinta daba 3.50:1; --gold-light da 4.98:1 */
 }
 
 
@@ -3132,7 +3171,7 @@
   margin-bottom: 8px;
   padding: 2px 10px;
   font-size: var(--fs-label);
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   border-color: var(--gold-dark);
 }
 
@@ -3180,7 +3219,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.05em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   background: rgba(168, 138, 60, 0.12);
 }
 
@@ -3210,7 +3249,7 @@
 }
 
 .nutri-event-midpoint {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   font-style: italic;
 }
 
@@ -3218,7 +3257,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 

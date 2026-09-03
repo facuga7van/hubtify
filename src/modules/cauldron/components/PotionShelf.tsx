@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import PotionJar from './PotionJar';
+import EmptyState from '../../../shared/components/EmptyState';
+import { Potion } from '../../../shared/components/icons/CodexIcons';
 import type { CauldronShelfSession, CauldronWeekTaskRow } from '../types';
 
 interface Props {
@@ -8,6 +10,12 @@ interface Props {
   week: CauldronWeekTaskRow[];
   hasMore: boolean;
   onLoadMore: () => void;
+  /**
+   * La salida del estante vacío: encender el caldero desde acá mismo. La página
+   * la pasa sólo cuando hay receta elegida y el fuego está apagado; sin eso el
+   * hueco se queda con el ícono y la frase, que es lo honesto.
+   */
+  onBrew?: () => void;
 }
 
 /** Clave de día LOCAL. `startedAt` es un instante UTC: un slice(0,10) rodaría a las 21:00 en UTC-3. */
@@ -25,7 +33,7 @@ function localDayKey(iso: string): string {
  * crece — nunca se vacía, nunca se resetea. Esa permanencia es el mecanismo:
  * lo que se acumula tiene valor, y lo que tiene valor cuesta romper.
  */
-export default function PotionShelf({ sessions, week, hasMore, onLoadMore }: Props) {
+export default function PotionShelf({ sessions, week, hasMore, onLoadMore, onBrew }: Props) {
   const { t } = useTranslation();
 
   /** Frascos agrupados por día; el día es la repisa. */
@@ -126,9 +134,13 @@ export default function PotionShelf({ sessions, week, hasMore, onLoadMore }: Pro
 
   if (sessions.length === 0) {
     return (
-      <div className="cauldron-empty-state">
-        {t('cauldron.shelf.empty', 'El estante está vacío. La primera poción lo estrena.')}
-      </div>
+      <EmptyState
+        icon={<Potion width={32} height={32} />}
+        message={t('cauldron.shelf.empty', 'El estante está vacío. La primera poción lo estrena.')}
+        action={onBrew
+          ? { label: t('cauldron.startBrew', 'Start Brew'), onClick: onBrew }
+          : undefined}
+      />
     );
   }
 

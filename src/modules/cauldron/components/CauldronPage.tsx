@@ -21,12 +21,15 @@ import {
   Cartouche,
 } from '../../../shared/components/codex/CodexPrimitives';
 import { Cauldron as CauldronIcon, Flame, Potion, ChevronUp, ChevronDown } from '../../../shared/components/icons/CodexIcons';
+import Skeleton from '../../../shared/components/Skeleton';
+import EmptyState from '../../../shared/components/EmptyState';
+import ErrorState from '../../../shared/components/ErrorState';
 import { CastleBarChart } from '../../../shared/components/charts/CastleBarChart';
 import CauldronSVG from './CauldronSVG';
 import MissionPicker, { useOpenMissions } from './MissionPicker';
 import PotionShelf from './PotionShelf';
 import { formatTime } from '../utils';
-import { useCauldronLabels, usePresetName, useTimerPresetName, rememberLastPreset, POPOUT_ON_START_KEY } from '../hooks';
+import { useCauldronLabels, usePresetName, useTimerPresetName, rememberLastPreset, resolveDefaultPresetId, POPOUT_ON_START_KEY } from '../hooks';
 import {
   cancelAutoStart,
   getWeekByProject,
@@ -110,6 +113,22 @@ export default function CauldronPage() {
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [timerState, setTimerState] = useState<CauldronTimerStateEx | null>(null);
   const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
+  /**
+   * La página no tenía NINGÚN estado de carga: `stats` arrancaba en ceros y
+   * `presets`/`sessions`/`weeklyFocus` en `[]`, así que en el primer frame
+   * mostraba «El estante está vacío», el gráfico sin barras y 0 pociones —
+   * exactamente lo mismo que un caldero que nunca se usó, y exactamente lo
+   * mismo que un caldero cuyas cinco consultas se cayeron (ninguna tenía
+   * `.catch`). Tres situaciones distintas con una sola cara.
+   */
+  const [loading, setLoading] = useState(true);
+  /**
+   * «Alguna vez cargó ENTERA». No es «alguna vez terminó»: si en la primera
+   * vuelta se cayó aunque sea una de las siete consultas, la página nunca tuvo
+   * el dato completo y no puede afirmar que el estante está vacío.
+   */
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [editingPreset, setEditingPreset] = useState<Partial<CauldronPresetEx> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -178,31 +197,45 @@ export default function CauldronPage() {
   const prevTodayRef = useRef(0);
   const statsRef = useRef<HTMLDivElement>(null);
 
-  /* -- Data loaders -- */
-  const loadPresets = useCallback(() => {
-    window.api.cauldronGetPresets().then((p) => {
-      setPresets(p);
-      setSelectedPresetId((prev) => {
-        if (!prev && p.length > 0) return p[0].id;
-        return prev;
-      });
-    });
+  /* -- Data loaders --
+     Cada uno atrapa lo suyo y prende `loadError`: los llaman también el
+     `onCauldronSessionEnd` y los handlers de botón, donde un rechazo sin dueño
+     no lo ve nadie. Ninguno rechaza, así que `Promise.all` de abajo sólo mide
+     CUÁNDO terminaron, no si salieron bien. */
+  const failuresRef = useRef(0);
+  const noteFailure = useCallback((op: string) => (err: unknown) => {
+    console.error(`[Caldero] ${op} falló`, err);
+    failuresRef.current += 1;
+    setLoadError(true);
   }, []);
 
-  const loadStats = useCallback(() => {
-    window.api.cauldronGetStats().then((s) => setStats(s));
-  }, []);
+  /**
+   * `p[0]` era «Classic» siempre —`cauldron:getPresets` ordena
+   * `is_default DESC, name ASC`— así que la página abría en la receta que el
+   * historial dice que menos se usa: 30 de las 41 sesiones de la base real son
+   * de una receta propia. `resolveDefaultPresetId` respeta la última usada, que
+   * esta misma pantalla ya venía guardando sin que nadie la leyera.
+   */
+  const loadPresets = useCallback(() => window.api.cauldronGetPresets().then(async (p) => {
+    setPresets(p);
+    const preferred = await resolveDefaultPresetId(p);
+    // Funcional y no `if (!selectedPresetId)`: `loadState` puede haber puesto
+    // la receta de una sesión en curso mientras se resolvía el default, y esa
+    // gana — es lo que está al fuego ahora mismo.
+    setSelectedPresetId((prev) => prev ?? preferred);
+  }).catch(noteFailure('cauldron:getPresets')), [noteFailure]);
 
-  const loadState = useCallback(() => {
-    window.api.cauldronGetState().then((s) => {
-      setTimerState(s);
-      if (s.presetId) setSelectedPresetId(s.presetId);
-    });
-  }, []);
+  const loadStats = useCallback(() => window.api.cauldronGetStats()
+    .then((s) => setStats(s)).catch(noteFailure('cauldron:getStats')), [noteFailure]);
+
+  const loadState = useCallback(() => window.api.cauldronGetState().then((s) => {
+    setTimerState(s);
+    if (s?.presetId) setSelectedPresetId(s.presetId);
+  }).catch(noteFailure('cauldron:getState')), [noteFailure]);
 
   /** Los frascos del estante, paginados hacia atrás. Nunca se vacía. */
-  const loadSessions = useCallback((offset = 0) => {
-    window.api.cauldronGetSessions(offset, 20).then((result) => {
+  const loadSessions = useCallback((offset = 0) => window.api.cauldronGetSessions(offset, 20)
+    .then((result) => {
       const page = result.sessions as unknown as CauldronShelfSession[];
       if (offset === 0) {
         setSessions(page);
@@ -211,56 +244,55 @@ export default function CauldronPage() {
       }
       setSessionsHasMore(result.hasMore);
       setSessionsOffset(offset + result.sessions.length);
-    });
-  }, []);
+    })
+    // «Ver más» también puede fallar, y desde el click nadie lo agarraba.
+    .catch(noteFailure('cauldron:getSessions')), [noteFailure]);
 
-  const loadWeeklyFocus = useCallback(() => {
-    window.api.cauldronGetWeeklyFocusTime().then((data) => setWeeklyFocus(data));
-  }, []);
+  const loadWeeklyFocus = useCallback(() => window.api.cauldronGetWeeklyFocusTime()
+    .then((data) => setWeeklyFocus(data)).catch(noteFailure('cauldron:getWeeklyFocusTime')), [noteFailure]);
 
   /** El resumen de una línea sobre el estante: en qué se fue el foco esta semana. */
-  const loadWeekByProject = useCallback(() => {
-    getWeekByProject().then(setWeekByProject).catch(() => setWeekByProject([]));
-  }, []);
+  const loadWeekByProject = useCallback(
+    () => getWeekByProject().then(setWeekByProject).catch(() => setWeekByProject([])), []);
 
   /** A session the app was killed in the middle of — offer it back instead of losing it. */
-  const loadInterrupted = useCallback(() => {
-    window.api.cauldronGetInterruptedSession()
-      .then((session) => { setInterrupted(session); setResumeBlocked(false); })
-      .catch(() => setInterrupted(null));
-  }, []);
+  const loadInterrupted = useCallback(() => window.api.cauldronGetInterruptedSession()
+    .then((session) => { setInterrupted(session); setResumeBlocked(false); })
+    .catch(() => setInterrupted(null)), []);
+
+  /**
+   * Las siete consultas de la página, con UN estado de carga y UNO de fallo.
+   * Antes eran siete `.then()` sueltos: cinco sin `.catch` (promesa rechazada
+   * sin dueño) y ninguno capaz de decir que la página no llegó a cargar.
+   */
+  const loadAll = useCallback(() => {
+    setLoadError(false);
+    setLoading(true);
+    const failuresBefore = failuresRef.current;
+    return Promise.all([
+      loadPresets(), loadStats(), loadState(),
+      loadSessions(0), loadWeeklyFocus(), loadWeekByProject(), loadInterrupted(),
+    ]).finally(() => {
+      setLoading(false);
+      if (failuresRef.current === failuresBefore) setLoadedOnce(true);
+    });
+  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
 
   /* -- Mount: load everything -- */
-  useEffect(() => {
-    loadPresets();
-    loadStats();
-    loadState();
-    loadSessions(0);
-    loadWeeklyFocus();
-    loadWeekByProject();
-    loadInterrupted();
-  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   /* -- Account switch / sync pull reload --
      Layout fires `sync:cauldronUpdated` after a pull that changed rows; until
      now nobody listened, so the shelf and stats stayed stale after alt-tab. */
   useEffect(() => {
-    const handler = () => {
-      loadPresets();
-      loadStats();
-      loadState();
-      loadSessions(0);
-      loadWeeklyFocus();
-      loadWeekByProject();
-      loadInterrupted();
-    };
+    const handler = () => { loadAll(); };
     window.addEventListener('account:switched', handler);
     window.addEventListener('sync:cauldronUpdated', handler);
     return () => {
       window.removeEventListener('account:switched', handler);
       window.removeEventListener('sync:cauldronUpdated', handler);
     };
-  }, [loadPresets, loadStats, loadState, loadSessions, loadWeeklyFocus, loadWeekByProject, loadInterrupted]);
+  }, [loadAll]);
 
   /* -- Subscribe to tick events -- */
   /* Sounds live in CauldronFloatingTimer: it is the only surface mounted no
@@ -732,7 +764,46 @@ export default function CauldronPage() {
   const canCompleteMission =
     isAwaiting && timerState?.sessionType === 'work' && !!timerState?.taskId;
 
-  /* -- Render -- */
+  /* -- Render --
+     Las dos puertas van acá, después del último hook: mientras el caldero no
+     contestó, la página no puede afirmar que no hay nada. */
+  if (loading && !loadedOnce) {
+    return (
+      <BookPage
+        eyebrow={t('cauldron.eyebrow', 'CALDERO')}
+        title={t('cauldron.title', 'The Cauldron')}
+        subtitle={t('cauldron.subtitle', 'Brew focus. Rest deliberately. Earn experience for every potion completed.')}
+        className="cauldron-book"
+      >
+        <Skeleton variant="block" />
+        <div style={{ height: 16 }} />
+        <Skeleton variant="card" count={2} />
+        <div style={{ height: 16 }} />
+        <Skeleton variant="block" count={3} />
+      </BookPage>
+    );
+  }
+
+  /* La página ENTERA sólo se rinde si nunca llegó a cargar. Si ya había datos
+     —y sobre todo si hay una poción al fuego— un fallo de refresco no puede
+     borrar de la pantalla lo que el usuario está mirando: baja a un aviso
+     angosto arriba de todo (más abajo, dentro del BookPage). */
+  if (loadError && !loadedOnce) {
+    return (
+      <BookPage
+        eyebrow={t('cauldron.eyebrow', 'CALDERO')}
+        title={t('cauldron.title', 'The Cauldron')}
+        subtitle={t('cauldron.subtitle', 'Brew focus. Rest deliberately. Earn experience for every potion completed.')}
+        className="cauldron-book"
+      >
+        <ErrorState
+          message={t('cauldron.loadFailed', 'No se pudo leer el caldero.')}
+          onRetry={loadAll}
+        />
+      </BookPage>
+    );
+  }
+
   return (
     <BookPage
       eyebrow={t('cauldron.eyebrow', 'CALDERO')}
@@ -743,6 +814,14 @@ export default function CauldronPage() {
       )}
       className="cauldron-book"
     >
+      {loadError && (
+        <ErrorState
+          compact
+          message={t('cauldron.loadFailed', 'No se pudo leer el caldero.')}
+          onRetry={loadAll}
+        />
+      )}
+
       {/* === Interrupted session — offer it back instead of losing it === */}
       {interrupted && isIdle && (
         <div className="cauldron-resume-banner">
@@ -1156,9 +1235,14 @@ export default function CauldronPage() {
         {weeklyChartData.length > 0 && weeklyChartData.some((d) => d.value > 0) ? (
           <CastleBarChart data={weeklyChartData} height={200} themed />
         ) : (
-          <div className="cauldron-empty-state">
-            {t('cauldron.weeklyFocus.empty', 'Todavía no hay minutos de enfoque esta semana.')}
-          </div>
+          <EmptyState
+            compact
+            icon={<Flame width={28} height={28} />}
+            message={t('cauldron.weeklyFocus.empty', 'Todavía no hay minutos de enfoque esta semana.')}
+            action={selectedPresetId
+              ? { label: t('cauldron.startBrew', 'Start Brew'), onClick: () => { void handleStart(); } }
+              : undefined}
+          />
         )}
       </Section>
 
@@ -1189,6 +1273,7 @@ export default function CauldronPage() {
             week={weekByProject}
             hasMore={sessionsHasMore}
             onLoadMore={() => loadSessions(sessionsOffset)}
+            onBrew={isIdle && selectedPresetId ? () => { void handleStart(); } : undefined}
           />
         )}
 

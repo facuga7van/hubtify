@@ -29,6 +29,9 @@ vi.mock('../../src/modules/nutrition/estimate-service', () => ({
       { name: 'Ensalada mixta', calories: 120, proteinG: 4, carbsG: 8, fatG: 4 },
     ],
   }),
+  // Los llamadores distinguen «no hay sesión» (modo invitado) de «falló la red»
+  // para empujar a la carga manual; acá siempre hay sesión.
+  isNoSessionError: () => false,
 }));
 
 // Now import the screens (after the mock is registered).

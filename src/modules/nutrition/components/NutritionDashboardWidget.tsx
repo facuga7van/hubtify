@@ -9,6 +9,7 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 // The widget used to call the model directly, so a dish logged from the
 // dashboard neither benefited from a correction nor left one behind.
 import { resolveEstimate } from '../estimate-with-cache';
+import { isNoSessionError } from '../estimate-service';
 import { cacheEstimate } from '../history-api';
 import { resolveMealType } from '../../../../shared/meal-utils';
 import type { MealSchedule } from '../../../../shared/meal-utils';
@@ -41,6 +42,8 @@ export default function NutritionDashboardWidget() {
     proteinG: number | null; carbsG: number | null; fatG: number | null;
   } | null>(null);
   const [showManualFallback, setShowManualFallback] = useState(false);
+  /** El fallo NO es de red: no hay sesión (modo invitado). Reintentar no sirve. */
+  const [aiNoSession, setAiNoSession] = useState(false);
   const [manualCalories, setManualCalories] = useState('');
   const [mealSchedule, setMealSchedule] = useState<MealSchedule | null>(null);
   // Cached with the profile the widget already loads: the widget must write its
@@ -119,9 +122,14 @@ export default function NutritionDashboardWidget() {
       });
       // A later success has to close the fallback, otherwise it stays open forever.
       setShowManualFallback(false);
-    } catch {
+      setAiNoSession(false);
+    } catch (err) {
+      // Modo invitado: la IA no va a andar hasta que vincule una cuenta, así que
+      // el botón de estimar deja de invitar a un reintento que no puede salir
+      // bien y el camino manual queda como el único abierto.
       setEstimation(null);
       setShowManualFallback(true);
+      setAiNoSession(isNoSessionError(err));
     } finally {
       setEstimating(false);
       setRetrying(false);
@@ -270,13 +278,15 @@ export default function NutritionDashboardWidget() {
     setShowQuickLog(false);
   };
 
+  // El esqueleto estaba hardcodeado en `style={{}}`, con dos rgba() literales y
+  // sin animación, teniendo `.nutri-skeleton` (con shimmer) en la misma hoja.
   if (loading)
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0 10px' }}>
-        <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(74,55,32,.1)' }} />
+        <div className="nutri-skeleton" style={{ width: 68, height: 68, borderRadius: '50%', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
-          <div style={{ height: 10, background: 'rgba(74,55,32,.1)', marginBottom: 4 }} />
-          <div style={{ height: 10, background: 'rgba(74,55,32,.08)', width: '70%' }} />
+          <div className="nutri-skeleton nutri-skeleton--text" style={{ marginBottom: 6 }} />
+          <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '70%' }} />
         </div>
       </div>
     );
@@ -322,14 +332,14 @@ export default function NutritionDashboardWidget() {
                2000 kcal. Now it names what is missing and goes to fix it. */
             <div className="nutri-empty nutri-dash-setup">
               <p className="nutri-dash-setup__text">
-                {t('nutrify.targetNotSet', 'Todavía no fijaste tu meta diaria. Podés registrar igual: el anillo se llena cuando la definas.')}
+                {t('nutrify.targetNotSet', 'Todavía no fijaste tu objetivo diario. Podés registrar igual: el anillo se llena cuando lo definas.')}
               </p>
               <button
                 type="button"
                 className="widget-empty-cta"
                 onClick={() => navigate('/nutrition')}
               >
-                {t('nutrify.targetNotSetCta', 'Calculá tu meta')}
+                {t('nutrify.targetNotSetCta', 'Calculá tu objetivo')}
               </button>
             </div>
           )}
@@ -406,7 +416,13 @@ export default function NutritionDashboardWidget() {
       <div className="nutri-dash-quick-toggle">
         <button
           className="rpg-button nutri-dash-quick-btn"
-          onClick={() => { setShowQuickLog(prev => !prev); if (showQuickLog) { setEstimation(null); setFoodInput(''); } }}
+          onClick={() => {
+            setShowQuickLog(prev => !prev);
+            // Cerrar y volver a abrir es la vía de escape si mientras tanto
+            // vinculó una cuenta: el botón de estimar vuelve a estar vivo.
+            setAiNoSession(false);
+            if (showQuickLog) { setEstimation(null); setFoodInput(''); setShowManualFallback(false); }
+          }}
         >
           {showQuickLog ? t('nutrify.closeEstimate', 'Cerrar') : t('nutrify.estimate', 'Estimar')}
         </button>
@@ -428,7 +444,10 @@ export default function NutritionDashboardWidget() {
             <button
               className="rpg-button nutri-dash-quick-submit"
               onClick={handleEstimate}
-              disabled={estimating || !foodInput.trim()}
+              disabled={estimating || !foodInput.trim() || aiNoSession}
+              title={aiNoSession
+                ? t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual')
+                : undefined}
             >
               {retrying
                 ? t('nutrify.retrying', 'Reintentando...')

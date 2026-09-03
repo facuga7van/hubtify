@@ -77,6 +77,10 @@
   justify-content: center;
   font-size: var(--fs-label);
   font-weight: bold;
+  /* contrast-ok: el rotulo flota SOBRE el relleno de la barra (rayas de
+     --rubric / --moss / --gold), no sobre la pista --parch-2 que hereda; no
+     hay un color unico que sirva para las dos mitades, y por eso lleva el
+     text-shadow. La pista vacia queda como el peor caso conocido. */
   color: var(--parch-0);
   font-family: 'IM Fell English SC', serif;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
@@ -291,6 +295,8 @@
   padding: 0;
   border: 0;
   background: transparent;
+  /* contrast-ok: flechas dibujadas del control numerico, contenido no textual
+     (WCAG 1.4.11, 3:1); dan 3.84:1 sobre --parch-0 */
   color: var(--gold-dark);
   cursor: pointer;
   user-select: none;
@@ -422,48 +428,10 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Page Header ──────────────────────────────────── */
-.page-header {
-  margin-bottom: 20px;
-  position: relative;
-}
-
-.page-header__ornament {
-  height: 3px;
-  background: linear-gradient(90deg, transparent 0%, var(--gold-dark) 20%, var(--gold) 50%, var(--gold-dark) 80%, transparent 100%);
-  margin-bottom: 16px;
-  border-radius: 2px;
-}
-
-.page-header__content {
-  position: relative;
-}
-
-.page-header__title {
-  font-family: 'UnifrakturCook', cursive;
-  font-size: var(--fs-accent);
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0.04em;
-  margin: 0;
-}
-
-.page-header__subtitle {
-  font-family: 'Cormorant Garamond', serif;
-  font-style: italic;
-  font-size: var(--fs-quote);
-  color: var(--ink-faded);
-  margin-top: 2px;
-}
-
-.page-header__actions {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+/* `.page-header*` vivía acá para `src/shared/components/PageHeader.tsx`, cuyo
+   ÚNICO consumidor era Ajustes. Ajustes pasó a `BookPage` (ítem 12 de la
+   rúbrica), el componente se borró y con él estas reglas. El cromo de página
+   es uno solo y vive en `codex.css` (`.qb-header`, `.qb-rule`, `.qb-corner`). */
 
 /* La ventana tiene minWidth 700 (electron/main.ts), asi que un breakpoint en 700px
    solo disparaba en ese pixel exacto. A 880 de viewport el contenido ronda los
@@ -471,10 +439,6 @@ textarea:focus-visible {
 @media (max-width: 880px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
-  }
-
-  .page-header__actions {
-    right: 0;
   }
 }
 
@@ -616,7 +580,7 @@ textarea:focus-visible {
 }
 
 .auth-card__password-toggle:hover {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84:1, MENOS que el --ink-faded en reposo */
   background: rgba(168, 138, 60, 0.12);
 }
 
@@ -936,7 +900,9 @@ textarea:focus-visible {
   border-color: var(--moss);
 }
 
-/* Font scale selector */
+/* Font scale selector — mismo par que el idioma: `.rpg-button` para el elegido,
+   `.onboarding__btn-dim` (pergamino) para el resto. Esta clase ya no pinta
+   nada: sólo hace que los cuatro repartan el ancho de la tarjeta de 560 px. */
 .onboarding__font-options {
   display: flex;
   gap: 6px;
@@ -944,29 +910,13 @@ textarea:focus-visible {
 }
 
 .onboarding__font-btn {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 4px;
-  border: 1px solid rgba(74, 55, 32, 0.4);
-  border-radius: 3px;
-  background: rgba(245, 231, 192, 0.3);
-  font-family: 'IM Fell English', serif;
-  font-size: var(--fs-label);
-  color: var(--ink-faded);
-  cursor: pointer;
+  /* `flex-basis: auto` (y no 0) a propósito: así el rótulo manda y, cuando no
+     entran los cuatro en un renglón, la fila ENVUELVE en vez de apretarlos
+     hasta partir la palabra. */
+  flex: 1 1 auto;
+  padding: 8px 6px;
   text-align: center;
-  transition: all 0.15s;
-}
-
-.onboarding__font-btn:hover {
-  background: rgba(245, 231, 192, 0.5);
-}
-
-.onboarding__font-btn--active {
-  background: rgba(168, 138, 60, 0.2);
-  border-color: var(--gold-dark);
-  color: var(--ink);
-  font-weight: bold;
+  white-space: nowrap;
 }
 
 /* Hero name input */

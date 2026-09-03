@@ -50,7 +50,7 @@
   overflow: auto;
   border-radius: 3px;
   background: var(--parch-3);
-  color: var(--ink-faded);
+  color: var(--ink);  /* --ink-faded sobre --parch-3 daba 3.43:1 */
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-label);
   text-align: left;
@@ -62,16 +62,20 @@
   padding: 8px 16px;
   border: 1px solid var(--gold-dark);
   border-radius: 6px;
-  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
-  color: var(--gold);
+  /* Misma leccion que .rpg-button: la parada peor del degrade es la que lee el
+     ojo. --leather-light + --gold daba 3.06:1. */
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  color: var(--gold-light);
   font-family: var(--ff-accent);
   font-size: var(--fs-body);
   box-shadow: 0 2px 4px rgba(42, 29, 14, 0.3);
   cursor: pointer;
 }
 
+/* Una superficie dorada que lleva texto arranca en --gold-light: la parada
+   peor pasa de --gold-dark (3.47:1) a --gold (4.97:1). */
 .mobile-fatal__button:active {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
   color: var(--ink);
 }
 

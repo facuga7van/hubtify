@@ -189,7 +189,7 @@
 
 .widget-drag-handle:hover,
 .widget-resize-btn:hover {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84:1: el hover leia MENOS que el reposo */
   border-color: var(--gold-dark);
   background: rgba(245, 231, 192, 0.95);
 }
@@ -268,6 +268,88 @@
   grid-template-columns: 1.2fr 1fr;
   gap: 16px;
 }
+
+/* ── La crónica — decisión abierta nº6, CERRADA ─────
+   Entre el final del hecho y su columna de XP quedaban 278–491 px de pergamino
+   (medidos a 1640): el `minmax(0,1fr)` del texto se come todo el sobrante y
+   empuja la cifra contra el borde derecho. Angostar la fila hubiera roto la
+   alineación entre columnas que se ganó antes.
+
+   La salida es la de imprenta, la que propone el propio documento de decisiones
+   abiertas: un PUNTILLADO GUÍA, lo que hace el índice de cualquier libro. No
+   angosta nada, llena el hueco y además dice a qué renglón pertenece la cifra.
+   De paso la fila deja de pintarse con estilos en línea desde `Dashboard.tsx`,
+   que era lo que impedía cualquier regla —de móvil o de otra— sobre ella. */
+.dash-chronicle {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: var(--fs-body);
+  font-family: var(--ff-body);
+}
+
+.dash-chronicle__row {
+  display: grid;
+  /* Cada <li> es su propia grilla, así que con `auto auto` las columnas de XP y
+     de hora quedaban desalineadas entre filas (cada fila medía su propio
+     texto). Un ancho mínimo por columna las pone en línea. */
+  grid-template-columns: 18px minmax(0, 1fr) minmax(56px, auto) minmax(72px, auto);
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.3);
+}
+
+.dash-chronicle__icon {
+  color: var(--rubric);
+  font-size: var(--fs-quote);
+  text-align: center;
+}
+
+.dash-chronicle__fact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* `flex: 0 1 auto`: el rótulo pide su ancho natural y se recorta con puntos
+   suspensivos sólo cuando de verdad no entra. */
+.dash-chronicle__text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* El guía se queda con TODO el sobrante (`flex-basis: 0`) y no puede
+   encogerse por debajo de cero, así que nunca le roba lugar al texto: cuando
+   el hecho es largo, el puntillado desaparece solo. */
+.dash-chronicle__leader {
+  flex: 1 1 0;
+  min-width: 0;
+  align-self: flex-end;
+  margin-bottom: 0.3em;
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.45);
+}
+
+.dash-chronicle__xp {
+  color: var(--moss);
+  font-size: var(--fs-label);
+  font-family: 'Fira Code', monospace;
+  text-align: right;
+}
+
+.dash-chronicle__time {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+/* A 390 px la columna es una sola y el hecho ya la llena: el guía no tiene
+   sobrante que cubrir y colapsa a cero por su cuenta. Lo que sí sobra es la
+   hora al lado del XP, así que se conservan las cuatro pistas tal cual. */
 
 /* A 390-412 px dos columnas dejan los nombres de la crónica en «Lo…» y la
    caja «Empezá por acá» en una columna angosta con los botones partidos.

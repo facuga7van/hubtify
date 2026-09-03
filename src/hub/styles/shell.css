@@ -64,11 +64,10 @@
 }
 
 /* ══ SETTINGS PAGE ════════════════════════════════════
-   `.settings-page` had no CSS at all anywhere in the project, and
-   `.main-content` is `padding: 0`, so the title and every card started flush
-   against the window edge. */
+   `.settings-page` es ahora el `className` de un `BookPage`, o sea que cae
+   sobre el MISMO `<div class="qb-page">`: el padding (24/28/32) y las escuadras
+   ya vienen de `codex.css`. Acá queda sólo lo que es propio de esta página. */
 .settings-page {
-  padding: 24px 28px 32px;
   max-width: 860px;
   /* La columna tenía techo de ancho pero no centrado: en ventana maximizada
      quedaba pegada al borde izquierdo con ~520 px de pergamino vacío al lado,
@@ -199,7 +198,13 @@
   display: none;
 }
 
-/* ══ UPDATE DIALOG ════════════════════════════════════ */
+/* ══ UPDATE DIALOG ════════════════════════════════════
+   Este bloque era CSS MUERTO: ningún `.tsx` lo usaba porque
+   `UpdateNotification.tsx` se pintaba con estilos en línea. En vez de borrarlo
+   se hizo lo que el sistema quiere —el componente ahora usa estas clases— y se
+   completó con las piezas que faltaban (la tablilla de novedades, la lista y el
+   cartel de «lista para instalar»). Los valores son los que el componente ya
+   tenía en línea, no los de este bloque cuando estaba dormido. */
 .update-dialog-overlay {
   position: fixed;
   inset: 0;
@@ -217,33 +222,67 @@
   border: 2px solid var(--gold-dark);
   border-radius: 6px;
   padding: 24px;
-  max-width: 360px;
-  width: 100%;
+  max-width: 380px;
+  width: 90%;
   text-align: center;
   color: var(--parch-0);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-.update-dialog__close {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: none;
-  border: none;
-  color: var(--gold);
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.update-dialog__close:hover {
-  color: var(--gold-light);
-  background: rgba(168, 138, 60, 0.2);
+/* `useModalA11y` le pone `tabIndex={-1}` para poder llevarle el foco: sin esto
+   Chromium le dibuja el anillo por defecto al abrir. */
+.update-dialog:focus {
+  outline: none;
 }
 
 .update-dialog__title {
   font-family: 'UnifrakturCook', cursive;
   margin: 0 12px 12px;
+  color: var(--gold-light);   /* 7.07:1 sobre --leather */
+}
+
+/* ── Qué hay de nuevo (entrada del changelog) ──────── */
+.update-dialog__news {
+  text-align: left;
+  margin-bottom: 16px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+  padding: 12px 14px;
+}
+
+.update-dialog .update-dialog__news-title {
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  /* --gold sobre el cuero oscurecido de la tablilla queda al filo; el oro claro
+     es el único que se lee sobre cuero (DESIGN_SYSTEM, «el oro no es tinta»). */
   color: var(--gold-light);
+  margin-bottom: 8px;
+}
+
+.update-dialog__news-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-dialog__news-item {
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--parch-1);
+  padding-left: 14px;
+  position: relative;
+}
+
+.update-dialog__news-item::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: var(--gold-light);  /* --gold daba 4.38:1 sobre --leather */
 }
 
 .update-dialog__progress {
@@ -270,9 +309,24 @@
 }
 
 .update-dialog__error {
+  /* Rojo claro, no `--rubric`: el fondo es cuero y el rubí encima es 1.7:1. */
   color: #f87171;
   font-size: var(--fs-label);
   margin-bottom: 8px;
+  text-align: left;
+}
+
+/* `--moss` sobre `--leather` son 1.69:1: el ÚNICO cartel que confirma que la
+   actualización ya está lista era ilegible. El verde vive en una tablilla de
+   pergamino (8.1:1). */
+.update-dialog__ready {
+  font-size: var(--fs-label);
+  color: var(--moss);
+  margin-bottom: 10px;
+  background: rgba(245, 231, 192, 0.92);
+  border: 1px solid var(--moss);
+  border-radius: 4px;
+  padding: 6px 10px;
 }
 
 .update-dialog__primary {
@@ -280,14 +334,18 @@
   margin-bottom: 8px;
 }
 
-.update-dialog__secondary {
+/* Compuesto con `.rpg-button`: si no, pisar el degradé de cuero por un
+   `background: transparent` de la misma especificidad depende del orden de
+   importación, que es exactamente lo que este archivo promete no hacer. */
+.rpg-button.update-dialog__secondary {
   width: 100%;
   margin-bottom: 6px;
   padding: 4px 8px;
   font-size: var(--fs-label);
   background: transparent;
   border: 1px solid var(--gold-dark);
-  color: var(--gold);
+  color: var(--gold-light);   /* 6.5:1 sobre el cuero del diálogo */
+  box-shadow: none;
 }
 
 .update-chip {
@@ -360,8 +418,14 @@
   transition: width 0.3s ease;
 }
 
+/* Sobre cuero no hay rojo legible: --rubric-light da 2.09:1. Se usa el mismo
+   recurso que el chip de sincronizacion (sync-status-chip.css): pildora llena
+   de --rubric con tinta --parch-0, 8.4:1, y el rojo se conserva. */
 .update-chip__error {
-  color: var(--rubric-light);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--rubric);
+  color: var(--parch-0);
 }
 
 .update-chip__permission {
@@ -444,15 +508,13 @@
    to breathe, and `.qb-page` had no media query at all. Scoped under
    `.main-content` so it wins over codex.css regardless of import order. */
 @media (max-width: 900px) {
-  .main-content .qb-page,
-  .main-content .settings-page {
+  .main-content .qb-page {
     padding: 18px 18px 24px;
   }
 }
 
 @media (max-width: 780px) {
-  .main-content .qb-page,
-  .main-content .settings-page {
+  .main-content .qb-page {
     padding: 14px 12px 20px;
   }
 }

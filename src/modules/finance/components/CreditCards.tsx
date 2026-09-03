@@ -5,6 +5,7 @@ import CreditCardManager from './shared/CreditCardManager';
 import StatementDetail from './shared/StatementDetail';
 import { MonthNavigator } from './shared/MonthNavigator';
 import { Section, Rune } from '../../../shared/components/codex/CodexPrimitives';
+import { Coin } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
 
@@ -27,18 +28,30 @@ export default function CreditCards() {
   const [statements, setStatements] = useState<CreditCardStatement[]>([]);
   const [showManager, setShowManager] = useState(false);
   const [selectedStatement, setSelectedStatement] = useState<CreditCardStatement | null>(null);
+  // «Todavía no cargaste ninguna tarjeta» se pintaba desde el primer frame, y
+  // si la lectura fallaba (promesa sin `catch`) se quedaba diciendo eso.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [month, setMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
   const loadCards = useCallback(() => {
-    window.api.financeGetCreditCards().then((data) => setCards(data as CreditCard[]));
+    setLoadError(false);
+    window.api.financeGetCreditCards()
+      .then((data) => setCards(data as CreditCard[]))
+      .catch((err) => {
+        console.error('[CreditCards] financeGetCreditCards failed:', err);
+        setLoadError(true);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const loadStatements = useCallback(() => {
     window.api.financeGetCreditCardStatements({ periodMonth: month })
-      .then((data) => setStatements(data as CreditCardStatement[]));
+      .then((data) => setStatements(data as CreditCardStatement[]))
+      .catch((err) => console.error('[CreditCards] financeGetCreditCardStatements failed:', err));
   }, [month]);
 
   useEffect(() => { loadCards(); }, [loadCards]);
@@ -74,7 +87,18 @@ export default function CreditCards() {
 
       <div style={{ marginTop: 16 }}>
         <Section title={t('coinify.statements').toUpperCase()} rightSlot={<HelpBubble variant="inline" text={t('coinify.statementsHelp', 'Resumen por tarjeta: período de facturación, gastos del ciclo actual y estado de cierre.')} />}>
-          {cards.map((card) => {
+          {loading && <div className="coin-skeleton coin-skeleton--card" />}
+
+          {!loading && loadError && (
+            <div className="coin-load-error">
+              <p className="coin-load-error__text">{t('coinify.cardsLoadError', 'No se pudieron cargar las tarjetas')}</p>
+              <button className="rpg-button" onClick={() => { setLoading(true); loadCards(); loadStatements(); }}>
+                {t('common.tryAgain', 'Intentar de nuevo')}
+              </button>
+            </div>
+          )}
+
+          {!loading && !loadError && cards.map((card) => {
             const stmt = statements.find((s) => s.creditCardId === card.id);
             const range = getStatementPeriodRange(month, card.closingDay);
 
@@ -122,20 +146,21 @@ export default function CreditCards() {
           {/* The condition is "no cards", so say that: the old copy claimed
               there were no statements for the period, sending new users off to
               hunt through months for something that could not exist yet. */}
-          {cards.length === 0 && (
+          {!loading && !loadError && cards.length === 0 && (
             <div className="coin-empty-codex">
-              <p>{t('coinify.noCardsYet', 'Todavía no cargaste ninguna tarjeta')}</p>
-              <p style={{ fontSize: 'var(--fs-label)', marginTop: 4 }}>
+              <Coin width={28} height={28} aria-hidden="true" />
+              <p className="coin-empty-codex__title">{t('coinify.noCardsYet', 'Todavía no cargaste ninguna tarjeta')}</p>
+              <p className="coin-empty-codex__desc">
                 {t('coinify.noCardsYetHint', 'Agregá una tarjeta para ver sus resúmenes mes a mes')}
               </p>
-              <button className="rpg-button" style={{ marginTop: 8 }} onClick={() => setShowManager(true)}>
+              <button className="rpg-button" onClick={() => setShowManager(true)}>
                 + {t('coinify.newCard', 'Nueva tarjeta')}
               </button>
             </div>
           )}
 
-          {cards.length > 0 && statements.length === 0 && (
-            <p className="coin-empty-codex" style={{ fontSize: 'var(--fs-label)' }}>
+          {!loading && !loadError && cards.length > 0 && statements.length === 0 && (
+            <p className="coin-empty-codex__desc" style={{ textAlign: 'center', padding: 12 }}>
               {t('coinify.noStatements')}
             </p>
           )}

@@ -78,7 +78,7 @@
   font-family: 'UnifrakturCook', cursive;
   font-size: var(--fs-nav);
   font-weight: 700;
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84 / 3.26 / 2.55 sobre el pergamino */
   letter-spacing: 0.03em;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(168, 138, 60, 0.25);

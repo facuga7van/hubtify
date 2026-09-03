@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { genId } from '../ids';
 import { todayDateString, formatDateString, yesterdayDateString, localTimestamp, nextDateString } from '../../shared/date-utils';
 import { reconcileHabitShields, serializeSpecificDays } from './quests.habits';
+import { getQuestEntryDefaults } from './quests-defaults';
 import { syncHabitSchedule } from './notification-schedule';
 
 /**
@@ -590,6 +591,12 @@ export function registerQuestsIpcHandlers(): void {
       FROM projects WHERE deleted_at IS NULL ORDER BY project_order ASC
     `).all();
   });
+
+  /**
+   * El default del alta rápida, inferido del historial en vez de hardcodeado.
+   * Ver `quests-defaults.ts` para los números de la base real que lo justifican.
+   */
+  ipcHandle('quests:getEntryDefaults', () => getQuestEntryDefaults(getDb()));
 
   ipcHandle('quests:upsertProject', (_e, project: {
     id?: string; name: string; color: string;

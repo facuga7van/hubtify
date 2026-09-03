@@ -12,6 +12,7 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 // (retry + timeout live inside it). breakdown-utils = upstream's editable
 // per-ingredient breakdown and portion scaling. Both survive.
 import { resolveEstimate } from '../estimate-with-cache';
+import { isNoSessionError } from '../estimate-service';
 import { rescaleItem, sumBreakdown, scalePortion } from '../breakdown-utils';
 import type { BreakdownItem, BreakdownTotals } from '../breakdown-utils';
 import { AnimatedNumber } from '../../finance/components/shared/AnimatedNumber';
@@ -382,8 +383,17 @@ export default function Today() {
       // One inline signal the user can act on — no toast stacked on top of it,
       // and no silent jump to Manual mode: the user decides. (Upstream forced
       // Manual and toasted; the notice keeps its calmer wording, the forcing goes.)
+      //
+      // La excepción es el modo invitado: ahí «probá de nuevo» es mentira — no
+      // hay sesión y no la va a haber hasta que vincule una cuenta. Ese caso SÍ
+      // pasa a Manual, que es el único camino que puede terminar bien.
       console.error('[Nutrition]', err);
-      setEstimateNotice(t('nutrify.aiUnavailable', 'La IA tardó demasiado o no está disponible. Probá de nuevo o cargá las calorías a mano.'));
+      if (isNoSessionError(err)) {
+        setManualMode(true);
+        setEstimateNotice(t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual'));
+      } else {
+        setEstimateNotice(t('nutrify.aiUnavailable', 'La IA tardó demasiado o no está disponible. Probá de nuevo o cargá las calorías a mano.'));
+      }
     } finally {
       setEstimating(false);
       setRetrying(false);
@@ -592,7 +602,13 @@ export default function Today() {
       setEventMax(String(Math.round(result.totalCalories * 1.15)));
     } catch (err) {
       console.error('[Nutrition] event estimate error:', err);
-      toast({ type: 'info', message: t('nutrify.estimateUnavailable', 'No se pudo estimar. Revisá tu conexión o cargá las calorías en modo Manual.') });
+      toast({
+        type: 'info',
+        // Sin sesión no hay conexión que revisar: la banda se tipea a mano.
+        message: isNoSessionError(err)
+          ? t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual')
+          : t('nutrify.estimateUnavailable', 'No se pudo estimar. Revisá tu conexión o cargá las calorías en modo Manual.'),
+      });
     } finally {
       setEventEstimating(false);
     }
@@ -930,7 +946,10 @@ export default function Today() {
       loadData(date);
       notifyNutritionChanged();
     } catch (err) {
+      // El ícono del momento volvía solo al valor viejo, sin explicación: se
+      // leía como «no me registró el click», no como «el backend lo rechazó».
       console.error('[Nutrify] meal change failed', err);
+      toast({ type: 'warning', message: t('nutrify.mealChangeError', 'No se pudo cambiar el momento de la comida') });
     }
   };
 
@@ -941,7 +960,12 @@ export default function Today() {
         loadData(date);
         notifyNutritionChanged();
       } catch (err) {
+        // El peor de todos: la fila ya salió de pantalla por la animación de
+        // salida, así que el usuario CREE que borró. Se avisa y se recarga el
+        // día, que trae la comida de vuelta a la lista.
         console.error('[Nutrify] delete failed', err);
+        toast({ type: 'warning', message: t('nutrify.deleteEntryError', 'No se pudo eliminar la comida') });
+        loadData(date);
       }
     }, 300);
   };
@@ -1981,7 +2005,7 @@ export default function Today() {
             disabled={consumed === 0}
             title={consumed === 0
               ? t('nutrify.closeDayDisabled', 'Registrá al menos una comida para poder cerrar el día')
-              : t('nutrify.closeDayTitleCodex', 'Cerrá el día en el Códice: nutrición y sello, un solo ritual')}
+              : t('nutrify.closeDayTitleCodex', 'Cerrá el día en el Códice, el diario de tus días: comidas y sello en un solo paso')}
             onClick={() => openCodex(date)}
           >
             {t('nutrify.closeDayInCodex', 'Cerrar el día en el Códice')}
@@ -2376,9 +2400,12 @@ function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: numbe
           {data.hpChange !== 0 && (
             <>
               <span className={data.hpChange >= 0 ? 'nutri-green' : 'nutri-red'} style={{ marginLeft: 8 }}>
-                {data.hpChange >= 0 ? '+' : ''}{data.hpChange} HP
+                {/* Rótulo de estadística, no la sigla del par «XP y HP»: acá el
+                    número va solo y el sello de ayuda de al lado ya dice «Vigor».
+                    Mismo criterio que hpExplanation, scoringBands y dayStatus.over. */}
+                {data.hpChange >= 0 ? '+' : ''}{data.hpChange} {t('rpg.vigor', 'Vigor')}
               </span>
-              <HelpBubble variant="inline" text={t('nutrify.hpExplanation', 'HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP')} />
+              <HelpBubble variant="inline" text={t('nutrify.hpExplanation', 'Vigor según cercanía al objetivo: dentro del rango = +Vigor, fuera del rango = -Vigor')} />
             </>
           )}
         </span>

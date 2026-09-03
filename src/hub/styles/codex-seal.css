@@ -355,6 +355,8 @@
   display: inline-flex;
   align-items: flex-end;
   gap: 3px;
+  /* contrast-ok: fila de monedas dibujadas (svg), no texto; rige el 3:1 de
+     contenido no textual y da 3.84:1 sobre el pergamino */
   color: var(--gold-dark);
 }
 
@@ -377,7 +379,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-body);
   letter-spacing: 0.05em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -394,7 +396,7 @@
 }
 
 .codex-unlocks__title {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
 }
 
 .codex-unlocks__list {
@@ -413,6 +415,8 @@
   color: var(--ink);
 }
 
+/* contrast-ok: ícono del ítem desbloqueado, no texto; el rótulo lo lleva
+   --ink al lado y el oro queda de ornamento (3.84:1, sobre el 3:1) */
 .codex-unlocks__item svg { color: var(--gold-dark); }
 
 /* ── la salida del ritual ─────────────────────────
@@ -1028,7 +1032,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.1em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   border: 1px solid rgba(138, 112, 48, 0.5);
   border-radius: 999px;
   background: rgba(196, 168, 78, 0.12);
@@ -1045,9 +1049,14 @@
   border-top: 1px dotted rgba(74, 55, 32, 0.35);
 }
 
+/* El título ahora lleva su sello de ayuda al lado (el bloque de las maestrías
+   era el único de la ficha sin uno). Flex para que el sello quede en el
+   renglón y no herede el `letter-spacing` del small-caps. */
 .hero-masteries-title {
   color: var(--ink-soft);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
 }
 
 .hero-masteries {
@@ -1078,6 +1087,7 @@
 /* Module colours, coherent with the codex vocabulary. */
 .hero-mastery--quests .hero-mastery__icon { color: var(--rubric); }
 .hero-mastery--nutrition .hero-mastery__icon { color: var(--moss); }
+/* contrast-ok: sello del módulo, ícono y no texto; el nombre va en --ink-soft */
 .hero-mastery--finance .hero-mastery__icon { color: var(--gold-dark); }
 .hero-mastery--cauldron .hero-mastery__icon { color: var(--ink); }
 
@@ -1168,6 +1178,7 @@
 
 .codex-purse__coin {
   display: inline-flex;
+  /* contrast-ok: moneda dibujada al lado del saldo, no texto (3.84:1 > 3:1) */
   color: var(--gold-dark);
   flex-shrink: 0;
 }

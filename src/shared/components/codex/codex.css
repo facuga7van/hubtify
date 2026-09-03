@@ -568,13 +568,13 @@
   top: 8px;
   right: 8px;
   z-index: 2;
+  /* Estaba en opacity .35, que arrastraba --ink-faded a 3.26:1 y en (hover:
+     none) no se levantaba nunca. Lo apagado ya lo dice el token. */
   color: var(--ink-faded);
-  opacity: 0.35;
-  transition: opacity 0.2s, color 0.2s;
+  transition: color 0.2s;
   line-height: 1;
 }
 .qb-module-card-nav:hover {
-  opacity: 1;
   color: var(--rubric);
 }
 

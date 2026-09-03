@@ -11,9 +11,13 @@ import { SealRosette } from './codex/CodexSealIcons';
 import { useSealInvite } from './codex/useSealInvite';
 import { openCodex } from './codex/codexApi';
 import Tooltip from '../shared/components/Tooltip';
+import HelpBubble from '../shared/components/HelpBubble';
 import { useVisibleInterval } from '../shared/hooks/useVisibleInterval';
 import './styles/layout.css';
 import './styles/codex-seal.css';
+/* El sello de ayuda del Vigor vive en el riel: la hoja tiene que viajar con
+   el componente y no depender de que Layout la haya importado antes. */
+import '../shared/styles/help-bubble.css';
 
 const STREAK_BAR_SCALE = 3.3; // 30 days = ~100% width
 
@@ -48,6 +52,33 @@ const NAV_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement
   bag: Bag,
 };
 
+/* Respaldo por si una clave todavía no llegó al bundle de idioma: `t()` con
+   fallback vacío devolvería la clave cruda («nav.homeDesc») como nombre
+   accesible, que es peor que no tener descripción. */
+const NAV_DESC_FALLBACKS: Record<string, string> = {
+  'nav.homeDesc': 'Tu día de un vistazo — la Tabla del Aventurero',
+  'nav.questifyDesc': 'Misiones y hábitos — el Libro de Misiones',
+  'nav.nutrifyDesc': 'Comidas y calorías — el Diario de Provisiones',
+  'nav.coinifyDesc': 'Gastos, ingresos y presupuesto — el Libro del Tesorero',
+  'nav.cauldronDesc': 'Temporizador de enfoque, al estilo Pomodoro',
+  'nav.achievementsDesc': 'Los logros que fuiste desbloqueando',
+  'nav.rewardsDesc': 'Canjeá tus óbolos por premios que elegís vos',
+  'nav.characterDesc': 'Tu ficha: nivel, virtudes y todo lo hecho',
+  'nav.settingsDesc': 'Cuenta, apariencia, respaldo y sincronización',
+};
+
+/**
+ * Nombre accesible de un ítem del menú: la palabra temática MÁS la función.
+ * `badge` va adelante porque es donde estaba antes de que existiera el
+ * `aria-label` (el <span> del contador se pinta antes del rótulo y el nombre
+ * accesible se armaba solo del contenido): al fijar un `aria-label` el
+ * contenido deja de leerse, y perder el contador sería una regresión.
+ */
+function navName(label: string, desc: string, badge = 0): string {
+  const head = badge > 0 ? `${badge} ${label}` : label;
+  return desc ? `${head} — ${desc}` : head;
+}
+
 function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width={24} height={24} fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -62,22 +93,32 @@ function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
    'Logros' and 'Aldea' were `comingSoon: true`: rendered at opacity .4 on
    leather (~2:1 contrast) as focusable <button>s that did nothing on Enter, and
    they ate 2 of the 7 main-menu slots. Out until they exist. */
-const navKeys: Array<{ path: string; key: string; icon: string }> = [
-  { path: '/', key: 'nav.home', icon: 'scroll' },
-  { path: '/quests', key: 'nav.questify', icon: 'sword' },
-  { path: '/nutrition', key: 'nav.nutrify', icon: 'bread' },
-  { path: '/finance', key: 'nav.coinify', icon: 'coin' },
-  { path: '/cauldron', key: 'nav.cauldron', icon: 'cauldron' },
+/* Cada entrada lleva `desc`: la FUNCIÓN, no el sinónimo temático. Un ícono de
+   caldero más la palabra «Caldero» no dicen «temporizador de enfoque», y el
+   tooltip del riel colapsado repetía el mismo rótulo. La descripción viaja en
+   tres canales: `aria-label` (nombre accesible), `title` (hover de escritorio)
+   y el tooltip del riel angosto. En el cajón del teléfono —donde no hay
+   hover y sí hay lugar— además se PINTA como segundo renglón.
+   `desc` también es el puente entre el ítem del menú y el título de la página
+   a la que lleva: «Inicio» abre «la Tabla del Aventurero». */
+interface NavEntry { path: string; key: string; descKey: string; icon: string }
+
+const navKeys: NavEntry[] = [
+  { path: '/', key: 'nav.home', descKey: 'nav.homeDesc', icon: 'scroll' },
+  { path: '/quests', key: 'nav.questify', descKey: 'nav.questifyDesc', icon: 'sword' },
+  { path: '/nutrition', key: 'nav.nutrify', descKey: 'nav.nutrifyDesc', icon: 'bread' },
+  { path: '/finance', key: 'nav.coinify', descKey: 'nav.coinifyDesc', icon: 'coin' },
+  { path: '/cauldron', key: 'nav.cauldron', descKey: 'nav.cauldronDesc', icon: 'cauldron' },
   /* 'Logros' was pulled from this list while it was vapour (a focusable button
      at opacity .4 that did nothing). The shelf exists now, so it is back —
      Chalice, because a footed cup already IS the trophy in this icon family. */
-  { path: '/achievements', key: 'nav.achievements', icon: 'chalice' },
+  { path: '/achievements', key: 'nav.achievements', descKey: 'nav.achievementsDesc', icon: 'chalice' },
   /* The purse: obolos earned at the seal, spent on the user's own rewards. */
-  { path: '/rewards', key: 'nav.rewards', icon: 'bag' },
+  { path: '/rewards', key: 'nav.rewards', descKey: 'nav.rewardsDesc', icon: 'bag' },
 ];
 
-const bottomNavKeys: Array<{ path: string; key: string; icon: string }> = [
-  { path: '/character', key: 'nav.character', icon: 'shield' },
+const bottomNavKeys: NavEntry[] = [
+  { path: '/character', key: 'nav.character', descKey: 'nav.characterDesc', icon: 'shield' },
 ];
 
 export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: SidebarProps) {
@@ -146,7 +187,18 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
           <div className="sidebar-bars">
             <div className="sidebar-bar">
               <div className="sidebar-bar__row">
-                <span className="sidebar-bar__label" title={t('rpg.vigorHint', 'Se recupera cada mañana. Es el estado del día, no una deuda.')}>{t('rpg.vigor', 'VIGOR')}</span>
+                {/* El rótulo alcanza por sí solo («Vigor» es palabra llana y
+                    está pegado a la barra roja y a su 84/100); la REGLA —que se
+                    recupera sola cada mañana— vivía únicamente en un `title=`,
+                    invisible en touch. El sello de ayuda se abre con foco, así
+                    que también se alcanza con un toque o con el teclado. */}
+                <span className="sidebar-bar__label" title={t('rpg.vigorHint', 'El Vigor se recupera solo cada mañana')}>
+                  {/* La palabra queda en su propio nodo hoja: el arnés visual
+                      sólo mide contraste y tamaño en hojas de texto, y meter el
+                      sello adentro del rótulo la habría sacado de la medición. */}
+                  <span className="sidebar-bar__label-txt">{t('rpg.vigor', 'VIGOR')}</span>
+                  <HelpBubble variant="inline" className="sidebar-bar__help" text={t('rpg.vigorHint', 'El Vigor se recupera solo cada mañana')} />
+                </span>
                 <span className="sidebar-bar__val">{stats.hp} / {stats.maxHp}</span>
               </div>
               <div className="sidebar-bar__track">
@@ -185,14 +237,19 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                   <div className="sidebar-bar__fill sidebar-bar__fill--gold" style={{ width: `${Math.min(stats.streak * STREAK_BAR_SCALE, 100)}%` }} />
                 </div>
                 <div className="sidebar-streak__meta">
+                  {/* Era un escudito con un número y NADA más: ni rótulo ni
+                      unidad, con la palabra «indultos» sólo dentro de un
+                      `title=`. Ahora el rótulo se ve, y la regla completa está
+                      en la línea de abajo, que no depende de ningún hover. */}
                   <span
                     className="sidebar-streak__pardons"
-                    title={t('rpg.pardonsHint', 'Indultos del mes: si te salteás un solo día, se usa uno solo y la racha sigue.')}
+                    title={t('rpg.pardonsHint', 'Perdonan un día perdido. Se recargan cada mes.')}
                   >
                     {/* No "/2": a shop-bought pardon extends the month's cap,
                         and "3/2" would read as a bug. The hint carries the rule. */}
                     <Shield width={11} height={11} />
-                    {' '}{stats.pardonsRemaining ?? 0}
+                    {' '}{stats.pardonsRemaining ?? 0}{' '}
+                    {t('rpg.pardonsShort', 'indultos')}
                   </span>
                   {/* El récord vivía pegado al valor de la racha: a 220 px de
                       riel «RACHA» y «9 días» se tocaban y «· récord 21» se
@@ -208,13 +265,22 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                     className="sidebar-streak__inn tap-target"
                     onClick={() => onToggleInn?.()}
                     title={stats.innSince
-                      ? t('rpg.innLeave', 'Salir de la Posada: la racha retoma donde estaba.')
-                      : t('rpg.innHint', 'Vacaciones sin culpa: la racha no avanza ni se rompe hasta que vuelvas.')}
+                      ? t('rpg.innLeave', 'Volver a la aventura')
+                      : t('rpg.innHint', 'Pausa la racha sin perderla. El XP sigue contando.')}
+                    aria-label={stats.innSince
+                      ? `${t('rpg.innLeaveShort', 'Volver')} — ${t('rpg.innLeave', 'Volver a la aventura')}`
+                      : `${t('rpg.inn', 'Posada')} — ${t('rpg.innHint', 'Pausa la racha sin perderla. El XP sigue contando.')}`}
                     aria-pressed={!!stats.innSince}
                   >
                     <MoonCrescent width={12} height={12} />
                     <span>{stats.innSince ? t('rpg.innLeaveShort', 'Volver') : t('rpg.inn', 'Posada')}</span>
                   </button>
+                </div>
+                {/* La regla de los dos controles de la racha, VISIBLE. Vivía
+                    repartida en dos `title=`, y `title` no existe en un
+                    teléfono — que es donde el cajón es la única navegación. */}
+                <div className="sidebar-streak__rule">
+                  {t('rpg.streakRule', 'Un día salteado gasta un indulto; la Posada la pausa.')}
                 </div>
               </div>
             )}
@@ -269,11 +335,15 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
           if (item.path === '/quests') badgeCount = badges.questsOverdue;
           if (item.path === '/nutrition') badgeDot = badges.nutritionNoMeals;
 
+          const label = t(item.key);
+          const desc = t(item.descKey, NAV_DESC_FALLBACKS[item.descKey] ?? '');
           const navItem = (
             <button
               key={item.path}
               className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''}`}
               aria-current={isActive(item.path) ? 'page' : undefined}
+              aria-label={navName(label, desc, badgeCount)}
+              title={desc || undefined}
               /* anchor for the unlock spark fired from Layout's watcher */
               data-codex-nav={item.path === '/achievements' ? 'achievements' : undefined}
               onClick={() => animatedNavigate(item.path)}
@@ -287,11 +357,12 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                   <span className="sidebar-badge sidebar-badge--dot" />
                 )}
               </span>
-              <span className="sidebar-nav-item__label">{t(item.key)}</span>
+              <span className="sidebar-nav-item__label">{label}</span>
+              {desc && <span className="sidebar-nav-item__desc">{desc}</span>}
             </button>
           );
           if (collapsed) {
-            return <Tooltip key={item.path} text={t(item.key)}>{navItem}</Tooltip>;
+            return <Tooltip key={item.path} text={navName(label, desc)}>{navItem}</Tooltip>;
           }
           return navItem;
         })}
@@ -303,39 +374,49 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
       <nav className="sidebar-settings-area" aria-label={t('hub.settingsNavigation', 'Configuración')}>
         {bottomNavKeys.map((item) => {
           const IconComp = NAV_ICONS[item.icon];
+          const label = t(item.key);
+          const desc = t(item.descKey, NAV_DESC_FALLBACKS[item.descKey] ?? '');
           const btn = (
             <button
               key={item.path}
               className={`sidebar-nav-item ${isActive(item.path) ? 'active' : ''}`}
               aria-current={isActive(item.path) ? 'page' : undefined}
+              aria-label={navName(label, desc)}
+              title={desc || undefined}
               onClick={() => animatedNavigate(item.path)}
             >
               <span className="sidebar-nav-item__ico">
                 {IconComp && <IconComp width={18} height={18} />}
               </span>
-              <span className="sidebar-nav-item__label">{t(item.key)}</span>
+              <span className="sidebar-nav-item__label">{label}</span>
+              {desc && <span className="sidebar-nav-item__desc">{desc}</span>}
             </button>
           );
           return collapsed
-            ? <Tooltip key={item.path} text={t(item.key)}>{btn}</Tooltip>
+            ? <Tooltip key={item.path} text={navName(label, desc)}>{btn}</Tooltip>
             : btn;
         })}
         {(() => {
+          const label = t('nav.settings');
+          const desc = t('nav.settingsDesc', NAV_DESC_FALLBACKS['nav.settingsDesc']);
           const settingsBtn = (
             <button
               className={`sidebar-nav-item ${isActive('/settings') ? 'active' : ''}`}
               aria-current={isActive('/settings') ? 'page' : undefined}
+              aria-label={navName(label, desc)}
+              title={desc || undefined}
               onClick={() => animatedNavigate('/settings')}
               data-tour="settings"
             >
               <span className="sidebar-nav-item__ico">
                 <SettingsIcon width={18} height={18} />
               </span>
-              <span className="sidebar-nav-item__label">{t('nav.settings')}</span>
+              <span className="sidebar-nav-item__label">{label}</span>
+              {desc && <span className="sidebar-nav-item__desc">{desc}</span>}
             </button>
           );
           return collapsed
-            ? <Tooltip text={t('nav.settings')}>{settingsBtn}</Tooltip>
+            ? <Tooltip text={navName(label, desc)}>{settingsBtn}</Tooltip>
             : settingsBtn;
         })()}
         {cauldronHidden && (() => {

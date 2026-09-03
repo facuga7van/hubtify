@@ -699,7 +699,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
                 </span>
               </button>
               <div className="qb-hand codex-wax__hint">
-                {t('rpg.codexHoldHint', 'Mantené apretado para estampar el lacre')}
+                {t('rpg.codexHoldHint', 'Mantené apretado para sellar el día')}
               </div>
             </>
           )}

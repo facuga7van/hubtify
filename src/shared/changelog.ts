@@ -36,8 +36,8 @@ export const changelog: ChangelogEntry[] = [
         category: 'feat',
         scope: 'hub',
         text: {
-          es: 'Los espacios vacíos dejaron de ser carteles que te mandan a otro lado: crean ahí mismo la primera misión, el primer ritual o la primera comida, sin navegar. Y si volvés después de dos días o más, un parte de regreso te cuenta qué pasó mientras no estabas y por dónde seguir, sin reproches',
-          en: 'Empty spaces stopped being signs that send you elsewhere: they now create your first quest, first ritual or first meal right there, no navigating. And if you come back after two days or more, a return briefing tells you what happened while you were away and where to pick up, no guilt trip',
+          es: 'Los espacios vacíos dejaron de ser carteles que te mandan a otro lado: crean ahí mismo la primera misión, el primer hábito o la primera comida, sin navegar. Y si volvés después de dos días o más, un parte de regreso te cuenta qué pasó mientras no estabas y por dónde seguir, sin reproches',
+          en: 'Empty spaces stopped being signs that send you elsewhere: they now create your first quest, first habit or first meal right there, no navigating. And if you come back after two days or more, a return briefing tells you what happened while you were away and where to pick up, no guilt trip',
         },
       },
       {

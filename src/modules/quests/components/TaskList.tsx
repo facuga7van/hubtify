@@ -10,7 +10,7 @@ import { BookPage } from '../../../shared/components/codex/BookPage';
 import {
   Section, Tick, Gauge, SmallCount, Banner, QBDividerSection,
 } from '../../../shared/components/codex/CodexPrimitives';
-import { Compass, Map as MapIcon } from '../../../shared/components/icons/CodexIcons';
+import { Compass, Map as MapIcon, Sword } from '../../../shared/components/icons/CodexIcons';
 import TaskForm from './TaskForm';
 import SubtaskList from './SubtaskList';
 import QuestRowActions from './QuestRowActions';
@@ -332,7 +332,7 @@ export default function TaskList() {
     playTaskComplete();
     toast({
       type: 'xp',
-      message: t('questify.batchCompleted', '{{count}} quests completed!', { count: ids.length }),
+      message: t('questify.batchCompleted', '{{count}} misiones completadas!', { count: ids.length }),
     });
     setSelectedIds(new Set());
     await loadTasks();
@@ -414,23 +414,48 @@ export default function TaskList() {
     setActiveProjectId(undefined);
   };
 
+  /**
+   * Abre el formulario de alta desde cualquier parte de la página. El
+   * formulario vive arriba del todo y el hueco vacío abajo: sin el
+   * `scrollIntoView` el botón del vacío parecía no hacer nada.
+   */
+  const openAddForm = useCallback(() => {
+    setShowForm(true);
+    setEditingTask(null);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ block: 'nearest' });
+    });
+  }, []);
+
   /* Plain render helper, not a nested component: an inline component would be a
-     new type every render and remount (stealing focus from "Limpiar filtros"). */
+     new type every render and remount (stealing focus from "Limpiar filtros").
+
+     Las dos ramas tienen la MISMA forma —ícono, frase, salida— porque un hueco
+     que sólo dice una frase es la mitad de un estado vacío (rúbrica C8). La
+     rama sin filtros es el primer contacto del héroe nuevo: el botón abre el
+     alta acá mismo en vez de mandarlo a buscar el control a otra punta. */
   const renderEmptyState = (noneAtAllText: string) => (
     <div className="quest-empty">
       {hasActiveFilters ? (
         <>
-          <p style={{ margin: 0 }}>
+          <Compass width={32} height={32} aria-hidden="true" />
+          <p>
             {searchQuery
               ? t('questify.noSearchResults', 'Sin resultados para «{{query}}»', { query: searchQuery })
               : t('questify.noFilterResults', 'Ninguna misión coincide con los filtros activos.')}
           </p>
-          <button type="button" className="rpg-button" style={{ marginTop: 10, fontSize: 'var(--fs-label)', padding: '4px 12px' }} onClick={clearFilters}>
+          <button type="button" className="rpg-button quest-empty__cta" onClick={clearFilters}>
             {t('questify.clearFilters', 'Limpiar filtros')}
           </button>
         </>
       ) : (
-        noneAtAllText
+        <>
+          <Sword width={32} height={32} aria-hidden="true" />
+          <p>{noneAtAllText}</p>
+          <button type="button" className="rpg-button quest-empty__cta" onClick={openAddForm}>
+            {t('questify.addQuest')}
+          </button>
+        </>
       )}
     </div>
   );
@@ -525,9 +550,30 @@ export default function TaskList() {
   return (
     <BookPage
       data-tour="quests"
+      /* `--today`: en «Hoy» la lista es una sola columna de renglones cortos y
+         lleva medida (960px). Sin la clase, la tira de stats y la de pestañas
+         se estiraban a 1640 y la lista arrancaba 312px más adentro: tres ejes
+         en la misma página. */
+      className={`quest-page${activeTab === 'today' ? ' quest-page--today' : ''}`}
       eyebrow={t('questify.eyebrow', 'QUESTIFY — LIBER MISSIONUM')}
       title={t('questify.title')}
       subtitle={t('questify.subtitle')}
+      /* El alta es la acción de la PÁGINA, no un renglón más del cuerpo:
+         va en el encabezado, a la derecha, como en todo otro tomo. Antes
+         vivía centrada sobre una página alineada a la izquierda. */
+      headerExtra={(
+        <button
+          type="button"
+          className={`quest-add-toggle${showForm || editingTask ? ' quest-add-toggle--active' : ''}`}
+          onClick={() => { setShowForm(prev => !prev); if (editingTask) setEditingTask(null); }}
+          title={t('questify.addQuest')}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            {showForm || editingTask ? <path d="M4 8h8" /> : <><path d="M8 3v10" /><path d="M3 8h10" /></>}
+          </svg>
+          {showForm || editingTask ? t('questify.cancel', 'Cancelar') : t('questify.addQuest')}
+        </button>
+      )}
     >
       {/* ── Stats strip ──────────────────────────── */}
       {/* Inline help beside the strip — the old `sealed` bubble was absolutely
@@ -562,21 +608,6 @@ export default function TaskList() {
             shouldFocus={showForm || !!editingTask}
           />
         </div>
-      </div>
-
-      {/* ── Add quest toggle button ────────────── */}
-      <div className="quest-add-toggle-wrapper">
-        <button
-          type="button"
-          className={`quest-add-toggle${showForm || editingTask ? ' quest-add-toggle--active' : ''}`}
-          onClick={() => { setShowForm(prev => !prev); if (editingTask) setEditingTask(null); }}
-          title={t('questify.addQuest')}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            {showForm || editingTask ? <path d="M4 8h8" /> : <><path d="M8 3v10" /><path d="M3 8h10" /></>}
-          </svg>
-          {showForm || editingTask ? t('questify.cancel', 'Cancelar') : t('questify.addQuest')}
-        </button>
       </div>
 
       {/* ── Tabs + filters bar ───────────────────── */}
@@ -865,9 +896,12 @@ export default function TaskList() {
           <QBDividerSection />
 
           {/* Campaigns (project progress) */}
-          <Section title={t('questify.campaigns', 'CAMPAÑAS')} icon={<MapIcon width={12} height={12} style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('questify.campaignsHelp', 'Progreso de tus proyectos activos. Cada tarea completada avanza la barra del proyecto.')} />}>
+          <Section title={t('questify.campaigns', 'CAMPAÑAS')} icon={<MapIcon width={12} height={12} style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('questify.campaignsHelp', 'Progreso de tus proyectos activos. Cada misión completada avanza la barra del proyecto.')} />}>
             {campaignData.length === 0 ? (
-              <p className="quest-empty" style={{ padding: 8 }}>{t('questify.noCampaigns', 'Sin campañas activas')}</p>
+              <div className="quest-empty quest-empty--inline">
+                <MapIcon width={24} height={24} aria-hidden="true" />
+                <p>{t('questify.noCampaigns', 'Sin campañas activas')}</p>
+              </div>
             ) : (
               campaignData.map((c, i) => {
                 const tones: Array<'rubric' | 'sage' | 'gold' | 'ink'> = ['rubric', 'sage', 'gold', 'ink'];
@@ -989,7 +1023,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
   const subCount = subtasks.length;
   const doneCount = subtasks.filter(s => s.status).length;
   if (subCount > 0) {
-    meta.push(`${doneCount}/${subCount} ${t('questify.subtasksLabel', 'subtareas')}`);
+    meta.push(`${doneCount}/${subCount} ${t('questify.subtasksLabel', 'pasos')}`);
   }
 
   return (

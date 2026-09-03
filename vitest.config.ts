@@ -36,6 +36,12 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'browser',
+          // Montar una pantalla entera en un Chromium real no entra en los 5 s
+          // por defecto de vitest, y con la máquina cargada tampoco en 15 s: se
+          // caía con «Test timed out» en suites que pasan sueltas, y el falso
+          // negativo se leía como regresión. Va en la config y no en el script
+          // de package.json para que valga también en CI y en el IDE.
+          testTimeout: 60_000,
           include: ['tests/visual/**/*.test.tsx'],
           // El subárbol mobile corre en su propio project (abajo), con otro
           // viewport y el define de Android.
@@ -57,6 +63,9 @@ export default defineConfig({
         define: { __HUBTIFY_PLATFORM__: '"android"' },
         test: {
           name: 'browser-mobile',
+          // Misma razón que en `browser`: el project móvil es el que más sufre
+          // la contención (13 archivos que montan el shell entero).
+          testTimeout: 60_000,
           include: ['tests/visual/mobile/**/*.test.tsx'],
           browser: {
             enabled: true,

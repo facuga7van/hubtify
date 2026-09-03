@@ -85,7 +85,10 @@
   background: var(--leather);
   border: 1px solid rgba(168, 138, 60, 0.25);
   border-left: none;
-  color: var(--gold);
+  /* contrast-ok: chevron del riel, contenido no textual (3:1). --gold daba
+     4.38:1 sobre --leather y 2.35:1 al 40% de opacidad; --gold-light da
+     6.23:1, o sea 3.09:1 en reposo y 4.66:1 con el sidebar bajo el puntero */
+  color: var(--gold-light);
   cursor: pointer;
   opacity: 0.4;
   width: 20px;
@@ -291,9 +294,13 @@
   transition: opacity .2s .05s, max-height .3s;
 }
 
+/* 200 px era el alto exacto del bloque de entonces, y `overflow: hidden` con
+   `max-height` no avisa: recorta. Con el rótulo «indultos» visible y la línea
+   de reglas de la racha el bloque pide ~40 px más, así que la tapa sube a un
+   valor que sigue siendo generoso para la transición sin cortar nada. */
 .sidebar:not(.sidebar--collapsed) .sidebar-bars {
   opacity: 1;
-  max-height: 200px;
+  max-height: 280px;
 }
 
 /* Sin `gap` el rótulo y el valor se tocaban: a 220 px de riel se leía
@@ -312,6 +319,30 @@
   font-family: 'IM Fell English SC', serif;
   letter-spacing: .18em;
   color: rgba(245,231,192,.85);
+  display: inline-flex;
+  align-items: center;
+}
+
+.sidebar-bar__help.help-bubble-inline {
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  margin-right: 0;
+  top: 0;
+}
+
+.sidebar-bar__help.help-bubble-inline > svg {
+  width: 9px;
+  height: 9px;
+}
+
+/* El blanco de toque del sello mide 32 px y es `position: absolute`: dentro
+   del riel de 220-260 px eso SUMA al scrollWidth de la fila y dispara las
+   aserciones de «no hay desborde». 24 px sigue siendo un blanco decente para
+   un glifo de 14 y sobresale 5 px por lado, no 9. */
+.sidebar-bar__help.help-bubble-inline::after {
+  width: 24px;
+  height: 24px;
 }
 
 .sidebar-bar__val {
@@ -421,7 +452,7 @@
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold daba 4.38:1 sobre --leather */
 }
 
 .sidebar-nav-item__label {
@@ -431,6 +462,15 @@
   opacity: 0;
   transform: translateX(-4px);
   transition: opacity .2s .05s, transform .25s;
+}
+
+/* La función del ítem («temporizador de enfoque», no «Caldero»). En escritorio
+   viaja por `aria-label`, `title` y el tooltip del riel colapsado: pintarla
+   sumaría ~135 px de alto a un riel que ya pelea por entrar en 620 px de
+   ventana. En el cajón del teléfono no hay hover NINGUNO y sí hay alto, así
+   que ahí sí se pinta (regla al final de esta hoja). */
+.sidebar-nav-item__desc {
+  display: none;
 }
 
 .sidebar:not(.sidebar--collapsed) .sidebar-nav-item__label {
@@ -451,7 +491,7 @@
 }
 
 .sidebar-nav-item:hover .sidebar-nav-item__ico {
-  color: var(--gold-light);
+  color: var(--parch-0);  /* el renglon entero pasa a pergamino en hover */
 }
 
 .sidebar--collapsed .sidebar-nav-item:hover {
@@ -464,8 +504,11 @@
   color: var(--parch-0);
 }
 
+/* El icono activo estaba en --rubric-light: 2.09:1 sobre el cuero, por debajo
+   incluso del 3:1 de contenido no textual. El rojo del estado activo ya lo
+   llevan el borde izquierdo y el degrade del fondo. */
 .sidebar-nav-item.active .sidebar-nav-item__ico {
-  color: var(--rubric-light);
+  color: var(--parch-0);
 }
 
 .sidebar--collapsed .sidebar-nav-item.active {
@@ -560,7 +603,7 @@
   overflow: hidden;
   transition: opacity .2s .05s, max-height .3s;
   font-family: 'IM Fell English', serif;
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold daba 4.38:1 sobre --leather */
 }
 
 .sidebar:not(.sidebar--collapsed) .sidebar-footer {
@@ -640,9 +683,19 @@
    que cortaba «Recompensas» por la mitad.
    La coma es un OR: las mismas métricas para una ventana angosta o baja. */
 @media (max-width: 900px), (max-height: 900px) {
+  /* 6px → 5px: en el riel angosto (220 px) el rótulo «indultos» empuja la fila
+     de la racha a un segundo renglón, y un píxel de padding por fila —nueve
+     filas, dieciocho píxeles— es más barato que dejar a los indultos como un
+     escudito con un número y nada más. */
   .sidebar-nav-item {
-    padding: 6px 8px;
+    padding: 5px 8px;
     font-size: var(--fs-label);
+  }
+
+  /* Cuando la fila de la racha envuelve, los 10 px de `gap` se cobraban dos
+     veces (columna y fila). El de fila alcanza con 3. */
+  .sidebar-streak__meta {
+    gap: 3px 10px;
   }
 
   .sidebar-nav-item__label {
@@ -655,9 +708,12 @@
     gap: 6px;
   }
 
-  .sidebar-divider { margin: 3px 12px; }
+  .sidebar-divider { margin: 2px 12px; }
 
-  .sidebar-nav { padding: 2px 6px; }
+  /* Los últimos 6 px que faltaban: 1 px de separación entre filas en vez de 2.
+     Las filas ya se distinguen por el hover y por el borde izquierdo del ítem
+     activo, no por el aire entre ellas. */
+  .sidebar-nav { padding: 2px 6px; gap: 1px; }
 
   .sidebar-footer { padding: 8px 12px 10px; gap: 6px; }
 }
@@ -680,6 +736,16 @@
   .sidebar-nav { gap: 0; padding: 1px 6px; }
   .sidebar-footer { padding: 6px 12px 8px; gap: 4px; }
   .sidebar-divider { margin: 2px 12px; }
+}
+
+/* La regla de la racha ocupa dos renglones y el riel de escritorio ya pelea
+   por entrar sin scroll (medido: 36 px de más a 1200x720). Por debajo de
+   780 px de viewport se paga con ella, igual que con «faltan N niveles»: en
+   ESCRITORIO la explicación sigue disponible por `title=`, porque el
+   escritorio sí tiene hover. En el teléfono no se paga nunca — el cajón mide
+   844 px y, por las dudas, la regla de más abajo la reimpone. */
+@media (max-height: 780px) {
+  .sidebar-streak__rule { display: none; }
 }
 
 /* Si aun así hay que scrollear, que no parezca roto: barra fina, del tema, y
@@ -757,7 +823,7 @@
 }
 
 .account-dropdown__item--add {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1; el acento lo lleva el peso */
   font-weight: 600;
 }
 
@@ -780,7 +846,7 @@
   justify-content: center;
   font-size: var(--fs-label);
   font-weight: 700;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* la inicial es texto: --gold-dark daba 3.84:1 */
   flex-shrink: 0;
 }
 
@@ -818,7 +884,7 @@
    El bloque vive dentro de .sidebar-bar de la racha. La Posada opaca la barra
    (pausada, no rota) y el boton es el unico control del sistema: un click. */
 .sidebar-bar--resting .sidebar-bar__track { opacity: 0.45; }
-.sidebar-bar--resting .sidebar-bar__label { color: var(--gold); }
+.sidebar-bar--resting .sidebar-bar__label { color: var(--gold-light); }  /* --gold: 4.38:1 sobre cuero */
 
 /* Estaba en `--ink-faded` (#6b5535), un marrón OSCURO, sobre el cuero OSCURO
    del sidebar: 1.7:1 de contraste. El récord de racha es un dato, no una marca
@@ -829,12 +895,25 @@
   white-space: nowrap;
 }
 
+/* Con el rótulo «indultos» a la vista los tres controles ya no entran en una
+   sola línea de 196 px (riel angosto). Envuelven en vez de recortarse. */
 .sidebar-streak__meta {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 10px 10px;
   margin-top: 4px;
+}
+
+/* La regla de la racha, VISIBLE y sin hover: --parch-3 sobre el cuero más
+   oscuro del degradé (rgb(42,29,14)) da 6.15:1, y 5.43:1 sobre --leather. */
+.sidebar-streak__rule {
+  margin-top: 4px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  line-height: 1.3;
+  color: var(--parch-3);
 }
 
 /* La Posada se queda a la derecha; indultos y récord se agrupan a la izquierda. */
@@ -905,12 +984,10 @@
   font-size: var(--fs-hero);
 }
 
-/* Estaba `position: absolute; right: 0; bottom: 0`: encima del título. */
-[data-shell="mobile"] .main-content .page-header__actions {
-  position: static;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
+/* Acá vivía `[data-shell="mobile"] .main-content .page-header__actions`, que
+   corregía el `position: absolute` de `src/shared/components/PageHeader.tsx`.
+   Ese componente ya no existe (ver el comentario de `components.css:425`) y
+   ningún `.tsx` pinta esa clase: selector muerto, barrido. */
 
 [data-shell="mobile"] .main-content .settings-row {
   flex-wrap: wrap;
@@ -997,6 +1074,39 @@
    no tocar el riel de 56 px del escritorio. */
 :root[data-shell="mobile"] .sidebar:not(.sidebar--collapsed) .sidebar-nav-item {
   min-height: var(--touch-min);
+}
+
+/* ── La función del ítem, pintada (solo teléfono) ─────
+   El cajón es la ÚNICA navegación del teléfono y ahí `title=` no existe: un
+   ícono de caldero más la palabra «Caldero» no dicen «temporizador de
+   enfoque». El renglón cuelga del mismo botón (envuelve a una segunda línea),
+   así que no agrega ningún blanco de toque nuevo ni rompe el mínimo de 44 px.
+   --parch-3 sobre el cuero: 6.15:1 contra rgb(42,29,14), 5.43:1 contra
+   --leather. Piso tipográfico: --fs-label (13 px). */
+:root[data-shell="mobile"] .sidebar:not(.sidebar--collapsed) .sidebar-nav-item {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+/* En el teléfono la regla de la racha NO se negocia: `title=` no existe en
+   touch y el cajón es la única navegación de las once pantallas. */
+:root[data-shell="mobile"] .sidebar .sidebar-streak__rule {
+  display: block;
+}
+
+:root[data-shell="mobile"] .sidebar:not(.sidebar--collapsed) .sidebar-nav-item__desc {
+  display: block;
+  flex: 1 0 100%;
+  /* 20 px de ícono + los 12 px de `gap`: la segunda línea arranca bajo el
+     rótulo, no bajo el ícono. */
+  margin-left: 32px;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  line-height: 1.3;
+  white-space: normal;
+  color: var(--parch-3);
 }
 
 :root[data-shell="mobile"] .sidebar .notif-bell,

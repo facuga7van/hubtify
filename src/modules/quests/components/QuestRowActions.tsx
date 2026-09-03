@@ -270,7 +270,16 @@ export default function QuestRowActions({
         document.body,
       )}
 
-      {/* Batch selection — visually separated from the per-row actions */}
+      {/* Batch selection — visually separated from the per-row actions.
+
+          Era un CUADRADO con tilde, en rubric/ink-faded: exactamente el mismo
+          dibujo y los mismos colores que el `QuillCheckbox` de completar, dos
+          controles distintos leyéndose como duplicados en la misma fila
+          (rúbrica C7). Ahora es un DISCO —la marca de cera del que elige, no
+          la casilla del que cumple— y su estado marcado es oro macizo, no un
+          tilde rojo. La forma y el color viven en `quests.css`
+          (`.quest-row-select`), no en atributos, para que el estado se lea del
+          `aria-checked` y no de un ternario en el JSX. */}
       <span className="quest-row-select-divider" aria-hidden="true" />
       <button
         type="button"
@@ -278,13 +287,11 @@ export default function QuestRowActions({
         onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
         role="checkbox"
         aria-checked={selected}
-        aria-label={t('questify.selectTask', 'Seleccionar misión')}
-        title={t('questify.selectTask', 'Seleccionar misión')}
+        aria-label={t('questify.selectTask', 'Marcar para acciones en lote')}
+        title={t('questify.selectTask', 'Marcar para acciones en lote')}
       >
-        <svg width="20" height="20" viewBox="0 0 14 14" aria-hidden="true"
-          fill="none" stroke={selected ? 'var(--rubric)' : 'var(--ink-faded)'} strokeWidth="1.3">
-          <rect x="1" y="1" width="12" height="12" rx="1"/>
-          {selected && <path d="M3.5 7l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round"/>}
+        <svg width="20" height="20" viewBox="0 0 14 14" aria-hidden="true" strokeWidth="1.3">
+          <circle cx="7" cy="7" r="5.4" />
         </svg>
       </button>
     </div>

@@ -5,6 +5,7 @@ import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import Sidebar from './Sidebar';
 import NotificationBell from '../shared/components/NotificationBell';
+import SyncStatusChip from '../shared/components/SyncStatusChip';
 import { MenuLines } from '../shared/components/icons';
 import { useModalA11y } from '../shared/hooks/useModalA11y';
 import { hasCapacitorBridge } from '../shared/platform-detect';
@@ -124,6 +125,9 @@ export default function MobileShell({ stats, onBellClick, onToggleInn, children 
         {/* La página conserva su propio h1; la cabecera es chrome. */}
         <div className="mobile-header__title" role="heading" aria-level={2}>{t(titleKey, titleFallback)}</div>
         <div className="mobile-header__actions">
+          {/* Al lado de la campana: es la única señal de sync que ve el teléfono
+              sin entrar a Ajustes (tres taps, y ahí el sello es el del pull). */}
+          <SyncStatusChip />
           <NotificationBell onClick={onBellClick} />
         </div>
       </header>
