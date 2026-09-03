@@ -47,8 +47,9 @@ enforces the ink/parchment ratios.
 |----------|-----|--------|-------|
 | `--rubric` | `#7a1e1e` | ![](https://via.placeholder.com/16/7a1e1e/7a1e1e) | Danger, HP, warnings |
 | `--rubric-light` | `#a43030` | ![](https://via.placeholder.com/16/a43030/a43030) | Hover states |
-| `--moss` | `#556b3c` | ![](https://via.placeholder.com/16/556b3c/556b3c) | Success, XP, growth |
+| `--moss` | `#40522c` | ![](https://via.placeholder.com/16/40522c/40522c) | Success, XP, growth |
 | `--moss-light` | `#6b8a4c` | ![](https://via.placeholder.com/16/6b8a4c/6b8a4c) | Hover/highlight |
+| `--moss-dark` | `#2e3c20` | ![](https://via.placeholder.com/16/2e3c20/2e3c20) | One step below `--moss` (XP bar stripe) |
 | `--gold` | `#a88a3c` | ![](https://via.placeholder.com/16/a88a3c/a88a3c) | Primary accent, nav |
 | `--gold-light` | `#c4a84e` | ![](https://via.placeholder.com/16/c4a84e/c4a84e) | Active/focus |
 | `--gold-dark` | `#8a7030` | ![](https://via.placeholder.com/16/8a7030/8a7030) | Borders, shadows |
@@ -249,7 +250,9 @@ native mobile, so `AuthPage` and `Onboarding` lose it too.
 | `--z-modal` | `5000` | Full modals |
 | `--z-toast` | `8000` | XP/feedback toasts |
 | `--z-dropdown-top` | `9000` | Account dropdown, tooltips |
+| `--z-page-transition` | `9400` | Page-flip cover (must stay under the tour) |
 | `--z-tour` | `9500` | Onboarding tour |
+| `--z-confirm` | `10001` | Confirm dialog (above modals and tour) |
 | `--z-system-toast` | `10003` | System toast (topmost) |
 
 ---
@@ -303,7 +306,7 @@ native mobile, so `AuthPage` and `Onboarding` lose it too.
 | Sidebar | `linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%)` | Navigation |
 | Wax Seal | `radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%)` | Seal elements |
 | HP Bar | `repeating-linear-gradient(135deg, var(--rubric) 0 4px, #5a1414 4px 8px)` | Health bar fill |
-| XP Bar | `repeating-linear-gradient(135deg, var(--moss) 0 4px, #3d4d2a 4px 8px)` | Experience bar fill |
+| XP Bar | `repeating-linear-gradient(135deg, var(--moss) 0 4px, var(--moss-dark) 4px 8px)` | Experience bar fill |
 | Gold Bar | `repeating-linear-gradient(135deg, var(--gold-light) 0 4px, var(--gold) 4px 8px)` | Gold bar fill |
 
 ---
@@ -846,6 +849,31 @@ icons on leather and no white strip — there are no runtime `StatusBar` calls.
   outline-offset: -2px;
 }
 ```
+
+### Contrast is a test, not a comment
+
+`tests/shared/css-ink-contrast.test.ts` sweeps **every** `.css` under `src/`,
+derives the forbidden ink tokens from the real values in `theme.css` (a token
+that reaches AA on **no** surface of a family cannot be the `color:` of text on
+that family), and measures each declaration against the surface its own block —
+or its nearest ancestor — declares. It exists because the "gold is not ink" rule
+above was written in prose, written again as a CSS comment, and still violated
+**333 lines below that same comment**, four times in one iteration.
+
+A deliberate sub-AA use is marked in the CSS with a reasoned escape on the line
+above the declaration (or above the selector, for the whole block):
+
+```css
+/* contrast-ok: icono de la cuenta, contenido no textual (3:1); 3.84:1 */
+color: var(--gold-dark);
+```
+
+The reason is **mandatory**, and an escape that no longer covers a sub-AA case
+fails too — a dead exception is how an exception list rots.
+
+`tests/shared/design-system-drift.test.ts` keeps this file and `theme.css` from
+diverging: every documented hex, type size and z-index must be the real one, and
+no colour or z-index token may live in `theme.css` without a row here.
 
 ### Touch Targets
 
