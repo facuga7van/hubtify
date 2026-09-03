@@ -910,3 +910,59 @@ movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
    árbol que esa medición auditó. Es el riesgo del formato: un criterio que
    nadie tocó se copia con su número viejo. De acá en más conviene volver a
    medir **los trece**, aunque la vuelta no los haya tocado.
+
+---
+
+## Addendum — 2026-09-03, después de `d27dfcb`
+
+**Esto no es una cuarta medición: no remonté el arnés.** Es la constancia de qué
+pasó con lo que esta sección dejó abierto, verificado leyendo el código y
+corriendo los gates.
+
+**Los tres chips «Hoy» que clavaban C2 están arreglados**, y con ellos los otros
+seis del barrido. Verificado en la hoja: `.quest-due--today` pasó a
+`background: var(--gold-light); color: var(--ink)`; `.shop-item__state` y
+`.nutri-event-midpoint` a `--ink-soft`; `.nutri-btn-primary` a `--gold-light`
+sobre su degradé, con el comentario que nombra a los tres hermanos que la
+segunda vuelta ya había curado. Los ratios que publica el informe del ejecutor
+(7,12 / 9,37 / 4,98) me dan **7,07 / 9,19 / 4,87** con la fórmula WCAG sobre los
+mismos tokens: **un 1–2 % más bajos, sin consecuencia** —todos siguen holgados
+sobre AA— pero conviene saber que las dos cuentas no coinciden al centésimo.
+
+**El barrido estático encontró 70 pares, no 7. Eso liquida mi propia nota de
+método.** Yo había escrito que medir sólo el primer render deja fuera la mitad
+de la app; es peor que eso. Un arnés sólo ve lo que un montaje concreto llega a
+dibujar: con datos de prueba, en una ruta, en un estado. `css-ink-contrast.test.ts`
+lee las 24 hojas y mide **cada declaración contra cada superficie que le puede
+tocar**, exista o no un montaje que la produzca — y donde yo vi 7, hay 70. De
+esos, 50 arreglados con tokens y 20 amnistiados por 19 escapes `contrast-ok:`
+con razón obligatoria. **La lección para la cuarta vuelta cambia**: el arnés de
+navegador sirve para lo que sólo existe en runtime (cajas, desbordes, opacidad
+heredada, estados desplegados); para el contraste, la unidad correcta es la
+**declaración**, no el nodo, y eso se barre en estático.
+
+**C2 se queda publicado en 8, y quiero ser explícito de por qué.** Todo indica
+que hoy daría 9 —los seis nodos que yo nombré están arreglados y hay un test que
+impide que vuelvan—, pero **no lo re-medí con el arnés**, y el 8 de esta tabla
+es un número medido, no inferido. No voy a escribir un 9 que no medí. Para
+cerrarlo hace falta exactamente esto: volver a correr el barrido de estados
+desplegados sobre las 10 pantallas de escritorio y las 11 del teléfono; si
+devuelve 0 fallos habilitados, C2 es 9 y los promedios pasan a **7,9 / 8,0**.
+Mientras tanto, **los promedios publicados siguen siendo 7,8 (escritorio) y
+7,9 (teléfono)**.
+
+**Corrección a un dato mío.** Atribuí a `.quest-project-header-name` un fallo de
+3,84:1. Es falso: en el mismo árbol que medí (`2b5f948`) esa clase ya declaraba
+`color: var(--ink)` (#2a1d0e), única regla que la toca, ~13:1 sobre pergamino.
+El fallo era de otro elemento de la fila y mi clasificador se lo colgó a esa
+clase. **No cambia el veredicto**: los otros dos «Hoy» (`.quest-due--today` ×2)
+eran reales, y dos fallos en una pantalla ya rompen el «≤1 por pantalla» que
+pide el 9. Queda como recordatorio de que identificar un nodo por
+`clase + texto` no alcanza cuando la fila repite ambos.
+
+**Gates, corridos por mí:** tsc 0 · shared-logic 0 · `npm test` **2001/2001**
+(169 archivos) · `test:visual` **327/327**. `test:visual:mobile` **66/66**,
+pero **sólo con `--testTimeout=60000`**: con el default de 15 s me dio 8 y
+después 1 fallo, todos por `Test timed out`, la contención que la nota de método
+de la primera vuelta ya había señalado. No es una regresión; es una trampa del
+comando corto que conviene no repetir en un informe.
