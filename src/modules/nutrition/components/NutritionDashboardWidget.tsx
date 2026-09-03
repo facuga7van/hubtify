@@ -15,6 +15,7 @@ import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import { notifyNutritionChanged } from '../notify';
 import type { NutritionProfile } from '../types';
 import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-create';
+import { pickQuickMeals, type QuickMealSource, type FavoriteLike, type FrequentLike } from '../quick-meals';
 
 export default function NutritionDashboardWidget() {
   const { t } = useTranslation();
@@ -43,6 +44,9 @@ export default function NutritionDashboardWidget() {
   // Cached with the profile the widget already loads: the widget must write its
   // logs to the SAME day the backend counts them on (see nutrition-day.ts).
   const [dayCutoffHour, setDayCutoffHour] = useState(0);
+  /** Favoritos + frecuentes, ya fusionados y deduplicados. */
+  const [quickMeals, setQuickMeals] = useState<QuickMealSource[]>([]);
+  const [repeating, setRepeating] = useState(false);
 
   /** Same meal resolution the full page uses, so widget entries are not orphaned with a "?". */
   const resolveNowMeal = useCallback(() => {
@@ -58,12 +62,17 @@ export default function NutritionDashboardWidget() {
       window.api.nutritionGetWeekCalories(),
       window.api.nutritionGetMealSchedule(),
       window.api.nutritionGetProfile(),
-    ]).then(([c, t, wk, schedule, prof]) => {
+      // Los atajos vivían sólo dentro de /nutrition: desde el hub, hasta el
+      // café de todos los días pagaba un viaje a la Cloud Function.
+      window.api.nutritionGetFavoriteFoods().catch(() => []),
+      window.api.nutritionGetFrequentFoods().catch(() => []),
+    ]).then(([c, t, wk, schedule, prof, favs, freqs]) => {
       setCalories(c);
       setTarget(t);
       setWeekCalories(wk);
       setMealSchedule(schedule ?? null);
       setDayCutoffHour((prof as NutritionProfile | null)?.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR);
+      setQuickMeals(pickQuickMeals(favs as FavoriteLike[], freqs as FrequentLike[]));
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
@@ -183,6 +192,70 @@ export default function NutritionDashboardWidget() {
     }
   });
 
+  /** Un toque, cero red: la comida ya está descrita y contada. */
+  const handleQuickMeal = (meal: QuickMealSource) => withLogGuard(async () => {
+    try {
+      await window.api.nutritionLogFood({
+        date: nutritionToday(dayCutoffHour),
+        description: meal.description,
+        calories: meal.calories,
+        source: meal.kind === 'favorite' ? 'favorite' : 'frequent',
+        aiBreakdown: meal.aiBreakdown ?? undefined,
+        proteinG: meal.proteinG ?? null,
+        carbsG: meal.carbsG ?? null,
+        fatG: meal.fatG ?? null,
+        meal: resolveNowMeal(),
+      });
+      if (meal.frequentId != null) {
+        await window.api.nutritionIncrementFrequentUsage(meal.frequentId).catch(() => undefined);
+      }
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+      });
+      toast({ type: 'nutri', message: `+${meal.calories} kcal` });
+      loadData();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
+    } catch (err) {
+      toast({ type: 'warning', message: logErrorMessage(err) });
+    }
+  });
+
+  /** El día entero de ayer, copiado. El atajo más barato que existe. */
+  const handleRepeatYesterday = async () => {
+    if (repeating) return;
+    setRepeating(true);
+    try {
+      const res = await window.api.nutritionCopyDay({ to: nutritionToday(dayCutoffHour) });
+      if (!res?.success) {
+        toast({
+          type: 'info',
+          message: t('nutrify.repeatYesterdayEmpty', 'Ayer no registraste ninguna comida.'),
+        });
+        return;
+      }
+      // Un solo evento por la copia entera, igual que en /nutrition: copiar un
+      // día no vale un MEAL_LOGGED por plato.
+      await window.api.processRpgEvent({
+        type: 'MEAL_LOGGED', moduleId: 'nutrition',
+        payload: { xp: 10, hp: 0, source: 'copy_day', copied: res.copied },
+        timestamp: Date.now(),
+      });
+      toast({
+        type: 'nutri',
+        message: t('nutrify.repeatYesterdayDone', 'Comidas de ayer copiadas'),
+      });
+      loadData();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+      notifyNutritionChanged();
+    } catch (err) {
+      toast({ type: 'warning', message: logErrorMessage(err) });
+    } finally {
+      setRepeating(false);
+    }
+  };
+
   const handleDismiss = () => {
     setEstimation(null);
     setFoodInput('');
@@ -288,6 +361,38 @@ export default function NutritionDashboardWidget() {
           </Rune>
         )}
       </div>
+
+      {/* Atajos de repetición: un toque, cero red. Vivían sólo dentro de
+          /nutrition, así que desde el hub hasta el café de todos los días
+          pagaba un viaje a la Cloud Function (35 s de timeout). */}
+      {(quickMeals.length > 0 || calories === 0) && (
+        <div className="nutri-dash-repeat">
+          {quickMeals.map((meal) => (
+            <button
+              key={meal.key}
+              type="button"
+              className="nutri-btn nutri-pill nutri-dash-repeat__pill"
+              disabled={logging}
+              onClick={() => handleQuickMeal(meal)}
+              title={t('nutrify.favoriteLogTitle', 'Registrar {{name}} ({{kcal}} kcal)', {
+                name: meal.description, kcal: meal.calories,
+              })}
+            >
+              <span className="nutri-dash-repeat__name">{meal.description}</span>
+              <span className="nutri-dash-repeat__kcal qb-numeral">{meal.calories}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="nutri-btn nutri-btn-sm nutri-dash-repeat__yesterday"
+            disabled={repeating || logging}
+            onClick={handleRepeatYesterday}
+            title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
+          >
+            {t('nutrify.repeatYesterday', 'Repetir ayer')}
+          </button>
+        </div>
+      )}
 
       {/* Quick-estimate toggle */}
       <div className="nutri-dash-quick-toggle">

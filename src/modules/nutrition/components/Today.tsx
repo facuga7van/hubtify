@@ -1565,6 +1565,23 @@ export default function Today() {
         </div>
       )}
 
+      {/* «Repetir ayer» vivía DENTRO de la tarjeta de favoritos, que sólo se
+          renderiza cuando ya hay un favorito guardado: el atajo para no tipear
+          estaba escondido detrás de haber usado otro atajo. Ahora vive solo. */}
+      {!dayClosed && (
+        <div className="nutri-card nutri-repeat-card">
+          <button
+            type="button"
+            className="nutri-btn nutri-btn-sm"
+            onClick={handleRepeatYesterday}
+            disabled={logging}
+            title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
+          >
+            {t('nutrify.repeatYesterday', 'Repetir ayer')}
+          </button>
+        </div>
+      )}
+
       {/* ── Favorite Foods ─────────────────────────── */}
       {!dayClosed && favoriteFoods.length > 0 && (
         <div className="nutri-card">
@@ -1582,17 +1599,6 @@ export default function Today() {
           </h3>
           {showFavorites && (
             <>
-              <div className="nutri-portion-chips">
-                <button
-                  type="button"
-                  className="nutri-btn nutri-btn-sm"
-                  onClick={handleRepeatYesterday}
-                  disabled={!!dayClosed || logging}
-                  title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
-                >
-                  {t('nutrify.repeatYesterday', 'Repetir ayer')}
-                </button>
-              </div>
               <div className="nutri-frequent-pills">
                 {favoriteFoods.map((f) => (
                   <span key={f.id} className="nutri-fav-pill">

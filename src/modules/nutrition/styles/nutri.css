@@ -3423,3 +3423,52 @@
 .nutri-dash-plain-total .qb-hand {
   font-size: var(--fs-label);
 }
+
+/* «Repetir ayer», ahora por su cuenta: vivía dentro de la tarjeta de favoritos,
+   que sólo aparece cuando ya hay un favorito guardado. */
+.nutri-repeat-card {
+  display: flex;
+  justify-content: flex-start;
+  padding: 10px 12px;
+}
+
+[data-shell="mobile"] .nutri-repeat-card .nutri-btn {
+  min-height: 44px;
+  width: 100%;
+}
+
+/* ── Atajos de repetición en el widget del hub ──────
+   Favoritos + frecuentes + «Repetir ayer»: un toque, cero red. Vivían sólo
+   dentro de /nutrition, a un cambio de ruta de distancia. */
+.nutri-dash-repeat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.nutri-dash-repeat__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.nutri-dash-repeat__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14ch;
+}
+
+.nutri-dash-repeat__kcal {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-label);
+}
+
+[data-shell="mobile"] .nutri-dash-repeat__pill,
+[data-shell="mobile"] .nutri-dash-repeat__yesterday {
+  min-height: 44px;
+}
