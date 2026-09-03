@@ -2,6 +2,7 @@ import { genId } from '../ids';
 import type { SqlDatabase } from '../db';
 import type { ExpenseBreakdown, ExpenseBreakdownByCurrency } from '../../shared/types';
 import { todayDateString } from '../../shared/date-utils';
+import { getEntryDefaults } from './finance-defaults';
 import {
   buildIpcCoefficients,
   coefficientDetail,
@@ -459,6 +460,8 @@ export interface RecurringTemplate {
   accountId?: string | null;
   /** `YYYY-MM` the cadence is anchored on; `null` = month of `createdAt`. */
   anchorMonth?: string | null;
+  /** Medio de pago de cada instancia generada. `null` = sin opinión: se infiere. */
+  paymentMethod?: string | null;
 }
 
 /**
@@ -541,7 +544,8 @@ export function generateRecurringForMonth(
   const actives = db.prepare(`
     SELECT id, name, type, amount, currency, category, billing_day AS billingDay,
            frequency, created_at AS createdAt,
-           account_id AS accountId, anchor_month AS anchorMonth
+           account_id AS accountId, anchor_month AS anchorMonth,
+           payment_method AS paymentMethod
     FROM finance_recurring
     WHERE deleted_at IS NULL AND active = 1
   `).all() as RecurringTemplate[];
@@ -559,14 +563,31 @@ export function generateRecurringForMonth(
   // account_id is inherited from the template: a generated rent that belongs
   // to no account never moved the chest, so "Total en cuentas" stayed at the
   // starting balance while the month said −$200.000.
+  /**
+   * `payment_method` era la constante `'cash'`: la plantilla no tenía dónde
+   * guardar el medio, así que las 17 filas de efectivo de la base real las
+   * inventó este INSERT, no una persona. Ahora sale de la plantilla, y si la
+   * plantilla no opina, del historial del usuario.
+   */
   const insertStmt = db.prepare(`
     INSERT OR IGNORE INTO finance_transactions
       (id, type, amount, currency, category, description, date, payment_method,
        source, installments, installment_group_id, for_third_party, recurring_id,
        import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source,
        account_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'recurring', 1, NULL, 0, ?, NULL, NULL, 1, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'recurring', 1, NULL, 0, ?, NULL, NULL, 1, ?, ?, ?, ?, ?)
   `);
+
+  // Una sola vez por corrida, y solo si hace falta: la moda del historial no
+  // cambia entre dos plantillas del mismo mes.
+  let inferredMethod: string | null = null;
+  const methodFor = (rec: RecurringTemplate): string => {
+    const own = typeof rec.paymentMethod === 'string' && rec.paymentMethod.trim() !== ''
+      ? rec.paymentMethod.trim() : null;
+    if (own) return own;
+    if (inferredMethod === null) inferredMethod = getEntryDefaults(db, RESERVED_CATEGORIES).paymentMethod;
+    return inferredMethod;
+  };
 
   const now = nowIso();
   const today = todayDateString();
@@ -595,6 +616,7 @@ export function generateRecurringForMonth(
         rec.category ?? 'Otros',
         rec.name,
         date,
+        methodFor(rec),
         rec.id,
         fxRate,
         fxRate === null ? null : fxRateSourceFor(date, today),

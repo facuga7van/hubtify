@@ -173,9 +173,9 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       resetCapture();
       let closed = false;
       render(
-        <ToastProvider><ConfirmProvider>
+        <MemoryRouter><ToastProvider><ConfirmProvider>
           <CodexSealModal date={today} onClose={() => { closed = true; }} onSelectDate={() => {}} />
-        </ConfirmProvider></ToastProvider>,
+        </ConfirmProvider></ToastProvider></MemoryRouter>,
       );
       await settle(1400);
 
@@ -234,6 +234,80 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       expect(closed).toBe(true);
     });
   }
+
+  /* La página del día mide ~1000 px: SIEMPRE hay que scrollear para llegar al
+     lacre. Con el scroll en `.codex-modal` y la X en `position: absolute`
+     contra ese mismo elemento, la cruz se iba con el contenido y quedaba fuera
+     de pantalla justo después de sellar. En escritorio zafabas con Escape o el
+     backdrop; en touch no hay teclado y el modal ocupa 96vw, así que quedabas
+     encerrado. Este test fija las dos mitades del arreglo. */
+  test('la salida sigue a mano después de scrollear hasta el lacre', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    render(
+      <MemoryRouter><ToastProvider><ConfirmProvider>
+        <CodexSealModal date={today} onClose={() => {}} onSelectDate={() => {}} />
+      </ConfirmProvider></ToastProvider></MemoryRouter>,
+    );
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    const scroller = dlg.querySelector('.codex-modal__scroll') as HTMLElement;
+    expect(scroller).not.toBeNull();
+
+    // El marco no scrollea; el que scrollea es el wrapper de adentro.
+    expect(dlg.scrollHeight - dlg.clientHeight).toBeLessThanOrEqual(1);
+    expect(scroller.scrollHeight - scroller.clientHeight).toBeGreaterThan(100);
+
+    scroller.scrollTop = scroller.scrollHeight;
+    await settle(120);
+
+    const close = dlg.querySelector('.codex-modal__close') as HTMLElement;
+    const box = insideViewport(close);
+    // eslint-disable-next-line no-console
+    console.log('CODEX SALIDA', JSON.stringify({ ...box, scrollTop: scroller.scrollTop }, null, 1));
+    expect(box.offTop).toBeLessThanOrEqual(1);
+    expect(box.offBottom).toBeLessThanOrEqual(1);
+    expect(box.offRight).toBeLessThanOrEqual(1);
+    // …y del tamaño de un dedo.
+    const r = close.getBoundingClientRect();
+    expect(Math.min(r.width, r.height)).toBeGreaterThanOrEqual(32);
+  });
+
+  test('la página ya sellada ofrece su propia salida, al pie del lacre', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    let closed = false;
+    installApi({
+      rpgGetDaySummary: () => Promise.resolve({
+        date: today, sealed: true, totalXp: 148, eventsCount: 7, maxCombo: 3,
+        modules: ['quests'], vigor: 84, streak: 9,
+        events: [{ moduleId: 'quests', eventType: 'TASK_COMPLETED', xpGained: 15, time: '09:12' }],
+      }),
+      rpgGetSeals: () => Promise.resolve([
+        { date: today, sealedAt: new Date().toISOString(), xpAwarded: 20 },
+      ]),
+    });
+    render(
+      <MemoryRouter><ToastProvider><ConfirmProvider>
+        <CodexSealModal date={today} onClose={() => { closed = true; }} onSelectDate={() => {}} />
+      </ConfirmProvider></ToastProvider></MemoryRouter>,
+    );
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    const exit = dlg.querySelector('.codex-sealed__exit') as HTMLButtonElement;
+    expect(exit).not.toBeNull();
+    expect(exit.textContent?.trim()).toBeTruthy();
+
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-codex-02-salida.png` });
+    resetCapture();
+
+    exit.click();
+    await settle(120);
+    expect(closed).toBe(true);
+  });
 });
 
 describe('Avisos de actualización', () => {

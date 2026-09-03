@@ -42,6 +42,21 @@ function expectNoHorizontalOverflow(tag: string) {
   expect(mainOverflowX()).toBeLessThanOrEqual(1);
 }
 
+/**
+ * Cuántos renglones ocupa el TEXTO de un botón.
+ *
+ * Estas dos comprobaciones (QA 0.9.0) medían `height <= 40` como atajo de «no
+ * se parte en dos renglones». El atajo se venció el 2026-09-03, cuando los
+ * botones del teléfono pasaron a tener 44 px de piso de toque (WCAG 2.5.5):
+ * un botón de un solo renglón mide 44 y el atajo lo daba por partido. Esto
+ * mide lo que la prueba siempre quiso medir: las cajas de línea del texto.
+ */
+function lineCount(el: HTMLElement): number {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  return range.getClientRects().length;
+}
+
 describe('Hub a 390×844', () => {
   test('Tabla del Aventurero', async () => {
     await setMobileViewport();
@@ -104,7 +119,9 @@ describe('Hub a 390×844', () => {
     await page.getByRole('button', { name: /Personalizar/i }).click();
     await settle(400);
     for (const btn of document.querySelectorAll<HTMLElement>('.hero-customize-actions .rpg-button')) {
-      expect(btn.getBoundingClientRect().height, `«${btn.textContent}» en dos renglones`).toBeLessThanOrEqual(40);
+      expect(lineCount(btn), `«${btn.textContent}» en dos renglones`).toBe(1);
+      // Y sigue siendo alcanzable con el pulgar.
+      expect(btn.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     }
   });
 
@@ -129,7 +146,8 @@ describe('Hub a 390×844', () => {
     // QA 0.9.0: «Nueva recompensa» no se parte en dos renglones.
     const add = document.querySelector('.rwd-add') as HTMLElement;
     expect(add).not.toBeNull();
-    expect(add.getBoundingClientRect().height).toBeLessThanOrEqual(40);
+    expect(lineCount(add), '«Nueva recompensa» en dos renglones').toBe(1);
+    expect(add.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
   });
 
   /* SET-01: sin teclado físico no hay atajos; la tarjeta «Atajos de teclado» sobra en Android. */

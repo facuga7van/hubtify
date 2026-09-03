@@ -50,7 +50,7 @@ export const WIDGET_DEFINITIONS: Record<string, WidgetDefinition> = {
     component: HabitsDashboardWidget as ComponentType<{ colSpan?: number }>,
     defaultColSpan: 2,
     titleKey: 'dashboard.moduleHabits',
-    titleFallback: 'Rituales Diarios',
+    titleFallback: 'Hábitos Diarios',
     tome: 'Tomus I-B',
     latin: 'De Ritibus Quotidianis',
     IconComponent: Flame,

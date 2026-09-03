@@ -20,7 +20,10 @@ export type PlatformMethod =
   | 'pickPdfText'
   | 'pickBinaryFile'
   | 'saveTextFile'
-  | 'saveBinaryFile';
+  | 'saveBinaryFile'
+  | 'applyNotificationPlan'
+  | 'exactAlarmState'
+  | 'requestExactAlarms';
 
 // ── UI → worker ────────────────────────────────────────────────────────────
 

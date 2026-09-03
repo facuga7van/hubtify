@@ -4,7 +4,7 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useToast } from '../../../shared/components/useToast';
 import { Tick } from '../../../shared/components/codex/CodexPrimitives';
 import { HeatmapCalendar, type CellLevel } from '../../../shared/components/charts/HeatmapCalendar';
-import { Shield } from '../../../shared/components/icons/CodexIcons';
+import { Shield, Flame } from '../../../shared/components/icons/CodexIcons';
 import type { HabitWithStreak, HabitFrequency } from '../types';
 import { MAX_HABIT_SHIELDS } from '../types';
 import { processHabitCheck, isHabitSettledToday } from '../utils';
@@ -329,10 +329,12 @@ export default function HabitTracker({ onXpGained }: Props) {
 
   if (habits.length === 0 && !adding) {
     return (
-      <div>
-        <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', marginBottom: 8 }}>
-          {t('questify.habitsEmptyHint', 'Rituales diarios o semanales que querés mantener.')}
-        </p>
+      /* El mismo hueco que el de las misiones: ícono del ritual, frase y
+         salida. Vivía con estilos inline sueltos, así que el módulo tenía
+         dos vacíos distintos a diez centímetros uno del otro. */
+      <div className="quest-empty quest-empty--inline">
+        <Flame width={28} height={28} aria-hidden="true" />
+        <p>{t('questify.habitsEmptyHint', 'Hábitos diarios o semanales que querés mantener.')}</p>
         <button type="button" className="qb-rune quest-rune-btn" onClick={() => setAdding(true)}>
           + {t('questify.addHabit')}
         </button>
@@ -669,9 +671,9 @@ export default function HabitTracker({ onXpGained }: Props) {
                   </div>
                 </div>
               ) : (
-                <p className="quest-empty" style={{ padding: 8, fontSize: 'var(--fs-label)' }}>
-                  {t('questify.heatmapEmpty', 'Todavía no hay actividad registrada.')}
-                </p>
+                <div className="quest-empty quest-empty--inline">
+                  <p>{t('questify.heatmapEmpty', 'Todavía no hay actividad registrada.')}</p>
+                </div>
               )}
             </div>
           )}

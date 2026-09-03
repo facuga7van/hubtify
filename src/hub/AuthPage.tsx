@@ -3,15 +3,23 @@ import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '../shared/AuthContext';
 import { Eye, EyeOff } from '../shared/components/icons';
 import TitleBar from '../shared/components/TitleBar';
+import { useGuestMode } from '../shared/guest';
+import './guest-mode.css';
 
 interface Props {
   onAuth: () => void;
+  /**
+   * «Entrar sin cuenta». Cuando no viene, el botón no se dibuja: el modo
+   * invitado es una decisión del contenedor, no de esta pantalla.
+   */
+  onGuest?: () => void;
   mode?: 'default' | 'addAccount';
   onBack?: () => void;
 }
 
-export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
+export default function AuthPage({ onAuth, onGuest, mode = 'default', onBack }: Props) {
   const { t } = useTranslation();
+  const alreadyGuest = useGuestMode();
   const { login, register, addAccount, forgotPassword } = useAuthContext();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgot, setIsForgot] = useState(false);
@@ -267,6 +275,19 @@ export default function AuthPage({ onAuth, mode = 'default', onBack }: Props) {
               <button onClick={enterForgotMode} className="auth-card__toggle">
                 {t('auth.forgotPassword', '¿Olvidaste tu contraseña?')}
               </button>
+            )}
+            {/* La puerta sin muro. No aparece en «agregar cuenta» ni en
+                «recuperar contraseña» (los dos ya están fuera de este bloque),
+                ni cuando el invitado vuelve justamente a vincular. */}
+            {onGuest && !alreadyGuest && (
+              <div className="auth-card__guest">
+                <button type="button" onClick={onGuest} className="auth-card__guest-btn">
+                  {t('guest.enter', 'Entrar sin cuenta')}
+                </button>
+                <p className="auth-card__guest-note">
+                  {t('guest.enterNote', 'Tus datos quedan solo en este dispositivo: sin respaldo en la nube ni sincronización con el teléfono. Podés vincular una cuenta cuando quieras y todo lo que cargaste se conserva.')}
+                </p>
+              </div>
             )}
           </div>
         )}

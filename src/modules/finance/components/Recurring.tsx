@@ -81,6 +81,10 @@ export default function Recurring() {
 
   const [items, setItems] = useState<RecurringRow[]>([]);
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
+  // El vacío se pintaba desde el primer frame — «no hay recurrentes» antes de
+  // preguntar — y una lectura fallida lo dejaba ahí, mintiendo, para siempre.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showCoinDrop, setShowCoinDrop] = useState(false);
@@ -115,9 +119,20 @@ export default function Recurring() {
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, AmountHistoryRow[]>>({});
 
-  const load = () => {
-    window.api.financeGetRecurring().then((rows) => setItems(rows as RecurringRow[]));
-  };
+  const load = useCallback(() => {
+    setLoadError(false);
+    window.api.financeGetRecurring()
+      .then((rows) => setItems(rows as RecurringRow[]))
+      .catch((err) => {
+        console.error('[Recurring] financeGetRecurring failed:', err);
+        setLoadError(true);
+        toast({ type: 'warning', message: t('coinify.loadError', 'Error al cargar datos') });
+      })
+      // Sólo la PRIMERA vuelta muestra esqueleto: un refresco después de pausar
+      // un recurrente no tiene por qué hacer parpadear la lista entera.
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Live accounts, to print the name next to each template. Empty while unwired. */
   const loadAccounts = useCallback(() => {
@@ -125,7 +140,7 @@ export default function Recurring() {
     getAccounts().then((rows) => setAccounts(rows ?? []));
   }, []);
 
-  useEffect(() => { load(); loadAccounts(); }, [loadAccounts]);
+  useEffect(() => { load(); loadAccounts(); }, [load, loadAccounts]);
 
   useEffect(() => {
     const handler = () => { load(); loadAccounts(); };
@@ -135,7 +150,7 @@ export default function Recurring() {
       window.removeEventListener('account:switched', handler);
       window.removeEventListener('finance:accountsChanged', handler);
     };
-  }, [loadAccounts]);
+  }, [load, loadAccounts]);
 
   const accountName = (id: string | null | undefined): string | null =>
     id ? (accounts.find((a) => a.id === id)?.name ?? null) : null;
@@ -402,10 +417,25 @@ export default function Recurring() {
       )}
 
       {/* List */}
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="coin-skeleton coin-skeleton--card" />
+      ) : loadError ? (
+        <div className="coin-load-error">
+          <p className="coin-load-error__text">{t('coinify.loadError', 'Error al cargar datos')}</p>
+          <button className="rpg-button" onClick={load}>{t('common.tryAgain', 'Intentar de nuevo')}</button>
+        </div>
+      ) : items.length === 0 ? (
+        /* Era el peor de los cinco huecos: le pedía al usuario «agregá gastos
+           fijos como alquiler» y le escondía el botón que hace exactamente eso,
+           arriba a la derecha de una barra de tres acciones. */
         <div className="coin-empty-codex">
-          <p>{t('coinify.noRecurring', 'No hay recurrentes configurados')}</p>
-          <p style={{ fontSize: 'var(--fs-label)', marginTop: 4 }}>{t('coinify.noRecurringHint', 'Agregá gastos fijos como alquiler, servicios o suscripciones')}</p>
+          <Scroll width={28} height={28} aria-hidden="true" />
+          <p className="coin-empty-codex__title">{t('coinify.noRecurring', 'No hay recurrentes configurados')}</p>
+          <p className="coin-empty-codex__desc">{t('coinify.noRecurringHint', 'Agregá gastos fijos como alquiler, servicios o suscripciones')}</p>
+          <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }}
+            onClick={() => setShowForm(true)}>
+            + {t('coinify.addRecurring', 'Agregar recurrente')}
+          </button>
         </div>
       ) : (
         <div className="coin-recurring-list">

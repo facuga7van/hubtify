@@ -92,7 +92,7 @@ function deriveVirtues(stats: PlayerStats, t: TFunction) {
   // Each virtue maps a real metric to a 0-100 pct scale
   const cap = (v: number, max: number) => Math.min(100, Math.round((v / max) * 100));
   return [
-    { name: t('character.virtueStrength', 'Fortaleza'), tip: t('character.virtueStrengthTip', 'Salud actual del héroe (HP)'), value: stats.hp, pct: cap(stats.hp, stats.maxHp), icon: Sword },
+    { name: t('character.virtueStrength', 'Fortaleza'), tip: t('character.virtueStrengthTip', 'Vigor actual del héroe'), value: stats.hp, pct: cap(stats.hp, stats.maxHp), icon: Sword },
     { name: t('character.virtueWisdom', 'Sabiduría'), tip: t('character.virtueWisdomTip', 'Misiones completadas en total'), value: Math.min(stats.totalTasks, 99), pct: cap(stats.totalTasks, 200), icon: Book },
     { name: t('character.virtueTemperance', 'Templanza'), tip: t('character.virtueTemperanceTip', 'Comidas registradas en total'), value: Math.min(stats.totalMeals, 99), pct: cap(stats.totalMeals, 300), icon: Scale },
     { name: t('character.virtueDexterity', 'Destreza'), tip: t('character.virtueDexterityTip', 'Combo diario: acciones variadas en un día'), value: stats.dailyCombo, pct: cap(stats.dailyCombo, 10), icon: Bow },
@@ -294,7 +294,7 @@ export default function CharacterPage() {
           <div className="hero-bars">
             <div>
               <div className="hero-bar-header">
-                <span className="qb-small-caps" style={{ color: 'var(--rubric)' }}>{t('rpg.vita', 'VITA')}</span>
+                <span className="qb-small-caps" style={{ color: 'var(--rubric)' }}>{t('rpg.vita', 'VIGOR')}</span>
                 <span className="qb-numeral" style={{ fontSize: 'var(--fs-label)' }}>{stats.hp} / {stats.maxHp}</span>
               </div>
               <Gauge value={stats.hp} max={stats.maxHp} tone="rubric" />
@@ -318,8 +318,17 @@ export default function CharacterPage() {
               until the rpg:getMasteries handler is wired. */}
           {masteries && (
             <div className="hero-masteries-block">
+              {/* Un bloque de progresión ENTERO —diez rangos, de Iniciado a
+                  Leyenda del Oficio— era el único de la ficha sin sello de
+                  ayuda, cuando sus cuatro vecinos (virtudes, libro de hechos,
+                  gesta reciente, camino de los títulos) sí lo tienen. La única
+                  pista era el `title=` de OTRO elemento. */}
               <div className="qb-small-caps hero-masteries-title">
-                {t('rpg.masteryTitle', 'Maestrías del oficio').toUpperCase()}
+                <span>{t('rpg.masteryTitle', 'Maestrías del oficio').toUpperCase()}</span>
+                <HelpBubble
+                  variant="inline"
+                  text={t('rpg.masteryHelp', 'Cada módulo tiene su propio oficio y sube por separado con el XP que ganás ahí. El nivel de leyenda de arriba es la suma de toda la cuenta.')}
+                />
               </div>
               <div className="hero-masteries">
                 {masteries.map((m) => (
@@ -409,7 +418,7 @@ export default function CharacterPage() {
               <Tooltip text={t('character.statStreakTip', 'Días consecutivos de actividad')}><StatBox label={t('character.statStreak', 'RACHA')} value={`${stats.streak}d`} /></Tooltip>
               <Tooltip text={t('character.statLevelTip', 'Nivel actual del héroe')}><StatBox label={t('character.statLevel', 'NIVEL')} value={levelDisplay} /></Tooltip>
               <Tooltip text={t('character.statTotalXpTip', 'Experiencia acumulada en total')}><StatBox label={t('character.statTotalXp', 'XP TOTAL')} value={formatNumber(xpTotal, locale)} /></Tooltip>
-              <Tooltip text={t('character.statMaxHpTip', 'Salud máxima del héroe')}><StatBox label={t('character.statMaxHp', 'SALUD MAX')} value={String(stats.maxHp)} /></Tooltip>
+              <Tooltip text={t('character.statMaxHpTip', 'Vigor máximo del héroe')}><StatBox label={t('character.statMaxHp', 'VIGOR MÁX')} value={String(stats.maxHp)} /></Tooltip>
             </div>
           </Section>
 

@@ -5,6 +5,7 @@ import { platform } from '../platform';
 import { todayDateString } from '../../shared/date-utils';
 import {
   CARD_PAYMENT_CATEGORY,
+  RESERVED_CATEGORIES,
   DEFAULT_CASH_ACCOUNT_ID,
   MAX_INSTALLMENTS,
   RECURRING_FREQUENCY_MONTHS,
@@ -45,6 +46,7 @@ import {
   softDeleteAccount,
   transferBetweenAccounts,
 } from './finance.balance';
+import { getEntryDefaults } from './finance-defaults';
 
 /** Uniform failure envelope for handlers that used to persist garbage or throw raw. */
 function fail(reason: string): { ok: false; reason: string } {
@@ -425,6 +427,14 @@ export function registerFinanceIpcHandlers(): void {
     return projection;
   });
 
+  /**
+   * El default del alta manual, inferido del historial (no una constante).
+   *
+   * El formulario arrancaba en efectivo y el usuario tiene CERO movimientos en
+   * efectivo cargados a mano: cada alta empezaba corrigiendo el medio de pago.
+   */
+  ipcHandle('finance:getEntryDefaults', () => getEntryDefaults(getDb(), RESERVED_CATEGORIES));
+
   // ── Categories ──────────────────────────────────────
 
   ipcHandle('finance:getCategories', () => {
@@ -541,7 +551,8 @@ export function registerFinanceIpcHandlers(): void {
   ipcHandle('finance:getCreditCards', () => {
     const db = getDb();
     return db.prepare(`
-      SELECT id, name, closing_day AS closingDay, due_day AS dueDay, created_at AS createdAt
+      SELECT id, name, closing_day AS closingDay, due_day AS dueDay,
+             last4, issuer, created_at AS createdAt
       FROM finance_credit_cards
       WHERE deleted_at IS NULL
       ORDER BY created_at ASC
@@ -556,7 +567,14 @@ export function registerFinanceIpcHandlers(): void {
     return day;
   }
 
-  ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number; dueDay?: number | null }) => {
+  /** `last4` / `issuer` los completa el import desde el papel; a mano son opcionales. */
+  function parseLast4(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return /^\d{4}$/.test(trimmed) ? trimmed : null;
+  }
+
+  ipcHandle('finance:addCreditCard', (_e, card: { name: string; closingDay: number; dueDay?: number | null; last4?: string | null; issuer?: string | null }) => {
     const name = parseNonEmptyString(card?.name);
     if (name === null) return fail('invalid_name');
     const closingDay = Number(card?.closingDay);
@@ -567,12 +585,13 @@ export function registerFinanceIpcHandlers(): void {
     const db = getDb();
     const id = genId();
     const now = nowIso();
-    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, due_day, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, name, closingDay, dueDay, now, now);
+    db.prepare('INSERT INTO finance_credit_cards (id, name, closing_day, due_day, last4, issuer, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, name, closingDay, dueDay, parseLast4(card?.last4),
+        typeof card?.issuer === 'string' && card.issuer.trim() !== '' ? card.issuer.trim() : null, now, now);
     return id;
   });
 
-  ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number; dueDay?: number | null }) => {
+  ipcHandle('finance:updateCreditCard', (_e, id: string, fields: { name?: string; closingDay?: number; dueDay?: number | null; last4?: string | null; issuer?: string | null }) => {
     const db = getDb();
     const now = nowIso();
     const sets: string[] = ['updated_at = ?'];
@@ -591,6 +610,11 @@ export function registerFinanceIpcHandlers(): void {
       const dueDay = parseDueDay(fields.dueDay);
       if (dueDay === 'invalid') return fail('invalid_due_day');
       sets.push('due_day = ?'); vals.push(dueDay);
+    }
+    if (fields.last4 !== undefined) { sets.push('last4 = ?'); vals.push(parseLast4(fields.last4)); }
+    if (fields.issuer !== undefined) {
+      sets.push('issuer = ?');
+      vals.push(typeof fields.issuer === 'string' && fields.issuer.trim() !== '' ? fields.issuer.trim() : null);
     }
     if (sets.length === 1) return { ok: true }; // only updated_at, no real changes
     vals.push(id);
@@ -832,6 +856,147 @@ export function registerFinanceIpcHandlers(): void {
     });
 
     return trx();
+  });
+
+  /**
+   * Guarda LOS NÚMEROS DEL PAPEL sobre un resumen que ya existe.
+   *
+   * `calculated_amount` (lo que Coinify suma con las filas que tiene) y
+   * `statement_total_ars` (lo que dice el banco) conviven a propósito y no se
+   * pisan: que difieran ES el dato, y de esa diferencia vive la conciliación.
+   *
+   * Efectos, todos en la misma transacción:
+   *  1. estampa los 11 campos del resumen;
+   *  2. completa la tarjeta con el cierre, el vencimiento, los últimos 4 y el
+   *     emisor que trae el papel — dejaban de tipearse;
+   *  3. **salda el resumen ANTERIOR** con el «SU PAGO» impreso, que es
+   *     exactamente el «total que pagué en el mes».
+   *
+   * Regla dura (precedente de las cuotas huérfanas): **nunca inventar datos.**
+   * Si el resumen del período no existe, no se crea; si el anterior no existe o
+   * ya está `paid`, no se toca. Un resumen que la app no vio nunca no se puede
+   * reconstruir desde una sola cifra sin adivinar qué había adentro.
+   */
+  ipcHandle('finance:saveStatementPaper', (_e, creditCardId: string, paper: {
+    period?: string;
+    closingDate?: string | null;
+    dueDate?: string | null;
+    totalArs?: number | null;
+    totalUsd?: number | null;
+    minimumArs?: number | null;
+    previousArs?: number | null;
+    previousUsd?: number | null;
+    priorPaymentArs?: number | null;
+    priorPaymentUsd?: number | null;
+    /** `true` cerró · `false` no cerró · `null`/ausente = no había checksum. */
+    reconciled?: boolean | null;
+    forecast?: unknown;
+    last4?: string | null;
+    issuer?: string | null;
+  }) => {
+    const db = getDb();
+    const period = typeof paper?.period === 'string' ? paper.period : '';
+    if (!isValidMonthString(period)) return fail('invalid_period');
+
+    const card = db.prepare(
+      'SELECT id FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL',
+    ).get(creditCardId) as { id: string } | undefined;
+    if (!card) return fail('credit_card_not_found');
+
+    const statement = db.prepare(`
+      SELECT id FROM finance_credit_card_statements
+      WHERE credit_card_id = ? AND period_month = ? AND deleted_at IS NULL
+    `).get(creditCardId, period) as { id: string } | undefined;
+    if (!statement) return fail('statement_not_found');
+
+    const num = (v: unknown): number | null =>
+      typeof v === 'number' && Number.isFinite(v) ? round2(v) : null;
+    /** Un día del mes válido a partir de una fecha completa del papel. */
+    const dayOf = (iso: unknown): number | null => {
+      if (typeof iso !== 'string') return null;
+      const m = iso.match(/^\d{4}-\d{2}-(\d{2})$/);
+      if (!m) return null;
+      const day = Number(m[1]);
+      return day >= 1 && day <= 31 ? day : null;
+    };
+
+    const now = nowIso();
+    const forecastJson = Array.isArray(paper.forecast) && paper.forecast.length > 0
+      ? JSON.stringify(paper.forecast)
+      : null;
+    const reconciled = paper.reconciled === true ? 1 : paper.reconciled === false ? 0 : null;
+
+    const trx = db.transaction(() => {
+      db.prepare(`
+        UPDATE finance_credit_card_statements
+        SET closing_date = ?, due_date = ?,
+            statement_total_ars = ?, statement_total_usd = ?,
+            minimum_payment_ars = ?,
+            previous_balance_ars = ?, previous_balance_usd = ?,
+            prior_payment_ars = ?, prior_payment_usd = ?,
+            reconciled = ?, forecast_json = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        typeof paper.closingDate === 'string' ? paper.closingDate : null,
+        typeof paper.dueDate === 'string' ? paper.dueDate : null,
+        num(paper.totalArs), num(paper.totalUsd), num(paper.minimumArs),
+        num(paper.previousArs), num(paper.previousUsd),
+        num(paper.priorPaymentArs), num(paper.priorPaymentUsd),
+        reconciled, forecastJson, now, statement.id,
+      );
+
+      // La tarjeta: solo lo que el papel efectivamente trae. Lo que no viene se
+      // deja como está — el silencio no borra.
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      const closingDay = dayOf(paper.closingDate);
+      const dueDay = dayOf(paper.dueDate);
+      if (closingDay !== null) { sets.push('closing_day = ?'); vals.push(closingDay); }
+      if (dueDay !== null) { sets.push('due_day = ?'); vals.push(dueDay); }
+      if (typeof paper.last4 === 'string' && /^\d{4}$/.test(paper.last4)) {
+        sets.push('last4 = ?'); vals.push(paper.last4);
+      }
+      if (typeof paper.issuer === 'string' && paper.issuer.trim() !== '') {
+        sets.push('issuer = ?'); vals.push(paper.issuer.trim());
+      }
+      if (sets.length > 0) {
+        sets.push('updated_at = ?'); vals.push(now, creditCardId);
+        db.prepare(`UPDATE finance_credit_cards SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+      }
+
+      // El resumen anterior, saldado con lo que el papel dice que se pagó.
+      const paidArs = num(paper.priorPaymentArs) ?? 0;
+      const paidUsd = num(paper.priorPaymentUsd) ?? 0;
+      if (paidArs <= 0 && paidUsd <= 0) return { settledPrevious: false };
+
+      const previousPeriod = addMonthsToMonth(period, -1);
+      const previous = db.prepare(`
+        SELECT id, status, transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
+        FROM finance_credit_card_statements
+        WHERE credit_card_id = ? AND period_month = ? AND deleted_at IS NULL
+      `).get(creditCardId, previousPeriod) as
+        { id: string; status: string; transactionId: string | null; transactionIdUsd: string | null } | undefined;
+
+      // No existe → no se fabrica. Ya pagado → es historia.
+      if (!previous || previous.status === 'paid') return { settledPrevious: false };
+
+      db.prepare(`
+        UPDATE finance_credit_card_statements
+        SET paid_amount = ?, paid_amount_usd = ?, status = 'paid', paid_date = ?, updated_at = ?
+        WHERE id = ?
+      `).run(paidArs, paidUsd, typeof paper.closingDate === 'string' ? paper.closingDate : todayDateString(), now, previous.id);
+
+      // El «Pago Tarjeta» del resumen anterior pasa a valer lo que se pagó de
+      // verdad, no lo que la app había calculado.
+      const updateTx = db.prepare('UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?');
+      if (previous.transactionId && paidArs > 0) updateTx.run(paidArs, now, previous.transactionId);
+      if (previous.transactionIdUsd && paidUsd > 0) updateTx.run(paidUsd, now, previous.transactionIdUsd);
+
+      return { settledPrevious: true };
+    });
+
+    const result = trx();
+    return { ok: true as const, statementId: statement.id, ...result };
   });
 
   /**
@@ -1285,6 +1450,10 @@ export function registerFinanceIpcHandlers(): void {
     description: string;
     installmentCount: number;
     installmentAmount: number;
+    /** Monto cuota por cuota, cuando repartir el total no da un número redondo
+     *  y la última se lleva el resto — mismo contrato que
+     *  `finance:createInstallmentGroup`. */
+    installmentAmounts?: number[];
     currency?: string;
     category?: string;
     startDate: string;
@@ -1298,13 +1467,17 @@ export function registerFinanceIpcHandlers(): void {
     const installmentCount = Number(data.installmentCount);
     if (!Number.isInteger(installmentCount) || installmentCount < 1) return fail('invalid_installment_count');
     if (installmentCount > MAX_INSTALLMENTS) return fail('too_many_installments');
-    const installmentAmount = parsePositiveAmount(data.installmentAmount);
-    if (installmentAmount === null) return fail('invalid_amount');
 
+    const amounts: number[] = [];
+    for (let i = 0; i < installmentCount; i++) {
+      const parsed = parsePositiveAmount(data.installmentAmounts?.[i] ?? data.installmentAmount);
+      if (parsed === null) return fail('invalid_amount');
+      amounts.push(parsed);
+    }
     const db = getDb();
     const currency = data.currency ?? 'ARS';
     const category = data.category ?? 'Otros';
-    const totalAmount = installmentCount * installmentAmount;
+    const totalAmount = round2(amounts.reduce((a, b) => a + b, 0));
     const groupId = genId();
     const loanId = genId();
     const fxRate = await captureFxRate(db);
@@ -1334,7 +1507,7 @@ export function registerFinanceIpcHandlers(): void {
       for (let i = 0; i < installmentCount; i++) {
         insertTx.run(
           genId(),
-          installmentAmount,
+          amounts[i],
           currency,
           category,
           `${data.description} (Cuota ${i + 1}/${installmentCount})`,

@@ -9,6 +9,9 @@ import InstallLocationBanner from './InstallLocationBanner';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull, SYNC_PUSH_FAILED_EVENT } from '../shared/sync';
+import { markSyncPending } from '../shared/sync-status';
+import { bindLifecycleSync } from './lifecycle-sync';
+import SyncStatusChip from '../shared/components/SyncStatusChip';
 import './styles/layout.css';
 import './styles/components.css';
 import './styles/shell.css';
@@ -415,6 +418,9 @@ export default function Layout() {
   const syncGenRef = useRef(0);
   const debouncedPush = useCallback(() => {
     if (!authUser) return;
+    // Hay trabajo local que todavía no viajó: el chip lo dice mientras dure la
+    // espera. Sin esto los 30 s de debounce son invisibles.
+    markSyncPending();
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     const gen = syncGenRef.current;
     syncTimeoutRef.current = setTimeout(async () => {
@@ -458,7 +464,13 @@ export default function Layout() {
     };
   }, [debouncedPush]);
 
-  // Push on blur (leaving app), pull on focus (coming back)
+  /* Push al irse, pull al volver.
+     En Android `blur`/`focus` de window NO llegan cuando otra Activity tapa el
+     WebView, así que el push quedaba colgando del setTimeout de 30 s —que muere
+     con el proceso— y el pull al volver simplemente no ocurría: con las dos
+     apps abiertas y quietas, el dato no cruzaba. bindLifecycleSync suma a esos
+     dos eventos los que emite native-shell.ts desde `appStateChange`, con el
+     MISMO handler: el throttle y el orden pull→push no se duplican. */
   useEffect(() => {
     if (!authUser) return;
     const onBlur = async () => {
@@ -495,12 +507,7 @@ export default function Layout() {
         if (result.changed) announcePulledData();
       } catch { /* Silent fail */ }
     };
-    window.addEventListener('blur', onBlur);
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.removeEventListener('blur', onBlur);
-      window.removeEventListener('focus', onFocus);
-    };
+    return bindLifecycleSync(window, { onEnterBackground: onBlur, onEnterForeground: onFocus });
   }, [authUser]);
 
   useEffect(() => {
@@ -510,6 +517,14 @@ export default function Layout() {
       const modEnabled = localStorage.getItem(`hubtify_notifications_module_${mod}`) !== 'false';
       window.api.notificationsSetModuleEnabled?.(mod, modEnabled);
     }
+    // La hora del recordatorio de hábitos también se empuja acá, no solo cuando
+    // se abre Ajustes: en Android esa hora es la de una ALARMA que el sistema va
+    // a disparar con la app cerrada, así que tiene que quedar armada al arrancar
+    // y no cuando el usuario pase por la pantalla de configuración.
+    window.api.notificationsSetHabitReminder?.(
+      localStorage.getItem('hubtify_habit_reminder_enabled') !== 'false',
+      localStorage.getItem('hubtify_habit_reminder_time') || '21:00',
+    );
     window.api.notificationsRunCheck?.();
   }, []);
 
@@ -541,8 +556,21 @@ export default function Layout() {
     retrySyncPull();
   }, [retrySyncPull]);
 
-  const levelUpOverlayRef = useRef<HTMLDivElement>(null);
+  /* El overlay de subida de nivel tapa la pantalla entera y era un <div> pelado:
+     sin `role`, sin nombre y sin salida de teclado. useModalA11y le da los tres
+     —Escape cierra, el foco entra y vuelve— y, de yapa, lo hace visible para el
+     botón atrás de Android, que busca exactamente
+     `[role="dialog"][aria-modal="true"]:not([inert])` (mobile/dialog-dom.ts:17-19)
+     y lo cierra con un Escape sintético. No toca la animación: GSAP sigue
+     animando el mismo nodo por el mismo ref, que ahora lo provee el hook.
+     El ref indirecto es por orden de declaración: el hook corre en render y
+     handleDismissLevelUp se define más abajo (necesita este mismo ref). */
   const levelUpTimelineRef = useRef<gsap.core.Timeline | null>(null);
+  const dismissLevelUpRef = useRef<() => void>(() => {});
+  const { dialogProps: levelUpDialogProps, containerRef: levelUpOverlayRef } = useModalA11y<HTMLDivElement>({
+    onClose: () => dismissLevelUpRef.current(),
+    active: levelUp !== null,
+  });
 
   useEffect(() => {
     if (stats && prevLevelRef.current > 0 && stats.level > prevLevelRef.current) {
@@ -571,7 +599,7 @@ export default function Layout() {
       levelUp,
       () => setLevelUp(null),
     );
-  }, [levelUp]);
+  }, [levelUp, levelUpOverlayRef]);
 
   const handleDismissLevelUp = useCallback(() => {
     if (!levelUpOverlayRef.current) return;
@@ -588,7 +616,9 @@ export default function Layout() {
         setLevelUp(null);
       },
     });
-  }, []);
+  }, [levelUpOverlayRef]);
+
+  useEffect(() => { dismissLevelUpRef.current = handleDismissLevelUp; }, [handleDismissLevelUp]);
 
   return (
     <AnimatedNavigateContext.Provider value={animatedNavigate}>
@@ -598,6 +628,12 @@ export default function Layout() {
     <TourProvider>
     <div className="shell-frame">
       <Shell stats={stats} onBellClick={() => setShowNotifications(true)} onToggleInn={handleToggleInn}>
+        {/* En escritorio el chip va acá, junto al banner de error de sync que
+            hasta ahora era la única señal —y solo ante el fallo—. En Android lo
+            monta MobileShell dentro de la cabecera de 56 px. */}
+        {shellKind === 'desktop' && (
+          <div className="sync-chip-row"><SyncStatusChip /></div>
+        )}
         {syncError && (
           <div role="alert" style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
@@ -618,7 +654,8 @@ export default function Layout() {
       {/* Level-up epic overlay — always in DOM when levelUp != null, hidden via display:none until GSAP shows it */}
       {levelUp !== null && (
         <div
-          ref={levelUpOverlayRef}
+          {...levelUpDialogProps}
+          aria-label={t('rpg.levelUpDialog', 'Subiste de nivel')}
           onClick={handleDismissLevelUp}
           style={{
             position: 'fixed', inset: 0, display: 'none',

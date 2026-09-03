@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XP_MAP, PROJECT_COLORS, type TaskTier, type Task, type Project } from '../types';
 import { TierBadge, TIER_LABEL } from '../utils';
@@ -10,6 +10,7 @@ import { parseQuickAdd, type QuickAddProjectRef } from '../quickadd-parser';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
 import HabitDayPicker from './HabitDayPicker';
+import { todayDateString } from '../../../../shared/date-utils';
 
 interface Props {
   editingTask: Task | null;
@@ -36,6 +37,15 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
   /** Chosen weekdays for freq 'days', in the picker's ISO numbering (1 = Monday). */
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [dismissedQuick, setDismissedQuick] = useState(false);
+  /**
+   * El proyecto que sugiere el historial, SOLO como respaldo.
+   *
+   * El contexto explícito manda: si el usuario está parado en un proyecto,
+   * `activeProjectId` gana siempre. Esto contesta el otro caso —la vista «Todos»,
+   * donde `activeProjectId` es `null`— que antes creaba misiones sin proyecto
+   * aunque 28 de las 37 vivas de la base real tengan uno.
+   */
+  const inferredProjectId = useRef<string | null>(null);
 
   const projectRefs = useMemo<QuickAddProjectRef[]>(
     () => projects.map((p) => ({ id: p.id, name: p.name })),
@@ -72,6 +82,26 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
     loadCategories(projectId);
   }, [projectId, loadCategories]);
 
+  // Se pide una sola vez al montar: mientras el formulario está abierto el
+  // historial no cambia lo suficiente como para justificar mover el select
+  // debajo de los dedos de nadie.
+  useEffect(() => {
+    // Canal nuevo: en un binding viejo simplemente no está, y el default vale.
+    const api = window.api as Partial<typeof window.api>;
+    if (typeof api.questsGetEntryDefaults !== 'function') return;
+    let cancelled = false;
+    api.questsGetEntryDefaults()
+      .then((d) => {
+        if (cancelled || !d) return;
+        inferredProjectId.current = d.projectId;
+        // Sólo rellena el hueco: nunca pisa una elección ni un contexto activo,
+        // y nunca toca el formulario de edición de una misión que ya existe.
+        setProjectId((prev) => (prev === null && !editingTask && activeProjectId == null ? d.projectId : prev));
+      })
+      .catch(() => { /* el default ya está puesto */ });
+    return () => { cancelled = true; };
+  }, [editingTask, activeProjectId]);
+
   useEffect(() => {
     setDismissedQuick(false);
     if (editingTask) {
@@ -86,9 +116,13 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       setRepeatFreq(rule?.freq ?? 'never');
       setRepeatDays(rule?.days ? rule.days.map(jsToIsoDay).sort((a, b) => a - b) : []);
     } else {
-      setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(''); setUseDate(false);
+      // Suggested, never imposed: the picker opens already on today, so putting
+      // a quest in "Hoy" costs one tick and zero typing — but the checkbox stays
+      // off, so nothing gets a date the user did not ask for.
+      setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(todayDateString()); setUseDate(false);
       setRepeatFreq('never'); setRepeatDays([]);
-      setProjectId(activeProjectId);
+      // El contexto explícito gana; el historial sólo contesta cuando no hay.
+      setProjectId(activeProjectId ?? inferredProjectId.current);
     }
   }, [editingTask, activeProjectId]);
 
@@ -132,10 +166,10 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     // No `questsEnsureCategory` call any more: categories are derived from
     // `tasks.category` (the handler is a no-op), so saving the task registers it.
-    setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(todayDateString()); setUseDate(false);
     setRepeatFreq('never'); setRepeatDays([]);
     setDismissedQuick(false);
-    setProjectId(activeProjectId);
+    setProjectId(activeProjectId ?? inferredProjectId.current);
     onSaved();
   };
 

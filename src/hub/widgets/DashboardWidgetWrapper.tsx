@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModuleCard } from '../../shared/components/codex';
+import ErrorBoundary from '../../shared/components/ErrorBoundary';
+import ErrorState from '../../shared/components/ErrorState';
 import { ResizeHorizontal, ResizeVertical } from '../../shared/components/icons/CodexIcons';
 import type { ColSpan, RowSpan } from './widget-registry';
 
@@ -130,11 +132,29 @@ export default function DashboardWidgetWrapper({
         icon={icon}
         navTo={navTo}
       >
-        {React.Children.map(children, child =>
-          React.isValidElement(child)
-            ? React.cloneElement(child as React.ReactElement<{ colSpan?: number; rowSpan?: number }>, { colSpan, rowSpan })
-            : child
-        )}
+        {/* Un boundary POR CUADRO. `ErrorBoundary` existía desde siempre y sólo
+            se usaba dos veces, las dos en la raíz de `App.tsx`: cualquier
+            excepción dentro de un widget del tablero se llevaba puesto el shell
+            entero —los otros cuatro cuadros, la barra lateral y todo—. Ahora el
+            que se rompe es el que se rompe, y se puede volver a intentar sin
+            recargar la app. */}
+        <ErrorBoundary
+          label={widgetId}
+          fallbackRender={(error, reset) => (
+            <ErrorState
+              compact
+              message={t('dashboard.widgetFailed', 'Este cuadro no se pudo dibujar.')}
+              detail={error?.message ?? null}
+              onRetry={reset}
+            />
+          )}
+        >
+          {React.Children.map(children, child =>
+            React.isValidElement(child)
+              ? React.cloneElement(child as React.ReactElement<{ colSpan?: number; rowSpan?: number }>, { colSpan, rowSpan })
+              : child
+          )}
+        </ErrorBoundary>
       </ModuleCard>
     </div>
   );

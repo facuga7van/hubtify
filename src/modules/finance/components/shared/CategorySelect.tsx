@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import CategoryManager from './CategoryManager';
 import { RESERVED_CATEGORIES } from '../../types';
+import { useToast } from '../../../../shared/components/useToast';
 
 interface CategorySelectProps {
   value: string;
@@ -11,6 +12,7 @@ interface CategorySelectProps {
 
 export function CategorySelect({ value, onChange, className }: CategorySelectProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [categories, setCategories] = useState<string[]>([]);
   const [showManager, setShowManager] = useState(false);
   const [open, setOpen] = useState(false);
@@ -31,12 +33,26 @@ export function CategorySelect({ value, onChange, className }: CategorySelectPro
    *
    * The current value is kept even when reserved, so editing an imported tax row
    * shows its real category instead of an empty field.
+   *
+   * El `.then()` iba pelado, sin `.catch()`. Con el puente caído —o con un
+   * binding viejo, que devuelve `null`— `cats.filter` reventaba DENTRO del
+   * `.then()`: una promesa rechazada sin dueño («TypeError: Cannot read
+   * properties of null (reading 'filter')»), el campo mudo y nadie avisado.
+   * Ahora degrada a lista vacía —se puede seguir escribiendo la categoría a
+   * mano— y lo dice con el mismo aviso que usa el resto del módulo.
    */
   const loadCategories = useCallback(() => {
-    window.api.financeGetCategories().then((cats: string[]) => {
-      setCategories(cats.filter((c) => !RESERVED_CATEGORIES.includes(c)));
-    });
-  }, []);
+    window.api.financeGetCategories()
+      .then((cats: string[]) => {
+        if (!Array.isArray(cats)) throw new TypeError('financeGetCategories no devolvió una lista');
+        setCategories(cats.filter((c) => !RESERVED_CATEGORIES.includes(c)));
+      })
+      .catch((err) => {
+        console.error('[CategorySelect] financeGetCategories failed:', err);
+        setCategories([]);
+        toast({ type: 'warning', message: t('coinify.loadError', 'Error al cargar datos') });
+      });
+  }, [toast, t]);
 
   useEffect(() => {
     loadCategories();

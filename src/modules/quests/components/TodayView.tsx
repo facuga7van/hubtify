@@ -8,7 +8,7 @@ import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
 import PostponeMenu from './PostponeMenu';
 import type { Task, Project, HabitWithStreak } from '../types';
-import { getDueDateStatus, TierBadge, processHabitCheck } from '../utils';
+import { dueTimeOf, bucketTodayTasks, UNDATED_TODAY_LIMIT, TierBadge, processHabitCheck } from '../utils';
 
 interface Props {
   /** Every pending task, unfiltered: this view deliberately ignores the filters. */
@@ -35,12 +35,6 @@ function ClockIcon() {
       <path d="M8 5v3.5l2.2 1.5" />
     </svg>
   );
-}
-
-/** 'YYYY-MM-DDTHH:mm' → 'HH:mm'. A bare date has no time to show. */
-function dueTimeOf(dueDate: string | null): string | null {
-  if (!dueDate || !dueDate.includes('T')) return null;
-  return dueDate.slice(11, 16);
 }
 
 /**
@@ -80,29 +74,9 @@ export default function TodayView({
     };
   }, [loadHabits]);
 
-  const pending = useMemo(() => tasks.filter((task) => !task.status), [tasks]);
-
-  const overdue = useMemo(
-    () => pending
-      .filter((task) => task.dueDate && getDueDateStatus(task.dueDate) === 'overdue')
-      .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')),
-    [pending],
-  );
-
-  /* Timed items first, in clock order — the day reads as a schedule and the
-     open-ended work sinks below it. */
-  const today = useMemo(
-    () => pending
-      .filter((task) => task.dueDate && getDueDateStatus(task.dueDate) === 'today')
-      .sort((a, b) => {
-        const at = dueTimeOf(a.dueDate);
-        const bt = dueTimeOf(b.dueDate);
-        if (at && bt) return at.localeCompare(bt);
-        if (at) return -1;
-        if (bt) return 1;
-        return a.order - b.order;
-      }),
-    [pending],
+  const { overdue, today, undated, undatedTotal } = useMemo(
+    () => bucketTodayTasks(tasks),
+    [tasks],
   );
 
   const pendingHabits = useMemo(() => habits.filter((h) => h.pendingToday), [habits]);
@@ -125,7 +99,8 @@ export default function TodayView({
 
   const projectOf = (task: Task) => projects.find((p) => p.id === task.projectId) ?? null;
 
-  const isClear = overdue.length === 0 && today.length === 0 && pendingHabits.length === 0;
+  const isClear = overdue.length === 0 && today.length === 0
+    && undated.length === 0 && pendingHabits.length === 0;
 
   /* One line per day, not per render: a phrase that reshuffles while you look
      at it reads as a glitch, not as a reward. */
@@ -213,9 +188,37 @@ export default function TodayView({
         </section>
       )}
 
+      {/* A quest with no date is still work. Hiding it is what left this tab
+          structurally empty (67 of 68 real quests carry no due_date). We show a
+          short head in the user's own ranking and point at the full backlog —
+          no date is ever invented on their behalf. */}
+      {undated.length > 0 && (
+        <section style={{ marginBottom: 12 }}>
+          <div className="quest-today-heading">
+            {t('questify.todayUndated', 'Sin fecha')}
+          </div>
+          {undated.map((task) => (
+            <TodayRow
+              key={task.id}
+              task={task}
+              project={projectOf(task)}
+              onComplete={() => onComplete(task)}
+              onPostpone={(target) => onPostpone(task.id, target)}
+            />
+          ))}
+          {undatedTotal > UNDATED_TODAY_LIMIT && (
+            <button type="button" className="qb-rune quest-rune-btn" onClick={onPlanAhead}>
+              {t('questify.todayUndatedMore', '+{{count}} sin fecha', {
+                count: undatedTotal - UNDATED_TODAY_LIMIT,
+              })}
+            </button>
+          )}
+        </section>
+      )}
+
       {pendingHabits.length > 0 && (
         <section>
-          <div className="quest-today-heading">{t('questify.todayHabits', 'Rituales de hoy')}</div>
+          <div className="quest-today-heading">{t('questify.todayHabits', 'Hábitos de hoy')}</div>
           {pendingHabits.map((habit) => (
             <div key={habit.id} className="quest-today-habit">
               <Tick checked={false} onChange={() => handleHabitCheck(habit.id)} label={habit.name} />
@@ -304,7 +307,7 @@ function TodayRow({ task, project, overdue, onComplete, onPostpone }: {
 
         {/* Rescheduling is the one escape a stale row needs, and it costs
             nothing (Fase 1): no XP, no penalty, no confirmation. */}
-        {overdue && onPostpone && (
+        {onPostpone && (
           <PostponeMenu
             onPick={onPostpone}
             className="quest-icon-btn tap-target"

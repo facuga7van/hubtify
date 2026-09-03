@@ -16,11 +16,12 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { useModalA11y } from '../../../shared/hooks/useModalA11y';
 import { CategorySelect } from './shared/CategorySelect';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
-import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark, Coin } from '../../../shared/components/icons';
+import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark, Coin, Scroll, Compass } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../utils/api-ext';
 import type { FinanceAccount } from '../types';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
+import { buildInstallmentGroupPayload, type AmountMode } from '../utils/installment-payload';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { emitMovementLogged, emitMovementDeleted } from '../utils/rpg-events';
 import { checkBudgetOverflow } from '../utils/budget-guards';
@@ -182,6 +183,19 @@ export default function Transactions() {
   const [exitingId, setExitingId] = useState<string | null>(null);
   const [enteringType, setEnteringType] = useState<TransactionType | null>(null);
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const quickAddRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * El CTA del hueco: abre la carga rápida Y la trae a la vista. El vacío decía
+   * «cargá un movimiento» y el control estaba fuera de pantalla, arriba.
+   */
+  const openQuickAdd = useCallback(() => {
+    setShowForm(true);
+    requestAnimationFrame(() => {
+      quickAddRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      quickAddRef.current?.querySelector<HTMLInputElement>('input, select')?.focus();
+    });
+  }, []);
 
   // Accordion collapsed state
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -358,23 +372,22 @@ export default function Transactions() {
   const handleAdd = async (data: {
     type: TransactionType; amount: number; category: string; description: string;
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
+    amountMode: AmountMode;
     creditCardId?: string;
     accountId?: string | null;
   }) => {
     try {
       // These handlers now answer `{ ok: false, reason }` for bad input instead
       // of writing garbage, so the result has to be checked before celebrating.
+      //
+      // El payload del plan se arma en `buildInstallmentGroupPayload`: acá se
+      // omitía `paymentMethod`, y sin él el handler evaluaba `isCreditCard` en
+      // false aunque el usuario hubiera elegido tarjeta — el plan quedaba sin
+      // tarjeta, descontaba del saldo y no llegaba a ningún resumen.
       const result = data.paymentMethod === 'credit_card' && data.installments > 1
-        ? await unwrap(window.api.financeCreateInstallmentGroup({
-          description: data.description || data.category,
-          totalAmount: data.amount * data.installments,
-          installmentCount: data.installments,
-          installmentAmount: data.amount,
-          currency: data.currency,
-          category: data.category,
-          startDate: data.date,
-          creditCardId: data.creditCardId,
-        }))
+        ? await unwrap(window.api.financeCreateInstallmentGroup(
+          buildInstallmentGroupPayload(data) as unknown as Record<string, unknown>,
+        ))
         : await unwrap(window.api.financeAddTransaction({
           type: data.type,
           amount: data.amount,
@@ -718,7 +731,7 @@ export default function Transactions() {
       </div>
 
       {/* Quick Add Form */}
-      <div className={`coin-quick-add-form ${showForm ? 'coin-quick-add-form--open' : 'coin-quick-add-form--closed'}`}>
+      <div ref={quickAddRef} className={`coin-quick-add-form ${showForm ? 'coin-quick-add-form--open' : 'coin-quick-add-form--closed'}`}>
         {showForm && <QuickAddForm onSubmit={handleAdd} defaultType={defaultType} />}
       </div>
 
@@ -746,7 +759,9 @@ export default function Transactions() {
         <button className="coin-sort-header" onClick={() => toggleSort('category')}>
           {t('coinify.colCategory', 'CATEGORÍA')} {sortIndicator('category')}
         </button>
-        <span className="coin-ledger-header__spacer" aria-hidden="true" />
+        {/* La cuarta columna llevaba el medio de pago SIN rótulo: la auditoría
+            de diseño marcó que «CATEGORÍA» parecía titular dos columnas. */}
+        <span className="coin-ledger-header__label">{t('coinify.colMethod', 'MEDIO')}</span>
         <button className="coin-sort-header coin-sort-header--amount" onClick={() => toggleSort('amount')}>
           {t('coinify.colAmount', 'MONTO')} {sortIndicator('amount')}
         </button>
@@ -810,16 +825,29 @@ export default function Transactions() {
             {sortedTx.length === 0 ? (
               <div className="coin-empty-codex">
                 {/* "Nothing matched your filters" and "this month is empty" are
-                    different problems and need different answers. */}
+                    different problems and need different answers. Los dos huecos
+                    llevan ícono, frase y el control ADENTRO: el vacío del mes era
+                    una sola línea en itálica y el botón de cargar estaba arriba,
+                    fuera del alcance del ojo que acaba de leer «sin movimientos». */}
                 {hasAnyFilter ? (
                   <>
-                    <p>{t('coinify.noMatchingTransactions', 'Ningún movimiento coincide con los filtros')}</p>
-                    <button className="rpg-button" style={{ fontSize: 'var(--fs-label)', marginTop: 6 }} onClick={clearFilters}>
+                    <Compass width={28} height={28} aria-hidden="true" />
+                    <p className="coin-empty-codex__title">{t('coinify.noMatchingTransactions', 'Ningún movimiento coincide con los filtros')}</p>
+                    <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }} onClick={clearFilters}>
                       {t('coinify.clearFilters', 'Limpiar filtros')}
                     </button>
                   </>
                 ) : (
-                  <p>{t('coinify.noTransactions', 'Sin transacciones este mes')}</p>
+                  <>
+                    <Coin width={28} height={28} aria-hidden="true" />
+                    <p className="coin-empty-codex__title">{t('coinify.noTransactions', 'Sin transacciones este mes')}</p>
+                    <p className="coin-empty-codex__desc">
+                      {t('coinify.noTransactionsHint', 'Cargá el primer movimiento del mes y el libro empieza a escribirse.')}
+                    </p>
+                    <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }} onClick={openQuickAdd}>
+                      + {t('coinify.quickAdd', 'Carga rápida')}
+                    </button>
+                  </>
                 )}
               </div>
             ) : (
@@ -848,7 +876,18 @@ export default function Transactions() {
       {!collapsedSections.has('recurring') && (
         <div className="coin-ledger">
           {filteredRecurringTx.length === 0 ? (
-            <p className="coin-empty-codex">{t('coinify.noTransactions')}</p>
+            /* El hueco de la sección Recurrentes decía «sin transacciones» y
+               nada más: ahora nombra dónde se configuran y lleva hasta ahí. */
+            <div className="coin-empty-codex">
+              <Scroll width={28} height={28} aria-hidden="true" />
+              <p className="coin-empty-codex__title">{t('coinify.noTransactions', 'Sin transacciones este mes')}</p>
+              <p className="coin-empty-codex__desc">
+                {t('coinify.noRecurringLedgerHint', 'El alquiler, los servicios y las suscripciones se cargan una vez y se generan solos.')}
+              </p>
+              <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }} onClick={() => navigate('/finance/recurring')}>
+                {t('coinify.manageRecurring', 'Ver recurrentes')}
+              </button>
+            </div>
           ) : (
             filteredRecurringTx.map((tx) => renderTxRow(tx))
           )}

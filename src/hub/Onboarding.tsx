@@ -28,7 +28,15 @@ const FONT_OPTIONS = [
   { value: '1.3', key: 'onboarding.fontXLarge' },
 ] as const;
 
-const TOTAL_STEPS = 4;
+/**
+ * Cinco pasos, no cuatro: Coinify no tenía NINGUNO.
+ *
+ * El contraste era el dato más fuerte de la auditoría: el onboarding le dedica
+ * un paso entero a Nutrify (seis campos y cálculo de TDEE) y cero al módulo más
+ * grande de la app. El paso nuevo no pide datos — ofrece un solo camino, el
+ * mismo que después vive en el panel vacío: importar el resumen.
+ */
+const TOTAL_STEPS = 5;
 
 export default function Onboarding({ onComplete }: Props) {
   const { t, i18n } = useTranslation();
@@ -142,6 +150,17 @@ export default function Onboarding({ onComplete }: Props) {
     onComplete();
   };
 
+  /**
+   * El onboarding termina y la app abre directamente en el importador. Es el
+   * embudo de un solo botón de Monarch: el compromiso declarado se cobra ahí
+   * mismo, no tres pantallas después.
+   */
+  const finishIntoImport = () => {
+    localStorage.setItem('hubtify_onboarded', 'true');
+    localStorage.setItem('hubtify_open_route', '/finance/import');
+    onComplete();
+  };
+
   const animClass = animDir === 'forward' ? 'onboarding-step-forward' : 'onboarding-step-back';
 
   // Was a <div role="switch" tabIndex={0}> with a hand-rolled key handler.
@@ -188,10 +207,15 @@ export default function Onboarding({ onComplete }: Props) {
               {/* Font scale */}
               <div className="onboarding__pref-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
                 <span className="onboarding__pref-label">{t('onboarding.fontScale')}</span>
+                {/* Decisión abierta nº5, cerrada: el tamaño de fuente elegido se
+                    marcaba con «pergamino tostado» y el idioma —diez centímetros
+                    más arriba— con cuero. Dos convenciones de «elegido» en la
+                    misma tarjeta. Gana el cuero, que es lo que usa el resto de la
+                    app (y lo que ya resolvió Ajustes con este mismo par). */}
                 <div className="onboarding__font-options">
                   {FONT_OPTIONS.map(({ value, key }) => (
                     <button key={value}
-                      className={`onboarding__font-btn${fontScale === value ? ' onboarding__font-btn--active' : ''}`}
+                      className={`rpg-button onboarding__font-btn${fontScale === value ? '' : ' onboarding__btn-dim'}`}
                       onClick={() => applyFontScale(value)}>
                       {t(key)}
                     </button>
@@ -354,8 +378,34 @@ export default function Onboarding({ onComplete }: Props) {
           </div>
         );
 
-      /* ──────────── STEP 3: Ready ──────────── */
+      /* ──────────── STEP 3: Coinify ──────────── */
       case 3:
+        return (
+          <div key="coinify" className={animClass} style={{ textAlign: 'center' }}>
+            <h2 className="onboarding__step-title">{t('onboarding.coinifySetup', 'Tu dinero')}</h2>
+            <p className="onboarding__tagline" style={{ marginBottom: 18 }}>
+              {t('onboarding.coinifySetupDesc', 'Coinify se llena solo desde el resumen de tu tarjeta: la tarjeta, el período, las cuotas en curso y el total del mes salen del PDF.')}
+            </p>
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--gold)"
+              strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"
+              style={{ marginBottom: 18 }} aria-hidden="true">
+              <path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /><path d="M9 12h6M9 15h6M9 18h3" />
+            </svg>
+            <div className="onboarding__nav-row">
+              <BackBtn target={2} />
+              {/* Un solo camino visible; la salida existe pero no compite. */}
+              <button className="rpg-button onboarding__primary-btn" onClick={finishIntoImport}>
+                {t('onboarding.coinifyImport', 'Importar mi resumen')}
+              </button>
+            </div>
+            <button type="button" className="onboarding__skip-all" onClick={() => goStep(4)}>
+              {t('onboarding.coinifyLater', 'Lo hago después')}
+            </button>
+          </div>
+        );
+
+      /* ──────────── STEP 4: Ready ──────────── */
+      case 4:
         return (
           <div key="ready" className={animClass} style={{ textAlign: 'center' }}>
             <svg className="onboarding__ready-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">

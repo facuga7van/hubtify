@@ -1,0 +1,53 @@
+Resumen N° VI00000000012345678
+Tarjeta Crédito VISA
+NOMBRE DE PRUEBA Responsable inscripto CUIT Banco: 30-00000000-0
+CALLE FALSA 123, CIUDAD DE PRUEBA, X0000XXX N° Cuenta: 0000000000 Sucursal: 000
+Resumen de tarjeta de credito VISA
+20251127071234567H
+Página 1 / 5
+18.192,00
+10,00
+30-Oct-25 07-Nov-25 27-Nov-25 05-Dic-25 31-Dic-25 09-Ene-26
+PAGO MINIMO LÍMITES
+En pesos
+$ 5.000,00
+De compras en un pago y en cuotas
+$ 900.000,00
+De financiación
+$ 450.000,00
+TASAS Nominal Anual
+En pesos 100,000% En dólares 50,000%
+Efectiva mensual
+En pesos 8,000% En dólares 4,000%
+CONSOLIDADO PESOS DÓLARES
+SALDO ANTERIOR 100.000,00 10,00
+04-11-25 SU PAGO EN PESOS -100.000,00
+05-11-25 SU PAGO EN USD -10,00
+07-11-25 DEV.IMP. RG 5617 30%( 1000,00) -300,00
+DETALLE DEL CONSUMO
+FECHA REFERENCIA CUOTA COMPROBANTE PESOS DÓLARES
+22-06-25 * TIENDA DEMO UNO 06/06 100001 1.000,00
+03-07-25 * TIENDA DEMO DOS 05/09 100002 2.000,00
+02-11-25 * SUSCRIPCION DEMO 100003 3.000,00
+12-11-25 K COMERCIO DEMO 01/03 100004 4.000,00
+21-11-25 TIENDA SIN MARCADOR 100007 5.000,00
+02-11-25 K SERVICIO USD DEMO P1abcdef USD 6,00 100005 6,00
+05-11-25 K OTRO USD DEMO 100006 USD 4,00 100006 4,00
+TARJETA 1234 Total Consumos de NOMBRE DE PRUEBA 15.000,00 10,00
+27-11-25 IMP DE SELLOS P/INT.FIN. $ 100,00
+27-11-25 INTERESES FINANCIACION $ 200,00
+27-11-25 DB IVA $ 21% 200,00 42,00
+27-11-25 IVA RG 4240 21%( 15000,00) 3.150,00
+TOTAL A PAGAR 18.192,00 10,00
+Plan V: abonando el pago mínimo de $ 5.000,00 usted puede cancelar en cuotas
+fijas su saldo financiable de $ 13.192,00 en:
+3 cuotas de $ 5.000,00 (TNA Fija: 100,000% - TEA: 200,000%) *
+CFTEA - Ejemplo: cada $ 1000, su CFTEA será:
+Cancelación anticipada: el importe de las cuotas se incluirá en el pago mínimo.
+Condiciones vigentes hasta el 5-12-25. Llame al 0810-222-CUOTAS (2868)
+Cuotas a vencer:
+Diciembre/25 Enero/26 Febrero/26 Marzo/26 Abril/26 Mayo/26
+$1.000,00 $2.000,00 $3.000,00 $4.000,00 $5.000,00 $6.000,00
+A partir de Junio/26 $7.000,00
+Las nuevas comisiones vigentes a partir de noviembre 2025 son: Renovación
+Anual: Nacional / Regional $100.000; Internacional $100.000; Gold $200.000.

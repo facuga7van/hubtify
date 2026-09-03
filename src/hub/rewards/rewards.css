@@ -4,18 +4,40 @@
    Reuses the codex language (parchment, gold, rubric ink); no new vocabulary.
    ══════════════════════════════════════════════════════ */
 
-/* Medida de lectura del mostrador. Ver la nota en RewardsPage.tsx: sin esto la
-   página se estira a los 1380 px de una ventana maximizada y cada fila queda
-   partida en dos extremos con medio metro de pergamino en el medio. */
+/* El techo de 880 px arreglaba la fila (ver la nota en RewardsPage.tsx: sin él
+   cada fila quedaba partida en dos extremos con medio metro de pergamino en el
+   medio) y creaba otro problema: a 1640 la página usaba el 55 % del ancho, todo
+   apilado contra el borde izquierdo, sin margen que lo explicara (C4 = 5).
+
+   La salida no es angostar la página sino DOBLARLA. La fila conserva su medida
+   —el mínimo de la pista manda—, y cuando el ancho da para dos, el mostrador
+   pasa a dos columnas: la misma tinta, el doble de página aprovechada. Con
+   menos de ~1000 px de contenido `auto-fill` devuelve una sola columna, así que
+   el escritorio angosto y el teléfono no cambian. */
 .rwd-page {
-  max-width: 880px;
+  max-width: none;
+}
+
+.rwd-list,
+.shop-list {
+  display: grid;
+  /* `min(460px, 100%)` y no `460px` pelado: un `minmax` con mínimo fijo NO se
+     achica por debajo de ese mínimo, así que a 390 px la única pista seguía
+     midiendo 460 y la página desbordaba 82 px de costado. */
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
+  column-gap: 28px;
 }
 
 /* ── the purse (balance) ──────────────────────────── */
 
+/* La bolsa es una tarjeta, no una banda: `fit-content` la deja del tamaño de lo
+   que dice (moneda + saldo + el pie de ganados/gastados) en vez de estirarla a
+   los 1324 px de la página con todo apretado contra el borde izquierdo. */
 .rwd-purse {
   position: relative;
   display: flex;
+  width: fit-content;
+  max-width: 100%;
   align-items: center;
   gap: 16px;
   padding: 14px 18px;
@@ -33,6 +55,8 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
+  /* contrast-ok: ícono de la bolsa grabado sobre su propio disco dorado, no
+     texto; rige el 3:1 de contenido no textual (WCAG 1.4.11) y da 3.84:1 */
   color: var(--gold-dark);
   background: radial-gradient(circle at 38% 32%, rgba(230, 205, 130, 0.9) 0%, rgba(196, 168, 78, 0.7) 55%, rgba(138, 112, 48, 0.75) 100%);
   border: 1px solid var(--gold-dark);
@@ -44,7 +68,10 @@
   min-width: 0;
 }
 
-.rwd-purse__label { color: var(--gold-dark); }
+/* --gold-dark sobre pergamino es 3.84 / 3.26 / 2.55 (--parch-0/1/2): el oro no
+   es tinta. El rótulo pasa a --ink-soft (9.37 / 7.95 / 6.21); el oro sigue
+   siendo el color del ícono de la bolsa y de los bordes. */
+.rwd-purse__label { color: var(--ink-soft); }
 
 .rwd-purse__value {
   display: inline-flex;
@@ -82,6 +109,8 @@
 
 .rwd-burst__coin {
   display: inline-flex;
+  /* contrast-ok: monedas de la micro-ceremonia; GSAP las mueve y se apagan
+     solas, no llevan informacion que no este en el saldo de al lado */
   color: var(--gold-dark);
   opacity: 0;
 }
@@ -146,7 +175,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   font-size: var(--fs-sub);
   white-space: nowrap;
 }
@@ -165,13 +194,15 @@
   gap: 4px;
 }
 
+/* Editar / borrar: 24×24 quedaban por debajo del piso de control (32 px) y a
+   --ink-faded casi no se veían en la captura de la auditoría. */
 .rwd-item__tool {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  color: var(--ink-faded);
+  color: var(--ink-soft);
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -191,8 +222,11 @@
 
 /* ── inline form (create / edit) ──────────────────── */
 
+/* El alta es un formulario, no una banda: sin techo, el campo «Recompensa»
+   medía 1150 px para escribir «Café». */
 .rwd-form {
   margin-bottom: 12px;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -213,7 +247,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* ídem .rwd-item__cost */
 }
 
 .rwd-form__cost-input { width: 110px; }
@@ -356,7 +390,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   font-size: var(--fs-sub);
   white-space: nowrap;
 }
@@ -373,7 +407,9 @@
 .shop-item__buy--on { opacity: 0.85; }
 
 .shop-item__state {
-  color: var(--gold-dark);
+  /* El caso testigo: la regla estaba escrita 333 líneas más arriba, en esta
+     misma hoja, y este selector la seguía violando. --gold-dark daba 3.84:1. */
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -401,6 +437,7 @@
 
 .rwd-empty {
   margin: 8px 0;
+  max-width: var(--measure);
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-body);
   color: var(--ink-soft);
@@ -448,4 +485,11 @@
     width: 40px;
     height: 40px;
   }
+}
+
+/* ── Teléfono: área de toque ──────────────────────── */
+[data-shell="mobile"] .rwd-tab,
+[data-shell="mobile"] .rwd-item__tool {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
 }

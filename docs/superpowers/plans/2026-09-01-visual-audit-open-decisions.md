@@ -1,7 +1,7 @@
 # Auditoría visual — decisiones abiertas
 
-Estado: **la 1 resuelta (2026-09-02); 2–6 pendientes**. Anotado el 2026-09-01,
-después de publicar la v0.8.2.
+Estado: **la 1 resuelta (2026-09-02), la 2, la 5 y la 6 resueltas (2026-09-03);
+3 y 4 pendientes**. Anotado el 2026-09-01, después de publicar la v0.8.2.
 
 Lo que sigue NO son bugs sin arreglar: son las seis cosas que la auditoría visual
 dejó sobre la mesa porque la decisión es de diseño, no técnica, y tomarla solo
@@ -68,6 +68,51 @@ Arrancar el degradé en `--leather` da 7.07:1, y le saca el brillo al botón fir
 de la app. **Decisión estética.** Alternativa intermedia: mover la primera parada
 apenas, hasta cruzar 4.5:1 sin apagar el relieve.
 
+**RESUELTA (2026-09-03): el degradé arranca en `--leather` y el relieve vuelve
+por el filo, no por el fondo.**
+
+```css
+background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+color: var(--gold-light);
+box-shadow: inset 0 1px 0 rgba(245, 231, 192, 0.14), 0 2px 4px rgba(42,29,14,.3);
+```
+
+Ratios WCAG 2.x medidos sobre CADA parada del degradé, que es lo que ve el ojo:
+
+| `--gold-light` `#c4a84e` sobre | ratio | veredicto |
+|---|---|---|
+| `--leather-light` `#5c3a1e` (parada vieja) | **4.36** | fallaba |
+| `--leather` `#3a2513` (parada nueva, la peor) | **6.23** | cumple |
+| `--leather-dark` `#2a1d0e` (parada de abajo) | **7.07** | cumple |
+
+Por qué no la «alternativa intermedia»: se midió. El punto MÁS CLARO de la
+rampa `--leather → --leather-light` que cruza 4.5:1 es `#59381d` con **4.511:1**
+— 92.6 % del camino hacia `--leather-light`, indistinguible a ojo del valor que
+fallaba y con 0.011 de margen. Un token nuevo para eso es deuda, no diseño.
+
+El relieve —lo que la decisión temía perder— no vivía en la parada clara del
+degradé: vive en el filo de arriba. Un `inset 0 1px 0` de pergamino al 14 % lo
+devuelve, y no es fondo de texto (el texto tiene 8 px de padding), así que no
+entra en la cuenta del contraste. El `:hover` y el `:active` pisan el
+`box-shadow` completo, o sea que el filo se apaga al apretar: el botón se hunde.
+
+Mismo tratamiento en `.rpg-btn-sm`, `.player-card__level-badge` y
+`.notif-action-go`, que copiaban el degradé viejo.
+
+**Vigilado por** `tests/shared/theme-contrast.test.ts`: lee el degradé real de
+`.rpg-button` y de `.rpg-btn-sm` en `components.css`, resuelve cada `var()`
+contra `theme.css` y exige 4.5:1 en TODAS las paradas. Si alguien vuelve a
+arrancar en `--leather-light`, el test lo caza.
+
+Corolario que salió de la misma medición: **el oro no es tinta.** `--gold` sobre
+pergamino da 2.68 / 2.27 / 1.78 (`--parch-0/1/2`) y `--gold-dark` 3.84 / 3.26 /
+2.55; el punto de la rampa dorada que cumple sobre `--parch-2` ya es un marrón
+oliva indistinguible de `--ink-soft`. El oro queda para bordes, íconos y
+ornamento; el texto usa `--ink-soft` o `--ink-faded`. Y al revés: sobre oro, la
+parada peor de `--gold → --gold-dark` es `--gold-dark` (3.47:1 con `--ink`), así
+que las superficies doradas CON texto arrancan en `--gold-light` y terminan en
+`--gold` (4.97:1).
+
 ## 3. ¿Ajustes centrado, o pegado a la izquierda como el resto?
 
 `src/hub/styles/shell.css:70-75`
@@ -106,6 +151,31 @@ para el mismo concepto, a diez centímetros una de otra.
 Elegir una y aplicarla a las dos. El cuero es el que ya usa el resto de la app
 para «activo».
 
+**RESUELTA (2026-09-03): gana el cuero, en las dos.**
+
+El tamaño de fuente usaba una clase base entera y propia —`.onboarding__font-btn`
+(`components.css`), con `--active` en «pergamino tostado» (`rgba(168,138,60,.2)`
++ `font-weight: bold`)— mientras el idioma, diez centímetros más arriba, usaba
+`.rpg-button` pelado para el elegido y `.rpg-button.onboarding__btn-dim`
+(pergamino) para el resto. Ahora los cuatro botones de tamaño usan **ese mismo
+par**, que es el que ya había resuelto bien Ajustes (`SettingsPage.tsx:231-261`
+con `.settings-btn--dim`, idéntico a `.onboarding__btn-dim` y con un comentario
+que lo dice).
+
+Por qué el cuero y no el pergamino: el cuero es la superficie con la que la app
+entera dice «activo» (`.rpg-button` sin más), y ya cumple AA desde la decisión
+nº2 (6.23:1 en la parada peor). El pergamino tostado, además, competía con
+`.onboarding__btn-dim` —también pergamino— así que «elegido» y «no elegido» se
+distinguían por medio tono.
+
+`.onboarding__font-btn` sobrevive **sin pintar nada**: sólo reparte el ancho de
+la tarjeta de 560 px (`flex: 1 1 auto` con `flex-basis: auto`, para que la fila
+envuelva en vez de partir la palabra) y da el padding. Medido a 1640 y a 390: los
+cuatro entran, ninguno recorta su rótulo, el piso de 13 px se mantiene y en
+teléfono heredan los 44 px de `[data-shell="mobile"] .rpg-button`. Vigilado por
+`tests/visual/audit-hub-density.browser.test.tsx`, que compara el `background-image`
+y el `color` computados del idioma elegido contra los del tamaño elegido.
+
 ## 6. El hueco de la crónica
 
 La crónica del dashboard quedó con las columnas alineadas (antes cada `<li>` era
@@ -115,6 +185,30 @@ ya se lee como libro mayor.
 
 Si molesta, la solución de imprenta es un **puntillado guía** entre el hecho y su
 cifra — lo que hace un índice de libro. No es un bug; es si querés el puntillado.
+
+**RESUELTA (2026-09-03): sí al puntillado.**
+
+Primero se midió, porque «~250 px» se quedaba corto. A 1640×900, con el arnés de
+la rúbrica, el hueco entre el último glifo del hecho y el borde izquierdo de la
+columna de XP era de **278, 491, 448, 410 y 423 px** en las cinco filas de la
+crónica. Eso es el doble del umbral de la rúbrica («huecos >250 px dentro de una
+fila» = C4 de 3).
+
+Se descartó angostar la fila: las columnas alineadas se ganaron a pulso y
+achicar el `minmax(0,1fr)` del texto las volvería a soltar. El puntillado, en
+cambio, no angosta nada — **llena**, y además dice a qué renglón pertenece la
+cifra, que es exactamente para lo que lo inventó la imprenta.
+
+La fila pasó de estilos en línea (`Dashboard.tsx`) a `.dash-chronicle*` en
+`dashboard-layouts.css`: la grilla es la misma, el texto es
+`flex: 0 1 auto` (pide su ancho natural, se recorta con puntos suspensivos sólo
+si de verdad no entra) y el guía es `flex: 1 1 0`, o sea que se queda con TODO
+el sobrante y **desaparece solo** cuando el hecho es largo — nunca le roba lugar
+al texto. Medido después: lo que queda sin cubrir entre el guía y la cifra son
+**8 px**, que es el `gap` de la grilla, no un hueco de lectura.
+
+De yapa, sacarlos de la línea es lo que permite que cualquier regla —de móvil o
+no— pueda pisar la crónica; en línea no había manera.
 
 ---
 

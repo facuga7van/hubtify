@@ -1,0 +1,194 @@
+/* ── Estados compartidos: carga, vacío y error ────────────────────────────
+ *
+ * Las tres formas que puede tomar un hueco en la app, en un solo lugar.
+ *
+ * Antes de esta hoja había CUATRO dialectos de esqueleto (`.quest-skeleton`,
+ * `.coin-skeleton`, `.nutri-skeleton`, `.codex-skeleton`), dos más escritos en
+ * línea con colores literales y SIN animación (`Dashboard.tsx` y el widget de
+ * Nutrify), doce clases `*-empty` distintas y cuatro copias a mano del bloque
+ * «mensaje + reintentar». Los cuatro dialectos siguen donde están —migrarlos es
+ * una L que tocaría cuatro módulos a la vez—; lo nuevo usa esto.
+ *
+ * El shimmer es el de `.quest-skeleton` (`modules/quests/styles/quests.css`),
+ * que era el mejor de los cuatro: degradé a 90° con `background-size: 200%`,
+ * así la luz VIAJA de izquierda a derecha en vez de latir en el lugar. Los
+ * `rgba()` son `--parch-0` (#f5e7c0) al 40 / 60 %: una alpha no se puede
+ * expresar con el token, y son los mismos valores que el original para que un
+ * esqueleto nuevo al lado de uno viejo no se note.
+ */
+
+@keyframes hubShimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.hub-skeleton-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.hub-skeleton {
+  display: block;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(245, 231, 192, 0.4) 25%,
+    rgba(245, 231, 192, 0.6) 50%,
+    rgba(245, 231, 192, 0.4) 75%
+  );
+  background-size: 200% 100%;
+  animation: hubShimmer 1.5s ease infinite;
+  border: 1px solid rgba(74, 55, 32, 0.25);
+  border-radius: 3px;
+}
+
+/* Tres formas, no tres tamaños arbitrarios: un renglón de texto, un bloque de
+   contenido y una tarjeta entera. */
+.hub-skeleton--line  { height: 14px; border-radius: 2px; }
+.hub-skeleton--block { height: 48px; }
+.hub-skeleton--card  { height: 96px; border-radius: 6px; }
+
+/* La última línea de un párrafo nunca llega al margen. */
+.hub-skeleton-group--text .hub-skeleton:last-child { width: 62%; }
+
+/* Un esqueleto congelado a mitad del barrido queda como una mancha sin
+   explicación. La regla global de `theme.css` clava `iteration-count: 1`, que
+   para una animación de posición de fondo es exactamente eso: acá se apaga. */
+@media (prefers-reduced-motion: reduce) {
+  .hub-skeleton {
+    animation: none !important;
+    background: rgba(245, 231, 192, 0.5);
+  }
+}
+
+/* Sólo para el lector de pantalla: el esqueleto tiene que ANUNCIARSE, pero no
+   dibujar una segunda leyenda encima del dibujo. */
+.hub-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── El hueco vacío ────────────────────────────────────────────────────────
+ * Ícono, frase y salida, los tres DENTRO de la caja y en columna. El patrón
+ * viene de `.notif-empty` y `.quest-empty`: un botón que vive a 240 px del
+ * hueco al que pertenece no es una salida, es otra cosa en la pantalla.
+ */
+.hub-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px 16px;
+  font-family: var(--ff-body);
+  font-style: italic;
+  color: var(--ink-faded);
+}
+
+/* Dentro de una tarjeta del tablero o de un desplegable no hay 400 px de alto
+   para gastar. */
+.hub-empty--compact {
+  gap: 6px;
+  padding: 10px 8px;
+}
+
+/* El ícono acompaña; no compite con la frase. */
+.hub-empty__icon {
+  display: inline-flex;
+  color: var(--ink-soft);
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.hub-empty__title {
+  font-family: var(--ff-display);
+  font-style: normal;
+  font-size: var(--fs-nav);
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.hub-empty__text {
+  margin: 0;
+  max-width: var(--measure);
+  font-size: var(--fs-body);
+}
+
+.hub-empty--compact .hub-empty__text { font-size: var(--fs-label); }
+
+.hub-empty__cta {
+  font-size: var(--fs-label);
+  padding: 4px 12px;
+}
+
+/* ── El error ──────────────────────────────────────────────────────────────
+ * Un error NO es un vacío. El vacío dice «todavía no hay»; esto dice «lo pedí y
+ * no vino». El color es el del códice para advertir (`--rubric`) y siempre trae
+ * la puerta de vuelta.
+ */
+.hub-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 20px 16px;
+  font-family: var(--ff-body);
+  color: var(--ink);
+}
+
+.hub-error--compact {
+  gap: 6px;
+  padding: 10px 8px;
+}
+
+.hub-error__icon {
+  display: inline-flex;
+  color: var(--rubric);
+  flex-shrink: 0;
+}
+
+.hub-error__text {
+  margin: 0;
+  max-width: var(--measure);
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.hub-error--compact .hub-error__text { font-size: var(--fs-label); }
+
+/* El detalle técnico existe para el que sabe leerlo, en voz baja. */
+.hub-error__detail {
+  margin: 0;
+  max-width: var(--measure);
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  word-break: break-word;
+}
+
+.hub-error__retry {
+  font-size: var(--fs-label);
+  padding: 4px 12px;
+}
+
+/* En teléfono las dos salidas son controles reales, no rótulos: el piso de
+   toque del sistema (ver la sección «Touch Targets» de DESIGN_SYSTEM.md). */
+[data-shell="mobile"] .hub-empty__cta,
+[data-shell="mobile"] .hub-error__retry {
+  min-height: var(--touch-min);
+  padding: 8px 16px;
+}

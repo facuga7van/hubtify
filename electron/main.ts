@@ -12,14 +12,20 @@ import { electronPlatform, webContentsSink } from './platform';
 import { startNotificationEngine, stopNotificationEngine } from '../shared-logic/modules/notifications.ipc';
 import { generateRecurringForMonth } from '../shared-logic/modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
+import { appUserModelIdFor } from './app-identity';
 import { checkInstallLocation } from './install-location';
+import { healAppIcon } from './app-icon';
 import { todayDateString } from '../shared/date-utils';
 
-// Set a stable AppUserModelID matching the one Squirrel assigns to shortcuts
-// (com.squirrel.<PACKAGE>.<EXE>). Required so Windows keeps pinned taskbar items
-// associated with the app across updates instead of breaking the pin.
+// AppUserModelID: la identidad con la que Windows agrupa el botón de la barra de
+// tareas, resuelve su ícono y su nombre, y decide si un anclado sobrevive a una
+// actualización. En producción tiene que ser EXACTAMENTE el que Squirrel le pone
+// a los accesos directos; en desarrollo tiene que ser otro, o una corrida de
+// `npm start` (que es electron.exe) envenena la identidad de la app instalada.
+// El porqué completo, y las dos cadenas, en electron/app-identity.ts.
+// `app.isPackaged` es un getter sincrónico válido antes de `app.whenReady()`.
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.squirrel.Hubtify.Hubtify');
+  app.setAppUserModelId(appUserModelIdFor(app.isPackaged));
 }
 
 // Handle Squirrel events (Windows installer lifecycle). Custom handler instead of
@@ -413,6 +419,23 @@ app.whenReady().then(() => {
   if (mainWindow) initAutoUpdater(mainWindow);
 
   startNotificationEngine();
+
+  // Squirrel escribe `<raíz>\app.ico` solo en `--install`, nunca al actualizar,
+  // así que quien venga de una versión anterior al `iconUrl` de forge.config.ts
+  // se quedaría con el átomo de Electron para siempre. Lo curamos nosotros.
+  // Fuera del camino crítico: nada acá bloquea la ventana ni el arranque, y
+  // healAppIcon no lanza nunca (el .catch es cinturón y tiradores).
+  void healAppIcon({
+    execPath: process.execPath,
+    resourcesPath: process.resourcesPath,
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+  })
+    .then((res) => {
+      if (res.replaced) console.log(`[app-icon] ${res.target} actualizado (${res.reason})`);
+      else if (res.error) console.warn(`[app-icon] no se pudo escribir ${res.target}: ${res.error}`);
+    })
+    .catch((err) => console.warn('[app-icon] self-heal falló:', err));
 });
 
 app.on('before-quit', () => {

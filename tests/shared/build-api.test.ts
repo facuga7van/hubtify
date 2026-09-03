@@ -60,12 +60,12 @@ describe('buildApi', () => {
     expect(downloaded).toHaveBeenCalledWith(undefined);
   });
 
-  it('mobile omits the 8 desktop-only methods and keeps everything else', () => {
+  it('mobile omits the 9 desktop-only methods and keeps everything else', () => {
     const api = buildApi(fakeTransport(), 'mobile') as unknown as Record<string, unknown>;
-    for (const key of ['backupExport', 'backupPickImportFile', 'backupImport', 'cauldronOpenWindow', 'cauldronCloseWindow', 'updaterCheck', 'updaterDownload', 'updaterRestart']) {
+    for (const key of ['backupExport', 'backupPickImportFile', 'backupImport', 'cauldronOpenWindow', 'cauldronCloseWindow', 'updaterCheck', 'updaterDownload', 'updaterRestart', 'getInstallWarning']) {
       expect(api[key]).toBeUndefined();
     }
-    expect(Object.keys(api)).toHaveLength(254 - 8);
+    expect(Object.keys(api)).toHaveLength(264 - 9);
     expect(typeof api.onUpdateAvailable).toBe('function'); // NOT desktop-only (spec §3.1)
   });
 });

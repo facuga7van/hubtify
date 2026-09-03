@@ -4,9 +4,11 @@ import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 import { AmountWithCurrency } from './AmountWithCurrency';
+import { AmountModeToggle, useAmountModePlaceholder } from './AmountModeToggle';
 import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
+import type { AmountMode } from '../../utils/installment-payload';
 import { RESERVED_CATEGORIES } from '../../types';
 import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
 import { todayDateString } from '../../../../../shared/date-utils';
@@ -40,6 +42,9 @@ interface QuickAddFormProps {
     currency: Currency;
     paymentMethod: PaymentMethod;
     installments: number;
+    /** Si `amount` es el precio de UNA cuota o el total financiado. Sin esto,
+     *  quien tipeaba el precio de vidriera creaba un plan N veces más grande. */
+    amountMode: AmountMode;
     creditCardId?: string;
     /** Omitted while the accounts bridge is not wired (backend maps cash→Efectivo). */
     accountId?: string | null;
@@ -59,15 +64,27 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState('');
+  /** Semilla hasta que conteste `finance:getEntryDefaults` con la moda real. */
   const [category, setCategory] = useState('Otros');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(today);
   const [currency, setCurrency] = useState<Currency>('ARS');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  /**
+   * Arrancaba en `'cash'` — el único medio que el usuario NUNCA eligió: 40 de
+   * sus 60 altas manuales son transferencias y tiene cero movimientos en
+   * efectivo cargados a mano. Cada alta empezaba corrigiendo este select.
+   * Ahora el default lo dice el historial (`finance:getEntryDefaults`), y hasta
+   * que conteste se muestra el fallback digital, no el efectivo.
+   */
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer');
+  /** El usuario ya tocó el select: la inferencia no le pisa la elección. */
+  const methodTouched = useRef(false);
   const [installments, setInstallments] = useState(1);
+  const [amountMode, setAmountMode] = useState<AmountMode>('installment');
   const [creditCardId, setCreditCardId] = useState('');
-  // '' = unresolved; the AccountSelect picks the default (last used / Efectivo).
+  // '' = unresolved; the AccountSelect picks the default (last used / inferida / Efectivo).
   const [accountValue, setAccountValue] = useState('');
+  const [seedAccountId, setSeedAccountId] = useState<string | null>(null);
   const [accountsSupported, setAccountsSupported] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [lastTx, setLastTx] = useState<LastTransaction | null>(null);
@@ -75,6 +92,42 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   // Category mappings for auto-suggestion
   const [mappings, setMappings] = useState<CategoryMapping[]>([]);
   const userOverrode = useRef(false);
+
+  /**
+   * La moda de sus últimas altas manuales. Se pide una vez al montar y en cada
+   * cambio de cuenta: el historial de otra cuenta no dice nada sobre esta.
+   *
+   * El handler ya devolvía `accountId`, `currency` y ahora `category`, y este
+   * formulario **aplicaba sólo el medio de pago y tiraba el resto**. Mientras
+   * tanto la cuenta salía de `localStorage` y su último respaldo era «Efectivo»
+   * —la cuenta que el historial dice que no se usa: `account_id` en NULL en las
+   * 107 filas de la base real— y la categoría era el literal `'Otros'`.
+   */
+  const loadEntryDefaults = useCallback(() => {
+    const api = window.api as Partial<typeof window.api>;
+    // Canal nuevo: en un binding viejo simplemente no está, y el fallback vale.
+    if (typeof api.financeGetEntryDefaults !== 'function') return;
+    api.financeGetEntryDefaults()
+      .then((defaults) => {
+        if (!defaults) return;
+        if (!methodTouched.current) {
+          const method = defaults.paymentMethod;
+          if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
+            setPaymentMethod(method);
+          }
+          if (defaults.currency === 'ARS' || defaults.currency === 'USD') setCurrency(defaults.currency);
+        }
+        // La cuenta no se fuerza: se le pasa como semilla al `AccountSelect`,
+        // que ya sabe descartarla si murió y ya tiene su propio orden de
+        // preferencia (lo recordado localmente es más específico y gana).
+        setSeedAccountId(defaults.accountId ?? null);
+        // Ojo con el orden: el auto-sugerido por descripción
+        // (`finance:getCategoryMappings`) es MÁS específico que la moda y tiene
+        // que poder pisarla, así que la moda sólo entra si nadie tocó nada.
+        if (!userOverrode.current && defaults.category) setCategory(defaults.category);
+      })
+      .catch(() => { /* el fallback ya está puesto */ });
+  }, []);
 
   const loadMappings = useCallback(() => {
     window.api.financeGetCategoryMappings().then((data) => {
@@ -103,13 +156,15 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       .catch((err) => console.error('[QuickAddForm] financeGetTransactions failed:', err));
   }, []);
 
-  useEffect(() => { loadMappings(); loadLastTransaction(); }, [loadMappings, loadLastTransaction]);
+  useEffect(() => { loadMappings(); loadLastTransaction(); loadEntryDefaults(); },
+    [loadMappings, loadLastTransaction, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => { loadMappings(); loadLastTransaction(); };
+    // Otra cuenta, otro historial: lo que el usuario tocó acá ya no aplica.
+    const handler = () => { methodTouched.current = false; userOverrode.current = false; loadMappings(); loadLastTransaction(); loadEntryDefaults(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadMappings, loadLastTransaction]);
+  }, [loadMappings, loadLastTransaction, loadEntryDefaults]);
 
   // Auto-suggest category when description changes
   const suggestCategory = useCallback(
@@ -156,9 +211,11 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setDescription(lastTx.description ?? '');
     setCurrency(lastTx.currency === 'USD' ? 'USD' : 'ARS');
     setPaymentMethod(lastTx.paymentMethod);
+    methodTouched.current = true;
     setCreditCardId(lastTx.paymentMethod === 'credit_card' ? (lastTx.creditCardId ?? '') : '');
     if (accountsSupported) setAccountValue(lastTx.accountId ?? NO_ACCOUNT);
     setInstallments(1);
+    setAmountMode('installment');
     setDate(today);
     setAmount(String(lastTx.amount));
     // The category came from history, not from the description matcher.
@@ -170,6 +227,12 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       el?.select();
     });
   };
+
+  /** Cargar con tarjeta y más de una cuota no escribe un gasto: escribe un plan,
+   *  y entonces el número tipeado necesita decir de qué monto habla. */
+  const isInstallmentPlan = paymentMethod === 'credit_card' && installments > 1;
+  const installmentPlaceholder = useAmountModePlaceholder(amountMode);
+  const amountLabel = isInstallmentPlan ? installmentPlaceholder : t('coinify.amount');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,6 +257,9 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       currency,
       paymentMethod,
       installments: paymentMethod === 'credit_card' ? installments : 1,
+      // Solo un plan en cuotas puede estar en modo «total»; un gasto suelto es
+      // siempre su propio monto.
+      amountMode: isInstallmentPlan ? amountMode : 'installment',
       creditCardId: paymentMethod === 'credit_card' ? creditCardId : undefined,
       // Only when the selector is actually usable: absent, the backend applies
       // its own default mapping (cash → «Efectivo»). A card purchase never
@@ -206,6 +272,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setAmount('');
     setDescription('');
     setInstallments(1);
+    setAmountMode('installment');
     setCreditCardId('');
     userOverrode.current = false;
     // What was just written is the new "last one".
@@ -253,11 +320,24 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
       {/* Primary: Amount + Category + Description */}
       <div className="coin-quick-add-form__amount-row">
+        {/* El rótulo cambia con el modo: en un plan en cuotas «Monto» a secas
+            era ambiguo y quien tipeaba el precio total creaba un plan N veces
+            más grande, sin ningún aviso. */}
         <RpgNumberInput id={AMOUNT_INPUT_ID} value={amount} onChange={setAmount}
-          aria-label={t('coinify.amount')}
-          placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
+          aria-label={amountLabel}
+          placeholder={amountLabel} style={{ flex: 1 }} min={0} step={0.01} required />
         <CategorySelect value={category} onChange={handleCategoryChange} />
       </div>
+
+      {isInstallmentPlan && (
+        <AmountModeToggle
+          mode={amountMode}
+          onChange={setAmountMode}
+          typedAmount={amount}
+          installmentCount={installments}
+          currency={currency}
+        />
+      )}
 
       {/* What this amount is worth in the other currency, with the house that
           will be frozen on the row. Deliberately OUTSIDE «Más opciones»: the
@@ -275,7 +355,8 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
           default — cash — was silently applied to card purchases and the
           statement never saw them. */}
       <div className="coin-quick-add-form__payment-row">
-        <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+        <select value={paymentMethod}
+          onChange={(e) => { methodTouched.current = true; setPaymentMethod(e.target.value as PaymentMethod); }}
           className="rpg-select coin-quick-add-form__payment"
           aria-label={t('coinify.paymentMethod', 'Medio de pago')}>
           <option value="cash">{t('coinify.cash')}</option>
@@ -287,7 +368,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
             the accounts bridge is not wired. Card purchases do not touch any
             account until the statement is paid, so the picker steps aside. */}
         {paymentMethod !== 'credit_card' && (
-          <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+          <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />
         )}
         {paymentMethod === 'credit_card' && (
           <>

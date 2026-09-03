@@ -6,6 +6,10 @@ vi.mock('@capacitor/local-notifications', () => ({
     requestPermissions: vi.fn(),
     createChannel: vi.fn(async () => undefined),
     schedule: vi.fn(async () => ({ notifications: [] })),
+    cancel: vi.fn(async () => undefined),
+    removeDeliveredNotificationsById: vi.fn(async () => undefined),
+    checkExactNotificationSetting: vi.fn(async () => ({ exact_alarm: 'denied' })),
+    changeExactNotificationSetting: vi.fn(async () => ({ exact_alarm: 'granted' })),
   },
 }));
 vi.mock('@capacitor/filesystem', () => ({
@@ -24,7 +28,9 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Browser } from '@capacitor/browser';
-import { createPlatformHost, NOTIFICATION_CHANNEL_ID, readOsInfo } from '../../src/mobile/platform-host';
+import { createPlatformHost, NOTIFICATION_CHANNEL_ID, ONGOING_CHANNEL_ID, readOsInfo } from '../../src/mobile/platform-host';
+import { notificationIdFor } from '../../src/mobile/host-utils';
+import type { NotificationPlan } from '../../shared-logic/platform';
 
 const m = vi.mocked;
 
@@ -36,6 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'prompt' });
   m(LocalNotifications.requestPermissions).mockResolvedValue({ display: 'granted' });
+  m(LocalNotifications.checkExactNotificationSetting).mockResolvedValue({ exact_alarm: 'denied' });
 });
 
 describe('notify', () => {
@@ -44,8 +51,11 @@ describe('notify', () => {
     await h.notify({ title: 'T', body: 'B', tag: 'streak' });
     await h.notify({ title: 'T2', body: 'B2', tag: 'streak' });
     expect(LocalNotifications.requestPermissions).toHaveBeenCalledTimes(1);
-    expect(LocalNotifications.createChannel).toHaveBeenCalledTimes(1);
+    // Dos canales, una sola vez: el normal (importancia 4) y el del aviso
+    // persistente del Caldero (importancia 2, sin sonido ni heads-up).
+    expect(LocalNotifications.createChannel).toHaveBeenCalledTimes(2);
     expect(LocalNotifications.createChannel).toHaveBeenCalledWith(expect.objectContaining({ id: NOTIFICATION_CHANNEL_ID, name: 'Hubtify' }));
+    expect(LocalNotifications.createChannel).toHaveBeenCalledWith(expect.objectContaining({ id: ONGOING_CHANNEL_ID, importance: 2 }));
     const calls = m(LocalNotifications.schedule).mock.calls;
     expect(calls).toHaveLength(2);
     const [first, second] = calls.map((c) => c[0].notifications[0]);
@@ -149,8 +159,27 @@ describe('archivos', () => {
     expect(Array.from(r!.bytes)).toEqual([9, 8, 7]);
   });
 
-  it('pickPdfText → unsupported (sin pdf-parse en Android)', async () => {
-    await expect(host().pickPdfText()).resolves.toEqual({ unsupported: true });
+  // Android SÍ lee PDF: `pdfjs-dist` corre en el WebView y `getTextContent()`
+  // no necesita canvas. La extracción real se prueba en `tests/mobile/pdf-text`
+  // (`joinTextItems`, que es la parte que puede romper el parser line-based);
+  // acá se fija el CONTRATO del host, que es lo que ve `finance-import`.
+  it('pickPdfText → null si se cancela el selector', async () => {
+    await expect(host(null).pickPdfText()).resolves.toBeNull();
+  });
+
+  it('pickPdfText → unsupported si el PDF no tiene capa de texto o pdfjs falla', async () => {
+    // Un escaneo o una foto: no es un error, pero no hay nada que parsear. Y
+    // cualquier falla de pdfjs (worker que no resuelve, CSP) cae en la misma
+    // rama: el peor caso es exactamente el comportamiento anterior.
+    const file = new File([new Uint8Array([1, 2, 3])], 'escaneo.pdf', { type: 'application/pdf' });
+    await expect(host(file).pickPdfText()).resolves.toEqual({ unsupported: true });
+  });
+
+  it('pickPdfText pide el accept de PDF al selector', async () => {
+    const pick = vi.fn(async () => null);
+    const h = createPlatformHost({ pickFile: pick });
+    await h.pickPdfText();
+    expect(pick).toHaveBeenCalledWith('application/pdf,.pdf');
   });
 });
 
@@ -162,5 +191,116 @@ describe('otros', () => {
 
   it('readOsInfo', async () => {
     await expect(readOsInfo()).resolves.toBe('android 14');
+  });
+});
+
+/**
+ * Avisos con la app cerrada (spec §12 Fase 6). Acá se prueba la EJECUCIÓN del
+ * plan contra el plugin; qué entra en el plan se prueba en
+ * tests/shared-logic/notification-schedule.test.ts.
+ */
+describe('applyNotificationPlan', () => {
+  const plan = (over: Partial<NotificationPlan> = {}): NotificationPlan => ({
+    scope: 'cauldron',
+    owned: ['cauldron:end', 'cauldron:ongoing'],
+    ownedPersistent: ['cauldron:ongoing'],
+    schedule: [],
+    ...over,
+  });
+
+  it('programa la alarma de fin: con `at`, allowWhileIdle e inexacta si no hay permiso', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    const at = Date.UTC(2026, 8, 2, 15, 25);
+    await host().applyNotificationPlan(plan({
+      schedule: [{ tag: 'cauldron:end', title: 'Poción', body: 'Ciclo 2/4', at }],
+    }));
+
+    const sent = m(LocalNotifications.schedule).mock.calls[0][0].notifications[0];
+    expect(sent).toMatchObject({
+      id: notificationIdFor('cauldron:end'),
+      title: 'Poción',
+      channelId: NOTIFICATION_CHANNEL_ID,
+      // `allowWhileIdle` no es opcional: sin él el plugin usa AlarmManager.set(RTC),
+      // que no despierta el equipo y en Doze puede esperar horas.
+      schedule: { at: new Date(at), allowWhileIdle: true },
+      // Inexacta a propósito: pedir la exacta implícitamente ABRE la pantalla de
+      // sistema y deja esta promesa colgada.
+      isExactNotification: false,
+    });
+    expect(LocalNotifications.changeExactNotificationSetting).not.toHaveBeenCalled();
+  });
+
+  it('si SCHEDULE_EXACT_ALARM ya está concedido, la alarma va exacta', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    m(LocalNotifications.checkExactNotificationSetting).mockResolvedValue({ exact_alarm: 'granted' });
+    await host().applyNotificationPlan(plan({
+      schedule: [{ tag: 'cauldron:end', title: 'T', body: 'B', at: Date.now() + 60_000 }],
+    }));
+    expect(m(LocalNotifications.schedule).mock.calls[0][0].notifications[0].isExactNotification).toBe(true);
+  });
+
+  it('el aviso persistente va al canal silencioso, sin alarma y sin autoCancel', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    await host().applyNotificationPlan(plan({
+      schedule: [{ tag: 'cauldron:ongoing', title: 'Enfoque', body: 'Termina a las 15:25', ongoing: true }],
+    }));
+    const sent = m(LocalNotifications.schedule).mock.calls[0][0].notifications[0];
+    expect(sent).toMatchObject({ channelId: ONGOING_CHANNEL_ID, ongoing: true, autoCancel: false, isExactNotification: false });
+    expect(sent).not.toHaveProperty('schedule');
+    // Sin `at` no hay alarma que pueda ser exacta: ni se consulta el permiso.
+    expect(LocalNotifications.checkExactNotificationSetting).not.toHaveBeenCalled();
+  });
+
+  it('lo gobernado que no está en el plan se cancela; el persistente además se baja de la bandeja', async () => {
+    await host().applyNotificationPlan(plan()); // plan vacío = detener/pausar
+    expect(LocalNotifications.cancel).toHaveBeenCalledWith({
+      notifications: [{ id: notificationIdFor('cauldron:end') }, { id: notificationIdFor('cauldron:ongoing') }],
+    });
+    // `cancel()` no baja una notificación YA publicada (solo la marca en su
+    // storage): el `ongoing` hay que retirarlo aparte.
+    expect(LocalNotifications.removeDeliveredNotificationsById).toHaveBeenCalledWith({
+      ids: [notificationIdFor('cauldron:ongoing')],
+    });
+    expect(LocalNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('un plan que solo cancela NO dispara el diálogo de permisos', async () => {
+    await host().applyNotificationPlan(plan());
+    expect(LocalNotifications.requestPermissions).not.toHaveBeenCalled();
+    expect(LocalNotifications.createChannel).not.toHaveBeenCalled();
+  });
+
+  it('no cancela lo que sigue vivo: el diff es por id, no por ámbito', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    await host().applyNotificationPlan(plan({
+      schedule: [{ tag: 'cauldron:end', title: 'T', body: 'B', at: Date.now() + 60_000 }],
+    }));
+    expect(LocalNotifications.cancel).toHaveBeenCalledWith({
+      notifications: [{ id: notificationIdFor('cauldron:ongoing') }],
+    });
+  });
+
+  it('sin permiso de notificaciones no programa, pero igual cancela', async () => {
+    m(LocalNotifications.requestPermissions).mockResolvedValue({ display: 'denied' });
+    await host().applyNotificationPlan(plan({
+      schedule: [{ tag: 'cauldron:end', title: 'T', body: 'B', at: Date.now() + 60_000 }],
+    }));
+    expect(LocalNotifications.cancel).toHaveBeenCalled();
+    expect(LocalNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('nunca rechaza: un plugin que lanza queda en un warn', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    m(LocalNotifications.cancel).mockRejectedValueOnce(new Error('bridge down'));
+    await expect(host().applyNotificationPlan(plan())).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('exactAlarmState lee el ajuste; requestExactAlarms abre la pantalla de sistema', async () => {
+    const h = host();
+    await expect(h.exactAlarmState()).resolves.toBe('denied');
+    await expect(h.requestExactAlarms()).resolves.toBe('granted');
+    expect(LocalNotifications.changeExactNotificationSetting).toHaveBeenCalledTimes(1);
   });
 });

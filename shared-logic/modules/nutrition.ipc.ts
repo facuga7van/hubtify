@@ -1,5 +1,6 @@
 import { registerHandler as ipcHandle } from '../registry';
 import { getDb } from '../db';
+import type { SqlDatabase } from '../db';
 import { genId } from '../ids';
 
 import { formatDateString, getMondayOfWeek, getAgeFromDob, daysAgoDateString } from '../../shared/date-utils';
@@ -47,6 +48,65 @@ function normMacro(v: unknown): number | null {
 export function normalizeFoodSource(source: string | undefined | null): string {
   if (source === 'history') return 'frequent';
   return source ?? 'manual';
+}
+
+/**
+ * Un plato con nombre razonable. Más largo que esto ya es una crónica, no algo
+ * que se vaya a repetir de un toque.
+ */
+const FREQUENT_NAME_MAX = 80;
+
+/**
+ * Anota el plato en `frequent_foods` cada vez que se registra.
+ *
+ * `frequent_foods` estaba VACÍA en la base real, y no por falta de uso: el
+ * canal `nutrition:createFrequentFood` nunca tuvo un solo llamador en `src/` en
+ * toda la historia del repo. La tabla sólo podía llenarse desde un sync con
+ * otro dispositivo que la tuviera igual de vacía, así que la tarjeta "Comidas
+ * Frecuentes" estaba escondida para siempre y el atajo de repetir nunca se
+ * estrenó. El diseño original (2026-05-02-nutrify-ux-audit-design.md:310) ya
+ * proponía derivarla del registro; esto es eso.
+ *
+ * Reglas:
+ * - Un evento no es un plato repetible: lleva una banda, no un número.
+ * - Un plato que el usuario BORRÓ de la lista no resucita solo. Se le cuenta
+ *   el uso y nada más; sacarlo de la lista fue una decisión suya.
+ * - Las calorías y macros se actualizan al último valor registrado, que es el
+ *   que el atajo debería ofrecer.
+ * - `sync_id` nuevo por fila, como en `createFrequentFood`: el merge adopta por
+ *   nombre (UNIQUE COLLATE NOCASE) cuando los sync_id no coinciden, así que dos
+ *   dispositivos que anotan "milanesa" convergen en una sola fila.
+ */
+export function rememberFrequentFood(
+  db: SqlDatabase,
+  food: { description: string; calories: number; proteinG?: number | null; carbsG?: number | null; fatG?: number | null },
+  now: string,
+): void {
+  const name = food.description.trim();
+  if (!name || name.length > FREQUENT_NAME_MAX) return;
+  if (!Number.isFinite(food.calories) || food.calories <= 0) return;
+
+  const existing = db.prepare('SELECT id, deleted_at FROM frequent_foods WHERE name = ? COLLATE NOCASE')
+    .get(name) as { id: number; deleted_at: string | null } | undefined;
+
+  if (existing) {
+    if (existing.deleted_at) {
+      db.prepare('UPDATE frequent_foods SET times_used = times_used + 1 WHERE id = ?').run(existing.id);
+      return;
+    }
+    db.prepare(`
+      UPDATE frequent_foods
+      SET times_used = times_used + 1, calories = ?, protein_g = ?, carbs_g = ?, fat_g = ?, updated_at = ?
+      WHERE id = ?
+    `).run(food.calories, normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG), now, existing.id);
+    return;
+  }
+
+  db.prepare(`
+    INSERT INTO frequent_foods (name, calories, protein_g, carbs_g, fat_g, times_used, created_at, updated_at, sync_id)
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `).run(name, food.calories, normMacro(food.proteinG), normMacro(food.carbsG), normMacro(food.fatG),
+    now, now, genId());
 }
 
 /**
@@ -271,6 +331,16 @@ export function registerNutritionIpcHandlers(): void {
         entry.frequentFoodId ?? null, entry.aiBreakdown ?? null, meal,
         normMacro(entry.proteinG), normMacro(entry.carbsG), normMacro(entry.fatG),
         isEvent, eventMin, eventMax, syncStamp(), genId());
+      // Un evento lleva banda, no un número: no es un plato repetible.
+      if (!isEvent) {
+        rememberFrequentFood(db, {
+          description: entry.description,
+          calories: entry.calories,
+          proteinG: entry.proteinG,
+          carbsG: entry.carbsG,
+          fatG: entry.fatG,
+        }, syncStamp());
+      }
       recalcSummary(db, date);
     })();
   });

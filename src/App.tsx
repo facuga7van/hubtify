@@ -22,6 +22,7 @@ import {
   FinanceLayout,
   FinanceDashboard,
   Transactions,
+  Commitments,
   Installments,
   Loans,
   Recurring,
@@ -30,6 +31,7 @@ import {
   prefetchRoutes,
 } from './routes';
 import { useAuthContext } from './shared/AuthContext';
+import { useGuestMode, enterGuestMode, leaveGuestMode } from './shared/guest';
 
 /* The Logros shelf is a rarely-first screen and its own chunk. It is lazied
    here rather than in `routes.tsx` because that module is owned by another
@@ -45,7 +47,22 @@ const FatalScreen = lazy(() => import('./mobile/FatalScreen'));
 
 function AuthPageWrapper() {
   const navigate = useNavigate();
-  return <AuthPage onAuth={() => navigate('/')} />;
+  return (
+    <AuthPage
+      onAuth={() => {
+        // Vino de vuelta con cuenta: se apaga el flag y NADA más. Pasar por
+        // `logout()` acá borraría con `syncClearUserData()` (useAuth.ts:183)
+        // justo la base que el invitado viene a conservar. `login()` ya hizo
+        // `syncSetCurrentUser` + `syncPull`, y ese pull FUSIONA.
+        leaveGuestMode();
+        navigate('/');
+      }}
+      onGuest={() => {
+        enterGuestMode();
+        navigate('/');
+      }}
+    />
+  );
 }
 
 function AddAccountPageWrapper() {
@@ -56,10 +73,15 @@ function AddAccountPageWrapper() {
 export default function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('hubtify_onboarded') === 'true');
   const { user, loading } = useAuthContext();
+  // Modo invitado: la app entera anda sin cuenta. Es el techo de C1 de la
+  // rúbrica de user journey — el muro del login era lo único que separaba al
+  // usuario nuevo del producto.
+  const guest = useGuestMode();
+  const navigate = useNavigate();
 
   // Re-read onboarded flag after login/account switch (syncPull may restore it from cloud)
   useEffect(() => {
-    if (!user) return;
+    if (!user && !guest) return;
     const checkOnboarded = () => {
       const flag = localStorage.getItem('hubtify_onboarded') === 'true';
       setOnboarded(flag);
@@ -71,12 +93,12 @@ export default function App() {
       clearTimeout(timer);
       window.removeEventListener('account:switched', checkOnboarded);
     };
-  }, [user]);
+  }, [user, guest]);
 
   // Warm the route chunks while the main thread is idle, so navigating (Ctrl+1..6
   // included) never waits on a chunk it could have fetched during the lull after
   // startup. Only once past both gates — the shell is what the chunks belong to.
-  const shellVisible = !loading && !!user && onboarded;
+  const shellVisible = !loading && (!!user || guest) && onboarded;
   useEffect(() => {
     if (!shellVisible) return;
     return prefetchRoutes();
@@ -102,8 +124,8 @@ export default function App() {
   // Show loading while Firebase checks auth state
   if (loading) return null;
 
-  // Auth gate: must be logged in first
-  if (!user) {
+  // Auth gate: cuenta O modo invitado. Sin ninguna de las dos, al login.
+  if (!user && !guest) {
     return (
       <ErrorBoundary>
         <Routes>
@@ -116,13 +138,26 @@ export default function App() {
 
   // Onboarding gate: must complete onboarding after first login
   if (!onboarded) {
-    return <Onboarding onComplete={() => setOnboarded(true)} />;
+    return (
+      <Onboarding
+        onComplete={() => {
+          // El paso de Coinify termina llevando derecho al importador: el
+          // embudo de un solo botón se cobra ahí, no tres pantallas después.
+          const target = localStorage.getItem('hubtify_open_route');
+          localStorage.removeItem('hubtify_open_route');
+          setOnboarded(true);
+          if (target) navigate(target, { replace: true });
+        }}
+      />
+    );
   }
 
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/login" element={<Navigate to="/" replace />} />
+        {/* Con cuenta, `/login` no tiene nada que ofrecer. En modo invitado SÍ:
+            es la vía de vuelta, el «Vincular cuenta» del PlayerCard apunta acá. */}
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <AuthPageWrapper />} />
         <Route path="/login/add" element={<AddAccountPageWrapper />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
@@ -141,13 +176,25 @@ export default function App() {
             <Route path="dashboard" element={<NutritionCharts />} />
             <Route path="settings" element={<NutritionSettings />} />
           </Route>
+          {/* Coinify pasó de seis pestañas a tres: Panel · Movimientos ·
+              Compromisos. Las cuatro rutas viejas de primer nivel sobreviven
+              como redirecciones — hay links del tour, del panel y del historial
+              del usuario apuntando a ellas, y un 404 sería peor que una pestaña
+              de más. */}
           <Route path="/finance" element={<FinanceLayout />}>
             <Route index element={<FinanceDashboard />} />
             <Route path="transactions" element={<Transactions />} />
-            <Route path="installments" element={<Installments />} />
-            <Route path="cards" element={<CreditCards />} />
-            <Route path="loans" element={<Loans />} />
-            <Route path="recurring" element={<Recurring />} />
+            <Route path="commitments" element={<Commitments />}>
+              <Route index element={<Navigate to="/finance/commitments/installments" replace />} />
+              <Route path="installments" element={<Installments />} />
+              <Route path="recurring" element={<Recurring />} />
+              <Route path="cards" element={<CreditCards />} />
+              <Route path="loans" element={<Loans />} />
+            </Route>
+            <Route path="installments" element={<Navigate to="/finance/commitments/installments" replace />} />
+            <Route path="recurring" element={<Navigate to="/finance/commitments/recurring" replace />} />
+            <Route path="cards" element={<Navigate to="/finance/commitments/cards" replace />} />
+            <Route path="loans" element={<Navigate to="/finance/commitments/loans" replace />} />
             <Route path="import" element={<Import />} />
           </Route>
           <Route path="/cauldron" element={<CauldronPage />} />

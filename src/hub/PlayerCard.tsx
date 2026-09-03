@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Loading from '../shared/components/Loading';
 import Character from './Character';
@@ -9,6 +10,8 @@ import { getTitleKey } from '../../shared/rpg-engine';
 import NotificationBell from '../shared/components/NotificationBell';
 import { useConfirm } from '../shared/components/ConfirmDialog';
 import { useToast } from '../shared/components/useToast';
+import { useGuestMode } from '../shared/guest';
+import './guest-mode.css';
 
 interface PlayerCardProps {
   stats: PlayerStats | null;
@@ -21,6 +24,11 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
   const confirm = useConfirm();
   const { toast } = useToast();
   const { user: authUser, logout, switching, switchAccount, getCachedAccounts } = useAuthContext();
+  const navigate = useNavigate();
+  const guest = useGuestMode();
+  /** Sin cuenta no hay cuentas que listar: el botón deja de abrir un menú y
+   *  pasa a ser la vía de vuelta («Vincular cuenta» → `/login`). */
+  const linkMode = !authUser && guest;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const nameRef = useRef<HTMLButtonElement>(null);
   const [characterName, setCharacterName] = useState<string>('');
@@ -128,13 +136,25 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
           <div className="player-card__name" title={displayName}>
             {displayName}
           </div>
-          {authUser?.email && (
+          {authUser?.email ? (
             // Two accounts with the same hero name were indistinguishable
             // without opening the dropdown.
             <div className="player-card__email" title={authUser.email}>
               {authUser.email}
             </div>
-          )}
+          ) : linkMode ? (
+            /* El aviso de «no hay respaldo» vive acá y no en un cartel aparte:
+               es el renglón que en una cuenta lleva el mail, se lee una sola vez
+               por pantalla y no interrumpe nada. Clickeable, lleva a vincular. */
+            <button
+              type="button"
+              className="player-card__guest-tag"
+              onClick={() => navigate('/login')}
+              title={t('guest.localOnlyTitle', 'Estás sin cuenta: tus datos viven solo acá, sin respaldo en la nube. Tocá para vincular una cuenta.')}
+            >
+              {t('guest.localOnly', 'Solo en este dispositivo')}
+            </button>
+          ) : null}
         </div>
 
         {/* Bell + account menu live OUTSIDE __ident on purpose: __ident collapses
@@ -149,25 +169,33 @@ export default function PlayerCard({ stats, collapsed, onBellClick }: PlayerCard
           <button
             ref={nameRef}
             className="player-card__account-btn tap-target"
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            aria-expanded={dropdownOpen}
-            aria-haspopup="true"
-            aria-label={t('account.menu', 'Menú de cuenta')}
-            title={authUser?.email || displayName}
+            onClick={() => (linkMode ? navigate('/login') : setDropdownOpen(!dropdownOpen))}
+            aria-expanded={linkMode ? undefined : dropdownOpen}
+            aria-haspopup={linkMode ? undefined : 'true'}
+            aria-label={linkMode
+              ? t('guest.link', 'Vincular cuenta')
+              : t('account.menu', 'Menú de cuenta')}
+            title={linkMode
+              ? t('guest.linkHint', 'Vincular una cuenta para respaldar y sincronizar')
+              : authUser?.email || displayName}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="8" cy="5.5" r="2.75" />
               <path d="M2.75 13.5c0-2.35 2.35-3.85 5.25-3.85s5.25 1.5 5.25 3.85" />
             </svg>
-            <svg
-              className="player-card__account-caret"
-              width="9" height="9" viewBox="0 0 10 10" fill="none"
-              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-              aria-hidden="true"
-              style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            >
-              <path d="M3 4l2 2 2-2"/>
-            </svg>
+            {/* La flechita promete un menú desplegable. En modo invitado no hay
+                menú: el botón navega, así que se va. */}
+            {!linkMode && (
+              <svg
+                className="player-card__account-caret"
+                width="9" height="9" viewBox="0 0 10 10" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                aria-hidden="true"
+                style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              >
+                <path d="M3 4l2 2 2-2"/>
+              </svg>
+            )}
           </button>
           {dropdownOpen && authUser && !switching && (
             <AccountDropdown

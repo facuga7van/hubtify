@@ -77,6 +77,7 @@ export const API_CHANNELS = {
   questsGetPendingCount: { channel: 'quests:getPendingCount', kind: 'invoke' },
   questsGetCompletedTodayCount: { channel: 'quests:getCompletedTodayCount', kind: 'invoke' },
   questsGetOverdueCount: { channel: 'quests:getOverdueCount', kind: 'invoke' },
+  questsGetEntryDefaults: { channel: 'quests:getEntryDefaults', kind: 'invoke' },
   // Nutrition
   nutritionGetProfile: { channel: 'nutrition:getProfile', kind: 'invoke' },
   nutritionSaveProfile: { channel: 'nutrition:saveProfile', kind: 'invoke' },
@@ -157,6 +158,8 @@ export const API_CHANNELS = {
   notificationsSetLocale: { channel: 'notifications:setLocale', kind: 'invoke' },
   notificationsSetModuleEnabled: { channel: 'notifications:setModuleEnabled', kind: 'invoke' },
   notificationsSetHabitReminder: { channel: 'notifications:setHabitReminder', kind: 'invoke' },
+  notificationsExactAlarmState: { channel: 'notifications:exactAlarmState', kind: 'invoke' },
+  notificationsRequestExactAlarms: { channel: 'notifications:requestExactAlarms', kind: 'invoke' },
   onRpgAchievementUnlocked: { channel: 'rpg:achievementUnlocked', kind: 'on', unwrap: (p: unknown) => (p as { id?: string } | undefined)?.id },
   onRpgAchievementsBackfilled: { channel: 'rpg:achievementsBackfilled', kind: 'on', unwrap: (p: unknown) => (p as { ids?: string[] } | undefined)?.ids ?? [] },
   onRpgDaySealed: { channel: 'rpg:daySealed', kind: 'on' },
@@ -164,6 +167,7 @@ export const API_CHANNELS = {
   onNotificationsUpdated: { channel: 'notifications:updated', kind: 'on' },
   // Cauldron
   cauldronGetPresets: { channel: 'cauldron:getPresets', kind: 'invoke' },
+  cauldronGetLastUsedPreset: { channel: 'cauldron:getLastUsedPreset', kind: 'invoke' },
   cauldronUpsertPreset: { channel: 'cauldron:upsertPreset', kind: 'invoke' },
   cauldronDeletePreset: { channel: 'cauldron:deletePreset', kind: 'invoke' },
   cauldronStart: { channel: 'cauldron:start', kind: 'invoke' },
@@ -252,6 +256,11 @@ export const API_CHANNELS = {
   financeSetBudget: { channel: 'finance:setBudget', kind: 'invoke' },
   financeGetBudgetStatus: { channel: 'finance:getBudgetStatus', kind: 'invoke' },
   financeUpdateCategoryMapping: { channel: 'finance:updateCategoryMapping', kind: 'invoke' },
+  financeSaveStatementPaper: { channel: 'finance:saveStatementPaper', kind: 'invoke' },
+  financeImportSelectAndParseTable: { channel: 'finance:importSelectAndParseTable', kind: 'invoke' },
+  financeImportApplyTableMapping: { channel: 'finance:importApplyTableMapping', kind: 'invoke' },
+  financeImportConfirmTable: { channel: 'finance:importConfirmTable', kind: 'invoke' },
+  financeGetEntryDefaults: { channel: 'finance:getEntryDefaults', kind: 'invoke' },
   // Finance - Dashboard
   financeGetMonthlyBalance: { channel: 'finance:getMonthlyBalance', kind: 'invoke' },
   financeGetCategoryBreakdown: { channel: 'finance:getCategoryBreakdown', kind: 'invoke' },

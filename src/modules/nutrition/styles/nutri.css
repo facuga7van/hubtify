@@ -1,5 +1,4 @@
-/* ========================================================
-   Nutrify — Medieval Codex Theme
+/* =================================================   Nutrify — Medieval Codex Theme
    Uses codex tokens from hub/styles/theme.css
    ======================================================== */
 
@@ -106,7 +105,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: var(--fs-label);
-  color: var(--gold);
+  /* --gold sobre la parada clara del degradé (--ink-soft) daba 3.50:1 y era el
+     fallo real de Nutrify —los otros dos peores de la auditoría eran botones
+     deshabilitados, que WCAG exceptúa. --gold-light da 4.97:1 sobre --ink-soft
+     y 7.07:1 sobre --ink, sin salirse del oro. */
+  color: var(--gold-light);
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
   border: 1.5px solid var(--gold);
   border-radius: 3px;
@@ -124,7 +127,7 @@
 }
 
 .nutri-btn:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -142,11 +145,14 @@
   padding: 10px 16px;
   background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
   border-color: var(--gold);
-  color: var(--gold);
+  /* Mismo defecto que ya se curo en .nutri-btn, .nutri-action-bar y
+     .nutri-day-btn: --gold sobre --ink-soft da 3.50:1 clavado. Este hermano
+     quedo sin tocar. --gold-light da 4.98:1. */
+  color: var(--gold-light);
 }
 
 .nutri-btn-primary:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -178,7 +184,7 @@
   font-size: var(--fs-label) !important;
   padding: 3px 8px !important;
   letter-spacing: 0.04em !important;
-  min-height: 26px;
+  min-height: 32px;  /* era 26: el piso de control del escritorio es 32 */
 }
 
 
@@ -192,7 +198,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: var(--fs-label);
-  color: var(--gold);
+  color: var(--gold-light);  /* 4.97:1 sobre --ink-soft; --gold daba 3.50:1 */
   background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
   border: 1.5px solid var(--gold);
   border-radius: 3px;
@@ -204,7 +210,7 @@
 }
 
 .nutri-action-bar:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -255,13 +261,14 @@
   margin-bottom: 14px;
 }
 
+/* 28×28 quedaba bajo el piso de control (32 px) y con --gold daba 3.50:1. */
 .nutri-day-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   font-family: 'IM Fell English SC', serif;
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
   border: 1.5px solid var(--gold);
-  color: var(--gold);
+  color: var(--gold-light);
   border-radius: 3px;
   cursor: pointer;
   font-size: var(--fs-quote);
@@ -272,7 +279,7 @@
 }
 
 .nutri-day-btn:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -444,7 +451,7 @@
 .nutri-cal-val.red   { color: var(--rubric); }
 
 .nutri-cal-pct {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 .nutri-cal-hint {
@@ -454,13 +461,15 @@
 
 /* ── Status message ── */
 
+/* Texto corrido centrado: sin techo llegaba a 190 caracteres por renglón. */
 .nutri-status-message {
   text-align: center;
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-faded);
-  margin: 10px 0 0;
+  max-width: var(--measure);
+  margin: 10px auto 0;
   padding: 0 12px;
 }
 
@@ -580,8 +589,10 @@
 .nutri-macro.is-over .nutri-macro-fill {
   filter: saturate(1.15) brightness(1.07);
 }
+/* Pasarse del objetivo es una advertencia, y la advertencia del códice es la
+   rúbrica: 8.40 / 7.12 / 5.57 sobre --parch-0/1/2. --gold-dark daba 3.84. */
 .nutri-macro.is-over .nutri-macro-pct {
-  color: var(--gold-dark);
+  color: var(--rubric);
   font-weight: 700;
 }
 
@@ -732,9 +743,10 @@
 .nutri-mode-btn {
   background: none;
   border: 1px solid transparent;
-  color: var(--ink-faded);
+  color: var(--ink-soft);  /* es una pestaña, no una pista */
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
+  min-height: 32px;
   padding: 2px 10px;
   cursor: pointer;
   border-radius: 3px;
@@ -1343,13 +1355,45 @@
   outline-offset: 1px;
 }
 
+/* El hueco de Nutrify ya traía ícono + frase + botón en el JSX (es el mejor de
+   la app), pero la clase no los ordenaba: quedaban apilados por el flujo normal
+   y el ícono pegado al texto. Columna centrada, como `.notif-empty`. */
 .nutri-empty {
-  font-family: 'IM Fell English', serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--ff-body);
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-faded);
   text-align: center;
-  padding: 12px 0;
+  padding: 16px 0;
+}
+
+.nutri-empty > svg {
+  /* contrast-ok: sello decorativo del estado vacio; el mensaje esta en el <p>
+     de al lado. Ornamento, no informacion. */
+  color: var(--gold-dark);
+  opacity: 0.55;
+}
+
+.nutri-empty > p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+.nutri-empty .nutri-btn {
+  font-style: normal;
+}
+
+/* El widget del hub reusa `.nutri-empty` para «falta la meta»: ahí adentro de
+   una fila de 68 px el bloque va a la izquierda y sin aire propio. */
+.nutri-dash-setup.nutri-empty {
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
 }
 
 /* ── Meal group headers (N5) ── */
@@ -1406,17 +1450,21 @@
   border-bottom: none;
 }
 
+/* Era 18×12 con opacidad 0.5: un control invisible. Sigue siendo discreto,
+   pero ahora hay dónde apuntar. */
 .nutri-breakdown-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   background: none;
   border: none;
   padding: 1px 4px;
   margin-left: 4px;
   cursor: pointer;
-  color: var(--ink-faded);
-  opacity: 0.5;
+  color: var(--ink-soft);
+  opacity: 0.75;
   transition: opacity 150ms ease;
   vertical-align: middle;
 }
@@ -1489,16 +1537,20 @@
 /* Vive SIEMPRE pegado a una pastilla de cuero oscuro: en `--ink-faded` el
    glifo quedaba marrón sobre marrón, invisible. Va en oro, como la × que
    tiene al lado, y se separa con el mismo filete. */
+/* Medía 26×11 px: el control más chico de toda la app. El alto lo toma del
+   `.nutri-pill` que la contiene; el `min-height` es el piso propio. --gold
+   sobre pergamino tostado no llegaba a AA: la chapita usa la tinta. */
 .nutri-pill-portion {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 24px;
   padding: 0 7px;
   border: 1px solid var(--gold);
   border-left: 1px solid rgba(168, 138, 60, 0.4);
   border-radius: 0 3px 3px 0;
   background: rgba(168, 138, 60, 0.18);
-  color: var(--gold);
+  color: var(--ink-soft);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -1578,9 +1630,11 @@
   font-size: var(--fs-label) !important;
 }
 
+/* --parch-0 sobre --gold daba 2.68:1. Sobre una superficie dorada la tinta es
+   --ink (4.97:1), no el pergamino. */
 .nutri-portion-preset.active {
   background: var(--gold) !important;
-  color: var(--parch-0) !important;
+  color: var(--ink) !important;
   border-color: var(--gold) !important;
 }
 
@@ -1627,9 +1681,9 @@
 
 .nutri-cs-val.green { color: var(--moss); }
 .nutri-cs-val.red { color: var(--rubric); }
-.nutri-cs-val.gold { color: var(--gold-dark); }
+.nutri-cs-val.gold { color: var(--ink-soft); }/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 
-.nutri-cs-pct { color: var(--gold-dark); }
+.nutri-cs-pct { color: var(--ink-soft); }/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 
 .nutri-cs-sub {
   font-family: 'IM Fell English', serif;
@@ -1778,6 +1832,12 @@
   box-shadow:
     0 2px 4px rgba(42, 29, 14, 0.3),
     0 4px 16px rgba(42, 29, 14, 0.35);
+}
+
+/* Medía 37,5 px de alto: por debajo del piso de 44 px para el pulgar, y es el
+   botón que cierra el día. */
+[data-shell="mobile"] .nutri-sticky-footer .nutri-close-day-btn {
+  min-height: 44px;
 }
 
 
@@ -2128,7 +2188,7 @@
   font-family: 'Fira Code', monospace;
   font-size: var(--fs-heading);
   font-weight: 600;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 .nutri-adaptive-unit {
@@ -2147,7 +2207,7 @@
   font-weight: 600;
 }
 
-.nutri-adaptive-diff.pos { color: var(--gold-dark); }
+.nutri-adaptive-diff.pos { color: var(--ink-soft); }/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 .nutri-adaptive-diff.neg { color: var(--rubric); }
 
 .nutri-adaptive-explain {
@@ -2213,17 +2273,19 @@
 
 .nutri-goal-opt .opt-ico {
   font-size: var(--fs-quote);
+  /* contrast-ok: pictograma del objetivo, no texto; el rotulo va al lado en
+     tinta y el dibujo da 3.84:1 sobre el pergamino (3:1) */
   color: var(--gold-dark);
 }
 
 .nutri-goal-opt.active {
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold sobre el degrade de tinta daba 3.50:1; --gold-light da 4.98:1 */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(168, 138, 60, 0.25);
   border: 1px solid var(--gold);
 }
 
-.nutri-goal-opt.active .opt-ico { color: var(--gold); }
+.nutri-goal-opt.active .opt-ico { color: var(--gold-light); }
 
 .nutri-goal-desc {
   text-align: center;
@@ -2259,7 +2321,7 @@
 }
 
 .nutri-check.active .nutri-check-box {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   border-color: var(--ink);
   color: var(--ink);
 }
@@ -2347,7 +2409,7 @@
   display: grid;
   place-items: center;
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold sobre el degrade de tinta daba 3.50:1; --gold-light da 4.98:1 */
   border: 1px solid var(--gold);
   font-size: var(--fs-quote);
 }
@@ -2399,7 +2461,7 @@
 }
 
 .nutri-streak-note--pending {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 .nutri-streak-note--grace {
@@ -2440,7 +2502,7 @@
 
 .nutri-range-tab.active {
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold sobre el degrade de tinta daba 3.50:1; --gold-light da 4.98:1 */
 }
 
 
@@ -2560,7 +2622,7 @@
 /* Mismo tratamiento de «marcado» que el resto de las casillas del módulo: sin
    esto la tilde quedaba verde sobre pergamino y no leía como activa. */
 .nutri-meal-schedule-toggle.active .nutri-check-box {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   border-color: var(--ink);
   color: var(--ink);
 }
@@ -2609,14 +2671,14 @@
 }
 
 .nutri-meal-schedule-sep {
-  color: var(--ink-faded, #6b5535);
+  color: var(--ink-faded);
   font-size: var(--fs-label, 13px);
 }
 
 .nutri-meal-schedule-catch {
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label, 13px);
-  color: var(--ink-faded, #6b5535);
+  color: var(--ink-faded);
   font-style: italic;
 }
 
@@ -2748,7 +2810,7 @@
   cursor: pointer;
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label, 13px);
-  color: var(--ink-faded, #6b5535);
+  color: var(--ink-faded);
   text-decoration: underline;
   padding: 4px 6px;
 }
@@ -2856,6 +2918,17 @@
 
 /* ── Favourite pills: click to log, explicit × to remove ── */
 
+/* `.nutri-hint` se usaba en Today.tsx SIN definición en ninguna hoja: era un
+   <p> suelto que a 1640 px llegaba a 191 caracteres por renglón. */
+.nutri-hint {
+  margin: 0;
+  max-width: var(--measure);
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
 .nutri-fav-pill {
   display: inline-flex;
   align-items: center;
@@ -2934,7 +3007,7 @@
 }
 
 .nutri-portion-chip.active {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
   border-color: var(--gold);
   font-weight: 700;
@@ -3098,7 +3171,7 @@
   margin-bottom: 8px;
   padding: 2px 10px;
   font-size: var(--fs-label);
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   border-color: var(--gold-dark);
 }
 
@@ -3146,7 +3219,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.05em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   background: rgba(168, 138, 60, 0.12);
 }
 
@@ -3176,7 +3249,7 @@
 }
 
 .nutri-event-midpoint {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   font-style: italic;
 }
 
@@ -3184,7 +3257,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
 }
 
 
@@ -3377,4 +3450,121 @@
   .nutri-suggest-opt:hover {
     background: transparent;
   }
+}
+
+/* ── Teléfono: área de toque de las chapitas y los íconos de fila ──
+   Las pastillas de favorito, la chapita de porción, el desplegable del desglose
+   y los íconos de comida quedaban entre 24 y 30 px de alto. */
+[data-shell="mobile"] .nutri-pill,
+[data-shell="mobile"] .nutri-pill-portion,
+[data-shell="mobile"] .nutri-fav-pill,
+[data-shell="mobile"] .nutri-fav-remove,
+[data-shell="mobile"] .nutri-breakdown-toggle,
+[data-shell="mobile"] .nutri-meal-ico-btn,
+[data-shell="mobile"] .nutri-mode-btn,
+[data-shell="mobile"] .nutri-day-btn,
+[data-shell="mobile"] .nutri-btn-sm,
+[data-shell="mobile"] .nutri-date-pill,
+[data-shell="mobile"] .nutri-food-action {
+  min-height: var(--touch-min);
+}
+
+/* Los botones de SOLO ícono son cuadrados: el pulgar necesita las dos medidas.
+   La chapita de porción queda afuera a propósito — es un segmento dentro de la
+   pastilla del favorito y ensancharla la deformaría; con 44 px de alto ya se
+   toca, y el alto es lo que importa para el pulgar. */
+[data-shell="mobile"] .nutri-day-btn,
+[data-shell="mobile"] .nutri-meal-ico-btn,
+[data-shell="mobile"] .nutri-breakdown-toggle,
+[data-shell="mobile"] .nutri-icon-only,
+[data-shell="mobile"] .nutri-food-action {
+  min-width: var(--touch-min);
+}
+
+/* ── Widget del hub sin meta configurada ────────────
+   Antes decia «Configuracion requerida» (falso: se puede registrar igual) y
+   no era clickeable. Ahora nombra lo que falta y lleva a arreglarlo. */
+.nutri-dash-setup {
+  text-align: left;
+  padding: 0;
+}
+
+.nutri-dash-setup__text {
+  margin: 0 0 2px;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* Sin meta no hay anillo: mostramos lo registrado y nada mas. */
+.nutri-dash-plain-total {
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px dashed rgba(74, 55, 32, 0.4);
+  border-radius: 50%;
+  color: var(--ink-soft);
+}
+
+.nutri-dash-plain-total .qb-numeral {
+  font-size: var(--fs-sub);
+  color: var(--ink);
+}
+
+.nutri-dash-plain-total .qb-hand {
+  font-size: var(--fs-label);
+}
+
+/* «Repetir ayer», ahora por su cuenta: vivía dentro de la tarjeta de favoritos,
+   que sólo aparece cuando ya hay un favorito guardado. */
+.nutri-repeat-card {
+  display: flex;
+  justify-content: flex-start;
+  padding: 10px 12px;
+}
+
+[data-shell="mobile"] .nutri-repeat-card .nutri-btn {
+  min-height: 44px;
+  width: 100%;
+}
+
+/* ── Atajos de repetición en el widget del hub ──────
+   Favoritos + frecuentes + «Repetir ayer»: un toque, cero red. Vivían sólo
+   dentro de /nutrition, a un cambio de ruta de distancia. */
+.nutri-dash-repeat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.nutri-dash-repeat__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.nutri-dash-repeat__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14ch;
+}
+
+.nutri-dash-repeat__kcal {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-label);
+}
+
+[data-shell="mobile"] .nutri-dash-repeat__pill,
+[data-shell="mobile"] .nutri-dash-repeat__yesterday {
+  min-height: 44px;
 }

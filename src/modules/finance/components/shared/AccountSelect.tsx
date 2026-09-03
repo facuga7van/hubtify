@@ -38,9 +38,18 @@ interface AccountSelectProps {
   onChange: (value: string) => void;
   /** Reports whether the selector is actually usable (bridge + accounts). */
   onSupported?: (supported: boolean) => void;
+  /**
+   * La cuenta que el historial propone (`finance:getEntryDefaults`), si hay.
+   *
+   * Entra ANTES del respaldo a «Efectivo»: ese respaldo es la cuenta que el
+   * historial dice que la persona NO usa (`account_id` en NULL en las 107 filas
+   * de la base real), así que ofrecerla antes que un hecho medido es al revés.
+   * Sigue perdiendo contra lo recordado localmente, que es más específico.
+   */
+  seedAccountId?: string | null;
 }
 
-export function AccountSelect({ value, onChange, onSupported }: AccountSelectProps) {
+export function AccountSelect({ value, onChange, onSupported, seedAccountId }: AccountSelectProps) {
   const { t } = useTranslation();
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [supported, setSupported] = useState(false);
@@ -51,6 +60,14 @@ export function AccountSelect({ value, onChange, onSupported }: AccountSelectPro
   onSupportedRef.current = onSupported;
   const valueRef = useRef(value);
   valueRef.current = value;
+  const seedRef = useRef(seedAccountId);
+  seedRef.current = seedAccountId;
+  /**
+   * El valor actual salió del respaldo genérico («Efectivo» / «sin cuenta»), no
+   * de una elección ni de lo recordado. Es lo ÚNICO que la semilla del historial
+   * tiene derecho a pisar cuando llega tarde.
+   */
+  const usedGenericFallback = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,12 +86,16 @@ export function AccountSelect({ value, onChange, onSupported }: AccountSelectPro
       if (!usable) return;
 
       // Resolve the default: the current value if still alive, else the last
-      // account used, else the seeded «Efectivo», else "sin cuenta".
+      // account used, else the one the ledger infers, else the seeded
+      // «Efectivo», else "sin cuenta".
       const alive = new Set(live.map((a) => a.id));
       const current = valueRef.current;
       if (current === NO_ACCOUNT || alive.has(current)) return;
       const last = readLastAccountId();
-      if (last === NO_ACCOUNT || alive.has(last)) { onChangeRef.current(last); return; }
+      if (last === NO_ACCOUNT || alive.has(last)) { usedGenericFallback.current = false; onChangeRef.current(last); return; }
+      const seed = seedRef.current;
+      if (seed && alive.has(seed)) { usedGenericFallback.current = false; onChangeRef.current(seed); return; }
+      usedGenericFallback.current = true;
       onChangeRef.current(alive.has(DEFAULT_CASH_ACCOUNT_ID) ? DEFAULT_CASH_ACCOUNT_ID : NO_ACCOUNT);
     };
 
@@ -89,6 +110,21 @@ export function AccountSelect({ value, onChange, onSupported }: AccountSelectPro
     };
   }, []);
 
+  /**
+   * La semilla llega DESPUÉS de que las cuentas cargaron —es otro viaje de IPC—,
+   * así que para cuando aparece el select ya cayó en «Efectivo». Reintentar la
+   * carga entera no alcanzaba: el primer paso ya había dejado un valor vivo y el
+   * `alive.has(current)` de arriba corta antes de llegar a la semilla.
+   *
+   * Por eso este efecto es quirúrgico: pisa el respaldo genérico y NADA más.
+   */
+  useEffect(() => {
+    if (!seedAccountId || !usedGenericFallback.current) return;
+    if (!accounts.some((a) => a.id === seedAccountId)) return;
+    usedGenericFallback.current = false;
+    onChangeRef.current(seedAccountId);
+  }, [seedAccountId, accounts]);
+
   if (!supported) return null;
 
   return (
@@ -97,7 +133,7 @@ export function AccountSelect({ value, onChange, onSupported }: AccountSelectPro
       value={value === '' ? NO_ACCOUNT : value}
       aria-label={t('coinify.accountLabel', 'Cuenta')}
       title={t('coinify.accountLabel', 'Cuenta')}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => { usedGenericFallback.current = false; onChange(e.target.value); }}
     >
       {accounts.map((a) => (
         <option key={a.id} value={a.id}>{a.name}</option>

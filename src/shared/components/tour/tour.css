@@ -78,7 +78,7 @@
   font-family: 'UnifrakturCook', cursive;
   font-size: var(--fs-nav);
   font-weight: 700;
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84 / 3.26 / 2.55 sobre el pergamino */
   letter-spacing: 0.03em;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(168, 138, 60, 0.25);
@@ -158,7 +158,7 @@
 }
 
 .tour-tooltip__dot--active {
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 55%, #5a0e0e 100%);
   border-color: rgba(194, 58, 58, 0.6);
   box-shadow: 0 0 6px rgba(194, 58, 58, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
   transform: scale(1.2);

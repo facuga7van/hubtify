@@ -1,6 +1,7 @@
 import { doc, setDoc, getDoc, getDocs, collection, writeBatch } from 'firebase/firestore';
 import { getActiveFirestore } from './firebase';
 import { mergeQuestData } from './sync-merge';
+import { markSyncStarted, markSyncPushed, markSyncPulled, markSyncError } from './sync-status';
 import { daysAgoDateString } from '../../shared/date-utils';
 import {
   habitCheckDocId,
@@ -116,6 +117,7 @@ interface SyncSettings {
 }
 
 export async function syncPush(uid: string): Promise<{ success: boolean; error?: string }> {
+  markSyncStarted();
   try {
     const [stats, questData, charData, characterName, username, nutritionData, financeData, cauldronData, notificationData] = await Promise.all([
       window.api.getRpgStats(),
@@ -262,11 +264,13 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
       }
     }
 
+    markSyncPushed();
     return { success: true };
   } catch (err: unknown) {
     const error = err as { message?: string };
     const message = error.message ?? 'Sync push failed';
     console.error('[Sync] Push failed:', err);
+    markSyncError(message);
     // Tell the UI. A silent failure here means the user keeps working believing
     // their data is in the cloud — and logout/switchAccount then wipe it.
     try {
@@ -277,11 +281,14 @@ export async function syncPush(uid: string): Promise<{ success: boolean; error?:
 }
 
 export async function syncPull(uid: string): Promise<{ success: boolean; hasData?: boolean; changed?: boolean; error?: string }> {
+  markSyncStarted();
   try {
     const db = getActiveFirestore();
     const userRef = doc(db, 'hubtify_users', uid);
     const snap = await getDoc(userRef);
-    if (!snap.exists()) return { success: true, hasData: false };
+    // Una cuenta nueva sin documento remoto igual es un pull que funcionó: la
+    // conexión está y no hay nada que bajar.
+    if (!snap.exists()) { markSyncPulled(); return { success: true, hasData: false }; }
 
     const data = snap.data();
     let changed = false;
@@ -418,12 +425,16 @@ export async function syncPull(uid: string): Promise<{ success: boolean; hasData
     }
 
     // Track last successful pull time for overwrite guards
-    localStorage.setItem('hubtify_last_pull_at', new Date().toISOString());
+    const pulledAt = new Date().toISOString();
+    localStorage.setItem('hubtify_last_pull_at', pulledAt);
+    markSyncPulled(pulledAt);
 
     return { success: true, hasData: true, changed };
   } catch (err: unknown) {
     const error = err as { message?: string };
+    const message = error.message ?? 'Sync pull failed';
     console.error('[Sync] Pull failed:', err);
-    return { success: false, error: error.message ?? 'Sync pull failed' };
+    markSyncError(message);
+    return { success: false, error: message };
   }
 }

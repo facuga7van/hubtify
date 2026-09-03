@@ -28,7 +28,7 @@ describe('db provider', () => {
     expect(a).toBe(b);
     expect(factory).toHaveBeenCalledTimes(1);
     const applied = a.prepare("SELECT version FROM migrations_applied WHERE namespace = 'core' ORDER BY version").all() as Array<{ version: number }>;
-    expect(applied.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(applied.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect((a.pragma('foreign_keys') as Array<{ foreign_keys: number }>)[0].foreign_keys).toBe(1);
   });
 

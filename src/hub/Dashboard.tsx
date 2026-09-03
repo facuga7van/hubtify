@@ -10,7 +10,12 @@ import {
 import { Sword, Crown, Flame, Heart, Scroll, Quill, Cauldron, Sparkle, Dagger, FloralHeart, ArrowUpRight } from '../shared/components/icons';
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
+import Skeleton from '../shared/components/Skeleton';
+import ErrorState from '../shared/components/ErrorState';
 import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
+import { requestQuickCreate } from './widgets/quick-create';
+import { buildReturnBrief } from './return-brief';
+import { todayDateString } from '../../shared/date-utils';
 import { useDashboardLayout } from './layouts/useDashboardLayout';
 import { useDashboardDrag } from './layouts/useDashboardDrag';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
@@ -194,6 +199,8 @@ export default function Dashboard() {
   const { available: codexAvailable, invite: sealInvite, todaySealed } = useSealInvite();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  /** The return brief steps aside as soon as the user acts on it. */
+  const [returnDismissed, setReturnDismissed] = useState(false);
   const epigraph = useMemo(() => EPIGRAPHS[Math.floor(Math.random() * EPIGRAPHS.length)], []);
 
   const load = useCallback(() => {
@@ -219,7 +226,7 @@ export default function Dashboard() {
       .then(([questsOverdue, mealsToday]) => setTodo({ questsOverdue, mealsToday }))
       .catch(() => { /* the brief just stays generic */ });
 
-    getAchievements().then((list) => {
+    getAchievements().catch(() => null).then((list) => {
       if (!list) { setFreshAchievementId(null); return; }
       const cutoff = Date.now() - 24 * 60 * 60_000;
       const fresh = list
@@ -253,48 +260,39 @@ export default function Dashboard() {
     };
   }, [load]);
 
+  /* Era un esqueleto escrito en línea con `rgba(74,55,32,.1)` a mano y SIN
+     animación: una grilla de manchas quietas que no se distinguía de un error
+     de pintado. Ahora es la primitiva compartida, con el mismo shimmer que el
+     resto de la app. */
   if (loading)
     return (
       <div style={{ padding: '32px 24px', maxWidth: 900, margin: '0 auto' }}>
-        {/* Skeleton: title area */}
-        <div style={{ height: 18, width: 220, background: 'rgba(74,55,32,.1)', borderRadius: 4, marginBottom: 8 }} />
-        <div style={{ height: 12, width: 340, background: 'rgba(74,55,32,.07)', borderRadius: 4, marginBottom: 24 }} />
-        {/* Skeleton: salutation */}
+        <Skeleton variant="line" width={220} />
+        <div style={{ height: 8 }} />
+        <Skeleton variant="line" width={340} />
+        <div style={{ height: 24 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, marginBottom: 20 }}>
-          <div>
-            <div style={{ height: 12, background: 'rgba(74,55,32,.08)', marginBottom: 6, borderRadius: 3 }} />
-            <div style={{ height: 12, background: 'rgba(74,55,32,.06)', width: '85%', marginBottom: 6, borderRadius: 3 }} />
-            <div style={{ height: 12, background: 'rgba(74,55,32,.06)', width: '60%', borderRadius: 3 }} />
-          </div>
+          <Skeleton variant="line" count={3} text />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(74,55,32,.1)' }} />
+            <Skeleton variant="card" width={72} height={72} />
           </div>
         </div>
-        {/* Skeleton: cartouches */}
         <div className="qb-cartouche-row">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 64, background: 'rgba(74,55,32,.07)', borderRadius: 6 }} />
+            <Skeleton key={i} variant="block" height={64} />
           ))}
         </div>
-        {/* Skeleton: module cards (4-column grid) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: 'span 2' }} />
+            <div key={i} style={{ gridColumn: 'span 2' }}><Skeleton variant="card" height={120} /></div>
           ))}
-          <div style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: '1 / -1' }} />
+          <div style={{ gridColumn: '1 / -1' }}><Skeleton variant="card" height={120} /></div>
         </div>
       </div>
     );
 
   if (loadError)
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <p style={{ marginBottom: 12, color: 'var(--rubric)' }}>{t('common.somethingWentWrong')}</p>
-        <button className="rpg-button" onClick={load}>
-          {t('common.tryAgain')}
-        </button>
-      </div>
-    );
+    return <ErrorState message={t('common.somethingWentWrong')} onRetry={load} />;
 
   const level = stats?.level ?? 1;
   const hp = stats?.hp ?? 100;
@@ -379,6 +377,18 @@ export default function Dashboard() {
     });
   }
 
+  /* ── El regreso ───────────────────────────────────────────
+     El uso real no es diario: 14 días activos en cinco meses, con huecos de 6,
+     9, 40 y 54 días. El brief decía exactamente lo mismo después de un día que
+     después de cincuenta, y nadie explicaba dónde había quedado la racha.
+     Informa, no reprocha — C10 es lo mejor que tiene la app. */
+  const returnBrief = returnDismissed ? null : buildReturnBrief({
+    lastEventDate: recentEvents[0]?.createdAt?.slice(0, 10) ?? null,
+    today: todayDateString(),
+    streak,
+    overdueQuests: todo.questsOverdue,
+  });
+
   /** A fresh install used to be a wall of zeroes with no call to action. */
   const isEmptyState = !!stats
     && stats.totalTasks === 0
@@ -396,6 +406,51 @@ export default function Dashboard() {
       {/* ── row 1: today's brief + wax seal ──────────────── */}
       <div className="dash-row-brief">
         <div>
+          {returnBrief && (
+            <div className="dash-return" role="status">
+              <div className="qb-small-caps dash-return__eyebrow">
+                {t('dashboard.returnTitle', 'EL REGRESO')}
+              </div>
+              <p className="dash-return__lead">
+                {t('dashboard.returnDaysAway', {
+                  n: returnBrief.daysAway,
+                  defaultValue: 'Pasaron {{n}} días desde la última anotación.',
+                })}
+              </p>
+              <ul className="dash-return__list">
+                <li>
+                  {returnBrief.streak > 0
+                    ? t('dashboard.returnStreakAlive', {
+                      n: returnBrief.streak,
+                      defaultValue: 'Tu racha de {{n}} días sigue en pie.',
+                    })
+                    : t('dashboard.returnStreakReset', 'La racha volvió a cero. No hay multa: se empieza de nuevo cuando quieras.')}
+                </li>
+                <li>
+                  {returnBrief.overdueQuests > 0
+                    ? t('dashboard.returnOverdue', {
+                      n: returnBrief.overdueQuests,
+                      defaultValue: 'Te esperan {{n}} misiones con la fecha pasada. Se posponen sin costo.',
+                    })
+                    : t('dashboard.returnNothingOverdue', 'No quedó nada vencido esperándote.')}
+                </li>
+              </ul>
+              <button
+                type="button"
+                className="rpg-button dash-return__action"
+                onClick={() => {
+                  setReturnDismissed(true);
+                  if (returnBrief.action === 'review-overdue') animatedNavigate('/quests');
+                  else requestQuickCreate('quest');
+                }}
+              >
+                {returnBrief.action === 'review-overdue'
+                  ? t('dashboard.returnCtaReview', 'Mirá qué quedó pendiente')
+                  : t('dashboard.returnCtaCreate', 'Anotá por dónde seguís')}
+              </button>
+            </div>
+          )}
+
           <div className="dash-brief">
             <div className="qb-small-caps dash-brief__eyebrow">
               {t('dashboard.briefTitle', 'HOY')} {'·'}{' '}
@@ -415,14 +470,20 @@ export default function Dashboard() {
               <p className="dash-empty__text">
                 {t('dashboard.emptyStateText', 'Todavía no hay nada registrado. Empezá por acá:')}
               </p>
+              {/* These three used to only NAVIGATE, dropping the user on an
+                  equally empty page with the form still hidden. Now each one
+                  opens its widget's form right here, in the hub. */}
               <div className="dash-empty__actions">
-                <button className="rpg-button" onClick={() => animatedNavigate('/quests')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('quest')}>
                   {t('dashboard.emptyCtaQuest', 'Creá tu primera misión')}
                 </button>
-                <button className="rpg-button" onClick={() => animatedNavigate('/nutrition')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('habit')}>
+                  {t('dashboard.emptyCtaHabit', 'Creá tu primer hábito')}
+                </button>
+                <button className="rpg-button" onClick={() => requestQuickCreate('meal')}>
                   {t('dashboard.emptyCtaMeal', 'Registrá una comida')}
                 </button>
-                <button className="rpg-button" onClick={() => animatedNavigate('/finance')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('expense')}>
                   {t('dashboard.emptyCtaExpense', 'Anotá un gasto')}
                 </button>
               </div>
@@ -492,7 +553,7 @@ export default function Dashboard() {
         <Tooltip text={t('dashboard.cartLevelTip', 'Nivel actual del héroe')}><Cartouche label={t('dashboard.cartLevel', 'NIVEL')} value={level} foot={stats?.title} icon={<Crown width={14} height={14} />} /></Tooltip>
         <Tooltip text={t('dashboard.cartXpTip', 'Experiencia ganada hoy')}><Cartouche label={t('dashboard.cartXp', 'XP HODIE')} value={xpToday >= 0 ? `+${xpToday}` : `${xpToday}`} foot={t('dashboard.cartXpFoot', 'ganados al sol')} icon={<Sword width={14} height={14} />} tone="sage" /></Tooltip>
         <Tooltip text={t('dashboard.cartStreakTip', 'Días consecutivos de actividad')}><Cartouche label={t('dashboard.cartStreak', 'RACHA')} value={streak} foot={t('dashboard.cartStreakFoot', 'días de gloria')} icon={<Flame width={14} height={14} />} /></Tooltip>
-        <Tooltip text={t('dashboard.cartHpTip', 'Salud actual del héroe')}><Cartouche label={t('dashboard.cartHp', 'VITA')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" /></Tooltip>
+        <Tooltip text={t('dashboard.cartHpTip', 'Vigor actual del héroe')}><Cartouche label={t('dashboard.cartHp', 'VIGOR')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" /></Tooltip>
       </div>
 
       <QBDividerSection />
@@ -550,8 +611,10 @@ export default function Dashboard() {
           <HelpBubble text={t('dashboard.chronicleHelp', 'Últimos eventos que otorgaron XP: misiones, nutrición, finanzas y logros.')} />
           {recentEvents.length > 0 ? (
             // El hecho es el dato primario de la fila: cuerpo de texto. XP y
-            // hora quedan en --fs-label como meta.
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-body)', fontFamily: "'IM Fell English', serif" }}>
+            // hora quedan en --fs-label como meta. La pintura vive en
+            // `dashboard-layouts.css` (.dash-chronicle*): en línea no había
+            // manera de darle un puntillado guía ni de pisarla desde el móvil.
+            <ul className="dash-chronicle">
               {recentEvents.map((ev) => {
                 let description = '';
                 try {
@@ -564,31 +627,19 @@ export default function Dashboard() {
                 }
 
                 return (
-                  <li
-                    key={ev.id}
-                    style={{
-                      display: 'grid',
-                      // Cada <li> es su propia grilla, así que con `auto auto`
-                      // las columnas de XP y de tiempo quedaban desalineadas
-                      // entre filas (cada fila medía su propio texto). Un ancho
-                      // mínimo por columna las pone en línea.
-                      gridTemplateColumns: '18px minmax(0, 1fr) minmax(56px, auto) minmax(72px, auto)',
-                      gap: 8,
-                      alignItems: 'baseline',
-                      padding: '5px 0',
-                      borderBottom: '1px dotted rgba(74,55,32,.3)',
-                    }}
-                  >
-                    <span style={{ color: 'var(--rubric)', fontSize: 'var(--fs-quote)', textAlign: 'center' }}>
-                      {eventIcon(ev.moduleId)}
+                  <li key={ev.id} className="dash-chronicle__row">
+                    <span className="dash-chronicle__icon">{eventIcon(ev.moduleId)}</span>
+                    <span className="dash-chronicle__fact">
+                      <span className="dash-chronicle__text">{description}</span>
+                      {/* El puntillado guía del índice de un libro: cose el
+                          hecho con su cifra en vez de dejar 300 px de
+                          pergamino en el medio (decisión abierta nº6). */}
+                      <span className="dash-chronicle__leader" aria-hidden="true" />
                     </span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {description}
-                    </span>
-                    <span style={{ color: 'var(--moss)', fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", textAlign: 'right' }}>
+                    <span className="dash-chronicle__xp">
                       +{Math.round(ev.xpGained)} xp
                     </span>
-                    <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', textAlign: 'right' }}>
+                    <span className="qb-hand dash-chronicle__time">
                       {formatEventTime(ev.createdAt, t)}
                     </span>
                   </li>

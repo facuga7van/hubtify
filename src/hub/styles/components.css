@@ -77,6 +77,10 @@
   justify-content: center;
   font-size: var(--fs-label);
   font-weight: bold;
+  /* contrast-ok: el rotulo flota SOBRE el relleno de la barra (rayas de
+     --rubric / --moss / --gold), no sobre la pista --parch-2 que hereda; no
+     hay un color unico que sirva para las dos mitades, y por eso lleva el
+     text-shadow. La pista vacia queda como el peor caso conocido. */
   color: var(--parch-0);
   font-family: 'IM Fell English SC', serif;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
@@ -84,10 +88,16 @@
 }
 
 /* ── RPG Button ───────────────────────────────────── */
+/* Decisión abierta nº2 (2026-09-01), RESUELTA el 2026-09-03.
+   El degradé arrancaba en --leather-light: la parada PEOR daba 4.36:1 con
+   --gold-light y el botón firma de la app fallaba AA en las diez pantallas.
+   Arranca en --leather (6.23:1) y termina en --leather-dark (7.07:1). El
+   relieve NO se pierde: lo devuelve el filo claro de 1 px de arriba
+   (inset box-shadow), que es un borde, no un fondo de texto. */
 .rpg-button {
   padding: 8px 16px;
-  background: linear-gradient(180deg, var(--leather-light) 0%, var(--leather) 100%);
-  color: var(--gold-light);   /* 6.21:1 on leather; --gold was 3.06:1 */
+  background: linear-gradient(180deg, var(--leather) 0%, var(--leather-dark) 100%);
+  color: var(--gold-light);   /* 6.23:1 sobre --leather (parada peor) */
   border: 1px solid var(--gold-dark);
   border-radius: 6px;
   cursor: pointer;
@@ -97,7 +107,9 @@
   letter-spacing: 0.04em;
   transition: all 0.2s ease;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  box-shadow: 0 2px 4px rgba(42, 29, 14, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(245, 231, 192, 0.14),
+    0 2px 4px rgba(42, 29, 14, 0.3);
 }
 
 .rpg-button:hover {
@@ -130,10 +142,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(to bottom, var(--leather-light), var(--leather));
+  /* Mismo arreglo que .rpg-button: la parada clara del degradé dejaba el
+     rótulo en 4.36:1. Arranca en --leather (6.23:1). */
+  background: linear-gradient(to bottom, var(--leather), var(--leather-dark));
   color: var(--gold-light);
   border: 1px solid var(--gold-dark);
   border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(245, 231, 192, 0.14);
   font-family: 'IM Fell English SC', serif;
   font-weight: 600;
   font-size: var(--fs-label);
@@ -141,14 +156,17 @@
   transition: all 0.2s ease;
 }
 .rpg-btn-sm:hover {
-  background: linear-gradient(to bottom, var(--gold-dark), var(--gold));
-  color: var(--leather);
+  background: linear-gradient(to bottom, var(--gold-light), var(--gold));
+  color: var(--ink);  /* --leather sobre --gold (parada peor) daba 4.38:1 */
 }
 
 /* ── Button Active State ─────────────────────────── */
+/* «Gasto» seleccionado en el libro mayor medía 3.05:1 —el segundo peor de
+   escritorio— porque --leather se leía contra la parada clara del oro.
+   --ink da 6.60:1 sobre --gold-dark y 4.97:1 sobre --gold. */
 .rpg-button.rpg-btn-active {
-  background: linear-gradient(to bottom, var(--gold-dark), var(--gold));
-  color: var(--leather);
+  background: linear-gradient(to bottom, var(--gold-light), var(--gold));
+  color: var(--ink);
   border-color: var(--gold-light);
 }
 
@@ -277,6 +295,8 @@
   padding: 0;
   border: 0;
   background: transparent;
+  /* contrast-ok: flechas dibujadas del control numerico, contenido no textual
+     (WCAG 1.4.11, 3:1); dan 3.84:1 sobre --parch-0 */
   color: var(--gold-dark);
   cursor: pointer;
   user-select: none;
@@ -408,48 +428,10 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Page Header ──────────────────────────────────── */
-.page-header {
-  margin-bottom: 20px;
-  position: relative;
-}
-
-.page-header__ornament {
-  height: 3px;
-  background: linear-gradient(90deg, transparent 0%, var(--gold-dark) 20%, var(--gold) 50%, var(--gold-dark) 80%, transparent 100%);
-  margin-bottom: 16px;
-  border-radius: 2px;
-}
-
-.page-header__content {
-  position: relative;
-}
-
-.page-header__title {
-  font-family: 'UnifrakturCook', cursive;
-  font-size: var(--fs-accent);
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0.04em;
-  margin: 0;
-}
-
-.page-header__subtitle {
-  font-family: 'Cormorant Garamond', serif;
-  font-style: italic;
-  font-size: var(--fs-quote);
-  color: var(--ink-faded);
-  margin-top: 2px;
-}
-
-.page-header__actions {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+/* `.page-header*` vivía acá para `src/shared/components/PageHeader.tsx`, cuyo
+   ÚNICO consumidor era Ajustes. Ajustes pasó a `BookPage` (ítem 12 de la
+   rúbrica), el componente se borró y con él estas reglas. El cromo de página
+   es uno solo y vive en `codex.css` (`.qb-header`, `.qb-rule`, `.qb-corner`). */
 
 /* La ventana tiene minWidth 700 (electron/main.ts), asi que un breakpoint en 700px
    solo disparaba en ese pixel exacto. A 880 de viewport el contenido ronda los
@@ -457,10 +439,6 @@ textarea:focus-visible {
 @media (max-width: 880px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
-  }
-
-  .page-header__actions {
-    right: 0;
   }
 }
 
@@ -602,7 +580,7 @@ textarea:focus-visible {
 }
 
 .auth-card__password-toggle:hover {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84:1, MENOS que el --ink-faded en reposo */
   background: rgba(168, 138, 60, 0.12);
 }
 
@@ -851,7 +829,7 @@ textarea:focus-visible {
 }
 
 .onboarding__dot--active {
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 55%, #5a0e0e 100%);
   border-color: rgba(194, 58, 58, 0.6);
   box-shadow: 0 0 6px rgba(194, 58, 58, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
   transform: scale(1.15);
@@ -922,7 +900,9 @@ textarea:focus-visible {
   border-color: var(--moss);
 }
 
-/* Font scale selector */
+/* Font scale selector — mismo par que el idioma: `.rpg-button` para el elegido,
+   `.onboarding__btn-dim` (pergamino) para el resto. Esta clase ya no pinta
+   nada: sólo hace que los cuatro repartan el ancho de la tarjeta de 560 px. */
 .onboarding__font-options {
   display: flex;
   gap: 6px;
@@ -930,29 +910,13 @@ textarea:focus-visible {
 }
 
 .onboarding__font-btn {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 4px;
-  border: 1px solid rgba(74, 55, 32, 0.4);
-  border-radius: 3px;
-  background: rgba(245, 231, 192, 0.3);
-  font-family: 'IM Fell English', serif;
-  font-size: var(--fs-label);
-  color: var(--ink-faded);
-  cursor: pointer;
+  /* `flex-basis: auto` (y no 0) a propósito: así el rótulo manda y, cuando no
+     entran los cuatro en un renglón, la fila ENVUELVE en vez de apretarlos
+     hasta partir la palabra. */
+  flex: 1 1 auto;
+  padding: 8px 6px;
   text-align: center;
-  transition: all 0.15s;
-}
-
-.onboarding__font-btn:hover {
-  background: rgba(245, 231, 192, 0.5);
-}
-
-.onboarding__font-btn--active {
-  background: rgba(168, 138, 60, 0.2);
-  border-color: var(--gold-dark);
-  color: var(--ink);
-  font-weight: bold;
+  white-space: nowrap;
 }
 
 /* Hero name input */
@@ -1118,6 +1082,7 @@ textarea:focus-visible {
   font-size: var(--fs-label);
   color: var(--ink-faded);
   margin-top: 2px;
+  max-width: var(--measure);  /* llegaba a 118 ch en cinco filas de Ajustes */
 }
 
 .settings-row__buttons {
@@ -1314,4 +1279,66 @@ textarea:focus-visible {
   font-size: var(--fs-label);
   color: var(--ink-faded);
   margin-left: 3px;
+}
+
+/* ══════════════════════════════════════════════════════
+   TELÉFONO — área de toque de las bases
+   ══════════════════════════════════════════════════════
+   `components.css` era la única hoja sin bloque [data-shell="mobile"], y acá
+   viven `.rpg-button`, `.rpg-input`, `.rpg-select` y `.settings-toggle`: las
+   piezas que aparecen en las once pantallas. Con 26–32 px de alto, el 84–100 %
+   de los controles del teléfono quedaban por debajo del pulgar (C11 = 3).
+   `--touch-min` (44 px, WCAG 2.5.5) sólo se aplica bajo el shell mobile: en
+   escritorio la densidad del códice manda y no se toca nada.
+   El alto es lo que importa —un botón de 390×26 falla sólo por alto—, así que
+   va `min-height`, no `height`: nada se estira ni se recorta. */
+[data-shell="mobile"] .rpg-button,
+[data-shell="mobile"] .rpg-btn-sm,
+[data-shell="mobile"] .rpg-input,
+[data-shell="mobile"] .rpg-select,
+[data-shell="mobile"] .rpg-stepper-btn,
+[data-shell="mobile"] .settings-toggle {
+  min-height: var(--touch-min);
+}
+
+/* Los que ya venían con `height` fija le ganaban al `min-height`. */
+[data-shell="mobile"] .rpg-btn-sm {
+  height: auto;
+}
+
+/* El interruptor es un botón sin caja propia (padding 0, riel de 38×20): el
+   alto se lo da el bloque de arriba y el riel se queda centrado, así que el
+   dibujo no cambia — sólo crece la zona que responde al dedo. */
+[data-shell="mobile"] .settings-toggle {
+  align-items: center;
+}
+
+/* Un textarea con 44 px de piso sigue siendo un textarea: el `min-height` no
+   le impide crecer. */
+[data-shell="mobile"] textarea.rpg-input {
+  min-height: calc(var(--touch-min) * 2);
+}
+
+/* `.tap-target` ya existía con 32 px: es el piso del ESCRITORIO. En el teléfono
+   el mismo helper sube a 44. */
+[data-shell="mobile"] .tap-target {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+}
+
+/* Las casillas nativas miden 13–16 px en cualquier navegador. No se agrandan a
+   44 (dejarían de parecer casillas): se les da un tamaño legible de teléfono y
+   la zona que responde al dedo la pone el ::before, que no ocupa layout. */
+[data-shell="mobile"] input[type="checkbox"],
+[data-shell="mobile"] input[type="radio"] {
+  position: relative;
+  width: 22px;
+  height: 22px;
+}
+
+[data-shell="mobile"] input[type="checkbox"]::before,
+[data-shell="mobile"] input[type="radio"]::before {
+  content: '';
+  position: absolute;
+  inset: calc((22px - var(--touch-min)) / 2);
 }

@@ -531,4 +531,61 @@ export const financeMigrations: Migration[] = [
       ALTER TABLE finance_recurring ADD COLUMN anchor_month TEXT DEFAULT NULL;
     `,
   },
+  {
+    namespace: 'finance',
+    version: 19,
+    up: `
+      -- El resumen deja de ser «una pestaña más» y pasa a ser la puerta de
+      -- entrada: todo lo que el papel imprime deja de tipearse.
+      --
+      -- Aditiva y sin tocar UNA SOLA fila existente. Precedente:
+      -- docs/superpowers/plans/2026-09-03-coinify-orphan-installments.md — no se
+      -- reparó lo que hubiera exigido adivinar, y acá vale igual.
+
+      -- Últimos 4 impresos en «TARJETA NNNN Total Consumos de …»: es lo que
+      -- permite reconocer a qué tarjeta pertenece un resumen sin preguntarlo.
+      -- El emisor deja escrito con qué parser se leyó (hoy solo galicia_visa).
+      ALTER TABLE finance_credit_cards ADD COLUMN last4  TEXT DEFAULT NULL;
+      ALTER TABLE finance_credit_cards ADD COLUMN issuer TEXT DEFAULT NULL;
+
+      -- Los números DEL PAPEL, al lado de los calculados. No se pisan a
+      -- propósito: calculated_amount es lo que Coinify suma con las filas que
+      -- tiene, statement_total_ars es lo que dice el banco. Que difieran ES el
+      -- dato — la conciliación vive de esa diferencia.
+      --
+      -- Fechas completas (YYYY-MM-DD), no días del mes: el cierre de un resumen
+      -- concreto es un hecho, y derivarlo de closing_day pierde los meses de 30
+      -- y los feriados que el banco corre.
+      ALTER TABLE finance_credit_card_statements ADD COLUMN closing_date         TEXT DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN due_date             TEXT DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN statement_total_ars  REAL DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN statement_total_usd  REAL DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN minimum_payment_ars  REAL DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN previous_balance_ars REAL DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN previous_balance_usd REAL DEFAULT NULL;
+      -- «SU PAGO»: lo que el usuario pagó DURANTE este período, o sea la
+      -- cancelación del resumen anterior. Es, textual, el «total que pagué en el
+      -- mes» que pidió el usuario, y estaba impreso desde siempre.
+      ALTER TABLE finance_credit_card_statements ADD COLUMN prior_payment_ars    REAL DEFAULT NULL;
+      ALTER TABLE finance_credit_card_statements ADD COLUMN prior_payment_usd    REAL DEFAULT NULL;
+      -- 1 = lo importado cerró contra TOTAL A PAGAR · 0 = no cerró (y se importó
+      -- igual, avisando) · NULL = no había totales en el papel: no hay checksum,
+      -- que es distinto de decir que cierra.
+      ALTER TABLE finance_credit_card_statements ADD COLUMN reconciled           INTEGER DEFAULT NULL;
+      -- Foto inmutable del bloque «Cuotas a vencer». JSON y no tabla propia: se
+      -- escribe una vez, no se edita nunca, solo tiene sentido junto a su
+      -- resumen y jamás va a divergir entre dispositivos. Una tabla costaría
+      -- alta en USER_DATA_TABLES + get + merge + tombstones para nada.
+      ALTER TABLE finance_credit_card_statements ADD COLUMN forecast_json        TEXT DEFAULT NULL;
+
+      -- El motor de recurrentes hardcodeaba 'cash' porque la plantilla no tenía
+      -- dónde guardar el medio de pago: 17 de las 17 filas de efectivo de la
+      -- base real son de ese default fantasma, y el usuario no usa efectivo.
+      -- NULL = sin opinión → se infiere del historial (finance:getEntryDefaults).
+      -- Las filas YA generadas no se tocan: reescribirlas sería reescribir historia.
+      ALTER TABLE finance_recurring ADD COLUMN payment_method TEXT DEFAULT NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_finance_cards_last4 ON finance_credit_cards(last4);
+    `,
+  },
 ];

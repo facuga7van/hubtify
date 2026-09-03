@@ -26,17 +26,34 @@
   to   { opacity: 1; }
 }
 
+/* El marco QUIETO. Antes esta caja era también la que scrolleaba, y como la X
+   es `position: absolute` contra ella, la cruz viajaba con el contenido: a los
+   ~1000 px de página del día quedaba fuera de pantalla. En escritorio zafabas
+   con Escape o con el backdrop; en mobile no hay teclado y el modal ocupa
+   96vw —quedan 2vw de backdrop por lado, intocables con el dedo— así que
+   después de sellar la ÚNICA salida estaba arriba de todo. Encerrado.
+   El scroll ahora vive en `.codex-modal__scroll` y este marco no se mueve. */
 .codex-modal {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(880px, 96vw);
   max-height: min(92vh, 960px);
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--gold-dark);
   border-radius: 6px;
   background: var(--parch-0) url('../../assets/bg.jpg') repeat;
   background-size: 600px;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   animation: codex-rise 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.codex-modal__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 
   /* Cerca del mínimo de ventana (760×640 medido) la página del día mide ~820 px
      contra 588 de modal: el sello —la ÚNICA acción de la ceremonia— queda 200 px
@@ -48,14 +65,14 @@
   scrollbar-color: rgba(138, 112, 48, 0.6) transparent;
 }
 
-.codex-modal::-webkit-scrollbar { width: 8px; }
-.codex-modal::-webkit-scrollbar-track { background: transparent; border: none; }
-.codex-modal::-webkit-scrollbar-thumb {
+.codex-modal__scroll::-webkit-scrollbar { width: 8px; }
+.codex-modal__scroll::-webkit-scrollbar-track { background: transparent; border: none; }
+.codex-modal__scroll::-webkit-scrollbar-thumb {
   background: rgba(138, 112, 48, 0.55);
   border: none;
   border-radius: 4px;
 }
-.codex-modal::-webkit-scrollbar-thumb:hover { background: rgba(138, 112, 48, 0.85); }
+.codex-modal__scroll::-webkit-scrollbar-thumb:hover { background: rgba(138, 112, 48, 0.85); }
 
 @keyframes codex-rise {
   from { transform: translateY(14px) scale(0.985); opacity: 0; }
@@ -241,7 +258,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 45%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 45%, #5a0e0e 100%);
   clip-path: inset(calc(100% - var(--codex-hold)) 0 0 0);
 }
 
@@ -338,6 +355,8 @@
   display: inline-flex;
   align-items: flex-end;
   gap: 3px;
+  /* contrast-ok: fila de monedas dibujadas (svg), no texto; rige el 3:1 de
+     contenido no textual y da 3.84:1 sobre el pergamino */
   color: var(--gold-dark);
 }
 
@@ -360,7 +379,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-body);
   letter-spacing: 0.05em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -377,7 +396,7 @@
 }
 
 .codex-unlocks__title {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
 }
 
 .codex-unlocks__list {
@@ -396,7 +415,39 @@
   color: var(--ink);
 }
 
+/* contrast-ok: ícono del ítem desbloqueado, no texto; el rótulo lo lleva
+   --ink al lado y el oro queda de ornamento (3.84:1, sobre el 3:1) */
 .codex-unlocks__item svg { color: var(--gold-dark); }
+
+/* ── la salida del ritual ─────────────────────────
+   Un ritual sin cierre no es un ritual, es un callejón: la ceremonia terminaba
+   con el lacre, el XP y los óbolos, y después te dejaba parado ahí con la única
+   salida a 1000 px de scroll. Esta es la salida DONDE ESTÁS. Deliberadamente
+   sin timer: el subtítulo promete «podés irte cuando quieras», y un modal que
+   se cierra solo no cumple esa promesa —decide por vos. */
+.codex-sealed__exit {
+  margin-top: 16px;
+  padding: 7px 20px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: linear-gradient(180deg, #f7ecd0 0%, #ecdcb4 100%);
+  border: 1px solid var(--gold-dark);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.codex-sealed__exit:hover {
+  border-color: var(--rubric);
+  color: var(--rubric);
+}
+
+.codex-sealed__exit:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 
 /* ── the 14 day strip ─────────────────────────────── */
 
@@ -514,7 +565,7 @@
   height: 24px;
   border-radius: 50%;
   color: rgba(245, 231, 192, 0.9);
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 50%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 50%, #5a0e0e 100%);
   box-shadow: 0 0 0 0 rgba(196, 168, 78, 0.55);
   animation: codex-wax-pulse 2.8s ease-in-out infinite;
 }
@@ -799,7 +850,7 @@
 
 .codex-link__count {
   font-family: 'Fira Code', monospace;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre pergamino */
 }
 
 /* Dashboard brief: the seal call-to-action reads as a line, not a banner. */
@@ -981,7 +1032,7 @@
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
   letter-spacing: 0.1em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   border: 1px solid rgba(138, 112, 48, 0.5);
   border-radius: 999px;
   background: rgba(196, 168, 78, 0.12);
@@ -998,9 +1049,14 @@
   border-top: 1px dotted rgba(74, 55, 32, 0.35);
 }
 
+/* El título ahora lleva su sello de ayuda al lado (el bloque de las maestrías
+   era el único de la ficha sin uno). Flex para que el sello quede en el
+   renglón y no herede el `letter-spacing` del small-caps. */
 .hero-masteries-title {
   color: var(--ink-soft);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
 }
 
 .hero-masteries {
@@ -1031,6 +1087,7 @@
 /* Module colours, coherent with the codex vocabulary. */
 .hero-mastery--quests .hero-mastery__icon { color: var(--rubric); }
 .hero-mastery--nutrition .hero-mastery__icon { color: var(--moss); }
+/* contrast-ok: sello del módulo, ícono y no texto; el nombre va en --ink-soft */
 .hero-mastery--finance .hero-mastery__icon { color: var(--gold-dark); }
 .hero-mastery--cauldron .hero-mastery__icon { color: var(--ink); }
 
@@ -1075,4 +1132,167 @@
   flex: 1;
   justify-content: center;
   padding: 5px 4px;
+}
+
+/* La X es la única salida real en touch (no hay Escape, y el backdrop son 2vw
+   por lado): que sea del tamaño de un dedo, no de un puntero. */
+[data-shell="mobile"] .codex-modal__close {
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* Botón de ancho completo: en el pulgar es un blanco, no un enlace. */
+[data-shell="mobile"] .codex-sealed__exit {
+  width: 100%;
+  padding: 12px 20px;
+}
+
+/* ── Teléfono: área de toque ──────────────────────── */
+[data-shell="mobile"] .ach-filter__btn,
+[data-shell="mobile"] .codex-link {
+  min-height: var(--touch-min);
+}
+
+[data-shell="mobile"] .dash-brief__seal {
+  min-height: var(--touch-min);
+}
+
+/* ══ LA BOLSA ══════════════════════════════════════
+   Los óbolos se ganan acá y hasta ahora se nombraban una sola vez, en el
+   instante en que se acuñaban (base real: 132 ganados, 0 gastados). El saldo
+   vive donde se gana y dice para qué alcanza. */
+.codex-purse {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(74, 55, 32, 0.28);
+  background: rgba(245, 231, 192, 0.35);
+}
+
+.codex-purse__coin {
+  display: inline-flex;
+  /* contrast-ok: moneda dibujada al lado del saldo, no texto (3.84:1 > 3:1) */
+  color: var(--gold-dark);
+  flex-shrink: 0;
+}
+
+.codex-purse__balance {
+  font-size: var(--fs-body);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.codex-purse__balance .qb-numeral {
+  font-size: var(--fs-sub);
+}
+
+.codex-purse__hint {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.codex-purse__link {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.codex-purse__link:hover,
+.codex-purse__link:focus-visible {
+  color: var(--ink);
+}
+
+/* A 390 px la línea entra en tres renglones antes que desbordar. */
+[data-shell="mobile"] .codex-purse__hint {
+  flex-basis: 100%;
+}
+
+[data-shell="mobile"] .codex-purse__link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ══ LA JORNADA DE COMIDAS, DENTRO DEL MISMO RITUAL ══
+   Había DOS cierres que pagaban XP por separado y no se nombraban entre sí.
+   El de Nutrify no se anunciaba nunca (base real: 6 cierres contra 1 sello). */
+.codex-nutri {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(74, 55, 32, 0.28);
+  border-left: 3px solid var(--moss-dark);
+  background: rgba(245, 231, 192, 0.35);
+}
+
+.codex-nutri__title {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.codex-nutri__hint {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+}
+
+.codex-nutri__fields {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.codex-nutri__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-label);
+  color: var(--ink);
+}
+
+.codex-nutri__field--check {
+  cursor: pointer;
+}
+
+.codex-nutri__close {
+  margin-top: 10px;
+}
+
+.codex-nutri__award {
+  margin-top: 10px;
+  text-align: center;
+  font-size: var(--fs-body);
+  color: var(--moss-dark);
+}
+
+[data-shell="mobile"] .codex-nutri__fields {
+  gap: 12px;
+}
+
+[data-shell="mobile"] .codex-nutri__field--check {
+  min-height: 44px;
+}
+
+[data-shell="mobile"] .codex-nutri__close {
+  width: 100%;
+  min-height: 44px;
 }

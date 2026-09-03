@@ -7,8 +7,10 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { LoanDirection, LoanType, Currency } from '../types';
 import { loanPaidOff } from '../../../shared/animations/epic';
 import { CategorySelect } from './shared/CategorySelect';
+import { AmountModeToggle, useAmountModePlaceholder } from './shared/AmountModeToggle';
+import { resolveInstallmentAmounts, type AmountMode } from '../utils/installment-payload';
 import { Gauge, Rune } from '../../../shared/components/codex/CodexPrimitives';
-import { Checkmark, ChevronUp } from '../../../shared/components/icons';
+import { Checkmark, ChevronUp, Scale } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
 import { todayDateString } from '../../../../shared/date-utils';
@@ -72,33 +74,58 @@ export default function Loans() {
   const [formCurrency, setFormCurrency] = useState<Currency>('ARS');
   const [formDescription, setFormDescription] = useState('');
   const [formInstallments, setFormInstallments] = useState(1);
+  // «Monto» a secas era ambiguo: el backend guarda el monto DE LA CUOTA, y quien
+  // tipeaba el total de la compra creaba un plan N veces más grande.
+  const [formAmountMode, setFormAmountMode] = useState<AmountMode>('installment');
   const [formCategory, setFormCategory] = useState('Otros');
   const [formDate, setFormDate] = useState(today);
   const [submitting, setSubmitting] = useState(false);
+  // La pantalla pintaba «Sin préstamos activos» desde el primer frame, antes de
+  // que el backend contestara — y si la lectura fallaba se quedaba ahí para
+  // siempre, diciendo que no debés nada.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const isInstallmentLoan = formType === 'installments' && formInstallments > 1;
+  const installmentPlaceholder = useAmountModePlaceholder(formAmountMode);
+  const loanAmountLabel = isInstallmentLoan ? installmentPlaceholder : t('coinify.amount');
 
   const loadLoans = useCallback(async () => {
-    const [active, settled] = await Promise.all([
-      window.api.financeGetLoans({ direction, settled: false }) as Promise<LoanRow[]>,
-      window.api.financeGetLoans({ direction, settled: true }) as Promise<LoanRow[]>,
-    ]);
-    setActiveLoans(active);
-    setSettledLoans(settled);
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const [active, settled] = await Promise.all([
+        window.api.financeGetLoans({ direction, settled: false }) as Promise<LoanRow[]>,
+        window.api.financeGetLoans({ direction, settled: true }) as Promise<LoanRow[]>,
+      ]);
+      setActiveLoans(active);
+      setSettledLoans(settled);
 
-    // Partial payments were fetched but never rendered — you could not tell a
-    // loan half repaid from one untouched. Load them up front for active loans
-    // so every row can show what is actually left.
-    const singles = active.filter((l) => !l.installmentGroupId);
-    const entries = await Promise.all(
-      singles.map(async (loan) => {
-        try {
-          const rows = await window.api.financeGetLoanPayments(loan.id);
-          return [loan.id, rows as LoanPaymentRow[]] as const;
-        } catch {
-          return [loan.id, [] as LoanPaymentRow[]] as const;
-        }
-      }),
-    );
-    setPayments((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      // Partial payments were fetched but never rendered — you could not tell a
+      // loan half repaid from one untouched. Load them up front for active loans
+      // so every row can show what is actually left.
+      const singles = active.filter((l) => !l.installmentGroupId);
+      const entries = await Promise.all(
+        singles.map(async (loan) => {
+          try {
+            const rows = await window.api.financeGetLoanPayments(loan.id);
+            return [loan.id, rows as LoanPaymentRow[]] as const;
+          } catch {
+            return [loan.id, [] as LoanPaymentRow[]] as const;
+          }
+        }),
+      );
+      setPayments((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    } catch (err) {
+      // Era una promesa sin `catch`: la lectura fallaba, la consola lo sabía y
+      // el usuario veía un «sin préstamos» que no era cierto.
+      console.error('[Loans] financeGetLoans failed:', err);
+      setLoadError(true);
+      toast({ type: 'warning', message: t('coinify.loadError', 'Error al cargar datos') });
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [direction]);
 
   useEffect(() => { loadLoans(); }, [loadLoans]);
@@ -130,11 +157,16 @@ export default function Loans() {
     try {
       // Both handlers now reject bad input with `{ ok: false, reason }` rather
       // than throwing, so a silent no-op would otherwise look like a save.
+      // En modo «total» lo tipeado es el precio de la compra, no el de la cuota:
+      // se reparte acá y la última absorbe el resto del redondeo.
+      const amounts = resolveInstallmentAmounts(parsed, formInstallments, formAmountMode);
+
       const result = formType === 'installments'
         ? await unwrap(window.api.financeCreateThirdPartyPurchase({
           description: formDescription || formCategory,
           installmentCount: formInstallments,
-          installmentAmount: parsed,
+          installmentAmount: amounts?.installmentAmount ?? parsed,
+          installmentAmounts: amounts?.installmentAmounts,
           currency: formCurrency,
           category: formCategory,
           startDate: formDate,
@@ -157,7 +189,7 @@ export default function Loans() {
       }
 
       setFormPerson(''); setFormAmount(''); setFormDescription('');
-      setFormInstallments(1); setShowForm(false);
+      setFormInstallments(1); setFormAmountMode('installment'); setShowForm(false);
       loadLoans();
       window.dispatchEvent(new Event('finance:dataChanged'));
     } finally {
@@ -244,12 +276,26 @@ export default function Loans() {
 
   const isSettled = (loan: LoanRow) => loan.settled === true || loan.settled === 1;
 
-  const renderLoanGroups = (loans: LoanRow[]) => {
+  const renderLoanGroups = (loans: LoanRow[], withCta = false) => {
     const groups = groupByPerson(loans);
     if (Object.keys(groups).length === 0) {
       return (
         <div className="coin-empty-codex">
-          <p>{t('coinify.noLoans', 'Sin préstamos activos')}</p>
+          <Scale width={28} height={28} aria-hidden="true" />
+          <p className="coin-empty-codex__title">{t('coinify.noLoans', 'Sin préstamos activos')}</p>
+          {withCta && (
+            <>
+              <p className="coin-empty-codex__desc">
+                {t('coinify.noLoansHint', 'Anotá lo que prestaste o te prestaron y seguí los pagos parciales.')}
+              </p>
+              {/* El botón vive ADENTRO del hueco: el de la cabecera está arriba
+                  del todo y el ojo que acaba de leer «sin préstamos» está acá. */}
+              <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }}
+                onClick={() => setShowForm(true)}>
+                + {t('coinify.addLoan', 'Agregar Préstamo')}
+              </button>
+            </>
+          )}
         </div>
       );
     }
@@ -438,7 +484,8 @@ export default function Loans() {
 
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <RpgNumberInput value={formAmount} onChange={setFormAmount}
-                  placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
+                  aria-label={loanAmountLabel}
+                  placeholder={loanAmountLabel} style={{ flex: 1 }} min={0} step={0.01} required />
                 <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value as Currency)}
                   className="rpg-select" style={{ width: 70 }}>
                   <option value="ARS">ARS</option>
@@ -453,6 +500,16 @@ export default function Loans() {
                   </>
                 )}
               </div>
+
+              {isInstallmentLoan && (
+                <AmountModeToggle
+                  mode={formAmountMode}
+                  onChange={setFormAmountMode}
+                  typedAmount={formAmount}
+                  installmentCount={formInstallments}
+                  currency={formCurrency}
+                />
+              )}
 
               {formType === 'installments' && (
                 <CategorySelect value={formCategory} onChange={setFormCategory} />
@@ -503,7 +560,14 @@ export default function Loans() {
 
       {/* Active Loans */}
       <div style={{ marginBottom: 16 }}>
-        {renderLoanGroups(activeLoans)}
+        {loading ? (
+          <div className="coin-skeleton coin-skeleton--card" />
+        ) : loadError ? (
+          <div className="coin-load-error">
+            <p className="coin-load-error__text">{t('coinify.loadError', 'Error al cargar datos')}</p>
+            <button className="rpg-button" onClick={() => loadLoans()}>{t('common.tryAgain', 'Intentar de nuevo')}</button>
+          </div>
+        ) : renderLoanGroups(activeLoans, true)}
       </div>
 
       {/* Settled Section */}

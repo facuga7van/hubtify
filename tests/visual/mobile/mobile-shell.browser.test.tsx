@@ -111,8 +111,10 @@ describe('MobileShell — cabecera y drawer', () => {
     await expect.element(page.getByRole('heading', { name: /Tabla del Aventurero/i })).toBeVisible();
 
     await openDrawer();
-    // El nombre accesible es «3 Questify»: el badge de vencidas (Sidebar.tsx:283-285) va antes del rótulo.
-    await page.getByRole('button', { name: /Questify$/i }).click();
+    // El nombre accesible es «3 Questify — Misiones y hábitos — el Libro de
+    // Misiones»: el badge de vencidas va adelante y la FUNCIÓN del ítem
+    // detrás del guión (C11 — un ícono y una palabra no dicen qué hace).
+    await page.getByRole('button', { name: /Questify — /i }).click();
     await settle(400);
     expect(drawer().hasAttribute('inert')).toBe(true);
     await expect.element(page.getByRole('heading', { name: /^Questify$/i })).toBeVisible();
@@ -128,7 +130,7 @@ describe('MobileShell — cabecera y drawer', () => {
     expect(drawer().hasAttribute('inert')).toBe(false);
 
     // Estamos en «/»: «Inicio» es la sección actual y no navega a ningún lado.
-    await page.getByRole('button', { name: /^Inicio$/i }).click();
+    await page.getByRole('button', { name: /^Inicio — /i }).click();
     await settle(400);
     expect(drawer().hasAttribute('inert')).toBe(true);
     await expect.element(page.getByRole('heading', { name: /Tabla del Aventurero/i })).toBeVisible();
@@ -222,7 +224,7 @@ describe('MobileShell — cabecera y drawer', () => {
 
     // Cambio de ruta desde el drawer: arranca arriba.
     await openDrawer();
-    await page.getByRole('button', { name: /Questify$/i }).click();
+    await page.getByRole('button', { name: /Questify — /i }).click();
     await settle(400);
     await expect.element(page.getByRole('heading', { name: /^Questify$/i })).toBeVisible();
     expect(main.scrollTop).toBe(0);

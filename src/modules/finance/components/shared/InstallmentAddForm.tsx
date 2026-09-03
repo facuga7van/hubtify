@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../../shared/components/useToast';
 import type { Currency, PaymentMethod } from '../../types';
 import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
+import { AmountModeToggle, useAmountModePlaceholder } from './AmountModeToggle';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
-import { formatCurrency } from '../../utils/format';
 import { splitTotalIntoInstallments, installmentAmountsFromTotal } from '../../utils/split-total';
+import type { AmountMode } from '../../utils/installment-payload';
 import { todayDateString } from '../../../../../shared/date-utils';
 
 interface Props {
@@ -29,13 +30,25 @@ export default function InstallmentAddForm({ onCreated }: Props) {
   const today = todayDateString();
 
   const [description, setDescription] = useState('');
+  /** Semilla hasta que conteste `finance:getEntryDefaults` con la moda real. */
   const [category, setCategory] = useState('Otros');
   const [currency, setCurrency] = useState<Currency>('ARS');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('debit');
+  /**
+   * Arrancaba en `'debit'` — constante, y el único medio con el que NO se puede
+   * comprar en cuotas. En la base real hay 4 planes cargados a mano: **3 con
+   * tarjeta, 1 por transferencia, cero en débito**. Ahora lo dice el historial
+   * de PLANES (`installmentPaymentMethod`), que es otra pregunta que la moda del
+   * gasto suelto: esa da `transfer`, y sobre planes es la minoritaria.
+   */
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit_card');
+  /** El usuario ya tocó el select: la inferencia no le pisa la elección. */
+  const methodTouched = useRef(false);
+  const userOverrodeCategory = useRef(false);
   const [creditCardId, setCreditCardId] = useState('');
   // Pocket every instalment leaves (non-card plans). '' = unresolved default;
   // hidden and unsent while the accounts bridge is not wired.
   const [accountValue, setAccountValue] = useState('');
+  const [seedAccountId, setSeedAccountId] = useState<string | null>(null);
   const [accountsSupported, setAccountsSupported] = useState(false);
   const [startDate, setStartDate] = useState(today);
   const [installmentCount, setInstallmentCount] = useState('');
@@ -47,14 +60,47 @@ export default function InstallmentAddForm({ onCreated }: Props) {
    * Comprar en cuotas se piensa casi siempre por el total («la heladera salió
    * 900 mil en 12»), y obligaba a sacar la división a mano antes de cargarla.
    */
-  const [amountMode, setAmountMode] = useState<'installment' | 'total'>('installment');
+  const [amountMode, setAmountMode] = useState<AmountMode>('installment');
   const [submitting, setSubmitting] = useState(false);
 
-  /** Vista previa de la división mientras se escribe. */
-  const totalSplit = useMemo(() => {
-    if (amountMode !== 'total') return null;
-    return splitTotalIntoInstallments(parseFloat(firstAmount), parseInt(installmentCount, 10));
-  }, [amountMode, installmentCount, firstAmount]);
+  const amountPlaceholder = useAmountModePlaceholder(amountMode, customLastAmount);
+
+  /**
+   * Los defaults del alta, inferidos del historial. Este formulario ni siquiera
+   * llamaba al canal, que ya existía y ya lo usaba la carga rápida.
+   */
+  const loadEntryDefaults = useCallback(() => {
+    // Canal nuevo: en un binding viejo simplemente no está, y el fallback vale.
+    const api = window.api as Partial<typeof window.api>;
+    if (typeof api.financeGetEntryDefaults !== 'function') return;
+    api.financeGetEntryDefaults()
+      .then((defaults) => {
+        if (!defaults) return;
+        if (!methodTouched.current) {
+          const method = defaults.installmentPaymentMethod;
+          if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
+            setPaymentMethod(method);
+          }
+          if (defaults.currency === 'ARS' || defaults.currency === 'USD') setCurrency(defaults.currency);
+        }
+        setSeedAccountId(defaults.accountId ?? null);
+        if (!userOverrodeCategory.current && defaults.category) setCategory(defaults.category);
+      })
+      .catch(() => { /* el fallback ya está puesto */ });
+  }, []);
+
+  useEffect(() => { loadEntryDefaults(); }, [loadEntryDefaults]);
+
+  useEffect(() => {
+    // Otra cuenta, otro historial: lo que el usuario tocó acá ya no aplica.
+    const handler = () => {
+      methodTouched.current = false;
+      userOverrodeCategory.current = false;
+      loadEntryDefaults();
+    };
+    window.addEventListener('account:switched', handler);
+    return () => window.removeEventListener('account:switched', handler);
+  }, [loadEntryDefaults]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +178,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             onChange={(e) => setDescription(e.target.value)}
             required
           />
-          <CategorySelect value={category} onChange={setCategory} />
+          <CategorySelect value={category} onChange={(c) => { userOverrodeCategory.current = true; setCategory(c); }} />
         </div>
 
         <div className="coin-quick-add-form__row">
@@ -145,7 +191,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
           </select>
           <select className="rpg-select" value={paymentMethod}
             aria-label={t('coinify.paymentMethod', 'Medio de pago')}
-            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
+            onChange={(e) => { methodTouched.current = true; setPaymentMethod(e.target.value as PaymentMethod); }}>
             <option value="debit">{t('coinify.debit', 'Debito')}</option>
             <option value="credit_card">{t('coinify.creditCard', 'Tarjeta')}</option>
             <option value="transfer">{t('coinify.transfer', 'Transferencia')}</option>
@@ -165,7 +211,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
           <CreditCardSelect value={creditCardId} onChange={setCreditCardId} />
         ) : (
           <div className="coin-quick-add-form__row">
-            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+            <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />
           </div>
         )}
 
@@ -189,50 +235,21 @@ export default function InstallmentAddForm({ onCreated }: Props) {
             onChange={setFirstAmount}
             min={0}
             step={1}
-            placeholder={amountMode === 'total'
-              ? t('coinify.totalAmountPlaceholder', 'Monto total $')
-              : customLastAmount
-                ? t('coinify.firstAmount', '1ra cuota $')
-                : t('coinify.installmentAmount', 'Monto cuota $')}
-            aria-label={t('coinify.installmentAmount', 'Monto cuota $')}
+            placeholder={amountPlaceholder}
+            aria-label={amountPlaceholder}
             required
           />
         </div>
 
         {/* Qué número estás escribiendo. Una compra en cuotas se piensa por el
             total («salió 900 mil en 12»), y antes había que dividir a mano. */}
-        <div style={{ display: 'flex', gap: 0, border: '1px solid var(--gold-dark)', borderRadius: 4, overflow: 'hidden', alignSelf: 'flex-start' }} role="group" aria-label={t('coinify.amountModeLabel', 'Qué monto estás cargando')}>
-          <button
-            type="button"
-            style={{ padding: '4px 12px', border: 0, cursor: 'pointer', fontFamily: 'IM Fell English SC, serif', fontSize: 'var(--fs-label)', background: amountMode === 'installment' ? 'var(--gold)' : 'transparent', color: amountMode === 'installment' ? 'var(--leather-dark)' : 'var(--ink-soft)' }}
-            aria-pressed={amountMode === 'installment'}
-            onClick={() => setAmountMode('installment')}
-          >
-            {t('coinify.amountModeInstallment', 'Monto de la cuota')}
-          </button>
-          <button
-            type="button"
-            style={{ padding: '4px 12px', border: 0, cursor: 'pointer', fontFamily: 'IM Fell English SC, serif', fontSize: 'var(--fs-label)', background: amountMode === 'total' ? 'var(--gold)' : 'transparent', color: amountMode === 'total' ? 'var(--leather-dark)' : 'var(--ink-soft)' }}
-            aria-pressed={amountMode === 'total'}
-            onClick={() => setAmountMode('total')}
-          >
-            {t('coinify.amountModeTotal', 'Monto total')}
-          </button>
-        </div>
-
-        {totalSplit && (
-          <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-label)', color: 'var(--ink-soft)' }} role="status">
-            {t('coinify.totalSplitHint', '{{count}} cuotas de {{per}}', {
-              count: parseInt(installmentCount, 10),
-              per: formatCurrency(totalSplit.per, { currency }),
-            })}
-            {totalSplit.last !== totalSplit.per && (
-              <> · {t('coinify.totalSplitLast', 'la última, {{last}}', {
-                last: formatCurrency(totalSplit.last, { currency }),
-              })}</>
-            )}
-          </p>
-        )}
+        <AmountModeToggle
+          mode={amountMode}
+          onChange={setAmountMode}
+          typedAmount={firstAmount}
+          installmentCount={parseInt(installmentCount, 10)}
+          currency={currency}
+        />
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--fs-label)' }}>
           {/* Apagado el riel era `--parch-1` sobre una tarjeta de pergamino:

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Tick } from '../../../shared/components/codex';
-import Loading from '../../../shared/components/Loading';
+import Skeleton from '../../../shared/components/Skeleton';
+import ErrorState from '../../../shared/components/ErrorState';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
 // `Project` is deliberately not imported: the project selector this widget used
@@ -10,19 +11,33 @@ import { playTaskComplete } from '../../../shared/audio';
 import { type Task, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved } from '../utils';
 import { questsApi } from '../api';
+import WidgetQuickCreate from '../../../hub/widgets/WidgetQuickCreate';
+import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-create';
 
 export default function TasksDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
   const [allPendingTasks, setAllPendingTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const completingRef = useRef(false);
+  /**
+   * Con qué proyecto y tier nace lo que se anota acá.
+   *
+   * Era `projectId: null, tier: 2` fijo. En la base real 28 de las 37 misiones
+   * vivas tienen proyecto y sobre las 30 más recientes «sin proyecto» aparece
+   * **2 veces**: el atajo del tablero producía justo lo que casi nunca se elige,
+   * y la misión había que arrastrarla a su proyecto después.
+   */
+  const entryDefaults = useRef<{ projectId: string | null; tier: 1 | 2 | 3 }>({ projectId: null, tier: 2 });
 
   const loadData = useCallback(() => {
+    setLoadError(false);
     Promise.all([
       window.api.questsGetPendingCount(),
       window.api.questsGetCompletedTodayCount(),
@@ -36,23 +51,52 @@ export default function TasksDashboardWidget() {
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  /** Canal nuevo: en un binding viejo simplemente no está, y el default vale. */
+  const loadEntryDefaults = useCallback(() => {
+    const api = window.api as Partial<typeof window.api>;
+    if (typeof api.questsGetEntryDefaults !== 'function') return;
+    api.questsGetEntryDefaults()
+      .then((d) => { if (d) entryDefaults.current = { projectId: d.projectId, tier: d.tier }; })
+      .catch(() => { /* el default ya está puesto */ });
+  }, []);
+
+  useEffect(() => { loadData(); loadEntryDefaults(); }, [loadData, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => loadData();
+    const handler = () => { loadData(); loadEntryDefaults(); };
     window.addEventListener('sync:questsUpdated', handler);
     window.addEventListener('quests:dataChanged', handler);
     return () => {
       window.removeEventListener('sync:questsUpdated', handler);
       window.removeEventListener('quests:dataChanged', handler);
     };
-  }, [loadData]);
+  }, [loadData, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => loadData();
+    const handler = () => { loadData(); loadEntryDefaults(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadData]);
+  }, [loadData, loadEntryDefaults]);
+
+  // The dashboard's empty state asks for this form by name instead of dumping
+  // the user on /quests, where they would have to find the toggle themselves.
+  useEffect(() => subscribeQuickCreate('quest', () => {
+    setCreating(true);
+    revealWidget(rootRef.current);
+  }), []);
+
+  /** Un solo campo; el resto lo dice el historial (`quests:getEntryDefaults`). */
+  const handleQuickCreate = useCallback(async (name: string) => {
+    const { projectId, tier } = entryDefaults.current;
+    await window.api.questsUpsertTask({
+      name, description: '', tier, category: '',
+      projectId, dueDate: null, order: 0, status: false,
+    });
+    setCreating(false);
+    loadData();
+    window.dispatchEvent(new Event('quests:dataChanged'));
+    toast({ type: 'success', message: t('questify.questCreated', 'Misión anotada') });
+  }, [loadData, toast, t]);
 
   /* The project selector was removed: it duplicated the one on the Questify
      page, ate the full width of a small card, and its footer counters still
@@ -106,18 +150,31 @@ export default function TasksDashboardWidget() {
     }
   }, [loadData, toast, t]);
 
-  if (loading) return <Loading size="sm" />;
+  /* Era una brújula girando: no decía nada de lo que venía después. El
+     esqueleto ocupa el sitio exacto de las filas de misión. */
+  if (loading) return <Skeleton variant="line" count={3} />;
+  /* Y el aviso de fallo era una frase roja sin salida: ahora tiene reintentar. */
   if (loadError)
     return (
-      <p style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
-        {t('common.somethingWentWrong')}
-      </p>
+      <ErrorState
+        compact
+        message={t('questify.tasksLoadFailed', 'No se pudieron leer tus misiones.')}
+        onRetry={loadData}
+      />
     );
 
   const total = completedToday + pendingCount;
 
   return (
-    <div>
+    <div ref={rootRef}>
+      {creating && (
+        <WidgetQuickCreate
+          placeholder={t('questify.widgetQuestPlaceholder', 'Comprar pan')}
+          onSubmit={handleQuickCreate}
+          onCancel={() => setCreating(false)}
+        />
+      )}
+
       {/* Task checklist */}
       {displayTasks.length > 0 ? (
         <div className="widget-list-flow">
@@ -158,9 +215,18 @@ export default function TasksDashboardWidget() {
           )}
         </div>
       ) : (
-        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', margin: '4px 0' }}>
-          {t('questify.noQuests', 'No quests yet')}
-        </p>
+        /* The old copy read "¡Agregá una arriba!" inside a card with nothing
+           above it, and offered no way to add anything. Now the CTA creates. */
+        <div>
+          <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', margin: '4px 0' }}>
+            {t('questify.widgetNoQuests', 'Todavía no hay misiones en el libro.')}
+          </p>
+          {!creating && (
+            <button type="button" className="widget-empty-cta" onClick={() => setCreating(true)}>
+              + {t('questify.widgetCreateQuest', 'Anotá tu primera misión')}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Footer stats */}

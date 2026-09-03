@@ -111,6 +111,12 @@ const proxyPlatform: PlatformPort = {
     protocol.callPlatform('pickBinaryFile', [filters]) as ReturnType<PlatformPort['pickBinaryFile']>,
   saveTextFile: (name, content) => protocol.callPlatform('saveTextFile', [name, content]) as Promise<boolean>,
   saveBinaryFile: (name, bytes) => protocol.callPlatform('saveBinaryFile', [name, bytes]) as Promise<boolean>,
+  // Avisos con la app cerrada (spec §12 Fase 6): el plan se calcula acá, con la
+  // DB y el estado del Caldero a mano, y lo ejecuta el hilo UI, que es el único
+  // que puede hablar con @capacitor/local-notifications.
+  applyNotificationPlan: (plan) => protocol.callPlatform('applyNotificationPlan', [plan]) as Promise<void>,
+  exactAlarmState: () => protocol.callPlatform('exactAlarmState', []) as Promise<string>,
+  requestExactAlarms: () => protocol.callPlatform('requestExactAlarms', []) as Promise<string>,
 };
 
 function fatal(reason: FatalMsg['reason'], err: unknown): void {

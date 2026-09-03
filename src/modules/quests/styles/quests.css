@@ -9,13 +9,10 @@
   margin-bottom: 14px;
 }
 
-/* ── Add quest toggle button ───────────────────── */
-.quest-add-toggle-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 10px;
-}
-
+/* ── Add quest toggle button ─────────────────────
+   Vive en el `headerExtra` del BookPage (TaskList.tsx): es la acción de la
+   página. `.quest-add-toggle-wrapper`, que lo centraba sobre una página
+   alineada a la izquierda, ya no existe. */
 .quest-add-toggle {
   display: inline-flex;
   align-items: center;
@@ -227,7 +224,7 @@
 }
 
 .quest-tier-label--epica {
-  color: var(--gold-dark);
+  color: var(--ink);/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   border-color: rgba(168, 138, 60, 0.35);
 }
 
@@ -365,6 +362,34 @@
   background: rgba(74, 55, 32, 0.25);
 }
 
+/* ── Marca de lote ≠ casilla de completar ──────────
+   La fila tenía DOS cuadrados con tilde, en los mismos colores: el
+   `QuillCheckbox` que completa (y paga XP) y este, que sólo junta filas para
+   la barra de acciones en lote. El divisor de 1px no alcanzaba.
+
+   Ahora son dos familias distintas: cuadrado + tilde = cumplir; DISCO = elegir.
+   En reposo es un aro de tinta (`--ink-soft`, 7.95:1 sobre el pergamino, muy
+   por encima del 3:1 que WCAG pide a un control); marcado se llena de oro con
+   el aro más oscuro, la marca de cera del que separa páginas. Ni el rojo de
+   «completada» ni el tilde aparecen nunca acá. */
+.quest-row-select svg {
+  fill: none;
+  stroke: var(--ink-soft);
+  transition: fill 0.15s, stroke 0.15s;
+}
+
+.quest-row-select[aria-checked='true'] {
+  /* `.quest-icon-btn` deja los íconos a 0.6: lo elegido no es un ícono en
+     reposo, es un estado y se muestra entero. */
+  opacity: 1;
+}
+
+.quest-row-select[aria-checked='true'] svg {
+  fill: var(--gold);
+  stroke: var(--gold-dark);
+  stroke-width: 1.6;
+}
+
 /* ── Row overflow menu (portaled) ─────────────────── */
 .quest-row-menu {
   z-index: var(--z-modal);
@@ -416,9 +441,12 @@
   border-radius: 2px;
 }
 
+/* Era --parch-0 sobre --gold-dark: 3.84:1, y el chip sale hasta tres veces en
+   una sola pantalla. Una superficie dorada que lleva texto arranca en
+   --gold-light, con tinta --ink: 7.12:1, y ademas grita mas que el oro apagado. */
 .quest-due--today {
-  background: var(--gold-dark);
-  color: var(--parch-0);
+  background: var(--gold-light);
+  color: var(--ink);
   padding: 1px 6px;
   font-size: var(--fs-label);
   font-family: 'IM Fell English SC', serif;
@@ -449,6 +477,8 @@
 .quest-repeat-badge {
   display: inline-flex;
   align-items: center;
+  /* contrast-ok: sello de recurrencia, dibujo y no texto (WCAG 1.4.11, 3:1);
+     da 3.28:1 con la opacidad de 0.8 que lo mantiene en segundo plano */
   color: var(--gold-dark);
   opacity: 0.8;
   flex-shrink: 0;
@@ -756,13 +786,48 @@
   border: 1px solid rgba(74, 55, 32, 0.25);
 }
 
-/* ── Empty state ─────────────────────────────────── */
+/* ── Empty state ───────────────────────────────────
+   Era `text-align: center` y nada más: una frase en itálica flotando en un
+   hueco de 770×400, con el botón al que apuntaba fuera de la caja. El patrón
+   canónico del repo es `.nutri-empty` / `.notif-empty`: ícono, frase y salida,
+   los tres DENTRO del hueco, en columna. */
 .quest-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   text-align: center;
   padding: 24px;
   font-family: 'IM Fell English', serif;
   font-style: italic;
   color: var(--ink-faded);
+}
+
+/* Dentro de una sección de la columna derecha (rituales, campañas) el hueco
+   no tiene 400px de alto para gastar. */
+.quest-empty--inline {
+  gap: 6px;
+  padding: 10px 8px;
+}
+
+/* El ícono es ornamento: acompaña, no compite con la frase. */
+.quest-empty svg {
+  color: var(--ink-soft);
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.quest-empty p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+/* La salida del hueco: un `.rpg-button` a escala de rótulo. Era un `style=`
+   inline con `marginTop: 10`, que ahora es el `gap` de la columna. */
+.quest-empty__cta {
+  font-size: var(--fs-label);
+  padding: 4px 12px;
 }
 
 /* (project select styling is shared with .quest-filter-select above) */
@@ -803,9 +868,12 @@
 }
 
 .xp-toast__xp { font-size: 1.2rem; font-weight: bold; }
-.xp-toast__combo { font-size: var(--fs-label); color: var(--ink-soft); }
-.xp-toast__bonus { font-size: var(--fs-quote); color: var(--gold); }
-.xp-toast__streak { font-size: var(--fs-label); color: var(--moss-light); }
+/* El toast es CUERO: --ink-soft daba 1.25:1 (texto invisible), --gold 4.38:1 y
+   --moss-light 3.69:1. Sobre cuero mandan los tonos claros; el verde y el oro
+   del estado siguen viviendo en el borde de --good / --critical. */
+.xp-toast__combo { font-size: var(--fs-label); color: var(--parch-2); }
+.xp-toast__bonus { font-size: var(--fs-quote); color: var(--gold-light); }
+.xp-toast__streak { font-size: var(--fs-label); color: var(--parch-0); }
 
 .xp-toast--good {
   border-color: var(--moss);
@@ -1082,7 +1150,7 @@
 }
 .quest-retro-badge:hover,
 .quest-retro-badge:focus-visible {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark leia MENOS (3.84:1) que el reposo */
   border-bottom-color: var(--gold-dark);
 }
 
@@ -1474,7 +1542,7 @@
 }
 
 .quest-row-meta .quest-today-time {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }
@@ -1569,11 +1637,29 @@
 /* «Hoy» es una sola columna de renglones cortos: sin medida, a 1640 px cada
    fila era una línea de un metro con el título en una punta y el relojito en
    la otra. Centrada, porque un tope pegado a la izquierda deja el hueco de un
-   solo lado y se lee como error. */
+   solo lado y se lee como error.
+
+   Pero la medida la tenía SOLO la lista: la tira de stats y la de pestañas
+   seguían estirándose al contenedor entero, así que a 1640 px la página tenía
+   dos ejes —pestañas en x=28, lista en x=340, 312 px de desvío— y el ojo no
+   sabía dónde empieza el renglón (rúbrica C3). La medida es de la columna de
+   «Hoy», no de un elemento: la toman los tres. */
+.quest-page--today {
+  --quest-today-measure: 960px;
+}
+
+.quest-page--today .quest-stats-help,
+.quest-page--today .quest-stats-strip,
+.quest-page--today .quest-form-wrapper,
+.quest-page--today .quest-tab-bar,
+.quest-columns--single {
+  max-width: var(--quest-today-measure, 960px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .quest-columns--single {
   grid-template-columns: 1fr;
-  max-width: 960px;
-  margin: 0 auto;
 }
 
 .quest-row {
@@ -1756,4 +1842,17 @@
   .quest-cauldron-link {
     animation: none;
   }
+}
+
+/* ── Teléfono: área de toque del nombre del hábito ──
+   Es un botón (abre el detalle del hábito), no un rótulo: medía 291×23. */
+[data-shell="mobile"] .quest-today-habit-name {
+  min-height: var(--touch-min);
+  display: flex;
+  align-items: center;
+}
+
+[data-shell="mobile"] .quest-tier-btn,
+[data-shell="mobile"] .quest-add-toggle {
+  min-height: var(--touch-min);
 }

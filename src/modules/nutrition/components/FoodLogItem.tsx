@@ -5,7 +5,7 @@ import { registerFood } from '../../../shared/animations/feedback';
 import { DawnSun, NoonSun, MoonCrescent, Herb, Platter, Heart, Chalice, Meat } from '../../../shared/components/icons';
 import { resolveMealType, MEAL_ORDER } from '../../../../shared/meal-utils';
 import type { MealType, MealSchedule } from '../../../../shared/meal-utils';
-import { estimateNutrition } from '../estimate-service';
+import { estimateNutrition, isNoSessionError } from '../estimate-service';
 import { cacheEstimate } from '../history-api';
 import { usePopoverRegistration } from '../../../shared/hooks/usePopoverRegistration';
 
@@ -196,8 +196,15 @@ export default memo(function FoodLogItem({ entry, onDelete, onUpdate, onMealChan
       });
       editClosedRef.current = true;
       setEditing(false);
-    } catch {
-      toast({ type: 'warning', message: t('nutrify.estimationFailed', 'Estimation failed — edit manually') });
+    } catch (err) {
+      // Modo invitado: no es que «falló la re-estimación», es que sin sesión no
+      // hay IA. La fila queda abierta para tipear el número a mano.
+      toast({
+        type: 'warning',
+        message: isNoSessionError(err)
+          ? t('nutrify.aiUnavailableShort', 'Estimación IA no disponible — ingresá manual')
+          : t('nutrify.estimationFailed', 'Estimation failed — edit manually'),
+      });
     } finally {
       setEstimating(false);
       estimatingRef.current = false;

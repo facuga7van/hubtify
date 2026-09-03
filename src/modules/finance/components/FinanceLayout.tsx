@@ -6,13 +6,19 @@ import { isNativeMobile } from '../../../shared/platform-detect';
 import { DollarChip } from './shared/DollarChip';
 import { CryptoChip } from './shared/CryptoChip';
 
+/**
+ * Tres pestañas, no seis.
+ *
+ * Seis no entraban en 390 px: la tira scrolleaba **696 px** sin ninguna señal
+ * de que seguía, y el último rótulo quedaba cortado a mitad de palabra — la
+ * tercera pantalla peor puntuada de toda la app en la auditoría de diseño.
+ * Cuotas, Recurrentes, Tarjetas y Préstamos contestan todas la misma pregunta
+ * y viven ahora en **Compromisos**; sus rutas viejas redirigen.
+ */
 const tabs = [
   { path: '/finance', label: 'coinify.dashboard', end: true },
   { path: '/finance/transactions', label: 'coinify.transactions' },
-  { path: '/finance/installments', label: 'coinify.installments' },
-  { path: '/finance/recurring', label: 'coinify.recurringLabel' },
-  { path: '/finance/cards', label: 'coinify.creditCards' },
-  { path: '/finance/loans', label: 'coinify.loans' },
+  { path: '/finance/commitments', label: 'coinify.commitments' },
 ];
 
 export default function FinanceLayout() {
@@ -38,11 +44,26 @@ export default function FinanceLayout() {
       eyebrow={t('coinify.bookEyebrow', '† TOMO IV †  —  DE REBUS AERIS')}
       title={t('coinify.title', 'Libro del Tesorero')}
       subtitle={t('coinify.bookSubtitle', 'Registro de dádivas, tributos, préstamos y del estado del cofre real')}
-      headerExtra={<div style={{ display: 'flex', gap: 6 }}><DollarChip /><CryptoChip /></div>}
+      headerExtra={(
+        <div className="coin-book__actions">
+          {/* Importar el resumen era el camino principal Y no tenía entrada:
+              ruta sin pestaña, alcanzable solo por un modal dentro de
+              Movimientos. Ahora es la acción primaria del Tomo, visible desde
+              las tres pestañas. */}
+          <NavLink to="/finance/import" className="rpg-button coin-import-cta">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 20h16" />
+            </svg>
+            {t('coinify.importCta', 'Importar resumen')}
+          </NavLink>
+          <DollarChip /><CryptoChip />
+        </div>
+      )}
       className="coin-book"
     >
       {/* Tab navigation. Scrolls horizontally rather than overflowing the page
-          when the window is narrow — six tabs do not fit at the 700px minimum. */}
+          when the window is narrow. */}
       <div className="coin-tab-nav-wrap">
         <nav ref={navRef} className="coin-tab-nav" role="tablist">
           {tabs.map((tab) => {

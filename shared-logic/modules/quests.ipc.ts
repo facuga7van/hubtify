@@ -4,6 +4,8 @@ import { getDb } from '../db';
 import { genId } from '../ids';
 import { todayDateString, formatDateString, yesterdayDateString, localTimestamp, nextDateString } from '../../shared/date-utils';
 import { reconcileHabitShields, serializeSpecificDays } from './quests.habits';
+import { getQuestEntryDefaults } from './quests-defaults';
+import { syncHabitSchedule } from './notification-schedule';
 
 /**
  * Resolves the new `due_date` for a postponed task.
@@ -590,6 +592,12 @@ export function registerQuestsIpcHandlers(): void {
     `).all();
   });
 
+  /**
+   * El default del alta rápida, inferido del historial en vez de hardcodeado.
+   * Ver `quests-defaults.ts` para los números de la base real que lo justifican.
+   */
+  ipcHandle('quests:getEntryDefaults', () => getQuestEntryDefaults(getDb()));
+
   ipcHandle('quests:upsertProject', (_e, project: {
     id?: string; name: string; color: string;
   }) => {
@@ -784,6 +792,7 @@ export function registerQuestsIpcHandlers(): void {
     const times = days ? days.split(',').length : habit.timesPerWeek;
     db.prepare('INSERT INTO habits (id, name, frequency, times_per_week, specific_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(id, habit.name, habit.frequency, times, days, now, now);
+    syncHabitSchedule();
     return id;
   });
 
@@ -809,6 +818,7 @@ export function registerQuestsIpcHandlers(): void {
       fields.push('specific_days = NULL');
     }
     db.prepare(`UPDATE habits SET ${fields.join(', ')} WHERE id = ?`).run(...values, id);
+    syncHabitSchedule();
   });
 
   ipcHandle('quests:deleteHabit', (_e, id: string) => {
@@ -822,16 +832,30 @@ export function registerQuestsIpcHandlers(): void {
       db.prepare('UPDATE habit_checks SET deleted_at = ?, updated_at = ? WHERE habit_id = ?').run(now, now, id);
     });
     tx();
+    syncHabitSchedule();
   });
 
-  ipcHandle('quests:checkHabit', (_e, habitId: string) => toggleHabitCheck(getDb(), habitId, todayDateString()));
+  /**
+   * Marcar (o desmarcar) un hábito cambia la respuesta a «¿queda algo pendiente
+   * hoy?», que es exactamente lo que decide si el recordatorio de esta noche
+   * debe seguir armado en el SO. En Android eso ya no lo puede corregir nadie a
+   * las 21:00 —la app puede estar cerrada—, así que se corrige AHORA.
+   * En desktop `syncHabitSchedule()` sale por la primera línea sin tocar nada.
+   */
+  ipcHandle('quests:checkHabit', (_e, habitId: string) => {
+    const result = toggleHabitCheck(getDb(), habitId, todayDateString());
+    syncHabitSchedule();
+    return result;
+  });
 
   ipcHandle('quests:checkHabitForDate', (_e, habitId: string, date: string) => {
     const yesterday = yesterdayDateString();
     if (date !== yesterday) {
       throw new Error(`Retroactive check only allowed for yesterday (${yesterday}), got: ${date}`);
     }
-    return toggleHabitCheck(getDb(), habitId, date);
+    const result = toggleHabitCheck(getDb(), habitId, date);
+    syncHabitSchedule();
+    return result;
   });
 
   /**
@@ -847,7 +871,7 @@ export function registerQuestsIpcHandlers(): void {
     const db = getDb();
     const day = date || todayDateString();
     const now = new Date().toISOString();
-    return db.transaction(() => {
+    const result = db.transaction(() => {
       const existing = db.prepare(
         'SELECT id, kind, deleted_at FROM habit_checks WHERE habit_id = ? AND date = ?'
       ).get(habitId, day) as { id: string; kind: string | null; deleted_at: string | null } | undefined;
@@ -865,5 +889,7 @@ export function registerQuestsIpcHandlers(): void {
         .run(genId(), habitId, day, now, now);
       return { skipped: true };
     })();
+    syncHabitSchedule();
+    return result;
   });
 }

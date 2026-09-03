@@ -249,3 +249,38 @@ jobs:
         run: cd functions && npm ci && npm run build && npx firebase deploy --only functions --force --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      # The landing serves the APK from its own origin (that is the only way an
+      # <a download> works), so it bundles the file into its Pages artifact and
+      # has to be told to rebuild. Best-effort on purpose: the landing also runs
+      # on a 6-hourly schedule, so a failure here delays the new APK, it does not
+      # lose it, and it must never fail a release that already published.
+      #
+      # This needs a token with write access to facuga7van/hubtify-landing.
+      # RELEASES_TOKEN already writes to facuga7van/hubtify-releases; a classic
+      # PAT with the `repo` scope covers the landing too, a fine-grained one
+      # scoped to a single repo does not. The step says which case it hit.
+      - name: Ask the landing to redeploy with the new APK
+        if: success()
+        continue-on-error: true
+        shell: bash
+        env:
+          DISPATCH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "${DISPATCH_TOKEN:-}" ]; then
+            echo "::warning::RELEASES_TOKEN is empty; the landing will pick the APK up on its 6-hourly schedule"
+            exit 0
+          fi
+          code="$(curl -sS -o dispatch.out -w '%{http_code}' -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            https://api.github.com/repos/facuga7van/hubtify-landing/dispatches \
+            -d "{\"event_type\":\"release-published\",\"client_payload\":{\"version\":\"$VERSION\"}}")"
+          if [ "$code" = "204" ]; then
+            echo "landing redeploy dispatched for v$VERSION"
+          else
+            cat dispatch.out || true
+            echo "::warning::repository_dispatch to hubtify-landing returned HTTP $code - RELEASES_TOKEN probably does not cover that repo; the landing still redeploys on its 6-hourly schedule"
+          fi

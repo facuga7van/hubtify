@@ -25,6 +25,7 @@ import {
   type BudgetStatus,
 } from '../utils/api-ext';
 import AccountManager from './shared/AccountManager';
+import CoinifyStart from './shared/CoinifyStart';
 import { AccountKindGlyph } from './shared/AccountGlyphs';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { checkBudgetMonthClose, resetBudgetGuards } from '../utils/budget-guards';
@@ -454,6 +455,8 @@ export default function Dashboard() {
   const [showPrevComparison, setShowPrevComparison] = useState(false);
   /** Budget vs. reality for the navigated month. `null` = no budgets, or no bridge. */
   const [budgets, setBudgets] = useState<BudgetStatus | null>(null);
+  /** Alguno de los cinco paneles del período no cargó. Un aviso, no cinco. */
+  const [periodError, setPeriodError] = useState(false);
   /** ARS → USD → ARS de hoy — cycled from the DollarChip in the header. */
   const mode = useDisplayMode();
   /** Valued dashboard (USD / ARS de hoy / real trend). `null` = bridge not wired. */
@@ -545,17 +548,28 @@ export default function Dashboard() {
    * rune to explain it.
    */
   const loadPeriodData = useCallback((forMonth: string) => {
-    window.api.financeGetProjection(3, forMonth).then((data) => setProjection(data as ProjectionMonth[])).catch((err) => console.error('[Dashboard] financeGetProjection failed:', err));
-    window.api.financeGetActiveLoanSummary(forMonth).then((data) => setLoans({ ...EMPTY_LOANS, ...(data as LoanSummary) })).catch((err) => console.error('[Dashboard] financeGetActiveLoanSummary failed:', err));
-    window.api.financeGetInstallmentGroups(forMonth).then((data) => setInstallmentCount((data as unknown[]).length)).catch((err) => console.error('[Dashboard] financeGetInstallmentGroups failed:', err));
+    setPeriodError(false);
+    /**
+     * Los cinco paneles del período fallaban en silencio: cada uno con su
+     * `console.error` propio y una sección que se quedaba en cero, que el ojo
+     * lee como «no debés nada» y no como «no se pudo leer». Un solo aviso para
+     * los cinco — cinco toasts por un puente caído sería peor que el silencio.
+     */
+    const fail = (what: string) => (err: unknown) => {
+      console.error(`[Dashboard] ${what} failed:`, err);
+      setPeriodError(true);
+    };
+    window.api.financeGetProjection(3, forMonth).then((data) => setProjection(data as ProjectionMonth[])).catch(fail('financeGetProjection'));
+    window.api.financeGetActiveLoanSummary(forMonth).then((data) => setLoans({ ...EMPTY_LOANS, ...(data as LoanSummary) })).catch(fail('financeGetActiveLoanSummary'));
+    window.api.financeGetInstallmentGroups(forMonth).then((data) => setInstallmentCount((data as unknown[]).length)).catch(fail('financeGetInstallmentGroups'));
     window.api.financeGetCreditCardStatements({ status: 'pending' }).then((data) => {
       const rows = data as Array<{ calculatedAmount?: number; calculatedAmountUsd?: number }>;
       setPendingCC({
         ARS: rows.reduce((sum, s) => sum + (s.calculatedAmount ?? 0), 0),
         USD: rows.reduce((sum, s) => sum + (s.calculatedAmountUsd ?? 0), 0),
       });
-    }).catch((err) => console.error('[Dashboard] financeGetCreditCardStatements failed:', err));
-    window.api.financeGetMonthlyExpenses(forMonth).then((data) => setMonthlyExpenses(data)).catch((err) => console.error('[Dashboard] financeGetMonthlyExpenses failed:', err));
+    }).catch(fail('financeGetCreditCardStatements'));
+    window.api.financeGetMonthlyExpenses(forMonth).then((data) => setMonthlyExpenses(data)).catch(fail('financeGetMonthlyExpenses'));
   }, []);
 
   useEffect(() => { loadPeriodData(anchorMonth); }, [loadPeriodData, anchorMonth, refreshKey]);
@@ -660,7 +674,14 @@ export default function Dashboard() {
     if (!apply) { setBudgets(null); return; }
     getBudgetStatus(forMonth)
       .then(setBudgets)
-      .catch((err) => console.error('[Dashboard] getBudgetStatus failed:', err));
+      .catch((err) => {
+        // Un presupuesto que desaparece de la pantalla sin decir nada es peor
+        // que uno que no existe: el usuario cree que lo borró.
+        console.error('[Dashboard] getBudgetStatus failed:', err);
+        setBudgets(null);
+        toast({ type: 'warning', message: t('coinify.budgetsLoadError', 'No se pudieron cargar los presupuestos') });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { loadBudgets(month, budgetsApply); }, [loadBudgets, month, budgetsApply, refreshKey]);
@@ -924,6 +945,32 @@ export default function Dashboard() {
     );
   }
 
+  /**
+   * Coinify sin datos mostraba seis gráficos en cero y seis pestañas, sin decir
+   * por dónde empezar — el módulo no tenía ningún onboarding. Ahora el panel
+   * vacío ES el onboarding, con un solo camino: importar el resumen.
+   *
+   * La condición es deliberadamente estricta (ni un movimiento, ni una tarjeta,
+   * ni un plan de cuotas): en cuanto hay UN dato, el panel manda. Nadie que ya
+   * esté usando el módulo puede quedar encerrado en una pantalla de bienvenida.
+   */
+  const hasNothing =
+    balance !== null
+    && (balance.ARS?.income ?? 0) === 0 && (balance.ARS?.expenses ?? 0) === 0
+    && (balance.USD?.income ?? 0) === 0 && (balance.USD?.expenses ?? 0) === 0
+    && categories.length === 0
+    && installmentCount === 0
+    && pendingCC.ARS === 0 && pendingCC.USD === 0
+    && monthlyExpenses.every((v) => v === 0);
+
+  if (hasNothing) {
+    return (
+      <div className="coin-dashboard" data-tour="finance">
+        <CoinifyStart />
+      </div>
+    );
+  }
+
   // ── Render ──
 
   return (
@@ -951,6 +998,17 @@ export default function Dashboard() {
           CSV
         </button>
       </div>
+
+      {periodError && (
+        <div className="coin-load-error">
+          <p className="coin-load-error__text">
+            {t('coinify.panelLoadError', 'Algunos paneles del período no se pudieron cargar')}
+          </p>
+          <button className="rpg-button rpg-btn-sm" onClick={() => loadPeriodData(anchorMonth)}>
+            {t('common.tryAgain', 'Intentar de nuevo')}
+          </button>
+        </div>
+      )}
 
       <div
         className={`coin-dashboard__content ${

@@ -10,6 +10,8 @@ import { page, userEvent } from 'vitest/browser';
 // Mismo seam que mobile-nutrify: la callable de Firebase no corre en el browser.
 vi.mock('../../../src/modules/nutrition/estimate-service', () => ({
   estimateNutrition: async () => ({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0, items: [] }),
+  // Los llamadores distinguen «no hay sesión» de «falló la red»; acá hay sesión.
+  isNoSessionError: () => false,
 }));
 
 import Today from '@modules/nutrition/components/Today';
@@ -195,9 +197,11 @@ describe('Nutrify — QA 0.9.0 (NUT-05)', () => {
 
 describe('Nutrify — QA 0.9.0 (NUT-02)', () => {
   test('NUT-02: cerrar el día deja la página en solo lectura sin recargar', async () => {
+    let closed = false;
     installApi({
       ...NUTRITION_API,
       nutritionCloseDay: async () => ({ success: true, breakdown: BREAKDOWN }),
+      nutritionIsDayClosed: async () => (closed ? BREAKDOWN : null),
     });
     await setMobileViewport();
     mountInShell(<Today />, '/nutrition');
@@ -207,11 +211,11 @@ describe('Nutrify — QA 0.9.0 (NUT-02)', () => {
     expect(document.querySelectorAll('.nutri-food-action').length).toBeGreaterThan(0);
     expect(document.querySelector('.nutri-sticky-footer')).not.toBeNull();
 
-    await page.getByRole('button', { name: /Cerrar el Día|Confirmar Día/i }).click();
-    await settle(300);
-    const confirmBtn = document.querySelector('.nutri-popup .nutri-btn-primary') as HTMLButtonElement;
-    expect(confirmBtn).not.toBeNull();
-    confirmBtn.click();
+    // El cierre ya no ocurre acá: lo hace el Códice (un solo ritual). Lo que
+    // NUT-02 defiende sigue igual de vivo — la página tiene que enterarse y
+    // pasar a solo lectura SIN recargar, ahora por `nutrition:dayClosed`.
+    closed = true;
+    window.dispatchEvent(new Event('nutrition:dayClosed'));
     await settle(700);
 
     // Después: sin barra sticky, sin acciones de fila, con «Reabrir» a la vista.

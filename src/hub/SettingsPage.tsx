@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import PageHeader from '../shared/components/PageHeader';
+import { BookPage } from '../shared/components/codex';
+import { Sparkle } from '../shared/components/icons';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull } from '../shared/sync';
 import { useConfirm } from '../shared/components/ConfirmDialog';
@@ -92,6 +93,14 @@ export default function SettingsPage() {
   );
   const habitReminderEnabledRef = useRef(habitReminderEnabled);
   const habitReminderTimeRef = useRef(habitReminderTime);
+  /**
+   * Alarmas exactas (`SCHEDULE_EXACT_ALARM`, Android 12+). Sin este permiso los
+   * avisos programados salen como alarma INEXACTA y Android puede demorarlos
+   * varios minutos para ahorrar batería. No se pide solo: hacerlo abre una
+   * pantalla de sistema, y eso tiene que salir de un gesto del usuario.
+   * 'unsupported' en escritorio, donde la fila ni se dibuja.
+   */
+  const [exactAlarm, setExactAlarm] = useState('unsupported');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [patchNotesOpen, setPatchNotesOpen] = useState(false);
@@ -107,6 +116,19 @@ export default function SettingsPage() {
   }, []);
   useEffect(() => {
     window.api.notificationsSetHabitReminder?.(habitReminderEnabledRef.current, habitReminderTimeRef.current);
+  }, []);
+  useEffect(() => {
+    if (!isNativeMobile()) return;
+    let alive = true;
+    const read = () => {
+      window.api.notificationsExactAlarmState?.()
+        .then((state) => { if (alive) setExactAlarm(state); })
+        .catch(() => { /* sin plugin: la fila queda en 'unsupported' */ });
+    };
+    read();
+    // La pantalla de sistema no avisa cuando el usuario vuelve: se relee al foco.
+    window.addEventListener('focus', read);
+    return () => { alive = false; window.removeEventListener('focus', read); };
   }, []);
 
   const toggleLabels: [string, string] = [t('settings.toggleOn'), t('settings.toggleOff')];
@@ -194,9 +216,16 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="settings-page">
-      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
-
+    /* Ajustes era la ÚNICA página que abandonaba el cromo del códice: sin ceja,
+       sin regla ornamental y sin escuadras, con un `<PageHeader>` propio del que
+       era el último consumidor de toda la app. Ahora usa el mismo `BookPage` que
+       Personaje (TOMO V), Coinify (TOMO IV) y el resto — TOMO VI estaba libre. */
+    <BookPage
+      className="settings-page"
+      eyebrow={<><Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {t('settings.eyebrowText', 'TOMO VI')} <Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {'—'} {t('settings.eyebrowSub', 'ORDINATIO CODICIS')}</>}
+      title={t('settings.title')}
+      subtitle={t('settings.subtitle')}
+    >
       {/* ═══ APARIENCIA ═══════════════════════════════════ */}
       <SettingsGroup title={t('settings.groupAppearance', 'Apariencia')}>
         {/* Language + font size — two one-line button rows used to be two cards */}
@@ -328,7 +357,7 @@ export default function SettingsPage() {
 
           <div className="settings-subhead">{t('settings.notifModules', 'Por módulo')}</div>
           {([
-            { key: 'quests', state: notifQuests, setter: setNotifQuests, label: t('settings.notifQuests', 'Questify'), desc: t('settings.notifQuestsDesc', 'Tareas vencidas, atrasadas y estancadas') },
+            { key: 'quests', state: notifQuests, setter: setNotifQuests, label: t('settings.notifQuests', 'Questify'), desc: t('settings.notifQuestsDesc', 'Misiones vencidas, atrasadas y estancadas') },
             { key: 'nutrition', state: notifNutrition, setter: setNotifNutrition, label: t('settings.notifNutrition', 'Nutrify'), desc: t('settings.notifNutritionDesc', 'Días sin cerrar, comidas sin registrar y peso semanal') },
             { key: 'finance', state: notifFinance, setter: setNotifFinance, label: t('settings.notifFinance', 'Coinify'), desc: t('settings.notifFinanceDesc', 'Cuotas por vencer, cierres de tarjeta y préstamos') },
             // The Cauldron had no toggle at all: its system notifications could
@@ -354,7 +383,7 @@ export default function SettingsPage() {
           ))}
 
           <div className="settings-subhead">{t('settings.habitReminder', 'Recordatorio de hábitos')}</div>
-          <div className="settings-row settings-row--last">
+          <div className={isNativeMobile() ? 'settings-row' : 'settings-row settings-row--last'}>
             <div>
               <div className="settings-row__label">{t('settings.habitReminderLabel', 'Recordatorio diario')}</div>
               <div className="settings-row__desc">{t('settings.habitReminderDesc', 'Notificación si quedan hábitos sin marcar')}</div>
@@ -387,6 +416,37 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          {/* Solo Android: sin SCHEDULE_EXACT_ALARM los avisos programados
+              (fin del Caldero, recordatorio de hábitos) salen como alarma
+              inexacta y el sistema puede correrlos varios minutos. */}
+          {isNativeMobile() && (
+            <div className="settings-row settings-row--last">
+              <div>
+                <div className="settings-row__label">{t('settings.exactAlarms', 'Avisos puntuales')}</div>
+                <div className="settings-row__desc">
+                  {exactAlarm === 'granted'
+                    ? t('settings.exactAlarmsOn', 'El Caldero avisa a la hora exacta, con la app cerrada')
+                    : t('settings.exactAlarmsOff', 'Android puede demorar los avisos varios minutos para ahorrar batería')}
+                </div>
+              </div>
+              {exactAlarm === 'granted' ? (
+                <span className="settings-row__desc">{t('settings.exactAlarmsGranted', 'Concedido')}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="rpg-button"
+                  onClick={() => {
+                    window.api.notificationsRequestExactAlarms?.()
+                      .then((state) => setExactAlarm(state))
+                      .catch(() => { /* el usuario cerró la pantalla de sistema */ });
+                  }}
+                >
+                  {t('settings.exactAlarmsGrant', 'Permitir')}
+                </button>
+              )}
+            </div>
+          )}
         </SettingsCard>
       </SettingsGroup>
 
@@ -621,6 +681,6 @@ export default function SettingsPage() {
         title={t('settings.patchNotes', 'Notas del Parche')}
         entries={currentVersionEntries}
       />
-    </div>
+    </BookPage>
   );
 }
