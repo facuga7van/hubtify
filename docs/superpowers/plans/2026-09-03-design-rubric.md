@@ -351,10 +351,22 @@ Y al abrir ese mismo formulario —cosa que ninguna de las tres mediciones habí
 hecho— **apareció un fallo de contraste real que ninguna había visto**. Está en
 C2, abajo, y me obliga a bajarme una nota a mí mismo.
 
+### Revisión del 05:25 — el arreglo de C2, y el barrido que faltaba
+
+Entró `0ee0540`, que corrige los tres hallazgos que había levantado (el gemelo
+del par Gasto/Ingreso, el `.then()` sin `.catch()` de `CategorySelect`, y de
+paso el censo de selectores muertos). **Volví a montar el arnés**, esta vez con
+la disciplina que el propio hallazgo pedía: abrir lo plegado en las **diez**
+pantallas, no sólo en la que se acababa de arreglar. Resultado en C2, abajo: el
+arreglo se verifica, y el barrido ancho encuentra otros siete. Verifiqué también
+por mi cuenta el censo de selectores muertos (12 + `.coin-stat-card`) y la
+deriva de `DESIGN_SYSTEM.md`.
+
 Gates de la rama, corridos para este informe **después de borrar el arnés**:
 `npx tsc --noEmit` **0** · `npm run typecheck:shared-logic` **0** ·
-`npm run test:visual` **320/320** · `npm run test:visual:mobile` **66/66** ·
-`npm test` **1974/1974**.
+`npm test` **1985/1985** (167 archivos) · `npm run test:visual` **327/327** (43)
+· `npm run test:visual:mobile` **66/66** (13) · `npm run lint` **0 errores**
+(13 avisos).
 
 ## Los números duros, antes → después
 
@@ -403,17 +415,63 @@ de AA**, y el umbral de 9 de esta misma rúbrica pide «≤1 fallo por pantalla 
 Consecuencias, sin maquillar:
 
 1. **La frase «0 fallos de texto habilitado en las 21 pantallas» era cierta sólo
-   para el estado por defecto.** Con formularios y desplegables abiertos hay al
-   menos uno.
+   para el estado por defecto.** Con formularios y desplegables abiertos hay más.
 2. **Bajo C2 de 9 a 8 en las dos plataformas**, y el 9 de la segunda medición
    también estaba sobrevaluado: el control existe desde antes de esta rama, y
    esa vuelta tampoco abrió el formulario. No es una regresión de estos commits;
    es un agujero del método que arrastramos tres veces.
 3. La tabla por pantalla de arriba **se queda como está**, con su alcance
    declarado: es lo único comparable con las vueltas anteriores.
-4. Para la cuarta vuelta el arnés tiene que abrir, en cada pantalla, los
-   formularios y menús que la pantalla ofrece. La mitad de los controles de esta
-   app viven detrás de un `toggle`.
+
+#### Barrido de estados desplegados — el que faltaba
+
+Con el fallo de «Ingreso» ya arreglado en `0ee0540` (verificado: **desaparece**,
+y el Hub desplegado queda en **0 fallos habilitados**), rehice el barrido pero
+**abriendo, en las diez pantallas, todo lo que se despliega**: formularios
+plegados, menús de acciones, pestañas no activas, el popup de evento, el picker
+de misión, el editor de recetas, el cofre y la comparativa. Cada fallo se
+clasifica buscando el nodo hoja que lo produjo —el de **menor opacidad
+efectiva**, porque tres «Canjear» comparten clase y texto y sólo el apagado
+falla— y mirando si cuelga de un `[disabled]`/`[aria-disabled]`.
+
+| Fase | Fallos habilitados |
+|---|---|
+| Estado por defecto, 10 pantallas | **0** |
+| Estados desplegados, 10 pantallas | **7** |
+
+Los 7, con su regla:
+
+| Pantalla | Nodo | Ratio | Regla |
+|---|---|---|---|
+| Recompensas → Tienda | `.shop-item__state` «en uso» | 3.84:1 | `rewards.css:405` `color: var(--gold-dark)` |
+| Recompensas → Tienda | `.qb-numeral` «40» (precio) | 3.84:1 | hereda `--gold-dark` del bloque de precio |
+| Questify | `.quest-project-header-name` «Hoy» | 3.84:1 | `quests.css:546` |
+| Questify | `.quest-due--today` «Hoy» ×2 | 3.84:1 | `quests.css:444`, `--parch-0` sobre chip `--gold-dark` |
+| Nutrify Hoy → evento | `.nutri-event-midpoint` | 3.26:1 | `nutri.css:3242` `color: var(--gold-dark)` |
+| Nutrify Hoy → evento | `.nutri-btn-primary` «Registrar evento» | 3.50:1 | `nutri.css:143`, degradé que arranca en `--ink-soft` |
+
+**Los siete son enfermedades ya diagnosticadas y curadas en otro lado**: cinco
+son `--gold-dark` sobre pergamino (3.84 / 3.26) y uno es el `--gold` sobre
+`--ink-soft` de **3.50 exacto** que la segunda medición nombró como «el fallo
+real de Nutrify» y arregló en `.nutri-btn`, `.nutri-action-bar` y
+`.nutri-day-btn` — pero no en `.nutri-btn-primary`. Detalle en hallazgos.
+
+**Por eso C2 se queda en 8 y no vuelve a 9**, aunque el arreglo de `0ee0540`
+sea correcto y esté verificado. Lo que lo clava, concretamente: **Questify
+muestra tres chips «Hoy» a 3.84:1 en una sola pantalla**, y el umbral de 9 pide
+«≤1 fallo por pantalla y ninguno <4.0:1». Ninguno de los siete está en el
+teléfono por separado: son reglas de color sin bloque `[data-shell="mobile"]`
+que las pise, así que la misma cuenta vale para las dos plataformas.
+
+#### Nota de método para la cuarta vuelta
+
+**Medir sólo el primer render deja fuera la mitad de la app.** El arnés de la
+próxima vuelta tiene que, en cada pantalla: (1) abrir todo formulario plegado,
+menú y pestaña no activa; (2) clasificar cada fallo por el nodo de **menor
+opacidad efectiva** y descartar sólo los que cuelgan de `[disabled]`; (3)
+reportar «por defecto» y «desplegado» como dos columnas, no como una. Con esta
+disciplina el estado por defecto da 0 y el desplegado da 7 — un criterio que se
+puntuaba con la primera cifra estaba puntuando la mitad del trabajo.
 
 ### C1 — piso tipográfico
 
@@ -571,7 +629,7 @@ baseline decía 0). Y en las 11 pantallas del teléfono:
 | # | Criterio | Escritorio | Teléfono | Qué cambió (evidencia) |
 |---|---|---|---|---|
 | C1 | Piso tipográfico | 9 → 9 → **9** | 6 → 9 → **9** | 0 nodos <13 px en las 21 pantallas. 95.0 → **95.5 %** de `font-size` tokenizado: los 22 `font-size` nuevos de la rama son **los 22** con `var(--fs-*)`. Los 9 hardcodes <13 px son los mismos 9, línea por línea |
-| C2 | Contraste real | 4 → 9 → **8** | 3 → 9 → **8** | **Baja**, y no por estos commits. En estado por defecto sigue en 3 y 3, los seis **deshabilitados** (verificado `disabled=true`). Pero al abrir el quick-add del tablero aparece `.coin-dash-quick__type-btn` «Ingreso» a **3.62:1 habilitado** (`opacity: 0.5`, `coinify.css:2036`). El umbral de 9 pide ninguno <4.0:1. El 9 de la vuelta anterior también estaba sobrevaluado: nadie abrió nunca un formulario |
+| C2 | Contraste real | 4 → 9 → **8** | 3 → 9 → **8** | **Baja, y no por estos commits.** Estado por defecto intacto: 3 y 3 fallos, los seis **deshabilitados**, y **0 fallos habilitados** en las 10 pantallas. `0ee0540` arregla «Ingreso» del widget (3.62 → 7.95) y lo verifiqué: desaparece. Pero al abrir **todo lo plegado** de las diez pantallas aparecen **7 fallos habilitados** que ninguna vuelta había visto, cinco de ellos `--gold-dark` sobre pergamino (3.84:1) y uno el `--gold`/`--ink-soft` de 3.50 que la 2ª ya había curado en sus hermanos. Lo que clava el 8: **tres chips «Hoy» a 3.84:1 en la misma pantalla de Questify** contra un umbral de «≤1 por pantalla y ninguno <4.0» |
 | C3 | Jerarquía | 6 → 7 → **8** | 7 → 7 → **7** | Questify «Hoy» dejó de tener dos ejes: token `--quest-today-measure: 960px` (`quests.css:1639-1651`) tomado por tira de stats, tira de pestañas, formulario y lista — **medido: los cinco en x=340, ancho 960**. `.quest-add-toggle-wrapper` borrada; el botón vive en `headerExtra` (`TaskList.tsx:564-576`). Ajustes recuperó el cromo del códice, así que las 8 páginas se enmarcan igual. En teléfono no se movió nada medible, y encima apareció un roce nuevo (ver C12) |
 | C4 | Densidad / ancho | 3 → 5 → **7** | 8 → 8 → **8** | 8 de 10 pantallas con `inkSpan` ≥92 %. `.coin-summary-card` 238→**127 px**; Recompensas sin el techo de 880 (`rwd-list` de 1324 px en dos columnas de 648); la crónica con hueco máximo de **8 px** y puntillado guía de 264 px, y **0 estilos en línea**. Quedan Ajustes al 62 % y el libro mayor al 66 % |
 | C5 | Longitud de línea | 2 → 8 → **8** | 10 → 10 → **10** | 3 → **4** nodos ≥90 ch. El cuarto es `.quest-row-title`, `nowrap` + `ellipsis` como los otros dos falsos positivos; su regla es idéntica en la base. El único texto corrido largo sigue siendo `.coin-category-legend__usd-note` (95 ch), sin tocar |
@@ -593,13 +651,20 @@ movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
 
 ## Qué NO subió, y por qué
 
-- **C2 (contraste) — BAJÓ, de 9 a 8 en las dos plataformas.** En estado por
-  defecto está intacto: 3 fallos y 3, los seis deshabilitados, ni una regresión
-  de las 17 commits. Bajó porque **al abrir un formulario apareció un fallo
-  habilitado a 3.62:1** (`.coin-dash-quick__type-btn` «Ingreso») que las tres
-  mediciones se perdieron por medir sólo el primer render. No lo rompió nadie
-  esta vuelta: estaba desde antes de la rama. Lo que cambió es que ahora se ve.
-  Un 9 que se sostenía sobre un alcance incompleto no era un 9.
+- **C2 (contraste) — BAJÓ, de 9 a 8 en las dos plataformas, y se queda en 8
+  aunque el fallo que la bajó ya esté arreglado.** En estado por defecto está
+  intacto: 3 fallos y 3, los seis deshabilitados, **0 habilitados**, ni una
+  regresión. `0ee0540` corrigió el `.coin-dash-quick__type-btn` «Ingreso» que yo
+  había encontrado (3.62 → 7.95, verificado: desaparece del barrido). Pero al
+  abrir **todo lo plegado** de las diez pantallas —y no sólo el formulario que
+  se acababa de arreglar— aparecieron **otros 7 fallos habilitados**. Volver a
+  9 con ese barrido incompleto habría sido repetir el error por cuarta vez. Lo
+  que lo clava, textual: **`.quest-due--today` y `.quest-project-header-name`
+  ponen tres chips «Hoy» a 3.84:1 en la misma pantalla de Questify**, y el
+  umbral de 9 pide «≤1 fallo por pantalla y ninguno <4.0:1». Para llegar a 9
+  hay que mover los cinco `--gold-dark` a `--ink-soft` y el degradé de
+  `.nutri-btn-primary` a `--gold-light`, que es exactamente lo que ya se hizo
+  en sus hermanos.
 
 - **C6 (consistencia) — no subió, y esta vez sí es una deuda.** El ítem 19 de la
   lista de mejoras («reemplazar los hex sueltos que duplican un token») es una
@@ -724,12 +789,59 @@ movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
    3.05:1». Su gemelo en el widget del tablero,
    `.coin-dash-quick__type-btn` (`coinify.css:2032-2052`), hace lo mismo con
    otra técnica —apaga la mitad no elegida con `opacity: 0.5`— y **nadie lo
-   tocó**: «Ingreso» queda a **3.62:1, habilitado y clickeable**. Es la misma
+   tocó**: «Ingreso» quedaba a **3.62:1, habilitado y clickeable**. Es la misma
    clase de error que el punto 2: **el arreglo se hizo donde la medición miraba,
    no donde estaba el patrón.** Dos sitios que pintan el mismo control con dos
    técnicas distintas es, además, lo que hace que un arreglo no se propague.
+   **CERRADO en `0ee0540`**: los tres estados pasaron de `opacity` a superficie
+   opaca + tinta (apagado `--ink-soft`/`--parch-1` = **7.95:1**, gasto
+   `--rubric`/`--parch-0` = 8.40, ingreso `--moss`/`--parch-0` = 6.94), y lo
+   verifiqué remontando el arnés: el nodo desaparece del barrido y el Hub
+   desplegado queda en 0 fallos habilitados. Vigilado por 5 tests de
+   `theme-contrast.test.ts` y 7 de `audit-coin-widget-open.browser.test.tsx`,
+   que **abre el formulario antes de medir** — la nota de método de esta vuelta
+   ahora tiene un guardián.
 
-4. **`CategorySelect` tiene un `.then()` sin `.catch()`** —
+4. **«Se arregla donde mira la medición» es un patrón, no tres casualidades — y
+   ésta es la cuarta vez.** Los siete fallos del barrido desplegado no son
+   colores nuevos: son **las dos mismas familias** que las vueltas anteriores ya
+   diagnosticaron y curaron en otros nodos.
+   - `--gold-dark` sobre pergamino (3.84 / 3.26 / 2.55): la segunda medición lo
+     arregló en `.rwd-purse__label`, `.rwd-item__cost` y `.codex-link__count`.
+     Sobrevive en `.shop-item__state`, `.quest-due--today`,
+     `.quest-project-header-name` y `.nutri-event-midpoint`. **El caso más
+     desnudo está dentro del mismo archivo**: `rewards.css:69-72` escribe la
+     regla —«`--gold-dark` sobre pergamino es 3.84 / 3.26 / 2.55: **el oro no es
+     tinta**»— y la aplica a `.rwd-purse__label`; 333 líneas más abajo,
+     `rewards.css:405`, `.shop-item__state` sigue en `var(--gold-dark)`. La
+     regla y su violación conviven en la misma hoja.
+   - `--gold` sobre `--ink-soft` = **3.50:1**: la segunda medición lo llamó «el
+     fallo real de Nutrify» y lo movió a `--gold-light` en `.nutri-btn`,
+     `.nutri-action-bar` y `.nutri-day-btn`. `.nutri-btn-primary`
+     (`nutri.css:143`) quedó con el degradé viejo y mide 3.50 clavado.
+
+   La causa mecánica es siempre la misma: **el arreglo se aplica a los nodos que
+   la captura mostraba, no a la regla que los produce.** Mientras la unidad de
+   trabajo sea el selector y no el token, cada vuelta va a encontrar hermanos.
+
+5. **13 reglas de `coinify.css` apuntan a selectores que no existen.** Crucé las
+   **360** clases `.coin-*` de la hoja (descontando comentarios) contra todos los
+   `.tsx` de `src/`: **12 no aparecen en ningún JSX** —`.coin-as-of`,
+   `.coin-section-slot`, `.coin-widget__number`, `.coin-widget__label`,
+   `.coin-dollar-chip`, `.coin-dollar-chip__value`, `.coin-category-select`,
+   `.coin-installment-form`, `.coin-quick-add-form__field`,
+   `.coin-quick-add-form__installment-row`, `.coin-skeleton--number`,
+   `.coin-import-preview-count`— más `.coin-stat-card`, que hoy sólo sobrevive
+   en el comentario que documenta su propia muerte: **13 en total**. Revisé las
+   doce una por una y **ninguna esconde un arreglo de legibilidad sin aplicar**:
+   las cuatro que declaran color usan `--ink`, `--ink-soft` o `--ink-faded` para
+   elementos que no se dibujan. Son restos de layout y tipografía, no deuda de
+   contraste. Aparte, **tres que parecen muertas están vivas**:
+   `.coin-upcoming__row--recurring/--installment/--card_due` se componen por
+   template (`` `coin-upcoming__row--${kind}` ``), así que un censo por texto
+   plano las mataría por error.
+
+6. **`CategorySelect` tiene un `.then()` sin `.catch()`** —
    `src/modules/finance/components/shared/CategorySelect.tsx:35-39`:
    `window.api.financeGetCategories().then((cats) => setCategories(cats.filter(…)))`.
    Si el canal falla o devuelve `null`, es una promesa rechazada sin manejar y
@@ -738,9 +850,11 @@ movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
    formulario. Duele especialmente porque **es exactamente la clase de defecto
    que esta vuelta salió a cazar** en C8 (las 7 promesas sin `catch` del
    Caldero): quedó viva en un componente compartido de finance que el widget del
-   tablero monta.
+   tablero monta. **CERRADO en `0ee0540`**: `.catch()` + guarda
+   `Array.isArray` (el fallo real era `null`, no un rechazo) y degradación a
+   lista vacía con aviso `toast({ type: 'warning' })`.
 
-5. **La justificación escrita del disco de selección (C7) no se sostiene, aunque
+7. **La justificación escrita del disco de selección (C7) no se sostiene, aunque
    el cambio sí sirva.** El comentario de `quests.css:364-365` dice que la
    casilla de lote tenía «el mismo dibujo y **los mismos colores**» que el
    `QuillCheckbox`. Los colores nunca fueron los mismos: el `QuillCheckbox` va
@@ -754,27 +868,27 @@ movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
    por encima del 3:1 que WCAG le pide a un gráfico, así que el control pasa,
    pero el número escrito en el archivo es falso.
 
-6. **El `gap: 8px` de la crónica no es nuevo.** El comentario de la vuelta lo
+8. **El `gap: 8px` de la crónica no es nuevo.** El comentario de la vuelta lo
    presenta como parte del arreglo; en realidad es un port literal del
    `gap: 8` que ya estaba en el `style={{}}` en línea de `release/0.9.5`. Lo
    que cierra el hueco de 278–491 px es el puntillado
    (`dashboard-layouts.css:329-335`) y el `gap: 6px` de
    `.dash-chronicle__fact`. El mérito es real; la atribución no.
 
-7. **`.quest-columns--single` quedó fuera del token que la gobierna.** En
+9. **`.quest-columns--single` quedó fuera del token que la gobierna.** En
    `quests.css:1643-1651` el selector se lista **sin** el prefijo
    `.quest-page--today`, así que fuera de «Hoy» no toma
    `--quest-today-measure` sino el respaldo literal `960px`. Y quedó un bloque
    duplicado y muerto: `.quest-columns--single { grid-template-columns: 1fr }`
    aparece dos veces, en `:1506-1508` y en `:1653-1655`.
 
-8. **Los comentarios nuevos de `coinify.css` citan líneas que ya no existen.**
+10. **Los comentarios nuevos de `coinify.css` citan líneas que ya no existen.**
    `coinify.css:3536` remite a «líneas 1127 y 1144» de `Dashboard.tsx` y
    `:3544` a la 1139 — son los números de `release/0.9.5`; hoy son 1158, 1175 y
    1170. Un comentario que apunta a una línea equivocada envejece peor que no
    tener comentario.
 
-9. **`useModalA11y` es, de hecho, la razón por la que C11 cerró — y también por
+11. **`useModalA11y` es, de hecho, la razón por la que C11 cerró — y también por
    la que la métrica de `aria-modal` es invisible a `grep`.** De los 23
    diálogos, **22 reciben `role` y `aria-modal` por el spread `{...dialogProps}`**
    (`useModalA11y.ts:171-176`) y uno solo lo escribe literal. Un `grep
@@ -782,7 +896,15 @@ movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
    de un comentario. Cualquier auditoría futura que cuente por texto va a
    reportar un desastre que no existe.
 
-10. **La segunda medición dejó C9 del teléfono en 7 sin volver a medirlo.** El
+12. **`DESIGN_SYSTEM.md` documenta un token que ya no existe con ese valor.**
+    La tabla de color dice `--moss` = `#556b3c` (`DESIGN_SYSTEM.md:50`), pero
+    `theme.css:50` lo tiene en `#40522c` («darkened for WCAG AA across the
+    parchment gradient»). El valor documentado es el viejo, el que no cumplía —
+    la misma trampa que el respaldo `var(--ink-faded, #6b5535)` que la segunda
+    vuelta borró, sólo que ahora en la documentación en vez de en el CSS.
+    Cualquiera que copie el hex del doc reintroduce el fallo.
+
+13. **La segunda medición dejó C9 del teléfono en 7 sin volver a medirlo.** El
    ítem 16 («toast con `bottom: calc(20px + var(--safe-bottom))`») ya estaba
    implementado —`layout.css:1043-1044`, commit `bee2841`— antes incluso del
    árbol que esa medición auditó. Es el riesgo del formato: un criterio que
