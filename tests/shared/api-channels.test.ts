@@ -6,15 +6,16 @@ const entries = Object.entries(API_CHANNELS) as Array<[string, ChannelSpec]>;
 const DESKTOP_ONLY = [
   'backupExport', 'backupPickImportFile', 'backupImport',
   'cauldronOpenWindow', 'cauldronCloseWindow',
+  'getInstallWarning',
   'updaterCheck', 'updaterDownload', 'updaterRestart',
 ].sort();
 
 describe('API_CHANNELS', () => {
-  it('covers the 254 methods of HubtifyApi (238 invoke, 3 send, 13 on)', () => {
-    expect(entries).toHaveLength(254);
+  it('covers the 255 methods of HubtifyApi (239 invoke, 3 send, 13 on)', () => {
+    expect(entries).toHaveLength(255);
     const byKind = { invoke: 0, send: 0, on: 0 };
     for (const [, s] of entries) byKind[s.kind]++;
-    expect(byKind).toEqual({ invoke: 238, send: 3, on: 13 });
+    expect(byKind).toEqual({ invoke: 239, send: 3, on: 13 });
   });
 
   it('never reuses a channel', () => {
@@ -35,7 +36,7 @@ describe('API_CHANNELS', () => {
       .toEqual(['windowMinimize', 'windowMaximize', 'windowClose']);
   });
 
-  it('marks exactly the 8 desktop-only methods', () => {
+  it('marks exactly the 9 desktop-only methods', () => {
     expect(entries.filter(([, s]) => s.platforms === 'desktop').map(([k]) => k).sort()).toEqual(DESKTOP_ONLY);
   });
 

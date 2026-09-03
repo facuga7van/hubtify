@@ -748,6 +748,15 @@ export interface HubtifyApi {
   // Syl (read-projection snapshot)
   sylBuildSnapshot: () => Promise<SylSnapshot>;
 
+  /**
+   * Instalación duplicada de Squirrel: `suspicious` es true cuando la app corre
+   * desde una raíz que no cuelga de %LOCALAPPDATA% (típicamente
+   * C:\ProgramData\<usuario>\Hubtify). Desktop-only y sondeado desde el
+   * renderer — un `emit()` en el arranque del main llega antes de que React
+   * monte y se pierde. Ver electron/install-location.ts.
+   */
+  getInstallWarning?: () => Promise<{ suspicious: boolean; root: string }>;
+
   // Updater
   updaterCheck?: () => Promise<{ available: boolean; version?: string }>;
   updaterDownload?: () => Promise<string>;

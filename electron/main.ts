@@ -12,6 +12,7 @@ import { electronPlatform, webContentsSink } from './platform';
 import { startNotificationEngine, stopNotificationEngine } from '../shared-logic/modules/notifications.ipc';
 import { generateRecurringForMonth } from '../shared-logic/modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
+import { checkInstallLocation } from './install-location';
 import { todayDateString } from '../shared/date-utils';
 
 // Set a stable AppUserModelID matching the one Squirrel assigns to shortcuts
@@ -86,6 +87,24 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let minimizeToTray = true;
 let alwaysOnTop = false;
+
+/**
+ * `%LOCALAPPDATA%`, la raíz donde Squirrel DEBERÍA haber instalado.
+ * `app.getPath('localAppData')` no está en los tipos de Electron (es exclusivo
+ * de Windows), así que vamos por la variable de entorno y, si faltara, por el
+ * hermano `Local` de `appData` (= `…\AppData\Roaming`). Cadena vacía en
+ * macOS/Linux, donde checkInstallLocation ya no avisa nada.
+ */
+function localAppDataDir(): string {
+  if (process.platform !== 'win32') return '';
+  const fromEnv = process.env.LOCALAPPDATA;
+  if (fromEnv) return fromEnv;
+  try {
+    return path.join(path.dirname(app.getPath('appData')), 'Local');
+  } catch {
+    return '';
+  }
+}
 
 function getIconPath(): string {
   if (app.isPackaged) {
@@ -351,6 +370,15 @@ app.whenReady().then(() => {
   // Desktop-only handlers go through the same registry; they MUST be registered
   // before registerAllIpcHandlers(), which is what binds the registry to ipcMain.
   registerUpdaterIpcHandlers();
+  // Instalación duplicada de Squirrel: se calcula una vez y el renderer la
+  // sondea al montar. Un `emit()` acá se perdería — el main termina el arranque
+  // mucho antes de que React monte el Layout.
+  ipcHandle('app:getInstallWarning', () => checkInstallLocation({
+    execPath: process.execPath,
+    localAppData: localAppDataDir(),
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+  }));
   ipcHandle('cauldron:openWindow', () => createCauldronWindow());
   ipcHandle('cauldron:closeWindow', () => {
     if (cauldronWindow && !cauldronWindow.isDestroyed()) {
