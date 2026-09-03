@@ -544,6 +544,7 @@
     "importNoCards": "You have no credit cards yet.",
     "importNoFile": "No file selected",
     "importParsing": "Parsing...",
+    "importPdfNoText": "I could not read any text from that PDF. If it is a scan or a photo, ask your bank for the original statement; or import the CSV export.",
     "importPdfUnsupportedMobile": "Importing PDF statements is not available on Android. Use the desktop app.",
     "importPreview": "Preview",
     "importPreviousBatches": "Previous imports",

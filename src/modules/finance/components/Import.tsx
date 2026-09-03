@@ -175,10 +175,13 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         return; // user cancelled dialog
       }
       if ('ok' in result) {
-        // Android: no hay pdf-parse (spec §1). El handler lo dice; acá se explica.
+        // Android ya lee PDF (pdfjs en el WebView). Que llegue acá significa
+        // que el documento no tiene capa de texto —un escaneo, una foto— o que
+        // el worker no cargó: en los dos casos hay que decir qué hacer, no
+        // «no está disponible».
         toast({
           type: 'info',
-          message: t('coinify.importPdfUnsupportedMobile', 'Importar resúmenes PDF no está disponible en Android. Usalo desde la app de escritorio.'),
+          message: t('coinify.importPdfNoText', 'No pude leer texto de ese PDF. Si es un escaneo o una foto, pedile a tu banco el resumen original; o importá el extracto en CSV.'),
         });
         return; // el finally apaga `parsing`
       }
