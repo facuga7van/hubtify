@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
 import { useToast } from '../../../shared/components/useToast';
+import { useConfirm } from '../../../shared/components/ConfirmDialog';
 // resolveEstimate = the SQLite estimate cache in front of estimateNutrition.
 // The widget used to call the model directly, so a dish logged from the
 // dashboard neither benefited from a correction nor left one behind.
@@ -20,6 +21,7 @@ import { pickQuickMeals, type QuickMealSource, type FavoriteLike, type FrequentL
 export default function NutritionDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const [calories, setCalories] = useState(0);
@@ -225,6 +227,12 @@ export default function NutritionDashboardWidget() {
   /** El día entero de ayer, copiado. El atajo más barato que existe. */
   const handleRepeatYesterday = async () => {
     if (repeating) return;
+    // Copiar un día entero es una escritura en bloque: se pregunta, igual que
+    // en /nutrition. Un camino por concepto, misma pregunta en los dos lados.
+    const ok = await confirm({
+      message: t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.'),
+    });
+    if (!ok) return;
     setRepeating(true);
     try {
       const res = await window.api.nutritionCopyDay({ to: nutritionToday(dayCutoffHour) });
