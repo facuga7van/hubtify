@@ -322,7 +322,14 @@ export function computeHabits(db: SqlDatabase, today: Date): HabitWithStreakRow[
       // and this loop would spin forever, hanging the whole main process.
       const target = weeklyTarget(h.timesPerWeek);
       targetThisPeriod = target;
-      pendingToday = checksThisPeriod < target;
+      // La meta es SEMANAL, pero `pendingToday` responde por HOY, y
+      // `habit_checks` es UNIQUE(habit_id, date): un hábito ya marcado hoy no
+      // puede recibir otro check hoy, vaya la semana 2/3 o 0/3. Mirar solo el
+      // progreso del período dejaba al gimnasio de los miércoles listado como
+      // pendiente y sin tildar en el Hub y en «Hoy» el mismo día que se marcó,
+      // mientras la lista de Hábitos (que lee `checkedToday`) lo daba por hecho.
+      // Las ramas `daily` y "días elegidos" ya descontaban hoy; esta no.
+      pendingToday = checksThisPeriod < target && !checkedToday && !skippedToday;
 
       const currentMet = checksThisPeriod >= target;
       let weekStart = monday;

@@ -44,14 +44,23 @@ export function bonusMultiplierToTier(multiplier: number): 'normal' | 'good' | '
 /* ── Shared habit check logic ──────────────────── */
 
 /**
- * Whether a habit owes nothing more for its current period.
+ * Whether a habit owes nothing more TODAY — the tick state every "today"
+ * surface (Hub widget, habit list summary) paints.
  *
- * An explicitly skipped day counts as settled — that is the whole point of
- * skipping: the row stops nagging without pretending the habit was done.
+ * Three ways to be settled:
+ *   - explicitly skipped: that is the whole point of skipping, the row stops
+ *     nagging without pretending the habit was done;
+ *   - already checked today: `habit_checks` is UNIQUE(habit_id, date), so a
+ *     second check today is impossible whatever the weekly target. Asking only
+ *     "is the period complete?" left a 3x/week habit checked today painted
+ *     unticked at 2/3, while the habit row right next to it (which reads
+ *     `checkedToday`) showed it done;
+ *   - the period's bar is already met: a 3x/week habit that hit 3/3 on Friday
+ *     owes nothing on Saturday either.
  */
-export function isHabitPeriodComplete(h: HabitWithStreak): boolean {
-  if (h.skippedToday) return true;
-  if (h.frequency === 'daily') return h.checkedToday;
+export function isHabitSettledToday(h: HabitWithStreak): boolean {
+  if (h.skippedToday || h.checkedToday) return true;
+  if (h.frequency === 'daily') return false;
   return h.checksThisPeriod >= h.targetThisPeriod;
 }
 
@@ -62,7 +71,7 @@ export function isHabitPeriodComplete(h: HabitWithStreak): boolean {
  * simply not today's business, so listing it as unchecked is a false debt.
  */
 export function isHabitRelevantToday(h: HabitWithStreak): boolean {
-  return h.pendingToday || isHabitPeriodComplete(h);
+  return h.pendingToday || isHabitSettledToday(h);
 }
 
 export interface HabitCheckCallbacks {
