@@ -13,6 +13,36 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.4',
+    date: '2026-09-02',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'ui',
+        text: {
+          es: 'Si Hubtify quedó instalado dos veces en tu Windows —pasa si alguna vez abriste el instalador como administrador—, ahora te avisa apenas abrís la app y te explica cómo dejar una sola copia. Antes las dos convivían calladitas y el desinstalador terminaba apuntando a la equivocada',
+          en: 'If Hubtify ended up installed twice on your Windows — that happens if you ever opened the installer as administrator — it now warns you as soon as you open the app and explains how to keep a single copy. Before, the two lived side by side in silence and the uninstaller ended up pointing at the wrong one',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'Un hábito de varias veces por semana (gimnasio 3 veces, por ejemplo) que ya habías marcado hoy seguía apareciendo sin marcar en Inicio y en la pestaña Hoy de Questify. Ahora se ve hecho donde corresponde, y tu progreso de la semana se sigue mostrando igual',
+          en: 'A habit you do several times a week (gym three times, say) that you had already checked today kept showing up unchecked on Home and on the Today tab in Questify. Now it shows as done where it should, and your weekly progress still reads the same',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'El ícono que Windows mostraba en «Agregar o quitar programas» era el genérico de Electron y no el libro de Hubtify. Ahora es el nuestro',
+          en: 'The icon Windows showed under "Add or remove programs" was the generic Electron one instead of the Hubtify book. Now it is ours',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.3',
     date: '2026-09-02',
     changes: [
