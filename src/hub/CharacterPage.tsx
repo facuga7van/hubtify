@@ -318,8 +318,17 @@ export default function CharacterPage() {
               until the rpg:getMasteries handler is wired. */}
           {masteries && (
             <div className="hero-masteries-block">
+              {/* Un bloque de progresión ENTERO —diez rangos, de Iniciado a
+                  Leyenda del Oficio— era el único de la ficha sin sello de
+                  ayuda, cuando sus cuatro vecinos (virtudes, libro de hechos,
+                  gesta reciente, camino de los títulos) sí lo tienen. La única
+                  pista era el `title=` de OTRO elemento. */}
               <div className="qb-small-caps hero-masteries-title">
-                {t('rpg.masteryTitle', 'Maestrías del oficio').toUpperCase()}
+                <span>{t('rpg.masteryTitle', 'Maestrías del oficio').toUpperCase()}</span>
+                <HelpBubble
+                  variant="inline"
+                  text={t('rpg.masteryHelp', 'Cada módulo tiene su propio oficio y sube por separado con el XP que ganás ahí. El nivel de leyenda de arriba es la suma de toda la cuenta.')}
+                />
               </div>
               <div className="hero-masteries">
                 {masteries.map((m) => (

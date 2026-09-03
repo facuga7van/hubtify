@@ -1045,9 +1045,14 @@
   border-top: 1px dotted rgba(74, 55, 32, 0.35);
 }
 
+/* El título ahora lleva su sello de ayuda al lado (el bloque de las maestrías
+   era el único de la ficha sin uno). Flex para que el sello quede en el
+   renglón y no herede el `letter-spacing` del small-caps. */
 .hero-masteries-title {
   color: var(--ink-soft);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
 }
 
 .hero-masteries {
