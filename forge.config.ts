@@ -78,7 +78,22 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ name: 'Hubtify', setupIcon: './assets/icon.ico' }),
+    new MakerSquirrel({
+      name: 'Hubtify',
+      setupIcon: './assets/icon.ico',
+      // Ícono REMOTO que Squirrel baja como `app.ico` y registra como DisplayIcon
+      // en Agregar o quitar programas. Sin esta línea, electron-winstaller cae a
+      // su default (`electron.ico`, el átomo) — lib/index.js:162 — y todo usuario
+      // nuevo veía el logo de Electron en el panel de control (verificado por
+      // hash en docs/superpowers/plans/2026-09-03-windows-shortcut-icon.md).
+      // `setupIcon` es otra cosa: el ícono embebido en el Setup.exe.
+      // La URL apunta al repo (no a la landing) para que el ícono viva junto al
+      // archivo que lo genera: `assets/icon.ico` cambia y la URL sirve el nuevo
+      // sin depender de un deploy de GitHub Pages. raw.githubusercontent devuelve
+      // HTTP 200 con Content-Type: image/vnd.microsoft.icon (idéntico al que
+      // sirve la landing), así que Windows lo trata como ICO sin ambigüedad.
+      iconUrl: 'https://raw.githubusercontent.com/facuga7van/hubtify/master/assets/icon.ico',
+    }),
     new MakerZIP({}),
   ],
   publishers: [
