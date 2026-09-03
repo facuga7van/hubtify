@@ -13,6 +13,7 @@ import { startNotificationEngine, stopNotificationEngine } from '../shared-logic
 import { generateRecurringForMonth } from '../shared-logic/modules/finance.balance';
 import { initAutoUpdater, registerUpdaterIpcHandlers } from './modules/updater';
 import { checkInstallLocation } from './install-location';
+import { healAppIcon } from './app-icon';
 import { todayDateString } from '../shared/date-utils';
 
 // Set a stable AppUserModelID matching the one Squirrel assigns to shortcuts
@@ -413,6 +414,23 @@ app.whenReady().then(() => {
   if (mainWindow) initAutoUpdater(mainWindow);
 
   startNotificationEngine();
+
+  // Squirrel escribe `<raíz>\app.ico` solo en `--install`, nunca al actualizar,
+  // así que quien venga de una versión anterior al `iconUrl` de forge.config.ts
+  // se quedaría con el átomo de Electron para siempre. Lo curamos nosotros.
+  // Fuera del camino crítico: nada acá bloquea la ventana ni el arranque, y
+  // healAppIcon no lanza nunca (el .catch es cinturón y tiradores).
+  void healAppIcon({
+    execPath: process.execPath,
+    resourcesPath: process.resourcesPath,
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+  })
+    .then((res) => {
+      if (res.replaced) console.log(`[app-icon] ${res.target} actualizado (${res.reason})`);
+      else if (res.error) console.warn(`[app-icon] no se pudo escribir ${res.target}: ${res.error}`);
+    })
+    .catch((err) => console.warn('[app-icon] self-heal falló:', err));
 });
 
 app.on('before-quit', () => {
