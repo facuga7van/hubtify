@@ -1,6 +1,10 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { changelog } from '../shared/changelog';
+import useModalA11y from '../shared/hooks/useModalA11y';
+import './styles/shell.css';
+
+const TITLE_ID = 'update-dialog-title';
 
 export type UpdateState = 'idle' | 'downloading' | 'ready';
 
@@ -33,9 +37,16 @@ interface Props {
  * Update prompt shown when a new version is available. Presentational:
  * Layout owns the updater state and IPC; this only renders it. Pulls the
  * matching changelog entry so the user sees WHAT'S new, not just a number.
+ *
+ * Es un modal de verdad —tapa la app entera y pide reiniciar— y era el único
+ * que no lo decía: sin `role`, sin `aria-modal`, sin trampa de foco y sin
+ * Escape. Pasa por el mismo `useModalA11y` que los otros 21 (ítem 18 de la
+ * rúbrica). De paso deja los estilos en línea y usa `.update-dialog*`, que
+ * estaba escrito en `shell.css` desde siempre y no lo usaba nadie.
  */
 export default function UpdateNotification({ version, state, percent, error, onDownload, onRestart, onDismiss }: Props) {
   const { t, i18n } = useTranslation();
+  const { dialogProps } = useModalA11y<HTMLDivElement>({ onClose: onDismiss });
   const lang: 'es' | 'en' = i18n.language === 'en' ? 'en' : 'es';
   const whatsNew = lang === 'en' ? "What's new" : 'Qué hay de nuevo';
   const readyLabel = lang === 'en' ? 'Update ready to install' : 'Actualización lista para instalar';
@@ -45,75 +56,47 @@ export default function UpdateNotification({ version, state, percent, error, onD
   const entry = changelog.find((e) => e.version === version);
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(44, 24, 16, 0.7)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-    }}>
-      <div style={{
-        background: 'var(--leather)',
-        border: '2px solid var(--gold-dark)',
-        borderRadius: '6px', padding: '24px', maxWidth: 380, width: '90%',
-        textAlign: 'center', color: 'var(--parch-0)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-      }}>
-        <h3 style={{ fontFamily: "'UnifrakturCook', cursive", marginBottom: 12, color: 'var(--gold-light)' }}>
+    <div className="update-dialog-overlay">
+      <div className="update-dialog" {...dialogProps} aria-labelledby={TITLE_ID}>
+        <h3 id={TITLE_ID} className="update-dialog__title">
           {t('settings.updateAvailable', { version })}
         </h3>
 
         {/* What's new — pulled from the changelog */}
         {entry && entry.changes.length > 0 && (
-          <div style={{
-            textAlign: 'left', marginBottom: 16, maxHeight: 220, overflowY: 'auto',
-            background: 'rgba(0,0,0,0.18)', borderRadius: 4, padding: '12px 14px',
-          }}>
-            <p className="qb-small-caps" style={{
-              fontSize: 'var(--fs-label)', letterSpacing: '0.1em',
-              color: 'var(--gold)', marginBottom: 8,
-            }}>
-              {whatsNew}
-            </p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="update-dialog__news">
+            <p className="qb-small-caps update-dialog__news-title">{whatsNew}</p>
+            <ul className="update-dialog__news-list">
               {entry.changes.map((c, i) => (
-                <li key={i} style={{
-                  fontSize: 'var(--fs-label)', lineHeight: 1.45,
-                  color: 'var(--parch-1)', paddingLeft: 14, position: 'relative',
-                }}>
-                  <span style={{ position: 'absolute', left: 0, color: 'var(--gold-dark)' }}>•</span>
-                  {c.text[lang]}
-                </li>
+                <li key={i} className="update-dialog__news-item">{c.text[lang]}</li>
               ))}
             </ul>
           </div>
         )}
 
         {state === 'downloading' && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 4 }}>
-              <div style={{ height: '100%', background: 'var(--moss)', width: `${percent}%`, transition: 'width 0.3s ease' }} />
+          <div className="update-dialog__progress">
+            <div className="update-dialog__track">
+              <div className="update-dialog__fill" style={{ width: `${percent}%` }} />
             </div>
-            <span style={{ fontSize: 'var(--fs-label)' }}>{percent}%</span>
+            <span className="update-dialog__percent">{percent}%</span>
           </div>
         )}
 
         {error && (
-          <p
-            role="alert"
-            title={error}
-            style={{ color: '#f87171', fontSize: 'var(--fs-label)', marginBottom: 8, textAlign: 'left' }}
-          >
+          <p role="alert" title={error} className="update-dialog__error">
             {humanUpdateError(error, t)}
           </p>
         )}
 
         {state === 'idle' && (
           <>
-            <button className="rpg-button" onClick={onDownload} style={{ width: '100%', marginBottom: 8 }}>
+            <button className="rpg-button update-dialog__primary" onClick={onDownload}>
               {t('settings.downloadUpdate')}
             </button>
             {/* Decía `nutrify.weightCheckin.later`: una clave del módulo de
                 nutrición usada en el diálogo de actualización. */}
-            <button onClick={onDismiss} className="rpg-button"
-              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold-light)' }}>
+            <button onClick={onDismiss} className="rpg-button update-dialog__secondary">
               {t('common.later', 'Más tarde')}
             </button>
           </>
@@ -124,16 +107,11 @@ export default function UpdateNotification({ version, state, percent, error, onD
             {/* `--moss` sobre `--leather` son 1.69:1: el ÚNICO cartel que
                 confirma que la actualización ya está lista era ilegible. El
                 verde vive ahora en una tablilla de pergamino (8.1:1). */}
-            <p style={{
-              fontSize: 'var(--fs-label)', color: 'var(--moss)', marginBottom: 10,
-              background: 'rgba(245, 231, 192, 0.92)', border: '1px solid var(--moss)',
-              borderRadius: 4, padding: '6px 10px',
-            }}>{readyLabel}</p>
-            <button className="rpg-button" onClick={onRestart} style={{ width: '100%', marginBottom: 8 }}>
+            <p className="update-dialog__ready">{readyLabel}</p>
+            <button className="rpg-button update-dialog__primary" onClick={onRestart}>
               {restartNow}
             </button>
-            <button onClick={onDismiss} className="rpg-button"
-              style={{ width: '100%', padding: '4px 8px', fontSize: 'var(--fs-label)', background: 'transparent', border: '1px solid var(--gold-dark)', color: 'var(--gold-light)' }}>
+            <button onClick={onDismiss} className="rpg-button update-dialog__secondary">
               {restartLater}
             </button>
           </>
