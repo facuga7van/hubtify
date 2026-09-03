@@ -3440,6 +3440,8 @@
 [data-shell="mobile"] .nutri-icon-only,
 [data-shell="mobile"] .nutri-food-action {
   min-width: var(--touch-min);
+}
+
 /* ── Widget del hub sin meta configurada ────────────
    Antes decia «Configuracion requerida» (falso: se puede registrar igual) y
    no era clickeable. Ahora nombra lo que falta y lleva a arreglarlo. */

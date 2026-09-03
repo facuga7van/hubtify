@@ -1149,6 +1149,8 @@
 
 [data-shell="mobile"] .dash-brief__seal {
   min-height: var(--touch-min);
+}
+
 /* ══ LA BOLSA ══════════════════════════════════════
    Los óbolos se ganan acá y hasta ahora se nombraban una sola vez, en el
    instante en que se acuñaban (base real: 132 ganados, 0 gastados). El saldo
