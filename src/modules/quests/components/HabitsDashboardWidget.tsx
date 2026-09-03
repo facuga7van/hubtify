@@ -56,9 +56,25 @@ export default function HabitsDashboardWidget() {
     revealWidget(rootRef.current);
   }), []);
 
-  /** Daily is the frequency that needs no explanation; the rest is editable. */
+  /**
+   * Daily is the frequency that needs no explanation; the rest is editable.
+   *
+   * `timesPerWeek: 1`, no 7: el mismo gesto («creá un ritual diario») escribía
+   * `times_per_week` distinto según por dónde entraras — 7 acá, 1 en el
+   * formulario completo (`HabitTracker.tsx:246`). En la base real se ve el
+   * cicatriz: **18 hábitos diarios con 1 y 3 con 7**, y los 3 son exactamente
+   * los que salieron de este widget.
+   *
+   * Gana el 1 y no el 7 por tres razones, en este orden: (a) `computeHabits`
+   * IGNORA `times_per_week` en la rama `daily` —la meta diaria es 1 por
+   * definición—, así que el 7 nunca significó nada y sólo esperaba a hacer daño;
+   * (b) el daño llega al convertirlo a semanal, porque `HabitTracker` precarga
+   * el stepper con `h.timesPerWeek` y el ritual pasa a pedir 7 días por semana
+   * sin que nadie lo haya pedido; (c) el formulario completo es la fuente de
+   * verdad y ya escribía 1, igual que el `weeklyTarget()` que clampea al leer.
+   */
   const handleQuickCreate = useCallback(async (name: string) => {
-    await window.api.questsAddHabit({ name, frequency: 'daily', timesPerWeek: 7 });
+    await window.api.questsAddHabit({ name, frequency: 'daily', timesPerWeek: 1 });
     setCreating(false);
     await loadData();
     window.dispatchEvent(new Event('quests:dataChanged'));
