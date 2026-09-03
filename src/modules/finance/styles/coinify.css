@@ -940,6 +940,40 @@ button.coin-sort-header--amount {
   font-size: var(--fs-label);
 }
 
+/* ── «Monto de la cuota» vs «Monto total» ─────────────
+   Un plan en cuotas se piensa por el total («salió 900 mil en 12»), pero el
+   backend guarda el monto de cada cuota. El rótulo «Monto» a secas hacía que
+   quien tipeaba el precio de vidriera creara un plan N veces más grande. */
+
+.coin-amount-mode {
+  display: flex;
+  align-self: flex-start;
+  border: 1px solid var(--gold-dark);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.coin-amount-mode__option {
+  padding: 4px 12px;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+}
+
+.coin-amount-mode__option--active {
+  background: var(--gold);
+  color: var(--leather-dark);
+}
+
+.coin-amount-mode__preview {
+  margin: 4px 0 0;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
 /* ── Codex Form (generic parchment form container) ──── */
 
 .coin-codex-form {

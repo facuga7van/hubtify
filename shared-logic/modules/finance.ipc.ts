@@ -1285,6 +1285,10 @@ export function registerFinanceIpcHandlers(): void {
     description: string;
     installmentCount: number;
     installmentAmount: number;
+    /** Monto cuota por cuota, cuando repartir el total no da un número redondo
+     *  y la última se lleva el resto — mismo contrato que
+     *  `finance:createInstallmentGroup`. */
+    installmentAmounts?: number[];
     currency?: string;
     category?: string;
     startDate: string;
@@ -1298,13 +1302,17 @@ export function registerFinanceIpcHandlers(): void {
     const installmentCount = Number(data.installmentCount);
     if (!Number.isInteger(installmentCount) || installmentCount < 1) return fail('invalid_installment_count');
     if (installmentCount > MAX_INSTALLMENTS) return fail('too_many_installments');
-    const installmentAmount = parsePositiveAmount(data.installmentAmount);
-    if (installmentAmount === null) return fail('invalid_amount');
 
+    const amounts: number[] = [];
+    for (let i = 0; i < installmentCount; i++) {
+      const parsed = parsePositiveAmount(data.installmentAmounts?.[i] ?? data.installmentAmount);
+      if (parsed === null) return fail('invalid_amount');
+      amounts.push(parsed);
+    }
     const db = getDb();
     const currency = data.currency ?? 'ARS';
     const category = data.category ?? 'Otros';
-    const totalAmount = installmentCount * installmentAmount;
+    const totalAmount = round2(amounts.reduce((a, b) => a + b, 0));
     const groupId = genId();
     const loanId = genId();
     const fxRate = await captureFxRate(db);
@@ -1334,7 +1342,7 @@ export function registerFinanceIpcHandlers(): void {
       for (let i = 0; i < installmentCount; i++) {
         insertTx.run(
           genId(),
-          installmentAmount,
+          amounts[i],
           currency,
           category,
           `${data.description} (Cuota ${i + 1}/${installmentCount})`,

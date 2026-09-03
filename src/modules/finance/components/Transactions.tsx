@@ -21,6 +21,7 @@ import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../utils/api-ext';
 import type { FinanceAccount } from '../types';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
+import { buildInstallmentGroupPayload, type AmountMode } from '../utils/installment-payload';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { emitMovementLogged, emitMovementDeleted } from '../utils/rpg-events';
 import { checkBudgetOverflow } from '../utils/budget-guards';
@@ -358,23 +359,22 @@ export default function Transactions() {
   const handleAdd = async (data: {
     type: TransactionType; amount: number; category: string; description: string;
     date: string; currency: Currency; paymentMethod: PaymentMethod; installments: number;
+    amountMode: AmountMode;
     creditCardId?: string;
     accountId?: string | null;
   }) => {
     try {
       // These handlers now answer `{ ok: false, reason }` for bad input instead
       // of writing garbage, so the result has to be checked before celebrating.
+      //
+      // El payload del plan se arma en `buildInstallmentGroupPayload`: acá se
+      // omitía `paymentMethod`, y sin él el handler evaluaba `isCreditCard` en
+      // false aunque el usuario hubiera elegido tarjeta — el plan quedaba sin
+      // tarjeta, descontaba del saldo y no llegaba a ningún resumen.
       const result = data.paymentMethod === 'credit_card' && data.installments > 1
-        ? await unwrap(window.api.financeCreateInstallmentGroup({
-          description: data.description || data.category,
-          totalAmount: data.amount * data.installments,
-          installmentCount: data.installments,
-          installmentAmount: data.amount,
-          currency: data.currency,
-          category: data.category,
-          startDate: data.date,
-          creditCardId: data.creditCardId,
-        }))
+        ? await unwrap(window.api.financeCreateInstallmentGroup(
+          buildInstallmentGroupPayload(data) as unknown as Record<string, unknown>,
+        ))
         : await unwrap(window.api.financeAddTransaction({
           type: data.type,
           amount: data.amount,

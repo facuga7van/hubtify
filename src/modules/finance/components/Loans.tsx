@@ -7,6 +7,8 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import type { LoanDirection, LoanType, Currency } from '../types';
 import { loanPaidOff } from '../../../shared/animations/epic';
 import { CategorySelect } from './shared/CategorySelect';
+import { AmountModeToggle, useAmountModePlaceholder } from './shared/AmountModeToggle';
+import { resolveInstallmentAmounts, type AmountMode } from '../utils/installment-payload';
 import { Gauge, Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { Checkmark, ChevronUp } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
@@ -72,9 +74,16 @@ export default function Loans() {
   const [formCurrency, setFormCurrency] = useState<Currency>('ARS');
   const [formDescription, setFormDescription] = useState('');
   const [formInstallments, setFormInstallments] = useState(1);
+  // «Monto» a secas era ambiguo: el backend guarda el monto DE LA CUOTA, y quien
+  // tipeaba el total de la compra creaba un plan N veces más grande.
+  const [formAmountMode, setFormAmountMode] = useState<AmountMode>('installment');
   const [formCategory, setFormCategory] = useState('Otros');
   const [formDate, setFormDate] = useState(today);
   const [submitting, setSubmitting] = useState(false);
+
+  const isInstallmentLoan = formType === 'installments' && formInstallments > 1;
+  const installmentPlaceholder = useAmountModePlaceholder(formAmountMode);
+  const loanAmountLabel = isInstallmentLoan ? installmentPlaceholder : t('coinify.amount');
 
   const loadLoans = useCallback(async () => {
     const [active, settled] = await Promise.all([
@@ -130,11 +139,16 @@ export default function Loans() {
     try {
       // Both handlers now reject bad input with `{ ok: false, reason }` rather
       // than throwing, so a silent no-op would otherwise look like a save.
+      // En modo «total» lo tipeado es el precio de la compra, no el de la cuota:
+      // se reparte acá y la última absorbe el resto del redondeo.
+      const amounts = resolveInstallmentAmounts(parsed, formInstallments, formAmountMode);
+
       const result = formType === 'installments'
         ? await unwrap(window.api.financeCreateThirdPartyPurchase({
           description: formDescription || formCategory,
           installmentCount: formInstallments,
-          installmentAmount: parsed,
+          installmentAmount: amounts?.installmentAmount ?? parsed,
+          installmentAmounts: amounts?.installmentAmounts,
           currency: formCurrency,
           category: formCategory,
           startDate: formDate,
@@ -157,7 +171,7 @@ export default function Loans() {
       }
 
       setFormPerson(''); setFormAmount(''); setFormDescription('');
-      setFormInstallments(1); setShowForm(false);
+      setFormInstallments(1); setFormAmountMode('installment'); setShowForm(false);
       loadLoans();
       window.dispatchEvent(new Event('finance:dataChanged'));
     } finally {
@@ -438,7 +452,8 @@ export default function Loans() {
 
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <RpgNumberInput value={formAmount} onChange={setFormAmount}
-                  placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
+                  aria-label={loanAmountLabel}
+                  placeholder={loanAmountLabel} style={{ flex: 1 }} min={0} step={0.01} required />
                 <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value as Currency)}
                   className="rpg-select" style={{ width: 70 }}>
                   <option value="ARS">ARS</option>
@@ -453,6 +468,16 @@ export default function Loans() {
                   </>
                 )}
               </div>
+
+              {isInstallmentLoan && (
+                <AmountModeToggle
+                  mode={formAmountMode}
+                  onChange={setFormAmountMode}
+                  typedAmount={formAmount}
+                  installmentCount={formInstallments}
+                  currency={formCurrency}
+                />
+              )}
 
               {formType === 'installments' && (
                 <CategorySelect value={formCategory} onChange={setFormCategory} />
