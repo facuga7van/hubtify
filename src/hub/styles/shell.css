@@ -67,12 +67,82 @@
    `.settings-page` es ahora el `className` de un `BookPage`, o sea que cae
    sobre el MISMO `<div class="qb-page">`: el padding (24/28/32) y las escuadras
    ya vienen de `codex.css`. Acá queda sólo lo que es propio de esta página. */
+/* AJUSTES NO SE CENTRA — no volver a poner `margin-inline: auto` (decisión
+   abierta nº3, cerrada el 2026-09-03).
+
+   Esto es un libro de misiones, y en un libro se escribe de izquierda a
+   derecha: la página arranca en el margen izquierdo como todas las demás y usa
+   el ancho que le da la resolución, en lugar de una columna de 860 px con
+   ~520 px de pergamino muerto al costado.
+
+   Lo que NO se estira es el TEXTO CORRIDO. La prosa conserva su medida de
+   lectura —`.settings-row__desc` ya lleva `max-width: var(--measure)` en
+   `components.css`, y `.qb-subtitle` la lleva desde `theme.css`—; lo que se
+   reparte el ancho son los CONTROLES.
+
+   Cómo se reparte, en dos niveles, y por qué:
+
+   Medido a 1640×900 con el techo de 860 px todavía puesto, el hueco entre la
+   etiqueta de una fila y su interruptor era de 369 a 538 px: la fila es
+   `space-between` y la etiqueta pide su ancho natural (122–243 px), así que
+   TODO el sobrante caía en el medio. Es la falla C4 de la rúbrica (huecos
+   >250 px dentro de una fila), y el centrado no la arreglaba: la escondía
+   detrás de una página angosta. Al ancho completo, sin tocar nada más, ese
+   hueco pasaba de 500 a más de 1000 px.
+
+   Por eso el sobrante se gasta en COLUMNAS en vez de en vacío: las tarjetas
+   fluyen en tantas como entren, y adentro de cada tarjeta las filas hacen lo
+   mismo. Una tarjeta corta ocupa una columna; la de notificaciones —que es una
+   sola tarjeta larguísima— se queda con el renglón entero y acomoda sus
+   interruptores en cuatro. El conteo de columnas lo hace la resolución, no un
+   breakpoint. */
 .settings-page {
-  max-width: 860px;
-  /* La columna tenía techo de ancho pero no centrado: en ventana maximizada
-     quedaba pegada al borde izquierdo con ~520 px de pergamino vacío al lado,
-     como si la página se hubiera cargado a medias. */
-  margin-inline: auto;
+  /* Pisos de columna, locales a esta página: no son tokens del sistema. */
+  --settings-card-min: 340px;
+  --settings-row-min: 260px;
+}
+
+.settings-page .qb-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--settings-card-min)), 1fr));
+  column-gap: 20px;
+  /* Una tarjeta de una fila no se estira a la altura de la de al lado: eso es
+     pergamino vacío adentro de un marco, que es lo mismo que el hueco de
+     antes puesto en vertical. */
+  align-items: start;
+}
+
+/* El grupo lleva título propio con su regla, así que ocupa el renglón entero y
+   reparte SUS tarjetas con la misma retícula. `auto-fit` es deliberado: un
+   grupo de una sola tarjeta le da a esa tarjeta todo el ancho del grupo —por
+   eso el título vive fuera de esta retícula, ver el comentario de
+   `SettingsGroup` en `SettingsPage.tsx`. */
+.settings-page .settings-group {
+  grid-column: 1 / -1;
+}
+
+.settings-page .settings-group__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--settings-card-min)), 1fr));
+  column-gap: 20px;
+  align-items: start;
+}
+
+.settings-page .settings-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--settings-row-min)), 1fr));
+  column-gap: 20px;
+}
+
+/* Lo que es cabecera o tira de botones cruza la tarjeta entera; lo que es
+   «etiqueta + control» es una celda. */
+.settings-page .settings-section > .rpg-card-title,
+.settings-page .settings-section > .settings-subhead,
+.settings-page .settings-section > .settings-row--stack,
+.settings-page .settings-section > .settings-row__buttons,
+.settings-page .settings-section > .settings-row__desc,
+.settings-page .settings-section > .settings-sync-status {
+  grid-column: 1 / -1;
 }
 
 .settings-group {
@@ -80,6 +150,7 @@
 }
 
 .settings-group__title {
+  grid-column: 1 / -1;
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-sub);
   letter-spacing: 0.16em;

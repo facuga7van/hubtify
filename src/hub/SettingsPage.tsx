@@ -34,11 +34,18 @@ const MobileBackupButtons =
 
 /* ── little building blocks ──────────────────────────────── */
 
+/**
+ * El título va FUERA de la retícula de tarjetas a propósito: si fuera un hijo
+ * más ocupando el renglón entero, ningún hueco quedaría libre y `auto-fit` no
+ * podría colapsar las columnas sobrantes — un grupo de una sola tarjeta (el de
+ * notificaciones) se quedaría con una columna de 428 px y 880 px de pergamino
+ * al lado. Ver la nota de `.settings-page` en `shell.css`.
+ */
 function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="settings-group">
       <h2 className="settings-group__title">{title}</h2>
-      {children}
+      <div className="settings-group__cards">{children}</div>
     </section>
   );
 }
