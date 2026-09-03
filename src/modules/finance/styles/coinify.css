@@ -3459,9 +3459,22 @@ button.coin-sort-header--amount {
 }
 
 /* ── Deriva de ancho a 1640 (C4 de la rúbrica) ───────────────────
-   Las tarjetas INGRESO/GASTO se estiraban a la altura del Cofre y quedaban
-   dos tercios vacías: en un grid, `stretch` es el default. */
-.coin-stat-card { align-self: start; }
+   Las tarjetas INGRESO/GASTO se estiraban a la altura del Cofre (238 px) y
+   quedaban dos tercios vacías: en un grid, `stretch` es el default.
+
+   ESTA REGLA NO HACÍA NADA HASTA HOY. Apuntaba a `.coin-stat-card`, una clase
+   que no existe en ningún `.tsx`: la que Dashboard.tsx pinta es
+   `.coin-summary-card` (líneas 1127 y 1144, dentro de `.coin-top-grid`). El
+   ítem 15 de la rúbrica se escribió contra un selector muerto y por eso seguía
+   listado como pendiente en la segunda medición. Mismo accidente que el
+   documentado en la línea 2998 con `.coin-book .qb-page`. */
+.coin-summary-card { align-self: start; }
+
+/* Con `align-self: start` cada tarjeta mide su contenido, así que las dos barras
+   sólo quedan a la misma altura si las dos notas ocupan lo mismo. La de ingresos
+   es un `&nbsp;` (Dashboard.tsx:1139) y la de gastos una o dos líneas: se reserva
+   el renglón doble en las dos. Eso es 18 px de hueco deliberado, no 160. */
+.coin-summary-card__note { min-height: 2.7em; }
 
 /* ── Teléfono ─────────────────────────────────────────────────── */
 

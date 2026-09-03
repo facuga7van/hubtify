@@ -618,8 +618,10 @@ export default function Dashboard() {
           <HelpBubble text={t('dashboard.chronicleHelp', 'Últimos eventos que otorgaron XP: misiones, nutrición, finanzas y logros.')} />
           {recentEvents.length > 0 ? (
             // El hecho es el dato primario de la fila: cuerpo de texto. XP y
-            // hora quedan en --fs-label como meta.
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-body)', fontFamily: "'IM Fell English', serif" }}>
+            // hora quedan en --fs-label como meta. La pintura vive en
+            // `dashboard-layouts.css` (.dash-chronicle*): en línea no había
+            // manera de darle un puntillado guía ni de pisarla desde el móvil.
+            <ul className="dash-chronicle">
               {recentEvents.map((ev) => {
                 let description = '';
                 try {
@@ -632,31 +634,19 @@ export default function Dashboard() {
                 }
 
                 return (
-                  <li
-                    key={ev.id}
-                    style={{
-                      display: 'grid',
-                      // Cada <li> es su propia grilla, así que con `auto auto`
-                      // las columnas de XP y de tiempo quedaban desalineadas
-                      // entre filas (cada fila medía su propio texto). Un ancho
-                      // mínimo por columna las pone en línea.
-                      gridTemplateColumns: '18px minmax(0, 1fr) minmax(56px, auto) minmax(72px, auto)',
-                      gap: 8,
-                      alignItems: 'baseline',
-                      padding: '5px 0',
-                      borderBottom: '1px dotted rgba(74,55,32,.3)',
-                    }}
-                  >
-                    <span style={{ color: 'var(--rubric)', fontSize: 'var(--fs-quote)', textAlign: 'center' }}>
-                      {eventIcon(ev.moduleId)}
+                  <li key={ev.id} className="dash-chronicle__row">
+                    <span className="dash-chronicle__icon">{eventIcon(ev.moduleId)}</span>
+                    <span className="dash-chronicle__fact">
+                      <span className="dash-chronicle__text">{description}</span>
+                      {/* El puntillado guía del índice de un libro: cose el
+                          hecho con su cifra en vez de dejar 300 px de
+                          pergamino en el medio (decisión abierta nº6). */}
+                      <span className="dash-chronicle__leader" aria-hidden="true" />
                     </span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {description}
-                    </span>
-                    <span style={{ color: 'var(--moss)', fontSize: 'var(--fs-label)', fontFamily: "'Fira Code', monospace", textAlign: 'right' }}>
+                    <span className="dash-chronicle__xp">
                       +{Math.round(ev.xpGained)} xp
                     </span>
-                    <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', textAlign: 'right' }}>
+                    <span className="qb-hand dash-chronicle__time">
                       {formatEventTime(ev.createdAt, t)}
                     </span>
                   </li>

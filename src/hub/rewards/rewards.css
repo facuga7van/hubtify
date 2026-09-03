@@ -4,18 +4,40 @@
    Reuses the codex language (parchment, gold, rubric ink); no new vocabulary.
    ══════════════════════════════════════════════════════ */
 
-/* Medida de lectura del mostrador. Ver la nota en RewardsPage.tsx: sin esto la
-   página se estira a los 1380 px de una ventana maximizada y cada fila queda
-   partida en dos extremos con medio metro de pergamino en el medio. */
+/* El techo de 880 px arreglaba la fila (ver la nota en RewardsPage.tsx: sin él
+   cada fila quedaba partida en dos extremos con medio metro de pergamino en el
+   medio) y creaba otro problema: a 1640 la página usaba el 55 % del ancho, todo
+   apilado contra el borde izquierdo, sin margen que lo explicara (C4 = 5).
+
+   La salida no es angostar la página sino DOBLARLA. La fila conserva su medida
+   —el mínimo de la pista manda—, y cuando el ancho da para dos, el mostrador
+   pasa a dos columnas: la misma tinta, el doble de página aprovechada. Con
+   menos de ~1000 px de contenido `auto-fill` devuelve una sola columna, así que
+   el escritorio angosto y el teléfono no cambian. */
 .rwd-page {
-  max-width: 880px;
+  max-width: none;
+}
+
+.rwd-list,
+.shop-list {
+  display: grid;
+  /* `min(460px, 100%)` y no `460px` pelado: un `minmax` con mínimo fijo NO se
+     achica por debajo de ese mínimo, así que a 390 px la única pista seguía
+     midiendo 460 y la página desbordaba 82 px de costado. */
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
+  column-gap: 28px;
 }
 
 /* ── the purse (balance) ──────────────────────────── */
 
+/* La bolsa es una tarjeta, no una banda: `fit-content` la deja del tamaño de lo
+   que dice (moneda + saldo + el pie de ganados/gastados) en vez de estirarla a
+   los 1324 px de la página con todo apretado contra el borde izquierdo. */
 .rwd-purse {
   position: relative;
   display: flex;
+  width: fit-content;
+  max-width: 100%;
   align-items: center;
   gap: 16px;
   padding: 14px 18px;
@@ -196,8 +218,11 @@
 
 /* ── inline form (create / edit) ──────────────────── */
 
+/* El alta es un formulario, no una banda: sin techo, el campo «Recompensa»
+   medía 1150 px para escribir «Café». */
 .rwd-form {
   margin-bottom: 12px;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -406,6 +431,7 @@
 
 .rwd-empty {
   margin: 8px 0;
+  max-width: var(--measure);
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-body);
   color: var(--ink-soft);
