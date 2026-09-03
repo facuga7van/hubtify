@@ -128,16 +128,21 @@ El caldero sigue dibujado: mismo líquido, mismo hierro, mismas llamas. Queda qu
 
 ```
 data-lowfx en <html> ............................. "true"   (Device.getInfo().isVirtual llegó)
-DOM con la sesión encendida: smil=0, svgFilters=1, steam oculto por CSS
-A-idle    (150 s en /cauldron) .................... VIVO    (antes: muerto a los 93 s)
-B-running (150 s con la sesión corriendo) ......... VIVO    (antes: muerto a los 10 s)
+DOM con la sesión encendida: smil=0, svgFilters=1 (solo la sombra estática), vapor oculto por CSS
+
+corrida 1   A-idle 150 s .... VIVO   B-running 150 s .... VIVO   (RAM libre mínima: 238 MB)
+corrida 2   A-idle 240 s .... VIVO   B-running 240 s .... VIVO   (RAM libre mínima: 3479 MB)
 ```
 
-Y aguantó con la RAM libre del host bajando a **238 MB**, la condición más dura de toda la sesión —
-justo la que antes daba por muerto al emulador en segundos.
+Antes del arreglo, esas mismas fases daban **muerto a los 93 s en idle** y **a los 10 s con la sesión
+encendida**. La corrida 1 encima aguantó con la RAM libre del host en **238 MB**, la condición más
+dura de toda la sesión.
 
-Queda dicho igual: son 2 fases de una corrida, no N repeticiones. El crash tarda entre 8 s y 93 s,
-así que «sobrevivió 300 s» es evidencia fuerte pero no una prueba de que no pueda pasar nunca más.
+De yapa, la memoria de qemu deja de trepar: con la sesión corriendo la pendiente pasa de
+**+19 a +27 MB/min** (antes, en idle) a **−1 MB/min**.
+
+Queda dicho igual: son 2 corridas, no N repeticiones. El crash tardaba entre 8 s y 93 s, así que
+8 minutos seguidos de Caldero es evidencia fuerte, no una prueba de que no pueda pasar nunca más.
 
 ### Archivos
 
