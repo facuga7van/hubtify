@@ -288,9 +288,15 @@ archivo:línea, y los números de la base salen de una **copia de solo lectura**
 `%APPDATA%\hubtify\hubtify.db` consultada sólo con agregados. Ningún dato personal salió de ahí.
 
 Gates de la rama, corridos y verificados para este informe (no citados de segunda mano):
-`npx tsc --noEmit` **0** · `npm run typecheck:shared-logic` **0** · `npm test` **1949/1949**
-en 165 archivos (base `release/0.9.5`: 1868) · `npm run test:visual` **312/312** en 40 archivos
-(base 217) · `npm run test:visual:mobile` **65/65** en 13 archivos (base 57).
+`npx tsc --noEmit` **0** · `npm run typecheck:shared-logic` **0** · `npm test` **1974/1974**
+en 167 archivos (base `release/0.9.5`: 1868) · `npm run test:visual` **320/320** en 42 archivos
+(base 217) · `npm run test:visual:mobile` **66/66** en 13 archivos (base 57).
+
+> **Revisión del 2026-09-03, después de tres commits posteriores a la primera escritura de §6**
+> (`90a0632` merge de `release/0.9.5`, `55aea72` el quick-add del hub, `528b294` los respaldos de
+> i18n). Se reverificó todo en el código y se movieron **dos** filas: C7 6→7 y C12 6→7. **C2 y C11
+> NO se movieron**, aunque los commits resolvieron el motivo que §6.2 daba para no subirlos: el
+> motivo cambió de identidad, el puntaje no. Está explicado en cada fila y en §6.3.
 
 ### 6.0 Advertencia de método, otra vez
 
@@ -382,20 +388,31 @@ Tres asteriscos honestos sobre esa rama:
 | Acción | Camino más corto | Antes | Ahora |
 |---|---|---|---|
 | Completar misión | tilde del widget (`TasksDashboardWidget.tsx:193`) | 1 clic | 1 clic |
-| **Cargar gasto desde el hub** | quick-add del widget (`DashboardWidget.tsx:223-234`) | «2 clics + monto» | **2 clics + monto si aceptás un dato falso; 4 si lo corregís** (`:34` sigue en `'cash'`, `:286-296` es el select) |
+| **Cargar gasto desde el hub** | quick-add del widget (`DashboardWidget.tsx:223-234`) | «2 clics + monto», con un dato falso | **2 clics + monto, y la fila sale bien** — `55aea72` cableó la inferencia acá también (`:98-121`, `:379`) |
 | **Cargar gasto en Coinify** | el formulario ya está abierto (`Transactions.tsx:181`, `:735`) | 6 clics + 2 campos | **2 clics + monto** — medio, moneda, cuenta y categoría llegan inferidos (`QuickAddForm.tsx:106-130`) |
 | **Crear misión por Ctrl+K** | paleta global (`Layout.tsx:357-359`, foco automático en `QuickAdd.tsx:106`) | 0 clics, misión **huérfana** | **0 clics, con proyecto y tier del historial** (`QuickAdd.tsx:97-98`, `:135`) |
 | Repetir una comida | pastilla del widget | 1 clic, sin red | igual |
 | **Arrancar el Caldero desde el hub** | «Quick Brew» (`CauldronDashboardWidget.tsx:229-238`) | 1 clic, siempre `presets[0]` | 1 clic, receta resuelta en el momento del clic (`:160-162`) y nombrada en el tooltip (`:233-235`) |
 | Cerrar el día | el pie de Nutrify abre el Códice (`Today.tsx:1995-2014`) | 1 clic + 1,5 s de hold | igual |
 
-**El renglón que importa es el segundo, y es una mala noticia.** La inferencia de defaults existe,
-tiene cinco archivos de test y funciona — pero **el quick-add del tablero, que es el camino que J2
-mide, no la llama.** `DashboardWidget.tsx` no referencia `financeGetEntryDefaults` en ninguna
-línea: `:34` arranca en `'cash'` (0 de 61 filas manuales vivas), `:33` fija `'Otros'` a mano, `:113`
-manda `'ARS'` a mano, y `:303` monta `<AccountSelect>` **sin `seedAccountId`**, así que sólo puede
-caer en el respaldo genérico «Efectivo» (`AccountSelect.tsx:99`). La mejora llegó a la página de
-Coinify y no llegó al hub.
+**El renglón que importa es el segundo, y su historia vale más que su número.** Cuando §6 se
+escribió, la inferencia de defaults existía, tenía cinco archivos de test, funcionaba — y **el
+quick-add del tablero, que es el camino que J2 mide, no la llamaba**: `'cash'` a mano (0 de 61 filas
+manuales vivas), `'Otros'` a mano, `'ARS'` a mano y un `<AccountSelect>` sin semilla, que sólo podía
+caer en «Efectivo». El mismo gasto nacía con transferencia desde `/finance` y con efectivo desde el
+hub.
+
+`55aea72` lo cerró, y lo cerró con la misma disciplina y no con un parche: `DashboardWidget.tsx:98-121`
+llama al mismo `finance:getEntryDefaults` con feature-detection del canal (`:101`), un `touched` por
+control para que la inferencia no pise lo que el usuario ya eligió (`:53-55`, `:105`, `:111`,
+`:118`), re-inferencia en `account:switched` (`:128-137`), la cuenta como **semilla** del
+`AccountSelect` (`:117`, `:379`) y un select de moneda propio (`:334-337`), porque escribir dólares
+desde un atajo que sólo muestra un «$» sería una fila que el usuario no ve. El respaldo pasó de
+`'cash'` a `'transfer'` (`:44`). Lo demuestra
+`tests/visual/entry-defaults-parity.browser.test.tsx:167` con un `expect(hub).toEqual(ledger)`, y el
+mismo archivo deja escrita la divergencia previa —hub `{cash, Otros, ARS, cuenta genérica}` contra
+libro mayor `{transfer, Comida, USD, a2}`— más dos casos que verifican que tocar el control gana
+sobre la inferencia (`:187`, `:202`).
 
 #### J3 — La vuelta (dos días afuera)
 
@@ -459,23 +476,26 @@ válido y los tres inválidos.
 | # | Criterio | Base | 2ª | **3ª** | Evidencia dura |
 |---|---|---|---|---|---|
 | C1 | Primer valor | 4 | 5 | **7** | Cae el muro: `App.tsx:127-137` acepta invitado; primer registro **sin cuenta en 4 clics + un nombre** (`AuthPage.tsx:284` → `Dashboard.tsx:477` → `TasksDashboardWidget.tsx:193`). `tests/shared/guest-link.test.ts:99` prueba con SQLite en memoria y migraciones reales que el pull **fusiona** y la misión del invitado sobrevive. **No es 9**: la banda alta pide ≤3 interacciones y son 4-5; el onboarding sigue siendo compuerta (`App.tsx:140`); y `Layout.tsx:536-540` borra los datos del invitado si el dispositivo tenía otra cuenta |
-| C2 | Costo en régimen | 4 | 7 | **8** | El alta completa de Coinify pasó de 6 clics + 2 campos a **2 clics + monto** (`QuickAddForm.tsx:106-130`, `:326-328`, `:421`); Ctrl+K pasó de crear una misión huérfana —que después había que arrastrar a un proyecto— a heredar proyecto y tier (`QuickAdd.tsx:97-98`); el Caldero arranca en 1 clic con la receta resuelta (`CauldronDashboardWidget.tsx:160-162`). **No es 9** porque el hub, que es donde la banda alta exige que pase todo, empeoró en relación al resto: el gasto desde el tablero cuesta 4 clics, 2 de ellos deshaciendo un default falso (`DashboardWidget.tsx:34`) |
+| C2 | Costo en régimen | 4 | 7 | **8** | El alta completa de Coinify pasó de 6 clics + 2 campos a **2 clics + monto** (`QuickAddForm.tsx:106-130`, `:326-328`, `:421`); Ctrl+K pasó de crear una misión huérfana —que después había que arrastrar a un proyecto— a heredar proyecto y tier (`QuickAdd.tsx:97-98`); el Caldero arranca en 1 clic con la receta resuelta (`CauldronDashboardWidget.tsx:160-162`); y con `55aea72` el gasto desde el hub volvió a costar 2 clics + monto sin escribir un dato falso. **Sigue sin ser 9, con otro motivo que el que decía la primera escritura de §6.** Aquel motivo —4 clics en el tablero, 2 deshaciendo el default— está resuelto. El que queda es de fondo: la banda pide «≤2 interacciones para **repetir lo de ayer**», y en finanzas **no existe repetir lo de ayer**. Questify (tilde), Nutrify (pastilla + «repetir el día de ayer») y el Caldero lo cumplen; Coinify te hace retipear monto y descripción cada vez, y las 61 filas manuales vivas de la base son 61 tipeos |
 | C3 | Superficie de "hoy" | 5 | 7 | **7** | **No se movió.** El único cambio con nombre de C3 en los commits (`c3db037`) es alineación: la tira de stats, las pestañas y la lista de «Hoy» compartían contenedor pero no medida, y a 1640 px la página tenía dos ejes con 312 px de desvío; ahora los tres toman la medida de la columna. Es densidad, no rutas. Siguen 19 rutas, siguen las pestañas de Coinify, y un día completo se sigue cerrando desde el hub + el Códice |
 | C4 | Qué hago ahora | 5 | 7 | **8** | Tres cosas nuevas dicen la acción concreta donde antes no había nada: el esqueleto dice **qué forma** viene en vez de una brújula girando (`Skeleton.tsx:4-20`, `Dashboard.tsx`), cada ítem del menú dice **qué hace** en nombre accesible, `title` y tooltip (`Sidebar.tsx:345,346,365`) y en el teléfono como segundo renglón pintado (`layout.css:1093-1099`), y el error dejó de disfrazarse de vacío en 3 superficies (`HabitsDashboardWidget.tsx:120-128`, `AchievementsPage.tsx:193-200`, `CauldronPage.tsx:783-797`), más `DashboardWidgetWrapper` que aísla cada cuadro en su propio `ErrorBoundary`. Cuatro subtítulos ornamentales ahora dicen qué hace la página (`es.json:914,332,1727,1950`). **No es 9**: 11 de 32 vacíos siguen sin proponer nada |
 | C5 | Vacíos que enseñan | 4 | 7 | **7** | **No se movió, y es el criterio con más commits de la vuelta.** Se arreglaron ~12 superficies (los 5 vacíos de la lista de Coinify, `TaskList.tsx:451-458` con `Sword` + botón que abre el alta, `AchievementsPage.tsx:244-255` con «Ver todos», Recompensas `:447-451`, `PotionShelf.tsx:137-143`, `MissionPicker.tsx:220-229`). Pero el censo completo, que ninguna medición anterior había hecho, da **32 vacíos: 21 con alguna acción (65,6 %) y sólo 12 que abren el formulario (37,5 %)**. La banda 6 es «40-75 %» y la banda 9 es «>90 %, y el CTA abre el formulario». El número está donde estaba: dentro de la banda de 6-7. El punto que sí se ganó —el error que mentía— está contado en C4, no acá |
 | C6 | Recuperación | 5 | 7 | **7** | **Intacto.** `return-brief.ts`, `rpg-handlers.ts`, `meal-utils.ts` y las cuatro ventanas retroactivas no aparecen en el diff (`git diff cd905a5..HEAD`). Sigue faltando exactamente lo que separa un 7 de un 9: una ventana coherente entre módulos |
-| C7 | Un camino por concepto | 3 | 5 | **6** | Se cerró la única divergencia con **daño medido en la base**: `HabitsDashboardWidget.tsx:90` escribía `timesPerWeek: 7` y `HabitTracker.tsx:246` escribía 1 para el mismo gesto — y la base tiene 18 hábitos con 1 y **3 con 7**, que son los 3 que nacieron por el widget. Además la fila de misión ya no muestra dos cuadrados con tilde idénticos: cumplir es cuadrado, elegir es disco (`QuestRowActions.tsx:283-296`, `quests.css:355-391`). **Siguen** las 3 compuertas de perfil (`Onboarding.tsx:138`, `Today.tsx:1202-1208`, `NutritionSettings.tsx:201`), las 3 altas de cuotas y `copyDay`/`repeatDay` (`nutrition.ipc.ts:361-380` vs `:382-392`) |
+| C7 | Un camino por concepto | 3 | 5 | **7** | Se cerraron **dos** divergencias de banda 3 —«un mismo gesto produce filas distintas»—, no una. **La segunda es la más cara y la encontró esta misma medición**: el quick-add del hub y el libro mayor escribían la misma transacción con cuatro columnas distintas, y `55aea72` las igualó con un `expect(hub).toEqual(ledger)` de testigo (`entry-defaults-parity.browser.test.tsx:167`). La primera tiene **daño medido en la base**: `HabitsDashboardWidget.tsx:90` escribía `timesPerWeek: 7` y `HabitTracker.tsx:246` escribía 1 para el mismo gesto — y la base tiene 18 hábitos con 1 y **3 con 7**, que son los 3 que nacieron por el widget. Además la fila de misión ya no muestra dos cuadrados con tilde idénticos: cumplir es cuadrado, elegir es disco (`QuestRowActions.tsx:283-296`, `quests.css:355-391`). **No es 8** porque **siguen** las 3 compuertas de perfil (`Onboarding.tsx:138`, `Today.tsx:1202-1208`, `NutritionSettings.tsx:201`), `copyDay`/`repeatDay` (`nutrition.ipc.ts:361-380` vs `:382-392`) y sobre todo las 3 altas de cuotas, que no son «duplicadas pero equivalentes» (la banda 6) sino **divergentes**: `createThirdPartyPurchase` omite `account_id` y fuerza `credit_card` |
 | C8 | Continuidad | 4 | 4 | **7** | El salto más grande de la vuelta, y era una pérdida de datos real: en Android tapar la app no dispara `blur`, así que el push moría con el proceso. Hoy `native-shell.ts:42-44` + `lifecycle-sync.ts:25-28` + `Layout.tsx:478,481,500,502`. La sync se ve por primera vez (`sync-status.ts` + `SyncStatusChip` en `MobileShell.tsx:130` y `Layout.tsx:635`), con `dirtyDuringSync` para no mentir. La paridad del Caldero se arregló (`CauldronDashboardWidget.tsx:170-182`). **No es 9**: la banda pide ≤5 s, paridad total y ≤1 tap — hay 30 s de debounce en régimen (`Layout.tsx:431`), 2 taps por módulo (`MobileShell.tsx:115-124,151-153`) y escalares LWW de documento entero (`sync.ts:297-306`) |
 | C9 | Canilla y desagüe | 3 | 6 | **6** | **Intacto, como se esperaba.** El seed de 3 recompensas sigue en `migrate.ts:383-396` y la bolsa sigue visible en el sello. En la base real: 132 ganados (105 de logros + 27 del sello), **0 gastados**, `rewards` y `shop_purchases` vacías. Sólo lo mueve el uso, y §6.0 dice por qué no puede moverse acá |
 | C10 | Invita, no castiga | 8 | 8 | **8** | **Intacto, que sigue siendo el objetivo.** Nada del motor de HP, XP, racha, indultos o Posada aparece en el diff. Le sigue faltando lo mismo: que la gracia cubra 2 días, que es el hueco real medido |
-| C11 | La metáfora | 6 | 6 | **8** | Se rompió el empate de dos vueltas. Una palabra por concepto en i18n: **Vigor** (`es.json:346,854,2119,2121`, cero «SALUD» en ambos idiomas), **Hábito**, **Misión**. La función viaja en 4 canales por ítem de menú (`Sidebar.tsx:345,346,361,365`). Lo que sólo vivía en `title=` —que en touch no existe— se pintó: indultos con rótulo (`Sidebar.tsx:244-253`), la racha con su regla (`:282-284`, `es.json:2108`), el Vigor con un sello que abre **con foco** (`HelpBubble.tsx:87,91`), lo mismo en Maestrías (`CharacterPage.tsx:326-332`). **No es 9** por la letra de la banda: pide contraste OK **sobre la superficie más oscura**, y `--ink-faded` sobre `--parch-3` da **3,43:1**. Y sigue «HP» en 10 claves de Nutrify (`es.json:1092-1359`, render vivo en `Today.tsx:2403`) y la cabecera del teléfono titula `/` como «Tabla del Aventurero» (`MobileShell.tsx:29,126`) mientras el menú dice «Inicio» (`es.json:1018`) |
-| C12 | Defaults | 3 | 4 | **6** | Tres servicios de inferencia reales, con SQL sobre filas vivas y 5 archivos de test: `quests-defaults.ts:56-64` (moda sobre las 30 misiones vivas más recientes, con abstención si el proyecto murió, `:73-77`), `cauldron-defaults.ts:38-44` (la **última** usada, que es la regla que converge entre dispositivos) y `finance-defaults.ts:178-187` (`GROUP BY installment_group_id`: cuenta **planes**, no filas). Contra la base: el respaldo de cuotas pasó de `'debit'` —que tiene **0 planes**— a `'credit_card'`, que tiene 3 de 4; el de gasto suelto pasó de `'cash'` —**0 de 61 filas manuales vivas**— a `'transfer'`, que tiene 41. **No es 7 ni 8** por el agujero de J2: el quick-add del tablero (`DashboardWidget.tsx:33,34,113,303`) no llama a la inferencia. Y `account_id` sigue NULL en 107/107 filas, así que la inferencia de cuenta no tiene de dónde sacar nada y siempre devolverá `null` en esta base |
+| C11 | La metáfora | 6 | 6 | **8** | Se rompió el empate de dos vueltas. Una palabra por concepto en i18n: **Vigor** (`es.json:346,854,2119,2121`, cero «SALUD» en ambos idiomas), **Hábito**, **Misión**. La función viaja en 4 canales por ítem de menú (`Sidebar.tsx:345,346,361,365`). Lo que sólo vivía en `title=` —que en touch no existe— se pintó: indultos con rótulo (`Sidebar.tsx:244-253`), la racha con su regla (`:282-284`, `es.json:2108`), el Vigor con un sello que abre **con foco** (`HelpBubble.tsx:87,91`), lo mismo en Maestrías (`CharacterPage.tsx:326-332`). `528b294` completó la limpieza en la tercera capa, la de los respaldos del TSX —lo que se ve si falta una clave—: «HP» suelto **0 en las tres capas** (sobreviven 7+7+3 dentro del par abreviado «XP y HP», exención documentada y de doble filo en el test), `SALUD`/`VITA` 0, `ritual` 0, `tarea`/`subtarea` 0 (la sub-unidad pasó a «paso»), y un par que nadie había visto: «Meta diaria» plegado a «objetivo diario». Vigilado por `tests/i18n/vocabulario-unico.test.ts` (20 casos sobre las 3 capas, con un test de arnés que impide el falso verde). **Sigue sin ser 9, y el motivo que queda es duro:** la banda pide contraste OK **sobre la superficie más oscura**, y `--ink-faded` sobre `--parch-3` da **3,43:1**. Además la cabecera del teléfono titula `/` como «Tabla del Aventurero» (`MobileShell.tsx:29,126`) mientras el menú dice «Inicio» (`es.json:1018`), y queda un «HP» suelto **fuera** del catálogo, en JSX a mano, que el test no puede ver (`Today.tsx:2403` — ver §6.4 #10) |
+| C12 | Defaults | 3 | 4 | **7** | Tres servicios de inferencia reales, con SQL sobre filas vivas y 5 archivos de test: `quests-defaults.ts:56-64` (moda sobre las 30 misiones vivas más recientes, con abstención si el proyecto murió, `:73-77`), `cauldron-defaults.ts:38-44` (la **última** usada, que es la regla que converge entre dispositivos) y `finance-defaults.ts:178-187` (`GROUP BY installment_group_id`: cuenta **planes**, no filas). Contra la base: el respaldo de cuotas pasó de `'debit'` —que tiene **0 planes**— a `'credit_card'`, que tiene 3 de 4; el de gasto suelto pasó de `'cash'` —**0 de 61 filas manuales vivas**— a `'transfer'`, que tiene 41. Y con `55aea72` la inferencia por fin llega a **las dos puertas**, no a una: el agujero de J2 que justificaba el 6 está cerrado y medido (`DashboardWidget.tsx:98-121`, `:379`). **No es 8 ni 9**, y por dos motivos que ninguna rama puede tocar: `account_id` sigue NULL en **107/107** filas, así que la inferencia de cuenta no tiene de dónde sacar nada y devuelve `null` siempre, dejando el respaldo genérico «Efectivo» —la cuenta con 0 de 107—, que es literalmente el ancla de la banda 3; y la fecha de nacimiento se sigue fabricando. Además la banda 9 pide «el último valor usado» y quests y finanzas usan la **moda** (sólo el Caldero usa el último) |
 
-**Total: 85 / 120 · Promedio 7,1 / 10.**
-Baseline 54 / 120 (4,5) → segunda 73 / 120 (6,1) → **tercera 85 / 120 (7,1)**.
+**Total: 87 / 120 · Promedio 7,3 / 10.**
+Baseline 54 / 120 (4,5) → segunda 73 / 120 (6,1) → **tercera 87 / 120 (7,3)**.
 
 Los tres que más se movieron: **C8 +3** (4→7), **C11 +2** (6→8) y **C1 +2** (5→7).
 Los cinco que no se movieron: **C3, C5, C6, C9 y C10**.
+Y dos —**C2 y C11**— se quedaron donde estaban **aunque los commits de la revisión resolvieron el
+motivo que esta tabla daba para no subirlos**. Está dicho en cada fila: el motivo cambió de
+identidad, el puntaje no. Inventar el punto habría sido más fácil que explicarlo.
 
 ### 6.3 Lo que quedó sin hacer, y por qué
 
@@ -503,27 +523,42 @@ Los cinco que no se movieron: **C3, C5, C6, C9 y C10**.
 - **Los 2 taps del cajón (C8).** Es una decisión de diseño registrada
   (`2026-09-01-mobile-android-design.md:238`), no un olvido: para moverla hay que reabrir esa
   decisión, no escribir código.
+- **El techo de C12 no está en el código.** Con la inferencia ya cableada en las dos puertas, lo
+  que queda son dos cosas que ninguna rama puede arreglar: `account_id` es NULL en 107/107 filas
+  —así que la inferencia de cuenta no tiene historial que leer y el respaldo cae en «Efectivo», la
+  cuenta con 0 filas— y la fecha de nacimiento se sigue fabricando en el picker. La primera se
+  arregla sola en cuanto una transacción nazca con cuenta; la segunda es una línea que nadie
+  escribió.
+- **El «HP» de `Today.tsx:2403` (C11).** Es una línea y no entró: hay que envolverla en `t()` para
+  que el arnés de vocabulario pueda verla. Mientras siga en JSX pelado, el test seguirá verde y la
+  palabra seguirá en pantalla.
 
-**Y una cosa que empeoró, dicha con todas las letras.** La rama arregló el default del medio de
-pago en el formulario de Coinify y **no lo arregló en el camino que el propio informe usa para
-medir el día típico**. Hasta esta vuelta, «el default es `cash`» era una falla pareja: fea, pero
-igual en todos lados. Ahora es una **inconsistencia**: el mismo gasto cargado desde `/finance` sale
-con transferencia y desde el tablero sale con efectivo. Eso es peor que el bug original, porque
-convierte un default equivocado en dos verdades distintas para el mismo gesto —exactamente lo que
-C7 llama falla estructural—. Es una línea: `DashboardWidget.tsx` tiene que llamar a
-`financeGetEntryDefaults` como ya hace `QuickAddForm.tsx:106-130`, y pasarle `seedAccountId` al
-`<AccountSelect>` de `:303`.
+**Lo que empeoró, y se corrigió en la misma vuelta.** Queda escrito porque el ciclo importa más que
+el resultado. La rama había arreglado el default del medio de pago en el formulario de Coinify y
+**no en el camino que este mismo informe usa para medir el día típico**. Hasta entonces «el default
+es `cash`» era una falla pareja: fea, pero igual en todos lados. Por unas horas fue una
+**inconsistencia** —el mismo gasto salía con transferencia desde `/finance` y con efectivo desde el
+tablero—, que es peor que el bug original, porque convierte un default equivocado en dos verdades
+distintas para el mismo gesto: exactamente lo que C7 llama falla estructural. `55aea72` lo cerró
+llamando al mismo canal con la misma disciplina y dejando un test de paridad de testigo. Es el único
+renglón de esta medición que fue de 3 a 7 dentro de la misma iteración.
+
+**Y una advertencia que sigue viva.** Ese arreglo lo encontró una medición, no un test: durante
+todo el tiempo que las dos puertas escribieron filas distintas, `npm test` estuvo en verde. Hoy hay
+un test que lo cubre (`entry-defaults-parity.browser.test.tsx`) — pero es **el único** par de puertas
+del repo que tiene uno. Las 3 altas de cuotas no lo tienen, y ahí la divergencia sigue.
 
 ### 6.4 Hallazgos nuevos
 
-1. **La rama está 4 commits atrás de `release/0.9.5`.** `git merge-base` da `cd905a5`, no `e5d9baf`.
-   Faltan `c5b48d6` + `10fd3b9` + `11eb43f` —**el arreglo de CAU-03**— y el bump de versión. O sea:
-   el SVG del Caldero que mata al emulador (20 `<animate>` SMIL en bucle infinito, ignorando
-   `prefers-reduced-motion`) **sigue vivo en esta rama**: no existe
-   `src/shared/hooks/usePrefersReducedMotion.ts` y `CauldronSVG.tsx` conserva las animaciones
-   incondicionales. Hay que mergear `release/0.9.5` antes de publicar. Y de paso: **CAU-03 ya no
-   está sin causa** —la causa es el rasterizador por software del host, no el teléfono— así que
-   §5.2 y el enunciado de esta vuelta lo listan mal.
+1. ~~**La rama está 4 commits atrás de `release/0.9.5`**~~ — **RESUELTO por `90a0632`.**
+   `git merge-base --is-ancestor release/0.9.5 HEAD` ahora dice sí, y están
+   `usePrefersReducedMotion.ts`, `platform-detect.ts` y el `CauldronSVG` que apaga los 20
+   `<animate>` SMIL. Se deja anotado porque el hallazgo era real: la rama se midió contra una base
+   de la que estaba desprendida, y eso pudo haber publicado un regreso del crash. **No suma puntos
+   en C8**: ese arreglo ya vivía en `release/0.9.5`, o sea en la base contra la que se mide esta
+   iteración; lo que pasó es que la rama se puso al día consigo misma. Corrección aparte, que sí
+   vale: **CAU-03 ya no está «sin causa»** —es el rasterizador por software del host, no un teléfono
+   de verdad— así que §5.2 y el encargo de esta vuelta lo listaban mal.
 2. **Cuatro citas de este mismo documento ya no apuntan a nada.** `Today.tsx:1015` (§2 J4) hoy es
    `setWeightPopup({ show: false })`; `nutrition.ipc.ts:663` hoy es un `ORDER BY` dentro de
    `nutrition:getUserCorrections`; `finance.ipc.ts:1058` (§3 C7) hoy está dentro de
@@ -566,12 +601,21 @@ C7 llama falla estructural—. Es una línea: `DashboardWidget.tsx` tiene que ll
 9. **El botón de vincular cuenta no dice «Vincular cuenta».** `PlayerCard.tsx:175-180` lo pone en
    `aria-label` y `title`; lo que ve alguien que mira la pantalla es «Solo en este dispositivo»
    (`:155`) y un ícono de persona.
-10. **Quedaron ~10 fallbacks en español con el vocabulario viejo.** `Dashboard.tsx:481` «Creá tu
-    primer **ritual**», `widget-registry.ts:53` «**Rituales** Diarios», `CharacterPage.tsx:421`
-    «**SALUD MAX**», `Dashboard.tsx:556` «**VITA**», `CodexSealModal.tsx:702` «estampar el
-    **lacre**». Son cadenas muertas mientras la clave i18n exista — y exactamente las que se
-    renderizan el día que una clave se borra en un merge. El logro «Ritualista» (`es.json:1850`) es
-    aparte y parece intencional.
+10. **Los ~10 fallbacks con vocabulario viejo: resueltos por `528b294`, con dos colas.** Verificados
+    uno por uno: `Dashboard.tsx:481` dice «Creá tu primer **hábito**», `:556` «**VIGOR**»,
+    `widget-registry.ts:53` «**Hábitos** Diarios», `CharacterPage.tsx:421` «**VIGOR MÁX**». El censo
+    de las tres capas da 0 en las seis familias de palabras. Las dos colas:
+    **(a)** `CodexSealModal.tsx:702` sigue diciendo «estampar el **lacre**» — fuera del alcance de ese
+    commit, que se ocupó de seis conceptos y no del vocabulario del sello, pero es el mismo tipo de
+    deuda y ahora es la única que queda.
+    **(b) El test tiene un punto ciego que deja vivo el «HP» más visible de todos.**
+    `vocabulario-unico.test.ts` extrae el segundo argumento literal de `t('clave', 'respaldo')`; el
+    texto en JSX que no pasa por `t()` le es invisible. Y `Today.tsx:2403` renderiza
+    `{data.hpChange} HP` **a mano, sin traducir, suelto** —no dentro del par «XP y HP»— dos líneas
+    arriba de un `t('nutrify.hpExplanation', 'Vigor según…')`. O sea: el catálogo está limpio, el
+    arnés está verde, y la palabra que el criterio quería sacar se sigue pintando en la pantalla de
+    cierre de Nutrify. La capa que el test mide («respaldos») y la capa que importa («español
+    visible») no son el mismo conjunto.
 11. **La regla de la racha se esconde en pantallas bajas.** `layout.css:741-743` oculta
     `.sidebar-streak__rule` con `@media (max-height: 780px)` en escritorio, donde vuelve a depender
     de `title=` — que es justo lo que este commit se propuso eliminar. En el teléfono
