@@ -77,6 +77,10 @@
   justify-content: center;
   font-size: var(--fs-label);
   font-weight: bold;
+  /* contrast-ok: el rotulo flota SOBRE el relleno de la barra (rayas de
+     --rubric / --moss / --gold), no sobre la pista --parch-2 que hereda; no
+     hay un color unico que sirva para las dos mitades, y por eso lleva el
+     text-shadow. La pista vacia queda como el peor caso conocido. */
   color: var(--parch-0);
   font-family: 'IM Fell English SC', serif;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
@@ -291,6 +295,8 @@
   padding: 0;
   border: 0;
   background: transparent;
+  /* contrast-ok: flechas dibujadas del control numerico, contenido no textual
+     (WCAG 1.4.11, 3:1); dan 3.84:1 sobre --parch-0 */
   color: var(--gold-dark);
   cursor: pointer;
   user-select: none;
@@ -574,7 +580,7 @@ textarea:focus-visible {
 }
 
 .auth-card__password-toggle:hover {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84:1, MENOS que el --ink-faded en reposo */
   background: rgba(168, 138, 60, 0.12);
 }
 

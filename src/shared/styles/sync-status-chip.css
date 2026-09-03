@@ -35,7 +35,7 @@
 .sync-chip[data-sync-state='synced'] .sync-chip__ico { color: var(--moss-dark); }
 
 .sync-chip[data-sync-state='pending'] { border-color: var(--gold-dark); }
-.sync-chip[data-sync-state='pending'] .sync-chip__ico { color: var(--gold-dark); }
+.sync-chip[data-sync-state='pending'] .sync-chip__ico { color: var(--gold-dark); }  /* contrast-ok: icono de 14 px, contenido no textual (3:1); da 3.84:1 sobre --parch-1 */
 
 /* El fallo sí se escribe en rojo: --rubric sobre --parch-1 da 7.13:1. */
 .sync-chip[data-sync-state='error'] { border-color: var(--rubric); color: var(--rubric); }
@@ -88,7 +88,7 @@
    textual, 3:1): --parch-2 7.78:1, --gold-light 6.23:1, --moss-light 3.69:1.
    --rubric-light NO se usa acá: sobre cuero da 2.09:1 (layout.css:251). */
 [data-shell='mobile'] .mobile-header .sync-chip__ico { color: inherit; }
-[data-shell='mobile'] .mobile-header .sync-chip[data-sync-state='synced'] { color: var(--moss-light); }
+[data-shell='mobile'] .mobile-header .sync-chip[data-sync-state='synced'] { color: var(--moss-light); }  /* contrast-ok: la pildora del header es solo icono (el rotulo va en .sr-only), 3.69:1 sobre 3:1 */
 [data-shell='mobile'] .mobile-header .sync-chip[data-sync-state='pending'] { color: var(--gold-light); }
 
 /* El fallo, en píldora llena: --parch-0 sobre --rubric da 8.4:1. */

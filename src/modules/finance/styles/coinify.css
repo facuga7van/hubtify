@@ -1605,7 +1605,9 @@ button.coin-sort-header--amount {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  /* La inicial es TEXTO: una superficie dorada que lo lleva arranca en
+     --gold-light (peor parada 4.97:1); con --gold-dark daba 3.47:1. */
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
   color: var(--ink);
   display: flex;
   align-items: center;
@@ -1867,7 +1869,9 @@ button.coin-sort-header--amount {
 
 /* Principal: oro sobre tinta, sin gritar. */
 .rpg-button.coin-recurring__action--primary {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  /* La parada peor era --gold-dark: 3.47:1 con --ink. El degrade dorado que
+     lleva texto arranca en --gold-light y termina en --gold (4.97:1). */
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
   color: var(--ink);
   border-color: var(--gold-dark);
 }
@@ -2109,6 +2113,8 @@ button.coin-sort-header--amount {
 }
 
 .coin-empty-codex > svg {
+  /* contrast-ok: sello decorativo del estado vacio; el mensaje lo lleva el
+     texto en --ink-faded al lado. Ornamento, no informacion. */
   color: var(--gold-dark);
   opacity: 0.55;
   margin-bottom: 2px;
@@ -2462,8 +2468,9 @@ button.coin-sort-header--amount {
 }
 
 .coin-dollar-menu__config-btn--active {
-  background: var(--gold-dark);
-  color: var(--parch-0);
+  /* --parch-0 sobre --gold-dark daba 3.84:1 */
+  background: var(--gold-light);
+  color: var(--ink);
   opacity: 1;
 }
 
@@ -2655,7 +2662,7 @@ button.coin-sort-header--amount {
 
 .coin-budget-pencil:hover,
 .coin-budget-pencil:focus-visible {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark leia MENOS (3.84:1) que el --ink-faded en reposo */
 }
 
 .coin-budget-edit {
@@ -2745,7 +2752,8 @@ button.coin-sort-header--amount {
 }
 
 .coin-mode-chip__mode--active {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  /* Peor parada --gold-dark: 3.47:1 con --ink. Arranca en --gold-light. */
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
   color: var(--ink);
 }
 
@@ -2944,6 +2952,8 @@ button.coin-sort-header--amount {
 
 .coin-account-row__icon {
   display: inline-flex;
+  /* contrast-ok: icono de la cuenta, contenido no textual (3:1); el nombre va
+     al lado en tinta y el icono da 3.84:1 sobre el pergamino */
   color: var(--gold-dark);
   flex-shrink: 0;
 }
@@ -3014,6 +3024,7 @@ button.coin-sort-header--amount {
 
 .coin-account-manager__icon {
   display: inline-flex;
+  /* contrast-ok: mismo icono de cuenta que en la fila, no texto (3.84:1 > 3:1) */
   color: var(--gold-dark);
   flex-shrink: 0;
 }
@@ -3494,6 +3505,8 @@ button.coin-sort-header--amount {
   text-align: center;
 }
 
+/* contrast-ok: sello de bienvenida, puro ornamento; el titulo y el boton
+   llevan toda la informacion del estado inicial */
 .coin-start__icon { margin-bottom: 10px; color: var(--gold-dark); }
 
 .coin-start__title {

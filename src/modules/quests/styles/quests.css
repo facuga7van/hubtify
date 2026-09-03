@@ -224,7 +224,7 @@
 }
 
 .quest-tier-label--epica {
-  color: var(--gold-dark);
+  color: var(--ink);/* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   border-color: rgba(168, 138, 60, 0.35);
 }
 
@@ -441,9 +441,12 @@
   border-radius: 2px;
 }
 
+/* Era --parch-0 sobre --gold-dark: 3.84:1, y el chip sale hasta tres veces en
+   una sola pantalla. Una superficie dorada que lleva texto arranca en
+   --gold-light, con tinta --ink: 7.12:1, y ademas grita mas que el oro apagado. */
 .quest-due--today {
-  background: var(--gold-dark);
-  color: var(--parch-0);
+  background: var(--gold-light);
+  color: var(--ink);
   padding: 1px 6px;
   font-size: var(--fs-label);
   font-family: 'IM Fell English SC', serif;
@@ -474,6 +477,8 @@
 .quest-repeat-badge {
   display: inline-flex;
   align-items: center;
+  /* contrast-ok: sello de recurrencia, dibujo y no texto (WCAG 1.4.11, 3:1);
+     da 3.28:1 con la opacidad de 0.8 que lo mantiene en segundo plano */
   color: var(--gold-dark);
   opacity: 0.8;
   flex-shrink: 0;
@@ -863,9 +868,12 @@
 }
 
 .xp-toast__xp { font-size: 1.2rem; font-weight: bold; }
-.xp-toast__combo { font-size: var(--fs-label); color: var(--ink-soft); }
-.xp-toast__bonus { font-size: var(--fs-quote); color: var(--gold); }
-.xp-toast__streak { font-size: var(--fs-label); color: var(--moss-light); }
+/* El toast es CUERO: --ink-soft daba 1.25:1 (texto invisible), --gold 4.38:1 y
+   --moss-light 3.69:1. Sobre cuero mandan los tonos claros; el verde y el oro
+   del estado siguen viviendo en el borde de --good / --critical. */
+.xp-toast__combo { font-size: var(--fs-label); color: var(--parch-2); }
+.xp-toast__bonus { font-size: var(--fs-quote); color: var(--gold-light); }
+.xp-toast__streak { font-size: var(--fs-label); color: var(--parch-0); }
 
 .xp-toast--good {
   border-color: var(--moss);
@@ -1142,7 +1150,7 @@
 }
 .quest-retro-badge:hover,
 .quest-retro-badge:focus-visible {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark leia MENOS (3.84:1) que el reposo */
   border-bottom-color: var(--gold-dark);
 }
 
@@ -1534,7 +1542,7 @@
 }
 
 .quest-row-meta .quest-today-time {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0: el oro no es tinta */
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }

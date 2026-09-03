@@ -85,7 +85,10 @@
   background: var(--leather);
   border: 1px solid rgba(168, 138, 60, 0.25);
   border-left: none;
-  color: var(--gold);
+  /* contrast-ok: chevron del riel, contenido no textual (3:1). --gold daba
+     4.38:1 sobre --leather y 2.35:1 al 40% de opacidad; --gold-light da
+     6.23:1, o sea 3.09:1 en reposo y 4.66:1 con el sidebar bajo el puntero */
+  color: var(--gold-light);
   cursor: pointer;
   opacity: 0.4;
   width: 20px;
@@ -449,7 +452,7 @@
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold daba 4.38:1 sobre --leather */
 }
 
 .sidebar-nav-item__label {
@@ -488,7 +491,7 @@
 }
 
 .sidebar-nav-item:hover .sidebar-nav-item__ico {
-  color: var(--gold-light);
+  color: var(--parch-0);  /* el renglon entero pasa a pergamino en hover */
 }
 
 .sidebar--collapsed .sidebar-nav-item:hover {
@@ -501,8 +504,11 @@
   color: var(--parch-0);
 }
 
+/* El icono activo estaba en --rubric-light: 2.09:1 sobre el cuero, por debajo
+   incluso del 3:1 de contenido no textual. El rojo del estado activo ya lo
+   llevan el borde izquierdo y el degrade del fondo. */
 .sidebar-nav-item.active .sidebar-nav-item__ico {
-  color: var(--rubric-light);
+  color: var(--parch-0);
 }
 
 .sidebar--collapsed .sidebar-nav-item.active {
@@ -597,7 +603,7 @@
   overflow: hidden;
   transition: opacity .2s .05s, max-height .3s;
   font-family: 'IM Fell English', serif;
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold daba 4.38:1 sobre --leather */
 }
 
 .sidebar:not(.sidebar--collapsed) .sidebar-footer {
@@ -817,7 +823,7 @@
 }
 
 .account-dropdown__item--add {
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1; el acento lo lleva el peso */
   font-weight: 600;
 }
 
@@ -840,7 +846,7 @@
   justify-content: center;
   font-size: var(--fs-label);
   font-weight: 700;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* la inicial es texto: --gold-dark daba 3.84:1 */
   flex-shrink: 0;
 }
 
@@ -878,7 +884,7 @@
    El bloque vive dentro de .sidebar-bar de la racha. La Posada opaca la barra
    (pausada, no rota) y el boton es el unico control del sistema: un click. */
 .sidebar-bar--resting .sidebar-bar__track { opacity: 0.45; }
-.sidebar-bar--resting .sidebar-bar__label { color: var(--gold); }
+.sidebar-bar--resting .sidebar-bar__label { color: var(--gold-light); }  /* --gold: 4.38:1 sobre cuero */
 
 /* Estaba en `--ink-faded` (#6b5535), un marrón OSCURO, sobre el cuero OSCURO
    del sidebar: 1.7:1 de contraste. El récord de racha es un dato, no una marca

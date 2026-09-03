@@ -282,7 +282,7 @@
   content: '\2022';
   position: absolute;
   left: 0;
-  color: var(--gold);
+  color: var(--gold-light);  /* --gold daba 4.38:1 sobre --leather */
 }
 
 .update-dialog__progress {
@@ -418,8 +418,14 @@
   transition: width 0.3s ease;
 }
 
+/* Sobre cuero no hay rojo legible: --rubric-light da 2.09:1. Se usa el mismo
+   recurso que el chip de sincronizacion (sync-status-chip.css): pildora llena
+   de --rubric con tinta --parch-0, 8.4:1, y el rojo se conserva. */
 .update-chip__error {
-  color: var(--rubric-light);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--rubric);
+  color: var(--parch-0);
 }
 
 .update-chip__permission {

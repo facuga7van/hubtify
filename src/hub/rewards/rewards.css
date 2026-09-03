@@ -55,6 +55,8 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
+  /* contrast-ok: ícono de la bolsa grabado sobre su propio disco dorado, no
+     texto; rige el 3:1 de contenido no textual (WCAG 1.4.11) y da 3.84:1 */
   color: var(--gold-dark);
   background: radial-gradient(circle at 38% 32%, rgba(230, 205, 130, 0.9) 0%, rgba(196, 168, 78, 0.7) 55%, rgba(138, 112, 48, 0.75) 100%);
   border: 1px solid var(--gold-dark);
@@ -107,6 +109,8 @@
 
 .rwd-burst__coin {
   display: inline-flex;
+  /* contrast-ok: monedas de la micro-ceremonia; GSAP las mueve y se apagan
+     solas, no llevan informacion que no este en el saldo de al lado */
   color: var(--gold-dark);
   opacity: 0;
 }
@@ -386,7 +390,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   font-size: var(--fs-sub);
   white-space: nowrap;
 }
@@ -403,7 +407,9 @@
 .shop-item__buy--on { opacity: 0.85; }
 
 .shop-item__state {
-  color: var(--gold-dark);
+  /* El caso testigo: la regla estaba escrita 333 líneas más arriba, en esta
+     misma hoja, y este selector la seguía violando. --gold-dark daba 3.84:1. */
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 

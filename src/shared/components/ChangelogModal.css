@@ -150,7 +150,7 @@
   font-family: var(--ff-accent);
   font-size: var(--fs-label);
   letter-spacing: 0.18em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
 }
 
 .changelog-header__flourish {
@@ -192,7 +192,7 @@
   font-family: var(--ff-accent);
   font-size: var(--fs-body);
   letter-spacing: 0.15em;
-  color: var(--gold-dark);
+  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
   font-weight: 600;
   white-space: nowrap;
 }

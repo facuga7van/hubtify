@@ -189,7 +189,7 @@
 
 .widget-drag-handle:hover,
 .widget-resize-btn:hover {
-  color: var(--gold-dark);
+  color: var(--ink);  /* --gold-dark daba 3.84:1: el hover leia MENOS que el reposo */
   border-color: var(--gold-dark);
   background: rgba(245, 231, 192, 0.95);
 }
