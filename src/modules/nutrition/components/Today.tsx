@@ -2400,7 +2400,10 @@ function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: numbe
           {data.hpChange !== 0 && (
             <>
               <span className={data.hpChange >= 0 ? 'nutri-green' : 'nutri-red'} style={{ marginLeft: 8 }}>
-                {data.hpChange >= 0 ? '+' : ''}{data.hpChange} HP
+                {/* Rótulo de estadística, no la sigla del par «XP y HP»: acá el
+                    número va solo y el sello de ayuda de al lado ya dice «Vigor».
+                    Mismo criterio que hpExplanation, scoringBands y dayStatus.over. */}
+                {data.hpChange >= 0 ? '+' : ''}{data.hpChange} {t('rpg.vigor', 'Vigor')}
               </span>
               <HelpBubble variant="inline" text={t('nutrify.hpExplanation', 'Vigor según cercanía al objetivo: dentro del rango = +Vigor, fuera del rango = -Vigor')} />
             </>

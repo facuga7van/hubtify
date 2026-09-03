@@ -93,6 +93,77 @@ const RESPALDOS: Entry[] = walkTs(SRC).flatMap((file) => {
   }));
 });
 
+/**
+ * ── LA CUARTA CAPA: EL TEXTO LITERAL DEL JSX ──────────────────────────────
+ *
+ * EL AGUJERO QUE TAPA ESTA EXTENSIÓN
+ * Las tres capas de arriba miran texto que PASA por `t()`: los dos catálogos y
+ * el segundo argumento de `t('clave', 'RESPALDO')`. Un rótulo escrito a mano
+ * dentro del JSX no pasa por `t()`, así que era INVISIBLE para el arnés:
+ * catálogo limpio, suite en verde, palabra vieja en pantalla.
+ *
+ * No es hipotético. `Today.tsx` pintaba `{data.hpChange} HP` a cinco píxeles de
+ * un `HelpBubble` que llamaba «Vigor» a ese mismo número. Dos palabras para lo
+ * mismo, y las tres capas anteriores decían que todo estaba bien. Ésta es la
+ * TERCERA vez que este vocabulario se degrada; las dos anteriores se arreglaron
+ * a ojo y volvieron. Por eso la vigilancia se extiende en vez de repetir la
+ * limpieza.
+ *
+ * CÓMO SE EXTRAE, Y HASTA DÓNDE LLEGA (a propósito)
+ * No hay parser de JSX acá, y no hace falta: alcanza con los nodos de texto, que
+ * son los tramos que van de un `>` o un `}` hasta el siguiente `<` o `{`. Sobre
+ * ese tramo se aplica un filtro deliberadamente ESTRECHO: si contiene `;`, `=`,
+ * paréntesis, corchetes, comillas o backticks, es código y se descarta.
+ *
+ * Un arnés que grita en falso se termina apagando, así que se prefiere ACOTAR y
+ * declarar los puntos ciegos antes que llenar el test de excepciones. Lo que
+ * esta capa NO ve, y se acepta:
+ *   · atributos JSX (`title="…"`, `aria-label="…"`) — viven dentro de `<…>` y
+ *     casi siempre pasan por `t()`, que ya está cubierto por la capa 3;
+ *   · literales de plantilla (`` `${n} pasos` ``) — el backtick los marca como
+ *     código y quedan afuera;
+ *   · cualquier cadena armada en TypeScript fuera del JSX.
+ * Sin ese filtro, `tasks.map(`, `const meta =` y compañía entrarían como texto
+ * de interfaz y el test sería ruido puro.
+ *
+ * LAS EXCEPCIONES, EXPLÍCITAS
+ *   · Sólo `.tsx`: `src/shared/changelog.ts` es `.ts` y queda fuera por
+ *     construcción — sus notas fechadas de versiones YA PUBLICADAS no se
+ *     reescriben, corregirlas sería falsificar el historial.
+ *   · Comentarios de código (`//`, `/* *\/`, `{/* *\/}`) se borran antes de
+ *     extraer: son notas para quien programa, no texto de producto.
+ *   · «HP» sobrevive sólo si el mismo nodo trae «XP» al lado — el par abreviado
+ *     «XP y HP», misma regla que ya rige para catálogos y respaldos.
+ *   · El logro «Ritualista» y el latín «De Ritibus Quotidianis» no necesitan
+ *     excepción: no matchean `\brituales?\b` (falta el borde de palabra).
+ */
+const NODO_JSX = /[>}]([^<>{}]*)[<{]/g;
+/** Si el tramo tiene alguno de estos, es código y no texto que se pinte. */
+const HUELE_A_CODIGO = /[;=()[\]`'"\\]/;
+
+const sinComentarios = (src: string): string =>
+  src
+    // Bloques `/* … */` (incluye los `{/* … */}` del JSX). Se reemplaza cada
+    // carácter por un espacio salvo los saltos, para no correr los renglones.
+    .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
+    // Línea `// …`, con guardia para no romper `https://…`.
+    .replace(/(^|[^:])\/\/[^\n]*/gm, (_m, antes: string) => antes);
+
+const TEXTO_JSX: Entry[] = walkTs(SRC)
+  .filter((file) => file.endsWith('.tsx'))
+  .flatMap((file) => {
+    const rel = relative(ROOT, file).replace(/\\/g, '/');
+    const src = sinComentarios(readFileSync(file, 'utf8'));
+    const out: Entry[] = [];
+    for (const m of src.matchAll(NODO_JSX)) {
+      const texto = m[1].replace(/\s+/g, ' ').trim();
+      if (!texto || HUELE_A_CODIGO.test(texto)) continue;
+      const linea = src.slice(0, m.index).split('\n').length;
+      out.push({ where: `${rel}:${linea}`, key: 'texto JSX', text: texto });
+    }
+    return out;
+  });
+
 const listar = (entries: Entry[], re: RegExp) =>
   entries.filter((e) => re.test(e.text)).map((e) => `${e.where} → ${e.key}: «${e.text.slice(0, 90)}»`);
 
@@ -121,6 +192,7 @@ describe('vocabulario — una sola palabra por concepto', () => {
     expect(ES.length).toBeGreaterThan(1500);
     expect(EN.length).toBe(ES.length); // paridad de claves entre catálogos
     expect(RESPALDOS.length).toBeGreaterThan(500);
+    expect(TEXTO_JSX.length).toBeGreaterThan(300);
   });
 
   describe('es.json', () => {
@@ -143,6 +215,14 @@ describe('vocabulario — una sola palabra por concepto', () => {
     for (const { palabra, re, usar } of DESCARTADAS_ES) {
       it(`ningún respaldo dice «${palabra}» — se usa «${usar}»`, () => {
         expect(listar(RESPALDOS, re)).toEqual([]);
+      });
+    }
+  });
+
+  describe('texto literal del JSX en src/**/*.tsx', () => {
+    for (const { palabra, re, usar } of DESCARTADAS_ES) {
+      it(`ningún rótulo pintado a mano dice «${palabra}» — se usa «${usar}»`, () => {
+        expect(listar(TEXTO_JSX, re)).toEqual([]);
       });
     }
   });
@@ -197,6 +277,14 @@ describe('vocabulario — una sola palabra por concepto', () => {
     it('respaldos: los «HP» que quedan son de claves exceptuadas', () => {
       const claves = [...new Set(RESPALDOS.filter((e) => HP.test(e.text)).map((e) => e.key))];
       expect(claves.filter((k) => !HP_PERMITIDO.includes(k))).toEqual([]);
+    });
+
+    /* Un «HP» escrito a mano en el JSX es, por definición, un rótulo: no hay
+     * frase alrededor, hay un número pegado. Sólo pasa si el mismo nodo de
+     * texto trae «XP», que es el par abreviado. */
+    it('texto JSX: cada «HP» viene con su «XP» al lado', () => {
+      const sueltos = TEXTO_JSX.filter((e) => HP.test(e.text) && !/\bXP\b/.test(e.text));
+      expect(sueltos.map((e) => `${e.where}: «${e.text}»`)).toEqual([]);
     });
   });
 
