@@ -25,7 +25,7 @@ import CauldronSVG from './CauldronSVG';
 import MissionPicker, { useOpenMissions } from './MissionPicker';
 import PotionShelf from './PotionShelf';
 import { formatTime } from '../utils';
-import { useCauldronLabels, usePresetName, useTimerPresetName, rememberLastPreset, POPOUT_ON_START_KEY } from '../hooks';
+import { useCauldronLabels, usePresetName, useTimerPresetName, rememberLastPreset, resolveDefaultPresetId, POPOUT_ON_START_KEY } from '../hooks';
 import {
   cancelAutoStart,
   getWeekByProject,
@@ -171,13 +171,21 @@ export default function CauldronPage() {
   const statsRef = useRef<HTMLDivElement>(null);
 
   /* -- Data loaders -- */
+  /**
+   * `p[0]` era «Classic» siempre —`cauldron:getPresets` ordena
+   * `is_default DESC, name ASC`— así que la página abría en la receta que el
+   * historial dice que menos se usa: 30 de las 41 sesiones de la base real son
+   * de una receta propia. `resolveDefaultPresetId` respeta la última usada, que
+   * esta misma pantalla ya venía guardando sin que nadie la leyera.
+   */
   const loadPresets = useCallback(() => {
-    window.api.cauldronGetPresets().then((p) => {
+    window.api.cauldronGetPresets().then(async (p) => {
       setPresets(p);
-      setSelectedPresetId((prev) => {
-        if (!prev && p.length > 0) return p[0].id;
-        return prev;
-      });
+      const preferred = await resolveDefaultPresetId(p);
+      // Funcional y no `if (!selectedPresetId)`: `loadState` puede haber puesto
+      // la receta de una sesión en curso mientras se resolvía el default, y esa
+      // gana — es lo que está al fuego ahora mismo.
+      setSelectedPresetId((prev) => prev ?? preferred);
     });
   }, []);
 

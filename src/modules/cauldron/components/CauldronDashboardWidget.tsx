@@ -9,7 +9,7 @@ import type {
 import { statsShimmer } from '../../../shared/animations/cauldron';
 import { playCauldronStart } from '../../../shared/audio';
 import { formatTime } from '../utils';
-import { shouldPopOutOnStart, usePresetName } from '../hooks';
+import { shouldPopOutOnStart, usePresetName, rememberLastPreset, resolveDefaultPresetId } from '../hooks';
 
 function getSessionLabel(sessionType: string, t: (key: string, fallback: string) => string): string {
   switch (sessionType) {
@@ -58,7 +58,14 @@ export default function CauldronDashboardWidget() {
   const { t } = useTranslation();
   const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
-  const [firstPreset, setFirstPreset] = useState<CauldronPreset | null>(null);
+  /**
+   * La receta que va a arrancar el botón. Era `p[0]` —o sea «Classic», porque
+   * `cauldron:getPresets` ordena `is_default DESC, name ASC`— y el tooltip decía
+   * «Inicia Classic» aunque el historial mostrara 30 sesiones de una receta
+   * propia contra 11 de la clásica. Ahora es la última usada, y el tooltip dice
+   * la verdad porque se arma con este mismo objeto.
+   */
+  const [defaultPreset, setDefaultPreset] = useState<CauldronPreset | null>(null);
   const countRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
   const presetLabel = usePresetName();
@@ -71,17 +78,20 @@ export default function CauldronDashboardWidget() {
     window.api.cauldronGetState().then((s) => setTimerState(s));
   }, []);
 
-  const loadFirstPreset = useCallback(() => {
+  const loadDefaultPreset = useCallback(() => {
     window.api.cauldronGetPresets()
-      .then((p) => setFirstPreset(p[0] ?? null))
-      .catch(() => setFirstPreset(null));
+      .then(async (p) => {
+        const id = await resolveDefaultPresetId(p);
+        setDefaultPreset(p.find((preset) => preset.id === id) ?? p[0] ?? null);
+      })
+      .catch(() => setDefaultPreset(null));
   }, []);
 
   useEffect(() => {
     loadStats();
     loadState();
-    loadFirstPreset();
-  }, [loadStats, loadState, loadFirstPreset]);
+    loadDefaultPreset();
+  }, [loadStats, loadState, loadDefaultPreset]);
 
   // Reload on account switch and after a sync pull brought cauldron rows in
   // (Layout fires `sync:cauldronUpdated`; nobody listened, so the widget showed
@@ -90,7 +100,7 @@ export default function CauldronDashboardWidget() {
     const handler = () => {
       loadStats();
       loadState();
-      loadFirstPreset();
+      loadDefaultPreset();
     };
     window.addEventListener('account:switched', handler);
     window.addEventListener('sync:cauldronUpdated', handler);
@@ -98,7 +108,7 @@ export default function CauldronDashboardWidget() {
       window.removeEventListener('account:switched', handler);
       window.removeEventListener('sync:cauldronUpdated', handler);
     };
-  }, [loadStats, loadState, loadFirstPreset]);
+  }, [loadStats, loadState, loadDefaultPreset]);
 
   // Subscribe to tick events
   useEffect(() => {
@@ -130,8 +140,13 @@ export default function CauldronDashboardWidget() {
   const handleQuickStart = async () => {
     try {
       const presets = (await window.api.cauldronGetPresets()) as CauldronPreset[];
-      if (presets.length > 0) {
-        await window.api.cauldronStart(presets[0].id);
+      // Se relee la lista en vez de confiar en el estado: entre que se pintó el
+      // botón y el click pudo entrar una sync. Y se resuelve el default acá
+      // mismo para que el arranque sea EXACTAMENTE el que anuncia el tooltip.
+      const presetId = await resolveDefaultPresetId(presets);
+      if (presetId) {
+        await window.api.cauldronStart(presetId);
+        rememberLastPreset(presetId);
         // Same start feedback as the Cauldron page — starting from here used to
         // feel dead by comparison.
         playCauldronStart();
@@ -180,8 +195,8 @@ export default function CauldronDashboardWidget() {
                   className="rpg-button"
                   onClick={(e) => { e.stopPropagation(); handleQuickStart(); }}
                   style={{ fontSize: 'var(--fs-label)', padding: '4px 10px' }}
-                  title={firstPreset
-                    ? t('cauldron.quickStartTitle', 'Inicia "{{name}}"', { name: presetLabel(firstPreset) })
+                  title={defaultPreset
+                    ? t('cauldron.quickStartTitle', 'Inicia "{{name}}"', { name: presetLabel(defaultPreset) })
                     : undefined}
                 >
                   {t('cauldron.startBrew', 'Quick Brew')}
