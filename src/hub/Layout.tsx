@@ -510,6 +510,14 @@ export default function Layout() {
       const modEnabled = localStorage.getItem(`hubtify_notifications_module_${mod}`) !== 'false';
       window.api.notificationsSetModuleEnabled?.(mod, modEnabled);
     }
+    // La hora del recordatorio de hábitos también se empuja acá, no solo cuando
+    // se abre Ajustes: en Android esa hora es la de una ALARMA que el sistema va
+    // a disparar con la app cerrada, así que tiene que quedar armada al arrancar
+    // y no cuando el usuario pase por la pantalla de configuración.
+    window.api.notificationsSetHabitReminder?.(
+      localStorage.getItem('hubtify_habit_reminder_enabled') !== 'false',
+      localStorage.getItem('hubtify_habit_reminder_time') || '21:00',
+    );
     window.api.notificationsRunCheck?.();
   }, []);
 

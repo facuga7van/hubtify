@@ -272,7 +272,7 @@ Sin cambios en `src/shared/sync.ts`, `sync-merge.ts`, `habit-checks-sync.ts` ni 
 | 3. Shell mobile | `MobileShell`, drawer, sin TitleBar, StatusBar, safe areas, back button, project `browser-mobile` | Screenshots 390×844 de Dashboard, Questify, Coinify, Nutrify, Cauldron sin overflow horizontal; drawer abre/cierra; back cierra drawer |
 | 4. CI/keystore | keystore generado, `release.yml` en 3 jobs, `ci.yml` con APK debug, `.gitignore` | Revisión del YAML + `assembleRelease` firmado local; `apksigner verify` OK |
 | 5. PlatformPort mobile | `notify` real, `saveTextFile`, `pickBinaryFile`, `saveBinaryFile`, `src/mobile/backup.ts`, botón "Exportar .db" en `FatalScreen`; toast i18n `unsupported_platform` para import PDF | Export CSV y `.db` comparten por Share; import `.db` restaura y recarga; el import PDF muestra el toast y no rompe nada |
-| 6. Pendientes | Cauldron como notificación `ongoing`, notificaciones con app cerrada, updater in-app (GitHub API + `@capacitor/browser`), WHPX del emulador, `createTestDb` + `unit-wasm` | Fuera del alcance de esta rama |
+| 6. Pendientes | Cauldron como notificación `ongoing`, notificaciones con app cerrada, updater in-app (GitHub API + `@capacitor/browser`), WHPX del emulador, `createTestDb` + `unit-wasm` | Fuera del alcance de esta rama. **Los avisos con la app cerrada y el `ongoing` del Caldero se hicieron en `feat/android-background`: ver `2026-09-03-android-background-notifications.md`** |
 
 ## 12. Riesgos
 

@@ -157,6 +157,8 @@ export const API_CHANNELS = {
   notificationsSetLocale: { channel: 'notifications:setLocale', kind: 'invoke' },
   notificationsSetModuleEnabled: { channel: 'notifications:setModuleEnabled', kind: 'invoke' },
   notificationsSetHabitReminder: { channel: 'notifications:setHabitReminder', kind: 'invoke' },
+  notificationsExactAlarmState: { channel: 'notifications:exactAlarmState', kind: 'invoke' },
+  notificationsRequestExactAlarms: { channel: 'notifications:requestExactAlarms', kind: 'invoke' },
   onRpgAchievementUnlocked: { channel: 'rpg:achievementUnlocked', kind: 'on', unwrap: (p: unknown) => (p as { id?: string } | undefined)?.id },
   onRpgAchievementsBackfilled: { channel: 'rpg:achievementsBackfilled', kind: 'on', unwrap: (p: unknown) => (p as { ids?: string[] } | undefined)?.ids ?? [] },
   onRpgDaySealed: { channel: 'rpg:daySealed', kind: 'on' },

@@ -80,6 +80,16 @@ function msg(type: string, name: string = ''): { title: string; body: string } {
   return { title: m.title(name), body: m.body };
 }
 
+/**
+ * El texto del recordatorio de hábitos en el idioma vigente. Lo necesita el
+ * programador de avisos (`notification-schedule.ts`) para poner el título y el
+ * cuerpo DENTRO de la alarma que Android va a disparar con la app cerrada:
+ * cuando eso pasa no corre nada nuestro que pueda traducir nada.
+ */
+export function habitReminderMessage(): { title: string; body: string } {
+  return msg('habit_reminder');
+}
+
 export interface NotificationCandidate {
   type: string;
   module: string;
@@ -184,7 +194,7 @@ export function evaluateQuestNotifications(db: SqlDatabase): NotificationCandida
  * Lo único que queda acá es la política PROPIA de las notificaciones: un hábito
  * mensual solo molesta en los últimos 3 días del mes.
  */
-function habitsPendingToday(db: SqlDatabase, today: Date): number {
+export function habitsPendingToday(db: SqlDatabase, today: Date): number {
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const monthlyWindowOpen = today.getDate() >= lastDayOfMonth - 2;
 

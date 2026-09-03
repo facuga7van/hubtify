@@ -98,6 +98,9 @@ export function useCauldronLabels() {
       cycle: t('cauldron.notify.cycle', 'Ciclo'),
       next: t('cauldron.notify.next', 'Siguiente'),
       minutesShort: t('cauldron.weeklyFocus.unit', 'min'),
+      // Cuerpo del aviso persistente de Android: la alarma lleva el texto
+      // adentro porque cuando el SO la dispara no corre nada nuestro.
+      endsAt: t('cauldron.notify.endsAt', 'Termina a las'),
     }).catch(() => { /* main process not ready — labels keep their defaults */ });
   }, [t, i18n.language]);
 }
