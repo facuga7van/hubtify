@@ -44,6 +44,15 @@ import {
   setCodexModalOpen,
 } from './codexApi';
 import { purseHint } from './purse';
+import {
+  closeNutritionDay,
+  isNutritionDayClosed,
+  nutritionCloseApiReady,
+  readDayMetrics,
+} from './nutritionClose';
+import { notifyNutritionChanged, notifyNutritionDayClosed } from '../../modules/nutrition/notify';
+import Checkbox from '../../shared/components/Checkbox';
+import RpgNumberInput from '../../shared/components/RpgNumberInput';
 import '../styles/codex-seal.css';
 
 /** How long the wax has to be held before it takes. */
@@ -174,6 +183,60 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
 
   useEffect(() => { loadPurse(); }, [loadPurse]);
 
+  /* ── un solo cierre de día ────────────────────────
+     Había DOS rituales que pagaban XP por separado: este sello (anunciado en
+     el brief y en la barra) y el cierre de Nutrify (nunca anunciado, en un
+     footer sticky de /nutrition). En la base real: 6 cierres de Nutrify contra
+     1 sello. Si el día tiene comidas y todavía no está cerrado, el paso de
+     nutrición pasa a vivir acá adentro y el lacre hace las dos cosas.
+
+     Encadenar es seguro sin migración ni reescritura: los dos backends ya son
+     idempotentes por su cuenta (`alreadyClosed`, `already_sealed`), así que
+     nada se paga dos veces y nada ya otorgado se toca. */
+  const [nutriPending, setNutriPending] = useState(false);
+  const [nutriSteps, setNutriSteps] = useState('');
+  const [nutriGym, setNutriGym] = useState(false);
+  const [nutriAward, setNutriAward] = useState<number | null>(null);
+  const [nutriBusy, setNutriBusy] = useState(false);
+
+  const dayHasNutrition = !!summary?.modules.includes('nutrition');
+
+  useEffect(() => {
+    let alive = true;
+    setNutriAward(null);
+    if (!dayHasNutrition || !nutritionCloseApiReady()) { setNutriPending(false); return; }
+    isNutritionDayClosed(date).then(async (closed) => {
+      if (!alive) return;
+      setNutriPending(!closed);
+      if (closed) return;
+      const metrics = await readDayMetrics(date);
+      if (!alive) return;
+      setNutriSteps(metrics.steps);
+      setNutriGym(metrics.gym);
+    });
+    return () => { alive = false; };
+  }, [date, dayHasNutrition]);
+
+  /** Cierra la jornada de comidas y deja anotado lo que pagó. Nunca lanza. */
+  const runNutritionClose = useCallback(async () => {
+    if (!nutriPending) return;
+    setNutriBusy(true);
+    try {
+      const breakdown = await closeNutritionDay(date, nutriSteps, nutriGym);
+      setNutriPending(false);
+      if (breakdown) setNutriAward(breakdown.xpTotal);
+      notifyNutritionChanged();
+      // Nutrify tiene que pasar a solo lectura sin recargar (NUT-02).
+      notifyNutritionDayClosed();
+      window.dispatchEvent(new Event('rpg:statsChanged'));
+    } catch {
+      // Un tropiezo de nutrición no puede impedir sellar el día.
+      setNutriPending(false);
+    } finally {
+      setNutriBusy(false);
+    }
+  }, [date, nutriPending, nutriSteps, nutriGym]);
+
   useEffect(() => {
     const handler = () => { load(); loadPurse(); };
     window.addEventListener('account:switched', handler);
@@ -192,6 +255,10 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
 
   const commitSeal = useCallback(async () => {
     setProblem(null);
+    // Nutrición PRIMERO: su XP es propio y se paga aunque el sello después
+    // rebote (día ya sellado, fuera de ventana). Al revés, un rebote del sello
+    // se llevaría puesto el cierre de comidas que el usuario sí pidió.
+    await runNutritionClose();
     const res = await sealDay(date);
     if (!res) {
       // Handler not wired yet — say so rather than pretending it worked.
@@ -216,7 +283,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
     loadPurse();
     window.dispatchEvent(new Event('rpg:statsChanged'));
     window.dispatchEvent(new Event(CODEX_SEALED_EVENT));
-  }, [date, load, loadPurse]);
+  }, [date, load, loadPurse, runNutritionClose]);
 
   /* ── hold-to-seal (pointer + keyboard) ────────────── */
 
@@ -307,6 +374,9 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   const sealedNow = phase === 'sealing' || phase === 'done' || (summary?.sealed ?? false);
   const emptyDay = !!summary && summary.eventsCount === 0 && !summary.sealed;
   const thisSeal = seals.find((s) => s.date === date);
+  /** Sin lacre que apretar (ya sellado o fuera de ventana), el cierre de
+      comidas necesita su propio botón. */
+  const nutriStandalone = sealedNow || !!(summary && !summary.canSeal);
 
   const dayLabel = formatLongDate(date, locale);
   const isYesterday = date === addDaysISO(today, -1);
@@ -467,6 +537,58 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
         )}
 
         <QBDividerSection />
+
+        {/* ── la jornada de comidas, dentro del mismo ritual ── */}
+        {nutriPending && (
+          <div className="codex-nutri">
+            <div className="qb-small-caps codex-nutri__title">
+              {t('rpg.codexNutriTitle', 'LA JORNADA DE COMIDAS')}
+            </div>
+            <p className="qb-hand codex-nutri__hint">
+              {nutriStandalone
+                ? t('rpg.codexNutriHintSealed', 'La jornada de comidas quedó abierta. Cerrala y queda todo en una sola página.')
+                : t('rpg.codexNutriHint', 'Este día tiene comidas sin cerrar. El lacre cierra las dos cosas de una vez.')}
+            </p>
+            <div className="codex-nutri__fields">
+              <label className="codex-nutri__field">
+                <span className="qb-hand">{t('nutrify.steps', 'Pasos')}</span>
+                <RpgNumberInput
+                  value={nutriSteps}
+                  onChange={setNutriSteps}
+                  step={100} min={0} max={99999}
+                  style={{ width: 110 }}
+                />
+              </label>
+              <label className="codex-nutri__field codex-nutri__field--check">
+                <Checkbox checked={nutriGym} onChange={() => setNutriGym((v) => !v)} />
+                <span className="qb-hand">{t('nutrify.gym', 'Gimnasio')}</span>
+              </label>
+            </div>
+            {/* El lacre hace las dos cosas; pero si el sello ya está puesto o
+                el día quedó fuera de su ventana, el cierre de comidas tiene
+                que seguir siendo posible por su cuenta — Nutrify nunca tuvo
+                límite retroactivo y quitárselo sería sacarle XP al usuario. */}
+            {nutriStandalone && (
+              <button
+                type="button"
+                className="rpg-button codex-nutri__close tap-target"
+                disabled={nutriBusy}
+                onClick={runNutritionClose}
+              >
+                {t('rpg.codexNutriCloseNow', 'Cerrar la jornada')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {nutriAward !== null && (
+          <p className="codex-nutri__award" role="status">
+            {t('rpg.codexNutriClosed', {
+              n: Math.round(nutriAward),
+              defaultValue: 'Jornada de comidas cerrada · +{{n}} XP',
+            })}
+          </p>
+        )}
 
         {/* ── the wax ───────────────────────────────── */}
         <div className="codex-wax-zone">

@@ -73,19 +73,31 @@ describe('Nutrify a 390×844', () => {
     }
   });
 
-  test('el popup de cerrar el día scrollea en vez de salirse (N9)', async () => {
+  // El popup propio de cierre desapareció: hay UN solo ritual y vive en el
+  // Códice. Lo que este test cuida ahora es que el botón siga siendo tocable a
+  // 390 px y que abra el Códice con la fecha del día que se está mirando.
+  test('cerrar el día abre el Códice y el botón es tocable (N9)', async () => {
     await setMobileViewport();
     mountInShell(<Today />, '/nutrition');
     await settle(700);
-    // Today.tsx:2094-2100: «Cerrar el Día» (o «Confirmar Día» si el día está pendiente).
-    await page.getByRole('button', { name: /Cerrar el Día|Confirmar Día/i }).click();
-    await settle(300);
-    const popup = document.querySelector('.nutri-popup') as HTMLElement;
-    expect(popup).not.toBeNull();
-    const r = popup.getBoundingClientRect();
-    expect(r.top).toBeGreaterThanOrEqual(0);
-    expect(r.bottom).toBeLessThanOrEqual(window.innerHeight + 1);
-    expect(getComputedStyle(popup).overflowY).toBe('auto');
+
+    const btn = document.querySelector('.nutri-close-day-btn') as HTMLButtonElement;
+    expect(btn).not.toBeNull();
+    expect(btn.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+
+    const opened: Array<string | undefined> = [];
+    const spy = (e: Event) => opened.push((e as CustomEvent<{ date?: string }>).detail?.date);
+    window.addEventListener('codex:open', spy);
+    try {
+      await page.getByRole('button', { name: /Cerrar el día en el Códice/i }).click();
+      await settle(300);
+      expect(opened).toHaveLength(1);
+      expect(opened[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(document.querySelector('.nutri-popup')).toBeNull();
+    } finally {
+      window.removeEventListener('codex:open', spy);
+    }
     await shoot('nutrify-04-cerrar-dia');
+    noOverflow('NUTRIFY CIERRE');
   });
 });

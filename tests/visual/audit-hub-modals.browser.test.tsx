@@ -173,9 +173,9 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       resetCapture();
       let closed = false;
       render(
-        <ToastProvider><ConfirmProvider>
+        <MemoryRouter><ToastProvider><ConfirmProvider>
           <CodexSealModal date={today} onClose={() => { closed = true; }} onSelectDate={() => {}} />
-        </ConfirmProvider></ToastProvider>,
+        </ConfirmProvider></ToastProvider></MemoryRouter>,
       );
       await settle(1400);
 
@@ -245,9 +245,9 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     await page.viewport(...NARROW);
     resetCapture();
     render(
-      <ToastProvider><ConfirmProvider>
+      <MemoryRouter><ToastProvider><ConfirmProvider>
         <CodexSealModal date={today} onClose={() => {}} onSelectDate={() => {}} />
-      </ConfirmProvider></ToastProvider>,
+      </ConfirmProvider></ToastProvider></MemoryRouter>,
     );
     await settle(1400);
 
@@ -289,9 +289,9 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       ]),
     });
     render(
-      <ToastProvider><ConfirmProvider>
+      <MemoryRouter><ToastProvider><ConfirmProvider>
         <CodexSealModal date={today} onClose={() => { closed = true; }} onSelectDate={() => {}} />
-      </ConfirmProvider></ToastProvider>,
+      </ConfirmProvider></ToastProvider></MemoryRouter>,
     );
     await settle(1400);
 

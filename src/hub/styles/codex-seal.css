@@ -1208,3 +1208,70 @@
   display: inline-flex;
   align-items: center;
 }
+
+/* ══ LA JORNADA DE COMIDAS, DENTRO DEL MISMO RITUAL ══
+   Había DOS cierres que pagaban XP por separado y no se nombraban entre sí.
+   El de Nutrify no se anunciaba nunca (base real: 6 cierres contra 1 sello). */
+.codex-nutri {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(74, 55, 32, 0.28);
+  border-left: 3px solid var(--moss-dark);
+  background: rgba(245, 231, 192, 0.35);
+}
+
+.codex-nutri__title {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.codex-nutri__hint {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+}
+
+.codex-nutri__fields {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.codex-nutri__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-label);
+  color: var(--ink);
+}
+
+.codex-nutri__field--check {
+  cursor: pointer;
+}
+
+.codex-nutri__close {
+  margin-top: 10px;
+}
+
+.codex-nutri__award {
+  margin-top: 10px;
+  text-align: center;
+  font-size: var(--fs-body);
+  color: var(--moss-dark);
+}
+
+[data-shell="mobile"] .codex-nutri__fields {
+  gap: 12px;
+}
+
+[data-shell="mobile"] .codex-nutri__field--check {
+  min-height: 44px;
+}
+
+[data-shell="mobile"] .codex-nutri__close {
+  width: 100%;
+  min-height: 44px;
+}
