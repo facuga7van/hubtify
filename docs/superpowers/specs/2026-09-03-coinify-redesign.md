@@ -335,3 +335,100 @@ importando").
    `getTextContent()` no necesita canvas. Se implementa detrás de un `try/catch` que cae al toast
    de "solo escritorio" si el worker no resuelve; el riesgo es que en un device real no cargue, y
    el costo de ese fallo es exactamente el comportamiento de hoy.
+
+---
+
+## 11. Resultados medidos (post-implementación)
+
+> Sin un solo monto, comercio, saldo ni número de tarjeta real.
+
+### 11.1 El parser contra los dos resúmenes reales
+
+| Métrica | Doc A | Doc B |
+|---|---|---|
+| Campos del encabezado extraídos | **8 / 8** | **8 / 8** |
+| Bloque «Cuotas a vencer» | 6 meses + cola | 6 meses + cola |
+| Cierre del encabezado == cierre del código de barras | sí | sí |
+| Conciliación ARS | **cierra, diferencia 0** | **cierra, diferencia 0** |
+| Conciliación USD | **cierra, diferencia 0** | **cierra, diferencia 0** |
+| Filas del detalle | 34 | 45 *(44 antes: +1 recuperada)* |
+| Líneas con fecha sin entender | 0 | 0 *(2 antes: eran los `SU PAGO`)* |
+
+La fila recuperada del Doc B es la que no traía marcador `*`/`K`. **La encontró el
+checksum**: era la única razón por la que la conciliación en dólares no cerraba.
+
+### 11.2 La cadena completa, extremo a extremo
+
+Corrida contra los dos PDFs reales sobre una base limpia
+(`parse → importConfirm → generateStatement → saveStatementPaper`):
+
+- 14 planes de cuotas creados y 57 filas enganchadas a un plan.
+- Los 2 resúmenes quedaron con cierre, vencimiento, total del banco, pago
+  mínimo, saldo anterior, lo pagado, `reconciled = 1` y la proyección del banco.
+- La tarjeta se creó sola con su cierre (26), su vencimiento (6), sus últimos 4
+  y su emisor. Antes: 7 campos tipeados a mano.
+- **7 cuotas visibles en un mes futuro** que antes eran cero (el import no
+  escribía `installment_group_id`, así que la pestaña Cuotas —que hace `JOIN`—
+  no veía ninguna).
+- `settledPrevious: false` en los dos, **correctamente**: los períodos anteriores
+  no existían en esa base y la regla es no fabricarlos.
+
+### 11.3 Sobre una COPIA de la base real del usuario
+
+Migración v19 sola:
+
+| | antes | después |
+|---|---|---|
+| transacciones (vivas) | 107 | **107** |
+| planes de cuotas | 7 | **7** |
+| recurrentes / cuentas / tarjetas / resúmenes | 5 / 2 / 2 / 2 | **iguales** |
+| suma de importes | *X* | **idéntica** |
+| `MAX(updated_at)` | *T* | **idéntico** |
+
+**Cero filas modificadas.** Las 11 columnas del resumen, las 2 de la tarjeta y
+la de recurrentes quedan en `NULL`, y `payment_method` de los 5 recurrentes
+sigue en `NULL` (0 filas con valor). Segunda corrida: no aplica nada.
+
+Y volviendo a importar sus dos resúmenes sobre esa copia:
+
+| | antes | después |
+|---|---|---|
+| filas importadas que pertenecen a un plan de cuotas | **0** | **57** |
+| planes de cuotas | 7 | 21 |
+| **cuotas huérfanas preexistentes** | **12** | **12** *(intactas, por precedente)* |
+| duplicados detectados y salteados | — | 17 |
+
+Los 17 duplicados son las filas del primer resumen que ya estaban importadas: el
+dedupe por número de cuota funcionó sobre datos reales.
+
+### 11.4 El default, inferido sobre sus datos
+
+`finance:getEntryDefaults` sobre su base: **`transfer`**, con 50 filas de
+muestra. Sus altas manuales de gasto: 40 `transfer`, 18 `credit_card`,
+2 `debit`, **0 `cash`** — contra un formulario que arrancaba en efectivo.
+
+### 11.5 Mobile
+
+- La tira de pestañas **entra a 390 px sin scrollear** (`scrollWidth ≤ clientWidth`),
+  y ningún rótulo queda cortado. Los 696 px de desborde que midió la auditoría
+  de diseño desaparecen por construcción, no por un parche de CSS.
+- Sub-nav de Compromisos: sin desborde, botones de ≥44 px, sección activa a la vista.
+- Pantalla de import a 390 px: sin desborde, las fichas del resumen no se cortan,
+  y el selector de mes ya no está (el papel lo dijo).
+
+### 11.6 PDF en Android: **habilitado**
+
+`pdfjs-dist` 5.4.296 pasa de dependencia transitiva a **directa y fijada**. El
+bundle de Android compila: el worker sale como asset propio y su URL se resuelve
+contra `import.meta.url` del chunk, que es lo que Capacitor sirve. `pdfjs` va en
+un chunk aparte de 399 kB que **solo se descarga al elegir un PDF**.
+
+Red de contención: cualquier falla —worker que no resuelve, CSP del WebView, PDF
+escaneado sin capa de texto— devuelve `{ unsupported: true }`, que es
+exactamente el comportamiento anterior. **El peor caso cuesta cero.** Lo único
+que no se pudo verificar sin un teléfono real es que el WebView sirva el `.mjs`
+del worker con el MIME correcto; si no lo hace, cae en la red de contención.
+
+La parte que sí puede romper el parser —armar los renglones a partir de los
+fragmentos de `getTextContent()`, que no devuelve líneas— es pura y está
+cubierta por 8 tests (`tests/mobile/pdf-text.test.ts`).
