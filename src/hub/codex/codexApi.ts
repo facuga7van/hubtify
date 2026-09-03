@@ -7,6 +7,26 @@
  * method on `window.api`, so a build whose bridge does not carry one of them
  * (an older mobile shell, a test harness) runs degraded, never crashing.
  *
+ * CONTRATO DE FALLO (rúbrica C8). Los catch de este módulo devolvían todos
+ * `null` / `[]` / `false` sin loguear, así que el llamador no podía distinguir
+ * «no hay dato» de «se cayó»: el Códice fallaba MUDO y las pantallas de arriba
+ * pintaban su estado vacío. Ahora:
+ *
+ *   · TODO fallo pasa por `logCodexFailure`: ya no hay ni un catch mudo.
+ *   · `null` / `[]` / `false`  = el canal NO está expuesto por este binding
+ *     (shell móvil viejo, arnés de test), el handler contestó nada, o —por
+ *     compatibilidad— la llamada falló y el llamador no pidió enterarse.
+ *   · `{ strict: true }` en una CONSULTA hace que el fallo se PROPAGUE, para
+ *     que la pantalla pueda mostrar un `ErrorState` con «reintentar» en vez de
+ *     un hueco que miente. Es opt-in a propósito: media docena de llamadores
+ *     viejos (`CodexSealModal`, `CharacterPage`, el arranque de cosméticos)
+ *     encadenan `.then()` sin `.catch`, y volverlo obligatorio los convertiría
+ *     en promesas rechazadas sin dueño. Las pantallas que sí saben qué hacer
+ *     con un error lo piden.
+ *   · Las MUTACIONES (`sealDay`, `saveReward`, `deleteReward`, `redeemReward`,
+ *     `purchaseShopItem`, `equipShopItem`) siempre devuelven `null`/`false`:
+ *     sus llamadores ya leen eso como «no se hizo».
+ *
  * The TYPES are not declared here. They are derived from `HubtifyApi` — what a
  * method promises to return is, by construction, what the UI gets. A local copy
  * once drifted from the handler (`xpTotal` vs `totalXp`) and the codex painted
@@ -80,15 +100,42 @@ export function codexApiReady(): boolean {
   return typeof api().rpgGetDaySummary === 'function';
 }
 
-/* ── calls (all feature-detected, all failure-tolerant) ── */
+/* ── el registro de fallos ────────────────────────── */
 
-export async function getDaySummary(date?: string): Promise<DaySummary | null> {
+/**
+ * Un solo lugar por donde pasan TODOS los fallos del Códice. Antes eran catorce
+ * `catch {}` mudos: cuando el Códice se caía no quedaba rastro ni en la consola,
+ * y la única señal era una pantalla que decía «todavía no hay nada».
+ */
+function logCodexFailure(op: string, err: unknown): void {
+  console.error(`[codexApi] ${op} falló`, err);
+}
+
+export interface CodexCallOptions {
+  /**
+   * `true` = propagar el fallo al llamador, que va a mostrar un estado de
+   * error. Por defecto se degrada al valor vacío, que es lo que hacían las
+   * catorce llamadas antes de esto (ver el contrato en la cabecera).
+   */
+  strict?: boolean;
+}
+
+/** Loguea siempre; propaga sólo si el llamador dijo que sabe qué hacer. */
+function degrade<T>(op: string, err: unknown, fallback: T, opts?: CodexCallOptions): T {
+  logCodexFailure(op, err);
+  if (opts?.strict) throw err;
+  return fallback;
+}
+
+/* ── calls (all feature-detected) ────────────────── */
+
+export async function getDaySummary(date?: string, opts?: CodexCallOptions): Promise<DaySummary | null> {
   const fn = api().rpgGetDaySummary;
   if (!fn) return null;
   try {
     return (await fn(date)) ?? null;
-  } catch {
-    return null;
+  } catch (err) {
+    return degrade('rpgGetDaySummary', err, null, opts);
   }
 }
 
@@ -97,28 +144,29 @@ export async function sealDay(date?: string): Promise<SealResult | null> {
   if (!fn) return null;
   try {
     return (await fn(date)) ?? null;
-  } catch {
+  } catch (err) {
+    logCodexFailure('rpgSealDay', err);
     return null;
   }
 }
 
-export async function getSeals(from: string, to: string): Promise<DaySeal[]> {
+export async function getSeals(from: string, to: string, opts?: CodexCallOptions): Promise<DaySeal[]> {
   const fn = api().rpgGetSeals;
   if (!fn) return [];
   try {
     return (await fn(from, to)) ?? [];
-  } catch {
-    return [];
+  } catch (err) {
+    return degrade('rpgGetSeals', err, [] as DaySeal[], opts);
   }
 }
 
-export async function getAchievements(): Promise<AchievementState[] | null> {
+export async function getAchievements(opts?: CodexCallOptions): Promise<AchievementState[] | null> {
   const fn = api().rpgGetAchievements;
   if (!fn) return null;
   try {
     return (await fn()) ?? [];
-  } catch {
-    return null;
+  } catch (err) {
+    return degrade('rpgGetAchievements', err, null, opts);
   }
 }
 
@@ -128,23 +176,23 @@ export function rewardsApiReady(): boolean {
     && typeof api().rpgGetObolosBalance === 'function';
 }
 
-export async function getObolosBalance(): Promise<ObolosBalance | null> {
+export async function getObolosBalance(opts?: CodexCallOptions): Promise<ObolosBalance | null> {
   const fn = api().rpgGetObolosBalance;
   if (!fn) return null;
   try {
     return (await fn()) ?? null;
-  } catch {
-    return null;
+  } catch (err) {
+    return degrade('rpgGetObolosBalance', err, null, opts);
   }
 }
 
-export async function getRewards(): Promise<Reward[]> {
+export async function getRewards(opts?: CodexCallOptions): Promise<Reward[]> {
   const fn = api().rpgGetRewards;
   if (!fn) return [];
   try {
     return (await fn()) ?? [];
-  } catch {
-    return [];
+  } catch (err) {
+    return degrade('rpgGetRewards', err, [] as Reward[], opts);
   }
 }
 
@@ -153,7 +201,8 @@ export async function saveReward(input: RewardInput): Promise<Reward | null> {
   if (!fn) return null;
   try {
     return (await fn(input as unknown as Record<string, unknown>)) ?? null;
-  } catch {
+  } catch (err) {
+    logCodexFailure('rpgSaveReward', err);
     return null;
   }
 }
@@ -163,7 +212,8 @@ export async function deleteReward(id: string): Promise<boolean> {
   if (!fn) return false;
   try {
     return (await fn(id))?.ok ?? false;
-  } catch {
+  } catch (err) {
+    logCodexFailure('rpgDeleteReward', err);
     return false;
   }
 }
@@ -173,7 +223,8 @@ export async function redeemReward(id: string): Promise<RedeemResult | null> {
   if (!fn) return null;
   try {
     return (await fn(id)) ?? null;
-  } catch {
+  } catch (err) {
+    logCodexFailure('rpgRedeemReward', err);
     return null;
   }
 }
@@ -194,13 +245,13 @@ export function masteriesApiReady(): boolean {
   return typeof api().rpgGetMasteries === 'function';
 }
 
-export async function getShopCatalog(): Promise<ShopCatalogResult | null> {
+export async function getShopCatalog(opts?: CodexCallOptions): Promise<ShopCatalogResult | null> {
   const fn = api().rpgGetShopCatalog;
   if (!fn) return null;
   try {
     return (await fn()) ?? null;
-  } catch {
-    return null;
+  } catch (err) {
+    return degrade('rpgGetShopCatalog', err, null, opts);
   }
 }
 
@@ -209,7 +260,8 @@ export async function purchaseShopItem(itemId: string): Promise<PurchaseShopResu
   if (!fn) return null;
   try {
     return (await fn(itemId)) ?? null;
-  } catch {
+  } catch (err) {
+    logCodexFailure('rpgPurchaseShopItem', err);
     return null;
   }
 }
@@ -222,18 +274,19 @@ export async function equipShopItem(
   if (!fn) return null;
   try {
     return (await fn(itemId, kind)) ?? null;
-  } catch {
+  } catch (err) {
+    logCodexFailure('rpgEquipShopItem', err);
     return null;
   }
 }
 
-export async function getMasteries(): Promise<MasteryState[] | null> {
+export async function getMasteries(opts?: CodexCallOptions): Promise<MasteryState[] | null> {
   const fn = api().rpgGetMasteries;
   if (!fn) return null;
   try {
     return (await fn()) ?? null;
-  } catch {
-    return null;
+  } catch (err) {
+    return degrade('rpgGetMasteries', err, null, opts);
   }
 }
 
@@ -308,7 +361,8 @@ export function onAchievementUnlocked(cb: (id: string) => void): () => void {
   if (!fn) return () => { /* not wired yet */ };
   try {
     return fn(cb) ?? (() => { /* handler returned nothing */ });
-  } catch {
+  } catch (err) {
+    logCodexFailure('onRpgAchievementUnlocked', err);
     return () => { /* subscription failed */ };
   }
 }

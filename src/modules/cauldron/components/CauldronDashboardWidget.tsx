@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Rune } from '../../../shared/components/codex';
+import Skeleton from '../../../shared/components/Skeleton';
+import ErrorState from '../../../shared/components/ErrorState';
+import { useToast } from '../../../shared/components/useToast';
 import type {
   CauldronStats,
   CauldronTimerState,
@@ -56,6 +60,18 @@ function CauldronGlyph() {
 
 export default function CauldronDashboardWidget() {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  /**
+   * Los ceros de `useState` se pintaban desde el primer frame como si fueran el
+   * registro real: «Caldero en reposo · 0 esta semana» era indistinguible de un
+   * caldero que efectivamente no se usó, y de uno cuya consulta se cayó. Con
+   * estos dos flags las tres cosas se dicen distinto.
+   */
+  const [loading, setLoading] = useState(true);
+  /** «Alguna vez cargó bien»: sólo entonces los números son dato de verdad. */
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [stats, setStats] = useState<CauldronStats>({ today: 0, week: 0, total: 0, streak: 0 });
   const [timerState, setTimerState] = useState<CauldronTimerState | null>(null);
   /**
@@ -70,45 +86,43 @@ export default function CauldronDashboardWidget() {
   const prevCountRef = useRef(0);
   const presetLabel = usePresetName();
 
-  const loadStats = useCallback(() => {
-    window.api.cauldronGetStats().then((s) => setStats(s));
-  }, []);
+  const loadStats = useCallback(() => window.api.cauldronGetStats().then((s) => setStats(s)), []);
 
-  const loadState = useCallback(() => {
-    window.api.cauldronGetState().then((s) => setTimerState(s));
-  }, []);
+  const loadState = useCallback(() => window.api.cauldronGetState().then((s) => setTimerState(s)), []);
 
-  const loadDefaultPreset = useCallback(() => {
-    window.api.cauldronGetPresets()
-      .then(async (p) => {
-        const id = await resolveDefaultPresetId(p);
-        setDefaultPreset(p.find((preset) => preset.id === id) ?? p[0] ?? null);
+  const loadDefaultPreset = useCallback(() => window.api.cauldronGetPresets()
+    .then(async (p) => {
+      const id = await resolveDefaultPresetId(p);
+      setDefaultPreset(p.find((preset) => preset.id === id) ?? p[0] ?? null);
+    }), []);
+
+  /** Las tres consultas del cuadro, con UN solo estado de carga y de fallo. */
+  const loadAll = useCallback(() => {
+    setLoadError(false);
+    setLoading(true);
+    return Promise.all([loadStats(), loadState(), loadDefaultPreset()])
+      .then(() => { setLoadedOnce(true); })
+      .catch((err) => {
+        console.error('[Caldero] el cuadro del tablero no pudo leer sus datos', err);
+        setLoadError(true);
       })
-      .catch(() => setDefaultPreset(null));
-  }, []);
-
-  useEffect(() => {
-    loadStats();
-    loadState();
-    loadDefaultPreset();
+      .finally(() => setLoading(false));
   }, [loadStats, loadState, loadDefaultPreset]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   // Reload on account switch and after a sync pull brought cauldron rows in
   // (Layout fires `sync:cauldronUpdated`; nobody listened, so the widget showed
   // stale stats until the next navigation).
   useEffect(() => {
-    const handler = () => {
-      loadStats();
-      loadState();
-      loadDefaultPreset();
-    };
+    const handler = () => { loadAll(); };
     window.addEventListener('account:switched', handler);
     window.addEventListener('sync:cauldronUpdated', handler);
     return () => {
       window.removeEventListener('account:switched', handler);
       window.removeEventListener('sync:cauldronUpdated', handler);
     };
-  }, [loadStats, loadState, loadDefaultPreset]);
+  }, [loadAll]);
 
   // Subscribe to tick events
   useEffect(() => {
@@ -121,8 +135,8 @@ export default function CauldronDashboardWidget() {
   // Subscribe to session end events — reload both stats and timer state
   useEffect(() => {
     const cleanup = window.api.onCauldronSessionEnd(() => {
-      loadStats();
-      loadState();
+      loadStats().catch(() => setLoadError(true));
+      loadState().catch(() => setLoadError(true));
     });
     return cleanup;
   }, [loadStats, loadState]);
@@ -154,10 +168,31 @@ export default function CauldronDashboardWidget() {
         if (shouldPopOutOnStart()) window.api.cauldronOpenWindow?.();
       }
     } catch {
-      // Timer already active — surface it instead of failing silently.
-      window.api.cauldronOpenWindow?.();
+      /* Ya hay un timer activo. En escritorio la ventana flotante ES la
+         respuesta: te MUESTRA la sesión en curso. En Android ese canal no
+         existe (`platforms: 'desktop'` en `shared/api-channels.ts`), el `?.`
+         se tragaba la llamada y no pasaba absolutamente nada: tocabas el botón
+         y el tablero se quedaba mudo. Sin canal nuevo: se dice y se lleva. */
+      if (window.api.cauldronOpenWindow) {
+        window.api.cauldronOpenWindow();
+      } else {
+        toast({ type: 'info', message: t('cauldron.errors.timerActive', 'Ya hay una poción al fuego.') });
+        navigate('/cauldron');
+      }
     }
   };
+
+  if (loading && !loadedOnce) return <Skeleton variant="line" count={3} />;
+
+  if (loadError) {
+    return (
+      <ErrorState
+        compact
+        message={t('cauldron.loadFailed', 'No se pudo leer el caldero.')}
+        onRetry={loadAll}
+      />
+    );
+  }
 
   return (
     <div>

@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { gsap } from 'gsap';
 import { BookPage } from '../../shared/components/codex';
 import { Section, QBDividerSection } from '../../shared/components/codex/CodexPrimitives';
-import { Sparkle, Scroll } from '../../shared/components/icons';
-import Loading from '../../shared/components/Loading';
+import { Sparkle, Scroll, Chalice } from '../../shared/components/icons';
+import Skeleton from '../../shared/components/Skeleton';
+import EmptyState from '../../shared/components/EmptyState';
+import ErrorState from '../../shared/components/ErrorState';
 import { useConfirm } from '../../shared/components/ConfirmDialog';
 import {
   type ObolosBalance,
@@ -56,6 +58,8 @@ export default function RewardsPage() {
   const [balance, setBalance] = useState<ObolosBalance | null>(null);
   const [rewards, setRewards] = useState<Reward[] | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Un mostrador que no se pudo leer NO es un mostrador vacío. */
+  const [loadError, setLoadError] = useState(false);
   const [form, setForm] = useState<FormState>(CLOSED_FORM);
   const [notice, setNotice] = useState<Notice>(null);
   /** Rewards FIRST — the player's own counter is the economy's main drain. */
@@ -70,8 +74,11 @@ export default function RewardsPage() {
 
   const load = useCallback(() => {
     if (!available) { setLoading(false); return; }
-    Promise.all([getObolosBalance(), getRewards()])
+    setLoading(true);
+    setLoadError(false);
+    Promise.all([getObolosBalance({ strict: true }), getRewards({ strict: true })])
       .then(([b, r]) => { setBalance(b); setRewards(r); })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, [available]);
 
@@ -336,12 +343,31 @@ export default function RewardsPage() {
   const body = (() => {
     if (!available) {
       return (
-        <p className="rwd-empty">
-          {t('rpg.rwdUnavailable', 'El mostrador todavía no está disponible en esta versión.')}
-        </p>
+        <EmptyState
+          icon={<Chalice width={32} height={32} />}
+          message={t('rpg.rwdUnavailable', 'El mostrador todavía no está disponible en esta versión.')}
+        />
       );
     }
-    if (loading && !rewards) return <Loading />;
+    /* La brújula girando decía «esperá»; el esqueleto dice «esperá, y lo que
+       viene es una bolsa arriba y un listado abajo». */
+    if (loading && !rewards) {
+      return (
+        <>
+          <Skeleton variant="card" />
+          <div style={{ height: 12 }} />
+          <Skeleton variant="block" count={3} />
+        </>
+      );
+    }
+    if (loadError) {
+      return (
+        <ErrorState
+          message={t('rpg.rwdLoadFailed', 'No se pudo abrir el mostrador.')}
+          onRetry={load}
+        />
+      );
+    }
 
     return (
       <>
@@ -414,11 +440,16 @@ export default function RewardsPage() {
             <ul className="rwd-list">
               {rewards.map(renderReward)}
             </ul>
-          ) : (
-            <p className="rwd-empty">
-              {t('rpg.rwdEmpty', 'Los óbolos se ganan sellando el día y se gastan acá: escribí vos el premio («2 h de jueguito») y ponele precio.')}
-            </p>
-          )}
+          ) : form.id === null ? (
+            /* El texto explicaba bien qué hacer y el botón que lo hacía estaba
+               en el `rightSlot` de la Section, a media pantalla de distancia.
+               Ahora la salida vive DENTRO del hueco (C8). */
+            <EmptyState
+              icon={<Scroll width={32} height={32} />}
+              message={t('rpg.rwdEmpty', 'Los óbolos se ganan sellando el día y se gastan acá: escribí vos el premio («2 h de jueguito») y ponele precio.')}
+              action={{ label: t('rpg.rwdAdd', 'Nueva recompensa'), onClick: openCreate }}
+            />
+          ) : null}
 
           {notice?.kind === 'not_found' && (
             <p className="qb-hand rwd-item__notice" role="status">

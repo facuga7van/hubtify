@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Tick } from '../../../shared/components/codex';
+import Skeleton from '../../../shared/components/Skeleton';
+import ErrorState from '../../../shared/components/ErrorState';
 import { useToast } from '../../../shared/components/useToast';
 import type { HabitWithStreak } from '../types';
 import { processHabitCheck, isHabitSettledToday, isHabitRelevantToday } from '../utils';
@@ -16,16 +18,27 @@ export default function HabitsDashboardWidget() {
   const navigate = useNavigate();
   const [allHabits, setAllHabits] = useState<HabitWithStreak[]>([]);
   const [loading, setLoading] = useState(true);
+  /**
+   * Un fallo NO es un vacío. Esto era `console.error` + `finally setLoading` y
+   * después caía en el hueco de «Sin hábitos configurados» con su botón «Creá
+   * tu primer hábito»: la app le decía al usuario que no tenía rituales cuando
+   * lo que había pasado es que la consulta se cayó, e invitaba a resolver un
+   * problema inexistente. Ahora el hueco dice cuál de las dos cosas pasó.
+   */
+  const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
   const checkingRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
+    setLoading(true);
     try {
       const result = await window.api.questsGetHabits();
       setAllHabits(result as HabitWithStreak[]);
+      setLoadError(false);
     } catch (e) {
       console.error('HabitsDashboardWidget load error', e);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -97,7 +110,22 @@ export default function HabitsDashboardWidget() {
     }
   }, [habits, loadData, toast, t]);
 
-  if (loading) return null;
+  /* Era `return null`: la tarjeta del tablero se esfumaba entera mientras
+     cargaba y volvía a aparecer de golpe. Un esqueleto ocupa el mismo lugar que
+     va a ocupar la lista. */
+  if (loading && allHabits.length === 0) {
+    return <Skeleton variant="line" count={3} />;
+  }
+
+  if (loadError) {
+    return (
+      <ErrorState
+        compact
+        message={t('questify.habitsLoadFailed', 'No se pudieron leer tus rituales.')}
+        onRetry={loadData}
+      />
+    );
+  }
 
   if (allHabits.length === 0 || habits.length === 0) {
     return (

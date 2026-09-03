@@ -128,7 +128,9 @@ export async function getWeekByProject(): Promise<CauldronWeekTaskRow[]> {
   const fn = api().cauldronGetWeekByProject;
   if (typeof fn !== 'function') return [];
   try {
-    return await fn();
+    // `?? []`: un binding que contesta `null` dejaba `week` en null y el
+    // estante reventaba en `week.length` antes de dibujar nada.
+    return (await fn()) ?? [];
   } catch {
     return [];
   }
