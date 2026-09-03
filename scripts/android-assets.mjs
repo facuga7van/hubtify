@@ -6,9 +6,25 @@
 //     --iconBackgroundColor '#2a1d0e' --iconBackgroundColorDark '#2a1d0e' \
 //     --splashBackgroundColor '#2a1d0e' --splashBackgroundColorDark '#2a1d0e'
 //
+// OJO con ese segundo comando: @capacitor/assets 3.0.5 recorta el margen
+// transparente de `icon-foreground.png` y lo reescala hasta llenar la capa
+// (bbox 80% -> 100% del lado), con lo que el libro se sale de la máscara del
+// launcher y queda cortado; además deja los iconos legacy sin su placa de
+// cuero. Los `android/app/src/main/res/mipmap-*` versionados están generados
+// con una versión anterior que sí respetaba el margen: NO los regeneres con
+// 3.0.5. Por eso este script escribe él mismo la capa de fondo adaptativa
+// (ver `writeAdaptiveBackgrounds`), que al ser un color plano es exacta a
+// cualquier densidad.
+//
 // Los colores son los tokens de src/hub/styles/theme.css: --leather-dark
-// (#2a1d0e) como fondo y --leather (#3a2513) como centro del degradé radial
-// del fondo adaptativo. Si cambian los tokens, cambiar LEATHER/LEATHER_DARK.
+// (#2a1d0e) como fondo. Si cambia el token, cambiar LEATHER_DARK.
+//
+// El fondo del icono adaptativo tiene que ser un color PLANO de borde a borde:
+// el launcher ya recorta la capa con su propia máscara (círculo, squircle…), así
+// que cualquier degradé radial se lee como un segundo disco dentro del recorte
+// nativo — el efecto de "doble círculo". Además el rango del degradé era de sólo
+// ~15 niveles RGB, lo que producía bandas concéntricas visibles (banding de 8
+// bits) que reforzaban ese borde fantasma.
 import sharp from 'sharp';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -17,7 +33,6 @@ const ROOT = resolve(import.meta.dirname, '..');
 const SRC = resolve(ROOT, 'assets/icon.png');
 const OUT = resolve(ROOT, 'resources');
 
-const LEATHER = '#3a2513';
 const LEATHER_DARK = '#2a1d0e';
 
 const ICON = 1024;
@@ -34,18 +49,28 @@ async function logoCentered(canvasSide, logoSide, background) {
   }).composite([{ input: logo, gravity: 'centre' }]);
 }
 
-/** Fondo sólido leather-dark con un degradé radial sutil hacia --leather en el centro. */
-function radialLeatherBackground(side) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}">
-  <defs>
-    <radialGradient id="g" cx="50%" cy="45%" r="70%">
-      <stop offset="0" stop-color="${LEATHER}"/>
-      <stop offset="1" stop-color="${LEATHER_DARK}"/>
-    </radialGradient>
-  </defs>
-  <rect width="${side}" height="${side}" fill="url(#g)"/>
-</svg>`;
-  return sharp(Buffer.from(svg));
+/** Fondo plano leather-dark, de borde a borde (sin degradé: ver el comentario de arriba). */
+function flatLeatherBackground(side) {
+  return sharp({
+    create: { width: side, height: side, channels: 4, background: LEATHER_DARK },
+  });
+}
+
+/** Lado en px de `mipmap-<densidad>/` para el icono de launcher. */
+const MIPMAP_SIDES = { ldpi: 36, mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+
+/**
+ * Escribe la capa de fondo del icono adaptativo en cada densidad. Es un color
+ * plano, así que no hay reescalado que degradar y no hace falta @capacitor/assets.
+ */
+async function writeAdaptiveBackgrounds() {
+  const res = resolve(ROOT, 'android/app/src/main/res');
+  for (const [density, side] of Object.entries(MIPMAP_SIDES)) {
+    const dir = resolve(res, `mipmap-${density}`);
+    await mkdir(dir, { recursive: true });
+    await flatLeatherBackground(side).png().toFile(resolve(dir, 'ic_launcher_background.png'));
+  }
+  console.log(`fondo adaptativo plano escrito en ${Object.keys(MIPMAP_SIDES).length} densidades`);
 }
 
 async function main() {
@@ -65,8 +90,8 @@ async function main() {
     .png()
     .toFile(resolve(OUT, 'icon-foreground.png'));
 
-  // icon-background: cuero con degradé radial sutil, sin textura.
-  await radialLeatherBackground(ICON).png().toFile(resolve(OUT, 'icon-background.png'));
+  // icon-background: cuero plano de borde a borde. El recorte lo hace el launcher.
+  await flatLeatherBackground(ICON).png().toFile(resolve(OUT, 'icon-background.png'));
 
   // splash y splash-dark: cuero sólido, logo centrado al ~25% del lado.
   const splash = await (await logoCentered(SPLASH, Math.round(SPLASH * 0.25), LEATHER_DARK))
@@ -76,6 +101,7 @@ async function main() {
   await sharp(splash).toFile(resolve(OUT, 'splash-dark.png'));
 
   console.log(`resources/ generadas en ${OUT}`);
+  await writeAdaptiveBackgrounds();
 }
 
 main().catch((err) => {
