@@ -253,6 +253,9 @@ export const API_CHANNELS = {
   financeGetBudgetStatus: { channel: 'finance:getBudgetStatus', kind: 'invoke' },
   financeUpdateCategoryMapping: { channel: 'finance:updateCategoryMapping', kind: 'invoke' },
   financeSaveStatementPaper: { channel: 'finance:saveStatementPaper', kind: 'invoke' },
+  financeImportSelectAndParseTable: { channel: 'finance:importSelectAndParseTable', kind: 'invoke' },
+  financeImportApplyTableMapping: { channel: 'finance:importApplyTableMapping', kind: 'invoke' },
+  financeImportConfirmTable: { channel: 'finance:importConfirmTable', kind: 'invoke' },
   financeGetEntryDefaults: { channel: 'finance:getEntryDefaults', kind: 'invoke' },
   // Finance - Dashboard
   financeGetMonthlyBalance: { channel: 'finance:getMonthlyBalance', kind: 'invoke' },

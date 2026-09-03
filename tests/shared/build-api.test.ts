@@ -65,7 +65,7 @@ describe('buildApi', () => {
     for (const key of ['backupExport', 'backupPickImportFile', 'backupImport', 'cauldronOpenWindow', 'cauldronCloseWindow', 'updaterCheck', 'updaterDownload', 'updaterRestart']) {
       expect(api[key]).toBeUndefined();
     }
-    expect(Object.keys(api)).toHaveLength(256 - 8);
+    expect(Object.keys(api)).toHaveLength(259 - 8);
     expect(typeof api.onUpdateAvailable).toBe('function'); // NOT desktop-only (spec §3.1)
   });
 });

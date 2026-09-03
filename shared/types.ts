@@ -704,6 +704,38 @@ export interface HubtifyApi {
   }>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
+  /**
+   * Extracto de billetera / banco en tabla delimitada (CSV, TSV). Es la otra
+   * mitad del rediseño: el resumen de tarjeta no trae transferencias, y ahí
+   * está el 67 % de lo que el usuario cargaba a mano. Funciona en Android hoy.
+   */
+  financeImportSelectAndParseTable: () => Promise<
+    | {
+        fileName: string;
+        delimiter: string;
+        decimalSeparator: ',' | '.';
+        headers: string[];
+        rows: string[][];
+        suggested: Record<number, string>;
+      }
+    | { ok: false; reason: 'unreadable_table' }
+    | null
+  >;
+  financeImportApplyTableMapping: (
+    table: Record<string, unknown>,
+    mapping: Record<number, string>,
+    defaults?: Record<string, unknown>,
+  ) => Promise<{
+    rows: Array<{ date: string; description: string; amount: number; currency: 'ARS' | 'USD'; category: string; raw: number }>;
+    skipped: Array<{ line: number; reason: 'date' | 'amount' }>;
+  }>;
+  financeImportConfirmTable: (
+    rows: unknown[],
+    options?: Record<string, unknown>,
+  ) => Promise<
+    { batchId: string; count: number; duplicateCount: number; skipped: number }
+    | { ok: false; reason: string }
+  >;
   /** Estampa los números del papel sobre un resumen que ya existe. */
   financeSaveStatementPaper: (creditCardId: string, paper: Record<string, unknown>) => Promise<
     { ok: true; statementId: string; settledPrevious: boolean } | { ok: false; reason: string }

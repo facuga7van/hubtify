@@ -7,6 +7,7 @@ import { CARD_TAX_CATEGORY, CATEGORIES, type CreditCard, type ImportParsedRow } 
 import type { StatementHeaderDto } from '../../../../shared/types';
 import { reconcile, reconStatus } from '../utils/statement-recon';
 import StatementSummary from './shared/StatementSummary';
+import TableImport from './shared/TableImport';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import CreditCardManager from './shared/CreditCardManager';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
@@ -785,6 +786,13 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
           onSaved={loadCards}
         />
       )}
+
+      {/* La segunda fuente: el extracto de billetera o banco.
+          Sin ella el rediseño mejora el mes de SETUP y deja intacto el de
+          régimen — las transferencias no están en ningún PDF de tarjeta.
+          Se esconde mientras hay un resumen a medio confirmar: dos importadores
+          abiertos a la vez es exactamente la confusión que se está sacando. */}
+      {rows.length === 0 && <TableImport onImported={(n) => onImported?.(n)} />}
 
       {/* Previous imports — undo a batch that already landed. */}
       {batchSupport && batches.length > 0 && (

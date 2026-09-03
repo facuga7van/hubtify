@@ -4,6 +4,12 @@ import { genId } from '../ids';
 import { platform } from '../platform';
 import { parseGaliciaStatement } from './finance-statement';
 import {
+  applyMapping,
+  parseDelimitedTable,
+  type TableColumnMapping,
+  type ParsedTable,
+} from './finance-table';
+import {
   addMonthsClamped,
   addMonthsToMonth,
   CARD_TAX_CATEGORY,
@@ -685,6 +691,162 @@ export function registerFinanceImportIpcHandlers(): void {
       )
       .all();
   });
+
+  /**
+   * Extracto de billetera / banco en tabla delimitada (CSV, TSV).
+   *
+   * El resumen de tarjeta resuelve el setup y las cuotas, pero el 67 % de lo
+   * que el usuario carga a mano son transferencias y billeteras — 180 de las
+   * 330 interacciones de la auditoría, y se pagan todos los meses. Ninguna de
+   * esas filas está en un PDF de tarjeta.
+   *
+   * Genérico y no un parser por proveedor: la investigación midió que el CSV de
+   * Mercado Pago es una FAMILIA de formatos (delimitador, separador decimal,
+   * idioma de los encabezados y alias de columna son configurables por el
+   * usuario). Y `pickTextFile` ya funciona en Android hoy, sin plumbing nuevo.
+   */
+  ipcHandle('finance:importSelectAndParseTable', async () => {
+    const picked = await platform().pickTextFile([
+      { name: 'CSV', extensions: ['csv', 'tsv', 'txt'] },
+    ]);
+    if (picked === null) return null;
+    const table = parseDelimitedTable(picked.content);
+    if (table === null) return { ok: false as const, reason: 'unreadable_table' as const };
+    // Solo una muestra viaja al preview: un extracto anual son miles de filas y
+    // el renderer solo necesita mostrar cómo quedó el mapeo.
+    return {
+      fileName: picked.name,
+      delimiter: table.delimiter,
+      decimalSeparator: table.decimalSeparator,
+      headers: table.headers,
+      rows: table.rows,
+      suggested: table.suggested,
+    };
+  });
+
+  /**
+   * Aplica un mapeo de columnas y devuelve las filas listas — y las que NO se
+   * pudieron leer, con el número de línea y el motivo.
+   *
+   * Vive en el backend y no en el renderer para que la lógica de parseo exista
+   * UNA sola vez: el mapeo cambia por acción del usuario (un select), no por
+   * tecla, así que el viaje IPC no cuesta nada.
+   */
+  ipcHandle(
+    'finance:importApplyTableMapping',
+    (
+      _e,
+      table: ParsedTable,
+      mapping: TableColumnMapping,
+      defaults: { currency?: 'ARS' | 'USD'; category?: string } = {},
+    ) => {
+      if (!table || !Array.isArray(table.rows) || !Array.isArray(table.headers)) {
+        return { rows: [], skipped: [] };
+      }
+      return applyMapping(table, mapping ?? {}, defaults ?? {});
+    },
+  );
+
+  /**
+   * Escribe las filas de una tabla ya mapeada.
+   *
+   * A diferencia del resumen de tarjeta, acá NO hay tarjeta ni resumen: son
+   * movimientos que ya salieron de una cuenta. Por eso `account_id` **no es
+   * opcional** — que estuviera en NULL en las 107 filas de la base real es la
+   * razón por la que el cofre nunca se movió.
+   */
+  ipcHandle(
+    'finance:importConfirmTable',
+    async (
+      _e,
+      rawRows: unknown,
+      options: {
+        fileName?: string;
+        accountId?: string | null;
+        paymentMethod?: string;
+        /** Un importe negativo del extracto es un gasto (`expense`) o un ingreso. */
+        negativeIsExpense?: boolean;
+      } = {},
+    ) => {
+      const db = getDb();
+      if (!Array.isArray(rawRows) || rawRows.length === 0) return { ok: false, reason: 'no_rows' };
+
+      const accountId = typeof options.accountId === 'string' && options.accountId.trim() !== ''
+        ? options.accountId.trim() : null;
+      if (accountId) {
+        const alive = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(accountId);
+        if (!alive) return { ok: false, reason: 'account_not_found' };
+      }
+
+      const paymentMethod = typeof options.paymentMethod === 'string' && options.paymentMethod.trim() !== ''
+        ? options.paymentMethod.trim()
+        // Nunca `cash`: el default del módulo pasó a ser digital, y un extracto
+        // de billetera es, por definición, dinero digital.
+        : 'transfer';
+      const negativeIsExpense = options.negativeIsExpense !== false;
+
+      const batchId = genId();
+      const fxRate = await getCurrentRate(db, getFxHouse(db));
+      const now = nowIso();
+
+      const insertBatch = db.prepare(
+        `INSERT INTO finance_import_batches (id, source, filename, row_count, created_at)
+         VALUES (?, 'delimited_table', ?, ?, ?)`,
+      );
+      // Mismo dedupe que el PDF: una fila ya importada por OTRO lote no se
+      // duplica al reimportar un extracto que se solapa con el anterior.
+      const dupCheck = db.prepare(
+        `SELECT COUNT(*) as cnt FROM finance_transactions
+         WHERE deleted_at IS NULL AND source = 'import'
+           AND date = ? AND description = ? AND amount = ? AND currency = ?
+           AND (import_batch_id IS NULL OR import_batch_id <> ?)`,
+      );
+      const insertTx = db.prepare(
+        `INSERT INTO finance_transactions
+         (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
+          installments, impacts_balance, fx_rate, fx_rate_source, account_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, 1, 1, ?, ?, ?, ?, ?)`,
+      );
+
+      const run = db.transaction(() => {
+        insertBatch.run(batchId, typeof options.fileName === 'string' ? options.fileName : '', rawRows.length, now);
+        let inserted = 0;
+        let duplicateCount = 0;
+        let skipped = 0;
+
+        for (const row of rawRows as Array<Record<string, unknown>>) {
+          const date = typeof row.date === 'string' ? row.date : '';
+          const amount = Number(row.amount);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(amount) || amount <= 0) {
+            skipped++;
+            continue;
+          }
+          const raw = Number(row.raw);
+          const isNegative = Number.isFinite(raw) ? raw < 0 : false;
+          const type = negativeIsExpense
+            ? (isNegative ? 'expense' : 'income')
+            : (isNegative ? 'income' : 'expense');
+          const currency = row.currency === 'USD' ? 'USD' : 'ARS';
+          const description = typeof row.description === 'string' ? row.description : '';
+          const category = typeof row.category === 'string' && row.category.trim() !== ''
+            ? row.category.trim() : 'Otros';
+
+          const existing = dupCheck.get(date, description, round2(amount), currency, batchId) as { cnt: number };
+          if (existing.cnt > 0) { duplicateCount++; continue; }
+
+          insertTx.run(
+            genId(), type, round2(amount), currency, category, description, date,
+            paymentMethod, batchId, fxRate, fxRate === null ? null : 'process',
+            accountId, now, now,
+          );
+          inserted++;
+        }
+        return { batchId, count: inserted, duplicateCount, skipped };
+      });
+
+      return run();
+    },
+  );
 
   ipcHandle('finance:getCategoryMappings', () => {
     const db = getDb();

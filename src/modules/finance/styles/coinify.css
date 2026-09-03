@@ -3489,3 +3489,95 @@ button.coin-sort-header--amount {
 [data-shell="mobile"] .coin-stmt {
   padding: 12px;
 }
+
+/* ── Importar un extracto de billetera (CSV) ─────────────────────
+   La pieza que baja el costo de RÉGIMEN: las transferencias no están en
+   ningún PDF de tarjeta, y son el 67 % de lo que se cargaba a mano. */
+
+.coin-table-import {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(74, 55, 32, 0.3);
+}
+
+.coin-table-import__title {
+  margin: 0 0 4px;
+  font-family: var(--ff-display);
+  font-size: var(--fs-sub);
+  color: var(--leather);
+}
+
+.coin-table-import__lede {
+  margin: 0 0 12px;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.coin-table-import__file {
+  margin: 10px 0 6px;
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.coin-table-import__mapping {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px 12px;
+  margin: 10px 0;
+}
+
+.coin-table-import__col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.coin-table-import__col-name {
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coin-table-import__sign,
+.coin-table-import__account {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  flex-wrap: wrap;
+}
+
+.coin-table-import__summary {
+  margin: 10px 0;
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.coin-table-import__skipped {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold-dark);
+  background: rgba(168, 138, 60, 0.14);
+  border-radius: 2px;
+  font-size: var(--fs-body);
+  color: var(--leather);
+}
+
+.coin-table-import__done {
+  margin: 10px 0 0;
+  font-size: var(--fs-body);
+  color: var(--moss-dark);
+}
+
+[data-shell="mobile"] .coin-table-import__mapping {
+  grid-template-columns: 1fr;
+}
+
+[data-shell="mobile"] .coin-table-import__sign input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+}
