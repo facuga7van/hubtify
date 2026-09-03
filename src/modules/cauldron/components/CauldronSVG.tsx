@@ -1,13 +1,29 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type SVGProps } from 'react';
 
 export interface CauldronSVGProps {
   progress: number;
   sessionType: 'work' | 'break' | 'long_break' | 'idle';
   paused: boolean;
   clipId: string;
+  /**
+   * ¿Puede moverse el caldero? En `false` el dibujo queda quieto: sin un solo
+   * `<animate>` SMIL y sin el filtro de resplandor sobre las llamas.
+   *
+   * Existe por dos motivos distintos que llegan al mismo lugar:
+   *  - `prefers-reduced-motion`. El CSS y GSAP ya lo respetaban; este SVG no,
+   *    y son 20 animaciones en bucle infinito durante 25 minutos.
+   *  - El emulador de Android, que rasteriza por software y se cae entero
+   *    (CAU-03). En un teléfono con GPU de verdad esto no pasa.
+   */
+  animated: boolean;
 }
 
-function CauldronSVGComponent({ progress, sessionType, paused, clipId }: CauldronSVGProps) {
+/** Un `<animate>` que no existe cuando el caldero tiene que quedarse quieto. */
+function Anim({ on, ...rest }: SVGProps<SVGElement> & { on: boolean }) {
+  return on ? <animate {...rest} /> : null;
+}
+
+function CauldronSVGComponent({ progress, sessionType, paused, clipId, animated }: CauldronSVGProps) {
   const liquidColors = {
     work: { top: '#7a1e1e', mid: '#5a1414', deep: '#3a0e0e', glow: 'rgba(122,30,30,0.7)' },
     // Mirrors --moss / --moss-dark / one step below, kept in sync with theme.css.
@@ -119,13 +135,14 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
           <rect x="140" y="316" width="120" height="6" rx="3" fill="#4a2e18" opacity="0.7" transform="rotate(-8 200 319)" />
 
           {/* Main flame (center, tall) */}
-          <g filter={`url(#${clipId}-softGlow)`}>
+          <g filter={animated ? `url(#${clipId}-softGlow)` : undefined}>
             <path
               d="M185 322 Q 190 290, 200 306 Q 210 290, 215 322 Q 215 336, 200 336 Q 185 336, 185 322 Z"
               fill={`url(#${clipId}-embersGrad)`}
               opacity="0.95"
             >
-              <animate
+              <Anim
+                on={animated}
                 attributeName="d"
                 dur="0.8s"
                 repeatCount="indefinite"
@@ -144,7 +161,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
             fill={`url(#${clipId}-flameGrad)`}
             opacity="0.85"
           >
-            <animate
+            <Anim
+                on={animated}
               attributeName="d"
               dur="1.1s"
               repeatCount="indefinite"
@@ -162,7 +180,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
             fill={`url(#${clipId}-flameGrad)`}
             opacity="0.85"
           >
-            <animate
+            <Anim
+                on={animated}
               attributeName="d"
               dur="1.3s"
               begin="0.3s"
@@ -177,21 +196,21 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
 
           {/* Glow under pot */}
           <ellipse cx="200" cy="320" rx="55" ry="10" fill="#e07418" opacity="0.2">
-            <animate attributeName="opacity" values="0.12;0.28;0.12" dur="2s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.12;0.28;0.12" dur="2s" repeatCount="indefinite" />
           </ellipse>
 
           {/* Ember sparks */}
           <circle cx="170" cy="328" r="3" fill="#f5a020" opacity="0.9">
-            <animate attributeName="opacity" values="0.5;1;0.5" dur="1.3s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.5;1;0.5" dur="1.3s" repeatCount="indefinite" />
           </circle>
           <circle cx="230" cy="330" r="2.5" fill="#e07418" opacity="0.8">
-            <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.1s" begin="0.4s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.4;0.9;0.4" dur="1.1s" begin="0.4s" repeatCount="indefinite" />
           </circle>
           <circle cx="200" cy="326" r="2" fill="#f5c842" opacity="0.7">
-            <animate attributeName="opacity" values="0.3;0.85;0.3" dur="0.9s" begin="0.7s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.3;0.85;0.3" dur="0.9s" begin="0.7s" repeatCount="indefinite" />
           </circle>
           <circle cx="190" cy="332" r="1.5" fill="#c43a1a" opacity="0.6">
-            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="1.5s" begin="0.2s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.3;0.7;0.3" dur="1.5s" begin="0.2s" repeatCount="indefinite" />
           </circle>
         </g>
       )}
@@ -222,7 +241,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
               fill={`url(#${clipId}-liquidGrad)`}
             >
               {active && !paused && (
-                <animate
+                <Anim
+                on={animated}
                   attributeName="y"
                   values={`${fillY};${fillY - 1.5};${fillY}`}
                   dur="3s"
@@ -236,7 +256,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
               opacity="0.95"
             >
               {active && !paused && (
-                <animate
+                <Anim
+                on={animated}
                   attributeName="d"
                   dur="2.4s"
                   repeatCount="indefinite"
@@ -269,14 +290,16 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
                   stroke="rgba(255,255,255,0.5)"
                   strokeWidth="1"
                 >
-                  <animate
+                  <Anim
+                on={animated}
                     attributeName="cy"
                     values={`${floorY - 10};${fillY + 4}`}
                     dur={`${b.dur}s`}
                     begin={`${b.delay}s`}
                     repeatCount="indefinite"
                   />
-                  <animate
+                  <Anim
+                on={animated}
                     attributeName="opacity"
                     values="0;0.8;0.8;0"
                     keyTimes="0;0.15;0.85;1"
@@ -284,7 +307,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
                     begin={`${b.delay}s`}
                     repeatCount="indefinite"
                   />
-                  <animate
+                  <Anim
+                on={animated}
                     attributeName="r"
                     values={`${b.r * 0.5};${b.r}`}
                     dur={`${b.dur}s`}
@@ -300,7 +324,7 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
               height="8"
               fill={c.top}
               opacity="0.6"
-              filter={`url(#${clipId}-softGlow)`}
+              filter={animated ? `url(#${clipId}-softGlow)` : undefined}
             />
           </>
         )}
@@ -372,7 +396,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
             fill={`url(#${clipId}-flameGrad)`}
             opacity="0.65"
           >
-            <animate
+            <Anim
+                on={animated}
               attributeName="d"
               dur="1.0s"
               repeatCount="indefinite"
@@ -382,7 +407,7 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
                 M130 316 Q 136 280, 146 300 Q 150 274, 160 316 Q 160 338, 145 338 Q 130 338, 130 316 Z
               "
             />
-            <animate attributeName="opacity" values="0.55;0.75;0.55" dur="1.4s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.55;0.75;0.55" dur="1.4s" repeatCount="indefinite" />
           </path>
 
           {/* Front-right flame — big */}
@@ -391,7 +416,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
             fill={`url(#${clipId}-embersGrad)`}
             opacity="0.6"
           >
-            <animate
+            <Anim
+                on={animated}
               attributeName="d"
               dur="1.2s"
               begin="0.4s"
@@ -402,7 +428,7 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
                 M240 312 Q 246 272, 256 296 Q 260 266, 270 312 Q 270 338, 255 338 Q 240 338, 240 312 Z
               "
             />
-            <animate attributeName="opacity" values="0.5;0.7;0.5" dur="1.6s" begin="0.2s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.5;0.7;0.5" dur="1.6s" begin="0.2s" repeatCount="indefinite" />
           </path>
 
           {/* Front-center tongue */}
@@ -411,7 +437,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
             fill="#e07418"
             opacity="0.45"
           >
-            <animate
+            <Anim
+                on={animated}
               attributeName="d"
               dur="0.85s"
               begin="0.6s"
@@ -422,7 +449,7 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
                 M190 320 Q 194 296, 200 310 Q 206 294, 210 320 Q 210 338, 200 338 Q 190 338, 190 320 Z
               "
             />
-            <animate attributeName="opacity" values="0.35;0.55;0.35" dur="1.1s" repeatCount="indefinite" />
+            <Anim on={animated} attributeName="opacity" values="0.35;0.55;0.35" dur="1.1s" repeatCount="indefinite" />
           </path>
 
           {/* Extra small left-inner flame */}
@@ -431,7 +458,8 @@ function CauldronSVGComponent({ progress, sessionType, paused, clipId }: Cauldro
             fill={`url(#${clipId}-flameGrad)`}
             opacity="0.5"
           >
-            <animate
+            <Anim
+                on={animated}
               attributeName="d"
               dur="1.3s"
               begin="0.8s"
@@ -461,7 +489,8 @@ const CauldronSVG = memo(
     Math.round(a.progress * 100) === Math.round(b.progress * 100) &&
     a.sessionType === b.sessionType &&
     a.paused === b.paused &&
-    a.clipId === b.clipId,
+    a.clipId === b.clipId &&
+    a.animated === b.animated,
 );
 
 export default CauldronSVG;
