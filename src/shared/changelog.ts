@@ -13,6 +13,60 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.6',
+    date: '2026-09-03',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'quests',
+        text: {
+          es: 'Las misiones repetidas ahora entienden «cada 2 semanas», «cada 3 días» o «cada 6 meses», y no solo todos los días. Y si marcás «desde que la completo», la próxima se agenda contando desde el día que la hiciste — que es lo que querés para regar las plantas, no para pagar el alquiler',
+          en: 'Repeating quests now understand "every 2 weeks", "every 3 days" or "every 6 months", not just every single one. And if you pick "from when I complete it", the next one is scheduled counting from the day you actually did it — which is what you want for watering the plants, not for paying rent',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Importar un resumen en PDF nunca había funcionado en la app instalada: siempre respondía «No se pudo procesar el PDF», y solo andaba corriéndola desde el código. Ya está arreglado, en escritorio y en teléfono. En Android además el resumen aparecía gris en el selector de archivos y no se dejaba elegir',
+          en: 'Importing a PDF statement had never worked in the installed app: it always answered "Could not process the PDF", and only worked when running from source. Fixed, on desktop and phone. On Android the statement also showed greyed out in the file picker and could not be selected',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Si el lector de PDF falla, ahora te lo dice claro en vez de hacerte creer que tu resumen es un escaneo sin texto. Son dos problemas distintos y necesitan que hagas cosas distintas',
+          en: 'If the PDF reader fails, it now says so clearly instead of making you think your statement is a text-free scan. They are two different problems and they need two different things from you',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'mobile',
+        text: {
+          es: 'El icono de Hubtify en el teléfono era un libro marrón sobre un fondo del mismo marrón: no se veía el libro. Ahora va sobre pergamino, se ve nítido en cualquier pantalla y se adapta al tema del sistema en Android 13 y posteriores',
+          en: 'The Hubtify icon on your phone was a brown book on a background of the exact same brown: you could not see the book. It now sits on parchment, looks sharp on any screen, and adapts to the system theme on Android 13 and up',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'hub',
+        text: {
+          es: 'Ajustes aprovecha todo el ancho de la ventana en vez de apretarse en una columna angosta con medio pergamino vacío al lado',
+          en: 'Settings now uses the full width of the window instead of squeezing into a narrow column with half the parchment empty beside it',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'hub',
+        text: {
+          es: 'El contador de cada estante de logros ya no cambia de significado según el filtro: el total es siempre cuántos hay en esa sección, filtres lo que filtres',
+          en: 'The counter on each achievement shelf no longer changes meaning with the filter: the total is always how many there are in that section, whatever you filter by',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.5',
     date: '2026-09-03',
     changes: [
