@@ -1757,3 +1757,16 @@
     animation: none;
   }
 }
+
+/* ── Teléfono: área de toque del nombre del hábito ──
+   Es un botón (abre el detalle del hábito), no un rótulo: medía 291×23. */
+[data-shell="mobile"] .quest-today-habit-name {
+  min-height: var(--touch-min);
+  display: flex;
+  align-items: center;
+}
+
+[data-shell="mobile"] .quest-tier-btn,
+[data-shell="mobile"] .quest-add-toggle {
+  min-height: var(--touch-min);
+}

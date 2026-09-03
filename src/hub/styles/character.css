@@ -153,7 +153,7 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 50%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 50%, #5a0e0e 100%);
   box-shadow:
     inset -2px -3px 6px rgba(0, 0, 0, 0.45),
     0 2px 4px rgba(0, 0, 0, 0.3);
@@ -310,7 +310,7 @@
 }
 
 .hero-title-trail-dot--current {
-  background: radial-gradient(circle at 35% 30%, #c23a3a 0%, #8a1b1b 55%, #5a0e0e 100%);
+  background: radial-gradient(circle at 35% 30%, var(--rubric-light) 0%, #8a1b1b 55%, #5a0e0e 100%);
   border: 1px solid var(--ink);
   box-shadow: inset -1px -2px 4px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(245, 231, 192, 0.6);
   color: var(--parch-0);
@@ -423,4 +423,9 @@
     overflow: visible;
     text-overflow: clip;
   }
+}
+
+/* ── Teléfono: área de toque ──────────────────────── */
+[data-shell="mobile"] .hero-name-button {
+  min-height: var(--touch-min);
 }
