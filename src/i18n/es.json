@@ -1569,6 +1569,8 @@
     "todayHabits": "Rituales de hoy",
     "todayPlanAhead": "Planear mañana",
     "todayTab": "Hoy",
+    "todayUndated": "Sin fecha",
+    "todayUndatedMore": "+{{count}} sin fecha",
     "undoClear": "Deshacer",
     "unsaved": "Sin guardar",
     "update": "Actualizar",

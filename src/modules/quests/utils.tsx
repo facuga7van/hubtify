@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { TaskTier, HabitWithStreak } from './types';
+import type { Task, TaskTier, HabitWithStreak } from './types';
 import { XP_MAP } from './types';
 import { playTaskComplete } from '../../shared/audio';
 // `getComboMultiplier` is gone from here on purpose: `rollBonus` /
@@ -205,4 +205,68 @@ export function getDueDateStatus(dueDate: string): 'overdue' | 'today' | 'this-w
   if (due < todayEnd) return 'today';
   if (due < weekEnd) return 'this-week';
   return 'later';
+}
+
+/** 'YYYY-MM-DDTHH:mm' → 'HH:mm'. A bare date has no time to show. */
+export function dueTimeOf(dueDate: string | null): string | null {
+  if (!dueDate || !dueDate.includes('T')) return null;
+  return dueDate.slice(11, 16);
+}
+
+/**
+ * How many undated quests the execution list is willing to show.
+ *
+ * The real database has 67 of 68 quests with no `due_date`. Showing all of them
+ * would turn "Hoy" into the backlog; showing none is what left the tab empty
+ * forever. A short head, ordered by the user's own ranking, plus a link to the
+ * full list, is the honest middle.
+ */
+export const UNDATED_TODAY_LIMIT = 5;
+
+export interface TodayBuckets {
+  overdue: Task[];
+  today: Task[];
+  /** Capped to UNDATED_TODAY_LIMIT. */
+  undated: Task[];
+  /** How many undated quests exist, before the cap. */
+  undatedTotal: number;
+}
+
+/**
+ * The one place that decides what "hoy" contains.
+ *
+ * Extracted from TodayView's useMemos so the rule is unit-testable, and widened
+ * with an `undated` bucket: a quest without a date is still work the user has
+ * to do, and hiding it made the main surface structurally empty.
+ */
+export function bucketTodayTasks(tasks: Task[]): TodayBuckets {
+  const pending = tasks.filter((task) => !task.status);
+
+  const overdue = pending
+    .filter((task) => task.dueDate && getDueDateStatus(task.dueDate) === 'overdue')
+    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+
+  /* Timed items first, in clock order — the day reads as a schedule and the
+     open-ended work sinks below it. */
+  const today = pending
+    .filter((task) => task.dueDate && getDueDateStatus(task.dueDate) === 'today')
+    .sort((a, b) => {
+      const at = dueTimeOf(a.dueDate);
+      const bt = dueTimeOf(b.dueDate);
+      if (at && bt) return at.localeCompare(bt);
+      if (at) return -1;
+      if (bt) return 1;
+      return a.order - b.order;
+    });
+
+  const undatedAll = pending
+    .filter((task) => !task.dueDate)
+    .sort((a, b) => a.order - b.order);
+
+  return {
+    overdue,
+    today,
+    undated: undatedAll.slice(0, UNDATED_TODAY_LIMIT),
+    undatedTotal: undatedAll.length,
+  };
 }
