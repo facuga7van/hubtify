@@ -6,6 +6,9 @@ import FinanceDashboard from '@modules/finance/components/Dashboard';
 import Transactions from '@modules/finance/components/Transactions';
 import Loans from '@modules/finance/components/Loans';
 import Installments from '@modules/finance/components/Installments';
+import Commitments from '@modules/finance/components/Commitments';
+import Recurring from '@modules/finance/components/Recurring';
+import CreditCards from '@modules/finance/components/CreditCards';
 import { installApi, mountInShell, setMobileViewport, settle, shoot, docOverflowX, mainOverflowX, overflowingNodes } from './mobile-harness';
 import { FINANCE_API } from './fixtures';
 
@@ -39,11 +42,25 @@ function Finance() {
       <Route path="/finance" element={<FinanceLayout />}>
         <Route index element={<FinanceDashboard />} />
         <Route path="transactions" element={<Transactions />} />
-        <Route path="loans" element={<Loans />} />
-        <Route path="installments" element={<Installments />} />
+        <Route path="commitments" element={<Commitments />}>
+          <Route path="installments" element={<Installments />} />
+          <Route path="recurring" element={<Recurring />} />
+          <Route path="cards" element={<CreditCards />} />
+          <Route path="loans" element={<Loans />} />
+        </Route>
       </Route>
     </Routes>
   );
+}
+
+/** Ninguna palabra cortada: cada rótulo entra entero en su caja. */
+function noClippedLabels(selector: string) {
+  const nodes = [...document.querySelectorAll<HTMLElement>(selector)];
+  expect(nodes.length).toBeGreaterThan(0);
+  for (const node of nodes) {
+    expect(node.scrollWidth, `«${node.textContent}» está cortado`)
+      .toBeLessThanOrEqual(node.clientWidth + 1);
+  }
 }
 
 describe('Coinify a 390×844', () => {
@@ -76,12 +93,25 @@ describe('Coinify a 390×844', () => {
     expect(desc.getBoundingClientRect().width).toBeGreaterThan(120);
   });
 
+  test('la tira de pestañas ENTRA a 390 px: no hay 696 px de desborde ni rótulos cortados', async () => {
+    await setMobileViewport();
+    // La auditoría de diseño midió `mainOverflowX = 696 px` en esta pantalla,
+    // con el último rótulo cortado a mitad de palabra y sin señal de scroll.
+    // Con TRES pestañas en vez de seis la tira entra entera: la condición fuerte
+    // (no hace falta scrollear) implica la débil (nada queda cortado).
+    mountInShell(<Finance />, '/finance');
+    await settle(700);
+    const nav = document.querySelector('.coin-tab-nav') as HTMLElement;
+    expect(document.querySelectorAll('.coin-tab-link')).toHaveLength(3);
+    expect(nav.scrollWidth, 'la tira de pestañas sigue desbordando a 390 px')
+      .toBeLessThanOrEqual(nav.clientWidth + 1);
+    noClippedLabels('.coin-tab-link');
+    noOverflow('COIN TABS 390');
+  });
+
   test('la pestaña activa se ve aunque sea la última (C9)', async () => {
     await setMobileViewport();
-    // Préstamos es la SEXTA pestaña: con `scrollLeft = 0` queda fuera de vista.
-    // Montar en la segunda (Transacciones) daría un falso verde: entra igual sin
-    // el scrollIntoView de FinanceLayout.
-    mountInShell(<Finance />, '/finance/loans');
+    mountInShell(<Finance />, '/finance/commitments/loans');
     await settle(700);
     const active = document.querySelector('.coin-tab-link--active') as HTMLElement;
     const nav = document.querySelector('.coin-tab-nav') as HTMLElement;
@@ -91,9 +121,25 @@ describe('Coinify a 390×844', () => {
     expect(active.getBoundingClientRect().height).toBeGreaterThanOrEqual(38);
   });
 
+  test('Compromisos: la sub-nav no desborda y sus botones son tocables', async () => {
+    await setMobileViewport();
+    mountInShell(<Finance />, '/finance/commitments/installments');
+    await settle(700);
+    await shoot('coinify-06-compromisos');
+    noOverflow('COIN COMMITMENTS');
+    noClippedLabels('.coin-subtab');
+    // La sección activa a la vista, y ≥44 px de alto de toque.
+    const active = document.querySelector('.coin-subtab--active') as HTMLElement;
+    expect(active).not.toBeNull();
+    for (const tab of document.querySelectorAll<HTMLElement>('.coin-subtab')) {
+      expect(tab.getBoundingClientRect().height,
+        `«${tab.textContent}» mide menos de 44 px de alto`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
   test('COIN-03: Prestado / Tomado prestado van juntos en su propia fila', async () => {
     await setMobileViewport();
-    mountInShell(<Finance />, '/finance/loans');
+    mountInShell(<Finance />, '/finance/commitments/loans');
     await settle(700);
     await page.getByRole('button', { name: /Agregar préstamo/i }).click();
     await settle(400);
@@ -109,7 +155,7 @@ describe('Coinify a 390×844', () => {
 
   test('COIN-02: «Eliminar grupo» se ve sin hover y con un aspa legible', async () => {
     await setMobileViewport();
-    mountInShell(<Finance />, '/finance/installments');
+    mountInShell(<Finance />, '/finance/commitments/installments');
     await expect.element(page.getByText(/Heladera/i).first()).toBeVisible();
     await settle(500);
     await shoot('coinify-03-cuotas');

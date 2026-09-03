@@ -76,7 +76,7 @@ beforeEach(() => {
 });
 
 describe('Libro del Tesorero — pestañas y chip', () => {
-  test('1640×900: las seis pestañas entran en un renglón', async () => {
+  test('1640×900: las tres pestañas entran en un renglón', async () => {
     stub();
     await page.viewport(1640, 900);
     wrap();
@@ -85,13 +85,15 @@ describe('Libro del Tesorero — pestañas y chip', () => {
 
     const tops = [...document.querySelectorAll('.coin-tab-link')]
       .map((n) => Math.round(n.getBoundingClientRect().top));
-    expect(tops).toHaveLength(6);
+    // Eran seis, para alguien que usaba dos. Cuotas, Recurrentes, Tarjetas y
+    // Préstamos viven ahora dentro de «Compromisos».
+    expect(tops).toHaveLength(3);
     expect(new Set(tops).size, 'las pestañas se parten en dos renglones').toBe(1);
     const nav = el('.coin-tab-nav-wrap');
     expect(nav.scrollWidth).toBeLessThanOrEqual(nav.clientWidth + 1);
   });
 
-  test('760×640: la tira de pestañas scrollea, no desborda la página', async () => {
+  test('760×640: la tira de pestañas entra y no desborda la página', async () => {
     stub();
     await page.viewport(760, 640);
     wrap();
@@ -99,12 +101,9 @@ describe('Libro del Tesorero — pestañas y chip', () => {
     await page.screenshot({ path: `${SCREENS}/audit-coin-layout-02-760.png` });
     expect(document.documentElement.scrollWidth)
       .toBeLessThanOrEqual(document.documentElement.clientWidth + 1);
-    // La tira tiene su propio scroll horizontal: seis pestañas no entran en 700 px.
-    const wrapEl = el('.coin-tab-nav-wrap');
-    const overflowX = getComputedStyle(wrapEl).overflowX;
-    if (wrapEl.scrollWidth > wrapEl.clientWidth + 1) {
-      expect(['auto', 'scroll']).toContain(overflowX);
-    }
+    // Con tres pestañas la tira entra sin scrollear ni a 760 px.
+    const nav = el('.coin-tab-nav');
+    expect(nav.scrollWidth).toBeLessThanOrEqual(nav.clientWidth + 1);
   });
 
   test('el chip del dólar abre su menú dentro de la ventana', async () => {

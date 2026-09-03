@@ -25,6 +25,7 @@ import {
   type BudgetStatus,
 } from '../utils/api-ext';
 import AccountManager from './shared/AccountManager';
+import CoinifyStart from './shared/CoinifyStart';
 import { AccountKindGlyph } from './shared/AccountGlyphs';
 import { ensureRecurringGenerated, resetRecurringGuard, realCurrentMonth } from '../utils/ensure-recurring';
 import { checkBudgetMonthClose, resetBudgetGuards } from '../utils/budget-guards';
@@ -920,6 +921,32 @@ export default function Dashboard() {
           <div className="coin-skeleton coin-skeleton--card" />
         </div>
         <div className="coin-skeleton coin-skeleton--chart" />
+      </div>
+    );
+  }
+
+  /**
+   * Coinify sin datos mostraba seis gráficos en cero y seis pestañas, sin decir
+   * por dónde empezar — el módulo no tenía ningún onboarding. Ahora el panel
+   * vacío ES el onboarding, con un solo camino: importar el resumen.
+   *
+   * La condición es deliberadamente estricta (ni un movimiento, ni una tarjeta,
+   * ni un plan de cuotas): en cuanto hay UN dato, el panel manda. Nadie que ya
+   * esté usando el módulo puede quedar encerrado en una pantalla de bienvenida.
+   */
+  const hasNothing =
+    balance !== null
+    && (balance.ARS?.income ?? 0) === 0 && (balance.ARS?.expenses ?? 0) === 0
+    && (balance.USD?.income ?? 0) === 0 && (balance.USD?.expenses ?? 0) === 0
+    && categories.length === 0
+    && installmentCount === 0
+    && pendingCC.ARS === 0 && pendingCC.USD === 0
+    && monthlyExpenses.every((v) => v === 0);
+
+  if (hasNothing) {
+    return (
+      <div className="coin-dashboard" data-tour="finance">
+        <CoinifyStart />
       </div>
     );
   }

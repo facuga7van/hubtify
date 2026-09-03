@@ -68,7 +68,16 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(today);
   const [currency, setCurrency] = useState<Currency>('ARS');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  /**
+   * Arrancaba en `'cash'` — el único medio que el usuario NUNCA eligió: 40 de
+   * sus 60 altas manuales son transferencias y tiene cero movimientos en
+   * efectivo cargados a mano. Cada alta empezaba corrigiendo este select.
+   * Ahora el default lo dice el historial (`finance:getEntryDefaults`), y hasta
+   * que conteste se muestra el fallback digital, no el efectivo.
+   */
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer');
+  /** El usuario ya tocó el select: la inferencia no le pisa la elección. */
+  const methodTouched = useRef(false);
   const [installments, setInstallments] = useState(1);
   const [amountMode, setAmountMode] = useState<AmountMode>('installment');
   const [creditCardId, setCreditCardId] = useState('');
@@ -81,6 +90,27 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   // Category mappings for auto-suggestion
   const [mappings, setMappings] = useState<CategoryMapping[]>([]);
   const userOverrode = useRef(false);
+
+  /**
+   * La moda de sus últimas altas manuales. Se pide una vez al montar y en cada
+   * cambio de cuenta: el historial de otra cuenta no dice nada sobre esta.
+   */
+  const loadEntryDefaults = useCallback(() => {
+    const api = window.api as unknown as {
+      financeGetEntryDefaults?: () => Promise<{ paymentMethod?: string; currency?: string }>;
+    };
+    // Canal nuevo: en un binding viejo simplemente no está, y el fallback vale.
+    if (typeof api.financeGetEntryDefaults !== 'function') return;
+    api.financeGetEntryDefaults()
+      .then((defaults) => {
+        if (methodTouched.current || !defaults) return;
+        const method = defaults.paymentMethod;
+        if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
+          setPaymentMethod(method);
+        }
+      })
+      .catch(() => { /* el fallback ya está puesto */ });
+  }, []);
 
   const loadMappings = useCallback(() => {
     window.api.financeGetCategoryMappings().then((data) => {
@@ -109,13 +139,14 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       .catch((err) => console.error('[QuickAddForm] financeGetTransactions failed:', err));
   }, []);
 
-  useEffect(() => { loadMappings(); loadLastTransaction(); }, [loadMappings, loadLastTransaction]);
+  useEffect(() => { loadMappings(); loadLastTransaction(); loadEntryDefaults(); },
+    [loadMappings, loadLastTransaction, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => { loadMappings(); loadLastTransaction(); };
+    const handler = () => { methodTouched.current = false; loadMappings(); loadLastTransaction(); loadEntryDefaults(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadMappings, loadLastTransaction]);
+  }, [loadMappings, loadLastTransaction, loadEntryDefaults]);
 
   // Auto-suggest category when description changes
   const suggestCategory = useCallback(
@@ -162,6 +193,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setDescription(lastTx.description ?? '');
     setCurrency(lastTx.currency === 'USD' ? 'USD' : 'ARS');
     setPaymentMethod(lastTx.paymentMethod);
+    methodTouched.current = true;
     setCreditCardId(lastTx.paymentMethod === 'credit_card' ? (lastTx.creditCardId ?? '') : '');
     if (accountsSupported) setAccountValue(lastTx.accountId ?? NO_ACCOUNT);
     setInstallments(1);
@@ -305,7 +337,8 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
           default — cash — was silently applied to card purchases and the
           statement never saw them. */}
       <div className="coin-quick-add-form__payment-row">
-        <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+        <select value={paymentMethod}
+          onChange={(e) => { methodTouched.current = true; setPaymentMethod(e.target.value as PaymentMethod); }}
           className="rpg-select coin-quick-add-form__payment"
           aria-label={t('coinify.paymentMethod', 'Medio de pago')}>
           <option value="cash">{t('coinify.cash')}</option>
