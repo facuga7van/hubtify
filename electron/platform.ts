@@ -7,6 +7,12 @@ import type { FileFilter, PlatformPort } from '../shared-logic/platform';
  * Desktop PlatformPort. Everything that used to be inlined in the handlers
  * (dialog + fs in finance.ipc/finance-import.ipc, Notification in
  * notifications.ipc/cauldron.ipc, app/os in feedback.ipc/syl.ipc) lives here.
+ *
+ * NO implementa `applyNotificationPlan` A PROPÓSITO: su ausencia es lo que le
+ * dice a `shared-logic` que esta plataforma no programa avisos para el sistema
+ * (el proceso principal de Electron nunca se congela, y sus notificaciones salen
+ * por `notify()` en el momento). Con eso, en escritorio ni siquiera se calculan
+ * los planes. Ver `schedulingSupported()` en modules/notification-schedule.ts.
  */
 
 function focusMainWindow(): void {

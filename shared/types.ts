@@ -594,6 +594,13 @@ export interface HubtifyApi {
   notificationsSetLocale: (locale: string) => Promise<void>;
   notificationsSetModuleEnabled: (module: string, enabled: boolean) => Promise<void>;
   notificationsSetHabitReminder: (enabled: boolean, time: string) => Promise<void>;
+  /**
+   * Estado del permiso de alarmas exactas (`SCHEDULE_EXACT_ALARM`, Android 12+):
+   * 'granted' | 'denied' | 'prompt', o 'unsupported' en escritorio.
+   */
+  notificationsExactAlarmState: () => Promise<string>;
+  /** Abre «Alarmas y recordatorios» del sistema. Solo desde un gesto del usuario. */
+  notificationsRequestExactAlarms: () => Promise<string>;
   onNotificationsUpdated: (callback: () => void) => () => void;
 
   // Dollar

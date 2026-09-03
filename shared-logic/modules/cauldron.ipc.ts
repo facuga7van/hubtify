@@ -5,6 +5,15 @@ import { emit } from '../events';
 import { platform } from '../platform';
 import { getMondayOfWeek, formatDateString } from '../../shared/date-utils';
 import { isModuleNotificationEnabled } from './notifications.ipc';
+import {
+  cauldronEndMessage,
+  planCauldronNotifications,
+  pushPlan,
+  schedulingSupported,
+  DEFAULT_CAULDRON_LABELS,
+  type CauldronEndContext,
+  type CauldronLabels,
+} from './notification-schedule';
 import type {
   CauldronTimerState,
   CauldronPreset,
@@ -58,32 +67,12 @@ const AUTO_START_GRACE_MS = 5000;
  * OS-notification texts, supplied by the renderer (which owns i18n) via
  * `cauldron:setLabels`. Defaults keep the previous Spanish strings so nothing
  * breaks if the renderer hasn't pushed translations yet.
+ *
+ * El tipo vive en `notification-schedule.ts`: los mismos textos alimentan el
+ * aviso inmediato de escritorio y la alarma que Android dispara con la app
+ * cerrada.
  */
-interface CauldronLabels {
-  cycleComplete: string;   // title, whole cycle finished
-  cycleCompleteBody: string;
-  potionDone: string;      // title, work segment finished
-  breakDone: string;       // title, break finished
-  focus: string;
-  longBreak: string;
-  shortBreak: string;
-  cycle: string;           // "Ciclo" / "Cycle"
-  next: string;            // "Siguiente" / "Next"
-  minutesShort: string;    // "min"
-}
-
-let labels: CauldronLabels = {
-  cycleComplete: 'Caldero — ¡Ciclo completo!',
-  cycleCompleteBody: 'Ciclo de pociones terminado.',
-  potionDone: '¡Poción completada!',
-  breakDone: '¡Descanso terminado!',
-  focus: 'Enfoque',
-  longBreak: 'Descanso largo',
-  shortBreak: 'Descanso',
-  cycle: 'Ciclo',
-  next: 'Siguiente',
-  minutesShort: 'min',
-};
+let labels: CauldronLabels = { ...DEFAULT_CAULDRON_LABELS };
 
 /**
  * How long an interrupted session stays offerable before startup cleans it up.
@@ -247,6 +236,42 @@ function getSnapshotState(): CauldronTimerStateEx {
   return { ...timerState };
 }
 
+/** Lo que necesita `cauldronEndMessage` para redactar el fin del segmento actual. */
+function endContext(): CauldronEndContext {
+  return {
+    sessionType: timerState.sessionType,
+    currentCycle: timerState.currentCycle,
+    totalCycles: timerState.totalCycles,
+    presetName: timerState.presetName,
+    next: getNextSegment(),
+  };
+}
+
+/**
+ * Deja los avisos del sistema en sincronía con el reloj (spec §12 Fase 6).
+ *
+ * En Android el Worker se congela en segundo plano: la única forma de que suene
+ * algo con la app cerrada es que la alarma esté YA en manos del SO. Por eso se
+ * llama en TODA transición del temporizador —arrancar, pausar, reanudar, saltar,
+ * prorrogar, terminar, detener—, no solo al arrancar: una alarma que sobrevive a
+ * un «pausa» sonaría en medio de nada.
+ *
+ * En desktop `schedulingSupported()` es false y esto no hace absolutamente nada.
+ */
+function syncCauldronSchedule(): void {
+  if (!schedulingSupported()) return;
+  pushPlan(
+    planCauldronNotifications({
+      enabled: isModuleNotificationEnabled('cauldron'),
+      status: timerState.status,
+      targetEndTime,
+      now: Date.now(),
+      end: endContext(),
+      labels,
+    }),
+  );
+}
+
 function tick(): void {
   if (timerState.status !== 'work' && timerState.status !== 'on_break') return;
 
@@ -307,21 +332,24 @@ function onTimeUp(): void {
 
   // Native notification via PlatformPort — texts come from the renderer
   // (cauldron:setLabels); they used to be hardcoded Spanish regardless of language.
-  if (isModuleNotificationEnabled('cauldron')) {
-    const presetLabel = timerState.presetName ? ` (${timerState.presetName})` : '';
-    const cycleInfo = `${labels.cycle} ${timerState.currentCycle}/${timerState.totalCycles}`;
-    if (cycleComplete || nextSegment === null) {
-      void platform().notify({
-        title: labels.cycleComplete,
-        body: `${labels.cycleCompleteBody}${presetLabel}`,
-      });
-    } else {
-      const nextLabel = nextSegment.type === 'work' ? labels.focus : nextSegment.type === 'long_break' ? labels.longBreak : labels.shortBreak;
-      const nextMin = Math.round(nextSegment.durationMs / 60000);
-      const title = wasWork ? labels.potionDone : labels.breakDone;
-      const body = `${cycleInfo} — ${labels.next}: ${nextLabel} (${nextMin} ${labels.minutesShort})${presetLabel}`;
-      void platform().notify({ title, body });
-    }
+  //
+  // `schedulingSupported()` (Android) SALTEA este aviso a propósito: ahí el
+  // mismo texto ya viajó al SO como alarma programada a `targetEndTime` y salió
+  // solo, esté la app abierta o cerrada. Emitirlo de nuevo cuando el tick al fin
+  // corre sería el duplicado clásico — y en mobile ese tick puede llegar 40 min
+  // tarde, con lo cual el segundo aviso además mentiría.
+  if (isModuleNotificationEnabled('cauldron') && !schedulingSupported()) {
+    const { title, body } = cauldronEndMessage(
+      {
+        sessionType: timerState.sessionType,
+        currentCycle: timerState.currentCycle,
+        totalCycles: timerState.totalCycles,
+        presetName: timerState.presetName,
+        next: nextSegment,
+      },
+      labels,
+    );
+    void platform().notify({ title, body });
   }
 
   clearTimer();
@@ -350,6 +378,10 @@ function onTimeUp(): void {
     timerState = { ...timerState, status: 'idle', remainingMs: 0, autoStartAt: null };
     emit('cauldron:tick', getSnapshotState());
   }
+
+  // El segmento terminó: ya no hay alarma de fin ni poción al fuego que anunciar.
+  // Si el auto-inicio encadena el siguiente, `startSegment` vuelve a armarlas.
+  syncCauldronSchedule();
 }
 
 /**
@@ -483,6 +515,8 @@ function startSegment(
   if (!timerInterval) {
     timerInterval = setInterval(tick, 1000);
   }
+
+  syncCauldronSchedule();
 }
 
 // ─── Startup Cleanup ────────────────────────────────────────
@@ -570,13 +604,23 @@ export function registerCauldronIpcHandlers(): void {
         // congelados se completa AHORA (con `completed_at = targetEndTime`) en
         // vez de un segundo después.
         tick();
+        syncCauldronSchedule();
         return;
       }
       if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null && !autoStartInterval) {
         armAutoStart();
       }
+      // Volver del segundo plano es el momento de reconciliar: puede que el SO
+      // haya disparado la alarma, que el usuario la haya descartado, o que un
+      // fabricante agresivo la haya matado al cerrar la app desde recientes.
+      syncCauldronSchedule();
     },
   });
+
+  // Arranque en frío: si la app murió con una poción al fuego, el aviso
+  // persistente sigue en la bandeja. El plan de un temporizador en `idle` no
+  // programa nada, y eso es exactamente lo que lo retira.
+  syncCauldronSchedule();
 
   // ─── Preset CRUD ───
 
@@ -804,6 +848,9 @@ export function registerCauldronIpcHandlers(): void {
       getDb().prepare('UPDATE cauldron_sessions SET target_end_time = NULL, updated_at = ? WHERE id = ?')
         .run(nowIso, currentSessionDbId);
     }
+    // Pausar tiene que RETIRAR la alarma: si no, el SO la dispararía igual a la
+    // hora vieja, con la app cerrada y el reloj detenido.
+    syncCauldronSchedule();
     emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -824,6 +871,7 @@ export function registerCauldronIpcHandlers(): void {
         .run(targetEndTime, nowIso, currentSessionDbId);
     }
     timerInterval = setInterval(tick, 1000);
+    syncCauldronSchedule(); // nuevo targetEndTime → nueva alarma
     emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -863,6 +911,7 @@ export function registerCauldronIpcHandlers(): void {
       activePreset = null;
     }
 
+    syncCauldronSchedule();
     emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -915,6 +964,7 @@ export function registerCauldronIpcHandlers(): void {
     if (!timerInterval) {
       timerInterval = setInterval(tick, 1000);
     }
+    syncCauldronSchedule(); // la prórroga corre el fin del segmento
     emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
   });
@@ -1007,6 +1057,7 @@ export function registerCauldronIpcHandlers(): void {
     // The loop runs until here: `stop` is the only thing that ends it.
     timerState = { ...IDLE_STATE };
     activePreset = null;
+    syncCauldronSchedule(); // apagar el fuego retira la alarma y el aviso persistente
     emit('cauldron:tick', getSnapshotState());
   });
 
@@ -1393,6 +1444,7 @@ export function registerCauldronIpcHandlers(): void {
       .run(targetEndTime, nowIso, session.id);
 
     if (!timerInterval) timerInterval = setInterval(tick, 1000);
+    syncCauldronSchedule();
     emit('cauldron:tick', getSnapshotState());
     return { success: true, state: getSnapshotState() };
   });
@@ -1415,6 +1467,9 @@ export function registerCauldronIpcHandlers(): void {
   ipcHandle('cauldron:setLabels', (_e, next: Partial<CauldronLabels>) => {
     if (next && typeof next === 'object') {
       labels = { ...labels, ...next };
+      // Una alarma ya programada lleva su texto adentro: reescribirla es la
+      // única forma de que un cambio de idioma la alcance.
+      syncCauldronSchedule();
     }
   });
 }

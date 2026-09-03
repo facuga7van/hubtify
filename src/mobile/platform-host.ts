@@ -19,12 +19,19 @@ import { Device } from '@capacitor/device';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Share } from '@capacitor/share';
-import type { FileFilter } from '@logic/platform';
+import type { FileFilter, NotificationPlan } from '@logic/platform';
 import { pickFile } from './file-picker';
 import { acceptFor, bytesToBase64, notificationIdFor } from './host-utils';
 import type { PlatformHostFns } from './worker-client';
 
 export const NOTIFICATION_CHANNEL_ID = 'hubtify';
+/**
+ * Canal aparte para el aviso persistente del Caldero: importancia baja (2 =
+ * IMPORTANCE_LOW), sin sonido ni heads-up. Con el canal normal (4), cada vez que
+ * se reprograma el aviso «hay una poción al fuego» saltaría un cartel encima de
+ * lo que estés haciendo.
+ */
+export const ONGOING_CHANNEL_ID = 'hubtify-ongoing';
 /** Subcarpeta de Directory.Cache; el FileProvider del template permite todo el cache. */
 const SHARE_DIR = 'share';
 
@@ -71,9 +78,36 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
         description: 'Recordatorios, rachas y Cauldron',
         importance: 4,
       });
+      await LocalNotifications.createChannel({
+        id: ONGOING_CHANNEL_ID,
+        name: 'Caldero en curso',
+        description: 'Aviso persistente mientras hay una sesión al fuego',
+        importance: 2,
+      });
       channelReady = true;
     }
     return true;
+  }
+
+  /**
+   * ¿Puede la app usar alarmas EXACTAS ahora mismo (`SCHEDULE_EXACT_ALARM`)?
+   *
+   * No se cachea: `checkExactNotificationSetting()` es una consulta barata al
+   * sistema y el permiso se puede revocar desde Ajustes en cualquier momento.
+   * Cachearlo en `true` y equivocarse tiene un castigo desproporcionado: el
+   * plugin, ante `isExactNotification: true` sin permiso, ABRE la pantalla de
+   * sistema «Alarmas y recordatorios» en medio de un `schedule()` y deja la
+   * promesa colgada hasta que el usuario vuelva.
+   */
+  async function exactAlarmsAllowed(): Promise<boolean> {
+    try {
+      const status = await LocalNotifications.checkExactNotificationSetting();
+      return status.exact_alarm === 'granted';
+    } catch {
+      // Android < 12 no tiene el ajuste (y el plugin resuelve 'granted'); si la
+      // consulta falla, inexacto es la opción que nunca abre una pantalla.
+      return false;
+    }
   }
 
   async function writeAndShare(name: string, data: string, encoding?: Encoding): Promise<boolean> {
@@ -116,6 +150,92 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
         });
       } catch (err) {
         console.warn('[platform-host] notify failed', err);
+      }
+    },
+
+    /**
+     * Reconcilia un ámbito de avisos programados (spec §12 Fase 6).
+     *
+     * El plan es el estado COMPLETO del ámbito: se cancela todo lo que gobierna
+     * y ya no quiere, y se (re)programa lo que sí. Reprogramar un id que ya
+     * estaba pendiente REEMPLAZA la alarma (el plugin usa
+     * `PendingIntent.FLAG_CANCEL_CURRENT` con el id como requestId), no la
+     * duplica — por eso reconciliar entero en cada cambio es seguro.
+     *
+     * `cancel()` no baja una notificación YA publicada (LocalNotificationManager.kt
+     * solo la marca en su storage), así que los `ongoing` se retiran además con
+     * `removeDeliveredNotificationsById`.
+     *
+     * Nunca rechaza: los callers son fire-and-forget desde el worker.
+     */
+    async applyNotificationPlan(plan: NotificationPlan) {
+      try {
+        const desired = new Map(plan.schedule.map((n) => [notificationIdFor(n.tag), n]));
+        const stale = plan.owned.map(notificationIdFor).filter((id) => !desired.has(id));
+
+        if (stale.length > 0) {
+          // Cancelar no necesita permiso: se hace ANTES de `notificationsReady()`
+          // para que un plan que solo retira avisos no dispare el diálogo de
+          // permisos de Android 13 sin motivo.
+          await LocalNotifications.cancel({ notifications: stale.map((id) => ({ id })) });
+          const persistent = new Set((plan.ownedPersistent ?? []).map(notificationIdFor));
+          const delivered = stale.filter((id) => persistent.has(id));
+          if (delivered.length > 0) {
+            await LocalNotifications.removeDeliveredNotificationsById({ ids: delivered });
+          }
+        }
+
+        if (desired.size === 0) return;
+        if (!(await notificationsReady())) return;
+
+        // La exactitud se decide UNA vez por lote y solo importa si hay alarmas.
+        const exact = [...desired.values()].some((n) => n.at !== undefined)
+          ? await exactAlarmsAllowed()
+          : false;
+
+        await LocalNotifications.schedule({
+          notifications: [...desired].map(([id, n]) => ({
+            id,
+            title: n.title,
+            body: n.body,
+            channelId: n.ongoing ? ONGOING_CHANNEL_ID : NOTIFICATION_CHANNEL_ID,
+            ...(n.ongoing ? { ongoing: true, autoCancel: false } : {}),
+            ...(n.at !== undefined
+              ? {
+                  // `allowWhileIdle` NO es opcional acá: sin él el plugin usa
+                  // `AlarmManager.set(RTC, …)`, que no despierta el dispositivo y
+                  // en Doze puede quedarse esperando la próxima ventana de
+                  // mantenimiento (horas). Con él usa `setAndAllowWhileIdle`
+                  // (RTC_WAKEUP), que dispara aun dormido — limitado por Android
+                  // a una vez cada 9 minutos por app.
+                  schedule: { at: new Date(n.at), allowWhileIdle: true },
+                }
+              : {}),
+            // Exacta solo si el permiso YA está dado: pedirlo implícitamente abre
+            // la pantalla de sistema y cuelga esta promesa (Ajustes tiene el
+            // botón para concederlo con un gesto explícito).
+            isExactNotification: n.at !== undefined && exact,
+          })),
+        });
+      } catch (err) {
+        console.warn('[platform-host] applyNotificationPlan failed', err);
+      }
+    },
+
+    async exactAlarmState() {
+      try {
+        return (await LocalNotifications.checkExactNotificationSetting()).exact_alarm;
+      } catch {
+        return 'denied';
+      }
+    },
+
+    /** Abre «Alarmas y recordatorios». SOLO desde un gesto explícito del usuario. */
+    async requestExactAlarms() {
+      try {
+        return (await LocalNotifications.changeExactNotificationSetting()).exact_alarm;
+      } catch {
+        return 'denied';
       }
     },
 

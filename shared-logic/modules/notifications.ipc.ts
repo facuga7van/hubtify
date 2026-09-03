@@ -13,6 +13,12 @@ import {
   setEngineLocale,
   getEngineLocale,
 } from './notification-engine';
+import {
+  getHabitReminderConfig,
+  setHabitReminderConfig,
+  setQuestsNotificationsEnabled,
+  syncHabitSchedule,
+} from './notification-schedule';
 import type { AppNotification } from '../../shared/types';
 
 let pollingInterval: ReturnType<typeof setInterval> | null = null;
@@ -35,13 +41,15 @@ export function isModuleNotificationEnabled(module: string): boolean {
 const POLLING_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const NATIVE_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
 
-let habitReminderEnabled = true;
-let habitReminderTime = '21:00';
-
 function runNotificationCheck(): number {
   const db = getDb();
 
   const resolvedCount = autoResolve(db);
+
+  // La config del recordatorio de hábitos vive en `notification-schedule.ts`:
+  // quien más la necesita es el programador de avisos, y Questify llega a él
+  // sin arrastrar este módulo entero.
+  const { enabled: habitReminderEnabled, time: habitReminderTime } = getHabitReminderConfig();
 
   const candidates = [
     ...(enabledModules.quests ? evaluateQuestNotifications(db) : []),
@@ -91,6 +99,10 @@ function pausePolling(): void {
 
 export function startNotificationEngine(): void {
   engineWanted = true;
+  // Arranque en frío: es el primer momento con la DB migrada y el port
+  // instalado, o sea el primero en que se pueden dejar armadas las alarmas de
+  // hábitos de los próximos días. En desktop no hace nada.
+  syncHabitSchedule();
   if (pollingInterval) return;
   // The callback MUST NOT be allowed to throw: an unhandled throw inside a
   // setInterval callback has no catch frame above it and takes the whole main
@@ -113,7 +125,11 @@ export function registerNotificationIpcHandlers(): void {
   // Background (Android): the polling timer would hit a closed DB. Electron never calls these.
   registerLifecycle({
     suspend: pausePolling,
-    resume: () => { if (engineWanted) startNotificationEngine(); },
+    // Al volver del segundo plano puede haber pasado un día entero: los
+    // recordatorios ya disparados hay que reemplazarlos por los que siguen.
+    // (En `suspend` NO se reprograma: la UI ya se está congelando y el
+    // round-trip al plugin quedaría colgado. Cada mutación reprograma sola.)
+    resume: () => { if (engineWanted) startNotificationEngine(); else syncHabitSchedule(); },
   });
 
   ipcHandle('notifications:send', async (_e, title: string, body: string) => {
@@ -175,16 +191,37 @@ export function registerNotificationIpcHandlers(): void {
 
   ipcHandle('notifications:setLocale', (_e, locale: string) => {
     setEngineLocale(locale);
+    // Los avisos programados llevan el texto adentro (cuando Android los
+    // dispara no corre nada nuestro que pueda traducirlos): cambiar de idioma
+    // obliga a reescribirlos.
+    syncHabitSchedule();
   });
 
   ipcHandle('notifications:setModuleEnabled', (_e, module: string, enabled: boolean) => {
     if (module in enabledModules) {
       enabledModules[module] = enabled;
     }
+    if (module === 'quests') setQuestsNotificationsEnabled(enabled);
   });
 
   ipcHandle('notifications:setHabitReminder', (_e, enabled: boolean, time: string) => {
-    habitReminderEnabled = enabled;
-    if (time) habitReminderTime = time;
+    setHabitReminderConfig(enabled, time);
+  });
+
+  /**
+   * Alarmas exactas (Android 12+). El default del plugin es `isExactNotification:
+   * true`, y sin `SCHEDULE_EXACT_ALARM` concedido eso abre la pantalla de sistema
+   * «Alarmas y recordatorios» a mitad de un `schedule()` — por eso Hubtify programa
+   * inexacto salvo que el permiso YA esté dado. Estos dos canales existen para que
+   * Ajustes muestre el estado y ofrezca concederlo con un gesto explícito.
+   *
+   * En desktop el port no implementa los métodos y ambos responden 'unsupported'.
+   */
+  ipcHandle('notifications:exactAlarmState', async () => {
+    return (await platform().exactAlarmState?.()) ?? 'unsupported';
+  });
+
+  ipcHandle('notifications:requestExactAlarms', async () => {
+    return (await platform().requestExactAlarms?.()) ?? 'unsupported';
   });
 }

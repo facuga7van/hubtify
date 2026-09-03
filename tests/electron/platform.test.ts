@@ -94,3 +94,14 @@ describe('webContentsSink', () => {
     ]);
   });
 });
+
+describe('avisos programados', () => {
+  // El escritorio no programa NADA para el sistema: el proceso principal no se
+  // congela y sus notificaciones salen por `notify()` en el momento. La ausencia
+  // del método es la señal — `schedulingSupported()` la lee y ni calcula el plan.
+  it('el port de escritorio NO implementa applyNotificationPlan', () => {
+    expect(electronPlatform.applyNotificationPlan).toBeUndefined();
+    expect(electronPlatform.exactAlarmState).toBeUndefined();
+    expect(electronPlatform.requestExactAlarms).toBeUndefined();
+  });
+});
