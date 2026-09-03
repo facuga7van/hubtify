@@ -258,7 +258,34 @@ export default function NutritionSettings() {
     setMacroError('');
   };
 
-  if (loading) return <div style={{ padding: 24, fontFamily: "'IM Fell English', serif", color: 'var(--ink-faded)' }}>{t('common.loading')}</div>;
+  // Era un «Cargando...» pelado en el medio del pergamino. El esqueleto ya
+  // dibuja la forma de la página que está por llegar, como hace Hoy.
+  if (loading) return (
+    <div className="nutri-page">
+      <div className="nutri-page-head">
+        <div>
+          <h1 className="nutri-page-title">
+            <span className="nutri-title-ico"><Gear width={18} height={18} /></span> {t('nutrify.profileSettings', 'Configuración Nutrify')}
+          </h1>
+          <div className="nutri-page-sub">{t('nutrify.profileSettingsSub', 'Ajustá tus datos corporales y objetivo calórico')}</div>
+        </div>
+      </div>
+      <div className="nutri-card" style={{ marginBottom: 16 }}>
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '40%', marginBottom: 12 }} />
+        <div className="nutri-skeleton nutri-skeleton--bar" style={{ marginBottom: 8 }} />
+        <div className="nutri-skeleton nutri-skeleton--bar" />
+      </div>
+      <div className="nutri-card" style={{ marginBottom: 16 }}>
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '30%', marginBottom: 12 }} />
+        <div className="nutri-skeleton nutri-skeleton--bar" />
+      </div>
+      <div className="nutri-card">
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '35%', marginBottom: 12 }} />
+        <div className="nutri-skeleton nutri-skeleton--bar" style={{ marginBottom: 8 }} />
+        <div className="nutri-skeleton nutri-skeleton--text" style={{ width: '60%' }} />
+      </div>
+    </div>
+  );
 
   if (loadError) return (
     <div style={{ padding: 24, textAlign: 'center' }}>

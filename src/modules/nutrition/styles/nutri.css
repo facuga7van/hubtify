@@ -1352,13 +1352,43 @@
   outline-offset: 1px;
 }
 
+/* El hueco de Nutrify ya traía ícono + frase + botón en el JSX (es el mejor de
+   la app), pero la clase no los ordenaba: quedaban apilados por el flujo normal
+   y el ícono pegado al texto. Columna centrada, como `.notif-empty`. */
 .nutri-empty {
-  font-family: 'IM Fell English', serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--ff-body);
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-faded);
   text-align: center;
-  padding: 12px 0;
+  padding: 16px 0;
+}
+
+.nutri-empty > svg {
+  color: var(--gold-dark);
+  opacity: 0.55;
+}
+
+.nutri-empty > p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+.nutri-empty .nutri-btn {
+  font-style: normal;
+}
+
+/* El widget del hub reusa `.nutri-empty` para «falta la meta»: ahí adentro de
+   una fila de 68 px el bloque va a la izquierda y sin aire propio. */
+.nutri-dash-setup.nutri-empty {
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
 }
 
 /* ── Meal group headers (N5) ── */

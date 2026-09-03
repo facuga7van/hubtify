@@ -4,6 +4,8 @@ import { page } from 'vitest/browser';
 // Mismo seam que audit-nutri-screens: la callable de Firebase no corre en el browser.
 vi.mock('../../../src/modules/nutrition/estimate-service', () => ({
   estimateNutrition: async () => ({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0, items: [] }),
+  // Los llamadores distinguen «no hay sesión» de «falló la red»; acá hay sesión.
+  isNoSessionError: () => false,
 }));
 
 import Today from '@modules/nutrition/components/Today';

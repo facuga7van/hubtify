@@ -23,6 +23,9 @@ import '../../src/modules/nutrition/styles/nutri.css';
 const estimateNutrition = vi.fn(async () => { throw new Error('model must not be called on a cache hit'); });
 vi.mock('../../src/modules/nutrition/estimate-service', () => ({
   estimateNutrition: (...args: unknown[]) => estimateNutrition(...(args as [])),
+  // Los llamadores distinguen «no hay sesión» (modo invitado) de «falló la red»
+  // para empujar a la carga manual; acá siempre hay sesión.
+  isNoSessionError: () => false,
 }));
 
 import NutritionDashboardWidget from '@modules/nutrition/components/NutritionDashboardWidget';
