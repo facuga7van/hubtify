@@ -72,21 +72,51 @@ export default function QuickAdd({ onClose }: Props) {
   const [tier, setTier] = useState<TaskTier>(2);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  /** El usuario ya tocó los selectores: la inferencia no le pisa la elección. */
+  const projectTouched = useRef(false);
+  const tierTouched = useRef(false);
 
   const loadProjects = useCallback(() => {
     window.api.questsGetProjects().then((p) => setProjects(p as Project[]));
   }, []);
 
-  useEffect(() => {
-    loadProjects();
-    inputRef.current?.focus();
-  }, [loadProjects]);
+  /**
+   * La paleta creaba misiones huérfanas: `projectId` arrancaba en `null`
+   * hardcodeado mientras el formulario completo sí hereda el proyecto activo.
+   * En la base real 28 de las 37 misiones vivas tienen proyecto, y sobre las 30
+   * más recientes el reparto es «Dardo» 14, «Whatsnap» 8, `null` **2**: el
+   * default era el valor menos frecuente y había que arrastrar la misión después.
+   */
+  const loadEntryDefaults = useCallback(() => {
+    // Canal nuevo: en un binding viejo simplemente no está, y el default vale.
+    const api = window.api as Partial<typeof window.api>;
+    if (typeof api.questsGetEntryDefaults !== 'function') return;
+    api.questsGetEntryDefaults()
+      .then((defaults) => {
+        if (!defaults) return;
+        if (!projectTouched.current) setProjectId(defaults.projectId);
+        if (!tierTouched.current) setTier(defaults.tier);
+      })
+      .catch(() => { /* el default ya está puesto */ });
+  }, []);
 
   useEffect(() => {
-    const handler = () => loadProjects();
+    loadProjects();
+    loadEntryDefaults();
+    inputRef.current?.focus();
+  }, [loadProjects, loadEntryDefaults]);
+
+  useEffect(() => {
+    const handler = () => {
+      // Otra cuenta, otro historial: lo que el usuario tocó acá ya no aplica.
+      projectTouched.current = false;
+      tierTouched.current = false;
+      loadProjects();
+      loadEntryDefaults();
+    };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadProjects]);
+  }, [loadProjects, loadEntryDefaults]);
 
   // Escape, focus trap and focus restore.
   const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose });
@@ -274,7 +304,7 @@ export default function QuickAdd({ onClose }: Props) {
             <div style={{ display: 'flex', gap: 3 }}>
               {([1, 2, 3] as TaskTier[]).map((tierVal) => (
                 <button key={tierVal} type="button"
-                  onClick={() => { setTier(tierVal); release('tier'); }}
+                  onClick={() => { tierTouched.current = true; setTier(tierVal); release('tier'); }}
                   style={{
                     padding: '3px 8px', border: '1px solid var(--leather)',
                     borderRadius: '6px', cursor: 'pointer',
@@ -291,7 +321,7 @@ export default function QuickAdd({ onClose }: Props) {
             {/* Project */}
             {projects.length > 0 && (
               <select value={effectiveProjectId ?? ''}
-                onChange={(e) => { setProjectId(e.target.value || null); release('project'); }}
+                onChange={(e) => { projectTouched.current = true; setProjectId(e.target.value || null); release('project'); }}
                 className="rpg-select" style={{ fontSize: 'var(--fs-label)' }}>
                 <option value="">{t('questify.noProject')}</option>
                 {projects.map((p) => (

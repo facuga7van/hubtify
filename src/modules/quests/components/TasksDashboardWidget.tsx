@@ -25,6 +25,15 @@ export default function TasksDashboardWidget() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const completingRef = useRef(false);
+  /**
+   * Con qué proyecto y tier nace lo que se anota acá.
+   *
+   * Era `projectId: null, tier: 2` fijo. En la base real 28 de las 37 misiones
+   * vivas tienen proyecto y sobre las 30 más recientes «sin proyecto» aparece
+   * **2 veces**: el atajo del tablero producía justo lo que casi nunca se elige,
+   * y la misión había que arrastrarla a su proyecto después.
+   */
+  const entryDefaults = useRef<{ projectId: string | null; tier: 1 | 2 | 3 }>({ projectId: null, tier: 2 });
 
   const loadData = useCallback(() => {
     Promise.all([
@@ -40,23 +49,32 @@ export default function TasksDashboardWidget() {
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  /** Canal nuevo: en un binding viejo simplemente no está, y el default vale. */
+  const loadEntryDefaults = useCallback(() => {
+    const api = window.api as Partial<typeof window.api>;
+    if (typeof api.questsGetEntryDefaults !== 'function') return;
+    api.questsGetEntryDefaults()
+      .then((d) => { if (d) entryDefaults.current = { projectId: d.projectId, tier: d.tier }; })
+      .catch(() => { /* el default ya está puesto */ });
+  }, []);
+
+  useEffect(() => { loadData(); loadEntryDefaults(); }, [loadData, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => loadData();
+    const handler = () => { loadData(); loadEntryDefaults(); };
     window.addEventListener('sync:questsUpdated', handler);
     window.addEventListener('quests:dataChanged', handler);
     return () => {
       window.removeEventListener('sync:questsUpdated', handler);
       window.removeEventListener('quests:dataChanged', handler);
     };
-  }, [loadData]);
+  }, [loadData, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => loadData();
+    const handler = () => { loadData(); loadEntryDefaults(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadData]);
+  }, [loadData, loadEntryDefaults]);
 
   // The dashboard's empty state asks for this form by name instead of dumping
   // the user on /quests, where they would have to find the toggle themselves.
@@ -65,11 +83,12 @@ export default function TasksDashboardWidget() {
     revealWidget(rootRef.current);
   }), []);
 
-  /** One field, sane defaults: tier "normal", no project, no date. */
+  /** Un solo campo; el resto lo dice el historial (`quests:getEntryDefaults`). */
   const handleQuickCreate = useCallback(async (name: string) => {
+    const { projectId, tier } = entryDefaults.current;
     await window.api.questsUpsertTask({
-      name, description: '', tier: 2, category: '',
-      projectId: null, dueDate: null, order: 0, status: false,
+      name, description: '', tier, category: '',
+      projectId, dueDate: null, order: 0, status: false,
     });
     setCreating(false);
     loadData();
