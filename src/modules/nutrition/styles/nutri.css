@@ -106,7 +106,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: var(--fs-label);
-  color: var(--gold);
+  /* --gold sobre la parada clara del degradé (--ink-soft) daba 3.50:1 y era el
+     fallo real de Nutrify —los otros dos peores de la auditoría eran botones
+     deshabilitados, que WCAG exceptúa. --gold-light da 4.97:1 sobre --ink-soft
+     y 7.07:1 sobre --ink, sin salirse del oro. */
+  color: var(--gold-light);
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
   border: 1.5px solid var(--gold);
   border-radius: 3px;
@@ -124,7 +128,7 @@
 }
 
 .nutri-btn:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -146,7 +150,7 @@
 }
 
 .nutri-btn-primary:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -178,7 +182,7 @@
   font-size: var(--fs-label) !important;
   padding: 3px 8px !important;
   letter-spacing: 0.04em !important;
-  min-height: 26px;
+  min-height: 32px;  /* era 26: el piso de control del escritorio es 32 */
 }
 
 
@@ -192,7 +196,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: var(--fs-label);
-  color: var(--gold);
+  color: var(--gold-light);  /* 4.97:1 sobre --ink-soft; --gold daba 3.50:1 */
   background: linear-gradient(180deg, var(--ink-soft) 0%, var(--ink) 100%);
   border: 1.5px solid var(--gold);
   border-radius: 3px;
@@ -204,7 +208,7 @@
 }
 
 .nutri-action-bar:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -255,13 +259,14 @@
   margin-bottom: 14px;
 }
 
+/* 28×28 quedaba bajo el piso de control (32 px) y con --gold daba 3.50:1. */
 .nutri-day-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   font-family: 'IM Fell English SC', serif;
   background: linear-gradient(180deg, var(--ink-soft), var(--ink));
   border: 1.5px solid var(--gold);
-  color: var(--gold);
+  color: var(--gold-light);
   border-radius: 3px;
   cursor: pointer;
   font-size: var(--fs-quote);
@@ -272,7 +277,7 @@
 }
 
 .nutri-day-btn:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
 }
 
@@ -454,13 +459,15 @@
 
 /* ── Status message ── */
 
+/* Texto corrido centrado: sin techo llegaba a 190 caracteres por renglón. */
 .nutri-status-message {
   text-align: center;
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   font-size: var(--fs-label);
   color: var(--ink-faded);
-  margin: 10px 0 0;
+  max-width: var(--measure);
+  margin: 10px auto 0;
   padding: 0 12px;
 }
 
@@ -580,8 +587,10 @@
 .nutri-macro.is-over .nutri-macro-fill {
   filter: saturate(1.15) brightness(1.07);
 }
+/* Pasarse del objetivo es una advertencia, y la advertencia del códice es la
+   rúbrica: 8.40 / 7.12 / 5.57 sobre --parch-0/1/2. --gold-dark daba 3.84. */
 .nutri-macro.is-over .nutri-macro-pct {
-  color: var(--gold-dark);
+  color: var(--rubric);
   font-weight: 700;
 }
 
@@ -732,9 +741,10 @@
 .nutri-mode-btn {
   background: none;
   border: 1px solid transparent;
-  color: var(--ink-faded);
+  color: var(--ink-soft);  /* es una pestaña, no una pista */
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
+  min-height: 32px;
   padding: 2px 10px;
   cursor: pointer;
   border-radius: 3px;
@@ -1406,17 +1416,21 @@
   border-bottom: none;
 }
 
+/* Era 18×12 con opacidad 0.5: un control invisible. Sigue siendo discreto,
+   pero ahora hay dónde apuntar. */
 .nutri-breakdown-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   background: none;
   border: none;
   padding: 1px 4px;
   margin-left: 4px;
   cursor: pointer;
-  color: var(--ink-faded);
-  opacity: 0.5;
+  color: var(--ink-soft);
+  opacity: 0.75;
   transition: opacity 150ms ease;
   vertical-align: middle;
 }
@@ -1489,16 +1503,20 @@
 /* Vive SIEMPRE pegado a una pastilla de cuero oscuro: en `--ink-faded` el
    glifo quedaba marrón sobre marrón, invisible. Va en oro, como la × que
    tiene al lado, y se separa con el mismo filete. */
+/* Medía 26×11 px: el control más chico de toda la app. El alto lo toma del
+   `.nutri-pill` que la contiene; el `min-height` es el piso propio. --gold
+   sobre pergamino tostado no llegaba a AA: la chapita usa la tinta. */
 .nutri-pill-portion {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 24px;
   padding: 0 7px;
   border: 1px solid var(--gold);
   border-left: 1px solid rgba(168, 138, 60, 0.4);
   border-radius: 0 3px 3px 0;
   background: rgba(168, 138, 60, 0.18);
-  color: var(--gold);
+  color: var(--ink-soft);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -2259,7 +2277,7 @@
 }
 
 .nutri-check.active .nutri-check-box {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   border-color: var(--ink);
   color: var(--ink);
 }
@@ -2560,7 +2578,7 @@
 /* Mismo tratamiento de «marcado» que el resto de las casillas del módulo: sin
    esto la tilde quedaba verde sobre pergamino y no leía como activa. */
 .nutri-meal-schedule-toggle.active .nutri-check-box {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   border-color: var(--ink);
   color: var(--ink);
 }
@@ -2609,14 +2627,14 @@
 }
 
 .nutri-meal-schedule-sep {
-  color: var(--ink-faded, #6b5535);
+  color: var(--ink-faded);
   font-size: var(--fs-label, 13px);
 }
 
 .nutri-meal-schedule-catch {
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label, 13px);
-  color: var(--ink-faded, #6b5535);
+  color: var(--ink-faded);
   font-style: italic;
 }
 
@@ -2748,7 +2766,7 @@
   cursor: pointer;
   font-family: 'IM Fell English', serif;
   font-size: var(--fs-label, 13px);
-  color: var(--ink-faded, #6b5535);
+  color: var(--ink-faded);
   text-decoration: underline;
   padding: 4px 6px;
 }
@@ -2856,6 +2874,17 @@
 
 /* ── Favourite pills: click to log, explicit × to remove ── */
 
+/* `.nutri-hint` se usaba en Today.tsx SIN definición en ninguna hoja: era un
+   <p> suelto que a 1640 px llegaba a 191 caracteres por renglón. */
+.nutri-hint {
+  margin: 0;
+  max-width: var(--measure);
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
 .nutri-fav-pill {
   display: inline-flex;
   align-items: center;
@@ -2934,7 +2963,7 @@
 }
 
 .nutri-portion-chip.active {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
   color: var(--ink);
   border-color: var(--gold);
   font-weight: 700;
@@ -3377,4 +3406,33 @@
   .nutri-suggest-opt:hover {
     background: transparent;
   }
+}
+
+/* ── Teléfono: área de toque de las chapitas y los íconos de fila ──
+   Las pastillas de favorito, la chapita de porción, el desplegable del desglose
+   y los íconos de comida quedaban entre 24 y 30 px de alto. */
+[data-shell="mobile"] .nutri-pill,
+[data-shell="mobile"] .nutri-pill-portion,
+[data-shell="mobile"] .nutri-fav-pill,
+[data-shell="mobile"] .nutri-fav-remove,
+[data-shell="mobile"] .nutri-breakdown-toggle,
+[data-shell="mobile"] .nutri-meal-ico-btn,
+[data-shell="mobile"] .nutri-mode-btn,
+[data-shell="mobile"] .nutri-day-btn,
+[data-shell="mobile"] .nutri-btn-sm,
+[data-shell="mobile"] .nutri-date-pill,
+[data-shell="mobile"] .nutri-food-action {
+  min-height: var(--touch-min);
+}
+
+/* Los botones de SOLO ícono son cuadrados: el pulgar necesita las dos medidas.
+   La chapita de porción queda afuera a propósito — es un segmento dentro de la
+   pastilla del favorito y ensancharla la deformaría; con 44 px de alto ya se
+   toca, y el alto es lo que importa para el pulgar. */
+[data-shell="mobile"] .nutri-day-btn,
+[data-shell="mobile"] .nutri-meal-ico-btn,
+[data-shell="mobile"] .nutri-breakdown-toggle,
+[data-shell="mobile"] .nutri-icon-only,
+[data-shell="mobile"] .nutri-food-action {
+  min-width: var(--touch-min);
 }
