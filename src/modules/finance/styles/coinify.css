@@ -46,6 +46,12 @@
   width: 100%;
 }
 
+/* Un renglón: la fila de una cifra, o el riel de un medidor, mientras carga. */
+.coin-skeleton--bar {
+  height: 12px;
+  width: 100%;
+}
+
 .coin-skeleton--chart {
   height: 180px;
   width: 100%;
@@ -2072,14 +2078,77 @@ button.coin-sort-header--amount {
   cursor: not-allowed;
 }
 
-/* ── Empty States ────────────────────────────────────────────── */
+/* ── Empty States ─────────────────────────────────────────────
+   Un hueco tiene que explicar Y ofrecer la salida, con el control ADENTRO del
+   hueco: la frase suelta en itálica mandaba al usuario a buscar un botón que
+   estaba a 240 px. Misma estructura que `.notif-empty`: columna centrada,
+   ícono, título en tinta plena y descripción acotada a la medida de lectura. */
 
 .coin-empty-codex {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   text-align: center;
   padding: 20px;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--ff-quote);
   font-style: italic;
   color: var(--ink-faded);
+}
+
+.coin-empty-codex > svg {
+  color: var(--gold-dark);
+  opacity: 0.55;
+  margin-bottom: 2px;
+}
+
+.coin-empty-codex__title {
+  margin: 0;
+  font-family: var(--ff-body);
+  font-style: normal;
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.coin-empty-codex__desc {
+  margin: 0;
+  max-width: var(--measure);
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+/* El CTA nunca hereda la itálica del hueco. */
+.coin-empty-codex .rpg-button {
+  font-style: normal;
+  margin-top: 2px;
+}
+
+/* ── Load failures ────────────────────────────────────────────
+   Un `catch` que sólo loguea deja al usuario mirando un vacío que miente. */
+
+.coin-load-error,
+.coin-widget-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  text-align: center;
+  font-family: var(--ff-body);
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.coin-load-error__text,
+.coin-widget-error__text {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--rubric);
+}
+
+.coin-widget-error {
+  padding: 10px 0;
 }
 
 /* ── Shared: DollarChip ─────────────────────────────────────── */

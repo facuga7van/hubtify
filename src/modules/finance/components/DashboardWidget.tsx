@@ -15,9 +15,13 @@ import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-c
 export default function DashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [total, setTotal] = useState<number | null>(null);
   const [loansCount, setLoansCount] = useState(0);
   const [balance, setBalance] = useState<{ income: number; expenses: number; usdIncome?: number; usdExpenses?: number } | null>(null);
+  // Es el primer número que ve el usuario al abrir la app. Antes las tres
+  // lecturas eran promesas sueltas con `console.warn` por `catch`: si el puente
+  // fallaba, el widget se quedaba con «---» PARA SIEMPRE y nadie se enteraba.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // Quick-add form state
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -35,10 +39,16 @@ export default function DashboardWidget() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(() => {
-    window.api.financeGetMonthlyTotal().then(setTotal).catch((err) => console.warn('[DashboardWidget] financeGetMonthlyTotal failed:', err));
-    window.api.financeGetActiveLoansCount().then(setLoansCount).catch((err) => console.warn('[DashboardWidget] financeGetActiveLoansCount failed:', err));
-    // Get monthly balance for income/expense breakdown
-    window.api.financeGetMonthlyBalance().then((b) => {
+    setLoadError(false);
+    Promise.all([
+      // El total del mes no se pinta acá, pero es la primera lectura que se
+      // rompe cuando el puente no está: va en el mismo `Promise.all` para que
+      // el widget se entere y lo diga.
+      window.api.financeGetMonthlyTotal(),
+      window.api.financeGetActiveLoansCount(),
+      window.api.financeGetMonthlyBalance(),
+    ]).then(([, count, b]) => {
+      setLoansCount(count);
       const data = b as { ARS?: { income: number; expenses: number }; USD?: { income: number; expenses: number } } | null;
       if (data) {
         // ARS only — this widget renders a single peso-prefixed figure, and adding
@@ -51,7 +61,12 @@ export default function DashboardWidget() {
           usdExpenses: data.USD?.expenses ?? 0,
         });
       }
-    }).catch((err) => console.warn('[DashboardWidget] financeGetMonthlyBalance failed:', err));
+      setLoading(false);
+    }).catch((err) => {
+      console.error('[DashboardWidget] load failed:', err);
+      setLoadError(true);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -152,16 +167,28 @@ export default function DashboardWidget() {
 
   return (
     <div ref={rootRef}>
+      {loadError ? (
+        /* Un fallo de carga se dice. Antes se quedaba en «---», que el ojo lee
+           como «todavía cargando» y nunca deja de leer así. */
+        <div className="coin-widget-error">
+          <p className="coin-widget-error__text">{t('coinify.loadError', 'Error al cargar datos')}</p>
+          <button className="rpg-button rpg-btn-sm" onClick={() => { setLoading(true); loadData(); }}>
+            {t('common.tryAgain', 'Intentar de nuevo')}
+          </button>
+        </div>
+      ) : loading ? (
+        <div style={{ margin: '6px 0 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="coin-skeleton coin-skeleton--bar" />
+          <div className="coin-skeleton coin-skeleton--bar" />
+          <div className="coin-skeleton coin-skeleton--bar" style={{ height: 10 }} />
+        </div>
+      ) : (
       <div style={{ margin: '6px 0 10px' }}>
         {/* Income row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginBottom: 4 }}>
           <span className="qb-hand">{t('coinify.income', 'Ingreso')}</span>
           <span className="qb-numeral" style={{ fontSize: 'var(--fs-body)', color: 'var(--moss)' }}>
-            {total !== null ? (
-              <AnimatedNumber value={income} prefix={currencyPrefix()} />
-            ) : (
-              <span style={{ opacity: 0.4 }}>---</span>
-            )}
+            <AnimatedNumber value={income} prefix={currencyPrefix()} />
           </span>
         </div>
 
@@ -169,11 +196,7 @@ export default function DashboardWidget() {
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginBottom: 4 }}>
           <span className="qb-hand">{t('coinify.expense', 'Gasto')}</span>
           <span className="qb-numeral" style={{ fontSize: 'var(--fs-body)', color: 'var(--rubric)' }}>
-            {total !== null ? (
-              <AnimatedNumber value={expenses} prefix={currencyPrefix()} />
-            ) : (
-              <span style={{ opacity: 0.4 }}>---</span>
-            )}
+            <AnimatedNumber value={expenses} prefix={currencyPrefix()} />
           </span>
         </div>
 
@@ -183,20 +206,17 @@ export default function DashboardWidget() {
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginTop: 4, color: 'var(--ink-faded)' }}>
           <span>
             {t('coinify.thisMonth', 'este mes')} &middot;{' '}
-            {total !== null ? (
-              <>
-                <AnimatedNumber value={balanceNet} prefix={currencyPrefix()} />
-                {usdNet !== 0 && (
-                  <span style={{ opacity: 0.75, marginLeft: 6 }}>
-                    {usdNet > 0 ? '+' : '−'}US$ {Math.abs(usdNet).toLocaleString('es-AR')}
-                  </span>
-                )}
-              </>
-            ) : '---'}
+            <AnimatedNumber value={balanceNet} prefix={currencyPrefix()} />
+            {usdNet !== 0 && (
+              <span style={{ opacity: 0.75, marginLeft: 6 }}>
+                {usdNet > 0 ? '+' : '−'}US$ {Math.abs(usdNet).toLocaleString('es-AR')}
+              </span>
+            )}
           </span>
           <span>{monthPct}% {t('coinify.ofTheMonth', 'del mes')}</span>
         </div>
       </div>
+      )}
 
       {/* Quick-add toggle */}
       <div style={{ textAlign: 'center', marginTop: 6 }}>

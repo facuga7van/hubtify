@@ -8,7 +8,7 @@ import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { MonthNavigator } from './shared/MonthNavigator';
 import InstallmentAddForm from './shared/InstallmentAddForm';
 import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/codex/CodexPrimitives';
-import { Compass, CrossMark, ArrowRight, Checkmark, Pencil } from '../../../shared/components/icons';
+import { Compass, CrossMark, ArrowRight, Checkmark, Pencil, Bag } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
@@ -218,7 +218,20 @@ export default function Installments() {
         {loading ? (
           <div className="coin-skeleton coin-skeleton--card" />
         ) : rows.length === 0 ? (
-          <p className="coin-empty-codex">{t('coinify.noInstallments', 'No hay cuotas este mes')}</p>
+          /* El hueco explica qué es un plan y abre el alta acá mismo: era una
+             frase suelta y el botón «Nueva cuota» quedaba arriba del navegador
+             de mes, fuera del recorrido del ojo. */
+          <div className="coin-empty-codex">
+            <Bag width={28} height={28} aria-hidden="true" />
+            <p className="coin-empty-codex__title">{t('coinify.noInstallments', 'No hay cuotas este mes')}</p>
+            <p className="coin-empty-codex__desc">
+              {t('coinify.noInstallmentsHint', 'Un plan en cuotas se carga una vez y vuelve solo cada mes hasta terminar.')}
+            </p>
+            <button className="rpg-button" style={{ fontSize: 'var(--fs-label)' }}
+              onClick={() => setShowForm(true)}>
+              + {t('coinify.addInstallment', 'Nueva cuota')}
+            </button>
+          </div>
         ) : (
           <div className="coin-installment-list">
             {groups.map((group) => (

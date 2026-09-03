@@ -127,7 +127,13 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   const loadCards = useCallback(() => {
     window.api.financeGetCreditCards()
       .then((data) => setCards(data as CreditCard[]))
-      .catch((err) => console.error('[Import] financeGetCreditCards failed:', err));
+      .catch((err) => {
+        // Sin esto el selector de tarjetas queda vacío y parece que el usuario
+        // no cargó ninguna: dos problemas distintos, el mismo hueco.
+        console.error('[Import] financeGetCreditCards failed:', err);
+        toast({ type: 'warning', message: t('coinify.cardsLoadError', 'No se pudieron cargar las tarjetas') });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { loadCards(); }, [loadCards]);
@@ -285,7 +291,10 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
       loadCards();
       if (typeof id === 'string') { setCreditCardId(id); setCardTouched(true); }
     } catch (err) {
+      // El botón «volvía» sin decir nada y sin tarjeta nueva: parecía un click
+      // que no llegó a registrarse.
       console.error('[Import] no se pudo crear la tarjeta del resumen:', err);
+      toast({ type: 'warning', message: t('coinify.importCardCreateError', 'No se pudo crear la tarjeta del resumen. Elegila a mano de la lista.') });
     } finally {
       setCreatingCard(false);
     }
@@ -379,7 +388,10 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
             });
           }
         } catch (err) {
+          // Las filas SÍ entraron; lo que no quedó es el checksum contra el
+          // papel. Decirlo evita que el usuario reimporte buscando el error.
           console.error('[Import] no se pudo guardar el resumen del papel:', err);
+          toast({ type: 'warning', message: t('coinify.importStatementSaveError', 'Se importaron los movimientos, pero no se pudo guardar el resumen del papel.') });
         }
       }
 
