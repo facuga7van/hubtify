@@ -8,7 +8,6 @@ import FoodLogItem from './FoodLogItem';
 import NutritionOnboarding from './NutritionOnboarding';
 import { todayDateString, formatDateString } from '../../../../shared/date-utils';
 import RpgNumberInput from '../../../shared/components/RpgNumberInput';
-import Checkbox from '../../../shared/components/Checkbox';
 // resolveEstimate = the SQLite estimate cache in front of estimateNutrition
 // (retry + timeout live inside it). breakdown-utils = upstream's editable
 // per-ingredient breakdown and portion scaling. Both survive.
@@ -26,7 +25,8 @@ import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
 import { usePopoverRegistration } from '../../../shared/hooks/usePopoverRegistration';
 import { useFoodSuggestions } from '../useFoodSuggestions';
 import { cacheEstimate } from '../history-api';
-import { notifyNutritionChanged } from '../notify';
+import { notifyNutritionChanged, NUTRITION_DAY_CLOSED_EVENT } from '../notify';
+import { openCodex } from '../../../hub/codex/codexApi';
 import FoodSuggestionList from './FoodSuggestionList';
 import type { HistorySuggestion } from '../history-search';
 import type { TFunction } from 'i18next';
@@ -104,7 +104,6 @@ interface PortionTarget {
   frequentFoodId?: number;
 }
 interface DailySummary { date: string; totalCaloriesIn: number; bmr: number; tdee: number; balance: number; activityLevel?: string; proteinG?: number | null; carbsG?: number | null; fatG?: number | null; }
-interface DailyMetrics { date: string; steps: number | null; gym: boolean; }
 
 const MEAL_ICON: Record<MealType, React.ReactNode> = {
   breakfast: <DawnSun width={18} height={18} />,
@@ -144,7 +143,6 @@ export default function Today() {
   const [foods, setFoods] = useState<FoodEntry[]>([]);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
-  const [metrics, setMetrics] = useState<DailyMetrics>({ date: '', steps: null, gym: false });
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [frequentSearch, setFrequentSearch] = useState('');
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -157,14 +155,12 @@ export default function Today() {
     xpPrecision: number; xpSteps: number; xpGym: number; xpWeight: number;
     xpBonus: number; xpTotal: number; hpChange: number; consumed: number; target: number;
   } | null>(null);
-  const [closeResult, setCloseResult] = useState<typeof dayClosed | null>(null);
+  /** El día se cerró en ESTA sesión (desde el Códice): se festeja una vez. */
+  const [justClosed, setJustClosed] = useState(false);
 
   // Weight check-in popup
   const [weightPopup, setWeightPopup] = useState<{ show: boolean; lastWeight?: number }>({ show: false });
   const [weightInput, setWeightInput] = useState('');
-  const [closeDayPopup, setCloseDayPopup] = useState(false);
-  const [popupSteps, setPopupSteps] = useState('');
-  const [popupGym, setPopupGym] = useState(false);
   const [pendingDays, setPendingDays] = useState<string[]>([]);
 
   // Unified food input
@@ -252,10 +248,9 @@ export default function Today() {
   }, [suggest.open, suggest.suggestions.length, suggestAnchorRef]);
 
   const loadData = useCallback(async (d: string) => {
-    const [foodList, sum, met, freq, prof, tgt, closedDay, favorites, schedule, macros] = await Promise.all([
+    const [foodList, sum, freq, prof, tgt, closedDay, favorites, schedule, macros] = await Promise.all([
       window.api.nutritionGetFoodByDate(d),
       window.api.nutritionGetSummary(d),
-      window.api.nutritionGetDailyMetrics(d),
       window.api.nutritionGetFrequentFoods(),
       window.api.nutritionGetProfile(),
       window.api.nutritionGetTodayTarget(),
@@ -267,13 +262,11 @@ export default function Today() {
     setFoods(foodList as FoodEntry[]);
     setSummary(sum as DailySummary | null);
     setMacroTargets(macros as MacroTargets | null);
-    setMetrics(met as DailyMetrics);
     setFrequentFoods(freq as FrequentFood[]);
     setFavoriteFoods(favorites as FavoriteFood[]);
     setMealSchedule((schedule as MealSchedule) ?? DEFAULT_MEAL_SCHEDULE);
     setHasProfile(!!prof);
     setDeficitTargetKcal((prof as NutritionProfile | null)?.deficitTargetKcal ?? 0);
-    setCloseResult(null);
 
     const closed = closedDay as typeof dayClosed;
     setDayClosed(closed);
@@ -296,6 +289,9 @@ export default function Today() {
 
   useEffect(() => { loadData(date); }, [date, loadData]);
 
+  // La celebración es del día que se cerró, no del que se mira después.
+  useEffect(() => { setJustClosed(false); }, [date]);
+
   // Once the cutoff is known, "today" may be yesterday's calendar date. Only
   // move the view while the user is still on the auto-selected day.
   useEffect(() => {
@@ -306,10 +302,6 @@ export default function Today() {
   useEffect(() => {
     try { localStorage.setItem(FAVORITES_OPEN_KEY, String(showFavorites)); } catch { /* private mode */ }
   }, [showFavorites]);
-
-  useEffect(() => {
-    setCloseDayPopup(false);
-  }, [date]);
 
   const loadPendingDays = useCallback(async () => {
     const days = await window.api.nutritionGetPendingDays();
@@ -326,13 +318,19 @@ export default function Today() {
       loadData(date);
       loadPendingDays();
     };
+    const closedHandler = () => { setJustClosed(true); handler(); };
     window.addEventListener('nutrition:settingsChanged', handler);
     window.addEventListener('sync:nutritionUpdated', handler);
     window.addEventListener('account:switched', handler);
+    // El cierre de la jornada ahora ocurre en el Códice. Sin esto la página
+    // quedaba editable con el día ya cerrado y cada edicion fallaba con
+    // "Cannot modify a closed day" hasta recargar — el bug NUT-02, de vuelta.
+    window.addEventListener(NUTRITION_DAY_CLOSED_EVENT, closedHandler);
     return () => {
       window.removeEventListener('nutrition:settingsChanged', handler);
       window.removeEventListener('sync:nutritionUpdated', handler);
       window.removeEventListener('account:switched', handler);
+      window.removeEventListener(NUTRITION_DAY_CLOSED_EVENT, closedHandler);
     };
   }, [date, loadData, loadPendingDays]);
 
@@ -1010,19 +1008,6 @@ export default function Today() {
     setWeightPopup({ show: false });
   };
 
-  const handleCloseDayConfirm = async () => {
-    try {
-      const stepsVal = popupSteps ? parseInt(popupSteps) : null;
-      await window.api.nutritionSaveDailyMetrics({ ...metrics, steps: stepsVal, gym: popupGym, date });
-      setCloseDayPopup(false);
-      notifyNutritionChanged();
-      await doCloseDay();
-      loadPendingDays();
-    } catch {
-      toast({ type: 'warning', message: t('nutrify.closeDayError', 'Error al confirmar el día') });
-    }
-  };
-
   const handleReopenDay = async () => {
     if (reopening) return;
     const ok = await confirm({
@@ -1042,7 +1027,7 @@ export default function Today() {
         toast({ type: 'warning', message: result.error || t('nutrify.reopenDayError', 'No se pudo reabrir el día') });
         return;
       }
-      setCloseResult(null);
+      setJustClosed(false);
       setDayClosed(null);
       // The ENGINE reverts the close: rpg-handlers treats DAY_REOPENED as a
       // generic undo of the DAY_SUMMARY carrying the same `$.date`, refunding
@@ -1072,32 +1057,6 @@ export default function Today() {
       toast({ type: 'warning', message: t('nutrify.reopenDayError', 'No se pudo reabrir el día') });
     } finally {
       setReopening(false);
-    }
-  };
-
-  const doCloseDay = async () => {
-    const result = await window.api.nutritionCloseDay(date);
-    if (result.success && result.breakdown) {
-      const b = result.breakdown as typeof dayClosed;
-      setCloseResult(b);
-      // The whole page gates on `dayClosed` (`readOnly`, the log form, the
-      // sticky footer): without this the UI stayed editable and every edit
-      // failed with "Cannot modify a closed day" until a reload (NUT-02).
-      setDayClosed(b);
-      const xp = b?.xpTotal ?? 0;
-      const hp = b?.hpChange ?? 0;
-      await window.api.processRpgEvent({
-        type: 'DAY_SUMMARY', moduleId: 'nutrition',
-        // `date` lets a later DAY_REOPENED find and revert this exact close.
-        payload: { xp, hp, date },
-        timestamp: Date.now(),
-      });
-      toast({ type: 'info', message: `+${xp} XP` });
-      window.dispatchEvent(new Event('rpg:statsChanged'));
-      notifyNutritionChanged();
-    } else if (result.alreadyClosed) {
-      const closed = await window.api.nutritionIsDayClosed(date);
-      setDayClosed(closed as typeof dayClosed);
     }
   };
 
@@ -1172,7 +1131,6 @@ export default function Today() {
   // Focus trap + window-level Escape for both popups. The weight popup closes
   // WITHOUT marking the reminder dismissed — only the "Later" button does that.
   const weightModal = useModalA11y({ onClose: handleWeightClose, active: weightPopup.show });
-  const closeDayModal = useModalA11y({ onClose: () => setCloseDayPopup(false), active: closeDayPopup });
   const eventModal = useModalA11y({ onClose: () => setEventOpen(false), active: eventOpen });
 
   if (loading) return (
@@ -1607,6 +1565,23 @@ export default function Today() {
         </div>
       )}
 
+      {/* «Repetir ayer» vivía DENTRO de la tarjeta de favoritos, que sólo se
+          renderiza cuando ya hay un favorito guardado: el atajo para no tipear
+          estaba escondido detrás de haber usado otro atajo. Ahora vive solo. */}
+      {!dayClosed && (
+        <div className="nutri-card nutri-repeat-card">
+          <button
+            type="button"
+            className="nutri-btn nutri-btn-sm"
+            onClick={handleRepeatYesterday}
+            disabled={logging}
+            title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
+          >
+            {t('nutrify.repeatYesterday', 'Repetir ayer')}
+          </button>
+        </div>
+      )}
+
       {/* ── Favorite Foods ─────────────────────────── */}
       {!dayClosed && favoriteFoods.length > 0 && (
         <div className="nutri-card">
@@ -1624,17 +1599,6 @@ export default function Today() {
           </h3>
           {showFavorites && (
             <>
-              <div className="nutri-portion-chips">
-                <button
-                  type="button"
-                  className="nutri-btn nutri-btn-sm"
-                  onClick={handleRepeatYesterday}
-                  disabled={!!dayClosed || logging}
-                  title={t('nutrify.repeatYesterdayConfirm', 'Se van a copiar las comidas de ayer al día de hoy.')}
-                >
-                  {t('nutrify.repeatYesterday', 'Repetir ayer')}
-                </button>
-              </div>
               <div className="nutri-frequent-pills">
                 {favoriteFoods.map((f) => (
                   <span key={f.id} className="nutri-fav-pill">
@@ -1802,7 +1766,7 @@ export default function Today() {
         {dayClosed ? (
           <div>
             {/* Just closed in this session: keep the celebration, not the plain label. */}
-            {closeResult
+            {justClosed
               ? <p className="nutri-day-status nutri-day-success">{t('nutrify.dayClosedSuccess', '¡Día cerrado exitosamente!')}</p>
               : <p className="nutri-day-status">{t('nutrify.dayClosed', 'Día cerrado')}</p>}
             <div className="nutri-close-day">
@@ -1816,14 +1780,6 @@ export default function Today() {
             >
               {t('nutrify.reopenDay', 'Reabrir la jornada')}
             </button>
-          </div>
-        ) : closeResult ? (
-          <div>
-            <p className="nutri-day-status nutri-day-success">{t('nutrify.dayClosedSuccess', '¡Día cerrado exitosamente!')}</p>
-            <div className="nutri-close-day">
-              <CloseDayStats consumed={closeResult.consumed} target={closeResult.target} />
-              <DayBreakdown data={closeResult} t={t} />
-            </div>
           </div>
         ) : (
           <div className="nutri-close-day">
@@ -1985,89 +1941,6 @@ export default function Today() {
         </div>
       )}
 
-      {/* ── Close day popup ─────────────────────────── */}
-      {closeDayPopup && (
-        <div className="nutri-popup-overlay" onClick={() => setCloseDayPopup(false)}>
-          <div
-            {...closeDayModal.dialogProps}
-            className="nutri-popup"
-            aria-label={isPending ? t('nutrify.confirmDaySummary', 'Resumen del día') : t('nutrify.closeDay', 'Cierre del Día')}
-            onClick={closeDayModal.stopPropagation}
-          >
-            <button
-              className="nutri-popup-close tap-target"
-              onClick={() => setCloseDayPopup(false)}
-              aria-label={t('common.close', 'Cerrar')}
-              title={t('common.close', 'Cerrar')}
-            >
-              <CrossMark width={12} height={12} />
-            </button>
-            <h3 className="nutri-popup-title">
-              {isPending ? t('nutrify.confirmDaySummary', 'Resumen del día') : t('nutrify.closeDay', 'Cierre del Día')}
-            </h3>
-            <p className="nutri-popup-hint">
-              {t('nutrify.closeDayLockWarning', 'Al cerrar el día queda bloqueado: no vas a poder agregar ni editar comidas. Podés reabrirlo, pero se revierte el XP y el HP ganados.')}
-            </p>
-            <p className="nutri-popup-hint">
-              {t(
-                'nutrify.scoringBands',
-                'Cómo se puntúa: en déficit contás como logrado si comés hasta tu objetivo; en superávit, si llegás o lo pasás; en mantenimiento, dentro de ±10 %. Fuera de eso, hasta 10 % de desvío = -5 HP, hasta 20 % = -10 HP, más = -20 HP.',
-              )}
-            </p>
-            {dayHasEvent && (
-              <p className="nutri-popup-hint nutri-event-close-hint">
-                <Meat width={12} height={12} />{' '}
-                {t('nutrify.eventDayCloseHint', 'Día con evento: pasarte del objetivo no descuenta vigor. Registrarlo ya contó.')}
-              </p>
-            )}
-
-            {isPending && (
-              <div className="nutri-popup-summary">
-                <div className="nutri-popup-row">
-                  <span className="nutri-popup-label">{t('nutrify.caloriesConsumed', 'Calorías consumidas')}</span>
-                  <span className="nutri-popup-val">{consumed} kcal</span>
-                </div>
-                <div className="nutri-popup-row">
-                  <span className="nutri-popup-label">{t('nutrify.confirmTargetLabel', 'Objetivo calórico')}</span>
-                  <span className="nutri-popup-val">{target} kcal</span>
-                </div>
-                <div className="nutri-popup-row nutri-popup-row--border">
-                  <span className="nutri-popup-label">{t('nutrify.balance', 'Balance')}</span>
-                  <span className={`nutri-popup-val ${(target - consumed) >= 0 ? 'nutri-green' : 'nutri-red'}`}>
-                    {target - consumed >= 0 ? '+' : ''}{target - consumed} kcal
-                  </span>
-                </div>
-                <p className="nutri-popup-prompt">
-                  {t('nutrify.confirmDayPrompt', '¿Confirmar este día y recibir experiencia?')}
-                </p>
-              </div>
-            )}
-
-            <label className="nutri-popup-field">
-              <span>{t('nutrify.steps', 'Pasos')}</span>
-              <RpgNumberInput
-                value={popupSteps}
-                onChange={setPopupSteps}
-                step={100} min={0} max={99999}
-                style={{ width: 120 }}
-                autoFocus
-              />
-            </label>
-            <label className="nutri-popup-checkbox">
-              <Checkbox checked={popupGym} onChange={() => setPopupGym(v => !v)} />
-              <span>{t('nutrify.gym', 'Gimnasio')}</span>
-            </label>
-            <button className="nutri-btn nutri-btn-primary" onClick={handleCloseDayConfirm} style={{ width: '100%', marginBottom: 8 }}>
-              {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
-            </button>
-            <button onClick={() => setCloseDayPopup(false)} className="nutri-btn nutri-btn-ghost"
-              style={{ width: '100%' }}>
-              {t('common.cancel', 'Cancelar')}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── Repeat a day picker ─────────────────────── */}
       {repeatPickerOpen && (
         <RepeatDayPicker
@@ -2095,21 +1968,23 @@ export default function Today() {
         />
       )}
 
-      {!dayClosed && !closeResult && foods.length > 0 && (
+      {/* Un solo cierre de día. Este footer abría un segundo ritual que pagaba
+          XP por su cuenta y no se anunciaba en ningún lado (base real: 6
+          cierres de Nutrify contra 1 sello del Códice). Ahora lleva al mismo
+          Códice, que incluye el paso de nutrición cuando el día tiene comidas
+          sin cerrar. Nada se paga dos veces: los dos backends ya rebotan un
+          día ya cerrado / ya sellado. */}
+      {!dayClosed && foods.length > 0 && (
         <div className="nutri-sticky-footer">
           <button
             className="rpg-button nutri-close-day-btn"
             disabled={consumed === 0}
             title={consumed === 0
               ? t('nutrify.closeDayDisabled', 'Registrá al menos una comida para poder cerrar el día')
-              : t('nutrify.closeDayTitle', 'Calcula tu XP y HP y bloquea el día')}
-            onClick={() => {
-              setPopupSteps(metrics.steps != null ? String(metrics.steps) : '');
-              setPopupGym(!!metrics.gym);
-              setCloseDayPopup(true);
-            }}
+              : t('nutrify.closeDayTitleCodex', 'Cerrá el día en el Códice: nutrición y sello, un solo ritual')}
+            onClick={() => openCodex(date)}
           >
-            {isPending ? t('nutrify.confirmDay', 'Confirmar Día') : t('nutrify.closeDayButton', 'Cerrar el Día')}
+            {t('nutrify.closeDayInCodex', 'Cerrar el día en el Códice')}
           </button>
         </div>
       )}

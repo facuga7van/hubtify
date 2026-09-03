@@ -485,18 +485,28 @@ describe('Auditoría visual Nutrify — controles del registro', () => {
     expect(r.bottom).toBeLessThanOrEqual(window.innerHeight + 1);
   });
 
-  test('12 — popup de cerrar el día ABIERTO a 760×640', async () => {
+  // Un solo cierre de día: este footer abría un segundo ritual que pagaba XP
+  // por su cuenta y no se anunciaba en ningún lado. Ahora abre el Códice —que
+  // vive en Layout, no acá— con la fecha del día que se está mirando.
+  test('12 — cerrar el día abre el Códice, no un segundo ritual', async () => {
     await page.viewport(NARROW.w, NARROW.h);
     render(<Providers sidebar={NARROW.sidebar}><Today /></Providers>);
     await expect.element(page.getByText('Registro de Comidas')).toBeVisible();
-    await page.getByRole('button', { name: /Cerrar el Día/i }).click();
-    await expect.element(page.getByText(/Al cerrar, el día queda bloqueado/)).toBeVisible();
-    await sleep(200);
-    await page.screenshot({ path: `${SCREENS}/audit-nutri-12-cerrar-dia-760.png` });
-    const popup = document.querySelector('.nutri-popup') as HTMLElement;
-    const r = popup.getBoundingClientRect();
-    expect(r.top).toBeGreaterThanOrEqual(-1);
-    expect(r.bottom).toBeLessThanOrEqual(window.innerHeight + 1);
+
+    const opened: Array<string | undefined> = [];
+    const spy = (e: Event) => opened.push((e as CustomEvent<{ date?: string }>).detail?.date);
+    window.addEventListener('codex:open', spy);
+    try {
+      await page.getByRole('button', { name: /Cerrar el día en el Códice/i }).click();
+      await sleep(200);
+      await page.screenshot({ path: `${SCREENS}/audit-nutri-12-cerrar-dia-760.png` });
+      expect(opened).toHaveLength(1);
+      expect(opened[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // Y ya no queda ningún popup propio de cierre en la página.
+      expect(document.querySelector('.nutri-popup')).toBeNull();
+    } finally {
+      window.removeEventListener('codex:open', spy);
+    }
   });
 
   test('13 — desplegable de sugerencias ABIERTO sobre el input', async () => {

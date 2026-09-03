@@ -1,18 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Tick } from '../../../shared/components/codex';
 import { useToast } from '../../../shared/components/useToast';
 import type { HabitWithStreak } from '../types';
 import { processHabitCheck, isHabitSettledToday, isHabitRelevantToday } from '../utils';
+import WidgetQuickCreate from '../../../hub/widgets/WidgetQuickCreate';
+import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-create';
 
 const MAX_WIDGET_HABITS = 8;
 
 export default function HabitsDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [allHabits, setAllHabits] = useState<HabitWithStreak[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const checkingRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -43,6 +49,22 @@ export default function HabitsDashboardWidget() {
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
 
+  // Creating a habit used to require /quests → a tab that is not the default →
+  // a section hidden behind it. Three walls for one text field.
+  useEffect(() => subscribeQuickCreate('habit', () => {
+    setCreating(true);
+    revealWidget(rootRef.current);
+  }), []);
+
+  /** Daily is the frequency that needs no explanation; the rest is editable. */
+  const handleQuickCreate = useCallback(async (name: string) => {
+    await window.api.questsAddHabit({ name, frequency: 'daily', timesPerWeek: 7 });
+    setCreating(false);
+    await loadData();
+    window.dispatchEvent(new Event('quests:dataChanged'));
+    toast({ type: 'success', message: t('questify.habitCreated', 'Ritual anotado') });
+  }, [loadData, toast, t]);
+
   const isSettledToday = isHabitSettledToday;
   // A Mon/Wed/Fri habit on a Tuesday is not today business: showing it unticked
   // invents a debt and quietly drags the "3/5 hoy" counter down every Tuesday.
@@ -63,11 +85,24 @@ export default function HabitsDashboardWidget() {
 
   if (allHabits.length === 0 || habits.length === 0) {
     return (
-      <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', fontStyle: 'italic', margin: '4px 0' }}>
-        {allHabits.length === 0
-          ? t('questify.noHabits', 'Sin rituales configurados')
-          : t('questify.noHabitsToday', 'Ningun ritual toca hoy')}
-      </p>
+      <div ref={rootRef}>
+        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', fontStyle: 'italic', margin: '4px 0' }}>
+          {allHabits.length === 0
+            ? t('questify.noHabits', 'Sin rituales configurados')
+            : t('questify.noHabitsToday', 'Ningun ritual toca hoy')}
+        </p>
+        {creating ? (
+          <WidgetQuickCreate
+            placeholder={t('questify.widgetHabitPlaceholder', 'Tomar agua')}
+            onSubmit={handleQuickCreate}
+            onCancel={() => setCreating(false)}
+          />
+        ) : (
+          <button type="button" className="widget-empty-cta" onClick={() => setCreating(true)}>
+            + {t('questify.widgetCreateHabit', 'Creá tu primer ritual')}
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -77,7 +112,14 @@ export default function HabitsDashboardWidget() {
   const displayHabits = habits.slice(0, MAX_WIDGET_HABITS);
 
   return (
-    <div>
+    <div ref={rootRef}>
+      {creating && (
+        <WidgetQuickCreate
+          placeholder={t('questify.widgetHabitPlaceholder', 'Tomar agua')}
+          onSubmit={handleQuickCreate}
+          onCancel={() => setCreating(false)}
+        />
+      )}
       <div className="widget-list-flow">
         {displayHabits.map((h) => (
           <div
@@ -134,10 +176,11 @@ export default function HabitsDashboardWidget() {
             )}
           </div>
         ))}
+        {/* Was a dead <span>; its twin in the tasks widget navigates. */}
         {habits.length > MAX_WIDGET_HABITS && (
-          <span className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', padding: '2px 0' }}>
+          <button type="button" className="qb-hand widget-more-link" onClick={() => navigate('/quests')}>
             +{habits.length - MAX_WIDGET_HABITS} {t('questify.showMore', 'más')}
-          </span>
+          </button>
         )}
       </div>
 

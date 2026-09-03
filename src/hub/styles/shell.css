@@ -456,3 +456,60 @@
     padding: 14px 12px 20px;
   }
 }
+
+/* ── El regreso ────────────────────────────────────
+   Aparece a los dos días sin anotar nada. Informa, no reprocha: mismo
+   pergamino que el brief, sin rojo, sin alarma. */
+.dash-return {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  border-left: 3px solid var(--gold-dark);
+  background: rgba(245, 231, 192, 0.45);
+}
+
+.dash-return__eyebrow {
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.dash-return__lead {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: var(--fs-quote);
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.dash-return__list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.dash-return__list li {
+  position: relative;
+  padding-left: 14px;
+  margin-bottom: 3px;
+}
+
+.dash-return__list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold-dark);
+}
+
+[data-shell="mobile"] .dash-return__action {
+  min-height: 44px;
+  width: 100%;
+}

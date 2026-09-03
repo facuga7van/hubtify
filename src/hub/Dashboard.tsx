@@ -11,6 +11,9 @@ import { Sword, Crown, Flame, Heart, Scroll, Quill, Cauldron, Sparkle, Dagger, F
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
 import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
+import { requestQuickCreate } from './widgets/quick-create';
+import { buildReturnBrief } from './return-brief';
+import { todayDateString } from '../../shared/date-utils';
 import { useDashboardLayout } from './layouts/useDashboardLayout';
 import { useDashboardDrag } from './layouts/useDashboardDrag';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
@@ -194,6 +197,8 @@ export default function Dashboard() {
   const { available: codexAvailable, invite: sealInvite, todaySealed } = useSealInvite();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  /** The return brief steps aside as soon as the user acts on it. */
+  const [returnDismissed, setReturnDismissed] = useState(false);
   const epigraph = useMemo(() => EPIGRAPHS[Math.floor(Math.random() * EPIGRAPHS.length)], []);
 
   const load = useCallback(() => {
@@ -379,6 +384,18 @@ export default function Dashboard() {
     });
   }
 
+  /* ── El regreso ───────────────────────────────────────────
+     El uso real no es diario: 14 días activos en cinco meses, con huecos de 6,
+     9, 40 y 54 días. El brief decía exactamente lo mismo después de un día que
+     después de cincuenta, y nadie explicaba dónde había quedado la racha.
+     Informa, no reprocha — C10 es lo mejor que tiene la app. */
+  const returnBrief = returnDismissed ? null : buildReturnBrief({
+    lastEventDate: recentEvents[0]?.createdAt?.slice(0, 10) ?? null,
+    today: todayDateString(),
+    streak,
+    overdueQuests: todo.questsOverdue,
+  });
+
   /** A fresh install used to be a wall of zeroes with no call to action. */
   const isEmptyState = !!stats
     && stats.totalTasks === 0
@@ -396,6 +413,51 @@ export default function Dashboard() {
       {/* ── row 1: today's brief + wax seal ──────────────── */}
       <div className="dash-row-brief">
         <div>
+          {returnBrief && (
+            <div className="dash-return" role="status">
+              <div className="qb-small-caps dash-return__eyebrow">
+                {t('dashboard.returnTitle', 'EL REGRESO')}
+              </div>
+              <p className="dash-return__lead">
+                {t('dashboard.returnDaysAway', {
+                  n: returnBrief.daysAway,
+                  defaultValue: 'Pasaron {{n}} días desde la última anotación.',
+                })}
+              </p>
+              <ul className="dash-return__list">
+                <li>
+                  {returnBrief.streak > 0
+                    ? t('dashboard.returnStreakAlive', {
+                      n: returnBrief.streak,
+                      defaultValue: 'Tu racha de {{n}} días sigue en pie.',
+                    })
+                    : t('dashboard.returnStreakReset', 'La racha volvió a cero. No hay multa: se empieza de nuevo cuando quieras.')}
+                </li>
+                <li>
+                  {returnBrief.overdueQuests > 0
+                    ? t('dashboard.returnOverdue', {
+                      n: returnBrief.overdueQuests,
+                      defaultValue: 'Te esperan {{n}} misiones con la fecha pasada. Se posponen sin costo.',
+                    })
+                    : t('dashboard.returnNothingOverdue', 'No quedó nada vencido esperándote.')}
+                </li>
+              </ul>
+              <button
+                type="button"
+                className="rpg-button dash-return__action"
+                onClick={() => {
+                  setReturnDismissed(true);
+                  if (returnBrief.action === 'review-overdue') animatedNavigate('/quests');
+                  else requestQuickCreate('quest');
+                }}
+              >
+                {returnBrief.action === 'review-overdue'
+                  ? t('dashboard.returnCtaReview', 'Mirá qué quedó pendiente')
+                  : t('dashboard.returnCtaCreate', 'Anotá por dónde seguís')}
+              </button>
+            </div>
+          )}
+
           <div className="dash-brief">
             <div className="qb-small-caps dash-brief__eyebrow">
               {t('dashboard.briefTitle', 'HOY')} {'·'}{' '}
@@ -415,14 +477,20 @@ export default function Dashboard() {
               <p className="dash-empty__text">
                 {t('dashboard.emptyStateText', 'Todavía no hay nada registrado. Empezá por acá:')}
               </p>
+              {/* These three used to only NAVIGATE, dropping the user on an
+                  equally empty page with the form still hidden. Now each one
+                  opens its widget's form right here, in the hub. */}
               <div className="dash-empty__actions">
-                <button className="rpg-button" onClick={() => animatedNavigate('/quests')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('quest')}>
                   {t('dashboard.emptyCtaQuest', 'Creá tu primera misión')}
                 </button>
-                <button className="rpg-button" onClick={() => animatedNavigate('/nutrition')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('habit')}>
+                  {t('dashboard.emptyCtaHabit', 'Creá tu primer ritual')}
+                </button>
+                <button className="rpg-button" onClick={() => requestQuickCreate('meal')}>
                   {t('dashboard.emptyCtaMeal', 'Registrá una comida')}
                 </button>
-                <button className="rpg-button" onClick={() => animatedNavigate('/finance')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('expense')}>
                   {t('dashboard.emptyCtaExpense', 'Anotá un gasto')}
                 </button>
               </div>

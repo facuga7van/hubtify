@@ -10,6 +10,7 @@ import { parseQuickAdd, type QuickAddProjectRef } from '../quickadd-parser';
 import RpgDateTimePicker from '../../../shared/components/RpgDateTimePicker';
 import Checkbox from '../../../shared/components/Checkbox';
 import HabitDayPicker from './HabitDayPicker';
+import { todayDateString } from '../../../../shared/date-utils';
 
 interface Props {
   editingTask: Task | null;
@@ -86,7 +87,10 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
       setRepeatFreq(rule?.freq ?? 'never');
       setRepeatDays(rule?.days ? rule.days.map(jsToIsoDay).sort((a, b) => a - b) : []);
     } else {
-      setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(''); setUseDate(false);
+      // Suggested, never imposed: the picker opens already on today, so putting
+      // a quest in "Hoy" costs one tick and zero typing — but the checkbox stays
+      // off, so nothing gets a date the user did not ask for.
+      setName(''); setDescription(''); setTier(2); setCategory(''); setDueDate(todayDateString()); setUseDate(false);
       setRepeatFreq('never'); setRepeatDays([]);
       setProjectId(activeProjectId);
     }
@@ -132,7 +136,7 @@ export default function TaskForm({ editingTask, projects, activeProjectId, onSav
 
     // No `questsEnsureCategory` call any more: categories are derived from
     // `tasks.category` (the handler is a no-op), so saving the task registers it.
-    setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(''); setUseDate(false);
+    setName(''); setDescription(''); setTier(2); setNewCategory(''); setNewProject(''); setCategory(''); setDueDate(todayDateString()); setUseDate(false);
     setRepeatFreq('never'); setRepeatDays([]);
     setDismissedQuick(false);
     setProjectId(activeProjectId);

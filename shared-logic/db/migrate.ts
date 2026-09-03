@@ -353,6 +353,49 @@ export const coreMigrations: Migration[] = [
       DELETE FROM rpg_events WHERE id IN (${RPG_EVENTS_TWIN_IDS_SQL});
     `,
   },
+  {
+    // ── Darle desagüe a los óbolos: tres recompensas de arranque ─────────────
+    // Medido en la base real del dueño: 132 óbolos ganados, 0 gastados, con
+    // `rewards` y `shop_purchases` vacías. La canilla existe y el desagüe no:
+    // no había NADA que comprar, así que la moneda no significaba nada.
+    //
+    // Tres decisiones que hacen esto seguro:
+    //
+    // 1. **Ids deterministas** ('seed-reward-*'), como shop_purchases. El merge
+    //    de `rewards` es una unión por id con LWW sobre updated_at, así que dos
+    //    dispositivos que siembran por su cuenta convergen en las MISMAS tres
+    //    filas en vez de multiplicarlas.
+    // 2. **Timestamp fijo**, no datetime('now'). Cualquier edición o borrado
+    //    posterior del usuario tiene un updated_at más nuevo y gana el LWW
+    //    siempre — una recompensa que el usuario retiró no puede resucitar
+    //    porque el otro dispositivo la sembró un segundo después.
+    // 3. **Sólo si el usuario no tiene recompensas PROPIAS.** El guard mira
+    //    filas cuyo id no es de siembra, así que insertar la primera semilla no
+    //    invalida el guard de las otras dos (no depende del orden de
+    //    evaluación de SQLite) y a nadie que ya escribió su propio mostrador le
+    //    aparecen premios ajenos.
+    //
+    // Son borrables como cualquier otra (deleted_at) y los precios están
+    // calibrados contra lo que paga un sello: 6-28 óbolos por día sellado.
+    namespace: 'core',
+    version: 8,
+    up: `
+      INSERT OR IGNORE INTO rewards (id, name, cost, icon, created_at, updated_at, deleted_at)
+        SELECT 'seed-reward-chapter', 'Un capítulo más', 20, 'book',
+               '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z', NULL
+        WHERE NOT EXISTS (SELECT 1 FROM rewards WHERE id NOT LIKE 'seed-reward-%');
+
+      INSERT OR IGNORE INTO rewards (id, name, cost, icon, created_at, updated_at, deleted_at)
+        SELECT 'seed-reward-game', 'Dos horas de jueguito', 60, 'sword',
+               '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z', NULL
+        WHERE NOT EXISTS (SELECT 1 FROM rewards WHERE id NOT LIKE 'seed-reward-%');
+
+      INSERT OR IGNORE INTO rewards (id, name, cost, icon, created_at, updated_at, deleted_at)
+        SELECT 'seed-reward-meal', 'Una salida a comer', 150, 'platter',
+               '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z', NULL
+        WHERE NOT EXISTS (SELECT 1 FROM rewards WHERE id NOT LIKE 'seed-reward-%');
+    `,
+  },
 ];
 
 const DUPLICATE_COLUMN = 'duplicate column name';
