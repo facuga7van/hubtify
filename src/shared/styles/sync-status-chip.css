@@ -1,0 +1,99 @@
+/* ══════════════════════════════════════════════════════
+   SYNC STATUS CHIP — el estado de sincronización, a la vista.
+   Lo monta MobileShell en la cabecera de 56 px y Layout arriba del contenido
+   en escritorio. Tokens: theme.css (--parch-*, --ink-*, --moss-*, --rubric*,
+   --gold-*, --leather-*, --ff-accent, --fs-label, --touch-min).
+   ══════════════════════════════════════════════════════ */
+
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--leather-light);
+  border-radius: 999px;
+  background: var(--parch-1);
+  /* El rótulo SIEMPRE en tinta: --gold-dark sobre --parch-1 da 3.26:1 y no
+     llega a AA para 13 px. El color de estado va en el ícono y el borde, que
+     son gráfico (3:1) y no texto. */
+  color: var(--ink-soft);
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sync-chip__ico {
+  flex-shrink: 0;
+  color: var(--ink-faded);
+}
+
+/* Sobre pergamino claro mandan los tonos oscuros de cada familia. */
+.sync-chip[data-sync-state='synced'] { border-color: var(--moss-dark); }
+.sync-chip[data-sync-state='synced'] .sync-chip__ico { color: var(--moss-dark); }
+
+.sync-chip[data-sync-state='pending'] { border-color: var(--gold-dark); }
+.sync-chip[data-sync-state='pending'] .sync-chip__ico { color: var(--gold-dark); }
+
+/* El fallo sí se escribe en rojo: --rubric sobre --parch-1 da 7.13:1. */
+.sync-chip[data-sync-state='error'] { border-color: var(--rubric); color: var(--rubric); }
+.sync-chip[data-sync-state='error'] .sync-chip__ico { color: var(--rubric); }
+
+/* La brújula gira mientras hay algo en vuelo. */
+@media (prefers-reduced-motion: no-preference) {
+  .sync-chip[data-sync-state='syncing'] .sync-chip__ico {
+    animation: sync-chip-spin 1.6s linear infinite;
+    transform-origin: 50% 50%;
+  }
+}
+
+@keyframes sync-chip-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Escritorio: fila discreta arriba del contenido ── */
+.sync-chip-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 16px 0;
+}
+
+/* ── Android: dentro de la cabecera de cuero ─────────
+   Sin píldora (el fondo es cuero, no pergamino) y sin rótulo: 390 px no dan
+   para «Todo sincronizado» al lado del título. El texto sigue en aria-label y
+   en title. Caja de 44 px como el resto de la cabecera. */
+[data-shell='mobile'] .mobile-header .sync-chip {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  justify-content: center;
+  padding: 0 4px;
+  background: none;
+  border-color: transparent;
+  color: var(--parch-2);
+}
+
+[data-shell='mobile'] .mobile-header .sync-chip__text {
+  /* Clip y no `display: none`: el rótulo sigue en el árbol, pero no ocupa. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Sobre cuero mandan los tonos claros. Todos son gráfico de 14 px (AA no
+   textual, 3:1): --parch-2 7.78:1, --gold-light 6.23:1, --moss-light 3.69:1.
+   --rubric-light NO se usa acá: sobre cuero da 2.09:1 (layout.css:251). */
+[data-shell='mobile'] .mobile-header .sync-chip__ico { color: inherit; }
+[data-shell='mobile'] .mobile-header .sync-chip[data-sync-state='synced'] { color: var(--moss-light); }
+[data-shell='mobile'] .mobile-header .sync-chip[data-sync-state='pending'] { color: var(--gold-light); }
+
+/* El fallo, en píldora llena: --parch-0 sobre --rubric da 8.4:1. */
+[data-shell='mobile'] .mobile-header .sync-chip[data-sync-state='error'] {
+  background: var(--rubric);
+  border-color: var(--rubric-light);
+  color: var(--parch-0);
+}

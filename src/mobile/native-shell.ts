@@ -15,12 +15,13 @@
 import { App } from '@capacitor/app';
 import { handleBackButton } from './back-button';
 import { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover } from './dialog-dom';
+import { APP_BACKGROUND_EVENT, APP_FOREGROUND_EVENT } from '../shared/app-lifecycle-events';
 
 export { hasOpenDialog, closeTopDialog, hasOpenPopover, closeTopPopover };
 
-/** Devuelve la función que suelta el listener (MobileShell la llama al desmontar). */
+/** Devuelve la función que suelta los listeners (MobileShell la llama al desmontar). */
 export async function bindNativeShell(): Promise<() => void> {
-  const handle = await App.addListener('backButton', ({ canGoBack }) => {
+  const back = await App.addListener('backButton', ({ canGoBack }) => {
     handleBackButton({
       openPopover: hasOpenPopover(),
       closePopover: () => { closeTopPopover(); },
@@ -31,5 +32,19 @@ export async function bindNativeShell(): Promise<() => void> {
       minimize: () => { void App.minimizeApp(); },
     });
   });
-  return () => { void handle.remove(); };
+
+  /* Ciclo de vida → sync. `blur`/`focus` de window NO llegan cuando otra
+     Activity tapa el WebView (mismo hallazgo que AndroidUpdateBanner.tsx:70-75),
+     así que el push diferido moría con el proceso y el pull al volver no
+     ocurría nunca: con las dos apps abiertas y quietas, el dato no cruzaba.
+     Acá no hay lógica de sync a propósito — se emiten dos eventos de window y
+     Layout decide, para no importar `src/shared/sync` desde el shell nativo. */
+  const state = await App.addListener('appStateChange', ({ isActive }) => {
+    window.dispatchEvent(new Event(isActive ? APP_FOREGROUND_EVENT : APP_BACKGROUND_EVENT));
+  });
+
+  return () => {
+    void back.remove();
+    void state.remove();
+  };
 }

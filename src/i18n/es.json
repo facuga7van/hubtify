@@ -55,9 +55,15 @@
     "switchPushFailed": "No pudimos guardar tus cambios en la nube. No cambiamos de cuenta para no perderlos.",
     "sync": "Sincronizar",
     "syncFailed": "Sincronización fallida",
+    "syncIdle": "Sin sincronizar todavía",
+    "syncLocalOnly": "Solo en este dispositivo",
+    "syncPending": "Cambios sin subir",
     "syncPullFailed": "No se pudieron cargar tus datos. Revisá tu conexión y reintentá.",
     "syncPushFailed": "No pudimos guardar tus cambios en la nube. Seguimos intentando.",
     "syncRetry": "Reintentar",
+    "syncSyncing": "Sincronizando…",
+    "syncTrouble": "No pudimos sincronizar",
+    "syncUpToDate": "Todo sincronizado",
     "synced": "¡Sincronizado!",
     "username": "Nombre de usuario",
     "usernameHint": "Solo letras, números y guion bajo (_)",
@@ -953,6 +959,14 @@
     "TASK_CREATED": "Quest creada",
     "TASK_UNCOMPLETED": "Quest desmarcada"
   },
+  "guest": {
+    "enter": "Entrar sin cuenta",
+    "enterNote": "Tus datos quedan solo en este dispositivo: sin respaldo en la nube ni sincronización con el teléfono. Podés vincular una cuenta cuando quieras y todo lo que cargaste se conserva.",
+    "link": "Vincular cuenta",
+    "linkHint": "Vincular una cuenta para respaldar y sincronizar",
+    "localOnly": "Solo en este dispositivo",
+    "localOnlyTitle": "Estás sin cuenta: tus datos viven solo acá, sin respaldo en la nube. Tocá para vincular una cuenta."
+  },
   "hub": {
     "character": "Ficha del Héroe",
     "codex": "Códice del Aventurero",
@@ -1606,7 +1620,7 @@
     "scrollNotes": "Notas",
     "scrollNotesHelp": "Pergaminos: dibujá apuntes a mano alzada para cada misión. Podés crear varias páginas.",
     "searchPlaceholder": "Buscar...",
-    "selectTask": "Seleccionar misión",
+    "selectTask": "Marcar para acciones en lote",
     "showCompleted": "Mostrar completadas",
     "showMore": "Ver más",
     "widgetCreateHabit": "Creá tu primer ritual",
@@ -1929,6 +1943,7 @@
     "legendLevelTip": "Tu nivel global: la historia entera de la cuenta. El oficio de cada módulo se mide abajo.",
     "level": "Nivel",
     "levelUp": "¡SUBISTE DE NIVEL!",
+    "levelUpDialog": "Subiste de nivel",
     "loading": "Cargando...",
     "mastery": {
       "ranks": {
@@ -2096,6 +2111,8 @@
     "exportDb": "Exportar base de datos",
     "exportFailed": "Error al exportar",
     "exportSuccess": "Respaldo exportado correctamente",
+    "eyebrowSub": "ORDINATIO CODICIS",
+    "eyebrowText": "TOMO VI",
     "feedback": "Feedback",
     "feedbackBug": "Bug / Error",
     "feedbackDesc": "Envianos tu opinión, reportá bugs o sugerí features",

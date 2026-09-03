@@ -55,9 +55,15 @@
     "switchPushFailed": "We could not save your changes to the cloud, so we did not switch accounts — nothing was lost.",
     "sync": "Sync",
     "syncFailed": "Sync failed",
+    "syncIdle": "Not synced yet",
+    "syncLocalOnly": "On this device only",
+    "syncPending": "Changes not uploaded",
     "syncPullFailed": "Could not load your data. Check your connection and retry.",
     "syncPushFailed": "We could not save your changes to the cloud. We will keep trying.",
     "syncRetry": "Retry",
+    "syncSyncing": "Syncing…",
+    "syncTrouble": "We could not sync",
+    "syncUpToDate": "Everything is synced",
     "synced": "Synced!",
     "username": "Username",
     "usernameHint": "Letters, numbers and underscore (_) only",
@@ -953,6 +959,14 @@
     "TASK_CREATED": "Quest created",
     "TASK_UNCOMPLETED": "Quest uncompleted"
   },
+  "guest": {
+    "enter": "Continue without an account",
+    "enterNote": "Your data stays on this device only: no cloud backup and no sync with your phone. You can link an account whenever you want and everything you logged is kept.",
+    "link": "Link an account",
+    "linkHint": "Link an account to back up and sync",
+    "localOnly": "This device only",
+    "localOnlyTitle": "You have no account: your data lives here only, with no cloud backup. Tap to link an account."
+  },
   "hub": {
     "character": "Hero's Sheet",
     "codex": "Adventurer's Codex",
@@ -1606,7 +1620,7 @@
     "scrollNotes": "Notes",
     "scrollNotesHelp": "Scrolls: draw freehand notes for each quest. You can create multiple pages.",
     "searchPlaceholder": "Search...",
-    "selectTask": "Select task",
+    "selectTask": "Mark for batch actions",
     "showCompleted": "Show completed",
     "showMore": "Show more",
     "widgetCreateHabit": "Create your first ritual",
@@ -1929,6 +1943,7 @@
     "legendLevelTip": "Your global level: the whole account's history. Each module's craft is measured below.",
     "level": "Level",
     "levelUp": "LEVEL UP!",
+    "levelUpDialog": "You levelled up",
     "loading": "Loading...",
     "mastery": {
       "ranks": {
@@ -2096,6 +2111,8 @@
     "exportDb": "Export database",
     "exportFailed": "Export failed",
     "exportSuccess": "Backup exported successfully",
+    "eyebrowSub": "ORDINATIO CODICIS",
+    "eyebrowText": "TOME VI",
     "feedback": "Feedback",
     "feedbackBug": "Bug / Error",
     "feedbackDesc": "Send your opinion, report bugs or suggest features",
