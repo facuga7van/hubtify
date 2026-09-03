@@ -20,7 +20,7 @@ enunciado.** Las tres mediciones que la confirman:
    `docsexample/`, en las dos monedas, a 6 decimales:
 
    ```
-   Σ(filas parseadas)  ===  TOTAL A PAGAR − SALDO ANTERIOR − SU PAGO
+   Σ(filas parseadas)  ===  TOTAL A PAGAR − SALDO ANTERIOR + SU PAGO
    ```
 
    Diferencia medida: `0` en ARS en los dos documentos, `0` en USD en el primero. En el segundo el
@@ -129,9 +129,13 @@ usuario elige el mes a mano). Un cambio de layout del banco quita automatismo, n
 En el preview, antes de confirmar, y por moneda:
 
 ```
-esperado = totalDue − previousBalance − payments      (los tres, del papel)
+esperado = totalDue − previousBalance + payments      (los tres, del papel)
 importado = Σ (filas marcadas)
 ```
+
+`payments` se guarda en **magnitud positiva** (el papel lo imprime negativo), así que acá suma:
+el pago canceló arrastre, no consumo del período. La fórmula se verificó a 6 decimales contra los
+dos resúmenes reales.
 
 - `|diff| ≤ 0.01` → **sello verde**, "cierra con el resumen del banco".
 - `diff ≠ 0` → **aviso ámbar** con el faltante/sobrante y la causa probable (filas desmarcadas vs.
@@ -285,6 +289,7 @@ Mismo método que la auditoría (clic = clic real; campo = campo tipeado), leyen
 | **Setup** | **~140** | **~57** | |
 | 30 movimientos digitales | 180 | **~10** | 1 CSV de billetera: archivo + mapeo (recordado) + confirmar |
 | Import de 1 resumen | ~10 + revisión fila por fila | **~4** | archivo + confirmar; el resto es confirmar defaults correctos |
+| *(medido, extremo a extremo, contra los dos PDFs reales)* | | ✔ | §11.2 |
 | Generar + pagar resumen | 8 | **~2** | el pago sale del `SU PAGO` del resumen siguiente |
 | **Mes de régimen** | **~198** | **~16** | |
 | **Primer mes completo** | **~330** | **~73** | |
