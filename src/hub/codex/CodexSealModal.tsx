@@ -484,6 +484,19 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
                     +{Math.round(thisSeal.xpAwarded)} {t('rpg.codexXpUnit', 'XP')}
                   </div>
                 ) : null}
+
+                {/* La salida del ritual, acá abajo, donde te deja la ceremonia.
+                    Durante 'sealing' no: el lacre todavía se está estampando y
+                    el botón entra con el resto del bloque [data-seal="result"]. */}
+                {phase !== 'sealing' && (
+                  <button
+                    type="button"
+                    className="codex-sealed__exit tap-target"
+                    onClick={onClose}
+                  >
+                    {t('rpg.codexCloseBook', 'Cerrar el libro')}
+                  </button>
+                )}
               </div>
             </div>
           ) : emptyDay ? (
@@ -600,24 +613,30 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
           </svg>
         </button>
 
-        <BookPage
-          className="codex-book"
-          eyebrow={
-            <>
-              <Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}
-              {t('rpg.codexEyebrow', 'CIERRE DEL CÓDICE')}
-              {isYesterday && <> {'—'} {t('rpg.codexYesterdayTag', 'PÁGINA DE AYER')}</>}
-            </>
-          }
-          title={dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
-          subtitle={
-            sealedNow
-              ? t('rpg.codexSubtitleSealed', 'Esta página está cerrada. Lo que pasó, pasó, y quedó escrito.')
-              : t('rpg.codexSubtitle', 'Leé el día, y si querés, cerralo. Podés irte cuando quieras.')
-          }
-        >
-          {body}
-        </BookPage>
+        {/* El scroll vive acá adentro, no en `.codex-modal`: así la X de arriba
+            —que es `position: absolute` contra el modal— se queda quieta en el
+            marco en vez de irse con el contenido. Ver el comentario largo en
+            codex-seal.css. */}
+        <div className="codex-modal__scroll">
+          <BookPage
+            className="codex-book"
+            eyebrow={
+              <>
+                <Sparkle width={10} height={10} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}
+                {t('rpg.codexEyebrow', 'CIERRE DEL CÓDICE')}
+                {isYesterday && <> {'—'} {t('rpg.codexYesterdayTag', 'PÁGINA DE AYER')}</>}
+              </>
+            }
+            title={dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
+            subtitle={
+              sealedNow
+                ? t('rpg.codexSubtitleSealed', 'Esta página está cerrada. Lo que pasó, pasó, y quedó escrito.')
+                : t('rpg.codexSubtitle', 'Leé el día, y si querés, cerralo. Podés irte cuando quieras.')
+            }
+          >
+            {body}
+          </BookPage>
+        </div>
       </div>
     </div>
   );

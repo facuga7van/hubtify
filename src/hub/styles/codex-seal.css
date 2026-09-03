@@ -26,17 +26,34 @@
   to   { opacity: 1; }
 }
 
+/* El marco QUIETO. Antes esta caja era también la que scrolleaba, y como la X
+   es `position: absolute` contra ella, la cruz viajaba con el contenido: a los
+   ~1000 px de página del día quedaba fuera de pantalla. En escritorio zafabas
+   con Escape o con el backdrop; en mobile no hay teclado y el modal ocupa
+   96vw —quedan 2vw de backdrop por lado, intocables con el dedo— así que
+   después de sellar la ÚNICA salida estaba arriba de todo. Encerrado.
+   El scroll ahora vive en `.codex-modal__scroll` y este marco no se mueve. */
 .codex-modal {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(880px, 96vw);
   max-height: min(92vh, 960px);
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--gold-dark);
   border-radius: 6px;
   background: var(--parch-0) url('../../assets/bg.jpg') repeat;
   background-size: 600px;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   animation: codex-rise 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.codex-modal__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 
   /* Cerca del mínimo de ventana (760×640 medido) la página del día mide ~820 px
      contra 588 de modal: el sello —la ÚNICA acción de la ceremonia— queda 200 px
@@ -48,14 +65,14 @@
   scrollbar-color: rgba(138, 112, 48, 0.6) transparent;
 }
 
-.codex-modal::-webkit-scrollbar { width: 8px; }
-.codex-modal::-webkit-scrollbar-track { background: transparent; border: none; }
-.codex-modal::-webkit-scrollbar-thumb {
+.codex-modal__scroll::-webkit-scrollbar { width: 8px; }
+.codex-modal__scroll::-webkit-scrollbar-track { background: transparent; border: none; }
+.codex-modal__scroll::-webkit-scrollbar-thumb {
   background: rgba(138, 112, 48, 0.55);
   border: none;
   border-radius: 4px;
 }
-.codex-modal::-webkit-scrollbar-thumb:hover { background: rgba(138, 112, 48, 0.85); }
+.codex-modal__scroll::-webkit-scrollbar-thumb:hover { background: rgba(138, 112, 48, 0.85); }
 
 @keyframes codex-rise {
   from { transform: translateY(14px) scale(0.985); opacity: 0; }
@@ -397,6 +414,36 @@
 }
 
 .codex-unlocks__item svg { color: var(--gold-dark); }
+
+/* ── la salida del ritual ─────────────────────────
+   Un ritual sin cierre no es un ritual, es un callejón: la ceremonia terminaba
+   con el lacre, el XP y los óbolos, y después te dejaba parado ahí con la única
+   salida a 1000 px de scroll. Esta es la salida DONDE ESTÁS. Deliberadamente
+   sin timer: el subtítulo promete «podés irte cuando quieras», y un modal que
+   se cierra solo no cumple esa promesa —decide por vos. */
+.codex-sealed__exit {
+  margin-top: 16px;
+  padding: 7px 20px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-body);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: linear-gradient(180deg, #f7ecd0 0%, #ecdcb4 100%);
+  border: 1px solid var(--gold-dark);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.codex-sealed__exit:hover {
+  border-color: var(--rubric);
+  color: var(--rubric);
+}
+
+.codex-sealed__exit:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 
 /* ── the 14 day strip ─────────────────────────────── */
 
@@ -1075,4 +1122,21 @@
   flex: 1;
   justify-content: center;
   padding: 5px 4px;
+}
+
+/* La X es la única salida real en touch (no hay Escape, y el backdrop son 2vw
+   por lado): que sea del tamaño de un dedo, no de un puntero. */
+[data-shell="mobile"] .codex-modal__close {
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* Botón de ancho completo: en el pulgar es un blanco, no un enlace. */
+[data-shell="mobile"] .codex-sealed__exit {
+  width: 100%;
+  padding: 12px 20px;
 }
