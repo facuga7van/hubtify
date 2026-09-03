@@ -14,16 +14,38 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+/**
+ * MIME de las extensiones que la app realmente pide en un selector.
+ *
+ * La extensión sola NO alcanza: varios selectores de Android (el picker de
+ * Documentos, y las apps de archivos de cada fabricante) filtran por MIME y
+ * ignoran el `.ext` del `accept`, así que con `.pdf` a secas el PDF del resumen
+ * aparecía en gris y no se podía elegir. Emitimos los dos: el MIME para
+ * Android, la extensión para el escritorio (y para lo que no tenga MIME acá).
+ */
+const MIME_BY_EXT: Record<string, string> = {
+  csv: 'text/csv',
+  pdf: 'application/pdf',
+  tsv: 'text/tab-separated-values',
+  txt: 'text/plain',
+  zip: 'application/zip',
+};
+
 /** Lista `accept` de `<input type="file">` a partir de los FileFilter de Electron. `*` → sin filtro. */
 export function acceptFor(filters: FileFilter[]): string {
-  const exts = new Set<string>();
+  // Un solo Set: conserva el orden de aparición y descarta duplicados (dos
+  // filtros pueden repetir la misma extensión, y `.txt`/`.tsv` el mismo MIME).
+  const accept = new Set<string>();
   for (const filter of filters) {
     for (const ext of filter.extensions) {
       const clean = ext.replace(/^\*?\.?/, '').trim().toLowerCase();
-      if (clean && clean !== '*') exts.add(`.${clean}`);
+      if (!clean || clean === '*') continue;
+      const mime = MIME_BY_EXT[clean];
+      if (mime) accept.add(mime);
+      accept.add(`.${clean}`);
     }
   }
-  return [...exts].join(',');
+  return [...accept].join(',');
 }
 
 const SQLITE_HEADER = 'SQLite format 3\0';

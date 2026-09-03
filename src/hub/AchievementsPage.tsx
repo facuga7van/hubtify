@@ -153,13 +153,24 @@ export default function AchievementsPage() {
     });
 
     return GROUP_ORDER
-      .map((group) => ({
-        group,
-        items: shelved
-          .filter((s) => s.group === group)
-          .filter((s) => (filter === 'all' ? true : filter === 'unlocked' ? s.unlocked : !s.unlocked))
-          .sort((a, b) => a.order - b.order),
-      }))
+      .map((group) => {
+        /* El contador del estante se calcula SOBRE LA LISTA COMPLETA del
+           grupo, nunca sobre la filtrada (decisión abierta nº4). Si se contaba
+           lo filtrado, el «/ N» cambiaba de significado con el filtro: en
+           Pendientes decía «0 / 1» y en Todos «2 / 2» para el MISMO estante.
+           Un contador que cambia de denominador según lo que estás mirando
+           miente. Ahora dice siempre «obtenidos del grupo / total del grupo»,
+           igual que el contador de la cabecera. */
+        const all = shelved.filter((s) => s.group === group);
+        return {
+          group,
+          total: all.length,
+          unlocked: all.filter((s) => s.unlocked).length,
+          items: all
+            .filter((s) => (filter === 'all' ? true : filter === 'unlocked' ? s.unlocked : !s.unlocked))
+            .sort((a, b) => a.order - b.order),
+        };
+      })
       // Una estantería vacía bajo el filtro no se dibuja: nada de títulos
       // colgando sobre la nada.
       .filter((s) => s.items.length > 0);
@@ -254,7 +265,7 @@ export default function AchievementsPage() {
           />
         )}
 
-        {shelves.map(({ group, items: groupItems }, i) => (
+        {shelves.map(({ group, items: groupItems, total: groupTotal, unlocked: groupUnlocked }, i) => (
           <div key={group}>
             {i > 0 && <QBDividerSection />}
             <Section
@@ -263,8 +274,8 @@ export default function AchievementsPage() {
                 ? <SealRosette width={12} height={12} style={{ color: 'var(--rubric)' }} />
                 : <Scroll width={12} height={12} style={{ color: 'var(--rubric)' }} />}
               rightSlot={
-                <span className="ach-counter__total">
-                  {groupItems.filter((a) => a.unlocked).length}/{groupItems.length}
+                <span className="ach-counter__total" data-group={group}>
+                  {groupUnlocked}/{groupTotal}
                 </span>
               }
             >

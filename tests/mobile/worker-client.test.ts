@@ -34,7 +34,6 @@ function makePlatform(overrides: Partial<PlatformHostFns> = {}): PlatformHostFns
     notify: vi.fn(async () => undefined),
     openExternal: vi.fn(async () => undefined),
     pickTextFile: vi.fn(async () => null),
-    pickPdfText: vi.fn(async () => ({ unsupported: true })),
     pickBinaryFile: vi.fn(async () => null),
     saveTextFile: vi.fn(async () => false),
     saveBinaryFile: vi.fn(async () => false),

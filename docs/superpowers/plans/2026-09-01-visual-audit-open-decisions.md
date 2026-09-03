@@ -1,15 +1,16 @@
 # Auditoría visual — decisiones abiertas
 
-Estado: **la 1 resuelta (2026-09-02), la 2, la 5 y la 6 resueltas (2026-09-03);
-3 y 4 pendientes**. Anotado el 2026-09-01, después de publicar la v0.8.2.
+Estado: **las seis resueltas** — la 1 el 2026-09-02, las otras cinco el
+2026-09-03. Anotado el 2026-09-01, después de publicar la v0.8.2.
 
 Lo que sigue NO son bugs sin arreglar: son las seis cosas que la auditoría visual
 dejó sobre la mesa porque la decisión es de diseño, no técnica, y tomarla solo
 hubiera sido inventar criterio. Cada una trae el número medido, el archivo y la
 propuesta, para poder resolverlas mañana sin volver a investigarlas.
 
-Orden sugerido: el **1** primero. Es una sola definición que arrastra a todas las
-demás superficies, y varias de las otras dejan de existir si se resuelve.
+Orden sugerido (histórico): el **1** primero. Es una sola definición que
+arrastra a todas las demás superficies, y varias de las otras dejan de existir
+si se resuelve.
 
 ---
 
@@ -125,6 +126,44 @@ que un agente tomó solo, y el resto de las páginas usa el ancho completo.
 Se revierte borrando el `margin-inline: auto`. Definir si la app tiene columna
 centrada para las páginas de lectura, o si todo va al ancho completo.
 
+**RESUELTA (2026-09-03): al ancho completo, pegada a la izquierda.** Palabras
+del usuario: «centrado no, prefiero usar más espacio horizontal y que se ajuste
+por resolución, pero acordate que esto es como un libro de misiones, y en un
+libro se escribe de izq a der, no centrado.» Se fueron las dos líneas: el
+`max-width: 860px` y el `margin-inline: auto`.
+
+Pero al sacar el techo apareció lo que el centrado tapaba. Medido a 1640×900
+**con el techo de 860 px todavía puesto**, el hueco entre la etiqueta de una
+fila de ajustes y su interruptor ya era de **369 a 538 px** — C4 de la rúbrica
+marca >250 px dentro de una fila como falla. La causa: `.settings-row` es
+`space-between` y la etiqueta pide su ancho natural (122–243 px medidos), así
+que TODO el sobrante cae en el medio. Al ancho completo ese hueco pasaba de
+500 px a más de 1000.
+
+La distribución nueva gasta el sobrante en **columnas** en vez de en vacío, en
+dos niveles y sin un solo breakpoint:
+
+| nivel | retícula | resultado a 1640 (contenedor de 1324 px) |
+|---|---|---|
+| tarjetas de un grupo (`.settings-group__cards`) | `repeat(auto-fit, minmax(min(100%, 340px), 1fr))` | Apariencia 2×652; Notificaciones 1×1324; Datos 3×428; Ayuda 3×428 + 1 |
+| filas de una tarjeta (`.settings-section`) | `repeat(auto-fit, minmax(min(100%, 260px), 1fr))` | la tarjeta de 1324 acomoda sus interruptores en 4 columnas; la de 428, en 1 |
+
+El título del grupo salió de la retícula (`SettingsGroup` envuelve las tarjetas
+en un `div`) justamente para que `auto-fit` pueda colapsar las columnas
+sobrantes: con el `<h2>` ocupando el renglón entero, ninguna columna quedaba
+vacía y el grupo de una sola tarjeta —el de notificaciones, el más largo— se
+quedaba con 428 px y 880 px de pergamino al lado.
+
+Números después: **hueco máximo dentro de una fila = 77 px** (era 538),
+`inkSpan` de la página **100 %**, cero desborde horizontal a 1640, a 760 y a
+390. La prosa NO se estiró: `.settings-row__desc` ya llevaba
+`max-width: var(--measure)` y se conserva; los renglones quedan bajo 90 ch.
+
+Vigilado por `tests/visual/audit-hub-density.browser.test.tsx` («Ajustes —
+decisión abierta nº3»), que exige `max-width: none`, borde izquierdo pegado al
+contenedor, `inkSpan ≥ 75 %`, todos los huecos <250 px y la medida de lectura
+intacta. Si alguien vuelve a centrarla, el test lo caza.
+
 ## 4. El denominador del estante de logros cambia de significado
 
 `src/hub/AchievementsPage.tsx:224-227`
@@ -141,6 +180,28 @@ pasan el filtro».
 Propuesta: calcular el contador sobre la lista **completa** del grupo, no sobre
 la filtrada, para que el «/ N» sea siempre el total de la sección. El contador
 de la cabecera (`unlockedCount / total`) ya se comporta así y no cambia.
+
+**RESUELTA (2026-09-03): el contador entero se calcula sobre la lista sin
+filtrar.** El `useMemo` de `AchievementsPage.tsx` ahora devuelve, junto a los
+`items` filtrados, el `total` y el `unlocked` del grupo COMPLETO, y el render
+usa esos dos.
+
+Se movió también el numerador, no sólo el denominador: si el «/ N» pasa a ser
+el total de la sección pero el numerador sigue contando lo filtrado, con
+«Obtenidos» un estante de 4 con 1 ganado diría «1 / 4» (bien) y con
+«Pendientes» diría «0 / 4» (mal) — cero obtenidos de un estante donde hay uno
+obtenido. Las dos cifras tienen que salir de la misma lista para que la frase
+signifique algo. Ahora dice siempre «obtenidos del grupo / total del grupo»,
+que es exactamente lo que dice la cabecera, sin tocarla.
+
+Medido con el test nuevo contra el render viejo, el estante de Questify (4
+medallones, 1 ganado) decía **«1/4» en Todos y «0/3» en Pendientes**; ahora
+dice «1/4» en los dos.
+
+Vigilado por `tests/visual/achievements-shelf.browser.test.tsx`, que pinta el
+estante con un solo medallón ganado, lee los contadores con «Todos», cambia a
+«Pendientes» y exige que ningún estante haya cambiado de cifra. El contador de
+cabecera no se tocó.
 
 ## 5. Onboarding habla dos idiomas de «elegido»
 

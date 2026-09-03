@@ -149,6 +149,81 @@ describe('Ajustes — cromo del códice', () => {
 });
 
 /* ══════════════════════════════════════════════════════
+   C4 — Ajustes al ancho completo (decisión abierta nº3)
+   ══════════════════════════════════════════════════════ */
+describe('Ajustes — decisión abierta nº3', () => {
+  test('ni centrada ni con techo: usa el ancho y no deja huecos en la fila', async () => {
+    await page.viewport(...WIDE);
+    resetCapture();
+    mount(<SettingsPage />);
+    await settle();
+
+    const pageEl = el('.qb-page.settings-page');
+    const main = el('.main-content');
+    const cs = getComputedStyle(pageEl);
+
+    // 1. No hay columna centrada ni techo rígido: la página es el ancho del
+    //    contenedor y arranca en su borde izquierdo.
+    expect(cs.maxWidth, 'volvió el techo de ancho').toBe('none');
+    expect(Math.round(pageEl.getBoundingClientRect().left - main.getBoundingClientRect().left),
+      'la página está centrada: volvió el `margin-inline: auto`').toBe(0);
+    expect(Math.round(pageEl.getBoundingClientRect().width))
+      .toBe(Math.round(main.getBoundingClientRect().width));
+
+    // 2. Y usa ese ancho: la tinta llega al borde.
+    const content = el('.qb-content');
+    const span = inkSpan(content);
+
+    // 3. Sin pagarlo con huecos adentro de las filas: la etiqueta y su control
+    //    no pueden quedar en dos extremos. Antes de repartir las tarjetas y las
+    //    filas en columnas, con el techo de 860 px TODAVÍA puesto, este mismo
+    //    hueco medía entre 369 y 538 px.
+    const huecos = [...document.querySelectorAll<HTMLElement>('.settings-row')]
+      .map((row) => {
+        const kids = [...row.children] as HTMLElement[];
+        if (kids.length < 2) return null;
+        const a = kids[0].getBoundingClientRect();
+        const b = kids[kids.length - 1].getBoundingClientRect();
+        if (b.top >= a.bottom - 1) return null;   // fila apilada: no hay hueco horizontal
+        return {
+          fila: (row.querySelector('.settings-row__label')?.textContent ?? '').slice(0, 30),
+          hueco: Math.round(b.left - a.right),
+        };
+      })
+      .filter((x): x is { fila: string; hueco: number } => x !== null)
+      .sort((x, y) => y.hueco - x.hueco);
+
+    // eslint-disable-next-line no-console
+    console.log('AJUSTES C4', JSON.stringify({
+      contenedor: Math.round(content.getBoundingClientRect().width),
+      span: Math.round(span * 1000) / 10,
+      peorHueco: huecos[0],
+    }));
+
+    unclip();
+    fitCapture({ full: true });
+    await page.screenshot({ path: `${SCREENS}/audit-hub-ajustes-05-ancho.png` });
+    resetCapture();
+
+    expect(span, 'la tinta no llega al 75 % del ancho').toBeGreaterThanOrEqual(0.75);
+    for (const h of huecos) {
+      expect(h.hueco, `hueco dentro de la fila «${h.fila}»`).toBeLessThan(250);
+    }
+
+    // 4. El texto corrido NO se estira con la página: conserva su medida.
+    const medida = parseFloat(getComputedStyle(el('.settings-row__desc')).maxWidth);
+    expect(medida, 'la prosa perdió el `max-width: var(--measure)`').toBeGreaterThan(0);
+    for (const d of document.querySelectorAll<HTMLElement>('.settings-row__desc')) {
+      const fs = parseFloat(getComputedStyle(d).fontSize);
+      expect(d.getBoundingClientRect().width / (fs * 0.5), 'renglón fuera de medida')
+        .toBeLessThanOrEqual(90);
+    }
+
+    expect(main.scrollWidth - main.clientWidth).toBeLessThanOrEqual(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════
    ÍTEM 13 — una sola convención de «elegido» en el onboarding
    ══════════════════════════════════════════════════════ */
 describe('Onboarding — decisión abierta nº5', () => {

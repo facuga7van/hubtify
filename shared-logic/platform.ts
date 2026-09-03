@@ -49,7 +49,6 @@ export interface PlatformPort {
   notify(n: { title: string; body: string; tag?: string }): Promise<void>;
   openExternal(url: string): Promise<void>;
   pickTextFile(filters: FileFilter[]): Promise<{ name: string; content: string } | null>;
-  pickPdfText(): Promise<{ name: string; text: string } | { unsupported: true } | null>;
   pickBinaryFile(filters: FileFilter[]): Promise<{ name: string; bytes: Uint8Array } | null>;
   saveTextFile(defaultName: string, content: string): Promise<boolean>;
   saveBinaryFile(defaultName: string, bytes: Uint8Array): Promise<boolean>;

@@ -43,3 +43,35 @@ describe('forge.config.ts — MakerSquirrel', () => {
     expect(forgeConfig).toMatch(/setupIcon:\s*'\.\/assets\/icon\.ico'/);
   });
 });
+
+/**
+ * Vite deja fuera del bundle del main todo lo que está en `external`, y eso
+ * se resuelve con `require()` en runtime. En la app instalada el `require` solo
+ * encuentra lo que `copyExternalModules` copió: cada external que falte en
+ * `EXTERNAL_MODULES` es un `Cannot find module` que recién aparece EMPAQUETADO
+ * (en `npm start` está `node_modules` entero y nadie lo nota).
+ *
+ * Así estuvo roto el import de PDF desde marzo: `pdf-parse` se externalizó dos
+ * días después de crear la lista y nunca se agregó. Esta comparación es lo que
+ * lo hubiera atajado.
+ */
+describe('forge.config.ts — EXTERNAL_MODULES cubre los externals de Vite', () => {
+  const viteMain = readFileSync(
+    fileURLToPath(new URL('../../vite.main.config.ts', import.meta.url)),
+    'utf-8',
+  );
+
+  const listOf = (source: string, re: RegExp): string[] => {
+    const m = source.match(re);
+    expect(m, `no se pudo leer la lista con ${re}`).not.toBeNull();
+    return [...m![1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  };
+
+  it('todo external del main está en EXTERNAL_MODULES (si no, Cannot find module empaquetado)', () => {
+    const externals = listOf(viteMain, /external:\s*\[([^\]]*)\]/);
+    const copied = listOf(forgeConfig, /EXTERNAL_MODULES\s*=\s*\[([^\]]*)\]/);
+    expect(externals.length).toBeGreaterThan(0);
+    const missing = externals.filter((m) => !copied.includes(m));
+    expect(missing, `externals sin copiar al paquete: ${missing.join(', ')}`).toEqual([]);
+  });
+});

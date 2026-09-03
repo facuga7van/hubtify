@@ -309,13 +309,28 @@ function suggestCategory(merchant: string, mappings: Map<string, string>): strin
 // ── IPC Handlers ────────────────────────────────────
 
 export function registerFinanceImportIpcHandlers(): void {
-  ipcHandle('finance:importSelectAndParsePDF', async () => {
-    const picked = await platform().pickPdfText();
-    if (picked === null) return null;
-    // Android has no pdf-parse: the renderer shows a toast for this reason (Fase 5).
-    if ('unsupported' in picked) return { ok: false as const, reason: 'unsupported_platform' as const };
-    const fileName = picked.name;
-    const data = { text: picked.text };
+  /**
+   * Paso 1 del import de PDF: solo elegir el archivo y devolver sus bytes.
+   *
+   * El texto NO se extrae acá. Se hacía con `pdf-parse` en el main, que es
+   * node-only y arrastra un canvas nativo de 35 MB; el paquete instalado nunca
+   * lo incluyó y el import falló en toda versión desde marzo. El renderer
+   * (escritorio y Android por igual) lo lee con pdfjs, que ya tiene, y manda el
+   * texto a `finance:importParsePdfText`.
+   */
+  ipcHandle('finance:importPickPdf', async () => {
+    return platform().pickBinaryFile([{ name: 'PDF', extensions: ['pdf'] }]);
+  });
+
+  /** Paso 2: el texto plano del resumen, línea por línea, a filas. */
+  ipcHandle('finance:importParsePdfText', async (_e, fileName: string, text: string) => {
+    // Los dos llegan por IPC como `unknown` y el tipo de arriba es solo una
+    // promesa del renderer: un `undefined` acá reventaba adentro con un
+    // `.split of undefined` que no dice nada de dónde vino.
+    if (typeof fileName !== 'string') throw new Error('Invalid fileName');
+    if (typeof text !== 'string' || text.trim() === '') throw new Error('Invalid PDF text');
+
+    const data = { text };
 
     const db = getDb();
     const mappingsRaw = db

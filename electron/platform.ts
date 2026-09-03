@@ -59,23 +59,6 @@ export const electronPlatform: PlatformPort = {
     return { name: baseName(filePaths[0]), content: fs.readFileSync(filePaths[0], 'utf-8') };
   },
 
-  async pickPdfText() {
-    const { filePaths, canceled } = await dialog.showOpenDialog(ownerWindow(), {
-      title: 'Seleccionar PDF de resumen',
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      properties: ['openFile'],
-    });
-    if (canceled || filePaths.length === 0) return null;
-    const filePath = filePaths[0];
-    const buffer = fs.readFileSync(filePath);
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PDFParse } = require('pdf-parse');
-    const parser = new PDFParse({ data: new Uint8Array(buffer), verbosity: 0 });
-    await parser.load();
-    const data = await parser.getText();
-    return { name: baseName(filePath) || 'unknown.pdf', text: data.text };
-  },
-
   async pickBinaryFile(filters) {
     const { filePaths, canceled } = await dialog.showOpenDialog(ownerWindow(), { filters, properties: ['openFile'] });
     if (canceled || filePaths.length === 0) return null;

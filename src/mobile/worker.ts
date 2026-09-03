@@ -106,7 +106,6 @@ const proxyPlatform: PlatformPort = {
   openExternal: (url) => protocol.callPlatform('openExternal', [url]) as Promise<void>,
   pickTextFile: (filters) =>
     protocol.callPlatform('pickTextFile', [filters]) as ReturnType<PlatformPort['pickTextFile']>,
-  pickPdfText: () => protocol.callPlatform('pickPdfText', []) as ReturnType<PlatformPort['pickPdfText']>,
   pickBinaryFile: (filters) =>
     protocol.callPlatform('pickBinaryFile', [filters]) as ReturnType<PlatformPort['pickBinaryFile']>,
   saveTextFile: (name, content) => protocol.callPlatform('saveTextFile', [name, content]) as Promise<boolean>,

@@ -19,8 +19,26 @@ describe('bytesToBase64', () => {
 });
 
 describe('acceptFor', () => {
-  it('convierte extensiones a la lista de accept del input', () => {
-    expect(acceptFor([{ name: 'CSV', extensions: ['csv', '.txt'] }, { name: 'X', extensions: ['CSV'] }])).toBe('.csv,.txt');
+  it('convierte extensiones a la lista de accept del input, sin repetir', () => {
+    expect(acceptFor([{ name: 'CSV', extensions: ['csv', '.txt'] }, { name: 'X', extensions: ['CSV'] }]))
+      .toBe('text/csv,.csv,text/plain,.txt');
+  });
+
+  it('el PDF sale con MIME y con extensión: hay pickers de Android que solo miran el MIME', () => {
+    expect(acceptFor([{ name: 'PDF', extensions: ['pdf'] }])).toBe('application/pdf,.pdf');
+  });
+
+  it('las tres extensiones del import de tablas traen su MIME', () => {
+    expect(acceptFor([{ name: 'CSV', extensions: ['csv', 'tsv', 'txt'] }]))
+      .toBe('text/csv,.csv,text/tab-separated-values,.tsv,text/plain,.txt');
+  });
+
+  it('el backup .zip también', () => {
+    expect(acceptFor([{ name: 'Zip Files', extensions: ['zip'] }])).toBe('application/zip,.zip');
+  });
+
+  it('una extensión sin MIME conocido sale sola', () => {
+    expect(acceptFor([{ name: 'DB', extensions: ['db'] }])).toBe('.db');
   });
 
   it('comodín o sin filtros → cualquier archivo', () => {

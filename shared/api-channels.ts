@@ -247,7 +247,8 @@ export const API_CHANNELS = {
   financeGenerateRecurringForMonth: { channel: 'finance:generateRecurringForMonth', kind: 'invoke' },
   financeGetRecurringAmountHistory: { channel: 'finance:getRecurringAmountHistory', kind: 'invoke' },
   // Finance - Import
-  financeImportSelectAndParsePDF: { channel: 'finance:importSelectAndParsePDF', kind: 'invoke' },
+  financeImportPickPdf: { channel: 'finance:importPickPdf', kind: 'invoke' },
+  financeImportParsePdfText: { channel: 'finance:importParsePdfText', kind: 'invoke' },
   financeImportConfirm: { channel: 'finance:importConfirm', kind: 'invoke' },
   financeUndoImportBatch: { channel: 'finance:undoImportBatch', kind: 'invoke' },
   financeGetImportBatches: { channel: 'finance:getImportBatches', kind: 'invoke' },

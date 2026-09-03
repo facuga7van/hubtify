@@ -175,22 +175,38 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
 
     setParsing(true);
     try {
-      const result = await window.api.financeImportSelectAndParsePDF();
-      if (!result) {
-        setParsing(false);
-        return; // user cancelled dialog
+      const picked = await window.api.financeImportPickPdf();
+      if (!picked) return; // user cancelled dialog; el finally apaga `parsing`
+
+      // El texto se saca ACÁ, con pdfjs, en escritorio y en Android por igual.
+      // El main lo hacía con `pdf-parse`, que nunca llegó al paquete instalado:
+      // toda versión publicada respondía «No se pudo procesar el PDF».
+      let text = '';
+      try {
+        const { extractPdfText } = await import('../../../shared/pdf-text');
+        text = await extractPdfText(picked.bytes);
+      } catch (err) {
+        // Que pdfjs TIRE es un fallo nuestro (el worker no cargó, el chunk no
+        // bajó): el archivo puede estar perfecto. Es otra cosa que un PDF sin
+        // capa de texto, y lo que el usuario tiene que hacer es otro también.
+        console.warn('[Import] pdfjs no pudo leer el PDF:', err);
+        toast({
+          type: 'warning',
+          message: t('coinify.importPdfEngineFailed', 'Falló el lector de PDF de la app, no tu archivo. Probá de nuevo; si sigue igual, importá el extracto en CSV mientras lo arreglamos.'),
+        });
+        return;
       }
-      if ('ok' in result) {
-        // Android ya lee PDF (pdfjs en el WebView). Que llegue acá significa
-        // que el documento no tiene capa de texto —un escaneo, una foto— o que
-        // el worker no cargó: en los dos casos hay que decir qué hacer, no
-        // «no está disponible».
+      if (text.trim() === '') {
+        // El PDF se leyó bien y no tiene una sola letra: es un escaneo o una
+        // foto. Acá el archivo SÍ es el problema y hay que pedir otro.
         toast({
           type: 'info',
           message: t('coinify.importPdfNoText', 'No pude leer texto de ese PDF. Si es un escaneo o una foto, pedile a tu banco el resumen original; o importá el extracto en CSV.'),
         });
-        return; // el finally apaga `parsing`
+        return;
       }
+
+      const result = await window.api.financeImportParsePdfText(picked.name, text);
       setFileName(result.fileName);
       setSkippedLines(result.skippedLines ?? []);
       setSkippedExpanded(false);

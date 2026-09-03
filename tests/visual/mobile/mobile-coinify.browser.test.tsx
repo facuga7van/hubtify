@@ -60,6 +60,27 @@ function Finance() {
  * Un resumen ya parseado, tal como lo devuelve el importador. Sin PDF real:
  * los resúmenes del usuario viven fuera del repo y no se commitea ni un monto.
  */
+/**
+ * Un PDF de una página con capa de texto, escrito a mano (sin tabla xref:
+ * pdfjs la reconstruye). Alcanza para que `extractPdfText` devuelva texto y el
+ * importador siga al parseo.
+ */
+const MINIMAL_PDF = (() => {
+  const content = 'BT /F1 12 Tf 72 720 Td (05-01-26 TIENDA DEMO 1.000,00) Tj ET';
+  return new TextEncoder().encode([
+    '%PDF-1.4',
+    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj',
+    `4 0 obj << /Length ${content.length} >> stream`,
+    content,
+    'endstream endobj',
+    '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+    'trailer << /Root 1 0 R >>',
+    '%%EOF',
+  ].join('\n'));
+})();
+
 const PARSED_STATEMENT = {
   fileName: 'resumen-demo.pdf',
   skippedLines: [],
@@ -221,7 +242,10 @@ describe('Coinify a 390×844', () => {
     await setMobileViewport();
     installApi({
       ...FINANCE_API,
-      financeImportSelectAndParsePDF: () => Promise.resolve(PARSED_STATEMENT),
+      // El texto lo saca pdfjs EN ESTE Chromium a partir de los bytes: el
+      // worker se resuelve de verdad. Lo único simulado es el parseo de líneas.
+      financeImportPickPdf: () => Promise.resolve({ name: 'resumen-demo.pdf', bytes: MINIMAL_PDF }),
+      financeImportParsePdfText: () => Promise.resolve(PARSED_STATEMENT),
       financeGetCreditCards: () => Promise.resolve([
         { id: 'c1', name: 'Galicia VISA', closingDay: 27, dueDay: 5, last4: '1234', createdAt: '' },
       ]),
