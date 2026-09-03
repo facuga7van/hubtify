@@ -1798,6 +1798,11 @@
     "codexMaxCombo": "COMBO MÁXIMO",
     "codexNoPage": "No pudimos leer la página de este día.",
     "codexObolosGranted": "+{{n}} óbolos a la bolsa",
+    "codexPurseAffordable": "Te alcanza para «{{name}}».",
+    "codexPurseClosest": "«{{name}}» te queda a {{missing}} óbolos.",
+    "codexPurseNoRewards": "Escribí en el mostrador qué querés comprarte.",
+    "codexPurseSpend": "Ir al mostrador",
+    "codexPurseUnit": "óbolos en la bolsa",
     "codexPhrases": {
       "constancy": [
         "Otro día encadenado al anterior. La constancia ya es tuya.",

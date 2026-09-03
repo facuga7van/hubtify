@@ -1798,6 +1798,11 @@
     "codexMaxCombo": "HIGHEST COMBO",
     "codexNoPage": "We could not read this day's page.",
     "codexObolosGranted": "+{{n}} obols for the purse",
+    "codexPurseAffordable": "Enough for \"{{name}}\".",
+    "codexPurseClosest": "\"{{name}}\" is {{missing}} obols away.",
+    "codexPurseNoRewards": "Write on the counter what you want to buy yourself.",
+    "codexPurseSpend": "Go to the counter",
+    "codexPurseUnit": "obols in the purse",
     "codexPhrases": {
       "constancy": [
         "Another day chained to the last. The constancy is yours now.",

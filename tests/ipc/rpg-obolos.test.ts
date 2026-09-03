@@ -143,7 +143,13 @@ describe('rpg:getObolosBalance', () => {
 
 describe('rewards CRUD + redeem', () => {
   let db: Database.Database;
-  beforeEach(() => { db = setupDb(); });
+  beforeEach(() => {
+    db = setupDb();
+    // Core v8 seeds three starter rewards so the óbolos have somewhere to go.
+    // This block is about the user's OWN counter, so we start it bare; the
+    // seeds have their own suite in rpg-reward-seeds.test.ts.
+    db.prepare("DELETE FROM rewards WHERE id LIKE 'seed-reward-%'").run();
+  });
 
   it('upserts: create sanitised, then edit in place', () => {
     const created = saveReward(db, { name: '  2 h de jueguito  ', cost: 50.4, icon: 'sword' });

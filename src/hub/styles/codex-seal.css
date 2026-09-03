@@ -1140,3 +1140,71 @@
   width: 100%;
   padding: 12px 20px;
 }
+
+/* ══ LA BOLSA ══════════════════════════════════════
+   Los óbolos se ganan acá y hasta ahora se nombraban una sola vez, en el
+   instante en que se acuñaban (base real: 132 ganados, 0 gastados). El saldo
+   vive donde se gana y dice para qué alcanza. */
+.codex-purse {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(74, 55, 32, 0.28);
+  background: rgba(245, 231, 192, 0.35);
+}
+
+.codex-purse__coin {
+  display: inline-flex;
+  color: var(--gold-dark);
+  flex-shrink: 0;
+}
+
+.codex-purse__balance {
+  font-size: var(--fs-body);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.codex-purse__balance .qb-numeral {
+  font-size: var(--fs-sub);
+}
+
+.codex-purse__hint {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+.codex-purse__link {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.codex-purse__link:hover,
+.codex-purse__link:focus-visible {
+  color: var(--ink);
+}
+
+/* A 390 px la línea entra en tres renglones antes que desbordar. */
+[data-shell="mobile"] .codex-purse__hint {
+  flex-basis: 100%;
+}
+
+[data-shell="mobile"] .codex-purse__link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
