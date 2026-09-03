@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAnchoredPopup } from '../../../shared/hooks/useAnchoredPopup';
+import EmptyState from '../../../shared/components/EmptyState';
+import { Sword } from '../../../shared/components/icons/CodexIcons';
 import { UNLABELED_POTION_COLOR } from '../types';
 
 /** Una misión abierta, tal como la devuelve `quests:getTasks`. */
@@ -211,12 +213,20 @@ export default function MissionPicker({
               </button>
             )}
 
+            {/* Era una frase suelta. Con búsqueda escrita, la salida obvia es
+                borrarla —el desplegable no puede ofrecer «anotá una misión» sin
+                cerrarse encima de lo que el usuario estaba haciendo—. */}
             {groups.length === 0 && (
-              <div className="cauldron-mission-empty">
-                {missions.length === 0
+              <EmptyState
+                compact
+                icon={<Sword width={20} height={20} />}
+                message={missions.length === 0
                   ? t('cauldron.mission.noneOpen', 'No hay misiones abiertas.')
                   : t('cauldron.mission.noMatches', 'Ninguna misión coincide.')}
-              </div>
+                action={query.trim()
+                  ? { label: t('cauldron.mission.clearSearch', 'Borrar la búsqueda'), onClick: () => { setQuery(''); searchRef.current?.focus(); } }
+                  : undefined}
+              />
             )}
 
             {groups.map((group) => (

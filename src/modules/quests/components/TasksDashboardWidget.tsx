@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Tick } from '../../../shared/components/codex';
-import Loading from '../../../shared/components/Loading';
+import Skeleton from '../../../shared/components/Skeleton';
+import ErrorState from '../../../shared/components/ErrorState';
 import { useToast } from '../../../shared/components/useToast';
 import { playTaskComplete } from '../../../shared/audio';
 // `Project` is deliberately not imported: the project selector this widget used
@@ -36,6 +37,7 @@ export default function TasksDashboardWidget() {
   const entryDefaults = useRef<{ projectId: string | null; tier: 1 | 2 | 3 }>({ projectId: null, tier: 2 });
 
   const loadData = useCallback(() => {
+    setLoadError(false);
     Promise.all([
       window.api.questsGetPendingCount(),
       window.api.questsGetCompletedTodayCount(),
@@ -148,12 +150,17 @@ export default function TasksDashboardWidget() {
     }
   }, [loadData, toast, t]);
 
-  if (loading) return <Loading size="sm" />;
+  /* Era una brújula girando: no decía nada de lo que venía después. El
+     esqueleto ocupa el sitio exacto de las filas de misión. */
+  if (loading) return <Skeleton variant="line" count={3} />;
+  /* Y el aviso de fallo era una frase roja sin salida: ahora tiene reintentar. */
   if (loadError)
     return (
-      <p style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)' }}>
-        {t('common.somethingWentWrong')}
-      </p>
+      <ErrorState
+        compact
+        message={t('questify.tasksLoadFailed', 'No se pudieron leer tus misiones.')}
+        onRetry={loadData}
+      />
     );
 
   const total = completedToday + pendingCount;

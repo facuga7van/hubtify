@@ -10,6 +10,8 @@ import {
 import { Sword, Crown, Flame, Heart, Scroll, Quill, Cauldron, Sparkle, Dagger, FloralHeart, ArrowUpRight } from '../shared/components/icons';
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
+import Skeleton from '../shared/components/Skeleton';
+import ErrorState from '../shared/components/ErrorState';
 import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
 import { requestQuickCreate } from './widgets/quick-create';
 import { buildReturnBrief } from './return-brief';
@@ -224,7 +226,7 @@ export default function Dashboard() {
       .then(([questsOverdue, mealsToday]) => setTodo({ questsOverdue, mealsToday }))
       .catch(() => { /* the brief just stays generic */ });
 
-    getAchievements().then((list) => {
+    getAchievements().catch(() => null).then((list) => {
       if (!list) { setFreshAchievementId(null); return; }
       const cutoff = Date.now() - 24 * 60 * 60_000;
       const fresh = list
@@ -258,48 +260,39 @@ export default function Dashboard() {
     };
   }, [load]);
 
+  /* Era un esqueleto escrito en línea con `rgba(74,55,32,.1)` a mano y SIN
+     animación: una grilla de manchas quietas que no se distinguía de un error
+     de pintado. Ahora es la primitiva compartida, con el mismo shimmer que el
+     resto de la app. */
   if (loading)
     return (
       <div style={{ padding: '32px 24px', maxWidth: 900, margin: '0 auto' }}>
-        {/* Skeleton: title area */}
-        <div style={{ height: 18, width: 220, background: 'rgba(74,55,32,.1)', borderRadius: 4, marginBottom: 8 }} />
-        <div style={{ height: 12, width: 340, background: 'rgba(74,55,32,.07)', borderRadius: 4, marginBottom: 24 }} />
-        {/* Skeleton: salutation */}
+        <Skeleton variant="line" width={220} />
+        <div style={{ height: 8 }} />
+        <Skeleton variant="line" width={340} />
+        <div style={{ height: 24 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20, marginBottom: 20 }}>
-          <div>
-            <div style={{ height: 12, background: 'rgba(74,55,32,.08)', marginBottom: 6, borderRadius: 3 }} />
-            <div style={{ height: 12, background: 'rgba(74,55,32,.06)', width: '85%', marginBottom: 6, borderRadius: 3 }} />
-            <div style={{ height: 12, background: 'rgba(74,55,32,.06)', width: '60%', borderRadius: 3 }} />
-          </div>
+          <Skeleton variant="line" count={3} text />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(74,55,32,.1)' }} />
+            <Skeleton variant="card" width={72} height={72} />
           </div>
         </div>
-        {/* Skeleton: cartouches */}
         <div className="qb-cartouche-row">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 64, background: 'rgba(74,55,32,.07)', borderRadius: 6 }} />
+            <Skeleton key={i} variant="block" height={64} />
           ))}
         </div>
-        {/* Skeleton: module cards (4-column grid) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: 'span 2' }} />
+            <div key={i} style={{ gridColumn: 'span 2' }}><Skeleton variant="card" height={120} /></div>
           ))}
-          <div style={{ height: 120, background: 'rgba(74,55,32,.06)', borderRadius: 6, gridColumn: '1 / -1' }} />
+          <div style={{ gridColumn: '1 / -1' }}><Skeleton variant="card" height={120} /></div>
         </div>
       </div>
     );
 
   if (loadError)
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <p style={{ marginBottom: 12, color: 'var(--rubric)' }}>{t('common.somethingWentWrong')}</p>
-        <button className="rpg-button" onClick={load}>
-          {t('common.tryAgain')}
-        </button>
-      </div>
-    );
+    return <ErrorState message={t('common.somethingWentWrong')} onRetry={load} />;
 
   const level = stats?.level ?? 1;
   const hp = stats?.hp ?? 100;
