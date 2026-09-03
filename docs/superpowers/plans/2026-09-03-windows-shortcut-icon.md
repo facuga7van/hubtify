@@ -274,6 +274,45 @@ doble instalación (Squirrel no lo expone).
 
 ---
 
+## Addendum 2026-09-04 — el `iconUrl` no alcanza: Squirrel no reescribe `app.ico` al ACTUALIZAR
+
+El arreglo de §4 (`iconUrl` en `forge.config.ts`) viajó en 0.9.4: el `.nuspec` dentro de
+`Hubtify-0.9.4-full.nupkg` publicado ya lleva
+`<iconUrl>https://raw.githubusercontent.com/facuga7van/hubtify/master/assets/icon.ico</iconUrl>`.
+Pero el usuario actualizó 0.9.3 → 0.9.4 y su `app.ico` **siguió siendo el átomo**: mismo
+`mtime` que la instalación de 0.9.3 y sha256 `b5d81c93…` = `electron.ico`.
+
+Causa: Squirrel baja el `iconUrl` a `<raíz>\app.ico` **solo durante `--install`**. El
+`Squirrel-Update.log` de esa actualización muestra `Writing files to app directory`,
+`Rigging execution stub`, `fixPinnedExecutables`, `Fixing up tray icons` y `cleanDeadVersions`
+— y **ninguna escritura de `app.ico`**. O sea: la línea de `forge.config.ts` arregla a los
+usuarios NUEVOS, y a los que vienen de una versión anterior no los toca nunca.
+
+**Fix implementado**: `electron/app-icon.ts`. Al arrancar (Windows + `app.isPackaged`, fuera del
+camino crítico, después de `whenReady`) comparamos por sha256 el `app.ico` de la raíz de
+instalación contra el `.ico` que ya empaquetamos como `extraResource` en `resources/icon.ico`.
+Si difieren o falta, lo sobrescribimos. Idempotente, sin dependencias nuevas, sin red.
+Lógica pura (`shouldReplaceIcon`, `appIcoPathFor`) separada del efecto (`healAppIcon`), con
+tests en `tests/electron/app-icon.test.ts`.
+
+Decisiones deliberadas:
+
+- **No se toca el registro.** `HKCU\…\Uninstall\Hubtify\DisplayIcon` ya apunta a ese mismo
+  `app.ico`; reescribirlo no cambiaría nada y obligaría a spawnear `reg.exe`.
+- **No se refresca el caché de íconos del shell.** `SHChangeNotify`/`SHCNE_ASSOCCHANGED` vive en
+  `shell32.dll` y no hay forma de llamarlo sin un módulo nativo nuevo (koffi/ffi-napi) ni sin
+  levantar PowerShell con `Add-Type` en cada arranque. El panel de control relee `app.ico` por
+  ruta; en el peor caso el ícono nuevo se ve recién tras reiniciar el Explorador o la sesión.
+  Aceptable para algo que se cura una sola vez por usuario.
+- **Se cura la raíz que se está ejecutando**, no `%LOCALAPPDATA%` hardcodeado, así la instalación
+  duplicada de §2 también queda cubierta del lado que el usuario realmente usa.
+
+Verificado end-to-end con `npm run package`: sobre una raíz simulada
+(`<raíz>\app.ico` basura + `<raíz>\app-0.9.4\Hubtify.exe`), el primer arranque dejó `app.ico` en
+62 457 B / `a9531dd0…` (idéntico a `assets/icon.ico`) y el segundo no lo reescribió.
+
+---
+
 ## Respuesta a "¿le pasaría a un usuario nuevo?"
 
 | Síntoma | Usuario nuevo |
