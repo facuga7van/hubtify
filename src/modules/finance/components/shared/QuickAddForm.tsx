@@ -64,6 +64,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState('');
+  /** Semilla hasta que conteste `finance:getEntryDefaults` con la moda real. */
   const [category, setCategory] = useState('Otros');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(today);
@@ -81,8 +82,9 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const [installments, setInstallments] = useState(1);
   const [amountMode, setAmountMode] = useState<AmountMode>('installment');
   const [creditCardId, setCreditCardId] = useState('');
-  // '' = unresolved; the AccountSelect picks the default (last used / Efectivo).
+  // '' = unresolved; the AccountSelect picks the default (last used / inferida / Efectivo).
   const [accountValue, setAccountValue] = useState('');
+  const [seedAccountId, setSeedAccountId] = useState<string | null>(null);
   const [accountsSupported, setAccountsSupported] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [lastTx, setLastTx] = useState<LastTransaction | null>(null);
@@ -94,20 +96,35 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   /**
    * La moda de sus últimas altas manuales. Se pide una vez al montar y en cada
    * cambio de cuenta: el historial de otra cuenta no dice nada sobre esta.
+   *
+   * El handler ya devolvía `accountId`, `currency` y ahora `category`, y este
+   * formulario **aplicaba sólo el medio de pago y tiraba el resto**. Mientras
+   * tanto la cuenta salía de `localStorage` y su último respaldo era «Efectivo»
+   * —la cuenta que el historial dice que no se usa: `account_id` en NULL en las
+   * 107 filas de la base real— y la categoría era el literal `'Otros'`.
    */
   const loadEntryDefaults = useCallback(() => {
-    const api = window.api as unknown as {
-      financeGetEntryDefaults?: () => Promise<{ paymentMethod?: string; currency?: string }>;
-    };
+    const api = window.api as Partial<typeof window.api>;
     // Canal nuevo: en un binding viejo simplemente no está, y el fallback vale.
     if (typeof api.financeGetEntryDefaults !== 'function') return;
     api.financeGetEntryDefaults()
       .then((defaults) => {
-        if (methodTouched.current || !defaults) return;
-        const method = defaults.paymentMethod;
-        if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
-          setPaymentMethod(method);
+        if (!defaults) return;
+        if (!methodTouched.current) {
+          const method = defaults.paymentMethod;
+          if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
+            setPaymentMethod(method);
+          }
+          if (defaults.currency === 'ARS' || defaults.currency === 'USD') setCurrency(defaults.currency);
         }
+        // La cuenta no se fuerza: se le pasa como semilla al `AccountSelect`,
+        // que ya sabe descartarla si murió y ya tiene su propio orden de
+        // preferencia (lo recordado localmente es más específico y gana).
+        setSeedAccountId(defaults.accountId ?? null);
+        // Ojo con el orden: el auto-sugerido por descripción
+        // (`finance:getCategoryMappings`) es MÁS específico que la moda y tiene
+        // que poder pisarla, así que la moda sólo entra si nadie tocó nada.
+        if (!userOverrode.current && defaults.category) setCategory(defaults.category);
       })
       .catch(() => { /* el fallback ya está puesto */ });
   }, []);
@@ -143,7 +160,8 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     [loadMappings, loadLastTransaction, loadEntryDefaults]);
 
   useEffect(() => {
-    const handler = () => { methodTouched.current = false; loadMappings(); loadLastTransaction(); loadEntryDefaults(); };
+    // Otra cuenta, otro historial: lo que el usuario tocó acá ya no aplica.
+    const handler = () => { methodTouched.current = false; userOverrode.current = false; loadMappings(); loadLastTransaction(); loadEntryDefaults(); };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [loadMappings, loadLastTransaction, loadEntryDefaults]);
@@ -350,7 +368,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
             the accounts bridge is not wired. Card purchases do not touch any
             account until the statement is paid, so the picker steps aside. */}
         {paymentMethod !== 'credit_card' && (
-          <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} />
+          <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />
         )}
         {paymentMethod === 'credit_card' && (
           <>
