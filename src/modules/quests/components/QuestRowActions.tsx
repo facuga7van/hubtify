@@ -8,7 +8,7 @@ import { useToast } from '../../../shared/components/useToast';
 import { isTaskLinkWired, startBrew, setSessionTask } from '../../cauldron/api';
 import { quickStartPresetId } from '../../cauldron/hooks';
 import { getDueDateStatus } from '../utils';
-import { parseRepeatRule, describeRepeatRule } from '../repeat';
+import { parseRepeatRule, describeRepeatRule, parseRepeatAnchor } from '../repeat';
 import PostponeMenu, { PostponeOptions } from './PostponeMenu';
 import type { Task } from '../types';
 
@@ -133,6 +133,7 @@ export default function QuestRowActions({
 
   const dueStatus = task.dueDate ? getDueDateStatus(task.dueDate) : null;
   const repeatRule = parseRepeatRule(task.repeatRule);
+  const repeatLine = repeatRule ? describeRepeatRule(repeatRule, t, parseRepeatAnchor(task.repeatAnchor)) : '';
 
   return (
     <div className="quest-row-actions" onPointerDown={(e) => e.stopPropagation()}>
@@ -140,8 +141,8 @@ export default function QuestRowActions({
       {repeatRule && (
         <span
           className="quest-repeat-badge"
-          title={describeRepeatRule(repeatRule, t)}
-          aria-label={describeRepeatRule(repeatRule, t)}
+          title={repeatLine}
+          aria-label={repeatLine}
           role="img"
         >
           <RepeatIcon />

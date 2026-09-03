@@ -53,12 +53,47 @@ export function postponeTasks(
 // ── Recurring tasks (Fase 3) ─────────────────────────────────────────────────
 
 /**
- * Parsed form of `tasks.repeat_rule` (see quests migration v13).
+ * Parsed form of `tasks.repeat_rule` (see quests migrations v13 and v14).
  * `days` uses JS `Date.getDay()` numbering: 0 = Sunday … 6 = Saturday.
+ *
+ * `interval` is OPTIONAL and ABSENT means 1 — that is the whole
+ * backwards-compatibility story: a rule written before v14 (`{"freq":"daily"}`)
+ * parses to exactly what it always meant, and a rule with interval 1 is
+ * serialized without the key, so new clients keep emitting byte-identical old
+ * rules and nothing has to be migrated.
  */
 export interface RepeatRule {
   freq: 'daily' | 'weekly' | 'monthly' | 'days';
   days?: number[];
+  /** 1..30. Omitted when 1 — see above. */
+  interval?: number;
+}
+
+/** Where the next due date is measured from (`tasks.repeat_anchor`, v14). */
+export type RepeatAnchor = 'due' | 'completion';
+
+/** Upper bound for INTERVAL. Above this a "cadence" is really a one-off. */
+export const MAX_REPEAT_INTERVAL = 30;
+
+/** Anything that isn't a whole number in 1..30 clamps into range (1 on junk). */
+export function clampRepeatInterval(raw: unknown): number {
+  const n = Math.trunc(Number(raw));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, MAX_REPEAT_INTERVAL);
+}
+
+/**
+ * `tasks.repeat_anchor` → the mode. NULL, '', 'due' and any unknown value all
+ * mean 'due', the v13 fixed-date behaviour: a column an older client never
+ * writes must never change what a chain does.
+ */
+export function parseRepeatAnchor(raw: string | null | undefined): RepeatAnchor {
+  return raw === 'completion' ? 'completion' : 'due';
+}
+
+/** The value to STORE for an anchor: only 'completion' is persisted, else NULL. */
+export function serializeRepeatAnchor(raw: string | null | undefined): string | null {
+  return parseRepeatAnchor(raw) === 'completion' ? 'completion' : null;
 }
 
 /**
@@ -66,17 +101,28 @@ export interface RepeatRule {
  * anything that isn't a well-formed rule quietly means "never repeats" instead
  * of throwing mid-completion. For freq 'days' the list is deduped, sorted and
  * must be non-empty (a "repeat on no days" rule is not a rule).
+ *
+ * DECISION — no INTERVAL on freq 'days'. "Every 2 weeks on Mon and Thu" needs a
+ * notion of which weeks are "on", and nothing in this model anchors week parity:
+ * the chain root can be soft-deleted or absent after a partial sync (the
+ * generator already falls back to the completed instance for the monthly
+ * anchor), and a parity that silently flips would move a habit to the wrong
+ * week without anyone noticing. So the interval is dropped here and the form
+ * hides the control for 'days'; the combination has no half-defined meaning.
  */
 export function parseRepeatRule(raw: string | null | undefined): RepeatRule | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as { freq?: unknown; days?: unknown };
+    const parsed = JSON.parse(raw) as { freq?: unknown; days?: unknown; interval?: unknown };
+    if (!parsed || typeof parsed !== 'object') return null;
     if (parsed.freq === 'daily' || parsed.freq === 'weekly' || parsed.freq === 'monthly') {
-      return { freq: parsed.freq };
+      const interval = 'interval' in parsed ? clampRepeatInterval(parsed.interval) : 1;
+      return interval > 1 ? { freq: parsed.freq, interval } : { freq: parsed.freq };
     }
     if (parsed.freq === 'days' && Array.isArray(parsed.days)) {
       const days = [...new Set(parsed.days.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))]
         .sort((a, b) => a - b);
+      // No interval here on purpose — see the DECISION note above.
       if (days.length > 0) return { freq: 'days', days };
     }
   } catch { /* malformed JSON → no rule */ }
@@ -97,42 +143,77 @@ function ymd(d: Date): string {
 }
 
 /**
- * The next occurrence for a rule, advanced FROM the completed instance's own
- * due_date — never from today. Completing March's rent on the 3rd still puts
- * April's on the 1st. All arithmetic is LOCAL (`new Date(y, m, d)`), matching
- * the project's UTC-vs-local unification (shared/date-utils conventions).
+ * A stored date is only usable as arithmetic input when it actually starts with
+ * 'YYYY-MM-DD'. Junk from a hand-edited DB or a broken client used to reach
+ * `Number(undefined)` and get written back as '2026-02-NaN'.
+ */
+const ISO_DATE_HEAD = /^\d{4}-\d{2}-\d{2}/;
+
+/** Date part of `raw` if it is usable, else `fallback`, as [y, m, d]. */
+function dateParts(raw: string, fallback: string): [number, number, number] {
+  const src = (ISO_DATE_HEAD.test(raw) ? raw : fallback).slice(0, 10);
+  const [y, m, d] = src.split('-').map(Number);
+  return [y, m, d];
+}
+
+/**
+ * The next occurrence for a rule.
  *
- * - daily   → +1 day
- * - weekly  → +7 days
- * - monthly → +1 month, day-of-month = min(anchor day, last day of that month).
+ * By DEFAULT (anchor 'due', the v13 behaviour and still what a NULL
+ * `repeat_anchor` means) it advances FROM the completed instance's own due_date
+ * — never from today. Completing March's rent on the 3rd still puts April's on
+ * the 1st. `opts.anchor = 'completion'` switches to the habit reading: the
+ * cadence restarts from the day the instance was actually ticked ("water the
+ * plants every 3 days from when I watered them").
+ *
+ * All arithmetic is LOCAL (`new Date(y, m, d)`), matching the project's
+ * UTC-vs-local unification (shared/date-utils conventions).
+ *
+ * With `n = rule.interval ?? 1` (see RepeatRule — absent means 1):
+ * - daily   → +n days
+ * - weekly  → +7n days
+ * - monthly → +n months, day-of-month = min(anchor day, last day of that month).
  *             `anchorDue` is the chain root's due_date: it remembers "the 31st"
- *             across a Feb 28 hop (Jan 31 → Feb 28 → Mar 31, not Mar 28).
- * - days    → the first listed weekday strictly after the base date.
+ *             across a clamped month (Jan 31 → Feb 28 → Mar 31, not Mar 28), and
+ *             it keeps doing so at any interval (Dec 31 +2 → Feb 28 → Apr 30 →
+ *             Jun 30 → Aug 31). With anchor 'completion' there is no fixed
+ *             calendar day to remember, so the base day is the anchor.
+ * - days    → the first listed weekday strictly after the base date (never has
+ *             an interval — see parseRepeatRule).
  *
- * A task with no due_date starts its cadence from today. The time-of-day part,
- * when present, is carried over unchanged.
+ * A task with no due_date starts its cadence from today. The time-of-day part
+ * always comes from the due_date and is carried over unchanged, so a 9am
+ * standup stays a 9am standup even when the anchor is the completion date.
  */
 export function nextRepeatDueDate(
   rule: RepeatRule,
   currentDue: string | null,
   anchorDue?: string | null,
   today: string = todayDateString(),
+  opts: { anchor?: RepeatAnchor; completedOn?: string | null } = {},
 ): string {
   const { date, time } = splitDueDate(currentDue || today);
-  const [y, m, d] = date.split('-').map(Number);
+  const anchorMode = opts.anchor ?? 'due';
+  // completed_at is a LOCAL timestamp ('YYYY-MM-DD HH:MM:SS', quests v11) or a
+  // bare date; only its date part is a cadence input.
+  const base = anchorMode === 'completion' ? (opts.completedOn || today) : date;
+  const [y, m, d] = dateParts(base, today);
+  const step = rule.interval ?? 1;
 
   let next: Date;
   if (rule.freq === 'daily') {
-    next = new Date(y, m - 1, d + 1);
+    next = new Date(y, m - 1, d + step);
   } else if (rule.freq === 'weekly') {
-    next = new Date(y, m - 1, d + 7);
+    next = new Date(y, m - 1, d + 7 * step);
   } else if (rule.freq === 'monthly') {
-    const anchorDate = anchorDue ? splitDueDate(anchorDue).date : date;
-    const anchorDay = Number(anchorDate.slice(8, 10)) || d;
-    // Target month is index `m` (current is m-1, 0-based); its last day is
-    // day 0 of the month after it.
-    const lastDayOfTarget = new Date(y, m + 1, 0).getDate();
-    next = new Date(y, m, Math.min(anchorDay, lastDayOfTarget));
+    const anchorDay = anchorMode === 'completion'
+      ? d
+      : (Number(splitDueDate(anchorDue || base).date.slice(8, 10)) || d);
+    // Target month is 0-based index `m - 1 + step` (current is m-1); Date rolls
+    // the year over for us. Its last day is day 0 of the month after it.
+    const targetMonth = m - 1 + step;
+    const lastDayOfTarget = new Date(y, targetMonth + 1, 0).getDate();
+    next = new Date(y, targetMonth, Math.min(anchorDay, lastDayOfTarget));
   } else {
     const days = rule.days ?? [];
     next = new Date(y, m - 1, d + 1);
@@ -149,7 +230,8 @@ export function nextRepeatDueDate(
 interface RepeatTaskRow {
   id: string; name: string; description: string; tier: number; category: string;
   projectId: string | null; dueDate: string | null;
-  repeatRule: string | null; repeatOf: string | null; deletedAt: string | null;
+  repeatRule: string | null; repeatOf: string | null; repeatAnchor: string | null;
+  completedAt: string | null; deletedAt: string | null;
 }
 
 /**
@@ -179,6 +261,7 @@ export function spawnNextRepeatInstance(
     const task = db.prepare(`
       SELECT id, name, description, tier, category, project_id AS projectId,
              due_date AS dueDate, repeat_rule AS repeatRule, repeat_of AS repeatOf,
+             repeat_anchor AS repeatAnchor, completed_at AS completedAt,
              deleted_at AS deletedAt
       FROM tasks WHERE id = ?
     `).get(taskId) as RepeatTaskRow | undefined;
@@ -201,7 +284,13 @@ export function spawnNextRepeatInstance(
     // and when it's gone the completed instance's own date fills in.
     const root = db.prepare('SELECT due_date AS dueDate FROM tasks WHERE id = ?')
       .get(chainId) as { dueDate: string | null } | undefined;
-    const nextDueDate = nextRepeatDueDate(rule, task.dueDate, root?.dueDate ?? task.dueDate);
+    // The anchor MODE travels with the instance (like the rule itself), so the
+    // whole chain agrees on where its dates are measured from.
+    const anchor = parseRepeatAnchor(task.repeatAnchor);
+    const nextDueDate = nextRepeatDueDate(
+      rule, task.dueDate, root?.dueDate ?? task.dueDate, undefined,
+      { anchor, completedOn: task.completedAt },
+    );
 
     const nextTaskId = genId();
     const maxOrder = db.prepare(
@@ -209,10 +298,12 @@ export function spawnNextRepeatInstance(
     ).get() as { next: number };
     db.prepare(`
       INSERT INTO tasks (id, name, description, tier, category, project_id, due_date,
-                         task_order, status, repeat_rule, repeat_of, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+                         task_order, status, repeat_rule, repeat_of, repeat_anchor,
+                         created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
     `).run(nextTaskId, task.name, task.description, task.tier, task.category, task.projectId,
-      nextDueDate, maxOrder.next, task.repeatRule, chainId, now, now);
+      nextDueDate, maxOrder.next, task.repeatRule, chainId, serializeRepeatAnchor(task.repeatAnchor),
+      now, now);
 
     return { nextTaskId, nextDueDate };
   })();
@@ -353,6 +444,7 @@ export function registerQuestsIpcHandlers(): void {
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
                completed_at AS completedAt, repeat_rule AS repeatRule, repeat_of AS repeatOf,
+               repeat_anchor AS repeatAnchor,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL ORDER BY task_order ASC
       `).all();
@@ -361,6 +453,7 @@ export function registerQuestsIpcHandlers(): void {
         SELECT id, name, description, status, tier, category,
                project_id AS projectId, due_date AS dueDate, task_order AS "order",
                completed_at AS completedAt, repeat_rule AS repeatRule, repeat_of AS repeatOf,
+               repeat_anchor AS repeatAnchor,
                created_at AS createdAt, updated_at AS updatedAt
         FROM tasks WHERE deleted_at IS NULL AND project_id IS ? ORDER BY task_order ASC
       `).all(projectId);
@@ -370,7 +463,7 @@ export function registerQuestsIpcHandlers(): void {
   ipcHandle('quests:upsertTask', (_e, task: {
     id?: string; name: string; description?: string; tier?: number;
     category?: string; projectId?: string | null; dueDate?: string | null; order?: number; status?: boolean;
-    repeatRule?: string | null;
+    repeatRule?: string | null; repeatAnchor?: string | null;
   }) => {
     const db = getDb();
     const id = task.id || genId();
@@ -382,25 +475,33 @@ export function registerQuestsIpcHandlers(): void {
     // Callers that don't know about repeat_rule yet (QuickAdd, older widgets)
     // omit the key entirely — updating through them must not wipe the rule.
     const touchRepeat = task.repeatRule !== undefined;
+    // No rule → no anchor: 'completion' hanging off a one-off quest is dead data
+    // that would come back to life the day someone adds a rule. That only
+    // applies when the caller actually SAID there is no rule — when it doesn't
+    // touch the rule at all we can't know, so an explicit anchor is taken as is.
+    const repeatAnchor = touchRepeat && !repeatRule ? null : serializeRepeatAnchor(task.repeatAnchor);
+    // Clearing the rule also clears the anchor it belonged to.
+    const touchAnchor = task.repeatAnchor !== undefined || (touchRepeat && !repeatRule);
 
     if (task.id) {
       db.prepare(`
         UPDATE tasks SET name = ?, description = ?, tier = ?, category = ?,
                project_id = ?, due_date = ?, task_order = ?, status = ?, updated_at = ?
                ${touchRepeat ? ', repeat_rule = ?' : ''}
+               ${touchAnchor ? ', repeat_anchor = ?' : ''}
         WHERE id = ?
       `).run(
         task.name, task.description ?? '', validTier, task.category ?? '',
         task.projectId ?? null, task.dueDate ?? null, task.order ?? 0, task.status ? 1 : 0, now,
-        ...(touchRepeat ? [repeatRule] : []), id
+        ...(touchRepeat ? [repeatRule] : []), ...(touchAnchor ? [repeatAnchor] : []), id
       );
     } else {
       const maxOrder = db.prepare('SELECT COALESCE(MAX(task_order), -1) + 1 AS next FROM tasks WHERE deleted_at IS NULL').get() as { next: number };
       db.prepare(`
-        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, repeat_rule, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+        INSERT INTO tasks (id, name, description, tier, category, project_id, due_date, task_order, status, repeat_rule, repeat_anchor, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
       `).run(id, task.name, task.description ?? '', validTier, task.category ?? '',
-        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, repeatRule, now, now);
+        task.projectId ?? null, task.dueDate ?? null, task.order ?? maxOrder.next, repeatRule, repeatAnchor, now, now);
     }
     return id;
   });

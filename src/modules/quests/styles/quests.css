@@ -498,6 +498,33 @@
   letter-spacing: 0.06em;
 }
 
+/* INTERVAL box: two digits max (1..30), so it stays a stepper and not a field
+   that pushes the whole repeat group onto its own row. */
+.quest-repeat-interval {
+  width: 58px;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/* The unit that follows the number ("2 semanas"). Same voice as the label, but
+   it reads as part of the sentence, not as a heading. */
+.quest-repeat-unit {
+  font-family: var(--ff-accent, 'IM Fell English SC'), serif;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+/* "From when I complete it" toggle. */
+.quest-repeat-anchor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
 /* ── Expanded detail area ────────────────────────── */
 .quest-row-expanded {
   padding-left: 30px;
