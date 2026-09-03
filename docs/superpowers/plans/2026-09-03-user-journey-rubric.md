@@ -177,3 +177,104 @@ cuesta 6 clics + 2 campos, siempre.
 
 Si se hacen las 6 primeras (todas S), el total pasa de **54 a 65** (promedio 5,4). Con las de
 esfuerzo M (7-11), llega a **78** (6,5). El #12 es el techo de C1 y no se puede subir de otra forma.
+
+---
+
+## 5. Segunda medición (rama `feat/journey-improvements`, sobre `release/0.9.5`)
+
+Mismo método que la baseline: los pasos se contaron leyendo los componentes; los
+números vienen de una **copia de solo lectura** de `%APPDATA%\hubtify\hubtify.db`
+en el scratchpad, con consultas de agregado.
+
+### 5.0 Advertencia de método, antes de los puntajes
+
+**La base real no se movió**, y no podía moverse: los cambios están en una rama,
+no en la app que el dueño usa. Reconsultada hoy, devuelve exactamente lo mismo
+que la baseline:
+
+| Medida | Baseline | Segunda medición |
+|---|---|---|
+| Tareas / sin `due_date` | 68 / 67 | 68 / 67 |
+| Óbolos ganados / gastados | 132 / 0 | 132 / 0 |
+| `rewards` / `shop_purchases` | 0 / 0 | 0 / 0 |
+| `favorite_foods` / `frequent_foods` | 0 / 0 | 0 / 0 |
+| Sellos del Códice / cierres de Nutrify | 1 / 6 | 1 / 6 |
+| Sesiones de Caldero / vinculadas a una tarea | 41 / 0 | 41 / 0 |
+
+Por eso **ningún criterio que la rúbrica define por una medición de la base puede
+alcanzar su banda alta acá**. Lo que sí cambió, y es lo que se puntúa, es si el
+código todavía tiene el agujero estructural que producía ese número. Donde la
+distinción importa (C9, C12) está dicho en la evidencia.
+
+### 5.1 Los journeys, recontados
+
+**J1 — usuario nuevo.** Las dos compuertas siguen: login de Firebase obligatorio
+(`App.tsx:106-115`) y onboarding de 4 pasos salteable con 1 clic. Lo que cambió
+es lo que pasa después: los cuatro botones del vacío del tablero
+(`Dashboard.tsx:483-498`) ya no navegan — piden el formulario del widget por el
+bus `hub:quickCreate` (`src/hub/widgets/quick-create.ts`) y el widget lo abre y
+se trae a la vista. **La primera misión pasa de 3 clics + N tecleos a 1 clic + el
+nombre + Enter.** El vacío suma un cuarto botón, "Creá tu primer ritual", que
+antes no existía en ningún lado del tablero.
+
+**J2 — día típico.**
+
+| Acción | Camino más corto | Antes | Ahora |
+|---|---|---|---|
+| Completar misión | tilde en el widget | 1 clic | 1 clic |
+| Cargar gasto | quick-add del widget | 2 clics + monto | igual |
+| Registrar comida nueva | widget → Cloud Function | 3 clics + texto + espera | igual |
+| **Repetir una comida** | pastilla en el widget del hub (`NutritionDashboardWidget.tsx:377-400`) | 1 cambio de ruta + 1 clic | **1 clic, sin red** |
+| **Repetir el día de ayer** | botón en el mismo widget | inalcanzable sin un favorito previo | **1 clic + confirmación** |
+| **Cerrar el día** | el lacre del Códice cierra también la jornada de comidas (`CodexSealModal.tsx:542-598`) | **dos** rituales, 1 ruta + 2 clics + 1 clic + hold | **un** ritual: 1 clic + 1,5 s de hold |
+
+**Dejaron de ser dos rituales.** El footer de Nutrify abre el mismo Códice
+(`Today.tsx:1971-1990`) y el popup de cierre —con su `closeResult` y su
+`doCloseDay`— se borró. Encadenar es seguro sin migración porque los dos
+backends ya rebotaban por su cuenta (`alreadyClosed`, `already_sealed`), y
+nutrición corre primero para que un rebote del sello no se lleve puesto un
+cierre que el usuario sí pidió.
+
+**J3 — la vuelta.** A partir de dos días sin anotar nada, el tablero abre con un
+bloque de regreso (`Dashboard.tsx:416-459`, lógica pura en
+`src/hub/return-brief.ts`): cuántos días pasaron, qué pasó con la racha, qué
+quedó vencido y **una** acción para retomar. La racha en cero se dice con "no
+hay multa"; las vencidas, como "se posponen sin costo". Las ventanas
+retroactivas por módulo siguen siendo cuatro y distintas.
+
+**J4 — teléfono.** Todo lo nuevo tiene reglas bajo `[data-shell="mobile"]` con
+blancos de 44 px, y de paso el botón de cerrar el día —que medía 37,5 px— llegó
+al piso. Los dos bugs abiertos de QA 0.9.1 y la sync sin `appStateChange` siguen
+como estaban: no se tocaron.
+
+### 5.2 Puntuación
+
+| # | Criterio | Baseline | Ahora | Evidencia |
+|---|---|---|---|---|
+| C1 | Primer valor | 4 | **5** | El muro del login sigue y es el techo; pero después el vacío ya no sólo enseña: crea (`Dashboard.tsx:483-498` → `quick-create.ts`). Primera misión en 1 clic + nombre |
+| C2 | Costo en régimen | 4 | **7** | Repetir comida = 1 clic sin red desde el hub; "Repetir ayer" = 1 clic + confirmación. `frequent_foods` por fin se llena sola (`nutrition.ipc.ts:80-137`, 8 tests). El alta completa de Coinify sigue en 6 clics |
+| C3 | Superficie de "hoy" | 5 | **7** | Un día completo se cierra desde el hub + el overlay del Códice; ya no hace falta pasar por `/nutrition`. Las 19 rutas y las 6 pestañas de Coinify siguen ahí para todo lo demás |
+| C4 | Qué hago ahora | 5 | **7** | "Hoy" dejó de estar estructuralmente vacía (bucket sin fecha, `TodayView.tsx:198-225`); el cierre de nutrición ahora se anuncia porque viaja con la invitación al sello; el regreso propone una acción concreta |
+| C5 | Vacíos que enseñan | 4 | **7** | Los 2 callejones sin salida del tablero crean de verdad; el aviso de Nutrify dice qué falta, es un botón y lleva al cálculo, y el anillo dejó de llenarse contra 2000 kcal inventadas. Los 5 vacíos de Coinify siguen sin CTA (los toma el rediseño en paralelo) |
+| C6 | Recuperación | 5 | **7** | Existe el resumen de "qué pasó mientras no estuviste" (≥2 días, 8 tests). Falta la ventana retroactiva coherente entre módulos, que es lo que separa un 7 de un 9 |
+| C7 | Un camino por concepto | 3 | **5** | Se eliminó el duplicado más caro: dos cierres de día que pagaban XP por separado. Siguen las 3 compuertas de perfil de nutrición, las 3 altas de cuotas de Coinify y `copyDay` vs `repeatDay` |
+| C8 | Continuidad | 4 | **4** | Sin cambios de fondo. Lo nuevo respeta 44 px y no desborda a 390 px (11 suites móviles verdes), pero GEN-01, CAU-03 y el hook de ciclo de vida siguen abiertos |
+| C9 | Canilla y desagüe | 3 | **6** | El agujero estructural se cerró: `rewards` arranca con tres premios borrables (core v8, ids deterministas y `updated_at` fijo para que el merge converja) y el saldo se ve donde se gana, con qué alcanza (`CodexSealModal.tsx:713-732`). **No es 8**: en la base real el ratio gastado/ganado sigue siendo 0 y sólo puede moverlo el uso |
+| C10 | Invita, no castiga | 8 | **8** | Intacto, que era el objetivo. El bloque de regreso informa y no reprocha. Sigue faltando la gracia de 2 días para la racha |
+| C11 | La metáfora | 6 | **6** | Los términos nuevos ("la bolsa", "el regreso", "la jornada de comidas", "sin fecha") se explican en su lugar y usan tokens existentes. `--ink-faded` 3.80:1 sobre `--parch-2` sigue sin resolverse |
+| C12 | Defaults | 3 | **4** | `frequent_foods` guarda el último valor usado, que es el que el atajo ofrece; el formulario de misión sugiere hoy sin imponerlo. `paymentMethod='cash'` **no se tocó a propósito** (lo hace el rediseño de Coinify en paralelo); `account_id` NULL y la fecha de nacimiento fabricada siguen |
+
+**Total: 73 / 120 · Promedio 6,1 / 10** (baseline 54 / 120 · 4,5).
+
+### 5.3 Lo que quedó sin hacer, y por qué
+
+- **Defaults de medio de pago (C12)** — excluido a propósito: lo cubre el
+  rediseño de Coinify en otra rama y chocarían.
+- **Modo local/invitado (C1)** — es el techo real de C1 y sigue siendo un
+  cambio grande (`AuthContext`, `App.tsx`, `sync.ts`). No entró.
+- **Ventana retroactiva coherente y gracia de 2 días (C6/C10)** — tocan el motor
+  de rachas e indultos; es trabajo con riesgo de XP que merece su propia rama.
+- **Los 5 vacíos de Coinify (C5)** y **las 3 altas de cuotas (C7)** — misma
+  razón que el primer punto.
+- **Ctrl+K para comida y gasto (C9 del informe original)** y **los dos bugs
+  móviles abiertos (C8)** — no entraron en esta pasada.
