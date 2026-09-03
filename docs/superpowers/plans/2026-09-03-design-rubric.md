@@ -329,10 +329,32 @@ Como control de que el arnés es el mismo: C2 devuelve **exactamente los tres
 mismos nodos** que la segunda medición (`.nutri-day-btn` 2.19, `.nutri-btn`
 «Estimar» 2.59, `.rwd-item__redeem` 3.62), con los mismos ratios al centésimo.
 
-Gates de la rama, corridos para este informe: `npx tsc --noEmit` **0** ·
-`npm run typecheck:shared-logic` **0** · `npm run test:visual` **312/312** (40
-archivos) · `npm run test:visual:mobile` **65/65** (13 archivos) · `npm test`
-**1949/1949**.
+### Revisión del 04:45 — tres commits después de medir
+
+Después de cerrar la medición entraron tres commits, y **volví a montar el arnés
+entero** (las 10 + las 11 pantallas) sobre el árbol nuevo en vez de razonar sobre
+el diff:
+
+| Commit | Qué toca | Efecto medido |
+|---|---|---|
+| `90a0632` | merge de `release/0.9.5` (reduce-motion del Caldero) | Contadores de CSS **idénticos** (596/624, 135 hex, 894 `rgba()`, 258 bloques móviles) |
+| `55aea72` | `DashboardWidget.tsx` de Coinify: select de moneda ARS/USD + `finance:getEntryDefaults` | **C4, C7 y C11 sin mover**, byte por byte: escritorio 3/0/4 y 327/335, teléfono 3/0/0 y 31/240. El control nuevo vive **dentro del formulario plegado**, que en el primer render está cerrado |
+| `528b294` | vocabulario en `es.json`/`en.json` y en los respaldos `t()` | **Cierra el hallazgo de C12** (censo propio abajo) |
+
+Del formulario abierto, lo que sí verifiqué del commit `55aea72`: el select de
+moneda mide **72×44** y el de medio de pago **129×44** — los dos pasan el piso
+de toque, y de los 22 controles del widget abierto **ninguno de los nuevos**
+cae bajo 44 px (los 3 que fallan son los mismos de siempre: dos `.qb-check` y
+el `toggle`). Cero desborde, `doc` y `main` en 0. La afirmación se sostiene.
+
+Y al abrir ese mismo formulario —cosa que ninguna de las tres mediciones había
+hecho— **apareció un fallo de contraste real que ninguna había visto**. Está en
+C2, abajo, y me obliga a bajarme una nota a mí mismo.
+
+Gates de la rama, corridos para este informe **después de borrar el arnés**:
+`npx tsc --noEmit` **0** · `npm run typecheck:shared-logic` **0** ·
+`npm run test:visual` **320/320** · `npm run test:visual:mobile` **66/66** ·
+`npm test` **1974/1974**.
 
 ## Los números duros, antes → después
 
@@ -358,9 +380,40 @@ DOM en vez de deducido: `.rwd-item__redeem` `disabled=true opacity=0.5`,
 `disabled=true opacity=0.4`. WCAG los excepta. **Contraste real de texto
 habilitado: 0 fallos en las 21 pantallas.**
 
-**C2 no se movió, y no podía moverse: ya estaba en el piso.** Está acá para
-demostrar que las 17 commits no rompieron nada de lo que la vuelta anterior
-arregló.
+**En estado por defecto C2 no se movió, y no podía moverse: ya estaba en el
+piso.** Esa tabla sigue siendo comparable con las dos vueltas anteriores porque
+mide lo mismo que ellas.
+
+#### Y ahí está el problema: las tres mediciones midieron sólo el estado por defecto
+
+Al revisar el commit `55aea72` abrí el formulario plegado del widget de Coinify
+en el tablero —el único sitio donde se renderiza el control nuevo— y el arnés
+devolvió **dos fallos que ninguna de las tres vueltas había visto**:
+
+| Nodo | Ratio | `disabled` | `opacity` | ¿Excusable? |
+|---|---|---|---|---|
+| `.rpg-button` «Registrar» | 3.09:1 | **true** | 0.4 | Sí — deshabilitado, WCAG lo excepta |
+| `.coin-dash-quick__type-btn` «Ingreso» | **3.62:1** | **false** | 0.5 | **No.** Está habilitado y es clickeable |
+
+«Ingreso» es la mitad no elegida del par Gasto/Ingreso: `coinify.css:2036` la
+apaga con `opacity: 0.5` y nada la deshabilita. Es **texto habilitado por debajo
+de AA**, y el umbral de 9 de esta misma rúbrica pide «≤1 fallo por pantalla y
+**ninguno <4.0:1**».
+
+Consecuencias, sin maquillar:
+
+1. **La frase «0 fallos de texto habilitado en las 21 pantallas» era cierta sólo
+   para el estado por defecto.** Con formularios y desplegables abiertos hay al
+   menos uno.
+2. **Bajo C2 de 9 a 8 en las dos plataformas**, y el 9 de la segunda medición
+   también estaba sobrevaluado: el control existe desde antes de esta rama, y
+   esa vuelta tampoco abrió el formulario. No es una regresión de estos commits;
+   es un agujero del método que arrastramos tres veces.
+3. La tabla por pantalla de arriba **se queda como está**, con su alcance
+   declarado: es lo único comparable con las vueltas anteriores.
+4. Para la cuarta vuelta el arnés tiene que abrir, en cada pantalla, los
+   formularios y menús que la pantalla ofrece. La mitad de los controles de esta
+   app viven detrás de un `toggle`.
 
 ### C1 — piso tipográfico
 
@@ -518,7 +571,7 @@ baseline decía 0). Y en las 11 pantallas del teléfono:
 | # | Criterio | Escritorio | Teléfono | Qué cambió (evidencia) |
 |---|---|---|---|---|
 | C1 | Piso tipográfico | 9 → 9 → **9** | 6 → 9 → **9** | 0 nodos <13 px en las 21 pantallas. 95.0 → **95.5 %** de `font-size` tokenizado: los 22 `font-size` nuevos de la rama son **los 22** con `var(--fs-*)`. Los 9 hardcodes <13 px son los mismos 9, línea por línea |
-| C2 | Contraste real | 4 → 9 → **9** | 3 → 9 → **9** | 3 y 3 fallos, los mismos seis nodos, los seis **deshabilitados** (verificado `disabled=true` en el DOM). Nada de lo que arregló la vuelta anterior se rompió |
+| C2 | Contraste real | 4 → 9 → **8** | 3 → 9 → **8** | **Baja**, y no por estos commits. En estado por defecto sigue en 3 y 3, los seis **deshabilitados** (verificado `disabled=true`). Pero al abrir el quick-add del tablero aparece `.coin-dash-quick__type-btn` «Ingreso» a **3.62:1 habilitado** (`opacity: 0.5`, `coinify.css:2036`). El umbral de 9 pide ninguno <4.0:1. El 9 de la vuelta anterior también estaba sobrevaluado: nadie abrió nunca un formulario |
 | C3 | Jerarquía | 6 → 7 → **8** | 7 → 7 → **7** | Questify «Hoy» dejó de tener dos ejes: token `--quest-today-measure: 960px` (`quests.css:1639-1651`) tomado por tira de stats, tira de pestañas, formulario y lista — **medido: los cinco en x=340, ancho 960**. `.quest-add-toggle-wrapper` borrada; el botón vive en `headerExtra` (`TaskList.tsx:564-576`). Ajustes recuperó el cromo del códice, así que las 8 páginas se enmarcan igual. En teléfono no se movió nada medible, y encima apareció un roce nuevo (ver C12) |
 | C4 | Densidad / ancho | 3 → 5 → **7** | 8 → 8 → **8** | 8 de 10 pantallas con `inkSpan` ≥92 %. `.coin-summary-card` 238→**127 px**; Recompensas sin el techo de 880 (`rwd-list` de 1324 px en dos columnas de 648); la crónica con hueco máximo de **8 px** y puntillado guía de 264 px, y **0 estilos en línea**. Quedan Ajustes al 62 % y el libro mayor al 66 % |
 | C5 | Longitud de línea | 2 → 8 → **8** | 10 → 10 → **10** | 3 → **4** nodos ≥90 ch. El cuarto es `.quest-row-title`, `nowrap` + `ellipsis` como los otros dos falsos positivos; su regla es idéntica en la base. El único texto corrido largo sigue siendo `.coin-category-legend__usd-note` (95 ch), sin tocar |
@@ -528,20 +581,25 @@ baseline decía 0). Y en las 11 pantallas del teléfono:
 | C9 | Feedback | 8 → 8 → **8** | 7 → 7 → **8** | Nadie lo tocó en esta rama. Sube el teléfono porque **el ítem 16 ya estaba hecho y las dos mediciones anteriores lo arrastraron sin volver a mirar**: `layout.css:1043-1044` clava `bottom: calc(12px + var(--safe-bottom))` en `.xp-toast` desde el commit `bee2841`, anterior incluso a `198ec21`. El crédito no es de esta vuelta; el número sí es el que corresponde |
 | C10 | Paridad | 6 → 7 → **7** | 6 → 7 → **7** | 0 desborde horizontal en las 11 pantallas del teléfono, y las 3 hojas nuevas nacieron con su bloque móvil (218 → 244 → **258**). No sube porque **la brecha es la misma**: `charts.css`, `notifications.css`, `help-bubble.css`, `tour.css` y `ChangelogModal.css` siguen sin un solo bloque |
 | C11 | Accesibilidad | 7 → 7 → **8** | 3 → 8 → **8** | **`aria-modal` cerrado: 23 de 23 diálogos lo tienen, 0 faltantes** — era el techo que la segunda medición nombró. 22 llegan por el spread de `useModalA11y` (19 archivos, 22 sitios) y 1 a mano en `TourOverlay.tsx:197`. 0 botones sin nombre accesible en las 21 pantallas. El toque del teléfono **no se movió**: 31 fallos, los 31 preexistentes |
-| C12 | Metáfora | 7 → 8 → **8** | 7 → 8 → **8** | Cerró el cromo: Ajustes con `BookPage` + ceja **TOMO VI — ORDINATIO CODICIS** (claves i18n reales, `es.json:2149-2150`), `qb-rule` y las cuatro escuadras; `PageHeader.tsx` **borrado** en `0fe5881` con 0 consumidores. Pero **no sube**, porque la afirmación central del commit `b8bc72f` —«una sola palabra por concepto»— no se sostiene, y porque Nutrify sigue siendo la única página sin `BookPage`. Detalle en «qué NO subió» |
+| C12 | Metáfora | 7 → 8 → **8** | 7 → 8 → **8** | Cerró el cromo (Ajustes con `BookPage` + ceja **TOMO VI — ORDINATIO CODICIS**, `qb-rule` y escuadras; `PageHeader.tsx` **borrado** con 0 consumidores) **y ahora también el vocabulario**: `528b294` cierra el hallazgo que yo había levantado, verificado con censo propio —`tarea/subtarea` 12→**0**, `task/subtask` 14→**0**, «ritual» en respaldos 9→**0**, `SALUD`/`VITA` 3→**0**, «meta» 10→**0**— y queda vigilado por `tests/i18n/vocabulario-unico.test.ts`. **Sigue en 8 igual**, porque el tope nunca fue el vocabulario: Nutrify es la única superficie de ruta sin `BookPage`, y «una sola convención» es literalmente lo que pide el 9 |
 | C13 | Animación | 8 → 8 → **8** | 8 → 8 → **8** | Sin tocar. `prefers-reduced-motion` en CSS 14→16, `infinite` 22→**24**: los dos loops nuevos (el shimmer del esqueleto y la brújula del chip de sync) traen su propia guarda (`states.css:59-64`, `sync-status-chip.css` dentro de `@media (prefers-reduced-motion: no-preference)`). `outline: none` 3→4, pero el cuarto es `.update-dialog:focus` (`shell.css:234-236`) sobre un contenedor con `tabIndex={-1}`: es el patrón correcto para el foco programático de un modal, no un control sin anillo |
-| | **Promedio** | **5.9 → 7.3 → 7.9** | **6.2 → 7.6 → 8.0** | |
+| | **Promedio** | **5.9 → 7.3 → 7.8** | **6.2 → 7.6 → 7.9** | |
 
-El escritorio sube 0.6 por dos criterios y medio: **C8** (+3), **C4** (+2) y
-**C3/C11** (+1 cada uno). El teléfono sube 0.4 y casi todo es **C8** (+3) más
-un **C7** (+1) y un **C9** (+1) que, siendo honestos, es un número que ya
-correspondía desde antes. **Ocho de los trece criterios no se movieron.**
+El escritorio sube 0.5 por **C8** (+3), **C4** (+2) y **C3/C11** (+1 cada uno),
+y devuelve 0.1 por la corrección de **C2** (−1). El teléfono sube 0.3: **C8**
+(+3), **C7** (+1), un **C9** (+1) que ya correspondía desde antes, y el mismo
+**C2** (−1). **Ocho de los trece criterios no se movieron**, y el único que se
+movió para abajo lo hizo porque el método mejoró, no porque la app empeorara.
 
 ## Qué NO subió, y por qué
 
-- **C2 (contraste) — no subió, y está bien.** Ya estaba en 9/9 con 3 fallos por
-  plataforma, los tres deshabilitados. No hay nada que ganar. Lo medí igual para
-  probar que las 17 commits no rompieron nada, y no rompieron nada.
+- **C2 (contraste) — BAJÓ, de 9 a 8 en las dos plataformas.** En estado por
+  defecto está intacto: 3 fallos y 3, los seis deshabilitados, ni una regresión
+  de las 17 commits. Bajó porque **al abrir un formulario apareció un fallo
+  habilitado a 3.62:1** (`.coin-dash-quick__type-btn` «Ingreso») que las tres
+  mediciones se perdieron por medir sólo el primer render. No lo rompió nadie
+  esta vuelta: estaba desde antes de la rama. Lo que cambió es que ahora se ve.
+  Un 9 que se sostenía sobre un alcance incompleto no era un 9.
 
 - **C6 (consistencia) — no subió, y esta vez sí es una deuda.** El ítem 19 de la
   lista de mejoras («reemplazar los hex sueltos que duplican un token») es una
@@ -569,34 +627,51 @@ correspondía desde antes. **Ocho de los trece criterios no se movieron.**
   sección de hábitos en la pantalla que esta misma vuelta reordenó. Se le
   arreglaron los ejes y se le pasó por al lado el blanco de toque.
 
-- **C12 (metáfora) — no subió, y el motivo es incómodo.** El commit `b8bc72f`
-  se titula «una sola palabra por concepto (Vigor, Hábito, Misión)». Contado
-  sobre `src/i18n/es.json`, **no es cierto para ninguno de los tres**:
-  - **Vigor**: existe `rpg.vigor` y `dashboard.cartHp: "VIGOR"`, pero **«HP»
-    sigue siendo texto visible en 11 valores** (`es.json:1092, 1095, 1096, 1097,
-    1215, 1318, 1320, 1322, 1344, 1359` en `nutrify`, y `:2325` en el tour) —
-    p. ej. `hpExplanation: "HP según cercanía al objetivo…"`. Encima hay una
-    clave duplicada, `rpg.vita: "VIGOR"` (`:2121`), y un respaldo obsoleto
-    `'VITA'` en `Dashboard.tsx:556`. Son **tres nombres** para una barra.
-  - **Hábito**: el `es.json` sí está limpio (21 valores con «hábito», cero con
-    «ritual» como sustantivo), pero **los respaldos del TSX siguen diciendo
-    «ritual»** en 8 sitios (`Dashboard.tsx:481`, `HabitsDashboardWidget.tsx:94,
-    124, 135, 136, 146`, `HabitTracker.tsx:337`, `TodayView.tsx:221`). Sólo
-    salen si falta una clave — pero la capa de respaldo es exactamente donde
-    vive la definición por defecto del vocabulario.
-  - **Misión**: conviven **las tres**. «Tarea/subtarea» sobrevive en 11 valores,
-    incluido `first_quest.desc: "Completaste tu primera tarea."` cuyo propio
-    título es «Primera Misión» — dos palabras para el mismo concepto **dentro
-    del mismo logro**. Y `nav.questifyDesc` dice «Misiones y hábitos» mientras
-    `questifyDesc` dice «Tareas y productividad».
+- **C12 (metáfora) — no subió, pero ahora el motivo es OTRO, y hay que decirlo
+  con el mismo énfasis con que lo acusé.** En la primera pasada de esta medición
+  escribí que la afirmación del commit `b8bc72f` —«una sola palabra por
+  concepto»— no se sostenía, y di los números. El commit `528b294` la hizo
+  cierta. Lo verifiqué con un censo propio (no con los números que me pasaron),
+  aplanando `es.json`/`en.json` y extrayendo el 2.º argumento literal de cada
+  `t()` bajo `src/`:
 
-  Sumado a eso: **Nutrify sigue sin `BookPage`** —es la única superficie de
-  ruta que no lo usa; las otras ocho sí— y el título de la cabecera del teléfono
-  sigue diciendo **«Tabla del Aventurero»** (`MobileShell.tsx:27-30`, sin entrada
-  para `'/'` en `SECTION_TITLES`) donde el ítem del cajón dice **«Inicio»**
-  (`Sidebar.tsx:107` → `es.json:1018`). El puente existe (`nav.homeDesc`) pero en
-  escritorio vive sólo en `aria-label`/`title`, o sea invisible. Cerrar dos
-  roces y dejar tres abiertos no mueve el criterio.
+  | Regla | `50fd042` (es / en / respaldos) | **HEAD** |
+  |---|---|---|
+  | `tarea` / `subtarea` | 12 / 0 / 3 | **0 / 0 / 0** |
+  | `task` / `subtask` | 1 / 13 / 1 | **0 / 0 / 0** |
+  | «ritual» | 1 / 1 / 9 | **1 / 1 / 0** ᵃ |
+  | `SALUD` / `VITA` (rótulo) | 0 / 0 / 3 | **0 / 0 / 0** |
+  | «meta» (rótulo) | 7 / 0 / 3 | **0 / 0 / 0** |
+  | `HP` | 11 / 11 / 5 | **7 / 7 / 3** ᵇ |
+
+  ᵃ El único «ritual» que queda es `rpg.achievements.ritualist.title`
+  («Ritualista»): nombre propio con id persistido en la base y en la sync.
+  Excepción legítima. ᵇ Leí **los siete** enteros: los siete son el par
+  abreviado «XP y HP» de los textos de cierre de Nutrify, donde «HP» no es
+  rótulo suelto sino la mitad de un par. Los cuatro que **sí** eran rótulo
+  suelto (`hpExplanation`, `scoringBands`, `status.deficit.over`,
+  `tour.playerCard.desc`) pasaron a Vigor. Y el respaldo `'VITA'` de
+  `Dashboard.tsx` ya no existe.
+
+  De yapa, dos contradicciones que había señalado y que también cerraron:
+  `first_quest.desc` ahora dice «Completaste tu primera **misión**» (su título
+  siempre fue «Primera Misión»), y `onboarding.questifyDesc` pasó a «Misiones y
+  hábitos», igual que `nav.questifyDesc`. La sub-unidad `subtarea` es ahora
+  «paso». Todo vigilado por `tests/i18n/vocabulario-unico.test.ts`.
+
+  **Entonces, ¿por qué sigue en 8?** Porque el vocabulario nunca fue el tope —
+  era el argumento que yo había puesto para no subirlo, y el tope es otro:
+  **Nutrify es la única superficie de ruta sin `BookPage`** (0 archivos bajo
+  `src/modules/nutrition/components/` lo usan; las otras ocho superficies sí),
+  y el 9 pide literalmente «**una sola** convención». Queda además, más chico:
+  la cabecera del teléfono sigue diciendo **«Tabla del Aventurero»**
+  (`MobileShell.tsx:16-30`, sin entrada para `'/'` en `SECTION_TITLES`) donde el
+  cajón dice **«Inicio»** — aunque eso se atenuó, porque `nav.homeDesc` («Tu día
+  de un vistazo — la Tabla del Aventurero») ahora se **pinta** como segundo
+  renglón en el cajón, así que en el teléfono el puente se ve; en escritorio
+  sigue viviendo sólo en `aria-label`/`title`. Y sobrevive la clave duplicada
+  `rpg.vita` = `"VIGOR"` junto a `rpg.vigor` = `"Vigor"`: interna, sin efecto
+  visible, pero son dos claves para una barra.
 
 - **C8 no llegó a 9, y le faltó poco.** Dos razones, las dos duras:
   1. **La ficha de Personaje sigue con la brújula.** `CharacterPage.tsx:178`
@@ -643,7 +718,29 @@ correspondía desde antes. **Ocho de los trece criterios no se movieron.**
    mejora medida por su diff y no por su efecto**. Ahora sí está sobre la clase
    real (`coinify.css:3540`) y se mide: 238 → 127 px.
 
-3. **La justificación escrita del disco de selección (C7) no se sostiene, aunque
+3. **El arreglo del par Gasto/Ingreso se aplicó a uno de los dos gemelos.**
+   `components.css:159-167` corrige `.rpg-btn-active` con un comentario que
+   nombra el defecto exacto: «"Gasto" seleccionado en el libro mayor medía
+   3.05:1». Su gemelo en el widget del tablero,
+   `.coin-dash-quick__type-btn` (`coinify.css:2032-2052`), hace lo mismo con
+   otra técnica —apaga la mitad no elegida con `opacity: 0.5`— y **nadie lo
+   tocó**: «Ingreso» queda a **3.62:1, habilitado y clickeable**. Es la misma
+   clase de error que el punto 2: **el arreglo se hizo donde la medición miraba,
+   no donde estaba el patrón.** Dos sitios que pintan el mismo control con dos
+   técnicas distintas es, además, lo que hace que un arreglo no se propague.
+
+4. **`CategorySelect` tiene un `.then()` sin `.catch()`** —
+   `src/modules/finance/components/shared/CategorySelect.tsx:35-39`:
+   `window.api.financeGetCategories().then((cats) => setCategories(cats.filter(…)))`.
+   Si el canal falla o devuelve `null`, es una promesa rechazada sin manejar y
+   el selector se queda vacío sin decir nada. Lo levantó el propio arnés
+   (`TypeError: Cannot read properties of null (reading 'filter')`) al abrir el
+   formulario. Duele especialmente porque **es exactamente la clase de defecto
+   que esta vuelta salió a cazar** en C8 (las 7 promesas sin `catch` del
+   Caldero): quedó viva en un componente compartido de finance que el widget del
+   tablero monta.
+
+5. **La justificación escrita del disco de selección (C7) no se sostiene, aunque
    el cambio sí sirva.** El comentario de `quests.css:364-365` dice que la
    casilla de lote tenía «el mismo dibujo y **los mismos colores**» que el
    `QuillCheckbox`. Los colores nunca fueron los mismos: el `QuillCheckbox` va
@@ -657,27 +754,27 @@ correspondía desde antes. **Ocho de los trece criterios no se movieron.**
    por encima del 3:1 que WCAG le pide a un gráfico, así que el control pasa,
    pero el número escrito en el archivo es falso.
 
-4. **El `gap: 8px` de la crónica no es nuevo.** El comentario de la vuelta lo
+6. **El `gap: 8px` de la crónica no es nuevo.** El comentario de la vuelta lo
    presenta como parte del arreglo; en realidad es un port literal del
    `gap: 8` que ya estaba en el `style={{}}` en línea de `release/0.9.5`. Lo
    que cierra el hueco de 278–491 px es el puntillado
    (`dashboard-layouts.css:329-335`) y el `gap: 6px` de
    `.dash-chronicle__fact`. El mérito es real; la atribución no.
 
-5. **`.quest-columns--single` quedó fuera del token que la gobierna.** En
+7. **`.quest-columns--single` quedó fuera del token que la gobierna.** En
    `quests.css:1643-1651` el selector se lista **sin** el prefijo
    `.quest-page--today`, así que fuera de «Hoy» no toma
    `--quest-today-measure` sino el respaldo literal `960px`. Y quedó un bloque
    duplicado y muerto: `.quest-columns--single { grid-template-columns: 1fr }`
    aparece dos veces, en `:1506-1508` y en `:1653-1655`.
 
-6. **Los comentarios nuevos de `coinify.css` citan líneas que ya no existen.**
+8. **Los comentarios nuevos de `coinify.css` citan líneas que ya no existen.**
    `coinify.css:3536` remite a «líneas 1127 y 1144» de `Dashboard.tsx` y
    `:3544` a la 1139 — son los números de `release/0.9.5`; hoy son 1158, 1175 y
    1170. Un comentario que apunta a una línea equivocada envejece peor que no
    tener comentario.
 
-7. **`useModalA11y` es, de hecho, la razón por la que C11 cerró — y también por
+9. **`useModalA11y` es, de hecho, la razón por la que C11 cerró — y también por
    la que la métrica de `aria-modal` es invisible a `grep`.** De los 23
    diálogos, **22 reciben `role` y `aria-modal` por el spread `{...dialogProps}`**
    (`useModalA11y.ts:171-176`) y uno solo lo escribe literal. Un `grep
@@ -685,7 +782,7 @@ correspondía desde antes. **Ocho de los trece criterios no se movieron.**
    de un comentario. Cualquier auditoría futura que cuente por texto va a
    reportar un desastre que no existe.
 
-8. **La segunda medición dejó C9 del teléfono en 7 sin volver a medirlo.** El
+10. **La segunda medición dejó C9 del teléfono en 7 sin volver a medirlo.** El
    ítem 16 («toast con `bottom: calc(20px + var(--safe-bottom))`») ya estaba
    implementado —`layout.css:1043-1044`, commit `bee2841`— antes incluso del
    árbol que esa medición auditó. Es el riesgo del formato: un criterio que
