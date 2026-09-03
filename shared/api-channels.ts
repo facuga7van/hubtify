@@ -286,6 +286,8 @@ export const API_CHANNELS = {
   feedbackSend: { channel: 'feedback:send', kind: 'invoke' },
   // Syl (read-projection snapshot)
   sylBuildSnapshot: { channel: 'syl:buildSnapshot', kind: 'invoke' },
+  // Instalación duplicada de Squirrel (solo Windows empaquetado)
+  getInstallWarning: { channel: 'app:getInstallWarning', kind: 'invoke', platforms: 'desktop' },
   // Updater
   updaterCheck: { channel: 'updater:check', kind: 'invoke', platforms: 'desktop' },
   updaterDownload: { channel: 'updater:download', kind: 'invoke', platforms: 'desktop' },

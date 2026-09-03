@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Tick } from '../../../shared/components/codex';
 import { useToast } from '../../../shared/components/useToast';
 import type { HabitWithStreak } from '../types';
-import { processHabitCheck, isHabitPeriodComplete, isHabitRelevantToday } from '../utils';
+import { processHabitCheck, isHabitSettledToday, isHabitRelevantToday } from '../utils';
 
 const MAX_WIDGET_HABITS = 8;
 
@@ -43,7 +43,7 @@ export default function HabitsDashboardWidget() {
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
 
-  const isPeriodComplete = isHabitPeriodComplete;
+  const isSettledToday = isHabitSettledToday;
   // A Mon/Wed/Fri habit on a Tuesday is not today business: showing it unticked
   // invents a debt and quietly drags the "3/5 hoy" counter down every Tuesday.
   const habits = allHabits.filter(isHabitRelevantToday);
@@ -71,7 +71,7 @@ export default function HabitsDashboardWidget() {
     );
   }
 
-  const checkedCount = habits.filter(h => isPeriodComplete(h)).length;
+  const checkedCount = habits.filter(h => isSettledToday(h)).length;
   // Same cap as the tasks widget — an unbounded list turned this card into a
   // permanent scroll well once you had a dozen habits.
   const displayHabits = habits.slice(0, MAX_WIDGET_HABITS);
@@ -88,11 +88,11 @@ export default function HabitsDashboardWidget() {
               gap: 8,
               padding: '3px 0',
               fontSize: 'var(--fs-label)',
-              color: isPeriodComplete(h) ? 'var(--ink-faded)' : 'var(--ink)',
+              color: isSettledToday(h) ? 'var(--ink-faded)' : 'var(--ink)',
             }}
           >
             <Tick
-              checked={isPeriodComplete(h)}
+              checked={isSettledToday(h)}
               onChange={() => handleCheck(h.id)}
               label={h.name}
             />
@@ -102,8 +102,8 @@ export default function HabitsDashboardWidget() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
                 flex: 1,
-                textDecoration: isPeriodComplete(h) ? 'line-through' : undefined,
-                opacity: isPeriodComplete(h) ? 0.6 : 1,
+                textDecoration: isSettledToday(h) ? 'line-through' : undefined,
+                opacity: isSettledToday(h) ? 0.6 : 1,
               }}
               title={h.name}
             >

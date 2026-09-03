@@ -7,7 +7,7 @@ import { HeatmapCalendar, type CellLevel } from '../../../shared/components/char
 import { Shield } from '../../../shared/components/icons/CodexIcons';
 import type { HabitWithStreak, HabitFrequency } from '../types';
 import { MAX_HABIT_SHIELDS } from '../types';
-import { processHabitCheck, isHabitPeriodComplete } from '../utils';
+import { processHabitCheck, isHabitSettledToday } from '../utils';
 import { questsApi } from '../api';
 import { formatDateString, daysAgoDateString } from '../../../../shared/date-utils';
 import HelpBubble from '../../../shared/components/HelpBubble';
@@ -316,7 +316,7 @@ export default function HabitTracker({ onXpGained }: Props) {
     return `${h.checksThisPeriod}/${h.targetThisPeriod}`;
   };
 
-  const isPeriodComplete = isHabitPeriodComplete;
+  const isSettledToday = isHabitSettledToday;
   const todayDow = todayIsoWeekday();
 
   if (loading) return (
@@ -345,7 +345,7 @@ export default function HabitTracker({ onXpGained }: Props) {
       {/* Completion summary */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span className="quest-habit-progress">
-          {habits.filter(h => isPeriodComplete(h)).length}/{habits.length}
+          {habits.filter(h => isSettledToday(h)).length}/{habits.length}
         </span>
         <button
           type="button"
@@ -411,10 +411,10 @@ export default function HabitTracker({ onXpGained }: Props) {
               {/* The biggest target in the row does the most common thing: check it. */}
               <button
                 type="button"
-                className={`quest-habit-name${isPeriodComplete(h) ? ' quest-habit-name--done' : ''}`}
+                className={`quest-habit-name${isSettledToday(h) ? ' quest-habit-name--done' : ''}`}
                 onClick={() => handleCheck(h.id)}
                 title={h.name}
-                aria-pressed={isPeriodComplete(h)}
+                aria-pressed={isSettledToday(h)}
               >
                 {h.name}
               </button>

@@ -5,6 +5,7 @@ import MobileShell from './MobileShell';
 import { useShellKind } from './useShellKind';
 import UpdateNotification from './UpdateNotification';
 import UpdateBanner from './UpdateBanner';
+import InstallLocationBanner from './InstallLocationBanner';
 import type { PlayerStats } from '../../shared/types';
 import { useAuthContext } from '../shared/AuthContext';
 import { syncPush, syncPull, SYNC_PUSH_FAILED_EVENT } from '../shared/sync';
@@ -738,6 +739,9 @@ export default function Layout() {
         </Suspense>
       ) : (
         <>
+          {/* Instalación duplicada de Squirrel — desktop únicamente; el propio
+              componente se apaga solo si `getInstallWarning` no existe. */}
+          <InstallLocationBanner />
           {updateAvailable && (
             <UpdateBanner
               version={updateAvailable.version}

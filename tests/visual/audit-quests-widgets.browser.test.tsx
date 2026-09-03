@@ -150,4 +150,31 @@ describe('Widgets del tablero — tarjeta angosta', () => {
     console.log('[audit] fuente de la racha del widget:', font);
     expect(font).not.toMatch(/Cinzel/i);
   });
+
+  /* El bug que reportó el usuario: «Gimnasio», 3 veces por semana, marcado hoy.
+     La lista de Hábitos lo daba por hecho (lee `checkedToday`) y este widget lo
+     pintaba sin tildar, porque miraba el progreso del período (2/3). */
+  test('hábitos: un 3x/semana marcado hoy se ve tildado aunque la semana vaya 2/3', async () => {
+    const original = (window as unknown as { api: Record<string, unknown> }).api.questsGetHabits;
+    (window as unknown as { api: Record<string, unknown> }).api.questsGetHabits = () => Promise.resolve([
+      habit({
+        id: 'gym', name: 'Gimnasio', frequency: 'weekly', timesPerWeek: 3, streak: 2,
+        checkedToday: true, checksThisPeriod: 2, targetThisPeriod: 3, pendingToday: false,
+      }),
+    ]);
+    try {
+      await page.viewport(900, 700);
+      card(<HabitsDashboardWidget />, 300);
+      await settle();
+      await page.screenshot({ path: `${SCREENS}/audit-quests-w4-habito-semanal.png` });
+
+      const tick = el('.widget-list-flow [role="checkbox"]');
+      expect(tick.getAttribute('aria-checked')).toBe('true');
+      expect(tick.className).toMatch(/qb-check--done/);
+      // Y el pie del widget lo cuenta como hecho, no como deuda.
+      expect(el('.widget-list-flow')!.parentElement!.textContent).toContain('1/1');
+    } finally {
+      (window as unknown as { api: Record<string, unknown> }).api.questsGetHabits = original;
+    }
+  });
 });
