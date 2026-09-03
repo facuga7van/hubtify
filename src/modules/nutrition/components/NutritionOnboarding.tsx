@@ -199,7 +199,7 @@ export default function NutritionOnboarding({ onComplete, onSkip }: Props) {
           {tdee > 0 && (
             <div className="nutri-tdee-preview">
               <p>{t('nutrify.tdeeEstimateLabel', 'Estimación inicial (TDEE)')}: <strong>{tdee} kcal/{t('nutrify.perDay', 'day')}</strong></p>
-              <p>{t('nutrify.dailyTarget', 'Daily target')}: <strong>{dailyTarget} kcal/{t('nutrify.perDay', 'day')}</strong></p>
+              <p>{t('nutrify.dailyTarget', 'Objetivo diario')}: <strong>{dailyTarget} kcal/{t('nutrify.perDay', 'día')}</strong></p>
               <p style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-soft)', margin: '4px 0 0' }}>
                 {t('nutrify.tdeeEstimateNote', 'Es sólo una estimación de arranque: el objetivo real se ajusta con tu actividad de los últimos 14 días.')}
               </p>

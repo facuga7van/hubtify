@@ -430,7 +430,7 @@ export default function NutritionSettings() {
 
         {tdee > 0 && (
           <div className="nutri-daily-target-preview">
-            {t('nutrify.dailyTargetEstimate', 'Meta diaria estimada')}:{' '}
+            {t('nutrify.dailyTargetEstimate', 'Objetivo diario estimado')}:{' '}
             <strong>{Math.round(tdee + (goal === 'deficit' ? -goalAmount : goal === 'surplus' ? goalAmount : 0))} kcal</strong>
             <span className="nutri-target-breakdown">
               (TDEE {tdee} {goal === 'deficit' ? '-' : goal === 'surplus' ? '+' : '\u00b1'} {goal === 'maintain' ? 0 : goalAmount})

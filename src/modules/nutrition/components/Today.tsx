@@ -2005,7 +2005,7 @@ export default function Today() {
             disabled={consumed === 0}
             title={consumed === 0
               ? t('nutrify.closeDayDisabled', 'Registrá al menos una comida para poder cerrar el día')
-              : t('nutrify.closeDayTitleCodex', 'Cerrá el día en el Códice: nutrición y sello, un solo ritual')}
+              : t('nutrify.closeDayTitleCodex', 'Cerrá el día en el Códice, el diario de tus días: comidas y sello en un solo paso')}
             onClick={() => openCodex(date)}
           >
             {t('nutrify.closeDayInCodex', 'Cerrar el día en el Códice')}
@@ -2402,7 +2402,7 @@ function DayBreakdown({ data, t }: { data: { xpPrecision: number; xpSteps: numbe
               <span className={data.hpChange >= 0 ? 'nutri-green' : 'nutri-red'} style={{ marginLeft: 8 }}>
                 {data.hpChange >= 0 ? '+' : ''}{data.hpChange} HP
               </span>
-              <HelpBubble variant="inline" text={t('nutrify.hpExplanation', 'HP según cercanía al objetivo: dentro del rango = +HP, fuera del rango = -HP')} />
+              <HelpBubble variant="inline" text={t('nutrify.hpExplanation', 'Vigor según cercanía al objetivo: dentro del rango = +Vigor, fuera del rango = -Vigor')} />
             </>
           )}
         </span>

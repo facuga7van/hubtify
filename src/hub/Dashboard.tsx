@@ -478,7 +478,7 @@ export default function Dashboard() {
                   {t('dashboard.emptyCtaQuest', 'Creá tu primera misión')}
                 </button>
                 <button className="rpg-button" onClick={() => requestQuickCreate('habit')}>
-                  {t('dashboard.emptyCtaHabit', 'Creá tu primer ritual')}
+                  {t('dashboard.emptyCtaHabit', 'Creá tu primer hábito')}
                 </button>
                 <button className="rpg-button" onClick={() => requestQuickCreate('meal')}>
                   {t('dashboard.emptyCtaMeal', 'Registrá una comida')}
@@ -553,7 +553,7 @@ export default function Dashboard() {
         <Tooltip text={t('dashboard.cartLevelTip', 'Nivel actual del héroe')}><Cartouche label={t('dashboard.cartLevel', 'NIVEL')} value={level} foot={stats?.title} icon={<Crown width={14} height={14} />} /></Tooltip>
         <Tooltip text={t('dashboard.cartXpTip', 'Experiencia ganada hoy')}><Cartouche label={t('dashboard.cartXp', 'XP HODIE')} value={xpToday >= 0 ? `+${xpToday}` : `${xpToday}`} foot={t('dashboard.cartXpFoot', 'ganados al sol')} icon={<Sword width={14} height={14} />} tone="sage" /></Tooltip>
         <Tooltip text={t('dashboard.cartStreakTip', 'Días consecutivos de actividad')}><Cartouche label={t('dashboard.cartStreak', 'RACHA')} value={streak} foot={t('dashboard.cartStreakFoot', 'días de gloria')} icon={<Flame width={14} height={14} />} /></Tooltip>
-        <Tooltip text={t('dashboard.cartHpTip', 'Salud actual del héroe')}><Cartouche label={t('dashboard.cartHp', 'VITA')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" /></Tooltip>
+        <Tooltip text={t('dashboard.cartHpTip', 'Vigor actual del héroe')}><Cartouche label={t('dashboard.cartHp', 'VIGOR')} value={hp} foot={`${t('dashboard.cartHpFoot', 'de')} ${stats?.maxHp ?? 100} ${t('dashboard.cartHpUnit', 'puntos')}`} icon={<Heart width={14} height={14} />} tone="rubric" /></Tooltip>
       </div>
 
       <QBDividerSection />

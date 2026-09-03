@@ -334,7 +334,7 @@ export default function HabitTracker({ onXpGained }: Props) {
          dos vacíos distintos a diez centímetros uno del otro. */
       <div className="quest-empty quest-empty--inline">
         <Flame width={28} height={28} aria-hidden="true" />
-        <p>{t('questify.habitsEmptyHint', 'Rituales diarios o semanales que querés mantener.')}</p>
+        <p>{t('questify.habitsEmptyHint', 'Hábitos diarios o semanales que querés mantener.')}</p>
         <button type="button" className="qb-rune quest-rune-btn" onClick={() => setAdding(true)}>
           + {t('questify.addHabit')}
         </button>

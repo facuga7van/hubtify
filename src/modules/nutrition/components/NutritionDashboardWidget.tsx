@@ -332,14 +332,14 @@ export default function NutritionDashboardWidget() {
                2000 kcal. Now it names what is missing and goes to fix it. */
             <div className="nutri-empty nutri-dash-setup">
               <p className="nutri-dash-setup__text">
-                {t('nutrify.targetNotSet', 'Todavía no fijaste tu meta diaria. Podés registrar igual: el anillo se llena cuando la definas.')}
+                {t('nutrify.targetNotSet', 'Todavía no fijaste tu objetivo diario. Podés registrar igual: el anillo se llena cuando lo definas.')}
               </p>
               <button
                 type="button"
                 className="widget-empty-cta"
                 onClick={() => navigate('/nutrition')}
               >
-                {t('nutrify.targetNotSetCta', 'Calculá tu meta')}
+                {t('nutrify.targetNotSetCta', 'Calculá tu objetivo')}
               </button>
             </div>
           )}

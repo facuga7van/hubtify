@@ -357,7 +357,7 @@ export default function SettingsPage() {
 
           <div className="settings-subhead">{t('settings.notifModules', 'Por módulo')}</div>
           {([
-            { key: 'quests', state: notifQuests, setter: setNotifQuests, label: t('settings.notifQuests', 'Questify'), desc: t('settings.notifQuestsDesc', 'Tareas vencidas, atrasadas y estancadas') },
+            { key: 'quests', state: notifQuests, setter: setNotifQuests, label: t('settings.notifQuests', 'Questify'), desc: t('settings.notifQuestsDesc', 'Misiones vencidas, atrasadas y estancadas') },
             { key: 'nutrition', state: notifNutrition, setter: setNotifNutrition, label: t('settings.notifNutrition', 'Nutrify'), desc: t('settings.notifNutritionDesc', 'Días sin cerrar, comidas sin registrar y peso semanal') },
             { key: 'finance', state: notifFinance, setter: setNotifFinance, label: t('settings.notifFinance', 'Coinify'), desc: t('settings.notifFinanceDesc', 'Cuotas por vencer, cierres de tarjeta y préstamos') },
             // The Cauldron had no toggle at all: its system notifications could

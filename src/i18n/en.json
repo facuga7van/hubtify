@@ -967,8 +967,8 @@
     "POMODORO_COMPLETED": "Pomodoro completed",
     "RECURRING_UPDATED": "Recurring expense updated",
     "STATEMENT_IMPORTED": "Statement imported",
-    "SUBTASK_COMPLETED": "Subtask completed",
-    "SUBTASK_UNCOMPLETED": "Subtask uncompleted",
+    "SUBTASK_COMPLETED": "Step completed",
+    "SUBTASK_UNCOMPLETED": "Step uncompleted",
     "TASK_COMPLETED": "Quest completed",
     "TASK_CREATED": "Quest created",
     "TASK_UNCOMPLETED": "Quest uncompleted"
@@ -1212,7 +1212,7 @@
     "historyTimesLogged": "{{count}} time",
     "historyTimesLogged_other": "{{count}} times",
     "historyUsuals": "Your usuals",
-    "hpExplanation": "HP based on target accuracy: within range = +HP, outside range = -HP",
+    "hpExplanation": "Vigor based on target accuracy: within range = +Vigor, outside range = -Vigor",
     "inProgress": "in progress",
     "invalidCalories": "Calories must be greater than 0",
     "itemCaloriesLabel": "Calories for {{name}}",
@@ -1341,7 +1341,7 @@
     "saveProfile": "Save Changes",
     "saveToFavorites": "Save to favorites",
     "saved": "Saved",
-    "scoringBands": "How it scores: cutting counts as a hit if you eat up to your target; bulking, if you reach it or go past; maintenance, within ±10 %. Outside that: up to 10 % off = -5 HP, up to 20 % = -10 HP, beyond = -20 HP.",
+    "scoringBands": "How it scores: cutting counts as a hit if you eat up to your target; bulking, if you reach it or go past; maintenance, within ±10 %. Outside that: up to 10 % off = -5 Vigor, up to 20 % = -10, beyond = -20.",
     "sedentary": "Sedentary",
     "setupRequired": "Setup required",
     "targetNotSet": "You have not set a daily target yet. You can still log: the ring fills once you define it.",
@@ -1356,7 +1356,7 @@
         "close": "Almost at target — stay focused",
         "early": "Keep logging your meals",
         "good": "Good deficit — on track for XP bonus",
-        "over": "Over TDEE — HP penalty at day close!",
+        "over": "Over TDEE — Vigor penalty at day close!",
         "warning": "Over target but under TDEE — tighten up"
       },
       "maintain": {
@@ -1477,7 +1477,7 @@
     "nutriftyDesc": "Nutrition and calories",
     "passwordMin": "Password must be at least 6 characters",
     "preferences": "Preferences",
-    "questifyDesc": "Tasks and productivity",
+    "questifyDesc": "Quests and habits",
     "ready": "Your codex is ready!",
     "readyDesc": "Explore the modules with the guided tour",
     "register": "Create Account",
@@ -1498,7 +1498,7 @@
     "actionsHelp": "Quick shortcuts to manage projects, notes, and quest settings.",
     "addHabit": "New habit",
     "addQuest": "Add Quest",
-    "addSubtask": "+ Add Subtask",
+    "addSubtask": "+ Add step",
     "allCategories": "All categories",
     "allProjects": "All projects",
     "batchComplete": "Complete",
@@ -1507,7 +1507,7 @@
     "brewStarted": "The cauldron brews for this quest",
     "brewThis": "Focus in the Cauldron",
     "campaigns": "Campaigns",
-    "campaignsHelp": "Progress of your active projects. Each completed task advances the project bar.",
+    "campaignsHelp": "Progress of your active projects. Each completed quest advances the project bar.",
     "cancel": "Cancel",
     "categoryName": "Category name",
     "chooseDays": "Pick days",
@@ -1533,7 +1533,7 @@
     "deleteHabitConfirm": "Delete this habit and all its history?",
     "deleteNote": "Delete note",
     "deleteNoteConfirm": "Delete this note? This cannot be undone.",
-    "deleteProjectConfirm": "Tasks from this project will move to 'No project'. Continue?",
+    "deleteProjectConfirm": "Quests from this project will move to 'No project'. Continue?",
     "description": "Description (optional)",
     "doneToday": "done today",
     "dragHandle": "Reorder",
@@ -1658,10 +1658,10 @@
     "statsHelp": "Quest summary: in progress, overdue, due today, and completed.",
     "streakDays": "{{count}} days",
     "streakSaved": "Your streak survived — one day does not define you, adventurer",
-    "subtaskDeleteConfirm": "Delete this subtask?",
-    "subtaskLimit": "Max 30 subtasks reached",
-    "subtaskName": "Subtask name",
-    "subtasksLabel": "subtasks",
+    "subtaskDeleteConfirm": "Delete this step?",
+    "subtaskLimit": "Max 30 steps reached",
+    "subtaskName": "Step name",
+    "subtasksLabel": "steps",
     "subtitle": "Manage your daily adventures",
     "taskListHelp": "Quests sorted by due date and priority. Tier I = 5 XP, Tier II = 15 XP, Tier III = 40 XP.",
     "taskUncompleted": "Quest reopened — {{xp}} XP deducted",
@@ -1794,7 +1794,7 @@
         "title": "First Bite"
       },
       "first_quest": {
-        "desc": "You completed your first task.",
+        "desc": "You completed your first quest.",
         "title": "First Quest"
       },
       "first_seal": {
@@ -2212,7 +2212,7 @@
     "notifNutrition": "Nutrify",
     "notifNutritionDesc": "Unclosed days, unlogged meals, and weight check-in",
     "notifQuests": "Questify",
-    "notifQuestsDesc": "Overdue, stale, and due-soon tasks",
+    "notifQuestsDesc": "Overdue, stale, and due-soon quests",
     "notifications": "Notifications",
     "notificationsInApp": "In-App Notifications",
     "notificationsInAppDesc": "Notification center with pending items",
@@ -2322,11 +2322,11 @@
       "title": "Quick log"
     },
     "playerCard": {
-      "desc": "Your hero profile — level, HP, XP, and combo streak.",
+      "desc": "Your hero profile — level, Vigor, XP, and combo streak.",
       "title": "Your hero"
     },
     "quests": {
-      "desc": "Manage your daily tasks and long-term campaigns. Complete them to earn XP!",
+      "desc": "Manage your daily quests and long-term campaigns. Complete them to earn XP!",
       "title": "Questify"
     },
     "questsAdd": {

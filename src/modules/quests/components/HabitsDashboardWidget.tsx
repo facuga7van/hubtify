@@ -91,7 +91,7 @@ export default function HabitsDashboardWidget() {
     setCreating(false);
     await loadData();
     window.dispatchEvent(new Event('quests:dataChanged'));
-    toast({ type: 'success', message: t('questify.habitCreated', 'Ritual anotado') });
+    toast({ type: 'success', message: t('questify.habitCreated', 'Hábito anotado') });
   }, [loadData, toast, t]);
 
   const isSettledToday = isHabitSettledToday;
@@ -121,7 +121,7 @@ export default function HabitsDashboardWidget() {
     return (
       <ErrorState
         compact
-        message={t('questify.habitsLoadFailed', 'No se pudieron leer tus rituales.')}
+        message={t('questify.habitsLoadFailed', 'No se pudieron leer tus hábitos.')}
         onRetry={loadData}
       />
     );
@@ -132,8 +132,8 @@ export default function HabitsDashboardWidget() {
       <div ref={rootRef}>
         <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', fontStyle: 'italic', margin: '4px 0' }}>
           {allHabits.length === 0
-            ? t('questify.noHabits', 'Sin rituales configurados')
-            : t('questify.noHabitsToday', 'Ningun ritual toca hoy')}
+            ? t('questify.noHabits', 'Sin hábitos configurados')
+            : t('questify.noHabitsToday', 'Ningún hábito toca hoy')}
         </p>
         {creating ? (
           <WidgetQuickCreate
@@ -143,7 +143,7 @@ export default function HabitsDashboardWidget() {
           />
         ) : (
           <button type="button" className="widget-empty-cta" onClick={() => setCreating(true)}>
-            + {t('questify.widgetCreateHabit', 'Creá tu primer ritual')}
+            + {t('questify.widgetCreateHabit', 'Creá tu primer hábito')}
           </button>
         )}
       </div>

@@ -332,7 +332,7 @@ export default function TaskList() {
     playTaskComplete();
     toast({
       type: 'xp',
-      message: t('questify.batchCompleted', '{{count}} quests completed!', { count: ids.length }),
+      message: t('questify.batchCompleted', '{{count}} misiones completadas!', { count: ids.length }),
     });
     setSelectedIds(new Set());
     await loadTasks();
@@ -896,7 +896,7 @@ export default function TaskList() {
           <QBDividerSection />
 
           {/* Campaigns (project progress) */}
-          <Section title={t('questify.campaigns', 'CAMPAÑAS')} icon={<MapIcon width={12} height={12} style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('questify.campaignsHelp', 'Progreso de tus proyectos activos. Cada tarea completada avanza la barra del proyecto.')} />}>
+          <Section title={t('questify.campaigns', 'CAMPAÑAS')} icon={<MapIcon width={12} height={12} style={{ color: 'var(--rubric)' }} />} rightSlot={<HelpBubble variant="inline" text={t('questify.campaignsHelp', 'Progreso de tus proyectos activos. Cada misión completada avanza la barra del proyecto.')} />}>
             {campaignData.length === 0 ? (
               <div className="quest-empty quest-empty--inline">
                 <MapIcon width={24} height={24} aria-hidden="true" />
@@ -1023,7 +1023,7 @@ function SortableQuestRow({ task, expanded, selected, subtasks,
   const subCount = subtasks.length;
   const doneCount = subtasks.filter(s => s.status).length;
   if (subCount > 0) {
-    meta.push(`${doneCount}/${subCount} ${t('questify.subtasksLabel', 'subtareas')}`);
+    meta.push(`${doneCount}/${subCount} ${t('questify.subtasksLabel', 'pasos')}`);
   }
 
   return (

@@ -218,7 +218,7 @@ export default function TodayView({
 
       {pendingHabits.length > 0 && (
         <section>
-          <div className="quest-today-heading">{t('questify.todayHabits', 'Rituales de hoy')}</div>
+          <div className="quest-today-heading">{t('questify.todayHabits', 'Hábitos de hoy')}</div>
           {pendingHabits.map((habit) => (
             <div key={habit.id} className="quest-today-habit">
               <Tick checked={false} onChange={() => handleHabitCheck(habit.id)} label={habit.name} />
