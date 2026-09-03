@@ -6,6 +6,7 @@ import { CategorySelect } from './shared/CategorySelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
 import { currencyPrefix, formatCurrency } from '../utils/format';
 import { unwrap, failureMessage } from '../utils/api-ext';
+import type { PaymentMethod, Currency } from '../types';
 import { useToast } from '../../../shared/components/useToast';
 import { todayDateString } from '../../../../shared/date-utils';
 import { emitMovementLogged } from '../utils/rpg-events';
@@ -29,14 +30,29 @@ export default function DashboardWidget() {
   const [quickAmount, setQuickAmount] = useState('');
   const [quickDesc, setQuickDesc] = useState('');
   // The shortcut used to hard-code "Otros", quietly wrecking the category
-  // breakdown the dashboard shows two panels away.
+  // breakdown the dashboard shows two panels away. Ahora es sólo la semilla
+  // hasta que conteste `finance:getEntryDefaults` con la moda real.
   const [quickCategory, setQuickCategory] = useState('Otros');
-  const [quickPayment, setQuickPayment] = useState<'cash' | 'debit' | 'transfer' | 'credit_card'>('cash');
-  // '' = unresolved; the AccountSelect picks the default (last used / Efectivo).
+  /**
+   * Arrancaba en `'cash'`, el único medio que el usuario NUNCA eligió a mano
+   * —cero altas manuales en efectivo contra 41 transferencias—, mientras el
+   * mismo formulario en `/finance` ya arrancaba en el respaldo digital. Dos
+   * puertas de la misma habitación escribían filas distintas para el mismo
+   * gasto: el hub en efectivo, el libro mayor por transferencia.
+   * El respaldo es ahora el mismo de `QuickAddForm`, y encima manda la moda.
+   */
+  const [quickPayment, setQuickPayment] = useState<PaymentMethod>('transfer');
+  const [quickCurrency, setQuickCurrency] = useState<Currency>('ARS');
+  // '' = unresolved; the AccountSelect picks the default (last used / inferida / Efectivo).
   const [quickAccount, setQuickAccount] = useState('');
+  const [seedAccountId, setSeedAccountId] = useState<string | null>(null);
   const [accountsSupported, setAccountsSupported] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  /** El usuario ya tocó el control: la inferencia llega tarde y no lo pisa. */
+  const methodTouched = useRef(false);
+  const currencyTouched = useRef(false);
+  const categoryTouched = useRef(false);
 
   const loadData = useCallback(() => {
     setLoadError(false);
@@ -69,14 +85,56 @@ export default function DashboardWidget() {
     });
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  /**
+   * La moda de las últimas altas manuales — el MISMO canal, con la misma
+   * disciplina, que usa `QuickAddForm` en `/finance`.
+   *
+   * Este atajo es el camino más corto para cargar un gasto (dos clics y el
+   * monto), y era el único que seguía naciendo de constantes: `'cash'`,
+   * `'Otros'`, pesos y la cuenta «Efectivo» del respaldo genérico. Que el
+   * camino corto y el largo escriban filas distintas es peor que un default
+   * malo: el usuario no puede ni aprender la regla.
+   */
+  const loadEntryDefaults = useCallback(() => {
+    const api = window.api as Partial<typeof window.api>;
+    // Canal nuevo: en un binding viejo simplemente no está, y el respaldo vale.
+    if (typeof api.financeGetEntryDefaults !== 'function') return;
+    api.financeGetEntryDefaults()
+      .then((defaults) => {
+        if (!defaults) return;
+        if (!methodTouched.current) {
+          const method = defaults.paymentMethod;
+          if (method === 'cash' || method === 'debit' || method === 'transfer' || method === 'credit_card') {
+            setQuickPayment(method);
+          }
+        }
+        if (!currencyTouched.current && (defaults.currency === 'ARS' || defaults.currency === 'USD')) {
+          setQuickCurrency(defaults.currency);
+        }
+        // La cuenta no se fuerza: es una semilla para el `AccountSelect`, que ya
+        // sabe descartarla si murió y sólo deja que le gane al respaldo genérico
+        // (lo recordado en el dispositivo es más específico y sigue mandando).
+        setSeedAccountId(defaults.accountId ?? null);
+        if (!categoryTouched.current && defaults.category) setQuickCategory(defaults.category);
+      })
+      .catch(() => { /* el respaldo ya está puesto */ });
+  }, []);
+
+  useEffect(() => { loadData(); loadEntryDefaults(); }, [loadData, loadEntryDefaults]);
 
   // Reload data when account is switched
   useEffect(() => {
-    const handler = () => loadData();
+    // Otra cuenta, otro historial: lo que el usuario tocó acá ya no aplica.
+    const handler = () => {
+      methodTouched.current = false;
+      currencyTouched.current = false;
+      categoryTouched.current = false;
+      loadData();
+      loadEntryDefaults();
+    };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [loadData]);
+  }, [loadData, loadEntryDefaults]);
 
   // "Anotá un gasto" from the dashboard's empty state opens THIS form, in the
   // hub, instead of navigating to /finance and leaving the user to find it.
@@ -110,7 +168,7 @@ export default function DashboardWidget() {
         // to be filed under tomorrow.
         date: todayDateString(),
         category: quickCategory || 'Otros',
-        currency: 'ARS',
+        currency: quickCurrency,
         paymentMethod: quickPayment,
         // Absent while the accounts bridge is not wired — the backend then
         // applies its own cash→«Efectivo» default. Card purchases never belong
@@ -132,7 +190,7 @@ export default function DashboardWidget() {
       const xpSuffix = rpg ? ` · +${rpg.xpGained} XP` : '';
       toast({
         type: 'coin',
-        message: `${formatCurrency(quickType === 'expense' ? -amount : amount, { currency: 'ARS', decimals: 2, showSign: true })}${xpSuffix}`,
+        message: `${formatCurrency(quickType === 'expense' ? -amount : amount, { currency: quickCurrency, decimals: 2, showSign: true })}${xpSuffix}`,
         details: { transactionType: quickType },
       });
 
@@ -255,18 +313,33 @@ export default function DashboardWidget() {
             </button>
           </div>
 
-          {/* Amount input */}
-          <input
-            type="number"
-            className="rpg-input"
-            placeholder="$0.00"
-            step="0.01"
-            min="0"
-            value={quickAmount}
-            onChange={(e) => setQuickAmount(e.target.value)}
-            onKeyDown={handleQuickAddKeyDown}
-            style={{ width: '100%' }}
-          />
+          {/* Monto y moneda. La moneda también sale del historial, así que TIENE
+              que verse y poder corregirse acá: escribir dólares desde un atajo
+              que sólo muestra un «$» sería una fila que el usuario no pidió y
+              no ve. */}
+          <div className="coin-dash-quick__meta-row">
+            <input
+              type="number"
+              className="rpg-input"
+              placeholder={`${currencyPrefix(quickCurrency)}0.00`}
+              step="0.01"
+              min="0"
+              value={quickAmount}
+              onChange={(e) => setQuickAmount(e.target.value)}
+              onKeyDown={handleQuickAddKeyDown}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <select
+              className="rpg-select"
+              value={quickCurrency}
+              aria-label="ARS / USD"
+              style={{ width: 72 }}
+              onChange={(e) => { currencyTouched.current = true; setQuickCurrency(e.target.value as Currency); }}
+            >
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
 
           {/* Description input */}
           <input
@@ -282,12 +355,15 @@ export default function DashboardWidget() {
           {/* Category + payment method: without them this shortcut filed every
               entry under "Otros" in cash. */}
           <div className="coin-dash-quick__meta-row">
-            <CategorySelect value={quickCategory} onChange={setQuickCategory} />
+            <CategorySelect
+              value={quickCategory}
+              onChange={(cat) => { categoryTouched.current = true; setQuickCategory(cat); }}
+            />
             <select
               className="rpg-select"
               value={quickPayment}
               aria-label={t('coinify.paymentMethod', 'Medio de pago')}
-              onChange={(e) => setQuickPayment(e.target.value as typeof quickPayment)}
+              onChange={(e) => { methodTouched.current = true; setQuickPayment(e.target.value as PaymentMethod); }}
             >
               <option value="cash">{t('coinify.cash', 'Efectivo')}</option>
               <option value="debit">{t('coinify.debit', 'Débito')}</option>
@@ -300,7 +376,7 @@ export default function DashboardWidget() {
               accounts bridge is not wired. */}
           {quickPayment !== 'credit_card' && (
             <div className="coin-dash-quick__meta-row">
-              <AccountSelect value={quickAccount} onChange={setQuickAccount} onSupported={setAccountsSupported} />
+              <AccountSelect value={quickAccount} onChange={setQuickAccount} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />
             </div>
           )}
 
