@@ -35,12 +35,6 @@
   animation: coinShimmer 1.5s ease infinite;
 }
 
-.coin-skeleton--number {
-  height: 2rem;
-  width: 120px;
-  display: inline-block;
-}
-
 .coin-skeleton--card {
   height: 80px;
   width: 100%;
@@ -322,18 +316,6 @@
 
 .coin-summary-card .qb-gauge {
   margin-top: auto;
-}
-
-.coin-as-of {
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
-}
-
-.coin-section-slot {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 /* ── Middle Grid ── */
@@ -860,11 +842,6 @@ button.coin-sort-header--amount {
   margin-bottom: 8px;
 }
 
-.coin-quick-add-form__field {
-  width: 100%;
-  margin-bottom: 8px;
-}
-
 /* Payment method — and, only for a card, which card and how many instalments.
    Promoted out of "Más opciones" so the most consequential field on the form
    is not the one hidden behind a toggle. */
@@ -906,13 +883,6 @@ button.coin-sort-header--amount {
 .coin-quick-add-form__repeat:hover {
   color: var(--gold);
   border-color: var(--gold);
-}
-
-.coin-quick-add-form__installment-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
 }
 
 .coin-quick-add-form .rpg-input,
@@ -1273,13 +1243,6 @@ button.coin-sort-header--amount {
   font-size: var(--fs-label);
   color: var(--ink-soft);
   font-family: 'IM Fell English SC', serif;
-}
-
-.coin-import-preview-count {
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
-  margin-bottom: 12px;
-  font-family: 'Cormorant Garamond', serif;
 }
 
 .coin-import-seal {
@@ -1985,19 +1948,6 @@ button.coin-sort-header--amount {
 
 /* ── Widget ───────────────────────────────────────────────────── */
 
-.coin-widget__number {
-  font-family: 'UnifrakturCook', serif;
-  font-size: var(--fs-hero);
-  line-height: 1;
-  color: var(--ink);
-}
-
-.coin-widget__label {
-  font-size: var(--fs-label);
-  color: var(--ink-faded);
-  margin-top: 4px;
-}
-
 /* ── Dashboard Quick-Add ────────────────────────────────────── */
 
 .coin-dash-quick__toggle {
@@ -2166,38 +2116,6 @@ button.coin-sort-header--amount {
 
 .coin-widget-error {
   padding: 10px 0;
-}
-
-/* ── Shared: DollarChip ─────────────────────────────────────── */
-
-.coin-dollar-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  background: rgba(245, 231, 192, 0.6);
-  border: 1px solid rgba(74, 55, 32, 0.45);
-  font-size: var(--fs-label);
-  color: var(--ink);
-  cursor: default;
-  transition: all 0.15s ease;
-}
-
-.coin-dollar-chip:hover {
-  border-color: var(--gold);
-  background: rgba(245, 231, 192, 0.7);
-}
-
-.coin-dollar-chip__value {
-  font-family: 'UnifrakturCook', serif;
-  font-weight: 600;
-}
-
-/* ── Shared: CategorySelect ─────────────────────────────────── */
-
-.coin-category-select {
-  flex: 1;
-  min-width: 0;
 }
 
 /* ── Category Autocomplete ─────────────────────────────────── */
@@ -3075,7 +2993,6 @@ button.coin-sort-header--amount {
    en medio del pergamino. El chip del dólar ya lo hacía en línea; el resto
    (importador, alta de cuotas) quedaba con el azul. */
 .coin-import-table input[type='checkbox'],
-.coin-installment-form input[type='checkbox'],
 .coin-quick-add-form input[type='checkbox'] {
   accent-color: var(--gold);
 }
@@ -3248,8 +3165,7 @@ button.coin-sort-header--amount {
   max-height: 1400px;
 }
 
-[data-shell="mobile"] .coin-quick-add-form__amount-row,
-[data-shell="mobile"] .coin-quick-add-form__installment-row {
+[data-shell="mobile"] .coin-quick-add-form__amount-row {
   flex-wrap: wrap;
 }
 
