@@ -3,12 +3,17 @@ import { getDb } from '../db';
 import { genId } from '../ids';
 import { platform } from '../platform';
 import {
+  addMonthsClamped,
+  addMonthsToMonth,
   CARD_TAX_CATEGORY,
+  dateInMonthClamped,
   DEFAULT_CASH_ACCOUNT_ID,
   getCurrentRate,
   getFxHouse,
   isValidMonthString,
+  MAX_INSTALLMENTS,
   nowIso,
+  round2,
 } from './finance.balance';
 
 // ── Types ───────────────────────────────────────────
@@ -160,15 +165,29 @@ export function parseGaliciaLine(
   if (allAmounts.length === 0) return null;
 
   const lastAmountMatch = allAmounts[allAmounts.length - 1];
-  const amountARS = parseArgentineAmount(lastAmountMatch[0]);
+  let amountARS: number | undefined = parseArgentineAmount(lastAmountMatch[0]);
 
   // ── USD detection ────────────────────────────────
-  // Pattern: USD  <amount> <receipt> <arsAmount>
   // The USD amount is the first amount that appears AFTER the "USD" keyword.
   let amountUSD: number | undefined;
   const usdMatch = rest.match(/USD\s+([\d,]+(?:\.\d{3})*,\d{2}|-?\d{1,3}(?:\.\d{3})*,\d{2})/);
   if (usdMatch) {
     amountUSD = parseArgentineAmount(usdMatch[1]);
+
+    /**
+     * En un consumo en dólares la columna PESOS del resumen viene VACÍA y la
+     * última columna de la línea es la de DÓLARES. Tomar «el último monto» como
+     * el importe en pesos guardaba dólares en `billed_amount_ars` (medido: 5 de
+     * 5 filas USD de los resúmenes reales tenían `amountARS === amountUSD`), y
+     * `computeStatementTotals` los sumaba al total EN PESOS del resumen.
+     *
+     * Un importe en pesos de un consumo en dólares es siempre bastante MAYOR que
+     * el importe en dólares; nunca igual. Con eso alcanza para distinguir la
+     * columna real de la repetición, sin depender del layout exacto.
+     */
+    if (!(Math.abs(amountARS) > Math.abs(amountUSD))) {
+      amountARS = undefined;
+    }
   }
 
   // ── Merchant extraction ──────────────────────────
@@ -220,8 +239,11 @@ export function parseGaliciaLine(
     merchant,
     isExcluded: false,
     suggestedCategory,
-    amountARS,
   };
+
+  // Ausente en una línea en dólares donde el resumen no imprime la columna de
+  // pesos: pesos y dólares no se mezclan ni siquiera por omisión.
+  if (amountARS !== undefined) row.amountARS = amountARS;
 
   if (installmentCurrent !== undefined) {
     row.installmentCurrent = installmentCurrent;
@@ -229,8 +251,8 @@ export function parseGaliciaLine(
   }
 
   if (amountUSD !== undefined) {
-    // Keep amountARS too: it is the real peso amount the card billed, which the
-    // statement total needs. The UI displays amountUSD when it is present.
+    // `amountARS` sobrevive solo si el resumen SÍ trae el importe que la tarjeta
+    // cobró en pesos: eso es lo que necesita el total del resumen.
     row.amountUSD = amountUSD;
   }
 
@@ -392,8 +414,49 @@ export function registerFinanceImportIpcHandlers(): void {
         `INSERT INTO finance_transactions
          (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
           installments, installment_number, billed_amount_ars, credit_card_id, impacts_balance,
-          statement_period, fx_rate, fx_rate_source, account_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          statement_period, fx_rate, fx_rate_source, account_id, installment_group_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+
+      // ── Planes de cuotas ────────────────────────────
+      //
+      // El parser ya leía «CUOTA N/M» y el INSERT lo tiraba: la fila quedaba sin
+      // `installment_group_id` y la pestaña Cuotas —igual que la proyección y
+      // «próximas batallas»— hace `JOIN finance_installment_groups`. Una compra
+      // importada en 12 cuotas no existía para ninguna de las tres, y las cuotas
+      // que faltaban no aparecían hasta el resumen siguiente.
+      //
+      // Identidad del plan: comercio + fecha de compra + moneda + total de
+      // cuotas + tarjeta. Galicia imprime la fecha ORIGINAL de la compra en cada
+      // cuota, así que la clave es estable entre resúmenes consecutivos y el
+      // segundo import encuentra el plan del primero en vez de duplicarlo.
+      // La tarjeta no vive en el grupo, así que se mira en sus filas.
+      const findGroup = db.prepare(
+        `SELECT g.id AS id FROM finance_installment_groups g
+          WHERE g.deleted_at IS NULL AND g.description = ? AND g.currency = ?
+            AND g.total_installments = ? AND g.date = ?
+            AND EXISTS (SELECT 1 FROM finance_transactions t
+                         WHERE t.installment_group_id = g.id AND t.deleted_at IS NULL
+                           AND t.credit_card_id IS ?)
+          LIMIT 1`,
+      );
+      const insertGroup = db.prepare(
+        `INSERT INTO finance_installment_groups
+           (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      const findInstallment = db.prepare(
+        `SELECT id FROM finance_transactions
+          WHERE installment_group_id = ? AND installment_number = ? AND deleted_at IS NULL LIMIT 1`,
+      );
+      // La cuota proyectada pasa a ser la del papel: monto real, fecha de compra
+      // y el resumen al que pertenece. No se agrega otra fila.
+      const materialise = db.prepare(
+        `UPDATE finance_transactions
+            SET type = ?, amount = ?, currency = ?, category = ?, description = ?, date = ?,
+                billed_amount_ars = ?, statement_period = ?, import_batch_id = ?,
+                fx_rate = ?, fx_rate_source = ?, account_id = ?, updated_at = ?
+          WHERE id = ?`,
       );
 
       // One transaction: a failure halfway used to leave a partial import with a
@@ -423,6 +486,50 @@ export function registerFinanceImportIpcHandlers(): void {
             continue;
           }
 
+          const totalInstallments = Number.isInteger(row.installmentTotal) ? row.installmentTotal! : 1;
+          // Una cuota disparatada (13/12, 0/6, 200/300) no arma ningún plan: la
+          // fila entra suelta antes que fabricar un calendario inventado.
+          const isPlan = totalInstallments > 1
+            && totalInstallments <= MAX_INSTALLMENTS
+            && installmentNumber !== null
+            && installmentNumber >= 1
+            && installmentNumber <= totalInstallments;
+
+          let groupId: string | null = null;
+          if (isPlan) {
+            const found = findGroup.get(
+              row.merchant, currency, totalInstallments, row.date, cardId,
+            ) as { id: string } | undefined;
+
+            if (found) {
+              groupId = found.id;
+              const projected = findInstallment.get(groupId, installmentNumber) as { id: string } | undefined;
+              if (projected) {
+                materialise.run(
+                  type, amount, currency, row.suggestedCategory, row.merchant, row.date,
+                  billedArs, statementPeriod, batchId,
+                  fxRate, fxRate === null ? null : 'process', rowAccountId, now,
+                  projected.id,
+                );
+                inserted++;
+                continue;
+              }
+            } else {
+              groupId = genId();
+              insertGroup.run(
+                groupId,
+                row.merchant,
+                round2(amount * totalInstallments),
+                currency,
+                totalInstallments,
+                row.suggestedCategory,
+                row.date,
+                now,
+                now,
+              );
+            }
+          }
+
           insertTx.run(
             genId(),
             type,
@@ -433,7 +540,7 @@ export function registerFinanceImportIpcHandlers(): void {
             row.date,
             paymentMethod,
             batchId,
-            row.installmentTotal ?? 1,
+            totalInstallments,
             installmentNumber,
             billedArs,
             cardId,
@@ -442,10 +549,51 @@ export function registerFinanceImportIpcHandlers(): void {
             fxRate,
             fxRate === null ? null : 'process',
             rowAccountId,
+            groupId,
             now,
             now,
           );
           inserted++;
+
+          // Las cuotas que todavía no llegaron: se proyectan una por resumen a
+          // partir del que se está importando. Las ANTERIORES no se escriben —
+          // o ya se importaron con su propio resumen, o pertenecen a resúmenes
+          // cerrados, y crearlas ahora movería saldos y totales del pasado.
+          if (isPlan && groupId !== null) {
+            // La cuota importada cae en el resumen que se está cargando; las que
+            // siguen, uno por mes desde ahí, conservando el día de la compra.
+            const anchorMonth = statementPeriod ?? row.date.slice(0, 7);
+            const anchorDate = dateInMonthClamped(anchorMonth, Number(row.date.slice(8, 10)));
+            for (let n = installmentNumber! + 1; n <= totalInstallments; n++) {
+              // Los resúmenes pueden llegar desordenados (primero agosto, después
+              // junio): la cuota que ya existe en el plan no se vuelve a escribir.
+              if (findInstallment.get(groupId, n)) continue;
+              const offset = n - installmentNumber!;
+              insertTx.run(
+                genId(),
+                type,
+                amount,
+                currency,
+                row.suggestedCategory,
+                row.merchant,
+                addMonthsClamped(anchorDate, offset),
+                paymentMethod,
+                batchId,
+                totalInstallments,
+                n,
+                billedArs,
+                cardId,
+                impactsBalance,
+                statementPeriod === null ? null : addMonthsToMonth(statementPeriod, offset),
+                fxRate,
+                fxRate === null ? null : 'process',
+                rowAccountId,
+                groupId,
+                now,
+                now,
+              );
+            }
+          }
         }
 
         return { batchId, count: inserted, duplicateCount, creditCardId: cardId };
@@ -462,14 +610,33 @@ export function registerFinanceImportIpcHandlers(): void {
     }
     const db = getDb();
     const now = nowIso();
-    const result = db
-      .prepare(
-        `UPDATE finance_transactions
-         SET deleted_at = ?, updated_at = ?
-         WHERE import_batch_id = ? AND deleted_at IS NULL`,
-      )
-      .run(now, now, batchId);
-    return { ok: true, deleted: result.changes };
+    const run = db.transaction(() => {
+      const result = db
+        .prepare(
+          `UPDATE finance_transactions
+           SET deleted_at = ?, updated_at = ?
+           WHERE import_batch_id = ? AND deleted_at IS NULL`,
+        )
+        .run(now, now, batchId);
+
+      // Un import que crea planes de cuotas también tiene que poder deshacerlos:
+      // sin esto quedaba un grupo vivo sin ninguna fila, y la pestaña Cuotas —
+      // que hace INNER JOIN— mostraba un plan fantasma de cero movimientos.
+      // Solo los grupos que TOCÓ este lote y que quedaron sin cuotas vivas.
+      db.prepare(
+        `UPDATE finance_installment_groups SET deleted_at = ?, updated_at = ?
+          WHERE deleted_at IS NULL
+            AND id IN (SELECT DISTINCT installment_group_id FROM finance_transactions
+                        WHERE import_batch_id = ? AND installment_group_id IS NOT NULL)
+            AND NOT EXISTS (SELECT 1 FROM finance_transactions t
+                             WHERE t.installment_group_id = finance_installment_groups.id
+                               AND t.deleted_at IS NULL)`,
+      ).run(now, now, batchId);
+
+      return result.changes;
+    });
+
+    return { ok: true, deleted: run() };
   });
 
   ipcHandle('finance:getImportBatches', () => {

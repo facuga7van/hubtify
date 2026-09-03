@@ -100,12 +100,20 @@ describe('finance:importConfirm — dedup keeps instalments 2..N (#1)', () => {
 
     expect([r1, r2, r3].map((r) => [r.count, r.duplicateCount])).toEqual([[1, 0], [1, 0], [1, 0]]);
 
+    // El primer resumen ya arma el plan entero (la cuota 1 del papel + las 11 que
+    // el banco va a cobrar); los dos siguientes MATERIALIZAN su cuota proyectada
+    // en vez de agregar una fila nueva. El plan sigue siendo uno.
     const rows = liveImportRows();
-    expect(rows).toHaveLength(3);
-    expect(rows.map((r) => r.installmentNumber)).toEqual([1, 2, 3]);
+    expect(rows).toHaveLength(12);
+    expect(rows.map((r) => r.installmentNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(rows.every((r) => r.installments === 12 && r.amount === 25000)).toBe(true);
-    // $75.000 in, not $25.000 — the paper finally adds up across months.
-    expect(rows.reduce((s, r) => s + r.amount, 0)).toBe(75000);
+    const groups = harness.db
+      .prepare('SELECT COUNT(*) AS c FROM finance_installment_groups WHERE deleted_at IS NULL')
+      .get() as { c: number };
+    expect(groups.c).toBe(1);
+    // Las tres cuotas del papel entraron, cada una en su resumen — que es lo que
+    // el dedupe por (fecha, comercio, monto) se comía antes.
+    expect(rows.slice(0, 3).map((r) => r.statementPeriod)).toEqual(['2026-06', '2026-07', '2026-08']);
   });
 
   it('re-importing the SAME statement is still a duplicate', async () => {
@@ -113,7 +121,16 @@ describe('finance:importConfirm — dedup keeps instalments 2..N (#1)', () => {
     const again = await invoke<ImportResult>('finance:importConfirm', [fridge(4)], '2026-09', 'sep.pdf', cardId);
     expect(again.count).toBe(0);
     expect(again.duplicateCount).toBe(1);
-    expect(liveImportRows()).toHaveLength(1);
+    // La 4 del papel y las 9 que faltan del plan; el segundo import no suma nada.
+    expect(liveImportRows()).toHaveLength(9);
+  });
+
+  it('los resúmenes desordenados no duplican cuotas del mismo plan', async () => {
+    await invoke('finance:importConfirm', [fridge(3)], '2026-08', 'ago.pdf', cardId);
+    await invoke('finance:importConfirm', [fridge(1)], '2026-06', 'jun.pdf', cardId);
+
+    const rows = liveImportRows();
+    expect(rows.map((r) => r.installmentNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   });
 
   it('two identical tax lines in ONE PDF both land (dedup is against previous batches only)', async () => {
@@ -163,7 +180,12 @@ describe('finance:importConfirm — statementMonth is the statement period (#2)'
   });
 
   it('a manual card purchase without an explicit period still follows the closing day', async () => {
-    await invoke('finance:importConfirm', [fridge(4)], '2026-08', 'ago.pdf', cardId);
+    // Una compra al contado: acá se mide la regla del cierre, no el plan de cuotas.
+    const contado = {
+      date: '2026-05-10', merchant: 'FRAVEGA', amountARS: 25000,
+      isExcluded: false, suggestedCategory: 'Compras',
+    };
+    await invoke('finance:importConfirm', [contado], '2026-08', 'ago.pdf', cardId);
     // Dated after the 28th → September by the closing-day rule.
     await invoke('finance:addTransaction', {
       type: 'expense', amount: 1000, date: '2026-08-30', paymentMethod: 'credit_card', creditCardId: cardId, category: 'Otros',
@@ -192,8 +214,10 @@ describe('finance:importConfirm — account for card-less imports (#3)', () => {
     await invoke('finance:importConfirm', [fridge(2)], '2026-07', 'b.pdf', null);
     await invoke('finance:importConfirm', [fridge(3)], '2026-08', 'c.pdf', null, null);
 
+    // Las tres cuotas del papel, cada una con la cuenta elegida en SU import;
+    // las proyectadas heredan la del import que las creó.
     const rows = liveImportRows();
-    expect(rows.map((r) => r.accountId)).toEqual([banco.id, DEFAULT_CASH_ACCOUNT_ID, null]);
+    expect(rows.slice(0, 3).map((r) => r.accountId)).toEqual([banco.id, DEFAULT_CASH_ACCOUNT_ID, null]);
     expect(rows.every((r) => r.impactsBalance === 1)).toBe(true);
   });
 

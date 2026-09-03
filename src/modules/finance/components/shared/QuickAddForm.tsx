@@ -4,9 +4,11 @@ import { CategorySelect } from './CategorySelect';
 import { CreditCardSelect } from './CreditCardSelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 import { AmountWithCurrency } from './AmountWithCurrency';
+import { AmountModeToggle, useAmountModePlaceholder } from './AmountModeToggle';
 import { useToast } from '../../../../shared/components/useToast';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import type { TransactionType, PaymentMethod, Currency } from '../../types';
+import type { AmountMode } from '../../utils/installment-payload';
 import { RESERVED_CATEGORIES } from '../../types';
 import { ChevronUp, ChevronDown } from '../../../../shared/components/icons';
 import { todayDateString } from '../../../../../shared/date-utils';
@@ -40,6 +42,9 @@ interface QuickAddFormProps {
     currency: Currency;
     paymentMethod: PaymentMethod;
     installments: number;
+    /** Si `amount` es el precio de UNA cuota o el total financiado. Sin esto,
+     *  quien tipeaba el precio de vidriera creaba un plan N veces más grande. */
+    amountMode: AmountMode;
     creditCardId?: string;
     /** Omitted while the accounts bridge is not wired (backend maps cash→Efectivo). */
     accountId?: string | null;
@@ -65,6 +70,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
   const [currency, setCurrency] = useState<Currency>('ARS');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [installments, setInstallments] = useState(1);
+  const [amountMode, setAmountMode] = useState<AmountMode>('installment');
   const [creditCardId, setCreditCardId] = useState('');
   // '' = unresolved; the AccountSelect picks the default (last used / Efectivo).
   const [accountValue, setAccountValue] = useState('');
@@ -159,6 +165,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setCreditCardId(lastTx.paymentMethod === 'credit_card' ? (lastTx.creditCardId ?? '') : '');
     if (accountsSupported) setAccountValue(lastTx.accountId ?? NO_ACCOUNT);
     setInstallments(1);
+    setAmountMode('installment');
     setDate(today);
     setAmount(String(lastTx.amount));
     // The category came from history, not from the description matcher.
@@ -170,6 +177,12 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       el?.select();
     });
   };
+
+  /** Cargar con tarjeta y más de una cuota no escribe un gasto: escribe un plan,
+   *  y entonces el número tipeado necesita decir de qué monto habla. */
+  const isInstallmentPlan = paymentMethod === 'credit_card' && installments > 1;
+  const installmentPlaceholder = useAmountModePlaceholder(amountMode);
+  const amountLabel = isInstallmentPlan ? installmentPlaceholder : t('coinify.amount');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,6 +207,9 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
       currency,
       paymentMethod,
       installments: paymentMethod === 'credit_card' ? installments : 1,
+      // Solo un plan en cuotas puede estar en modo «total»; un gasto suelto es
+      // siempre su propio monto.
+      amountMode: isInstallmentPlan ? amountMode : 'installment',
       creditCardId: paymentMethod === 'credit_card' ? creditCardId : undefined,
       // Only when the selector is actually usable: absent, the backend applies
       // its own default mapping (cash → «Efectivo»). A card purchase never
@@ -206,6 +222,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
     setAmount('');
     setDescription('');
     setInstallments(1);
+    setAmountMode('installment');
     setCreditCardId('');
     userOverrode.current = false;
     // What was just written is the new "last one".
@@ -253,11 +270,24 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
 
       {/* Primary: Amount + Category + Description */}
       <div className="coin-quick-add-form__amount-row">
+        {/* El rótulo cambia con el modo: en un plan en cuotas «Monto» a secas
+            era ambiguo y quien tipeaba el precio total creaba un plan N veces
+            más grande, sin ningún aviso. */}
         <RpgNumberInput id={AMOUNT_INPUT_ID} value={amount} onChange={setAmount}
-          aria-label={t('coinify.amount')}
-          placeholder={t('coinify.amount')} style={{ flex: 1 }} min={0} step={0.01} required />
+          aria-label={amountLabel}
+          placeholder={amountLabel} style={{ flex: 1 }} min={0} step={0.01} required />
         <CategorySelect value={category} onChange={handleCategoryChange} />
       </div>
+
+      {isInstallmentPlan && (
+        <AmountModeToggle
+          mode={amountMode}
+          onChange={setAmountMode}
+          typedAmount={amount}
+          installmentCount={installments}
+          currency={currency}
+        />
+      )}
 
       {/* What this amount is worth in the other currency, with the house that
           will be frozen on the row. Deliberately OUTSIDE «Más opciones»: the
