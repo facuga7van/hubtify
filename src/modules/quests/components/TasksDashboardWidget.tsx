@@ -10,11 +10,15 @@ import { playTaskComplete } from '../../../shared/audio';
 import { type Task, XP_MAP } from '../types';
 import { getDueDateStatus, bonusMultiplierToTier, notifyStreakSaved } from '../utils';
 import { questsApi } from '../api';
+import WidgetQuickCreate from '../../../hub/widgets/WidgetQuickCreate';
+import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-create';
 
 export default function TasksDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
   const [allPendingTasks, setAllPendingTasks] = useState<Task[]>([]);
@@ -53,6 +57,25 @@ export default function TasksDashboardWidget() {
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
+
+  // The dashboard's empty state asks for this form by name instead of dumping
+  // the user on /quests, where they would have to find the toggle themselves.
+  useEffect(() => subscribeQuickCreate('quest', () => {
+    setCreating(true);
+    revealWidget(rootRef.current);
+  }), []);
+
+  /** One field, sane defaults: tier "normal", no project, no date. */
+  const handleQuickCreate = useCallback(async (name: string) => {
+    await window.api.questsUpsertTask({
+      name, description: '', tier: 2, category: '',
+      projectId: null, dueDate: null, order: 0, status: false,
+    });
+    setCreating(false);
+    loadData();
+    window.dispatchEvent(new Event('quests:dataChanged'));
+    toast({ type: 'success', message: t('questify.questCreated', 'Misión anotada') });
+  }, [loadData, toast, t]);
 
   /* The project selector was removed: it duplicated the one on the Questify
      page, ate the full width of a small card, and its footer counters still
@@ -117,7 +140,15 @@ export default function TasksDashboardWidget() {
   const total = completedToday + pendingCount;
 
   return (
-    <div>
+    <div ref={rootRef}>
+      {creating && (
+        <WidgetQuickCreate
+          placeholder={t('questify.widgetQuestPlaceholder', 'Comprar pan')}
+          onSubmit={handleQuickCreate}
+          onCancel={() => setCreating(false)}
+        />
+      )}
+
       {/* Task checklist */}
       {displayTasks.length > 0 ? (
         <div className="widget-list-flow">
@@ -158,9 +189,18 @@ export default function TasksDashboardWidget() {
           )}
         </div>
       ) : (
-        <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', margin: '4px 0' }}>
-          {t('questify.noQuests', 'No quests yet')}
-        </p>
+        /* The old copy read "¡Agregá una arriba!" inside a card with nothing
+           above it, and offered no way to add anything. Now the CTA creates. */
+        <div>
+          <p className="qb-hand" style={{ fontSize: 'var(--fs-label)', color: 'var(--ink-faded)', margin: '4px 0' }}>
+            {t('questify.widgetNoQuests', 'Todavía no hay misiones en el libro.')}
+          </p>
+          {!creating && (
+            <button type="button" className="widget-empty-cta" onClick={() => setCreating(true)}>
+              + {t('questify.widgetCreateQuest', 'Anotá tu primera misión')}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Footer stats */}

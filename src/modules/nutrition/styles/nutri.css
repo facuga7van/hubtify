@@ -3378,3 +3378,42 @@
     background: transparent;
   }
 }
+
+/* ── Widget del hub sin meta configurada ────────────
+   Antes decia «Configuracion requerida» (falso: se puede registrar igual) y
+   no era clickeable. Ahora nombra lo que falta y lleva a arreglarlo. */
+.nutri-dash-setup {
+  text-align: left;
+  padding: 0;
+}
+
+.nutri-dash-setup__text {
+  margin: 0 0 2px;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* Sin meta no hay anillo: mostramos lo registrado y nada mas. */
+.nutri-dash-plain-total {
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px dashed rgba(74, 55, 32, 0.4);
+  border-radius: 50%;
+  color: var(--ink-soft);
+}
+
+.nutri-dash-plain-total .qb-numeral {
+  font-size: var(--fs-sub);
+  color: var(--ink);
+}
+
+.nutri-dash-plain-total .qb-hand {
+  font-size: var(--fs-label);
+}

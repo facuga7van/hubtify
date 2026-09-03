@@ -276,3 +276,92 @@
 [data-shell="mobile"] .dash-row-chronicle {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* ── Alta rápida dentro del widget ──────────────────
+   El vacío de un widget tenía lugar para una frase y para nada más. Con un
+   solo campo, la primera misión / el primer ritual nacen sin salir del hub. */
+.widget-quick-create {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+
+.widget-quick-create__input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+}
+
+.widget-quick-create__save {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: var(--fs-label);
+}
+
+.widget-quick-create__cancel {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+}
+
+.widget-quick-create__cancel:hover,
+.widget-quick-create__cancel:focus-visible {
+  color: var(--rubric);
+}
+
+/* El botón que abre esa alta: un enlace de texto, no otro botón de piedra. */
+.widget-empty-cta {
+  display: inline-block;
+  margin: 4px 0 0;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.widget-empty-cta:hover,
+.widget-empty-cta:focus-visible {
+  color: var(--ink);
+}
+
+/* Android: nada de blancos de 26 px para el pulgar (regla de 44 px). */
+[data-shell="mobile"] .widget-quick-create {
+  flex-wrap: wrap;
+}
+
+[data-shell="mobile"] .widget-quick-create__input {
+  min-height: 44px;
+  flex-basis: 100%;
+}
+
+[data-shell="mobile"] .widget-quick-create__save {
+  min-height: 44px;
+  padding: 4px 16px;
+}
+
+[data-shell="mobile"] .widget-quick-create__cancel {
+  width: 44px;
+  height: 44px;
+}
+
+[data-shell="mobile"] .widget-empty-cta {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}

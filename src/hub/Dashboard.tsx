@@ -11,6 +11,7 @@ import { Sword, Crown, Flame, Heart, Scroll, Quill, Cauldron, Sparkle, Dagger, F
 import HelpBubble from '../shared/components/HelpBubble';
 import Tooltip from '../shared/components/Tooltip';
 import { WIDGET_DEFINITIONS, DashboardWidgetWrapper } from './widgets';
+import { requestQuickCreate } from './widgets/quick-create';
 import { useDashboardLayout } from './layouts/useDashboardLayout';
 import { useDashboardDrag } from './layouts/useDashboardDrag';
 import { useAnimatedNavigate } from '../shared/components/AnimatedOutlet';
@@ -415,14 +416,20 @@ export default function Dashboard() {
               <p className="dash-empty__text">
                 {t('dashboard.emptyStateText', 'Todavía no hay nada registrado. Empezá por acá:')}
               </p>
+              {/* These three used to only NAVIGATE, dropping the user on an
+                  equally empty page with the form still hidden. Now each one
+                  opens its widget's form right here, in the hub. */}
               <div className="dash-empty__actions">
-                <button className="rpg-button" onClick={() => animatedNavigate('/quests')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('quest')}>
                   {t('dashboard.emptyCtaQuest', 'Creá tu primera misión')}
                 </button>
-                <button className="rpg-button" onClick={() => animatedNavigate('/nutrition')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('habit')}>
+                  {t('dashboard.emptyCtaHabit', 'Creá tu primer ritual')}
+                </button>
+                <button className="rpg-button" onClick={() => requestQuickCreate('meal')}>
                   {t('dashboard.emptyCtaMeal', 'Registrá una comida')}
                 </button>
-                <button className="rpg-button" onClick={() => animatedNavigate('/finance')}>
+                <button className="rpg-button" onClick={() => requestQuickCreate('expense')}>
                   {t('dashboard.emptyCtaExpense', 'Anotá un gasto')}
                 </button>
               </div>

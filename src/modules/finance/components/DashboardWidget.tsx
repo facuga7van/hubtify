@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Gauge, Rune } from '../../../shared/components/codex';
 import { AnimatedNumber } from './shared/AnimatedNumber';
@@ -10,6 +10,7 @@ import { useToast } from '../../../shared/components/useToast';
 import { todayDateString } from '../../../../shared/date-utils';
 import { emitMovementLogged } from '../utils/rpg-events';
 import { checkBudgetOverflow } from '../utils/budget-guards';
+import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-create';
 
 export default function DashboardWidget() {
   const { t } = useTranslation();
@@ -31,6 +32,7 @@ export default function DashboardWidget() {
   const [quickAccount, setQuickAccount] = useState('');
   const [accountsSupported, setAccountsSupported] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(() => {
     window.api.financeGetMonthlyTotal().then(setTotal).catch((err) => console.warn('[DashboardWidget] financeGetMonthlyTotal failed:', err));
@@ -60,6 +62,14 @@ export default function DashboardWidget() {
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [loadData]);
+
+  // "Anotá un gasto" from the dashboard's empty state opens THIS form, in the
+  // hub, instead of navigating to /finance and leaving the user to find it.
+  useEffect(() => subscribeQuickCreate('expense', () => {
+    setQuickType('expense');
+    setShowQuickAdd(true);
+    revealWidget(rootRef.current);
+  }), []);
 
   const income = balance?.income ?? 0;
   const expenses = balance?.expenses ?? 0;
@@ -141,7 +151,7 @@ export default function DashboardWidget() {
   };
 
   return (
-    <div>
+    <div ref={rootRef}>
       <div style={{ margin: '6px 0 10px' }}>
         {/* Income row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-label)', marginBottom: 4 }}>

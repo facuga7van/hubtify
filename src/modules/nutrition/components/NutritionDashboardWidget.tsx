@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { RingGauge, Rune } from '../../../shared/components/codex';
 import { SparklineChart } from '../../../shared/components/charts';
 import { useToast } from '../../../shared/components/useToast';
@@ -13,10 +14,13 @@ import type { MealSchedule } from '../../../../shared/meal-utils';
 import { nutritionToday, DEFAULT_DAY_CUTOFF_HOUR } from '../nutrition-day';
 import { notifyNutritionChanged } from '../notify';
 import type { NutritionProfile } from '../types';
+import { subscribeQuickCreate, revealWidget } from '../../../hub/widgets/quick-create';
 
 export default function NutritionDashboardWidget() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [calories, setCalories] = useState(0);
   const [target, setTarget] = useState<number | null>(null);
   const [weekCalories, setWeekCalories] = useState<number[]>([]);
@@ -78,6 +82,13 @@ export default function NutritionDashboardWidget() {
       window.removeEventListener('sync:nutritionUpdated', handler);
     };
   }, [loadData]);
+
+  // The dashboard's "Registrá una comida" now opens this form instead of
+  // dropping the user on /nutrition, where a profile gate was waiting.
+  useEffect(() => subscribeQuickCreate('meal', () => {
+    setShowQuickLog(true);
+    revealWidget(rootRef.current);
+  }), []);
 
   // ── Quick-estimate handlers ──────────────────────
   const handleEstimate = async () => {
@@ -201,14 +212,18 @@ export default function NutritionDashboardWidget() {
   const isSetup = target && target > 0;
 
   return (
-    <div>
+    <div ref={rootRef}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0 10px' }}>
-        <RingGauge
-          value={calories}
-          max={effectiveTarget}
-          size={68}
-          label="kcal"
-        />
+        {/* A ring filled against a target the user never set is a lie with a
+            progress bar. Without a target we just show what was logged. */}
+        {isSetup ? (
+          <RingGauge value={calories} max={effectiveTarget} size={68} label="kcal" />
+        ) : (
+          <div className="nutri-dash-plain-total" aria-label={`${calories} kcal`}>
+            <span className="qb-numeral">{calories}</span>
+            <span className="qb-hand">kcal</span>
+          </div>
+        )}
         <div style={{ flex: 1 }}>
           {isSetup ? (
             <>
@@ -221,10 +236,20 @@ export default function NutritionDashboardWidget() {
               </div>
             </>
           ) : (
-            <div className="nutri-empty" style={{ textAlign: 'center', padding: 16 }}>
-              <p style={{ color: 'var(--ink-faded)', fontStyle: 'italic', margin: 0 }}>
-                {t('nutrify.setupRequired', 'Configurá tu perfil nutricional')}
+            /* The old notice said "Configuración requerida" — untrue: logging
+               works without a profile, and the gauge silently used a made-up
+               2000 kcal. Now it names what is missing and goes to fix it. */
+            <div className="nutri-empty nutri-dash-setup">
+              <p className="nutri-dash-setup__text">
+                {t('nutrify.targetNotSet', 'Todavía no fijaste tu meta diaria. Podés registrar igual: el anillo se llena cuando la definas.')}
               </p>
+              <button
+                type="button"
+                className="widget-empty-cta"
+                onClick={() => navigate('/nutrition')}
+              >
+                {t('nutrify.targetNotSetCta', 'Calculá tu meta')}
+              </button>
             </div>
           )}
         </div>
