@@ -13,6 +13,108 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.5',
+    date: '2026-09-03',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'mobile',
+        text: {
+          es: 'Los avisos ahora te llegan con Hubtify cerrada: el final del Pomodoro y los recordatorios de tus hábitos suenan igual aunque no tengas la app abierta. La primera vez Android puede pedirte permiso para los avisos puntuales — se lo das una vez y listo',
+          en: 'Notifications now reach you with Hubtify closed: the end of a Pomodoro and your habit reminders ring even when the app is not open. The first time, Android may ask you to allow exact alarms — grant it once and you are done',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'finance',
+        text: {
+          es: 'Coinify se rehizo alrededor de importar el resumen en vez de tipear: de seis pestañas quedaron tres, y cargar un mes pasó de unas 200 interacciones a unas 16. Del resumen salen solas las cuotas con las que te faltan, lo que pagaste en el mes, el cierre y el vencimiento de la tarjeta — y ahora también podés importarlo desde el teléfono',
+          en: 'Coinify was rebuilt around importing your statement instead of typing it in: six tabs became three, and logging a month went from roughly 200 interactions to about 16. The statement now fills in your installments with how many are left, what you paid during the month, and the card closing and due dates — and you can import it from your phone too',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'hub',
+        text: {
+          es: 'Los espacios vacíos dejaron de ser carteles que te mandan a otro lado: crean ahí mismo la primera misión, el primer ritual o la primera comida, sin navegar. Y si volvés después de dos días o más, un parte de regreso te cuenta qué pasó mientras no estabas y por dónde seguir, sin reproches',
+          en: 'Empty spaces stopped being signs that send you elsewhere: they now create your first quest, first ritual or first meal right there, no navigating. And if you come back after two days or more, a return briefing tells you what happened while you were away and where to pick up, no guilt trip',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'hub',
+        text: {
+          es: 'Ya hay en qué gastar los óbolos: un puñado de recompensas para canjear, y el saldo a la vista justo donde los ganás. Antes se te acumulaban sin destino',
+          en: 'Your obols finally have somewhere to go: a handful of rewards to redeem, with your balance in sight right where you earn them. Before, they just piled up with nowhere to spend them',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'hub',
+        text: {
+          es: 'Un solo ritual para cerrar el día. Antes había dos que no se conocían entre sí y te hacían despedirte del día dos veces',
+          en: 'A single ritual to close out your day. Before there were two that did not know about each other, so you ended up saying goodnight twice',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'Repetir una comida es un toque: tenés favoritos y «repetir lo de ayer» a mano en el hub, sin pasar por la IA ni volver a escribir todo',
+          en: 'Repeating a meal takes one tap: favorites and a "same as yesterday" shortcut right on the hub, without going through the AI or typing it all again',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Texto que no se leía: el día del estante del Caldero era prácticamente invisible y había avisos en Nutrify que se perdían contra el fondo. Ahora se lee todo',
+          en: 'Text you could not read: the day label on the Cauldron shelf was practically invisible and some notices in Nutrify blended into the background. Now it all reads clearly',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Si le pedís al sistema reducir las animaciones, el caldero ahora también se queda quieto. Antes seguía burbujeando como si nada',
+          en: 'If you ask your system to reduce motion, the cauldron now stays still too. Before it kept bubbling away as if nothing had happened',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'mobile',
+        text: {
+          es: 'En el teléfono los botones y controles chicos crecieron al tamaño que el pulgar necesita, así dejás de errarle. Y el ícono de Android quedó con un solo círculo — tenía dos, uno encima del otro',
+          en: 'On the phone, small buttons and controls grew to the size your thumb actually needs, so you stop missing them. And the Android icon now has a single circle — it used to have two, stacked on top of each other',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'En Windows, el ícono que aparece en «Agregar o quitar programas» ya no es el genérico, y si te quedó uno viejo de una actualización anterior se repone solo al abrir la app',
+          en: 'On Windows, the icon shown under "Add or remove programs" is no longer the generic one, and if an old one was left behind by a previous update it now restores itself when you open the app',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'quests',
+        text: {
+          es: 'La pestaña «Hoy» ahora también te muestra las misiones sin fecha, que antes quedaban invisibles ahí, y al crear una te sugiere hoy',
+          en: 'The "Today" tab now also shows quests with no date, which used to stay invisible there, and creating one suggests today by default',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Tres cosas del dinero que no cerraban: los consumos en dólares se sumaban como si fueran pesos, las compras en cuotas no guardaban con qué tarjeta las hiciste, y el campo de monto no aclaraba si esperaba la cuota o el total. Las tres, resueltas',
+          en: 'Three money things that did not add up: purchases in dollars were counted as if they were pesos, installment purchases did not remember which card you used, and the amount field never said whether it wanted the installment or the total. All three sorted',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.4',
     date: '2026-09-02',
     changes: [
