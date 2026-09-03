@@ -5,6 +5,7 @@ import { emit } from '../events';
 import { platform } from '../platform';
 import { getMondayOfWeek, formatDateString } from '../../shared/date-utils';
 import { isModuleNotificationEnabled } from './notifications.ipc';
+import { getLastUsedPresetId } from './cauldron-defaults';
 import {
   cauldronEndMessage,
   planCauldronNotifications,
@@ -638,6 +639,13 @@ export function registerCauldronIpcHandlers(): void {
       )
       .all();
   });
+
+  /**
+   * La última receta que se encendió, según el historial (que SÍ sincroniza).
+   * Respaldo del `localStorage` del renderer cuando éste no tiene nada que decir
+   * — instalación nueva, otro dispositivo. Ver `cauldron-defaults.ts`.
+   */
+  ipcHandle('cauldron:getLastUsedPreset', () => getLastUsedPresetId(getDb()));
 
   ipcHandle(
     'cauldron:upsertPreset',

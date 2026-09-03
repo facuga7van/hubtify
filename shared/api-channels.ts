@@ -77,6 +77,7 @@ export const API_CHANNELS = {
   questsGetPendingCount: { channel: 'quests:getPendingCount', kind: 'invoke' },
   questsGetCompletedTodayCount: { channel: 'quests:getCompletedTodayCount', kind: 'invoke' },
   questsGetOverdueCount: { channel: 'quests:getOverdueCount', kind: 'invoke' },
+  questsGetEntryDefaults: { channel: 'quests:getEntryDefaults', kind: 'invoke' },
   // Nutrition
   nutritionGetProfile: { channel: 'nutrition:getProfile', kind: 'invoke' },
   nutritionSaveProfile: { channel: 'nutrition:saveProfile', kind: 'invoke' },
@@ -166,6 +167,7 @@ export const API_CHANNELS = {
   onNotificationsUpdated: { channel: 'notifications:updated', kind: 'on' },
   // Cauldron
   cauldronGetPresets: { channel: 'cauldron:getPresets', kind: 'invoke' },
+  cauldronGetLastUsedPreset: { channel: 'cauldron:getLastUsedPreset', kind: 'invoke' },
   cauldronUpsertPreset: { channel: 'cauldron:upsertPreset', kind: 'invoke' },
   cauldronDeletePreset: { channel: 'cauldron:deletePreset', kind: 'invoke' },
   cauldronStart: { channel: 'cauldron:start', kind: 'invoke' },

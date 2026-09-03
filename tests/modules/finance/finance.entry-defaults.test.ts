@@ -31,13 +31,15 @@ function addTx(fields: {
   currency?: string;
   accountId?: string | null;
   date?: string;
+  installments?: number;
+  installmentGroupId?: string;
 }) {
   seq += 1;
   db.prepare(`
     INSERT INTO finance_transactions
       (id, type, amount, currency, category, description, date, payment_method, source,
-       installments, for_third_party, impacts_balance, account_id, created_at, updated_at)
-    VALUES (?, ?, 1000, ?, ?, 'x', ?, ?, ?, 1, 0, 1, ?, ?, ?)
+       installments, installment_group_id, for_third_party, impacts_balance, account_id, created_at, updated_at)
+    VALUES (?, ?, 1000, ?, ?, 'x', ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)
   `).run(
     `tx-${seq}`,
     fields.type ?? 'expense',
@@ -46,10 +48,19 @@ function addTx(fields: {
     fields.date ?? `2026-01-${String(seq).padStart(2, '0')}`,
     fields.paymentMethod,
     fields.source ?? 'manual',
+    fields.installments ?? 1,
+    fields.installmentGroupId ?? null,
     fields.accountId ?? null,
     `2026-01-01T00:00:0${seq % 10}Z`,
     `2026-01-01T00:00:0${seq % 10}Z`,
   );
+}
+
+/** Un plan en cuotas: N filas que comparten `installment_group_id`. */
+function addPlan(groupId: string, paymentMethod: string, count = 6, date = '2026-01-03') {
+  for (let i = 0; i < count; i++) {
+    addTx({ paymentMethod, installments: count, installmentGroupId: groupId, date });
+  }
 }
 
 const defaults = () => getEntryDefaults(db, RESERVED_CATEGORIES);
@@ -123,5 +134,82 @@ describe('getEntryDefaults', () => {
     addTx({ paymentMethod: 'transfer', currency: 'USD' });
     addTx({ paymentMethod: 'transfer', currency: 'ARS' });
     expect(defaults().currency).toBe('USD');
+  });
+});
+
+/**
+ * La categoría también sale del historial.
+ *
+ * En la base real es un caso degenerado y vale decirlo: **58 de las 60 altas
+ * manuales de gasto están en «Otros»** (las 2 restantes son «Pago Tarjeta», que
+ * escribe la app). O sea que el `'Otros'` hardcodeado acierta hoy por accidente.
+ * Lo que cambia es que deja de ser una constante: el día que la persona empiece
+ * a separar «Comida» de «Transporte», el formulario la sigue en vez de obligarla
+ * a corregir el mismo select para siempre.
+ */
+describe('getEntryDefaults — categoría', () => {
+  it('sin historial cae en «Otros»', () => {
+    expect(defaults().category).toBe('Otros');
+  });
+
+  it('devuelve la categoría más usada de las altas manuales', () => {
+    for (let i = 0; i < 3; i++) addTx({ paymentMethod: 'transfer', category: 'Comida' });
+    addTx({ paymentMethod: 'transfer', category: 'Transporte' });
+    expect(defaults().category).toBe('Comida');
+  });
+
+  it('nunca propone una categoría reservada, aunque sea la más frecuente', () => {
+    // «Pago Tarjeta» y «Transferencia» las escribe la app: cargarles un gasto a
+    // mano corrompe un número que se lee en otro lado.
+    for (let i = 0; i < 10; i++) addTx({ paymentMethod: 'debit', category: 'Pago Tarjeta' });
+    addTx({ paymentMethod: 'transfer', category: 'Comida' });
+    expect(defaults().category).toBe('Comida');
+  });
+});
+
+/**
+ * El medio de pago de un PLAN EN CUOTAS es otra pregunta que la de un gasto suelto.
+ *
+ * En la base real hay 4 planes cargados a mano: **3 con tarjeta y 1 por
+ * transferencia. Cero en débito** — que es exactamente con lo que arrancaba
+ * `InstallmentAddForm` (`paymentMethod: 'debit'`, constante). La moda general de
+ * los gastos sueltos tampoco sirve acá: da `transfer` (40 de 60), que es el
+ * plan minoritario.
+ */
+describe('getEntryDefaults — plan en cuotas', () => {
+  it('sin historial de planes cae en tarjeta, no en débito', () => {
+    expect(defaults()).toMatchObject({ installmentPaymentMethod: 'credit_card', installmentSampleSize: 0 });
+  });
+
+  it('cuenta PLANES, no filas: un plan de 36 cuotas no le gana a tres de 6', () => {
+    addPlan('g1', 'transfer', 36, '2026-02-01');
+    addPlan('g2', 'credit_card', 6, '2026-01-03');
+    addPlan('g3', 'credit_card', 6, '2026-03-03');
+    addPlan('g4', 'credit_card', 6, '2026-07-08');
+    expect(defaults()).toMatchObject({ installmentPaymentMethod: 'credit_card', installmentSampleSize: 4 });
+  });
+
+  it('respeta un historial de planes que no son con tarjeta', () => {
+    addPlan('g1', 'transfer', 3);
+    addPlan('g2', 'transfer', 3);
+    addPlan('g3', 'credit_card', 3);
+    expect(defaults().installmentPaymentMethod).toBe('transfer');
+  });
+
+  it('no confunde el plan con el gasto suelto', () => {
+    // 20 transferencias sueltas no dicen nada sobre cómo se financia una compra.
+    for (let i = 0; i < 20; i++) addTx({ paymentMethod: 'transfer' });
+    addPlan('g1', 'credit_card', 6);
+    const d = defaults();
+    expect(d.paymentMethod).toBe('transfer');
+    expect(d.installmentPaymentMethod).toBe('credit_card');
+  });
+
+  it('ignora los planes importados del resumen: no los eligió nadie', () => {
+    addPlan('g1', 'credit_card', 6);
+    for (let i = 0; i < 12; i++) {
+      addTx({ paymentMethod: 'debit', source: 'import', installments: 12, installmentGroupId: 'g-import' });
+    }
+    expect(defaults()).toMatchObject({ installmentPaymentMethod: 'credit_card', installmentSampleSize: 1 });
   });
 });
