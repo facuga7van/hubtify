@@ -7,6 +7,7 @@ import {
   isRecurringDueInMonth,
   recurringAnchorMonth,
 } from './finance.balance';
+import { computeHabits } from './quests.habits';
 
 /** Local date string YYYY-MM-DD (avoids UTC offset from toISOString) */
 function localDate(d: Date = new Date()): string {
@@ -166,6 +167,36 @@ export function evaluateQuestNotifications(db: SqlDatabase): NotificationCandida
 
 // ── Habit Evaluator ─────────────────────────────────────────
 
+/**
+ * ¿Cuántos hábitos quieren un check HOY?
+ *
+ * La pregunta ya la contesta `computeHabits` (`pendingToday`), que es la MISMA
+ * que leen el Hub, la pestaña «Hoy» y la lista de Hábitos. El motor tenía su
+ * propia cuenta a mano y se desincronizó dos veces: no descontaba el check de
+ * hoy en los "N veces por semana" (fuiste al gimnasio el lunes, lo marcaste, y
+ * el lunes a la noche te volvía a avisar porque la semana iba 1/3) y no
+ * conocía `specific_days` (un Lun/Mie/Vie con times_per_week = 3 sonaba también
+ * los martes). Una sola implementación, un solo lugar donde equivocarse.
+ *
+ * `computeHabits` es read-only a propósito — el escritor de escudos es
+ * `reconcileHabitShields`, y un chequeo de notificaciones no debe mutar nada.
+ *
+ * Lo único que queda acá es la política PROPIA de las notificaciones: un hábito
+ * mensual solo molesta en los últimos 3 días del mes.
+ */
+function habitsPendingToday(db: SqlDatabase, today: Date): number {
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const monthlyWindowOpen = today.getDate() >= lastDayOfMonth - 2;
+
+  let pending = 0;
+  for (const h of computeHabits(db, today)) {
+    if (!h.pendingToday) continue;
+    if (h.frequency === 'monthly' && !monthlyWindowOpen) continue;
+    pending++;
+  }
+  return pending;
+}
+
 export function evaluateHabitNotifications(
   db: SqlDatabase,
   reminderTime: string,
@@ -175,60 +206,9 @@ export function evaluateHabitNotifications(
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   if (currentTime < reminderTime) return [];
 
-  const todayStr = localDate();
+  const todayStr = localDate(now);
 
-  // Get all active habits
-  const habits = db.prepare(`
-    SELECT id, name, frequency, times_per_week AS timesPerWeek
-    FROM habits WHERE deleted_at IS NULL
-  `).all() as Array<{ id: string; name: string; frequency: string; timesPerWeek: number }>;
-
-  if (habits.length === 0) return [];
-
-  // Get all checks for period calculation
-  const allChecks = db.prepare(
-    'SELECT habit_id, date FROM habit_checks WHERE deleted_at IS NULL'
-  ).all() as Array<{ habit_id: string; date: string }>;
-
-  const checksByHabit = new Map<string, Set<string>>();
-  for (const c of allChecks) {
-    let set = checksByHabit.get(c.habit_id);
-    if (!set) { set = new Set(); checksByHabit.set(c.habit_id, set); }
-    set.add(c.date);
-  }
-
-  let uncheckedCount = 0;
-
-  for (const h of habits) {
-    const dates = checksByHabit.get(h.id) ?? new Set<string>();
-
-    if (h.frequency === 'daily') {
-      if (!dates.has(todayStr)) uncheckedCount++;
-    } else if (h.frequency === 'weekly') {
-      const today = new Date();
-      const dayOfWeek = today.getDay() || 7;
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - dayOfWeek + 1);
-      const mondayStr = localDate(monday);
-      let count = 0;
-      for (const d of dates) {
-        if (d >= mondayStr && d <= todayStr) count++;
-      }
-      if (count < h.timesPerWeek) uncheckedCount++;
-    } else if (h.frequency === 'monthly') {
-      const today = new Date();
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-      if (today.getDate() < lastDay - 2) continue;
-      const monthStart = todayStr.slice(0, 7) + '-01';
-      let count = 0;
-      for (const d of dates) {
-        if (d >= monthStart && d <= todayStr) count++;
-      }
-      if (count < 1) uncheckedCount++;
-    }
-  }
-
-  if (uncheckedCount === 0) return [];
+  if (habitsPendingToday(db, now) === 0) return [];
 
   return [{
     type: 'habit_reminder',
@@ -585,49 +565,14 @@ export function autoResolve(db: SqlDatabase): number {
       }
 
       if (n.type === 'habit_reminder') {
-        // Re-check if all habits are complete for the ref date
-        const refDate = n.ref_id;
-        const habits = db.prepare(`
-          SELECT id, frequency, times_per_week AS timesPerWeek
-          FROM habits WHERE deleted_at IS NULL
-        `).all() as Array<{ id: string; frequency: string; timesPerWeek: number }>;
-
-        const allChecks = db.prepare(
-          'SELECT habit_id, date FROM habit_checks WHERE deleted_at IS NULL'
-        ).all() as Array<{ habit_id: string; date: string }>;
-
-        const checksByHabit = new Map<string, Set<string>>();
-        for (const c of allChecks) {
-          let set = checksByHabit.get(c.habit_id);
-          if (!set) { set = new Set(); checksByHabit.set(c.habit_id, set); }
-          set.add(c.date);
+        // Un aviso de un día anterior ya no representa nada: se retira solo.
+        // Si es de hoy, la pregunta es exactamente la misma que lo encendió,
+        // así que la contesta la MISMA función (tercera copia de esta cuenta
+        // que había en el archivo — la que hacía que marcar el gimnasio no
+        // apagara la campana hasta cumplir la cuota semanal entera).
+        if (n.ref_id !== localDate() || habitsPendingToday(db, new Date()) === 0) {
+          shouldResolve = true;
         }
-
-        let allComplete = true;
-        for (const h of habits) {
-          const dates = checksByHabit.get(h.id) ?? new Set<string>();
-          if (h.frequency === 'daily') {
-            if (!dates.has(refDate)) { allComplete = false; break; }
-          } else if (h.frequency === 'weekly') {
-            const ref = new Date(refDate + 'T00:00:00');
-            const dayOfWeek = ref.getDay() || 7;
-            const monday = new Date(ref);
-            monday.setDate(ref.getDate() - dayOfWeek + 1);
-            const mondayStr = localDate(monday);
-            let count = 0;
-            for (const d of dates) { if (d >= mondayStr && d <= refDate) count++; }
-            if (count < h.timesPerWeek) { allComplete = false; break; }
-          } else if (h.frequency === 'monthly') {
-            const monthStart = refDate.slice(0, 7) + '-01';
-            let count = 0;
-            for (const d of dates) { if (d >= monthStart && d <= refDate) count++; }
-            if (count < 1) { allComplete = false; break; }
-          }
-        }
-        if (allComplete) shouldResolve = true;
-
-        // Also resolve if the notification is from a previous day (stale)
-        if (refDate !== localDate()) shouldResolve = true;
       }
 
       if (shouldResolve) {
