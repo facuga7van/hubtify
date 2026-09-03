@@ -154,7 +154,27 @@ export function parseGaliciaLine(
     }
   }
 
-  if (!markerMatch) return null;
+  /**
+   * Líneas del consolidado que llevan fecha pero NO son consumos. `SU PAGO` es
+   * la única medida en resúmenes reales; el encabezado
+   * (`finance-statement.ts`) la lee como «lo que pagué en el mes», que es su
+   * verdadero significado. Acá solo hay que no confundirla con una compra.
+   */
+  if (/^SU\s+PAGO\b/i.test(body)) return null;
+
+  /**
+   * El marcador `*` / `K` no está garantizado.
+   *
+   * Medido contra los resúmenes reales: hay filas de consumo impresas SIN
+   * marcador, y el `return null` de antes las tiraba enteras — ni siquiera
+   * llegaban a «líneas salteadas» de forma accionable. Se detectó porque el
+   * checksum del resumen no cerraba en dólares por exactamente esa fila.
+   *
+   * Sin marcador se exige la columna COMPROBANTE (un token suelto de 5 a 7
+   * dígitos): es lo que distingue una línea del detalle de cualquier otro
+   * renglón con fecha e importe. Sin esa señal no se adivina.
+   */
+  if (!markerMatch && !/\b\d{5,7}\b/.test(body)) return null;
 
   const rest = body;
 
@@ -213,8 +233,13 @@ export function parseGaliciaLine(
 
   // Clean up any trailing receipt-like tokens (alphanumeric short codes from USD lines)
   // e.g. "P1fMHM2Z" in "GOOGLE *YouTubeP P1fMHM2Z"
-  // Only strip if it looks like a receipt/code (no spaces, 6–10 chars, mixed alnum)
-  merchantSection = merchantSection.replace(/\s+[A-Z0-9]{5,10}\s*$/i, '').trim();
+  //
+  // El token tiene que LLEVAR AL MENOS UN DÍGITO para ser un código. Sin esa
+  // condición la regla se comía la última palabra de cualquier comercio cuyo
+  // nombre terminara en una palabra de 5 a 10 letras («TIENDA SIN MARCADOR» →
+  // «TIENDA SIN»), que es parte de por qué 47 de 61 nombres importados quedaban
+  // con forma sospechosa y la detección de recurrentes por nombre no servía.
+  merchantSection = merchantSection.replace(/\s+(?=[A-Za-z0-9]{5,10}$)(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,10}\s*$/, '').trim();
 
   const merchant = merchantSection;
   if (!merchant) return null;
