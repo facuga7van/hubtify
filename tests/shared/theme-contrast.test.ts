@@ -12,6 +12,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+// La fórmula vive en un solo lugar: `css-ink-contrast.test.ts` mide con la
+// misma. Dos copias de una fórmula WCAG son dos oportunidades de que una quede
+// vieja — exactamente el defecto que estos tests persiguen.
+import { contrast } from './css-contrast';
+
+export { contrast };
+
 const css = readFileSync(resolve(__dirname, '../../src/hub/styles/theme.css'), 'utf8');
 const components = readFileSync(resolve(__dirname, '../../src/hub/styles/components.css'), 'utf8');
 const coinify = readFileSync(resolve(__dirname, '../../src/modules/finance/styles/coinify.css'), 'utf8');
@@ -20,17 +27,6 @@ function token(name: string): string {
   const m = css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})\\s*;`));
   if (!m) throw new Error(`no encontré --${name} en theme.css`);
   return m[1].toLowerCase();
-}
-
-function luminance(hex: string): number {
-  const [r, g, b] = hex.replace('#', '').match(/.{2}/g)!.map((h) => parseInt(h, 16) / 255);
-  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-export function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
 }
 
 const INKS = ['ink', 'ink-soft', 'ink-faded'] as const;
