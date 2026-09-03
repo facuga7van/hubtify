@@ -133,9 +133,9 @@ describe('worker-protocol: platform proxy e init', () => {
   it('callPlatform postea {type:platform,id} y resuelve con platform-result ok', async () => {
     const { host, posted } = makeHost();
     const p = createWorkerProtocol(host);
-    const call = p.callPlatform('pickPdfText', []);
+    const call = p.callPlatform('pickBinaryFile', []);
     const msg = posted[0].msg as { id: number; type: string; method: string; args: unknown[] };
-    expect(msg).toEqual({ id: 1, type: 'platform', method: 'pickPdfText', args: [] });
+    expect(msg).toEqual({ id: 1, type: 'platform', method: 'pickBinaryFile', args: [] });
     await p.onMessage({ id: 1, type: 'platform-result', ok: true, value: { unsupported: true } });
     await expect(call).resolves.toEqual({ unsupported: true });
   });

@@ -700,10 +700,11 @@ export interface HubtifyApi {
   financeGetRecurringAmountHistory: (id: string) => Promise<unknown[]>;
 
   // Finance - Import
-  financeImportSelectAndParsePDF: () => Promise<
-    | { rows: ParsedRow[]; fileName: string; skippedLines: string[]; header?: StatementHeaderDto }
-    | { ok: false; reason: 'unsupported_platform' }
-    | null
+  /** Paso 1: el selector de archivos del sistema. `null` si se cancela. */
+  financeImportPickPdf: () => Promise<{ name: string; bytes: Uint8Array } | null>;
+  /** Paso 2: el texto que pdfjs sacó en el renderer (src/shared/pdf-text.ts), a filas. */
+  financeImportParsePdfText: (fileName: string, text: string) => Promise<
+    { rows: ParsedRow[]; fileName: string; skippedLines: string[]; header?: StatementHeaderDto }
   >;
   financeImportConfirm: (rows: unknown[], statementMonth: string, fileName: string, creditCardId?: string | null, accountId?: string | null) => Promise<{ batchId: string; count: number; duplicateCount: number; creditCardId?: string | null } | { ok: false; reason: string }>;
   financeUndoImportBatch: (batchId: string) => Promise<{ ok: boolean; reason?: string; deleted?: number }>;

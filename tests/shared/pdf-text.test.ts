@@ -8,7 +8,7 @@
  * es pura, y es la que puede romper el parser.
  */
 import { describe, it, expect } from 'vitest';
-import { joinTextItems } from '../../src/mobile/pdf-text';
+import { joinTextItems } from '../../src/shared/pdf-text';
 
 /** Un fragmento como lo entrega pdfjs: `transform[4]` es X y `transform[5]` es Y. */
 const item = (str: string, x: number, y: number, hasEOL = false) => ({

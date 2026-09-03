@@ -1,15 +1,16 @@
 /**
- * Extracción de texto de un PDF **dentro del WebView de Android**.
+ * Extracción de texto de un PDF **en el renderer**, escritorio y Android.
  *
- * `pickPdfText` estaba trabado en escritorio porque se implementó con
- * `pdf-parse`, que es node-only. La investigación midió que eso era una
- * DECISIÓN, no un límite técnico: `pdfjs-dist` corre en el navegador y
- * `getTextContent()` no necesita canvas (solo el renderizado lo necesita).
+ * Nació para Android, donde no hay Node. Escritorio lo leía en el main con
+ * `pdf-parse` (node-only, con un canvas nativo de 35 MB de polyfills): ese
+ * módulo nunca llegó al paquete instalado y el import falló en toda versión
+ * publicada desde marzo. `pdfjs-dist` corre en cualquier navegador y
+ * `getTextContent()` no necesita canvas, así que ahora hay UN camino: el main
+ * (o el host de Android) entrega los bytes y esto los convierte en texto.
  *
- * Riesgo asumido y acotado: lo único que puede fallar en un device real es la
- * resolución del worker (Vite ≥ 7.1 + CSP `worker-src` del WebView). Por eso
- * **todo** está detrás de un `try/catch` que devuelve `{ unsupported: true }` —
- * o sea, exactamente el comportamiento de hoy. El costo del peor caso es cero.
+ * Lo único que puede fallar es la resolución del worker (Vite ≥ 7.1, CSP
+ * `worker-src`, `file://` en Electron). Quien llama lo envuelve en `try/catch`
+ * y le explica al usuario qué hacer; el peor caso es un aviso, no un cuelgue.
  *
  * El import es dinámico a propósito: pdfjs pesa, y la mayoría de las sesiones
  * de Coinify no importan un resumen. Solo se descarga cuando se elige un PDF.
@@ -40,7 +41,7 @@ export async function extractPdfText(bytes: Uint8Array): Promise<string> {
     pages.push(joinTextItems(content.items as Array<Record<string, unknown>>));
   }
   await doc.destroy();
-  // Mismo separador de páginas que imprime `pdf-parse` en escritorio, para que
+  // Mismo separador de páginas que imprimía `pdf-parse`, para que
   // el parser de líneas vea exactamente la misma forma en las dos plataformas.
   return pages.join('\n\n');
 }

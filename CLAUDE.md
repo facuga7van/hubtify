@@ -16,7 +16,7 @@ shared-logic/      Business logic shared by desktop and Android. Pure TS, sync, 
   ids.ts           genId()
 electron/          Desktop binding only
   main.ts          Windows, tray, startup order: setDbFactory → setPlatform → setEventSink → registerAllIpcHandlers → getDb → runAllModuleMigrations
-  platform.ts      PlatformPort with dialog/fs/Notification/pdf-parse
+  platform.ts      PlatformPort with dialog/fs/Notification
   ipc/db.ts        openDesktopDb() (better-sqlite3 + WAL)
   ipc/registry.ts  registerAllIpcHandlers(): shared handlers + backup, then bind to ipcMain
   modules/         backup.ipc.ts, updater.ts (desktop-only)

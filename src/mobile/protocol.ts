@@ -17,7 +17,6 @@ export type PlatformMethod =
   | 'notify'
   | 'openExternal'
   | 'pickTextFile'
-  | 'pickPdfText'
   | 'pickBinaryFile'
   | 'saveTextFile'
   | 'saveBinaryFile'

@@ -40,7 +40,6 @@ const basePort: PlatformPort = {
   notify: async (n) => { notified.push({ title: n.title, body: n.body }); },
   openExternal: async () => undefined,
   pickTextFile: async () => null,
-  pickPdfText: async () => null,
   pickBinaryFile: async () => null,
   saveTextFile: async () => false,
   saveBinaryFile: async () => false,

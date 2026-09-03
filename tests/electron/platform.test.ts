@@ -72,11 +72,6 @@ describe('electronPlatform', () => {
     expect(await electronPlatform.saveTextFile('x.csv', '')).toBe(false);
   });
 
-  it('pickPdfText returns null when the dialog is cancelled', async () => {
-    h.openDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
-    expect(await electronPlatform.pickPdfText()).toBeNull();
-  });
-
   it('pickTextFile returns name + content', async () => {
     h.openDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['C:/tmp/notes.txt'] });
     expect(await electronPlatform.pickTextFile([{ name: 'Text', extensions: ['txt'] }]))
