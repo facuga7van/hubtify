@@ -167,6 +167,36 @@ describe('Libro mayor (Transactions)', () => {
     const header = getComputedStyle(el('.coin-ledger-header')).gridTemplateColumns;
     const row = getComputedStyle(el('.coin-ledger-row')).gridTemplateColumns;
     expect(header).toBe(row);
+    // A 760 px la columna del medio de pago se esconde: su rótulo tiene que
+    // irse con ella, o el encabezado queda con una celda de más y TODOS los
+    // títulos se corren una columna.
+    expect(getComputedStyle(el('.coin-ledger-header__label')).display).toBe('none');
+  });
+
+  test('cada rótulo del encabezado cae sobre su columna, y el medio de pago tiene uno', async () => {
+    stub();
+    await page.viewport(1640, 900);
+    wrap();
+    await settle();
+
+    // La cuarta columna llevaba el medio de pago SIN rótulo, y «CATEGORÍA»
+    // parecía titular dos columnas a la vez.
+    const label = el('.coin-ledger-header__label');
+    expect(label.textContent?.trim()).toBeTruthy();
+    expect(getComputedStyle(label).display).not.toBe('none');
+
+    const row = el('.coin-ledger-row');
+    const payment = row.querySelector('.coin-ledger-row__payment') as HTMLElement | null;
+    if (payment) {
+      const l = label.getBoundingClientRect();
+      const p = payment.getBoundingClientRect();
+      // Se solapan horizontalmente: el rótulo está encima de sus datos.
+      expect(l.left).toBeLessThan(p.right + 1);
+      expect(l.right).toBeGreaterThan(p.left - 1);
+    }
+
+    // El importe se alinea a la derecha, igual que sus datos.
+    expect(getComputedStyle(el('.coin-sort-header--amount')).textAlign).toBe('right');
   });
 
   test('ningún texto de la fila baja del piso de 13 px, y el concepto va en cuerpo', async () => {

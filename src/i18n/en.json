@@ -444,6 +444,7 @@
     "colCategory": "CATEGORY",
     "colDate": "DATE",
     "colDescription": "CONCEPT",
+    "colMethod": "METHOD",
     "commitments": "Commitments",
     "commitmentsLede": "Everything already committed ahead: running instalments, fixed expenses, card statements and loans.",
     "confirmDelete": "Delete?",

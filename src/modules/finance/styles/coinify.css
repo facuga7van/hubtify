@@ -517,6 +517,16 @@
   display: block;
 }
 
+/* Un rótulo que NO ordena (el medio de pago no tiene un orden con sentido):
+   mismo estilo que los demás, sin la afordancia de botón. */
+.coin-ledger-header__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 button.coin-sort-header {
   background: none;
   border: none;
@@ -2231,9 +2241,11 @@ button.coin-sort-header--amount {
     width: 100%;
   }
 
-  /* Origin + payment method go first when space runs out; the amount never does. */
+  /* Origin + payment method go first when space runs out; the amount never does.
+     El rótulo «MEDIO» se va con su columna: dejarlo convertía el encabezado en
+     seis celdas sobre una grilla de cinco y corría TODOS los títulos. */
   .coin-ledger-row__meta,
-  .coin-ledger-header__spacer:first-of-type {
+  .coin-ledger-header__label {
     display: none;
   }
 

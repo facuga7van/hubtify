@@ -746,7 +746,9 @@ export default function Transactions() {
         <button className="coin-sort-header" onClick={() => toggleSort('category')}>
           {t('coinify.colCategory', 'CATEGORÍA')} {sortIndicator('category')}
         </button>
-        <span className="coin-ledger-header__spacer" aria-hidden="true" />
+        {/* La cuarta columna llevaba el medio de pago SIN rótulo: la auditoría
+            de diseño marcó que «CATEGORÍA» parecía titular dos columnas. */}
+        <span className="coin-ledger-header__label">{t('coinify.colMethod', 'MEDIO')}</span>
         <button className="coin-sort-header coin-sort-header--amount" onClick={() => toggleSort('amount')}>
           {t('coinify.colAmount', 'MONTO')} {sortIndicator('amount')}
         </button>
