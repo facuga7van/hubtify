@@ -2,6 +2,7 @@ import { registerHandler as ipcHandle } from '../registry';
 import { getDb } from '../db';
 import { genId } from '../ids';
 import { platform } from '../platform';
+import { parseGaliciaStatement } from './finance-statement';
 import {
   addMonthsClamped,
   addMonthsToMonth,
@@ -341,12 +342,20 @@ export function registerFinanceImportIpcHandlers(): void {
       const parsed = parseGaliciaLine(trimmed, mappings);
       if (parsed) {
         rows.push(parsed);
-      } else if (datePrefix.test(trimmed)) {
-        // Line starts with a date but couldn't be parsed — potentially lost data
+      } else if (datePrefix.test(trimmed) && !/^\d{2}-\d{2}-\d{2}\s+SU\s+PAGO\b/i.test(trimmed)) {
+        // Line starts with a date but couldn't be parsed — potentially lost data.
+        // `SU PAGO` sale de acá: dejó de ser una línea incomprendida y pasó a ser
+        // «lo que pagué en el mes», que el encabezado lee y el preview muestra.
         skippedLines.push(trimmed);
       }
     }
-    return { rows, fileName, skippedLines };
+
+    // El 85 % del documento que se tiraba sin mirar: período, cierre,
+    // vencimiento, últimos 4, totales, pago mínimo, límites y la proyección de
+    // cuotas que el banco YA imprimió. Nada de esto se le vuelve a preguntar.
+    const header = parseGaliciaStatement(data.text);
+
+    return { rows, fileName, skippedLines, header };
   });
 
   /**

@@ -1201,6 +1201,7 @@ export function registerSyncIpcHandlers(): void {
       SELECT id, name, type, amount, currency, category, active,
              billing_day AS billingDay, frequency,
              account_id AS accountId, anchor_month AS anchorMonth,
+             payment_method AS paymentMethod,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_recurring ORDER BY created_at ASC
@@ -1238,6 +1239,7 @@ export function registerSyncIpcHandlers(): void {
 
     const creditCards = db.prepare(`
       SELECT id, name, closing_day AS closingDay, due_day AS dueDay,
+             last4, issuer,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_credit_cards
@@ -1250,6 +1252,15 @@ export function registerSyncIpcHandlers(): void {
              calculated_amount_usd AS calculatedAmountUsd,
              paid_amount_usd AS paidAmountUsd,
              transaction_id_usd AS transactionIdUsd,
+             closing_date AS closingDate, due_date AS dueDate,
+             statement_total_ars AS statementTotalArs,
+             statement_total_usd AS statementTotalUsd,
+             minimum_payment_ars AS minimumPaymentArs,
+             previous_balance_ars AS previousBalanceArs,
+             previous_balance_usd AS previousBalanceUsd,
+             prior_payment_ars AS priorPaymentArs,
+             prior_payment_usd AS priorPaymentUsd,
+             reconciled, forecast_json AS forecastJson,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_credit_card_statements
@@ -1641,8 +1652,8 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
       const getRec = db.prepare('SELECT id, updated_at FROM finance_recurring WHERE id = ?');
       const insertRec = db.prepare(`
         INSERT OR IGNORE INTO finance_recurring
-          (id, name, type, amount, currency, category, active, billing_day, frequency, account_id, anchor_month, created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, name, type, amount, currency, category, active, billing_day, frequency, account_id, anchor_month, payment_method, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       // frequency (the cadence — monthly / bimonthly / annual…) never travelled:
       // a bimonthly template arrived as 'monthly' on every other device.
@@ -1654,6 +1665,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
                frequency = CASE WHEN ? THEN ? ELSE frequency END,
                account_id = CASE WHEN ? THEN ? ELSE account_id END,
                anchor_month = CASE WHEN ? THEN ? ELSE anchor_month END,
+               payment_method = CASE WHEN ? THEN ? ELSE payment_method END,
                updated_at = ?, deleted_at = ?
         WHERE id = ?
       `);
@@ -1666,6 +1678,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
           const result = insertRec.run(r.id, r.name, r.type ?? 'income', r.amount, r.currency ?? 'ARS', r.category ?? 'Otros', r.active ?? 1, r.billingDay ?? 1,
             r.frequency ?? 'monthly',
             r.accountId ?? r.account_id ?? null, r.anchorMonth ?? r.anchor_month ?? null,
+            r.paymentMethod ?? r.payment_method ?? null,
             r.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt);
           if (result.changes > 0) changed = true;
         } else if (isNewerStamp(remoteUpdatedAt, local.updated_at)) {
@@ -1675,6 +1688,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
             'frequency' in r ? 1 : 0, r.frequency ?? 'monthly',
             hasAccount ? 1 : 0, r.accountId ?? r.account_id ?? null,
             hasAnchor ? 1 : 0, r.anchorMonth ?? r.anchor_month ?? null,
+            ('paymentMethod' in r || 'payment_method' in r) ? 1 : 0, r.paymentMethod ?? r.payment_method ?? null,
             remoteUpdatedAt, remoteDeletedAt, r.id);
           changed = true;
         }
@@ -2004,12 +2018,14 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
       const getCC = db.prepare('SELECT id, updated_at FROM finance_credit_cards WHERE id = ?');
       const insertCC = db.prepare(`
         INSERT OR IGNORE INTO finance_credit_cards
-          (id, name, closing_day, due_day, created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+          (id, name, closing_day, due_day, last4, issuer, created_at, updated_at, deleted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const updateCC = db.prepare(`
         UPDATE finance_credit_cards SET name = ?, closing_day = ?,
                due_day = CASE WHEN ? THEN ? ELSE due_day END,
+               last4  = CASE WHEN ? THEN ? ELSE last4  END,
+               issuer = CASE WHEN ? THEN ? ELSE issuer END,
                updated_at = ?, deleted_at = ?
         WHERE id = ?
       `);
@@ -2023,17 +2039,22 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
         const remoteUpdatedAt = (card.updatedAt as string) ?? (card.createdAt as string) ?? (card.created_at as string) ?? now;
         const remoteDeletedAt = (card.deletedAt as string) ?? (card.deleted_at as string) ?? null;
         const local = getCC.get(card.id) as { id: string; updated_at: string } | undefined;
+        const last4 = (card.last4 as string | null) ?? null;
+        const issuer = (card.issuer as string | null) ?? null;
         if (!local) {
           insertCC.run(card.id, card.name, closingDay,
             (card.dueDay as number | null) ?? (card.due_day as number | null) ?? null,
+            last4, issuer,
             card.createdAt ?? card.created_at ?? now, remoteUpdatedAt, remoteDeletedAt);
           changed = true;
         } else if (isNewerStamp(remoteUpdatedAt, local.updated_at)) {
-          // due_day: absent from an old client's payload = no opinion (keep
-          // local); an explicit null from a new client = clear the due day.
+          // due_day / last4 / issuer: absent from an old client's payload = no
+          // opinion (keep local); present and null = cleared on purpose.
           const hasDueDay = 'dueDay' in card || 'due_day' in card;
           updateCC.run(card.name, closingDay,
             hasDueDay ? 1 : 0, (card.dueDay as number | null) ?? (card.due_day as number | null) ?? null,
+            'last4' in card ? 1 : 0, last4,
+            'issuer' in card ? 1 : 0, issuer,
             remoteUpdatedAt, remoteDeletedAt, card.id);
           changed = true;
         }
@@ -2047,16 +2068,46 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
           (id, credit_card_id, period_month, calculated_amount, paid_amount,
            status, paid_date, transaction_id,
            calculated_amount_usd, paid_amount_usd, transaction_id_usd,
+           closing_date, due_date, statement_total_ars, statement_total_usd,
+           minimum_payment_ars, previous_balance_ars, previous_balance_usd,
+           prior_payment_ars, prior_payment_usd, reconciled, forecast_json,
            created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+      /**
+       * Los 11 campos del PAPEL no se pisan con NULL cuando el payload viene de
+       * un cliente viejo que ni los conoce: `CASE WHEN <presente> THEN ? ELSE
+       * <columna> END`, igual que `due_day`. Ausente = sin opinión; presente y
+       * null = borrado a propósito. Sin esto, un teléfono con la versión
+       * anterior borraba la conciliación de cada resumen en cada sync.
+       */
       const updateCCS = db.prepare(`
         UPDATE finance_credit_card_statements SET calculated_amount = ?, paid_amount = ?,
                status = ?, paid_date = ?, transaction_id = ?,
                calculated_amount_usd = ?, paid_amount_usd = ?, transaction_id_usd = ?,
+               closing_date          = CASE WHEN ? THEN ? ELSE closing_date          END,
+               due_date              = CASE WHEN ? THEN ? ELSE due_date              END,
+               statement_total_ars   = CASE WHEN ? THEN ? ELSE statement_total_ars   END,
+               statement_total_usd   = CASE WHEN ? THEN ? ELSE statement_total_usd   END,
+               minimum_payment_ars   = CASE WHEN ? THEN ? ELSE minimum_payment_ars   END,
+               previous_balance_ars  = CASE WHEN ? THEN ? ELSE previous_balance_ars  END,
+               previous_balance_usd  = CASE WHEN ? THEN ? ELSE previous_balance_usd  END,
+               prior_payment_ars     = CASE WHEN ? THEN ? ELSE prior_payment_ars     END,
+               prior_payment_usd     = CASE WHEN ? THEN ? ELSE prior_payment_usd     END,
+               reconciled            = CASE WHEN ? THEN ? ELSE reconciled            END,
+               forecast_json         = CASE WHEN ? THEN ? ELSE forecast_json         END,
                updated_at = ?, deleted_at = ?
         WHERE id = ?
       `);
+      /** Las 11 columnas del papel, en el orden de los dos statements. */
+      const PAPER_FIELDS = [
+        'closingDate', 'dueDate', 'statementTotalArs', 'statementTotalUsd',
+        'minimumPaymentArs', 'previousBalanceArs', 'previousBalanceUsd',
+        'priorPaymentArs', 'priorPaymentUsd', 'reconciled', 'forecastJson',
+      ] as const;
+      const paperValues = (s: Record<string, unknown>) => PAPER_FIELDS.map((f) => s[f] ?? null);
+      const paperPairs = (s: Record<string, unknown>) =>
+        PAPER_FIELDS.flatMap((f) => [f in s ? 1 : 0, s[f] ?? null]);
       // credit_card_id is a NOT NULL foreign key: an orphan cannot be kept.
       const cardExists = db.prepare('SELECT 1 FROM finance_credit_cards WHERE id = ?');
       for (const s of list('creditCardStatements')) {
@@ -2083,6 +2134,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
             s.calculatedAmountUsd ?? s.calculated_amount_usd ?? 0,
             s.paidAmountUsd ?? s.paid_amount_usd ?? null,
             s.transactionIdUsd ?? s.transaction_id_usd ?? null,
+            ...paperValues(s),
             s.createdAt ?? s.created_at ?? now, remoteUpdatedAt, remoteDeletedAt,
           );
           changed = true;
@@ -2094,6 +2146,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
             s.calculatedAmountUsd ?? s.calculated_amount_usd ?? 0,
             s.paidAmountUsd ?? s.paid_amount_usd ?? null,
             s.transactionIdUsd ?? s.transaction_id_usd ?? null,
+            ...paperPairs(s),
             remoteUpdatedAt, remoteDeletedAt, s.id,
           );
           changed = true;
