@@ -30,6 +30,12 @@
  *    la declaración (o sobre el selector, para todo el bloque). La razón es
  *    OBLIGATORIA, y un escape que ya no cubre nada por debajo de AA también
  *    falla: los permisos muertos son cómo una lista de excepciones se pudre.
+ *
+ * El censo, para que quede el número: sobre el código de 2b5f948 este barrido
+ * levantaba 70 pares (declaración, superficie) por debajo de 4.5:1. Cincuenta
+ * se arreglaron con tokens; los veinte que quedan son ornamento, íconos o
+ * contenido no textual y están cubiertos por 19 escapes con su razón escrita.
+ * La medición con arnés de navegador había encontrado 7 de esos 70.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
