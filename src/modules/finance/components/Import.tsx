@@ -4,6 +4,10 @@ import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { CARD_TAX_CATEGORY, CATEGORIES, type CreditCard, type ImportParsedRow } from '../types';
+import type { StatementHeaderDto } from '../../../../shared/types';
+import { reconcile, reconStatus } from '../utils/statement-recon';
+import StatementSummary from './shared/StatementSummary';
+import TableImport from './shared/TableImport';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import CreditCardManager from './shared/CreditCardManager';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
@@ -30,8 +34,14 @@ interface RowState extends ImportParsedRow {
  * card is a better guess than nothing — the user can always change it, and the
  * choice is spelled out right next to the confirm button.
  */
-export function pickLikelyCard(cards: CreditCard[], fileName: string): string {
+export function pickLikelyCard(cards: CreditCard[], fileName: string, last4?: string | null): string {
   if (cards.length === 0) return '';
+  // Los últimos 4 vienen impresos en el resumen: es una identidad, no una
+  // corazonada. Adivinar por el nombre del archivo queda como respaldo.
+  if (last4) {
+    const byLast4 = cards.find((c) => c.last4 === last4);
+    if (byLast4) return byLast4.id;
+  }
   const norm = (v: string) =>
     v.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '');
   const file = norm(fileName);
@@ -75,6 +85,11 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [showSeal, setShowSeal] = useState(false);
   const [skippedLines, setSkippedLines] = useState<string[]>([]);
+  /** Lo que el papel dice de sí mismo. `null` = el parser no reconoció el layout. */
+  const [header, setHeader] = useState<StatementHeaderDto | null>(null);
+  /** El detalle arranca plegado: el protagonista pasó a ser el resumen leído. */
+  const [rowsExpanded, setRowsExpanded] = useState(false);
+  const [creatingCard, setCreatingCard] = useState(false);
   const [skippedExpanded, setSkippedExpanded] = useState(false);
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchesExpanded, setBatchesExpanded] = useState(false);
@@ -94,6 +109,8 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   const resetPreview = useCallback(() => {
     setFileName('');
     setRows([]);
+    setHeader(null);
+    setRowsExpanded(false);
     setSkippedLines([]);
     setSkippedExpanded(false);
     setParseError('');
@@ -119,8 +136,8 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   // but never overrule a choice the user already made.
   useEffect(() => {
     if (cardTouched || rows.length === 0) return;
-    setCreditCardId((prev) => (prev ? prev : pickLikelyCard(cards, fileName)));
-  }, [cards, fileName, rows.length, cardTouched]);
+    setCreditCardId((prev) => (prev ? prev : pickLikelyCard(cards, fileName, header?.cardLast4)));
+  }, [cards, fileName, rows.length, cardTouched, header]);
 
   // Parsed-but-unconfirmed rows are minutes of work: let the host warn before closing.
   useEffect(() => { onDirtyChange?.(rows.length > 0); }, [rows.length, onDirtyChange]);
@@ -158,16 +175,24 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         return; // user cancelled dialog
       }
       if ('ok' in result) {
-        // Android: no hay pdf-parse (spec §1). El handler lo dice; acá se explica.
+        // Android ya lee PDF (pdfjs en el WebView). Que llegue acá significa
+        // que el documento no tiene capa de texto —un escaneo, una foto— o que
+        // el worker no cargó: en los dos casos hay que decir qué hacer, no
+        // «no está disponible».
         toast({
           type: 'info',
-          message: t('coinify.importPdfUnsupportedMobile', 'Importar resúmenes PDF no está disponible en Android. Usalo desde la app de escritorio.'),
+          message: t('coinify.importPdfNoText', 'No pude leer texto de ese PDF. Si es un escaneo o una foto, pedile a tu banco el resumen original; o importá el extracto en CSV.'),
         });
         return; // el finally apaga `parsing`
       }
       setFileName(result.fileName);
       setSkippedLines(result.skippedLines ?? []);
       setSkippedExpanded(false);
+      // El período, el cierre, el vencimiento y los totales dejan de pedirse:
+      // están impresos. Sin encabezado se vuelve al mes elegido a mano.
+      const parsedHeader = (result as { header?: StatementHeaderDto }).header ?? null;
+      setHeader(parsedHeader);
+      if (parsedHeader?.period) setStatementMonth(parsedHeader.period);
       const rowStates: RowState[] = (result.rows as ImportParsedRow[]).map((r) => ({
         ...r,
         included: !r.isExcluded,
@@ -216,6 +241,55 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
     () => rows.some((r) => r.amountUSD != null),
     [rows],
   );
+
+  /**
+   * El checksum, recalculado en vivo sobre lo que está marcado: desmarcar una
+   * fila deja de ser gratis y silencioso, ahora se ve cuánto falta.
+   */
+  const recon = useMemo(
+    () => reconcile(rows.filter((r) => r.included), header),
+    [rows, header],
+  );
+
+  /** Cuántas COMPRAS en cuotas distintas trae el resumen (no cuántas cuotas). */
+  const installmentPlans = useMemo(() => {
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (!row.included) continue;
+      if (!row.installmentTotal || row.installmentTotal <= 1) continue;
+      seen.add(`${row.merchant}|${row.date}|${row.installmentTotal}`);
+    }
+    return seen.size;
+  }, [rows]);
+
+  const selectedCard = cards.find((c) => c.id === creditCardId);
+
+  /**
+   * Crear la tarjeta desde el papel: nombre, últimos 4, cierre y vencimiento
+   * salen del encabezado. Eran 7 campos tipeados a mano por tarjeta.
+   */
+  const handleCreateCardFromStatement = async () => {
+    if (!header?.closingDate) return;
+    setCreatingCard(true);
+    try {
+      const name = header.cardLast4
+        ? t('coinify.importCardNamed', 'VISA ··{{last4}}', { last4: header.cardLast4 })
+        : t('coinify.importCardGeneric', 'Tarjeta de crédito');
+      const id = await window.api.financeAddCreditCard({
+        name,
+        closingDay: Number(header.closingDate.slice(8, 10)),
+        dueDay: header.dueDate ? Number(header.dueDate.slice(8, 10)) : null,
+        last4: header.cardLast4,
+        issuer: 'galicia_visa',
+      });
+      loadCards();
+      if (typeof id === 'string') { setCreditCardId(id); setCardTouched(true); }
+    } catch (err) {
+      console.error('[Import] no se pudo crear la tarjeta del resumen:', err);
+    } finally {
+      setCreatingCard(false);
+    }
+  };
 
   const handleDiscard = async () => {
     if (rows.length > 0) {
@@ -271,9 +345,48 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         type: 'STATEMENT_IMPORTED', moduleId: 'finance',
         payload: { xp: 0, hp: 0, count: result.count, month: statementMonth }, timestamp: Date.now(),
       }).catch(() => null);
+      // ── Los números del papel, encima del resumen recién armado ──────
+      //
+      // Tres pasos y no uno porque cada uno ya existía y hace una cosa: escribir
+      // las filas, (re)calcular el resumen del período con ellas, y estampar lo
+      // que dice el banco. Si el segundo o el tercero fallan quedan las filas —
+      // reimportar es idempotente (dedupe) y vuelve a intentarlo.
+      if (creditCardId && header) {
+        try {
+          const period = header.period ?? statementMonth;
+          await window.api.financeGenerateStatement(creditCardId, period);
+          const api = window.api as unknown as {
+            financeSaveStatementPaper?: (id: string, paper: Record<string, unknown>) => Promise<unknown>;
+          };
+          if (typeof api.financeSaveStatementPaper === 'function') {
+            await api.financeSaveStatementPaper(creditCardId, {
+              period,
+              closingDate: header.closingDate,
+              dueDate: header.dueDate,
+              totalArs: header.totalDue.ars,
+              totalUsd: header.totalDue.usd,
+              minimumArs: header.minimumPaymentArs,
+              previousArs: header.previousBalance.ars,
+              previousUsd: header.previousBalance.usd,
+              priorPaymentArs: header.payments.ars,
+              priorPaymentUsd: header.payments.usd,
+              // `null` = el papel no traía totales: sin checksum, que NO es lo
+              // mismo que decir que cerró.
+              reconciled: reconStatus(recon) === 'none' ? null : reconStatus(recon) === 'ok',
+              forecast: header.forecast,
+              last4: header.cardLast4,
+              issuer: 'galicia_visa',
+            });
+          }
+        } catch (err) {
+          console.error('[Import] no se pudo guardar el resumen del papel:', err);
+        }
+      }
+
       setSuccessCount(result.count);
       setRows([]);
       setFileName('');
+      setHeader(null);
       setSkippedLines([]);
       loadBatches();
       onImported?.(result.count);
@@ -376,14 +489,40 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
         <p style={{ fontSize: 'var(--fs-label)', color: 'var(--rubric)', marginBottom: 12 }}>{parseError}</p>
       )}
 
+      {/* Lo primero que se ve: lo que el resumen dice de sí mismo. El detalle
+          fila por fila pasó a ser un desplegable — el trabajo del usuario es
+          confirmar, no revisar 40 renglones. */}
+      {rows.length > 0 && header && (
+        <StatementSummary
+          header={header}
+          recon={recon}
+          installmentPlans={installmentPlans}
+          cardName={selectedCard?.name}
+        />
+      )}
+
+      {/* Sin encabezado reconocible no hay nada que confirmar: se dice, y el
+          flujo cae al de siempre (elegir mes y tarjeta a mano). */}
+      {rows.length > 0 && !header && (
+        <p className="coin-stmt__note">
+          {t('coinify.stmtNoHeader', 'No pude leer el encabezado de este resumen. Elegí el mes y la tarjeta a mano.')}
+        </p>
+      )}
+
       {/* Preview table */}
       {rows.length > 0 && (
         <div>
-          <p className="coin-import-preview-count">
-            {t('coinify.importPreview')} -- {includedCount} / {rows.length}
-          </p>
+          <button
+            type="button"
+            className="coin-import-rows-toggle"
+            aria-expanded={rowsExpanded}
+            onClick={() => setRowsExpanded((v) => !v)}
+          >
+            {rowsExpanded ? <ChevronDown width={10} height={10} /> : <ChevronRight width={10} height={10} />}
+            {' '}{t('coinify.importDetail', 'Ver el detalle')} ({includedCount} / {rows.length})
+          </button>
 
-          <div className="rpg-card" style={{ padding: 12, marginBottom: 16, overflowX: 'auto' }}>
+          <div className="rpg-card" hidden={!rowsExpanded} style={{ padding: 12, marginBottom: 16, overflowX: 'auto' }}>
             <table className="coin-import-table">
               <thead>
                 <tr>
@@ -545,13 +684,27 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
               <span className="coin-import-card__empty">
                 {t('coinify.importNoCards', 'No tenés ninguna tarjeta cargada.')}
                 {' '}
-                <button
-                  type="button"
-                  className="rpg-button coin-import-card__create"
-                  onClick={() => setShowCardManager(true)}
-                >
-                  {t('coinify.importCreateCard', 'Crear tarjeta')}
-                </button>
+                {/* El cierre, el vencimiento y los últimos 4 están en el papel:
+                    crear la tarjeta a mano era el primer muro del módulo (7
+                    campos, y el rechazo llegaba recién al apretar Agregar). */}
+                {header?.closingDate ? (
+                  <button
+                    type="button"
+                    className="rpg-button coin-import-card__create"
+                    onClick={handleCreateCardFromStatement}
+                    disabled={creatingCard}
+                  >
+                    {t('coinify.importCreateCardFromPdf', 'Crearla con los datos del resumen')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="rpg-button coin-import-card__create"
+                    onClick={() => setShowCardManager(true)}
+                  >
+                    {t('coinify.importCreateCard', 'Crear tarjeta')}
+                  </button>
+                )}
               </span>
             )}
             <p className="coin-import-card__hint">
@@ -577,19 +730,22 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
             )}
           </div>
 
-          {/* Month selector + confirm */}
+          {/* El mes SOLO se pide cuando el papel no lo dijo. El default era el
+              mes de HOY, que casi nunca es el del resumen que se está cargando. */}
           <div className="coin-import-confirm-row">
-            <div className="coin-import-confirm-row__month">
-              <label className="coin-import-confirm-row__month-label" htmlFor="coin-import-month">{t('coinify.importStatementMonth')}</label>
-              <input
-                id="coin-import-month"
-                type="month"
-                value={statementMonth}
-                onChange={(e) => setStatementMonth(e.target.value)}
-                className="rpg-input"
-                style={{ fontSize: 'var(--fs-label)' }}
-              />
-            </div>
+            {!header?.period && (
+              <div className="coin-import-confirm-row__month">
+                <label className="coin-import-confirm-row__month-label" htmlFor="coin-import-month">{t('coinify.importStatementMonth')}</label>
+                <input
+                  id="coin-import-month"
+                  type="month"
+                  value={statementMonth}
+                  onChange={(e) => setStatementMonth(e.target.value)}
+                  className="rpg-input"
+                  style={{ fontSize: 'var(--fs-label)' }}
+                />
+              </div>
+            )}
             <button
               className="rpg-button"
               onClick={handleConfirm}
@@ -633,6 +789,13 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
           onSaved={loadCards}
         />
       )}
+
+      {/* La segunda fuente: el extracto de billetera o banco.
+          Sin ella el rediseño mejora el mes de SETUP y deja intacto el de
+          régimen — las transferencias no están en ningún PDF de tarjeta.
+          Se esconde mientras hay un resumen a medio confirmar: dos importadores
+          abiertos a la vez es exactamente la confusión que se está sacando. */}
+      {rows.length === 0 && <TableImport onImported={(n) => onImported?.(n)} />}
 
       {/* Previous imports — undo a batch that already landed. */}
       {batchSupport && batches.length > 0 && (

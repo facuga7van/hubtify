@@ -135,6 +135,10 @@ export interface CreditCard {
   closingDay: number;
   /** Día de vencimiento del resumen. `null` = sin agenda de vencimiento. */
   dueDay?: number | null;
+  /** Últimos 4, impresos en el resumen: identifican a qué tarjeta pertenece un PDF. */
+  last4?: string | null;
+  /** Con qué parser se leyó su resumen (`galicia_visa`). */
+  issuer?: string | null;
   createdAt: string;
 }
 
@@ -149,6 +153,24 @@ export interface CreditCardStatement {
   paidAmount: number | null;
   paidAmountUsd?: number | null;
   status: 'pending' | 'paid';
+  // ── Los números DEL PAPEL (v19) ────────────────────────────────
+  // Conviven con los calculados y no los pisan: que difieran ES el dato.
+  /** Fecha exacta de cierre impresa, no el día del mes derivado. */
+  closingDate?: string | null;
+  dueDate?: string | null;
+  /** «TOTAL A PAGAR» del banco. */
+  statementTotalArs?: number | null;
+  statementTotalUsd?: number | null;
+  minimumPaymentArs?: number | null;
+  previousBalanceArs?: number | null;
+  previousBalanceUsd?: number | null;
+  /** «SU PAGO»: lo que se pagó durante el período. */
+  priorPaymentArs?: number | null;
+  priorPaymentUsd?: number | null;
+  /** 1 cerró · 0 no cerró · null sin checksum (distinto de «cerró»). */
+  reconciled?: number | null;
+  /** Foto del bloque «Cuotas a vencer», tal cual lo imprimió el banco. */
+  forecastJson?: string | null;
   paidDate: string | null;
   transactionId: string | null;
   transactionIdUsd?: string | null;

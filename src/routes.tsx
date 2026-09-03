@@ -71,6 +71,8 @@ export const Loans = lazyRoute(() => import('./modules/finance/components/Loans'
 export const Recurring = lazyRoute(() => import('./modules/finance/components/Recurring'), 'Recurring');
 export const Import = lazyRoute(() => import('./modules/finance/components/Import'), 'Import');
 export const CreditCards = lazyRoute(() => import('./modules/finance/components/CreditCards'), 'CreditCards');
+/** «Compromisos»: la sub-navegación que agrupa cuotas, recurrentes, tarjetas y préstamos. */
+export const Commitments = lazyRoute(() => import('./modules/finance/components/Commitments'), 'Commitments');
 
 /** Warm-up order: what Ctrl+1..6 reaches first, then the finance sub-tabs. */
 const PRELOAD_ORDER: Array<() => Promise<unknown>> = [
@@ -82,6 +84,7 @@ const PRELOAD_ORDER: Array<() => Promise<unknown>> = [
   CharacterPage.preload,
   SettingsPage.preload,
   Transactions.preload,
+  Commitments.preload,
   Installments.preload,
   CreditCards.preload,
   Loans.preload,

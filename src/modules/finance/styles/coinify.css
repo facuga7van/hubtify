@@ -517,6 +517,16 @@
   display: block;
 }
 
+/* Un rótulo que NO ordena (el medio de pago no tiene un orden con sentido):
+   mismo estilo que los demás, sin la afordancia de botón. */
+.coin-ledger-header__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 button.coin-sort-header {
   background: none;
   border: none;
@@ -2231,9 +2241,11 @@ button.coin-sort-header--amount {
     width: 100%;
   }
 
-  /* Origin + payment method go first when space runs out; the amount never does. */
+  /* Origin + payment method go first when space runs out; the amount never does.
+     El rótulo «MEDIO» se va con su columna: dejarlo convertía el encabezado en
+     seis celdas sobre una grilla de cinco y corría TODOS los títulos. */
   .coin-ledger-row__meta,
-  .coin-ledger-header__spacer:first-of-type {
+  .coin-ledger-header__label {
     display: none;
   }
 
@@ -3195,4 +3207,389 @@ button.coin-sort-header--amount {
   .coin-account-row {
     padding: 10px 6px;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   REDISEÑO: el resumen como puerta de entrada
+   docs/superpowers/specs/2026-09-03-coinify-redesign.md
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Acciones de la cabecera del Tomo ────────────────────────────
+   «Importar resumen» era el camino principal y no tenía entrada: ruta sin
+   pestaña, alcanzable sólo por un modal dentro de Movimientos. */
+
+.coin-book__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.coin-import-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  font-size: var(--fs-label);
+  white-space: nowrap;
+}
+
+/* ── Compromisos: la sub-navegación que reemplazó 4 pestañas ─────── */
+
+.coin-commitments__lede {
+  margin: 0 0 10px;
+  font-size: var(--fs-body);
+  /* --ink-soft #4a3520 sobre --parch-0: 8.9:1. No --ink-faded, que en las
+     superficies tostadas del códice se cae por debajo de AA. */
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.coin-subtab-wrap {
+  position: relative;
+  margin-bottom: 12px;
+  /* Sin esto el nav interior empuja al padre en vez de scrollear adentro: es
+     exactamente el mecanismo del desborde de 696 px de la tira de arriba. */
+  min-width: 0;
+}
+
+.coin-subtab-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(245, 231, 192, 0), rgba(232, 213, 163, 0.9));
+}
+
+.coin-subtab-nav {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  min-width: 0;
+}
+
+.coin-subtab-nav::-webkit-scrollbar { height: 3px; }
+.coin-subtab-nav::-webkit-scrollbar-thumb { background: rgba(74, 55, 32, 0.3); }
+
+.coin-subtab {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  color: var(--ink-soft);
+  border: 1px solid rgba(74, 55, 32, 0.35);
+  border-radius: 2px;
+  background: rgba(245, 231, 192, 0.35);
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.coin-subtab:hover { color: var(--ink); background: rgba(245, 231, 192, 0.7); }
+
+.coin-subtab--active {
+  /* Fondo Y color, no sólo el color: la auditoría marcó «seleccionado» apenas
+     distinguible como una de las convenciones rotas del módulo. */
+  color: var(--parch-0);
+  background: var(--leather);
+  border-color: var(--leather-dark);
+  font-weight: bold;
+}
+
+/* ── «Esto leí de tu resumen» ────────────────────────────────────
+   El giro del rediseño: lo que antes se tipeaba, mostrado para confirmar. */
+
+.coin-stmt {
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.coin-stmt__title {
+  margin: 0 0 4px;
+  font-family: var(--ff-display);
+  font-size: var(--fs-sub);
+  color: var(--leather);
+}
+
+.coin-stmt__lede {
+  margin: 0 0 12px;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+}
+
+.coin-stmt__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+
+.coin-stmt__fact { margin: 0; min-width: 0; }
+
+.coin-stmt__fact-label {
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.coin-stmt__fact-value {
+  margin: 2px 0 0;
+  font-size: var(--fs-sub);
+  color: var(--ink);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.coin-stmt__note {
+  margin: 12px 0 0;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+}
+
+.coin-stmt__note--warn { color: var(--rubric); }
+
+/* La conciliación. Verde/ámbar como SEÑAL, nunca como veredicto moral: la
+   investigación es explícita sobre el ciclo de culpa del rojo/verde binario. */
+.coin-stmt__recon {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 2px;
+  font-size: var(--fs-body);
+  line-height: 1.45;
+}
+
+.coin-stmt__recon svg { flex-shrink: 0; margin-top: 2px; }
+
+.coin-stmt__recon--ok {
+  color: var(--moss-dark);
+  background: rgba(64, 82, 44, 0.1);
+  border: 1px solid rgba(64, 82, 44, 0.35);
+}
+
+.coin-stmt__recon--off {
+  color: var(--leather);
+  background: rgba(168, 138, 60, 0.14);
+  border: 1px solid var(--gold-dark);
+}
+
+/* ── El detalle, ahora plegado ───────────────────────────────────── */
+
+.coin-import-rows-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 6px 2px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-family: var(--ff-accent);
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+  letter-spacing: 0.06em;
+}
+
+.coin-import-rows-toggle:hover { color: var(--ink); }
+
+/* ── Estado inicial: un solo camino ──────────────────────────────
+   NN/g: el estado vacío es onboarding, no vacío. Y patrón Monarch: un botón
+   visible, todo lo demás corrido a un segundo plano. */
+
+.coin-start {
+  max-width: 52ch;
+  margin: 24px auto;
+  padding: 24px 22px;
+  text-align: center;
+}
+
+.coin-start__icon { margin-bottom: 10px; color: var(--gold-dark); }
+
+.coin-start__title {
+  margin: 0 0 8px;
+  font-family: var(--ff-display);
+  font-size: var(--fs-heading);
+  color: var(--leather);
+}
+
+.coin-start__lede {
+  margin: 0 0 18px;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.coin-start__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.coin-start__secondary {
+  display: block;
+  margin: 14px auto 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--ff-body);
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.coin-start__secondary:hover { color: var(--ink); }
+
+.coin-start__note {
+  margin: 14px 0 0;
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+}
+
+/* ── Deriva de ancho a 1640 (C4 de la rúbrica) ───────────────────
+   Las tarjetas INGRESO/GASTO se estiraban a la altura del Cofre y quedaban
+   dos tercios vacías: en un grid, `stretch` es el default. */
+.coin-stat-card { align-self: start; }
+
+/* ── Teléfono ─────────────────────────────────────────────────── */
+
+[data-shell="mobile"] .coin-book__actions {
+  gap: 4px;
+}
+
+/* Área de toque ≥44 px: la rúbrica midió 58 de 64 controles del libro mayor
+   por debajo del mínimo. */
+[data-shell="mobile"] .coin-import-cta,
+[data-shell="mobile"] .coin-start__cta,
+[data-shell="mobile"] .coin-start__secondary,
+[data-shell="mobile"] .coin-import-rows-toggle {
+  min-height: 44px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+[data-shell="mobile"] .coin-subtab {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  scroll-snap-align: center;
+}
+
+[data-shell="mobile"] .coin-subtab-nav {
+  scroll-snap-type: x proximity;
+}
+
+/* Una sola columna a 390 px: dos de 160 px + el gap no entran, y el grid
+   `auto-fit` no lo sabe hasta que ya desbordó. */
+[data-shell="mobile"] .coin-stmt__facts {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+[data-shell="mobile"] .coin-stmt {
+  padding: 12px;
+}
+
+/* ── Importar un extracto de billetera (CSV) ─────────────────────
+   La pieza que baja el costo de RÉGIMEN: las transferencias no están en
+   ningún PDF de tarjeta, y son el 67 % de lo que se cargaba a mano. */
+
+.coin-table-import {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(74, 55, 32, 0.3);
+}
+
+.coin-table-import__title {
+  margin: 0 0 4px;
+  font-family: var(--ff-display);
+  font-size: var(--fs-sub);
+  color: var(--leather);
+}
+
+.coin-table-import__lede {
+  margin: 0 0 12px;
+  font-size: var(--fs-body);
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.coin-table-import__file {
+  margin: 10px 0 6px;
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.coin-table-import__mapping {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px 12px;
+  margin: 10px 0;
+}
+
+.coin-table-import__col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.coin-table-import__col-name {
+  font-family: var(--ff-accent);
+  font-size: var(--fs-label);
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coin-table-import__sign,
+.coin-table-import__account {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  flex-wrap: wrap;
+}
+
+.coin-table-import__summary {
+  margin: 10px 0;
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.coin-table-import__skipped {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold-dark);
+  background: rgba(168, 138, 60, 0.14);
+  border-radius: 2px;
+  font-size: var(--fs-body);
+  color: var(--leather);
+}
+
+.coin-table-import__done {
+  margin: 10px 0 0;
+  font-size: var(--fs-body);
+  color: var(--moss-dark);
+}
+
+[data-shell="mobile"] .coin-table-import__mapping {
+  grid-template-columns: 1fr;
+}
+
+[data-shell="mobile"] .coin-table-import__sign input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
 }

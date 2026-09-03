@@ -22,6 +22,7 @@ import {
   FinanceLayout,
   FinanceDashboard,
   Transactions,
+  Commitments,
   Installments,
   Loans,
   Recurring,
@@ -56,6 +57,7 @@ function AddAccountPageWrapper() {
 export default function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('hubtify_onboarded') === 'true');
   const { user, loading } = useAuthContext();
+  const navigate = useNavigate();
 
   // Re-read onboarded flag after login/account switch (syncPull may restore it from cloud)
   useEffect(() => {
@@ -116,7 +118,18 @@ export default function App() {
 
   // Onboarding gate: must complete onboarding after first login
   if (!onboarded) {
-    return <Onboarding onComplete={() => setOnboarded(true)} />;
+    return (
+      <Onboarding
+        onComplete={() => {
+          // El paso de Coinify termina llevando derecho al importador: el
+          // embudo de un solo botón se cobra ahí, no tres pantallas después.
+          const target = localStorage.getItem('hubtify_open_route');
+          localStorage.removeItem('hubtify_open_route');
+          setOnboarded(true);
+          if (target) navigate(target, { replace: true });
+        }}
+      />
+    );
   }
 
   return (
@@ -141,13 +154,25 @@ export default function App() {
             <Route path="dashboard" element={<NutritionCharts />} />
             <Route path="settings" element={<NutritionSettings />} />
           </Route>
+          {/* Coinify pasó de seis pestañas a tres: Panel · Movimientos ·
+              Compromisos. Las cuatro rutas viejas de primer nivel sobreviven
+              como redirecciones — hay links del tour, del panel y del historial
+              del usuario apuntando a ellas, y un 404 sería peor que una pestaña
+              de más. */}
           <Route path="/finance" element={<FinanceLayout />}>
             <Route index element={<FinanceDashboard />} />
             <Route path="transactions" element={<Transactions />} />
-            <Route path="installments" element={<Installments />} />
-            <Route path="cards" element={<CreditCards />} />
-            <Route path="loans" element={<Loans />} />
-            <Route path="recurring" element={<Recurring />} />
+            <Route path="commitments" element={<Commitments />}>
+              <Route index element={<Navigate to="/finance/commitments/installments" replace />} />
+              <Route path="installments" element={<Installments />} />
+              <Route path="recurring" element={<Recurring />} />
+              <Route path="cards" element={<CreditCards />} />
+              <Route path="loans" element={<Loans />} />
+            </Route>
+            <Route path="installments" element={<Navigate to="/finance/commitments/installments" replace />} />
+            <Route path="recurring" element={<Navigate to="/finance/commitments/recurring" replace />} />
+            <Route path="cards" element={<Navigate to="/finance/commitments/cards" replace />} />
+            <Route path="loans" element={<Navigate to="/finance/commitments/loans" replace />} />
             <Route path="import" element={<Import />} />
           </Route>
           <Route path="/cauldron" element={<CauldronPage />} />

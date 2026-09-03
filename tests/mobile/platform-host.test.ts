@@ -159,8 +159,27 @@ describe('archivos', () => {
     expect(Array.from(r!.bytes)).toEqual([9, 8, 7]);
   });
 
-  it('pickPdfText → unsupported (sin pdf-parse en Android)', async () => {
-    await expect(host().pickPdfText()).resolves.toEqual({ unsupported: true });
+  // Android SÍ lee PDF: `pdfjs-dist` corre en el WebView y `getTextContent()`
+  // no necesita canvas. La extracción real se prueba en `tests/mobile/pdf-text`
+  // (`joinTextItems`, que es la parte que puede romper el parser line-based);
+  // acá se fija el CONTRATO del host, que es lo que ve `finance-import`.
+  it('pickPdfText → null si se cancela el selector', async () => {
+    await expect(host(null).pickPdfText()).resolves.toBeNull();
+  });
+
+  it('pickPdfText → unsupported si el PDF no tiene capa de texto o pdfjs falla', async () => {
+    // Un escaneo o una foto: no es un error, pero no hay nada que parsear. Y
+    // cualquier falla de pdfjs (worker que no resuelve, CSP) cae en la misma
+    // rama: el peor caso es exactamente el comportamiento anterior.
+    const file = new File([new Uint8Array([1, 2, 3])], 'escaneo.pdf', { type: 'application/pdf' });
+    await expect(host(file).pickPdfText()).resolves.toEqual({ unsupported: true });
+  });
+
+  it('pickPdfText pide el accept de PDF al selector', async () => {
+    const pick = vi.fn(async () => null);
+    const h = createPlatformHost({ pickFile: pick });
+    await h.pickPdfText();
+    expect(pick).toHaveBeenCalledWith('application/pdf,.pdf');
   });
 });
 

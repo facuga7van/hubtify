@@ -249,10 +249,33 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
       return { name: file.name, content: await file.text() };
     },
 
-    // Import de resúmenes PDF: fuera de alcance en mobile (spec §1). El handler
-    // de finance-import responde { ok:false, reason:'unsupported_platform' }.
+    /**
+     * Import de resúmenes PDF **en Android**.
+     *
+     * Estaba trabado sólo porque la implementación de escritorio usa
+     * `pdf-parse` (node-only): la investigación midió que `pdfjs-dist` corre en
+     * el WebView y que `getTextContent()` no necesita canvas. Era una decisión,
+     * no un límite.
+     *
+     * Red de contención: cualquier falla —el worker que no resuelve, una CSP
+     * que lo bloquea, un PDF con contraseña— vuelve a `{ unsupported: true }`,
+     * que es exactamente el comportamiento anterior. El peor caso cuesta cero.
+     */
     async pickPdfText() {
-      return { unsupported: true as const };
+      const file = await deps.pickFile('application/pdf,.pdf');
+      if (!file) return null;
+      try {
+        const { extractPdfText } = await import('./pdf-text');
+        const text = await extractPdfText(new Uint8Array(await file.arrayBuffer()));
+        // Un PDF escaneado (imagen pura) no tiene capa de texto: no es un
+        // error, pero tampoco hay nada que parsear. Se responde lo mismo que
+        // una plataforma sin soporte en vez de un resumen vacío.
+        if (text.trim() === '') return { unsupported: true as const };
+        return { name: file.name, text };
+      } catch (err) {
+        console.warn('[platform-host] pickPdfText failed, falling back to unsupported', err);
+        return { unsupported: true as const };
+      }
     },
 
     async pickBinaryFile(filters: FileFilter[]) {

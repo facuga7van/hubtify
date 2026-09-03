@@ -181,6 +181,37 @@ export interface ParsedRow {
   isTax?: boolean;
 }
 
+/**
+ * Lo que el ENCABEZADO y el pie del resumen traen impreso, y que hasta ahora se
+ * le pedía tipeado al usuario. Todo opcional: cada campo ausente degrada al
+ * flujo manual, nunca corrompe una fila.
+ * Fuente y semántica: `shared-logic/modules/finance-statement.ts`.
+ */
+export interface StatementHeaderDto {
+  statementNumber: string | null;
+  cardLast4: string | null;
+  previousClosingDate: string | null;
+  previousDueDate: string | null;
+  closingDate: string | null;
+  dueDate: string | null;
+  nextClosingDate: string | null;
+  nextDueDate: string | null;
+  /** `YYYY-MM` — el período deja de preguntarse. */
+  period: string | null;
+  previousBalance: { ars: number | null; usd: number | null };
+  /** «SU PAGO»: lo que se pagó en el mes, en magnitud positiva. */
+  payments: { ars: number | null; usd: number | null };
+  consumos: { ars: number | null; usd: number | null };
+  totalDue: { ars: number | null; usd: number | null };
+  minimumPaymentArs: number | null;
+  purchaseLimitArs: number | null;
+  financingLimitArs: number | null;
+  /** «Cuotas a vencer»: la proyección que el banco ya firmó. */
+  forecast: Array<{ month: string; amount: number }>;
+  forecastTail: { month: string; amount: number } | null;
+  closingDateAgrees: boolean | null;
+}
+
 /** One confirmed PDF/CSV import, so the user can review and undo it. */
 export interface FinanceImportBatch {
   id: string;
@@ -664,7 +695,7 @@ export interface HubtifyApi {
 
   // Finance - Import
   financeImportSelectAndParsePDF: () => Promise<
-    | { rows: ParsedRow[]; fileName: string; skippedLines: string[] }
+    | { rows: ParsedRow[]; fileName: string; skippedLines: string[]; header?: StatementHeaderDto }
     | { ok: false; reason: 'unsupported_platform' }
     | null
   >;
@@ -680,6 +711,49 @@ export interface HubtifyApi {
   }>;
   financeGetCategoryMappings: () => Promise<unknown[]>;
   financeUpdateCategoryMapping: (pattern: string, category: string) => Promise<void>;
+  /**
+   * Extracto de billetera / banco en tabla delimitada (CSV, TSV). Es la otra
+   * mitad del rediseño: el resumen de tarjeta no trae transferencias, y ahí
+   * está el 67 % de lo que el usuario cargaba a mano. Funciona en Android hoy.
+   */
+  financeImportSelectAndParseTable: () => Promise<
+    | {
+        fileName: string;
+        delimiter: string;
+        decimalSeparator: ',' | '.';
+        headers: string[];
+        rows: string[][];
+        suggested: Record<number, string>;
+      }
+    | { ok: false; reason: 'unreadable_table' }
+    | null
+  >;
+  financeImportApplyTableMapping: (
+    table: Record<string, unknown>,
+    mapping: Record<number, string>,
+    defaults?: Record<string, unknown>,
+  ) => Promise<{
+    rows: Array<{ date: string; description: string; amount: number; currency: 'ARS' | 'USD'; category: string; raw: number }>;
+    skipped: Array<{ line: number; reason: 'date' | 'amount' }>;
+  }>;
+  financeImportConfirmTable: (
+    rows: unknown[],
+    options?: Record<string, unknown>,
+  ) => Promise<
+    { batchId: string; count: number; duplicateCount: number; skipped: number }
+    | { ok: false; reason: string }
+  >;
+  /** Estampa los números del papel sobre un resumen que ya existe. */
+  financeSaveStatementPaper: (creditCardId: string, paper: Record<string, unknown>) => Promise<
+    { ok: true; statementId: string; settledPrevious: boolean } | { ok: false; reason: string }
+  >;
+  /** El default del alta manual, inferido del historial (no una constante). */
+  financeGetEntryDefaults: () => Promise<{
+    paymentMethod: 'cash' | 'debit' | 'transfer' | 'credit_card';
+    currency: 'ARS' | 'USD';
+    accountId: string | null;
+    sampleSize: number;
+  }>;
 
   // Finance - Dashboard
   financeGetMonthlyBalance: (month?: string) => Promise<unknown>;
