@@ -119,11 +119,11 @@ describe('Coinify a 390×844', () => {
   test('Panel: la página respira y nada desborda (C1)', async () => {
     await setMobileViewport();
     mountInShell(<Finance />, '/finance');
-    // `.first()` —igual que mobile-hub con «Tabla del Aventurero»—: el título
-    // de la página ya no es el único nodo con ese texto, porque el ítem del
-    // cajón ahora declara su función («…— el Libro del Tesorero», nav.coinifyDesc)
-    // para que el menú y el encabezado dejen de llamarse distinto.
-    await expect.element(page.getByText(/Libro del Tesorero/i).first()).toBeVisible();
+    // El título de la página vuelve a ser el ÚNICO nodo pintado con ese texto:
+    // el ítem del cajón declara su función («…— el Libro del Tesorero»,
+    // nav.coinifyDesc) sólo por `aria-label` y `title`, ya no como segundo
+    // renglón pintado — ese renglón aplastaba la fila y se fue.
+    await expect.element(page.getByText(/Libro del Tesorero/i)).toBeVisible();
     await settle(700);
     await shoot('coinify-01-panel');
     noOverflow('COIN PANEL');

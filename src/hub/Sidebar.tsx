@@ -95,12 +95,20 @@ function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
    they ate 2 of the 7 main-menu slots. Out until they exist. */
 /* Cada entrada lleva `desc`: la FUNCIÓN, no el sinónimo temático. Un ícono de
    caldero más la palabra «Caldero» no dicen «temporizador de enfoque», y el
-   tooltip del riel colapsado repetía el mismo rótulo. La descripción viaja en
-   tres canales: `aria-label` (nombre accesible), `title` (hover de escritorio)
-   y el tooltip del riel angosto. En el cajón del teléfono —donde no hay
-   hover y sí hay lugar— además se PINTA como segundo renglón.
+   tooltip del riel colapsado repetía el mismo rótulo. La descripción viaja por
+   tres canales, TODOS invisibles hasta que se los pide: `aria-label` (nombre
+   accesible), `title` (hover de escritorio) y el tooltip del riel angosto.
    `desc` también es el puente entre el ítem del menú y el título de la página
-   a la que lleva: «Inicio» abre «la Tabla del Aventurero». */
+   a la que lleva: «Inicio» abre «la Tabla del Aventurero».
+
+   NO se pinta. Se pintó como segundo renglón en el cajón del teléfono
+   (b8bc72f) y fue un desastre medible: el botón es `min-height: 44px` con
+   `flex-shrink: 1` dentro de un flex column, así que el renglón de más NO
+   agrandaba la fila — la fila aplastaba el contenido. Cada ítem pedía 52.4 px
+   y recibía 44; «Coinify», cuya descripción envuelve a dos renglones en los
+   268 px del cajón, pedía 69.3 y su segunda línea terminaba 18.3 px FUERA del
+   botón, encima del rótulo «Caldero» (separación medida: −10.3 px). El texto
+   se amontonaba. La función se explica sin pintarse. */
 interface NavEntry { path: string; key: string; descKey: string; icon: string }
 
 const navKeys: NavEntry[] = [
@@ -358,7 +366,6 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                 )}
               </span>
               <span className="sidebar-nav-item__label">{label}</span>
-              {desc && <span className="sidebar-nav-item__desc">{desc}</span>}
             </button>
           );
           if (collapsed) {
@@ -389,7 +396,6 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                 {IconComp && <IconComp width={18} height={18} />}
               </span>
               <span className="sidebar-nav-item__label">{label}</span>
-              {desc && <span className="sidebar-nav-item__desc">{desc}</span>}
             </button>
           );
           return collapsed
@@ -412,7 +418,6 @@ export default function Sidebar({ stats, collapsed, onBellClick, onToggleInn }: 
                 <SettingsIcon width={18} height={18} />
               </span>
               <span className="sidebar-nav-item__label">{label}</span>
-              {desc && <span className="sidebar-nav-item__desc">{desc}</span>}
             </button>
           );
           return collapsed
