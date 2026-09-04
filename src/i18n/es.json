@@ -971,7 +971,8 @@
     "SUBTASK_UNCOMPLETED": "Paso desmarcado",
     "TASK_COMPLETED": "Misión completada",
     "TASK_CREATED": "Misión creada",
-    "TASK_UNCOMPLETED": "Misión desmarcada"
+    "TASK_UNCOMPLETED": "Misión desmarcada",
+    "WEEK_SUMMARY": "Pergamino de la semana"
   },
   "guest": {
     "enter": "Entrar sin cuenta",
@@ -1420,7 +1421,18 @@
       "6": "Sábado",
       "7": "Domingo"
     },
+    "weeklyArchive": "Archivo de Semanas Selladas",
+    "weeklyAvgIntake": "Consumo promedio",
     "weeklyBalance": "Balance semanal (kcal)",
+    "weeklyCompliance": "Días dentro del objetivo",
+    "weeklyHabits": "Pasos y gimnasio",
+    "weeklyNoWeight": "Sin pesaje esta semana",
+    "weeklySeal": "Sellar la Semana",
+    "weeklySealConfirm": "¿Sellar esta semana y cobrar tu bonus de constancia? No se puede deshacer.",
+    "weeklyStreakHelp": "Racha de días cerrados al terminar la semana.",
+    "weeklyTitle": "Pergamino Semanal",
+    "weeklyWeightDelta": "Variación de peso",
+    "weeklyZeroXp": "Esta semana no otorgó XP",
     "weight": "Peso (kg)",
     "weightCheckDay": "Día de pesaje semanal",
     "weightCheckin": {

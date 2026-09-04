@@ -63,6 +63,7 @@ const EVENT_ICON_COMPONENTS: Record<string, React.ComponentType<React.SVGProps<S
   MEAL_LOGGED: Scale,
   DAY_SUMMARY: Scale,
   DAY_REOPENED: Scale,
+  WEEK_SUMMARY: Scroll,
   EXPENSE_LOGGED: Coin,
   EXPENSE_TRACKED: Coin,
   INCOME_LOGGED: Coin,

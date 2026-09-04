@@ -971,7 +971,8 @@
     "SUBTASK_UNCOMPLETED": "Step uncompleted",
     "TASK_COMPLETED": "Quest completed",
     "TASK_CREATED": "Quest created",
-    "TASK_UNCOMPLETED": "Quest uncompleted"
+    "TASK_UNCOMPLETED": "Quest uncompleted",
+    "WEEK_SUMMARY": "Weekly scroll"
   },
   "guest": {
     "enter": "Continue without an account",
@@ -1420,7 +1421,18 @@
       "6": "Saturday",
       "7": "Sunday"
     },
+    "weeklyArchive": "Sealed Weeks Archive",
+    "weeklyAvgIntake": "Average intake",
     "weeklyBalance": "Weekly Balance (kcal)",
+    "weeklyCompliance": "Days within target",
+    "weeklyHabits": "Steps & gym",
+    "weeklyNoWeight": "No weigh-in this week",
+    "weeklySeal": "Seal the Week",
+    "weeklySealConfirm": "Seal this week and claim your consistency bonus? This can't be undone.",
+    "weeklyStreakHelp": "Closed-day streak at the end of the week.",
+    "weeklyTitle": "Weekly Scroll",
+    "weeklyWeightDelta": "Weight change",
+    "weeklyZeroXp": "This week earned no XP",
     "weight": "Weight (kg)",
     "weightCheckDay": "Weekly weigh-in day",
     "weightCheckin": {
