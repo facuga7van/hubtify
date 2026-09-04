@@ -102,7 +102,7 @@ const REF_FIELD_BY_TYPE: Record<string, string> = {
  * matcher). Letting them ride the combo/bonus dice would feed the matcher its
  * own output — an achievement that pays a 3.0x roll that unlocks "Tres Épicas".
  */
-const FLAT_XP_EVENTS = new Set(['DAY_SEALED', 'ACHIEVEMENT_UNLOCKED']);
+const FLAT_XP_EVENTS = new Set(['DAY_SEALED', 'ACHIEVEMENT_UNLOCKED', 'WEEK_SUMMARY']);
 
 /**
  * Flat events that STILL count as showing up for the global streak.
@@ -172,6 +172,9 @@ const REF_PAYLOAD_KEY_BY_TYPE: Record<string, string> = {
   // is what makes the exact XP, the mastery refund and the combo tick line up.
   DAY_SUMMARY: 'date',
   DAY_REOPENED: 'date',
+  // Nutrify: el pergamino semanal se identifica por su lunes. Es el balde del
+  // guard de unicidad, igual que `month` en BUDGET_MONTH_MET.
+  WEEK_SUMMARY: 'weekStart',
 };
 
 /** The entity id an event refers to — persisted to rpg_events.ref_id on insert. */
@@ -376,6 +379,22 @@ export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResul
           "SELECT 1 FROM rpg_events WHERE event_type = 'BUDGET_MONTH_MET' AND ref_id = ? LIMIT 1"
         ).get(refId);
         if (alreadyPaid) baseXp = 0;
+      }
+
+      // El pergamino semanal paga UNA vez por semana. A diferencia de
+      // BUDGET_MONTH_MET no hay fallback de balde: el motor solo conoce el reloj
+      // de PARED y cualquier lunes que derivara acá apuntaría a la semana pasada,
+      // colapsando cuatro pergaminos atrasados en un solo balde y convirtiendo
+      // tres pagos legítimos en 0. Sin balde, no se paga.
+      if (event.type === 'WEEK_SUMMARY') {
+        if (!refId) {
+          baseXp = 0;
+        } else {
+          const alreadyPaid = db.prepare(
+            "SELECT 1 FROM rpg_events WHERE event_type = 'WEEK_SUMMARY' AND ref_id = ? LIMIT 1",
+          ).get(refId);
+          if (alreadyPaid) baseXp = 0;
+        }
       }
 
       const isFlat = FLAT_XP_EVENTS.has(event.type);
