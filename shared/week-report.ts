@@ -100,3 +100,13 @@ export function weeklyXp(daysCompliant: number): number {
   const base = Math.round(40 * capped / WEEK_DAYS);
   return base + (capped === WEEK_DAYS ? 10 : 0);
 }
+
+/**
+ * Resultado de `nutrition:closeWeek`. Vive acá junto a `WeekReport` por la misma
+ * razón: `window.api` lo importa de este módulo, no lo redefine.
+ */
+export type CloseWeekResult =
+  | { success: true; report: WeekReport }
+  | { success: false; alreadyClosed: true }
+  | { success: false; error: 'No profile' | 'No closed days'
+                           | 'Week not finished' | 'Waiting for weigh-in' };

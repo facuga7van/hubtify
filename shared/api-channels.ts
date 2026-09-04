@@ -121,6 +121,10 @@ export const API_CHANNELS = {
   nutritionRemoveFavoriteFood: { channel: 'nutrition:removeFavoriteFood', kind: 'invoke' },
   nutritionGetPendingDays: { channel: 'nutrition:getPendingDays', kind: 'invoke' },
   nutritionGetMealSchedule: { channel: 'nutrition:getMealSchedule', kind: 'invoke' },
+  nutritionGetPendingWeeks: { channel: 'nutrition:getPendingWeeks', kind: 'invoke' },
+  nutritionGetWeekReport: { channel: 'nutrition:getWeekReport', kind: 'invoke' },
+  nutritionCloseWeek: { channel: 'nutrition:closeWeek', kind: 'invoke' },
+  nutritionGetClosedWeeks: { channel: 'nutrition:getClosedWeeks', kind: 'invoke' },
   // Character
   characterSave: { channel: 'character:save', kind: 'invoke' },
   characterLoad: { channel: 'character:load', kind: 'invoke' },
