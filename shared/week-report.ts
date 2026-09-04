@@ -6,6 +6,8 @@
  * horario a medianoche podría correr la frontera de una semana entera.
  */
 
+import { scoreNutritionDay } from './meal-utils';
+
 function parseNoon(dateStr: string): Date {
   return new Date(dateStr + 'T12:00:00');
 }
@@ -36,4 +38,41 @@ export function shiftDay(dateStr: string, days: number): string {
 /** El domingo de la semana que arranca en `weekStart`. */
 export function weekEndOf(weekStart: string): string {
   return shiftDay(weekStart, 6);
+}
+
+/** Una fila viva de `nutrition_daily_closed`, con consumo y objetivo congelados. */
+export interface ClosedDayRow {
+  date: string;
+  consumed: number;
+  target: number;
+}
+
+/**
+ * El denominador del cumplimiento semanal. SIEMPRE 7, nunca `days_closed`.
+ *
+ * Dividir por los días cerrados haría que cerrar únicamente los tres días que
+ * salieron bien diera ratio 1.0 y el máximo. Con el denominador fijado por el
+ * calendario, no cerrar un día simplemente cuesta y no queda nada que optimizar.
+ */
+export const WEEK_DAYS = 7;
+
+/** Techo del bonus semanal, plano. ~12 % de una semana perfecta de cierres diarios. */
+export const WEEKLY_XP_CAP = 50;
+
+/**
+ * Cuántos de los días cerrados cumplieron el objetivo.
+ *
+ * `consumed` y `target` vienen congelados de `nutrition_daily_closed`; el único
+ * input vivo es `deficitTargetKcal`, que solo elige la banda (déficit / superávit
+ * / mantenimiento). Al sellar, el resultado queda escrito y deja de depender de él.
+ */
+export function countCompliantDays(rows: ClosedDayRow[], deficitTargetKcal: number): number {
+  return rows.filter(r => scoreNutritionDay(r.consumed, r.target, deficitTargetKcal).compliant).length;
+}
+
+/** Bonus de consistencia. 7/7 = 50; el +10 es exclusivo de la semana perfecta. */
+export function weeklyXp(daysCompliant: number): number {
+  const capped = Math.max(0, Math.min(WEEK_DAYS, daysCompliant));
+  const base = Math.round(40 * capped / WEEK_DAYS);
+  return base + (capped === WEEK_DAYS ? 10 : 0);
 }
