@@ -163,14 +163,16 @@ h4 {
   color: var(--ink);
 }
 
-/* El subtítulo de página es texto corrido: a 1640 px llegaba a 166 ch en cinco
-   pantallas. Con --measure vuelve al rango de lectura (45–80 ch). */
+/* Sin techo de medida A PROPÓSITO (decisión de producto). La bajada es una
+   línea de cabecera, no prosa corrida: partirla en dos renglones gastaba alto
+   de cabecera en TODAS las páginas para ahorrar un barrido de ojo que acá se
+   paga UNA vez. A cambio, en pantallas anchas el renglón cruza la página
+   entera: es el precio aceptado, no un olvido. No le devuelvas `--measure`. */
 .qb-subtitle {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   font-size: var(--fs-quote);
   color: var(--ink-faded);
-  max-width: var(--measure);
 }
 
 .qb-hand {

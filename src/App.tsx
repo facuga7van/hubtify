@@ -15,6 +15,8 @@ import {
   CharacterPage,
   SettingsPage,
   CauldronPage,
+  AchievementsPage,
+  RewardsPage,
   TaskList,
   Today,
   NutritionCharts,
@@ -32,13 +34,6 @@ import {
 } from './routes';
 import { useAuthContext } from './shared/AuthContext';
 import { useGuestMode, enterGuestMode, leaveGuestMode } from './shared/guest';
-
-/* The Logros shelf is a rarely-first screen and its own chunk. It is lazied
-   here rather than in `routes.tsx` because that module is owned by another
-   pass; `fallback={null}` keeps the page-flip transition from ever being
-   handed a spinner as if it were the destination page. */
-const AchievementsPage = lazy(() => import('./hub/AchievementsPage'));
-const RewardsPage = lazy(() => import('./hub/rewards/RewardsPage'));
 
 // Solo se carga si el worker mobile muere después de `ready` (spec §3.5).
 // Aceptado: el bundle desktop emite este chunk (FatalScreen + su CSS, unos KB)
@@ -162,14 +157,8 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/character" element={<CharacterPage />} />
-          <Route
-            path="/achievements"
-            element={<Suspense fallback={null}><AchievementsPage /></Suspense>}
-          />
-          <Route
-            path="/rewards"
-            element={<Suspense fallback={null}><RewardsPage /></Suspense>}
-          />
+          <Route path="/achievements" element={<AchievementsPage />} />
+          <Route path="/rewards" element={<RewardsPage />} />
           <Route path="/quests" element={<TaskList />} />
           <Route path="/nutrition" element={<Outlet />}>
             <Route index element={<Today />} />

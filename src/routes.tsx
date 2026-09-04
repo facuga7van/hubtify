@@ -57,6 +57,12 @@ export const CharacterPage = lazyRoute(() => import('./hub/CharacterPage'), 'Cha
 export const SettingsPage = lazyRoute(() => import('./hub/SettingsPage'), 'SettingsPage');
 export const CauldronPage = lazyRoute(() => import('./modules/cauldron/components/CauldronPage'), 'CauldronPage');
 
+/* These two used to be `React.lazy` in App.tsx, outside this module — so
+   `prefetchRoutes()` never warmed them and the page flip turned to a blank
+   page while their chunk was still on disk. */
+export const AchievementsPage = lazyRoute(() => import('./hub/AchievementsPage'), 'AchievementsPage');
+export const RewardsPage = lazyRoute(() => import('./hub/rewards/RewardsPage'), 'RewardsPage');
+
 export const TaskList = lazyRoute(() => import('./modules/quests/components/TaskList'), 'TaskList');
 
 export const Today = lazyRoute(() => import('./modules/nutrition/components/Today'), 'Today');
@@ -83,6 +89,8 @@ const PRELOAD_ORDER: Array<() => Promise<unknown>> = [
   CauldronPage.preload,
   CharacterPage.preload,
   SettingsPage.preload,
+  AchievementsPage.preload,
+  RewardsPage.preload,
   Transactions.preload,
   Commitments.preload,
   Installments.preload,
@@ -93,6 +101,43 @@ const PRELOAD_ORDER: Array<() => Promise<unknown>> = [
   NutritionSettings.preload,
   Import.preload,
 ];
+
+/** First path segment → EVERY chunk that segment has to have in memory before
+    it can render without suspending. Lets AnimatedOutlet wait for the
+    destination before it starts the flip, instead of flipping to an empty page.
+
+    A list, not a single entry, because of `/finance`: the segment renders
+    `FinanceLayout` AND its index child `FinanceDashboard`, and they are separate
+    chunks. Waiting only for the shell let the child suspend after the flip had
+    already begun — the only Suspense boundary is AnimatedOutlet's, so the child
+    replaced the WHOLE outlet subtree with the spinner, `waitForSwap` saw the
+    node identity change and resolved, and the flip cloned a bare spinner as its
+    destination page. Reachable by clicking Coinify in the first second, before
+    the idle prefetch reached FinanceDashboard (4th in PRELOAD_ORDER).
+
+    `/nutrition` does NOT need this: its parent route element is a plain
+    `<Outlet/>`, so the index child IS the whole chunk. */
+const ROUTE_PRELOAD: Record<string, Array<() => Promise<unknown>>> = {
+  '/quests': [TaskList.preload],
+  '/nutrition': [Today.preload],
+  '/finance': [FinanceLayout.preload, FinanceDashboard.preload],
+  '/cauldron': [CauldronPage.preload],
+  '/achievements': [AchievementsPage.preload],
+  '/rewards': [RewardsPage.preload],
+  '/character': [CharacterPage.preload],
+  '/settings': [SettingsPage.preload],
+};
+
+/** Resolves when every chunk `pathname`'s segment needs is in memory. Unknown or
+    already-loaded routes resolve immediately. Never rejects — a chunk that
+    fails to preload surfaces on render, not here. */
+export function preloadRoute(pathname: string): Promise<unknown> {
+  const seg = '/' + (pathname.split('/')[1] || '');
+  const loads = ROUTE_PRELOAD[seg];
+  if (!loads) return Promise.resolve();
+  return Promise.all(loads.map((load) => load()))
+    .catch(() => { /* falls back to the Suspense path */ });
+}
 
 type IdleHandle = number;
 const scheduleIdle: (cb: () => void) => IdleHandle =
