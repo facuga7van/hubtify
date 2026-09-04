@@ -16,7 +16,7 @@ import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
 import { weekEndOf, shiftDay, countCompliantDays, weeklyXp, mondayOfWeek } from '../../shared/week-report';
-import type { WeekReport } from '../../shared/week-report';
+import type { WeekReport, CloseWeekResult } from '../../shared/week-report';
 // The prompt's identity, from the same file the Cloud Function ships. A cached
 // model answer is only a hit while the prompt that produced it is the current
 // one (migration v17). gemini.ts has no imports, so this is safe in the worker.
@@ -866,10 +866,10 @@ export function registerNutritionIpcHandlers(): void {
    * Revalida la condición 5 en vez de confiar en que el llamador pasó por
    * `getPendingWeeks`. Es el mismo principio que el guard de `ref_id` en el motor.
    */
-  ipcHandle('nutrition:closeWeek', (_e, weekStart: string) => {
+  ipcHandle('nutrition:closeWeek', (_e, weekStart: string): CloseWeekResult => {
     const db = getDb();
 
-    return db.transaction(() => {
+    return db.transaction((): CloseWeekResult => {
       if (db.prepare('SELECT 1 FROM nutrition_weekly_closed WHERE week_start = ?').get(weekStart)) {
         return { success: false, error: 'Already closed' };
       }
