@@ -48,6 +48,30 @@ export interface ClosedDayRow {
 }
 
 /**
+ * El veredicto de una semana. Idéntico esté sellado o en vista previa.
+ *
+ * Vive acá y no en `shared/types.ts` porque una tarea posterior conecta esto a
+ * `window.api` importándolo de este módulo — definirlo dos veces dejaría que
+ * las dos copias diverjan en silencio.
+ */
+export interface WeekReport {
+  weekStart: string;
+  weekEnd: string;
+  daysClosed: number;
+  daysCompliant: number;
+  avgConsumed: number;
+  avgTarget: number;
+  weightStart: number | null;
+  weightEnd: number | null;
+  daysSteps: number;
+  daysGym: number;
+  streakEnd: number;
+  xpTotal: number;
+  sealed: boolean;
+  closedAt: string | null;
+}
+
+/**
  * El denominador del cumplimiento semanal. SIEMPRE 7, nunca `days_closed`.
  *
  * Dividir por los días cerrados haría que cerrar únicamente los tres días que

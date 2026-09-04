@@ -16,6 +16,7 @@ import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
 import { weekEndOf, shiftDay, countCompliantDays, weeklyXp } from '../../shared/week-report';
+import type { WeekReport } from '../../shared/week-report';
 // The prompt's identity, from the same file the Cloud Function ships. A cached
 // model answer is only a hit while the prompt that produced it is the current
 // one (migration v17). gemini.ts has no imports, so this is safe in the worker.
@@ -1450,7 +1451,7 @@ export function calculateTDEEWithFactor(bmr: number, factor: number): number {
 export function buildWeekReport(
   db: ReturnType<typeof getDb>,
   weekStart: string,
-): Record<string, unknown> | null {
+): WeekReport | null {
   const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1')
     .get() as { deficit_target_kcal: number } | undefined;
   if (!profile) return null;
@@ -1462,12 +1463,18 @@ export function buildWeekReport(
   if (sealed) {
     return {
       weekStart, weekEnd,
-      daysClosed: sealed.days_closed, daysCompliant: sealed.days_compliant,
-      avgConsumed: sealed.avg_consumed, avgTarget: sealed.avg_target,
-      weightStart: sealed.weight_start ?? null, weightEnd: sealed.weight_end ?? null,
-      daysSteps: sealed.days_steps, daysGym: sealed.days_gym,
-      streakEnd: sealed.streak_end, xpTotal: sealed.xp_total,
-      sealed: true, closedAt: (sealed.closed_at as string | null) ?? null,
+      daysClosed: sealed.days_closed as number,
+      daysCompliant: sealed.days_compliant as number,
+      avgConsumed: sealed.avg_consumed as number,
+      avgTarget: sealed.avg_target as number,
+      weightStart: sealed.weight_start as number | null,
+      weightEnd: sealed.weight_end as number | null,
+      daysSteps: sealed.days_steps as number,
+      daysGym: sealed.days_gym as number,
+      streakEnd: sealed.streak_end as number,
+      xpTotal: sealed.xp_total as number,
+      sealed: true,
+      closedAt: sealed.closed_at as string | null,
     };
   }
 
@@ -1529,5 +1536,23 @@ function weekStreakAt(
      WHERE date <= ? AND total_calories_in > 0
      ORDER BY date DESC LIMIT 366`,
   ).all(weekEnd) as StreakDay[];
-  return computeNutritionStreak(rows, weekEnd, deficit).streak;
+
+  // ── Día con evento = presentarse ──────────────────────────────────────
+  // Mismo indulto que `nutrition:getStreak` (línea ~933): registrar el asado
+  // ES cumplir con la racha, no gastar el día de gracia semanal en algo que
+  // la app misma invitó a registrar. Si este remap se "simplifica" y se
+  // borra, el pergamino sellado archiva una racha DISTINTA a la que la app
+  // le mostró al usuario — y como los sellos nunca se recalculan, ese número
+  // equivocado queda permanente. Acotado a `date <= weekEnd` para no traer
+  // el historial de eventos completo en cada llamada.
+  const eventDates = new Set(
+    (db.prepare(
+      `SELECT DISTINCT date FROM food_log WHERE is_event = 1 AND deleted_at IS NULL AND date <= ?`,
+    ).all(weekEnd) as Array<{ date: string }>).map(r => r.date),
+  );
+  const streakRows = rows.map(r =>
+    eventDates.has(r.date) ? { ...r, totalCaloriesIn: r.tdee - deficit } : r,
+  );
+
+  return computeNutritionStreak(streakRows, weekEnd, deficit).streak;
 }

@@ -137,6 +137,63 @@ describe('nutrition:getWeekReport', () => {
     expect(report('2026-09-07').streakEnd).toBe(14);
   });
 
+  // Finding 1 de la revisión: weekStreakAt debe indultar los días evento igual
+  // que nutrition:getStreak, o el pergamino sellado archiva una racha DISTINTA
+  // a la que la app le mostró al usuario, y como los sellos no se recalculan
+  // esa racha equivocada queda permanente.
+  it('un día evento (asado) no rompe la racha, aunque esté muy por encima del objetivo', () => {
+    // Lun 08-31 → dom 09-06, todos compliant salvo el miércoles: comió muy
+    // por encima del objetivo pero está marcado is_event=1 en food_log, así
+    // que debe "presentarse" a la racha en vez de gastar el día de gracia.
+    const days = ['2026-08-31', '2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06'];
+    const EVENT_DAY = '2026-09-03'; // miércoles, el asado
+
+    for (const date of days) {
+      const totalCaloriesIn = date === EVENT_DAY ? 3500 : 1800;
+      testDb.prepare(`INSERT INTO nutrition_daily_summary
+        (date, total_calories_in, bmr, tdee, balance) VALUES (?, ?, 1600, 2400, 0)`)
+        .run(date, totalCaloriesIn);
+    }
+    testDb.prepare(`INSERT INTO food_log (date, time, description, calories, source, is_event)
+      VALUES (?, '20:00', 'Asado', 3500, 'manual', 1)`).run(EVENT_DAY);
+
+    expect(report(WEEK).streakEnd).toBe(7);
+  });
+
+  // Finding 3 de la revisión: la rama sellada no tenía NINGÚN test. Valores
+  // bien distinguibles para que un mapeo cruzado (ej. steps <-> gym) falle
+  // ruidosamente en vez de pasar por coincidencia.
+  it('la rama sellada devuelve la fila archivada tal cual, sin recalcular', () => {
+    // Cierro días vivos con números que, si buildWeekReport recalculara en
+    // vez de leer el sello, darían valores DISTINTOS a los archivados.
+    closeDay('2026-08-31', 1000);
+    closeDay('2026-09-01', 1000);
+
+    testDb.prepare(`
+      INSERT INTO nutrition_weekly_closed
+        (week_start, days_closed, days_compliant, avg_consumed, avg_target,
+         weight_start, weight_end, days_steps, days_gym, streak_end, xp_total,
+         closed_at, updated_at)
+      VALUES (?, 6, 5, 1777, 1888, 79.1, 78.4, 4, 3, 21, 29, ?, ?)
+    `).run(WEEK, '2026-09-08T10:00:00Z', '2026-09-08T10:00:00Z');
+
+    const r = report(WEEK);
+    expect(r.sealed).toBe(true);
+    expect(r.closedAt).toBe('2026-09-08T10:00:00Z');
+    expect(r.weekStart).toBe(WEEK);
+    expect(r.weekEnd).toBe(SUNDAY);
+    expect(r.daysClosed).toBe(6);
+    expect(r.daysCompliant).toBe(5);
+    expect(r.avgConsumed).toBe(1777);
+    expect(r.avgTarget).toBe(1888);
+    expect(r.weightStart).toBe(79.1);
+    expect(r.weightEnd).toBe(78.4);
+    expect(r.daysSteps).toBe(4);
+    expect(r.daysGym).toBe(3);
+    expect(r.streakEnd).toBe(21);
+    expect(r.xpTotal).toBe(29);
+  });
+
   // Spec test 12: guarda del BORDE de la banda. Con déficit > 0 la banda es
   // `consumed <= target`, así que consumido == objetivo CUMPLE.
   it('el borde exacto de la banda cumple', () => {
