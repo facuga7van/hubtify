@@ -42,24 +42,53 @@
 }
 
 /* ── page header ──────────────────────────────────── */
+/* El renglón envuelve. Medido en el Tomo IV (Coinify), que es el header con
+   más controles de la app —«Importar resumen» + chip de dólar + chip de
+   cripto, 474 px que NO encogen—: `.qb-header-extra` medía esos mismos 474 px
+   a 640 y a 1640, y `.qb-header-text` se quedaba con la sobra. A 640 px de
+   página eso son 94 px de columna: «Libro del Tesorero» partido en TRES
+   renglones (una palabra cada uno) y la bajada en seis.
+   Ya estaba diagnosticado y resuelto para el teléfono en `layout.css:970`;
+   el escritorio angosto (mínimo de ventana 700 px − 260 de barra lateral)
+   cae en el mismo pozo y no tenía la cura. */
 .qb-header {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   margin-bottom: 4px;
   position: relative;
   z-index: 10;
 }
 
 .qb-header-text {
-  flex: 1;
+  /* `flex: 1` era `1 1 0%`: el bloque del título no pedía NADA de ancho, así
+     que el reparto lo decidían enteros los controles. Con base propia, cuando
+     título y controles no entran juntos, los que bajan a su propio renglón son
+     los CONTROLES y el título se queda con la página entera.
+
+     24rem = 384 px, y el número NO es redondo por casualidad: medido con una
+     sonda `width: max-content` sobre los tres renglones del Tomo IV, el
+     epígrafe pide 245 px, el título 240 px y la bajada 371 px. 384 es el
+     primer múltiplo de la escala que supera a los tres, así que mientras los
+     controles comparten renglón el bloque de título entra ENTERO en una línea
+     por renglón. Con 20 rem (320 px) la cuenta daba justo para el título pero
+     no para la bajada: a 900 px de ventana el reparto era 354/474 —el título
+     más angosto que la botonera—, la bajada se partía en dos y quedaban 81 px
+     de pergamino muerto al lado de unos botones de 38 px de alto. Con 384 el
+     renglón se parte antes de llegar a eso y el hueco vuelve a 57 px. */
+  flex: 1 1 24rem;
   min-width: 0;
 }
 
 .qb-header-extra {
-  flex-shrink: 0;
+  /* No crece (el título se queda la sobra y esto sigue pegado a la derecha),
+     pero SÍ encoge: solo en la línea donde está solo y no entra, y ahí la
+     alternativa era desbordar la página. */
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   font-family: 'IM Fell English SC', serif;
   font-size: var(--fs-label);
