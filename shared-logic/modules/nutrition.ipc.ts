@@ -15,7 +15,7 @@ import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adapt
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
-import { weekEndOf, shiftDay, countCompliantDays, weeklyXp } from '../../shared/week-report';
+import { weekEndOf, shiftDay, countCompliantDays, weeklyXp, mondayOfWeek } from '../../shared/week-report';
 import type { WeekReport } from '../../shared/week-report';
 // The prompt's identity, from the same file the Cloud Function ships. A cached
 // model answer is only a hit while the prompt that produced it is the current
@@ -830,6 +830,32 @@ export function registerNutritionIpcHandlers(): void {
     return buildWeekReport(db, weekStart);
   });
 
+  /**
+   * Los lunes de las semanas que esperan pergamino.
+   *
+   * Cinco condiciones (spec §Cuándo hay pergamino pendiente). La 5 —el gate de
+   * peso— existe porque `weight_end` sale del pesaje de la semana SIGUIENTE: sin
+   * ella el usuario abre el pergamino el lunes temprano, lo sella, y el dato que
+   * motivó toda la feature queda NULL para siempre.
+   */
+  ipcHandle('nutrition:getPendingWeeks', () => {
+    const db = getDb();
+    const currentWeek = mondayOfWeek(nutritionToday(db));
+    const oldest = shiftDay(currentWeek, -28);
+
+    const candidates = db.prepare(`
+      SELECT DISTINCT c.date FROM nutrition_daily_closed c
+      WHERE c.deleted_at IS NULL AND c.date >= ? AND c.date < ?
+    `).all(oldest, currentWeek) as Array<{ date: string }>;
+
+    const weeks = [...new Set(candidates.map(r => mondayOfWeek(r.date)))]
+      .filter(w => w >= oldest && w < currentWeek)
+      .sort();
+
+    const isSealed = db.prepare('SELECT 1 FROM nutrition_weekly_closed WHERE week_start = ?');
+    return weeks.filter(w => !isSealed.get(w) && weeklyGateOpen(db, w));
+  });
+
   // Macro targets: profile override when all three set, otherwise auto from the helper.
   ipcHandle('nutrition:getMacroTargets', (_e, date?: string) => {
     const db = getDb();
@@ -1516,6 +1542,25 @@ export function buildWeekReport(
     sealed: false,
     closedAt: null,
   };
+}
+
+/**
+ * Condición 5: ¿hay con qué medir el peso, o ya se esperó suficiente?
+ *
+ * El escape es `weekStart+14` y el número no es negociable. `weight_check_day`
+ * va de 1 a 7 (`nutrition.ipc.ts:238` lo clampea) y `shouldAskWeight` solo
+ * pregunta cuando `dow >= checkDay`, así que el pesaje de la semana siguiente
+ * puede caer en cualquier día entre `+7` y `+13`. Un escape más corto —`+10`,
+ * por ejemplo— dispara antes que el pesaje para todo `weight_check_day >= 4`:
+ * retendría el pergamino tres días y lo soltaría con `weight_end` en NULL igual.
+ */
+export function weeklyGateOpen(db: ReturnType<typeof getDb>, weekStart: string): boolean {
+  const hasWeighIn = db.prepare(`
+    SELECT 1 FROM nutrition_weekly_metrics
+    WHERE weight_kg IS NOT NULL AND date BETWEEN ? AND ? LIMIT 1
+  `).get(shiftDay(weekStart, 7), shiftDay(weekStart, 13));
+  if (hasWeighIn) return true;
+  return nutritionToday(db) >= shiftDay(weekStart, 14);
 }
 
 /**
