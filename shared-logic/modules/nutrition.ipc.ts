@@ -860,6 +860,62 @@ export function registerNutritionIpcHandlers(): void {
     return weeks.filter(w => !isSealed.get(w) && weeklyGateOpen(db, w));
   });
 
+  /**
+   * Sella la semana. Irreversible por diseño: no existe `reopenWeek`.
+   *
+   * Revalida la condición 5 en vez de confiar en que el llamador pasó por
+   * `getPendingWeeks`. Es el mismo principio que el guard de `ref_id` en el motor.
+   */
+  ipcHandle('nutrition:closeWeek', (_e, weekStart: string) => {
+    const db = getDb();
+
+    return db.transaction(() => {
+      if (db.prepare('SELECT 1 FROM nutrition_weekly_closed WHERE week_start = ?').get(weekStart)) {
+        return { success: false, alreadyClosed: true };
+      }
+
+      const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1').get();
+      if (!profile) return { success: false, error: 'No profile' };
+
+      if (weekStart >= mondayOfWeek(nutritionToday(db))) {
+        return { success: false, error: 'Week not finished' };
+      }
+
+      const report = buildWeekReport(db, weekStart);
+      if (!report || report.daysClosed === 0) {
+        return { success: false, error: 'No closed days' };
+      }
+
+      if (!weeklyGateOpen(db, weekStart)) {
+        return { success: false, error: 'Waiting for weigh-in' };
+      }
+
+      const stamp = syncStamp();
+      db.prepare(`
+        INSERT INTO nutrition_weekly_closed
+          (week_start, days_closed, days_compliant, avg_consumed, avg_target,
+           weight_start, weight_end, days_steps, days_gym, streak_end,
+           xp_total, closed_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        weekStart, report.daysClosed, report.daysCompliant, report.avgConsumed, report.avgTarget,
+        report.weightStart, report.weightEnd, report.daysSteps, report.daysGym, report.streakEnd,
+        report.xpTotal, stamp, stamp,
+      );
+
+      return { success: true, report: { ...report, sealed: true, closedAt: stamp } };
+    })();
+  });
+
+  /** Las semanas selladas, más recientes primero. Para releer el archivo. */
+  ipcHandle('nutrition:getClosedWeeks', (_e, limit?: number) => {
+    const db = getDb();
+    const rows = db.prepare(
+      'SELECT week_start FROM nutrition_weekly_closed ORDER BY week_start DESC LIMIT ?',
+    ).all(Math.min(limit ?? 52, 200)) as Array<{ week_start: string }>;
+    return rows.map(r => buildWeekReport(db, r.week_start)).filter((r): r is WeekReport => r !== null);
+  });
+
   // Macro targets: profile override when all three set, otherwise auto from the helper.
   ipcHandle('nutrition:getMacroTargets', (_e, date?: string) => {
     const db = getDb();
