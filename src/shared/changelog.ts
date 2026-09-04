@@ -13,6 +13,36 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.7',
+    date: '2026-09-04',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'Cuando termina la semana, Nutrify te deja un pergamino en el Códice con cómo te fue: cuántos días diste en el objetivo, tu promedio contra lo que te tocaba, cuánto se movió el peso y cuántas veces fuiste al gimnasio. Sellalo y te llevás un bonus de constancia — cuanto más parejo estuviste, más grande',
+          en: 'When the week ends, Nutrify leaves a scroll in the Codex with how it went: how many days you hit your target, your average against what you were aiming for, how much the scale moved and how many times you made it to the gym. Seal it and you get a consistency bonus — the steadier you were, the bigger it is',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'nutrify',
+        text: {
+          es: 'El pergamino espera a que te peses antes de aparecer, así el «bajaste 400 g» no te queda vacío. Si dejaste de pesarte, a los catorce días se destraba solo y se sella igual. Una vez sellado no se toca más: aunque después cambies tu objetivo o reabras un día, esa semana queda contada como fue',
+          en: 'The scroll waits for your weigh-in before showing up, so the "you dropped 400 g" line is not left blank. If you stopped weighing yourself, it unlocks on its own after fourteen days and seals anyway. Once sealed it is final: even if you change your goal later or reopen a day, that week stays counted the way it happened',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'En el teléfono, el cajón lateral pintaba abajo de cada módulo la función que cumple. Estaba pensado para el escritorio, donde hay lugar de sobra, y en la pantalla chica solo comía espacio',
+          en: 'On the phone, the side drawer was painting each module\'s purpose underneath it. That was meant for desktop, where there is room to spare; on a small screen it only ate space',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.6',
     date: '2026-09-03',
     changes: [
