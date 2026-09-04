@@ -1427,6 +1427,7 @@
     "weeklyCompliance": "Días dentro del objetivo",
     "weeklyHabits": "Pasos y gimnasio",
     "weeklyNoWeight": "Sin pesaje esta semana",
+    "weeklyRpgFailed": "La semana quedó sellada, pero el bonus no se pudo registrar.",
     "weeklySeal": "Sellar la Semana",
     "weeklySealConfirm": "¿Sellar esta semana y cobrar tu bonus de constancia? No se puede deshacer.",
     "weeklyStreakHelp": "Racha de días cerrados al terminar la semana.",

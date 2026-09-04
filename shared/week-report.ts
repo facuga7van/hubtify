@@ -102,10 +102,22 @@ export function weeklyXp(daysCompliant: number): number {
 }
 
 /**
+ * Por qué `nutrition:closeWeek` NO selló. Extraído de `CloseWeekResult` para que
+ * el bridge del renderer (`weekly-api.ts`) pueda propagarlo sin redefinirlo:
+ * "Already closed" y "Waiting for weigh-in" son mensajes distintos y uno de
+ * los dos es accionable (andá a pesarte).
+ */
+export type CloseWeekError =
+  | 'Already closed'
+  | 'No profile'
+  | 'No closed days'
+  | 'Week not finished'
+  | 'Waiting for weigh-in';
+
+/**
  * Resultado de `nutrition:closeWeek`. Vive acá junto a `WeekReport` por la misma
  * razón: `window.api` lo importa de este módulo, no lo redefine.
  */
 export type CloseWeekResult =
   | { success: true; report: WeekReport }
-  | { success: false; error: 'Already closed' | 'No profile' | 'No closed days'
-                           | 'Week not finished' | 'Waiting for weigh-in' };
+  | { success: false; error: CloseWeekError };

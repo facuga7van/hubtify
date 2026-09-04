@@ -1427,6 +1427,7 @@
     "weeklyCompliance": "Days within target",
     "weeklyHabits": "Steps & gym",
     "weeklyNoWeight": "No weigh-in this week",
+    "weeklyRpgFailed": "The week was sealed, but the bonus could not be registered.",
     "weeklySeal": "Seal the Week",
     "weeklySealConfirm": "Seal this week and claim your consistency bonus? This can't be undone.",
     "weeklyStreakHelp": "Closed-day streak at the end of the week.",

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sealWeek } from '@modules/nutrition/weekly-api';
 
+// El sello (`report.weekStart`) y el argumento de `sealWeek` difieren A PROPÓSITO:
+// simula al renderer derivando el lunes equivocado (01:00 del lunes, reloj de
+// pared local) contra la fila que en realidad quedó sellada. Si el código usa
+// el argumento en vez de `report.weekStart`, este test debe fallar.
 const report = {
   weekStart: '2026-08-31', weekEnd: '2026-09-06', daysClosed: 7, daysCompliant: 7,
   avgConsumed: 1800, avgTarget: 1900, weightStart: 80.4, weightEnd: 80.0,
@@ -19,7 +23,7 @@ describe('sealWeek', () => {
       processRpgEvent,
     };
 
-    await sealWeek('2026-08-31');
+    await sealWeek('2026-09-07');
 
     expect(processRpgEvent).toHaveBeenCalledWith(expect.objectContaining({
       type: 'WEEK_SUMMARY',
@@ -34,17 +38,38 @@ describe('sealWeek', () => {
       processRpgEvent: vi.fn().mockResolvedValue({ xpGained: 0 }),   // el guard ya pagó
     };
     const res = await sealWeek('2026-08-31');
-    expect(res!.xpGained).toBe(0);         // NO 50
-    expect(res!.report.xpTotal).toBe(50);  // el declarado sigue disponible
+    expect(res).toEqual(expect.objectContaining({ ok: true, xpGained: 0, rpgFailed: false }));
+    if (res.ok) expect(res.report.xpTotal).toBe(50);  // el declarado sigue disponible
   });
 
-  it('no emite nada si el sellado falló', async () => {
+  it('no emite nada si el sellado falló, y devuelve por qué', async () => {
     const processRpgEvent = vi.fn();
     (window as any).api = {
       nutritionCloseWeek: vi.fn().mockResolvedValue({ success: false, error: 'Waiting for weigh-in' }),
       processRpgEvent,
     };
-    expect(await sealWeek('2026-08-31')).toBeNull();
+    const res = await sealWeek('2026-08-31');
+    expect(res).toEqual({ ok: false, error: 'Waiting for weigh-in' });
     expect(processRpgEvent).not.toHaveBeenCalled();
+  });
+
+  it('si processRpgEvent tira, el sello (ya irreversible) no se pierde', async () => {
+    (window as any).api = {
+      nutritionCloseWeek: vi.fn().mockResolvedValue({ success: true, report }),
+      processRpgEvent: vi.fn().mockRejectedValue(new Error('IPC caído')),
+    };
+
+    const res = await sealWeek('2026-08-31');
+
+    expect(res).toEqual(expect.objectContaining({ ok: true, rpgFailed: true, xpGained: 0 }));
+    if (res.ok) expect(res.report).toEqual(report);
+  });
+
+  it('una razón de fallo distinta también sobrevive', async () => {
+    (window as any).api = {
+      nutritionCloseWeek: vi.fn().mockResolvedValue({ success: false, error: 'Already closed' }),
+      processRpgEvent: vi.fn(),
+    };
+    expect(await sealWeek('2026-08-31')).toEqual({ ok: false, error: 'Already closed' });
   });
 });
