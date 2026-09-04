@@ -355,6 +355,21 @@
   font-style: italic;
 }
 
+/* El pergamino semanal del Códice usa el mismo aviso, pero es un <button>
+   que navega — necesita el reset del user-agent y una señal de que se
+   puede clickear, no el color de alarma nuevo (sigue siendo "algo pendiente"). */
+.nutri-pending-banner--week {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.nutri-pending-banner--week:hover,
+.nutri-pending-banner--week:focus-visible {
+  background: rgba(122, 30, 30, 0.2);
+}
+
 
 /* ── Calorie ring + details ── */
 

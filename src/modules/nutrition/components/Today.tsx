@@ -163,6 +163,8 @@ export default function Today() {
   const [weightPopup, setWeightPopup] = useState<{ show: boolean; lastWeight?: number }>({ show: false });
   const [weightInput, setWeightInput] = useState('');
   const [pendingDays, setPendingDays] = useState<string[]>([]);
+  /** Semanas con al menos un día cerrado y sin sellar — señal del pergamino del Códice. */
+  const [pendingWeeks, setPendingWeeks] = useState<string[]>([]);
 
   // Unified food input
   const [foodInput, setFoodInput] = useState('');
@@ -309,15 +311,25 @@ export default function Today() {
     setPendingDays(days);
   }, []);
 
+  const loadPendingWeeks = useCallback(async () => {
+    const weeks = await window.api.nutritionGetPendingWeeks();
+    setPendingWeeks(weeks);
+  }, []);
+
   useEffect(() => {
     loadPendingDays();
   }, [date, loadPendingDays]);
+
+  useEffect(() => {
+    loadPendingWeeks();
+  }, [date, loadPendingWeeks]);
 
   // Reload when settings change or sync completes
   useEffect(() => {
     const handler = () => {
       loadData(date);
       loadPendingDays();
+      loadPendingWeeks();
     };
     const closedHandler = () => { setJustClosed(true); handler(); };
     window.addEventListener('nutrition:settingsChanged', handler);
@@ -333,7 +345,7 @@ export default function Today() {
       window.removeEventListener('account:switched', handler);
       window.removeEventListener(NUTRITION_DAY_CLOSED_EVENT, closedHandler);
     };
-  }, [date, loadData, loadPendingDays]);
+  }, [date, loadData, loadPendingDays, loadPendingWeeks]);
 
   /** Nutritional today — the same day the backend writes logs to. */
   const nutriToday = nutritionToday(dayCutoffHour);
@@ -1273,6 +1285,20 @@ export default function Today() {
               </svg>
               {t('nutrify.pendingConfirmation', 'Pendiente de confirmar')}
             </div>
+          )}
+
+          {/* Quien vive en la vista diaria no ve el Códice: sin esto, el
+              pergamino semanal podía esperar sellado indefinidamente sin que
+              nadie se enterase de que estaba ahí. */}
+          {pendingWeeks.length > 0 && (
+            <button
+              type="button"
+              className="nutri-pending-banner nutri-pending-banner--week"
+              onClick={() => navigate('/nutrition/dashboard')}
+            >
+              <Scroll width={14} height={14} />
+              {t('nutrify.weeklyPendingBanner', 'Tu pergamino semanal espera en el Códice')}
+            </button>
           )}
 
           {/* Calorie main: ring + details */}

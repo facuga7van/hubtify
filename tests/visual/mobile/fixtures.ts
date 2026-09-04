@@ -254,6 +254,7 @@ export const NUTRITION_API: Record<string, unknown> = {
   nutritionGetMealSchedule: async () => null,
   nutritionGetMacroTargets: async () => ({ proteinG: 150, carbsG: 220, fatG: 60, auto: true }),
   nutritionGetPendingDays: async () => [],
+  nutritionGetPendingWeeks: async () => [],
   nutritionShouldAskWeight: async () => ({ shouldAsk: false }),
   nutritionGetRecentLoggedDays: async () => [
     { date: daysAgo(1), meals: 4, calories: 1980 },
