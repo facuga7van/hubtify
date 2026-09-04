@@ -115,6 +115,11 @@ export const NON_MEANINGFUL_EVENT_TYPES: readonly string[] = [
   'POMODORO_ABANDONED',
   'DAY_SEALED',
   'ACHIEVEMENT_UNLOCKED',
+  // El pergamino semanal es DERIVADO de días que ya contaron. Si fuese
+  // significativo, sellar 4 semanas atrasadas de un saque inyectaría 4 eventos
+  // de Nutrify en un mismo día — entrada directa a polymath, perfect_day y la
+  // escalera del Cronista. Un premio derivado no alimenta al matcher que lo generó.
+  'WEEK_SUMMARY',
 ];
 
 /** The module id the engine writes its own rows under (seal, achievements). */

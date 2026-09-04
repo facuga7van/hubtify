@@ -355,6 +355,21 @@
   font-style: italic;
 }
 
+/* El pergamino semanal del Códice usa el mismo aviso, pero es un <button>
+   que navega — necesita el reset del user-agent y una señal de que se
+   puede clickear, no el color de alarma nuevo (sigue siendo "algo pendiente"). */
+.nutri-pending-banner--week {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.nutri-pending-banner--week:hover,
+.nutri-pending-banner--week:focus-visible {
+  background: rgba(122, 30, 30, 0.2);
+}
+
 
 /* ── Calorie ring + details ── */
 
@@ -3567,4 +3582,152 @@
 [data-shell="mobile"] .nutri-dash-repeat__pill,
 [data-shell="mobile"] .nutri-dash-repeat__yesterday {
   min-height: 44px;
+}
+
+
+/* ── Pergamino semanal (WeeklyScroll) ──
+   Dos cartas -- pendientes lacradas, archivo de solo lectura -- cada una una
+   lista de filas que se despliegan al click. Reusa .nutri-card.medieval para
+   el marco; acá solo van la lista, la fila y el detalle. */
+
+.nutri-scroll-card .nutri-card-title { margin-bottom: 6px; }
+
+.nutri-scroll-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.nutri-scroll-item {
+  border-bottom: 1px dotted rgba(74, 55, 32, 0.25);
+}
+
+.nutri-scroll-item:last-child { border-bottom: none; }
+
+/* El lacre pendiente lleva un filo en --rubric: distingue "espera acción" del
+   archivo, que es simple lectura. */
+.nutri-scroll-item--pending {
+  border-left: 2px solid var(--rubric);
+  padding-left: 8px;
+  margin-left: -8px;
+}
+
+.nutri-scroll-item-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  text-align: left;
+}
+
+.nutri-scroll-item-head:hover {
+  background: rgba(74, 55, 32, 0.06);
+}
+
+.nutri-scroll-item-range {
+  flex: 1;
+  min-width: 0;
+}
+
+.nutri-scroll-item-xp {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-label);
+  color: var(--moss);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.nutri-scroll-item-head svg { color: var(--ink-faded); flex-shrink: 0; }
+
+.nutri-scroll-loading {
+  padding: 6px 4px 12px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--ink-faded);
+}
+
+.nutri-scroll-detail {
+  padding: 4px 4px 14px;
+}
+
+.nutri-scroll-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin-bottom: 10px;
+}
+
+.nutri-scroll-stat--wide { grid-column: 1 / -1; }
+
+.nutri-scroll-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.nutri-scroll-stat-val {
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+.nutri-scroll-stat-unit {
+  font-size: var(--fs-label);
+  font-weight: 400;
+  color: var(--ink-faded);
+}
+
+.nutri-scroll-stat-muted {
+  font-family: 'IM Fell English', serif;
+  font-size: var(--fs-label);
+  font-style: italic;
+  color: var(--ink-faded);
+}
+
+.nutri-scroll-xp-row {
+  text-align: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(168, 138, 60, 0.3);
+  font-family: 'Fira Code', monospace;
+  font-size: var(--fs-sub);
+  font-weight: 700;
+}
+
+.nutri-scroll-seal-btn {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.nutri-scroll-sealed-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: var(--fs-label);
+  color: var(--moss);
+}
+
+[data-shell="mobile"] .nutri-scroll-item-head {
+  min-height: 44px;
+}
+
+[data-shell="mobile"] .nutri-scroll-stats {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }

@@ -1,4 +1,5 @@
 import type { ShopItemKind } from './shop-catalog';
+import type { WeekReport, CloseWeekResult } from './week-report';
 
 // ── RPG Types ──────────────────────────────────────────────
 
@@ -590,6 +591,10 @@ export interface HubtifyApi {
   nutritionRemoveFavoriteFood: (id: string) => Promise<void>;
   nutritionGetPendingDays: () => Promise<string[]>;
   nutritionGetMealSchedule: () => Promise<import('./meal-utils').MealSchedule>;
+  nutritionGetPendingWeeks: () => Promise<string[]>;
+  nutritionGetWeekReport: (weekStart: string) => Promise<WeekReport | null>;
+  nutritionCloseWeek: (weekStart: string) => Promise<CloseWeekResult>;
+  nutritionGetClosedWeeks: (limit?: number) => Promise<WeekReport[]>;
 
   // Sync
   syncRestoreStats: (stats: Record<string, unknown>) => Promise<{ success: boolean }>;

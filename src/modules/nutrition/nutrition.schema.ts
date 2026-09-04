@@ -556,4 +556,25 @@ export const nutritionMigrations: Migration[] = [
       WHERE nutrition_ai_cache.source <> 'user';
     `,
   },
+  {
+    namespace: 'nutrition',
+    version: 19,
+    up: `
+      CREATE TABLE IF NOT EXISTS nutrition_weekly_closed (
+        week_start      TEXT PRIMARY KEY,
+        days_closed     INTEGER NOT NULL DEFAULT 0,
+        days_compliant  INTEGER NOT NULL DEFAULT 0,
+        avg_consumed    INTEGER NOT NULL DEFAULT 0,
+        avg_target      INTEGER NOT NULL DEFAULT 0,
+        weight_start    REAL,
+        weight_end      REAL,
+        days_steps      INTEGER NOT NULL DEFAULT 0,
+        days_gym        INTEGER NOT NULL DEFAULT 0,
+        streak_end      INTEGER NOT NULL DEFAULT 0,
+        xp_total        INTEGER NOT NULL DEFAULT 0,
+        closed_at       TEXT,
+        updated_at      TEXT
+      );
+    `,
+  },
 ];

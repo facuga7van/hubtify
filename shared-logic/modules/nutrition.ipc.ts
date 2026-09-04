@@ -15,6 +15,8 @@ import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adapt
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
+import { weekEndOf, shiftDay, countCompliantDays, weeklyXp, mondayOfWeek } from '../../shared/week-report';
+import type { WeekReport, CloseWeekResult } from '../../shared/week-report';
 // The prompt's identity, from the same file the Cloud Function ships. A cached
 // model answer is only a hit while the prompt that produced it is the current
 // one (migration v17). gemini.ts has no imports, so this is safe in the worker.
@@ -816,6 +818,110 @@ export function registerNutritionIpcHandlers(): void {
     `).all(start, end);
   });
 
+  // ── Pergamino semanal ──────────────────────────────
+
+  /**
+   * El veredicto de una semana. Idéntico esté sellada o en vista previa: si hay
+   * fila en `nutrition_weekly_closed` se devuelve TAL CUAL quedó archivada, y si
+   * no, se calcula en vivo. Un pergamino sellado nunca se recalcula.
+   */
+  ipcHandle('nutrition:getWeekReport', (_e, weekStart: string) => {
+    const db = getDb();
+    return buildWeekReport(db, weekStart);
+  });
+
+  /**
+   * Los lunes de las semanas que esperan pergamino.
+   *
+   * Cinco condiciones (spec §Cuándo hay pergamino pendiente). La 5 —el gate de
+   * peso— existe porque `weight_end` sale del pesaje de la semana SIGUIENTE: sin
+   * ella el usuario abre el pergamino el lunes temprano, lo sella, y el dato que
+   * motivó toda la feature queda NULL para siempre.
+   */
+  ipcHandle('nutrition:getPendingWeeks', () => {
+    const db = getDb();
+    const currentWeek = mondayOfWeek(nutritionToday(db));
+    const oldest = shiftDay(currentWeek, -28);
+
+    const candidates = db.prepare(`
+      SELECT DISTINCT c.date FROM nutrition_daily_closed c
+      WHERE c.deleted_at IS NULL AND c.date >= ? AND c.date < ?
+    `).all(oldest, currentWeek) as Array<{ date: string }>;
+
+    // `oldest` y `currentWeek` son ambos lunes a exactamente 28 días de distancia,
+    // así que todo candidato ya viene acotado a `[oldest, currentWeek)` en la query
+    // de arriba y su `mondayOfWeek` cae siempre dentro del mismo rango. Este filter
+    // es defensivo — no debería recortar nada nunca; si lo hace, algo más se rompió.
+    const weeks = [...new Set(candidates.map(r => mondayOfWeek(r.date)))]
+      .filter(w => w >= oldest && w < currentWeek)
+      .sort();
+
+    const isSealed = db.prepare('SELECT 1 FROM nutrition_weekly_closed WHERE week_start = ?');
+    return weeks.filter(w => !isSealed.get(w) && weeklyGateOpen(db, w));
+  });
+
+  /**
+   * Sella la semana. Irreversible por diseño: no existe `reopenWeek`.
+   *
+   * Revalida la condición 5 en vez de confiar en que el llamador pasó por
+   * `getPendingWeeks`. Es el mismo principio que el guard de `ref_id` en el motor.
+   */
+  ipcHandle('nutrition:closeWeek', (_e, weekStart: string): CloseWeekResult => {
+    const db = getDb();
+
+    return db.transaction((): CloseWeekResult => {
+      if (db.prepare('SELECT 1 FROM nutrition_weekly_closed WHERE week_start = ?').get(weekStart)) {
+        return { success: false, error: 'Already closed' };
+      }
+
+      const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1').get();
+      if (!profile) return { success: false, error: 'No profile' };
+
+      if (weekStart >= mondayOfWeek(nutritionToday(db))) {
+        return { success: false, error: 'Week not finished' };
+      }
+
+      const report = buildWeekReport(db, weekStart);
+      if (!report || report.daysClosed === 0) {
+        return { success: false, error: 'No closed days' };
+      }
+
+      if (!weeklyGateOpen(db, weekStart)) {
+        return { success: false, error: 'Waiting for weigh-in' };
+      }
+
+      const stamp = syncStamp();
+      db.prepare(`
+        INSERT INTO nutrition_weekly_closed
+          (week_start, days_closed, days_compliant, avg_consumed, avg_target,
+           weight_start, weight_end, days_steps, days_gym, streak_end,
+           xp_total, closed_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        weekStart, report.daysClosed, report.daysCompliant, report.avgConsumed, report.avgTarget,
+        report.weightStart, report.weightEnd, report.daysSteps, report.daysGym, report.streakEnd,
+        report.xpTotal, stamp, stamp,
+      );
+
+      return { success: true, report: { ...report, sealed: true, closedAt: stamp } };
+    })();
+  });
+
+  /** Las semanas selladas, más recientes primero. Para releer el archivo. */
+  ipcHandle('nutrition:getClosedWeeks', (_e, limit?: number) => {
+    const db = getDb();
+    // Mismo guard que nutrition:getRecentLoggedDays: en SQLite un LIMIT
+    // negativo es "sin límite" y uno no entero tira 'datatype mismatch', así
+    // que se acota a un entero positivo antes de que llegue a la query.
+    const n = Number.isFinite(limit) && (limit as number) > 0
+      ? Math.min(Math.floor(limit as number), 200)
+      : 52;
+    const rows = db.prepare(
+      'SELECT week_start FROM nutrition_weekly_closed ORDER BY week_start DESC LIMIT ?',
+    ).all(n) as Array<{ week_start: string }>;
+    return rows.map(r => buildWeekReport(db, r.week_start)).filter((r): r is WeekReport => r !== null);
+  });
+
   // Macro targets: profile override when all three set, otherwise auto from the helper.
   ipcHandle('nutrition:getMacroTargets', (_e, date?: string) => {
     const db = getDb();
@@ -1424,4 +1530,154 @@ export function calculateBMR(weight: number, height: number, age: number, sex: s
 
 export function calculateTDEEWithFactor(bmr: number, factor: number): number {
   return Math.round(bmr * factor);
+}
+
+/**
+ * Arma el `WeekReport` de una semana.
+ *
+ * Sellada → se lee la fila archivada sin recalcular nada (§Inmutabilidad).
+ * Sin sellar → se agrega en vivo desde `nutrition_daily_closed`.
+ * Sin perfil → null EN LA RAMA VIVA: `scoreNutritionDay` leería un déficit 0
+ * y re-puntuaría la semana en banda de mantenimiento, mintiendo sobre quien
+ * está en déficit.
+ *
+ * El orden de los guards es deliberado: primero se mira si la semana está
+ * sellada, y sólo si NO lo está se exige el perfil. Un pergamino sellado es
+ * autosuficiente — todo quedó congelado en la fila de `nutrition_weekly_closed`
+ * al momento de cerrar — y tiene que sobrevivir a un perfil borrado, porque es
+ * dato archivado que nunca se vuelve a calcular. Pedir el perfil ANTES del
+ * sello hacía que una semana ya sellada devolviera null sin perfil, y como
+ * `nutrition:getClosedWeeks` filtra los null, el pergamino desaparecía del
+ * archivo en silencio.
+ */
+export function buildWeekReport(
+  db: ReturnType<typeof getDb>,
+  weekStart: string,
+): WeekReport | null {
+  const weekEnd = weekEndOf(weekStart);
+
+  const sealed = db.prepare('SELECT * FROM nutrition_weekly_closed WHERE week_start = ?')
+    .get(weekStart) as Record<string, unknown> | undefined;
+  if (sealed) {
+    return {
+      weekStart, weekEnd,
+      daysClosed: sealed.days_closed as number,
+      daysCompliant: sealed.days_compliant as number,
+      avgConsumed: sealed.avg_consumed as number,
+      avgTarget: sealed.avg_target as number,
+      weightStart: sealed.weight_start as number | null,
+      weightEnd: sealed.weight_end as number | null,
+      daysSteps: sealed.days_steps as number,
+      daysGym: sealed.days_gym as number,
+      streakEnd: sealed.streak_end as number,
+      xpTotal: sealed.xp_total as number,
+      sealed: true,
+      closedAt: sealed.closed_at as string | null,
+    };
+  }
+
+  const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1')
+    .get() as { deficit_target_kcal: number } | undefined;
+  if (!profile) return null;
+
+  const rows = db.prepare(`
+    SELECT date, consumed, target FROM nutrition_daily_closed
+    WHERE date BETWEEN ? AND ? AND deleted_at IS NULL ORDER BY date ASC
+  `).all(weekStart, weekEnd) as Array<{ date: string; consumed: number; target: number }>;
+
+  const deficit = profile.deficit_target_kcal ?? 0;
+  const daysCompliant = countCompliantDays(rows, deficit);
+  const n = rows.length;
+
+  const weightAt = (from: string, to: string): number | null => {
+    const r = db.prepare(`
+      SELECT weight_kg FROM nutrition_weekly_metrics
+      WHERE weight_kg IS NOT NULL AND date BETWEEN ? AND ? ORDER BY date ASC LIMIT 1
+    `).get(from, to) as { weight_kg: number } | undefined;
+    return r?.weight_kg ?? null;
+  };
+
+  const habits = db.prepare(`
+    SELECT COALESCE(SUM(CASE WHEN steps > 0 THEN 1 ELSE 0 END), 0) AS steps,
+           COALESCE(SUM(CASE WHEN gym = 1 THEN 1 ELSE 0 END), 0) AS gym
+    FROM nutrition_daily_metrics WHERE date BETWEEN ? AND ?
+  `).get(weekStart, weekEnd) as { steps: number; gym: number };
+
+  return {
+    weekStart, weekEnd,
+    daysClosed: n,
+    daysCompliant,
+    avgConsumed: n ? Math.round(rows.reduce((s, r) => s + r.consumed, 0) / n) : 0,
+    avgTarget: n ? Math.round(rows.reduce((s, r) => s + r.target, 0) / n) : 0,
+    weightStart: weightAt(weekStart, weekEnd),
+    weightEnd: weightAt(shiftDay(weekStart, 7), shiftDay(weekEnd, 7)),
+    daysSteps: habits.steps,
+    daysGym: habits.gym,
+    streakEnd: weekStreakAt(db, weekEnd, deficit),
+    xpTotal: weeklyXp(daysCompliant),
+    sealed: false,
+    closedAt: null,
+  };
+}
+
+/**
+ * Condición 5: ¿hay con qué medir el peso, o ya se esperó suficiente?
+ *
+ * El escape es `weekStart+14` y el número no es negociable. `weight_check_day`
+ * va de 1 a 7 (clampeado en `nutrition:saveProfile`) y `shouldAskWeight` solo
+ * pregunta cuando `dow >= checkDay`, así que el usuario puede RESPONDER en
+ * cualquier día entre `+7` y `+13` según su configuración. Pero `saveWeeklyMetrics`
+ * no recibe `date` desde la UI: usa `getMondayOfWeek()`, que redondea al lunes de
+ * esa semana — la fila SIEMPRE queda fechada en `+7`, sin importar qué día contestó.
+ * El escape tiene que sobrevivir a la última RESPUESTA posible (`+13`), no a la
+ * fecha de la fila; por eso es `+14` y no algo más corto —`+10`, por ejemplo—
+ * dispararía antes que la respuesta para todo `weight_check_day >= 4`: retendría
+ * el pergamino tres días y lo soltaría con `weight_end` en NULL igual.
+ */
+export function weeklyGateOpen(db: ReturnType<typeof getDb>, weekStart: string): boolean {
+  const hasWeighIn = db.prepare(`
+    SELECT 1 FROM nutrition_weekly_metrics
+    WHERE weight_kg IS NOT NULL AND date BETWEEN ? AND ? LIMIT 1
+  `).get(shiftDay(weekStart, 7), shiftDay(weekStart, 13));
+  if (hasWeighIn) return true;
+  return nutritionToday(db) >= shiftDay(weekStart, 14);
+}
+
+/**
+ * La racha AL DOMINGO de esa semana, no al momento de sellar.
+ *
+ * Sellar puede pasar hasta 4 semanas después; calcularla al sellar haría que
+ * cuatro pergaminos atrasados cerrados en la misma sesión registraran todos el
+ * mismo número, que no describe ninguna de las cuatro semanas.
+ */
+function weekStreakAt(
+  db: ReturnType<typeof getDb>,
+  weekEnd: string,
+  deficit: number,
+): number {
+  const rows = db.prepare(
+    `SELECT date, total_calories_in AS totalCaloriesIn, tdee
+     FROM nutrition_daily_summary
+     WHERE date <= ? AND total_calories_in > 0
+     ORDER BY date DESC LIMIT 366`,
+  ).all(weekEnd) as StreakDay[];
+
+  // ── Día con evento = presentarse ──────────────────────────────────────
+  // Mismo indulto que `nutrition:getStreak`: registrar el asado
+  // ES cumplir con la racha, no gastar el día de gracia semanal en algo que
+  // la app misma invitó a registrar. Si este remap se "simplifica" y se
+  // borra, el pergamino sellado archiva una racha DISTINTA a la que la app
+  // le mostró al usuario — y como los sellos nunca se recalculan, ese número
+  // equivocado queda permanente. Acotado a `date <= weekEnd` para no traer
+  // el historial de eventos completo en cada llamada.
+  const eventDates = new Set(
+    (db.prepare(
+      `SELECT DISTINCT date FROM food_log WHERE is_event = 1 AND deleted_at IS NULL AND date <= ?`,
+    ).all(weekEnd) as Array<{ date: string }>).map(r => r.date),
+  );
+  const streakRows = rows.map(r =>
+    eventDates.has(r.date) ? { ...r, totalCaloriesIn: r.tdee - deficit } : r,
+  );
+
+  return computeNutritionStreak(streakRows, weekEnd, deficit).streak;
 }

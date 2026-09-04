@@ -40,6 +40,11 @@ export const DEFAULT_OVERRIDES: Record<string, unknown> = {
   ]),
   questsGetOverdueCount: () => Promise.resolve(3),
   nutritionGetTodayMealsCount: () => Promise.resolve(0),
+  // WeeklyScroll (montado dentro de NutritionCharts): sin overrides el Proxy
+  // permisivo de más abajo resolvería `null`, y el componente hace
+  // `pendingWeeks.length` — mismo tropiezo que nutritionGetEventDays ya evitaba.
+  nutritionGetPendingWeeks: () => Promise.resolve([]),
+  nutritionGetClosedWeeks: () => Promise.resolve([]),
   rpgGetAchievements: () => Promise.resolve([]),
   rpgGetDaySummary: () => Promise.resolve(null),
   rpgGetSeals: () => Promise.resolve([]),
