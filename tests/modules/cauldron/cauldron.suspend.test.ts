@@ -179,7 +179,17 @@ describe('lifecycle: runSuspend / runResume', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('resume durante la cuenta regresiva de auto-inicio la rearma y dispara el descanso', async () => {
+  /**
+   * INVERTIDO respecto de la versión anterior de este test, a propósito.
+   *
+   * Antes esperaba `on_break`: `resume` rearmaba el interval y, como
+   * `autoStartAt` ya había vencido durante la suspensión, disparaba el descanso
+   * en el primer tick. Pero los 5 s de gracia existen para poder apretar
+   * «Esperá», y con el teléfono congelado en el bolsillo nadie los vio: arrancar
+   * igual era un auto-inicio silencioso. Si la ventana venció mientras estábamos
+   * afuera, el segmento espera un «Continuar» explícito.
+   */
+  it('resume con la gracia ya vencida NO dispara el descanso: espera un «Continuar»', async () => {
     const presetId = await makePreset({ autoStartBreak: true });
     await invoke('cauldron:start', presetId);
     vi.advanceTimersByTime(1 * MIN); // termina el enfoque → awaiting_next con autoStartAt
@@ -193,6 +203,54 @@ describe('lifecycle: runSuspend / runResume', () => {
     vi.setSystemTime(Date.now() + 10_000); // la gracia de 5 s ya pasó
     runResume();
     vi.advanceTimersByTime(1000);
+    expect((await state()).status).toBe('awaiting_next');
+    expect((await state()).autoStartAt).toBeNull(); // desarmada, no rearmada
+    expect(vi.getTimerCount()).toBe(0); // ni siquiera queda el interval girando
+
+    // Y el segmento sigue en la cola: «Continuar» lo enciende.
+    await invoke('cauldron:confirmNext');
+    expect((await state()).status).toBe('on_break');
+  });
+
+  it('resume con la gracia todavía viva la rearma y dispara el descanso', async () => {
+    const presetId = await makePreset({ autoStartBreak: true });
+    await invoke('cauldron:start', presetId);
+    vi.advanceTimersByTime(1 * MIN);
+    expect((await state()).autoStartAt).not.toBeNull();
+
+    runSuspend();
+    vi.setSystemTime(Date.now() + 2000); // dentro de los 5 s: el usuario está ahí
+    runResume();
+    expect(vi.getTimerCount()).toBe(1); // interval de auto-inicio rearmado
+    vi.advanceTimersByTime(4000);
+    expect((await state()).status).toBe('on_break');
+  });
+
+  it('un enfoque que vence con el worker congelado no encadena solo el descanso', async () => {
+    const presetId = await makePreset({ autoStartBreak: true });
+    await invoke('cauldron:start', presetId);
+
+    runSuspend();
+    // El teléfono estuvo media hora en el bolsillo: el enfoque venció a los
+    // 60 s y la ventana de gracia se cerró 5 s después, sin nadie mirando.
+    vi.setSystemTime(Date.now() + 30 * MIN);
+    runResume();
+    vi.advanceTimersByTime(2000);
+
+    const s = await state();
+    expect(s.status).toBe('awaiting_next');
+    expect(s.autoStartAt).toBeNull();
+  });
+
+  it('camino feliz: con la app viva, el descanso sigue arrancando solo tras la gracia', async () => {
+    const presetId = await makePreset({ autoStartBreak: true });
+    await invoke('cauldron:start', presetId);
+
+    vi.advanceTimersByTime(1 * MIN); // el enfoque termina con el reloj corriendo
+    expect((await state()).status).toBe('awaiting_next');
+    expect((await state()).autoStartAt).not.toBeNull();
+
+    vi.advanceTimersByTime(6000); // pasan los 5 s de gracia
     expect((await state()).status).toBe('on_break');
   });
 });

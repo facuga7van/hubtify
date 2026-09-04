@@ -137,4 +137,32 @@ export const cauldronMigrations: Migration[] = [
       ALTER TABLE cauldron_sessions ADD COLUMN retroactive INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    namespace: 'cauldron',
+    version: 8,
+    up: `
+      -- El reloj DETENIDO no sobrevivía a que el sistema matara el proceso.
+      --
+      -- En Android el aviso persistente con el botón «Reanudar» sigue publicado
+      -- aunque la app deje de existir, así que ese botón prometía algo que el
+      -- arranque en frío no podía cumplir: pausar ponía target_end_time en NULL,
+      -- la fila quedaba indistinguible de un huérfano, el barrido de arranque la
+      -- borraba, y el cauldron:resume encolado moría con «Timer not paused». La
+      -- sesión se perdía sin una sola señal.
+      --
+      -- paused_at_ms (epoch ms) es el instante de la pausa. Con él y con
+      -- target_end_time —que ya NO se borra al pausar— alcanza para reconstruir
+      -- la pausa entera: lo que falta es target_end_time - paused_at_ms, y la
+      -- antigüedad es now - paused_at_ms. Los dos numéricos: la alternativa era
+      -- medir la antigüedad contra updated_at, que es TEXT y mezcla formatos.
+      -- NULL = el reloj corre (o no hay reloj).
+      --
+      -- DELIBERADAMENTE FUERA DEL SYNC, igual que target_end_time: es estado de
+      -- ESTE dispositivo. Que el teléfono tenga una pausa con 12 minutos no
+      -- significa que la notebook deba arrancar con el reloj detenido de una
+      -- sesión que nunca corrió acá. Está declarado en el LOCAL_ONLY de
+      -- tests/modules/sync/sync-columns.test.ts, que es quien lo vigila.
+      ALTER TABLE cauldron_sessions ADD COLUMN paused_at_ms INTEGER;
+    `,
+  },
 ];

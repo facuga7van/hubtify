@@ -143,6 +143,26 @@ function RpgMomentsWatcher() {
     };
   }, [t, toast]);
 
+  /* ── botones del aviso del Caldero (Android) ────────
+     El aviso persistente sobrevive a que el sistema mate el proceso, así que
+     «Reanudar» se puede apretar sobre una sesión que ya no se puede recuperar.
+     El invoke rechaza y hasta acá eso era un console.warn: el usuario apretaba
+     un botón y no pasaba nada, ni siquiera un error. Un aviso visible es el
+     mínimo que se le debe a un botón apretado. */
+  useEffect(() => {
+    const onActionFailed = () => {
+      toast({
+        type: 'warning',
+        message: t(
+          'cauldron.notify.actionFailed',
+          'No se pudo retomar desde el aviso. Abrí el Caldero para ver cómo quedó la sesión.',
+        ),
+      });
+    };
+    window.addEventListener('cauldron:actionFailed', onActionFailed);
+    return () => window.removeEventListener('cauldron:actionFailed', onActionFailed);
+  }, [t, toast]);
+
   /* ── achievement backfill ───────────────────────────
      One silent sweep of the whole catalog against rpg_events, on boot and on
      every account switch: history earned before the catalog existed (or on

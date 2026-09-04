@@ -633,6 +633,15 @@
   transition: border-color 150ms ease;
 }
 
+/* Mismo apagado que `.cauldron-btn:disabled`. Lo usan los campos de duración de
+   una receta de fábrica, que se abre para editar pero solo cede el auto-inicio:
+   sin esto el campo se veía escribible y el 25 volvía solo al guardar. */
+.cauldron-input:disabled,
+.cauldron-select:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .cauldron-input:focus,
 .cauldron-select:focus {
   border-color: var(--gold);

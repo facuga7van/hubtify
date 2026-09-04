@@ -22,6 +22,14 @@ export interface ScheduledNotification {
   at?: number;
   /** Persistente y silenciosa (canal de baja importancia, no se puede deslizar). */
   ongoing?: boolean;
+  /** Identidad del juego de botones. El host registra el tipo la primera vez que lo ve. */
+  actionTypeId?: string;
+  /**
+   * Los botones, CON su texto ya traducido. Viajan en el plan y no en una
+   * constante del host porque el idioma lo decide el renderer (cauldron:setLabels)
+   * y el host no tiene forma de esperarlo antes de registrar el tipo.
+   */
+  actions?: Array<{ id: string; title: string }>;
 }
 
 /**

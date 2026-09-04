@@ -2235,6 +2235,10 @@ export function mergeCauldronDataInto(db: SqlDatabase, data: Record<string, unkn
       // in every stat (+1 today, +minutes on the weekly chart, +XP eligibility).
       // task_id and abandoned travel too: without them, mission links and broken
       // flasks (the shelf's scars) never crossed devices.
+      // target_end_time and paused_at_ms deliberately DO NOT travel: they are
+      // this device's clock. Importing them would boot the laptop into a stopped
+      // (or ticking) timer for a session it never ran. See LOCAL_ONLY in
+      // tests/modules/sync/sync-columns.test.ts, which is what enforces it.
       const insertSession = db.prepare(`INSERT OR IGNORE INTO cauldron_sessions (id, preset_id, type, duration_minutes, completed, started_at, completed_at, created_at, updated_at, deleted_at, is_extension, task_id, abandoned, retroactive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       // LWW on the state that changes AFTER the row was first synced: abandoned
       // is set 5+ minutes in, task_id post-hoc, deleted_at by the orphan sweep.

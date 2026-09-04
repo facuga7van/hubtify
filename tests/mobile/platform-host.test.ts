@@ -7,6 +7,7 @@ vi.mock('@capacitor/local-notifications', () => ({
     createChannel: vi.fn(async () => undefined),
     schedule: vi.fn(async () => ({ notifications: [] })),
     cancel: vi.fn(async () => undefined),
+    registerActionTypes: vi.fn(async () => undefined),
     removeDeliveredNotificationsById: vi.fn(async () => undefined),
     checkExactNotificationSetting: vi.fn(async () => ({ exact_alarm: 'denied' })),
     changeExactNotificationSetting: vi.fn(async () => ({ exact_alarm: 'granted' })),
@@ -275,6 +276,77 @@ describe('applyNotificationPlan', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     m(LocalNotifications.cancel).mockRejectedValueOnce(new Error('bridge down'));
     await expect(host().applyNotificationPlan(plan())).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  // ─── Botones ──────────────────────────────────────────────
+  //
+  // Los títulos viajan TRADUCIDOS dentro del plan (el idioma lo decide el
+  // renderer vía cauldron:setLabels), así que el tipo de acción no se puede
+  // registrar de una vez junto a los canales: se registra perezosamente y se
+  // vuelve a registrar si los textos cambian.
+  const withActions = (title = 'Pausar') =>
+    plan({
+      schedule: [{
+        tag: 'cauldron:ongoing',
+        title: 'Enfoque',
+        body: 'Termina a las 15:25',
+        ongoing: true,
+        actionTypeId: 'cauldron-running',
+        actions: [{ id: 'cauldron:pause', title }, { id: 'cauldron:stop', title: 'Detener' }],
+      }],
+    });
+
+  it('registra el juego de botones y lo referencia en el schedule', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    await host().applyNotificationPlan(withActions());
+
+    expect(LocalNotifications.registerActionTypes).toHaveBeenCalledWith({
+      types: [{
+        id: 'cauldron-running',
+        actions: [{ id: 'cauldron:pause', title: 'Pausar' }, { id: 'cauldron:stop', title: 'Detener' }],
+      }],
+    });
+    expect(m(LocalNotifications.schedule).mock.calls[0][0].notifications[0])
+      .toMatchObject({ actionTypeId: 'cauldron-running' });
+  });
+
+  it('dos planes idénticos registran el tipo UNA sola vez', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    const h = host();
+    await h.applyNotificationPlan(withActions());
+    await h.applyNotificationPlan(withActions());
+    expect(LocalNotifications.registerActionTypes).toHaveBeenCalledTimes(1);
+  });
+
+  it('si cambian los títulos (idioma) se vuelve a registrar', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    const h = host();
+    await h.applyNotificationPlan(withActions('Pausar'));
+    await h.applyNotificationPlan(withActions('Pause'));
+    expect(LocalNotifications.registerActionTypes).toHaveBeenCalledTimes(2);
+    expect(m(LocalNotifications.registerActionTypes).mock.calls[1][0].types[0].actions![0].title)
+      .toBe('Pause');
+  });
+
+  it('un aviso sin botones no lleva actionTypeId ni registra nada', async () => {
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    await host().applyNotificationPlan(plan({
+      schedule: [{ tag: 'cauldron:end', title: 'T', body: 'B', at: Date.now() + 60_000 }],
+    }));
+    expect(LocalNotifications.registerActionTypes).not.toHaveBeenCalled();
+    expect(m(LocalNotifications.schedule).mock.calls[0][0].notifications[0])
+      .not.toHaveProperty('actionTypeId');
+  });
+
+  // Mejor una notificación sin botones que ninguna notificación.
+  it('si registrar los botones falla, el aviso se programa igual', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    m(LocalNotifications.checkPermissions).mockResolvedValue({ display: 'granted' });
+    m(LocalNotifications.registerActionTypes).mockRejectedValueOnce(new Error('bridge down'));
+    await expect(host().applyNotificationPlan(withActions())).resolves.toBeUndefined();
+    expect(LocalNotifications.schedule).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

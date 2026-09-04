@@ -22,7 +22,7 @@ import { Device } from '@capacitor/device';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Share } from '@capacitor/share';
-import type { FileFilter, NotificationPlan } from '@logic/platform';
+import type { FileFilter, NotificationPlan, ScheduledNotification } from '@logic/platform';
 import { markVirtualDevice } from '../shared/platform-detect';
 import { pickFile } from './file-picker';
 import { acceptFor, bytesToBase64, notificationIdFor } from './host-utils';
@@ -71,6 +71,16 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
   // sesión; si el usuario dice que no, no se insiste hasta el próximo arranque.
   let permission: 'unknown' | 'granted' | 'denied' = 'unknown';
   let channelReady = false;
+  /**
+   * Juegos de botones ya registrados: `actionTypeId` → firma de sus títulos.
+   *
+   * No se registran junto a los canales (arriba) porque los textos vienen
+   * TRADUCIDOS dentro del plan, y el idioma lo decide el renderer
+   * (`cauldron:setLabels`), que puede llegar después del primer plan o cambiar
+   * en caliente. La firma es lo que distingue «este plan repite lo de siempre»
+   * (no se re-registra) de «el usuario cambió de idioma» (sí).
+   */
+  const actionTypes = new Map<string, string>();
 
   async function notificationsReady(): Promise<boolean> {
     if (permission === 'unknown') {
@@ -115,6 +125,27 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
       // Android < 12 no tiene el ajuste (y el plugin resuelve 'granted'); si la
       // consulta falla, inexacto es la opción que nunca abre una pantalla.
       return false;
+    }
+  }
+
+  /**
+   * Deja registrado el juego de botones de un aviso, si hace falta.
+   *
+   * Tiene su propio try/catch a propósito: si `registerActionTypes` falla, el
+   * `schedule()` que viene después TIENE que ocurrir igual. Una notificación sin
+   * botones sigue avisando; ninguna notificación no avisa nada.
+   */
+  async function ensureActionType(n: ScheduledNotification): Promise<void> {
+    if (!n.actionTypeId || !n.actions?.length) return;
+    const signature = JSON.stringify(n.actions.map((a) => [a.id, a.title]));
+    if (actionTypes.get(n.actionTypeId) === signature) return;
+    try {
+      await LocalNotifications.registerActionTypes({
+        types: [{ id: n.actionTypeId, actions: n.actions.map((a) => ({ id: a.id, title: a.title })) }],
+      });
+      actionTypes.set(n.actionTypeId, signature);
+    } catch (err) {
+      console.warn('[platform-host] registerActionTypes failed', err);
     }
   }
 
@@ -196,6 +227,11 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
         if (desired.size === 0) return;
         if (!(await notificationsReady())) return;
 
+        // Los botones tienen que existir ANTES del `schedule()`: Android resuelve
+        // el `actionTypeId` al publicar, y un tipo desconocido sale como una
+        // notificación pelada.
+        for (const n of desired.values()) await ensureActionType(n);
+
         // La exactitud se decide UNA vez por lote y solo importa si hay alarmas.
         const exact = [...desired.values()].some((n) => n.at !== undefined)
           ? await exactAlarmsAllowed()
@@ -208,6 +244,7 @@ export function createPlatformHost(deps: PlatformHostDeps = { pickFile }): Platf
             body: n.body,
             channelId: n.ongoing ? ONGOING_CHANNEL_ID : NOTIFICATION_CHANNEL_ID,
             ...(n.ongoing ? { ongoing: true, autoCancel: false } : {}),
+            ...(n.actionTypeId ? { actionTypeId: n.actionTypeId } : {}),
             ...(n.at !== undefined
               ? {
                   // `allowWhileIdle` NO es opcional acá: sin él el plugin usa

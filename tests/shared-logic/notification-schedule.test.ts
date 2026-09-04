@@ -9,6 +9,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { questsMigrations } from '@modules/quests/quests.schema';
 import {
+  CAULDRON_ACTION_PAUSE,
+  CAULDRON_ACTION_PAUSED,
+  CAULDRON_ACTION_RESUME,
+  CAULDRON_ACTION_RUNNING,
+  CAULDRON_ACTION_STOP,
   CAULDRON_END_TAG,
   CAULDRON_ONGOING_TAG,
   DEFAULT_CAULDRON_LABELS,
@@ -32,6 +37,7 @@ function cauldronInput(over: Partial<Parameters<typeof planCauldronNotifications
     enabled: true,
     status: 'work',
     targetEndTime: NOW.getTime() + 25 * MIN,
+    remainingMs: 25 * MIN,
     now: NOW.getTime(),
     end: {
       sessionType: 'work' as const,
@@ -66,14 +72,66 @@ describe('planCauldronNotifications', () => {
     expect(ongoing.at).toBeUndefined();
     expect(ongoing.ongoing).toBe(true);
     expect(ongoing.body).toBe('Termina a las 12:25 (Clásico)');
+    // Corriendo se ofrece Pausar y Detener; el id de cada botón ES su canal IPC.
+    expect(ongoing.actionTypeId).toBe(CAULDRON_ACTION_RUNNING);
+    expect(ongoing.actions).toEqual([
+      { id: CAULDRON_ACTION_PAUSE, title: L.pause },
+      { id: CAULDRON_ACTION_STOP, title: L.stop },
+    ]);
+    // El aviso de fin NO lleva botones: cuando suena, el segmento terminó.
+    expect(end.actionTypeId).toBeUndefined();
+    expect(end.actions).toBeUndefined();
   });
 
-  it('gobierna siempre los dos tags: por eso pausar los CANCELA', () => {
-    const paused = planCauldronNotifications(cauldronInput({ status: 'work_paused' }));
-    expect(paused.schedule).toEqual([]);
+  it('pausar CONSERVA el aviso persistente: ahí vive el botón Reanudar', () => {
+    // Sin esto, «Pausar» se suicidaba: apretarlo borraba la única superficie
+    // desde la que se podía volver sin abrir la app.
+    const paused = planCauldronNotifications(
+      cauldronInput({ status: 'work_paused', remainingMs: 12 * MIN }),
+    );
+    expect(tags(paused)).toEqual([CAULDRON_ONGOING_TAG]);
     expect(paused.owned).toEqual([CAULDRON_END_TAG, CAULDRON_ONGOING_TAG]);
     // El persistente ya está publicado: cancelar la alarma no lo baja de la bandeja.
     expect(paused.ownedPersistent).toEqual([CAULDRON_ONGOING_TAG]);
+
+    const ongoing = paused.schedule[0];
+    expect(ongoing.ongoing).toBe(true);
+    // Sin `at`: el reloj está detenido, no hay nada que el SO deba disparar.
+    expect(ongoing.at).toBeUndefined();
+    expect(ongoing.title).toBe(`${L.focus} — ${L.paused}`);
+    expect(ongoing.body).toBe('Quedan 12 min (Clásico)');
+    expect(ongoing.actionTypeId).toBe(CAULDRON_ACTION_PAUSED);
+    expect(ongoing.actions).toEqual([
+      { id: CAULDRON_ACTION_RESUME, title: L.resume },
+      { id: CAULDRON_ACTION_STOP, title: L.stop },
+    ]);
+  });
+
+  it('un descanso pausado dice «Descanso», no «Enfoque»', () => {
+    const plan = planCauldronNotifications(
+      cauldronInput({
+        status: 'break_paused',
+        remainingMs: 5 * MIN,
+        end: { ...cauldronInput().end, sessionType: 'break' as const },
+      }),
+    );
+    expect(plan.schedule[0].title).toBe(`${L.shortBreak} — ${L.paused}`);
+  });
+
+  it('en pausa los minutos redondean hacia arriba: «Quedan 0 min» sería mentira', () => {
+    const plan = planCauldronNotifications(
+      cauldronInput({ status: 'work_paused', remainingMs: 40_000 }),
+    );
+    expect(plan.schedule[0].body).toBe('Quedan 1 min (Clásico)');
+  });
+
+  it('en pausa el fin vencido NO borra el aviso: ese guard es solo de la alarma', () => {
+    // `targetEndTime` quedó congelado al pausar y puede haber quedado atrás; el
+    // aviso pausado no programa nada, así que no hay alarma vencida que evitar.
+    const plan = planCauldronNotifications(
+      cauldronInput({ status: 'work_paused', remainingMs: 3 * MIN, targetEndTime: NOW.getTime() - 60 * MIN }),
+    );
+    expect(tags(plan)).toEqual([CAULDRON_ONGOING_TAG]);
   });
 
   it('en idle y en awaiting_next no queda nada armado', () => {
@@ -81,8 +139,11 @@ describe('planCauldronNotifications', () => {
     expect(planCauldronNotifications(cauldronInput({ status: 'awaiting_next' })).schedule).toEqual([]);
   });
 
-  it('con el módulo Caldero apagado en Ajustes no programa nada', () => {
+  it('con el módulo Caldero apagado en Ajustes no programa nada, ni siquiera en pausa', () => {
     expect(planCauldronNotifications(cauldronInput({ enabled: false })).schedule).toEqual([]);
+    expect(
+      planCauldronNotifications(cauldronInput({ enabled: false, status: 'work_paused' })).schedule,
+    ).toEqual([]);
   });
 
   it('un fin ya vencido NO se programa: el plugin lo dispararía en el acto', () => {

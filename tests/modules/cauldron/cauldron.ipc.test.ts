@@ -74,10 +74,14 @@ describe('cauldron preset operations', () => {
     expect(preset.break_minutes).toBe(7);
   });
 
-  it('upsertPreset rejects modification of default preset', () => {
+  // El handler ya NO rechaza un upsert sobre una receta de fábrica: acepta los
+  // dos flags de auto-inicio e ignora el resto. La invariante que sí se verifica
+  // contra los handlers reales vive en cauldron.autostart.test.ts («una receta
+  // de fábrica acepta cambiar el auto-inicio y NADA más»); acá solo queda la
+  // marca de la que todo depende.
+  it('the seeded recipes are flagged is_default', () => {
     const existing = db.prepare("SELECT is_default FROM cauldron_presets WHERE id = 'preset-classic'").get() as { is_default: number } | undefined;
     expect(existing?.is_default).toBe(1);
-    // In handler: if (existing?.is_default) throw new Error('Cannot modify default preset')
   });
 
   it('deletePreset soft-deletes custom preset', () => {

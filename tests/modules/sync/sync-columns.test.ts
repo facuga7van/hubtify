@@ -44,8 +44,10 @@ const LOCAL_ONLY: Record<string, string[]> = {
   habits: ['icon'],
   // GENERATED ALWAYS — SQLite computes it for every writer
   food_log: ['description_norm'],
-  // the running timer's recovery state, meaningful on this device only
-  cauldron_sessions: ['target_end_time'],
+  // the timer's recovery state, meaningful on this device only. paused_at_ms
+  // travels with target_end_time for the same reason: a pause on the phone must
+  // not make the laptop boot into a stopped clock for a session it never ran.
+  cauldron_sessions: ['target_end_time', 'paused_at_ms'],
   // copied from finance_income_sources by the v3 migration, never read since
   finance_recurring: ['is_variable'],
 };

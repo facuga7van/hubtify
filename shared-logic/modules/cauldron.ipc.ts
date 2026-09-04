@@ -266,6 +266,9 @@ function syncCauldronSchedule(): void {
       enabled: isModuleNotificationEnabled('cauldron'),
       status: timerState.status,
       targetEndTime,
+      // En pausa `targetEndTime` quedó congelado y no dice nada: lo único que
+      // sabe cuánto falta es `remainingMs`, que es lo que lee el aviso detenido.
+      remainingMs: timerState.remainingMs,
       now: Date.now(),
       end: endContext(),
       labels,
@@ -294,7 +297,8 @@ function onTimeUp(): void {
   // worker se congela en segundo plano y el tick puede llegar minutos tarde —
   // sin esto una sesión reanudada 40 min después quedaba registrada 40 min
   // después (spec §6).
-  const endedAt = new Date(targetEndTime).toISOString();
+  const expiredAt = targetEndTime;
+  const endedAt = new Date(expiredAt).toISOString();
   const wasWork = timerState.sessionType === 'work';
   const wasExtension = currentSessionIsExtension;
 
@@ -360,16 +364,26 @@ function onTimeUp(): void {
 
     // Should the next segment start by itself? An extension is a prolongation of
     // the segment you are already in, so it never auto-chains.
+    //
+    // La gracia se ancla a `expiredAt` (el vencimiento REAL), no a `Date.now()`.
+    // Medirla desde que el código CORRE la medía desde el tick, no desde que el
+    // segmento venció: en Android el Worker se congela y `onTimeUp` puede
+    // procesar el vencimiento media hora tarde, con lo cual la ventana para
+    // apretar «Esperá» se abría cuando ya no había nadie que la viera. Si la
+    // ventana ya pasó, no hay arranque automático: el segmento espera un
+    // «Continuar» explícito.
+    const graceDeadline = expiredAt + AUTO_START_GRACE_MS;
     const auto =
       !wasExtension &&
       !!activePreset &&
-      (wasWork ? activePreset.autoStartBreak : activePreset.autoStartWork);
+      (wasWork ? activePreset.autoStartBreak : activePreset.autoStartWork) &&
+      graceDeadline > Date.now();
 
     timerState = {
       ...timerState,
       status: 'awaiting_next',
       remainingMs: 0,
-      autoStartAt: auto ? Date.now() + AUTO_START_GRACE_MS : null,
+      autoStartAt: auto ? graceDeadline : null,
     };
     emit('cauldron:tick', getSnapshotState());
     if (auto) armAutoStart();
@@ -520,6 +534,29 @@ function startSegment(
   syncCauldronSchedule();
 }
 
+/**
+ * Propaga el auto-inicio recién guardado a la corrida EN CURSO.
+ *
+ * `activePreset` es una foto que se saca en `cauldron:start`, y `onTimeUp` lee
+ * de ahí —no de SQLite— si el próximo segmento arranca solo. Sin esto, destildar
+ * «que el descanso arranque solo» sobre la receta que está al fuego escribía en
+ * la base y no cambiaba absolutamente nada: el siguiente descanso arrancaba solo
+ * igual. Y es lo PRIMERO que se prueba, porque el sentido del cambio que abrió
+ * las recetas de fábrica era justamente volver alcanzable esa perilla.
+ *
+ * Solo el auto-inicio, a propósito: las duraciones y los ciclos definen los
+ * segmentos que la corrida ya tiene planificados, y cambiarlos a mitad de camino
+ * movería el piso debajo del reloj que está corriendo.
+ */
+function refreshActiveAutoStart(presetId: string, autoBreak: number, autoWork: number): void {
+  if (!activePreset || timerState.presetId !== presetId) return;
+  activePreset = {
+    ...activePreset,
+    autoStartBreak: autoBreak !== 0,
+    autoStartWork: autoWork !== 0,
+  };
+}
+
 // ─── Startup Cleanup ────────────────────────────────────────
 
 /**
@@ -540,10 +577,18 @@ function cleanupOrphanedSessions(): void {
       // target_end_time — exactamente el perfil que esta limpieza borra. Sin esta
       // condición, el estante se vaciaba de cicatrices en el próximo arranque, y
       // el estante NUNCA se vacía: ese es todo el mecanismo.
+      //
+      // Una fila PAUSADA se mide por su propia antigüedad, no por el fin
+      // congelado: el reloj está detenido, así que `target_end_time` quedó en el
+      // pasado desde el primer minuto y este barrido la borraba entera. Ese era
+      // el segundo filo del mismo bug — la pausa no llegaba viva ni al arranque.
       `UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?
        WHERE completed = 0 AND deleted_at IS NULL AND abandoned = 0
-         AND (target_end_time IS NULL OR target_end_time < ?)`,
-    ).run(now, now, staleBefore);
+         AND CASE WHEN paused_at_ms IS NOT NULL
+                  THEN paused_at_ms < ?
+                  ELSE (target_end_time IS NULL OR target_end_time < ?)
+             END`,
+    ).run(now, now, staleBefore, staleBefore);
   } catch {
     // Non-critical — silently ignore
   }
@@ -565,6 +610,11 @@ function readInterruptedSession(): {
      LEFT JOIN cauldron_presets p ON p.id = s.preset_id
      WHERE s.completed = 0 AND s.deleted_at IS NULL AND s.abandoned = 0
        AND s.target_end_time IS NOT NULL
+       -- Una sesión PAUSADA no es una interrumpida: el reloj se detuvo a
+       -- propósito y restorePausedSession la devuelve como pausa, no como una
+       -- oferta de «¿retomamos?». Antes salía sola por el target_end_time = NULL
+       -- que ponía la pausa; ahora ese fin se conserva y hay que excluirla acá.
+       AND s.paused_at_ms IS NULL
      ORDER BY s.started_at DESC LIMIT 1`,
   ).get() as Record<string, unknown> | undefined;
   if (!row) return null;
@@ -583,6 +633,111 @@ function readInterruptedSession(): {
     totalMs: (row.durationMinutes as number) * 60 * 1000,
     taskId: (row.taskId as string) ?? null,
   };
+}
+
+/**
+ * Reconstruye el reloj DETENIDO que quedó de la corrida anterior.
+ *
+ * El caso real es Android: se pausa a la noche, el sistema recicla el proceso, y
+ * a la mañana el usuario aprieta «Reanudar» en el aviso persistente —que sigue
+ * publicado, porque una notificación sobrevive a que la app deje de existir—.
+ * Sin esto el arranque en frío veía `idle`: el plan vacío BAJABA el aviso y el
+ * `cauldron:resume` que llegaba encolado moría con «Timer not paused». Botón
+ * apretado, aviso desaparecido, sesión perdida, cero señales. Y por el camino
+ * largo tampoco se recuperaba: una pausa nunca entró a la oferta de «retomar».
+ *
+ * Corre DESPUÉS de `cleanupOrphanedSessions` (que ya barrió las pausas viejas,
+ * así el `deleted_at IS NULL` de acá alcanza como filtro de antigüedad) y ANTES
+ * del `syncCauldronSchedule()` de arranque, que con el estado ya reconstruido
+ * vuelve a publicar el aviso pausado en vez de retirarlo.
+ */
+function restorePausedSession(): void {
+  try {
+    const db = getDb();
+    const row = db.prepare(
+      `SELECT s.id, s.preset_id AS presetId, s.type, s.duration_minutes AS durationMinutes,
+              s.target_end_time AS targetEnd, s.paused_at_ms AS pausedAtMs,
+              s.is_extension AS isExtension, s.task_id AS taskId
+       FROM cauldron_sessions s
+       WHERE s.completed = 0 AND s.deleted_at IS NULL AND s.abandoned = 0
+         AND s.paused_at_ms IS NOT NULL AND s.target_end_time IS NOT NULL
+       ORDER BY s.paused_at_ms DESC LIMIT 1`,
+    ).get() as Record<string, unknown> | undefined;
+    if (!row) return;
+
+    const pausedAtMs = row.pausedAtMs as number;
+    // Misma ventana que la oferta de «retomar»: una pausa de anteayer no se
+    // resucita. La comprobación se repite acá porque el barrido de arranque se
+    // traga sus propios errores y puede no haber corrido.
+    if (pausedAtMs < Date.now() - INTERRUPTED_SESSION_GRACE_MS) return;
+
+    const remainingMs = Math.max(0, (row.targetEnd as number) - pausedAtMs);
+    // Una pausa sin tiempo por delante no es una sesión: es un segmento que
+    // venció con el reloj detenido. Reanudarla terminaría en el acto.
+    if (remainingMs <= 0) return;
+
+    const presetId = (row.presetId as string) ?? null;
+    const preset = presetId
+      ? (db
+          .prepare(
+            `SELECT id, name, work_minutes AS workMinutes, break_minutes AS breakMinutes,
+                    long_break_minutes AS longBreakMinutes, cycles_before_long AS cyclesBeforeLong,
+                    extension_minutes AS extensionMinutes,
+                    auto_start_break AS autoStartBreak, auto_start_work AS autoStartWork
+             FROM cauldron_presets WHERE id = ? AND deleted_at IS NULL`,
+          )
+          .get(presetId) as CauldronPresetEx | undefined)
+      : undefined;
+
+    // Sin la receta (la borraron acá, o la sesión llegó por sync desde un
+    // dispositivo cuya receta este nunca vio) la pausa se restaura IGUAL: poder
+    // reanudar y terminar ESTE segmento es exactamente lo que el botón prometió.
+    // Lo único que no habrá es un segmento siguiente que encadenar.
+    activePreset = preset
+      ? {
+          workMinutes: preset.workMinutes,
+          breakMinutes: preset.breakMinutes,
+          longBreakMinutes: preset.longBreakMinutes,
+          cyclesBeforeLong: preset.cyclesBeforeLong,
+          extensionMinutes: preset.extensionMinutes ?? 5,
+          autoStartBreak: (preset.autoStartBreak ?? 1) !== 0,
+          autoStartWork: (preset.autoStartWork ?? 0) !== 0,
+        }
+      : null;
+
+    const type = row.type as 'work' | 'break' | 'long_break';
+    currentSessionDbId = row.id as string;
+    currentSessionIsExtension = (row.isExtension as number) === 1;
+    lastCompletedWorkSessionId = null;
+    // Con el reloj detenido nadie lo lee (`cauldron:resume` lo recalcula), pero
+    // dejarlo en 0 sería una hora de pared de 1970 esperando a que algo la use.
+    targetEndTime = Date.now() + remainingMs;
+
+    timerState = withTask(
+      {
+        ...IDLE_STATE,
+        status: type === 'work' ? 'work_paused' : 'break_paused',
+        remainingMs,
+        totalMs: (row.durationMinutes as number) * 60 * 1000,
+        // El ciclo exacto no se persiste — mismo criterio que
+        // `cauldron:resumeInterruptedSession`: lo que importa es el segmento que
+        // el usuario dejó a medias, no en qué número de vuelta iba.
+        currentCycle: 1,
+        totalCycles: preset?.cyclesBeforeLong ?? 1,
+        sessionType: type,
+        presetId,
+        presetName: preset?.name ?? null,
+        extensionMinutes: preset?.extensionMinutes ?? 5,
+        autoStartAt: null,
+        round: 1,
+      },
+      (row.taskId as string) ?? null,
+    );
+  } catch {
+    // El binding registra los handlers ANTES de correr las migraciones, así que
+    // en una instalación nueva la tabla todavía no existe. No hay nada que
+    // reconstruir en ese caso, y el próximo arranque sí encuentra el esquema.
+  }
 }
 
 // ─── IPC Handlers ──────────────────────────────────────────
@@ -609,7 +764,18 @@ export function registerCauldronIpcHandlers(): void {
         return;
       }
       if (timerState.status === 'awaiting_next' && timerState.autoStartAt !== null && !autoStartInterval) {
-        armAutoStart();
+        // Misma regla que en `onTimeUp`, para el caso «me congelé DURANTE la
+        // cuenta regresiva»: rearmar el interval a secas disparaba el segmento
+        // en el primer tick, porque `autoStartAt` ya había vencido con el
+        // teléfono en el bolsillo. Los 5 s existen para poder decir «Esperá»; si
+        // nadie estuvo presente para verlos, arrancar igual es un auto-inicio
+        // silencioso. Queda en `awaiting_next` esperando un «Continuar».
+        if (timerState.autoStartAt <= Date.now()) {
+          clearAutoStart();
+          emit('cauldron:tick', getSnapshotState());
+        } else {
+          armAutoStart();
+        }
       }
       // Volver del segundo plano es el momento de reconciliar: puede que el SO
       // haya disparado la alarma, que el usuario la haya descartado, o que un
@@ -618,9 +784,16 @@ export function registerCauldronIpcHandlers(): void {
     },
   });
 
+  // Si la app murió con el reloj DETENIDO, la pausa se reconstruye desde la
+  // fila: el aviso persistente sigue publicado con su botón «Reanudar» y ese
+  // botón tiene que seguir significando algo. Va después del barrido (que ya se
+  // llevó las pausas vencidas) y antes del plan de abajo.
+  restorePausedSession();
+
   // Arranque en frío: si la app murió con una poción al fuego, el aviso
   // persistente sigue en la bandeja. El plan de un temporizador en `idle` no
-  // programa nada, y eso es exactamente lo que lo retira.
+  // programa nada, y eso es exactamente lo que lo retira — mientras que con una
+  // pausa restaurada arriba, lo que hace es volver a publicarlo tal cual estaba.
   syncCauldronSchedule();
 
   // ─── Preset CRUD ───
@@ -664,7 +837,19 @@ export function registerCauldronIpcHandlers(): void {
           .prepare('SELECT is_default FROM cauldron_presets WHERE id = ?')
           .get(id) as { is_default: number } | undefined;
         if (existing?.is_default) {
-          throw new Error('Cannot modify default preset');
+          // Excepción acotada, y a propósito: las duraciones y los ciclos de una
+          // receta de fábrica SON la receta —su contrato— y siguen intactos, se
+          // mande lo que se mande. Pero que el descanso (o el enfoque) arranque
+          // solo no es parte del contrato: es preferencia del usuario, y hasta
+          // acá la única forma de tocarla era descubrir que había que duplicar
+          // la receta. La perilla existía y estaba escondida detrás de un
+          // «Cannot modify default preset». El resto del payload se ignora.
+          db.prepare(
+            `UPDATE cauldron_presets SET auto_start_break = ?, auto_start_work = ?, updated_at = ?
+             WHERE id = ? AND deleted_at IS NULL`,
+          ).run(autoBreak, autoWork, now, id);
+          refreshActiveAutoStart(id, autoBreak, autoWork);
+          return id;
         }
         db.prepare(
           `UPDATE cauldron_presets SET name = ?, work_minutes = ?, break_minutes = ?,
@@ -683,6 +868,9 @@ export function registerCauldronIpcHandlers(): void {
           now,
           id,
         );
+        // El problema preexiste para las recetas propias: editar la que está al
+        // fuego tampoco movía nada hasta el próximo `cauldron:start`.
+        refreshActiveAutoStart(id, autoBreak, autoWork);
       } else {
         db.prepare(
           `INSERT INTO cauldron_presets (id, name, work_minutes, break_minutes, long_break_minutes, cycles_before_long, extension_minutes, auto_start_break, auto_start_work, is_default, created_at, updated_at)
@@ -845,19 +1033,28 @@ export function registerCauldronIpcHandlers(): void {
     if (timerState.status !== 'work' && timerState.status !== 'on_break') {
       throw new Error('Timer not running');
     }
-    timerState.remainingMs = Math.max(0, targetEndTime - Date.now());
+    const pausedAt = Date.now();
+    timerState.remainingMs = Math.max(0, targetEndTime - pausedAt);
     timerState.status =
       timerState.status === 'work' ? 'work_paused' : 'break_paused';
     clearTimer();
-    // A paused session has no wall-clock deadline; clearing target_end_time keeps
-    // it out of the "resume this?" offer until it is resumed again.
+    // La pausa se PERSISTE, no se borra. Antes esto ponía `target_end_time` en
+    // NULL y la fila quedaba indistinguible de un huérfano: en Android el aviso
+    // persistente con «Reanudar» sobrevive a que el sistema mate el proceso, y
+    // en el arranque en frío siguiente el barrido borraba la fila y el
+    // `cauldron:resume` encolado moría con «Timer not paused» — la sesión se
+    // perdía en silencio con el usuario mirando el botón que acababa de apretar.
+    // Guardar el instante de la pausa (y conservar el fin) es lo que le permite
+    // a `restorePausedSession` reconstruir el reloj detenido. Sigue fuera de la
+    // oferta de «retomar»: `readInterruptedSession` filtra por paused_at_ms.
     if (currentSessionDbId) {
       const nowIso = new Date().toISOString();
-      getDb().prepare('UPDATE cauldron_sessions SET target_end_time = NULL, updated_at = ? WHERE id = ?')
-        .run(nowIso, currentSessionDbId);
+      getDb().prepare('UPDATE cauldron_sessions SET paused_at_ms = ?, updated_at = ? WHERE id = ?')
+        .run(pausedAt, nowIso, currentSessionDbId);
     }
     // Pausar tiene que RETIRAR la alarma: si no, el SO la dispararía igual a la
-    // hora vieja, con la app cerrada y el reloj detenido.
+    // hora vieja, con la app cerrada y el reloj detenido. El aviso persistente,
+    // en cambio, se REESCRIBE (no se baja): ahí vive el botón «Reanudar».
     syncCauldronSchedule();
     emit('cauldron:tick', getSnapshotState());
     return getSnapshotState();
@@ -875,7 +1072,9 @@ export function registerCauldronIpcHandlers(): void {
       timerState.status === 'work_paused' ? 'work' : 'on_break';
     if (currentSessionDbId) {
       const nowIso = new Date().toISOString();
-      getDb().prepare('UPDATE cauldron_sessions SET target_end_time = ?, updated_at = ? WHERE id = ?')
+      // `paused_at_ms = NULL` vuelve a poner la fila en «el reloj corre»: si
+      // quedara puesto, el próximo arranque en frío la reconstruiría como pausa.
+      getDb().prepare('UPDATE cauldron_sessions SET target_end_time = ?, paused_at_ms = NULL, updated_at = ? WHERE id = ?')
         .run(targetEndTime, nowIso, currentSessionDbId);
     }
     timerInterval = setInterval(tick, 1000);
@@ -891,8 +1090,11 @@ export function registerCauldronIpcHandlers(): void {
     if (currentSessionDbId) {
       const db = getDb();
       const now = new Date().toISOString();
+      // `paused_at_ms = NULL` acompaña siempre a `target_end_time = NULL`: se
+      // puede saltear un segmento con el reloj detenido, y la marca de pausa
+      // huérfana haría que el próximo arranque en frío resucitara esta fila.
       db.prepare(
-        'UPDATE cauldron_sessions SET updated_at = ?, target_end_time = NULL WHERE id = ?',
+        'UPDATE cauldron_sessions SET updated_at = ?, target_end_time = NULL, paused_at_ms = NULL WHERE id = ?',
       ).run(now, currentSessionDbId);
       currentSessionDbId = null;
     }
@@ -1030,13 +1232,14 @@ export function registerCauldronIpcHandlers(): void {
           : now;
         db.prepare(
           `UPDATE cauldron_sessions
-           SET abandoned = 1, completed_at = ?, updated_at = ?, target_end_time = NULL
+           SET abandoned = 1, completed_at = ?, updated_at = ?, target_end_time = NULL,
+               paused_at_ms = NULL
            WHERE id = ?`,
         ).run(stoppedAt, now, currentSessionDbId);
       } else {
         // Arranque en falso (o un descanso cortado): se descarta sin dejar rastro.
         db.prepare(
-          'UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?, target_end_time = NULL WHERE id = ?',
+          'UPDATE cauldron_sessions SET updated_at = ?, deleted_at = ?, target_end_time = NULL, paused_at_ms = NULL WHERE id = ?',
         ).run(now, now, currentSessionDbId);
       }
       currentSessionDbId = null;
@@ -1084,7 +1287,7 @@ export function registerCauldronIpcHandlers(): void {
    * nunca se vacía. El conteo de pomodoros (`cauldron:getStats`) sigue mirando
    * solo `completed = 1`: un frasco roto se ve, no se cuenta.
    */
-  ipcHandle('cauldron:getSessions', (_e, offset = 0, limit = 20) => {
+  ipcHandle('cauldron:getSessions', (_e, offset = 0, limit = 15) => {
     const db = getDb();
     // El JOIN a quests es condicional: en una base donde el módulo todavía no
     // migró, `tasks` no existe y el JOIN tiraría en vez de devolver vacío.

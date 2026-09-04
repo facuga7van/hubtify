@@ -26,9 +26,14 @@ vi.mock('../../../shared-logic/modules/notifications.ipc', () => ({
 const { getHandler, runResume, runSuspend } = await import('../../../shared-logic/registry');
 const { setEventSink } = await import('../../../shared-logic/events');
 const { setPlatform } = await import('../../../shared-logic/platform');
-const { CAULDRON_END_TAG, CAULDRON_ONGOING_TAG } = await import(
-  '../../../shared-logic/modules/notification-schedule'
-);
+const {
+  CAULDRON_ACTION_PAUSED,
+  CAULDRON_ACTION_RESUME,
+  CAULDRON_ACTION_RUNNING,
+  CAULDRON_ACTION_STOP,
+  CAULDRON_END_TAG,
+  CAULDRON_ONGOING_TAG,
+} = await import('../../../shared-logic/modules/notification-schedule');
 const { registerCauldronIpcHandlers } = await import('../../../shared-logic/modules/cauldron.ipc');
 
 const plans: NotificationPlan[] = [];
@@ -120,11 +125,24 @@ describe('el Caldero deja la alarma en manos del sistema', () => {
     expect(lastPlan().owned).toEqual([CAULDRON_END_TAG, CAULDRON_ONGOING_TAG]);
   });
 
-  it('pausar cancela: sin esto la alarma sonaría con el reloj detenido', async () => {
+  it('pausar retira la ALARMA pero deja el aviso: ahí vive el botón Reanudar', async () => {
     const presetId = await makePreset();
     await invoke('cauldron:start', presetId);
+    // El aviso corriendo ofrece Pausar; apretarlo no puede dejar el ámbito vacío,
+    // o el botón se suicida y no queda superficie para volver sin abrir la app.
+    expect(lastPlan().schedule.find((n) => n.tag === CAULDRON_ONGOING_TAG)?.actionTypeId)
+      .toBe(CAULDRON_ACTION_RUNNING);
+
+    vi.advanceTimersByTime(3 * MIN);
     await invoke('cauldron:pause');
-    expect(lastPlan().schedule).toEqual([]);
+
+    expect(scheduledTags()).toEqual([CAULDRON_ONGOING_TAG]);
+    expect(endAt()).toBeUndefined(); // la alarma sí se fue
+    const ongoing = lastPlan().schedule[0];
+    expect(ongoing.ongoing).toBe(true);
+    expect(ongoing.actionTypeId).toBe(CAULDRON_ACTION_PAUSED);
+    expect(ongoing.actions?.map((a) => a.id)).toEqual([CAULDRON_ACTION_RESUME, CAULDRON_ACTION_STOP]);
+    expect(ongoing.body).toContain('22'); // «Quedan 22 min»
   });
 
   it('reanudar reprograma con el nuevo fin, no con el viejo', async () => {

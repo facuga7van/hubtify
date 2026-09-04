@@ -139,6 +139,13 @@ export function useCauldronLabels() {
       // Cuerpo del aviso persistente de Android: la alarma lleva el texto
       // adentro porque cuando el SO la dispara no corre nada nuestro.
       endsAt: t('cauldron.notify.endsAt', 'Termina a las'),
+      paused: t('cauldron.notify.paused', 'Pausado'),
+      remaining: t('cauldron.notify.remaining', 'Quedan'),
+      // Los botones del aviso persistente. Viajan traducidos dentro del plan
+      // porque el host los registra en el SO y no tiene acceso al i18n.
+      pause: t('cauldron.notify.pause', 'Pausar'),
+      resume: t('cauldron.notify.resume', 'Reanudar'),
+      stop: t('cauldron.notify.stop', 'Detener'),
     }).catch(() => { /* main process not ready — labels keep their defaults */ });
   }, [t, i18n.language]);
 }

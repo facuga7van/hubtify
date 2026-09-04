@@ -295,4 +295,133 @@ describe('auto-start preset flags', () => {
     expect(byId.get('preset-classic')?.autoStartBreak).toBe(1);
     expect(byId.get('preset-classic')?.autoStartWork).toBe(0);
   });
+
+  /**
+   * Una receta de fábrica ya no rechaza TODO upsert.
+   *
+   * Que el descanso arranque solo o no es preferencia del usuario, y la única
+   * forma de tocarla era descubrir que primero había que duplicar la receta: la
+   * perilla existía, escondida detrás de un trámite. Las duraciones, los ciclos
+   * y el nombre SÍ son el contrato de la receta y siguen intactos, se mande lo
+   * que se mande en el payload.
+   */
+  it('una receta de fábrica acepta cambiar el auto-inicio y NADA más', async () => {
+    const read = async () =>
+      (await invoke<Array<Record<string, unknown>>>('cauldron:getPresets'))
+        .find((p) => p.id === 'preset-classic')!;
+
+    const before = await read();
+    expect(before.isDefault).toBe(1);
+    expect(before.autoStartBreak).toBe(1);
+    expect(before.autoStartWork).toBe(0);
+
+    await invoke('cauldron:upsertPreset', {
+      id: 'preset-classic',
+      name: 'Robada',
+      workMinutes: 90,
+      breakMinutes: 30,
+      longBreakMinutes: 60,
+      cyclesBeforeLong: 8,
+      extensionMinutes: 45,
+      autoStartBreak: false,
+      autoStartWork: true,
+    });
+
+    const after = await read();
+    // Lo único que se movió:
+    expect(after.autoStartBreak).toBe(0);
+    expect(after.autoStartWork).toBe(1);
+    // Todo lo demás conserva su valor de fábrica.
+    expect(after.name).toBe(before.name);
+    expect(after.workMinutes).toBe(before.workMinutes);
+    expect(after.breakMinutes).toBe(before.breakMinutes);
+    expect(after.longBreakMinutes).toBe(before.longBreakMinutes);
+    expect(after.cyclesBeforeLong).toBe(before.cyclesBeforeLong);
+    expect(after.extensionMinutes).toBe(before.extensionMinutes);
+    expect(after.isDefault).toBe(1);
+  });
+
+  it('borrar una receta de fábrica sigue prohibido', async () => {
+    await expect(invoke('cauldron:deletePreset', 'preset-classic')).rejects.toThrow(
+      /Cannot delete default preset/,
+    );
+  });
+});
+
+// ── 4. Cambiar el auto-inicio de la receta EN CURSO ───────────
+
+/**
+ * `activePreset` es una FOTO que se saca en `cauldron:start`, y `onTimeUp` lee de
+ * ahí —no de SQLite— si el próximo segmento arranca solo. Guardar la receta
+ * escribía únicamente en la base: se destildaba «que el descanso arranque solo»
+ * a mitad del enfoque, se guardaba, y el descanso arrancaba solo igual.
+ *
+ * Es lo primero que se prueba, además, porque el sentido de haber abierto las
+ * recetas de fábrica era justamente volver alcanzable esa perilla.
+ */
+describe('el auto-inicio de la receta que está al fuego', () => {
+  /** El payload completo que exige el UPDATE de una receta propia. */
+  const edit = (id: string, flags: { autoStartBreak: boolean; autoStartWork: boolean }) =>
+    invoke('cauldron:upsertPreset', {
+      id,
+      name: 'T-editada',
+      workMinutes: 1,
+      breakMinutes: 1,
+      longBreakMinutes: 1,
+      cyclesBeforeLong: 2,
+      extensionMinutes: 5,
+      ...flags,
+    });
+
+  it('apagarlo sobre una receta propia frena el segmento siguiente', async () => {
+    const id = await makePreset({ autoStartBreak: true, autoStartWork: false });
+    await invoke('cauldron:start', id);
+
+    await edit(id, { autoStartBreak: false, autoStartWork: false });
+
+    vi.advanceTimersByTime(1 * MIN);
+    const parked = await state();
+    expect(parked.status).toBe('awaiting_next');
+    expect(parked.autoStartAt).toBeNull();
+
+    vi.advanceTimersByTime(10 * GRACE);
+    expect((await state()).status).toBe('awaiting_next');
+  });
+
+  it('encenderlo sobre una receta propia alcanza a la corrida en curso', async () => {
+    const id = await makePreset({ autoStartBreak: false, autoStartWork: false });
+    await invoke('cauldron:start', id);
+
+    await edit(id, { autoStartBreak: true, autoStartWork: false });
+
+    vi.advanceTimersByTime(1 * MIN);
+    expect((await state()).autoStartAt).not.toBeNull();
+    vi.advanceTimersByTime(GRACE);
+    expect((await state()).status).toBe('on_break');
+  });
+
+  it('apagarlo sobre la receta de FÁBRICA en curso también surte efecto', async () => {
+    // El escenario del reporte: arranca un descanso solo, el usuario abre
+    // «Clásica» al toque y destilda la perilla. Sin esto, el descanso siguiente
+    // arrancaba solo igual — la única perilla editable de una receta de fábrica
+    // no hacía nada sobre la corrida en la que se la editaba.
+    await invoke('cauldron:start', 'preset-classic');
+    await invoke('cauldron:upsertPreset', { id: 'preset-classic', autoStartBreak: false });
+
+    vi.advanceTimersByTime(25 * MIN);
+    const parked = await state();
+    expect(parked.status).toBe('awaiting_next');
+    expect(parked.autoStartAt).toBeNull();
+  });
+
+  it('editar OTRA receta no toca la corrida', async () => {
+    const running = await makePreset({ autoStartBreak: true, autoStartWork: false });
+    const other = await makePreset({ autoStartBreak: true, autoStartWork: false });
+    await invoke('cauldron:start', running);
+
+    await edit(other, { autoStartBreak: false, autoStartWork: false });
+
+    vi.advanceTimersByTime(1 * MIN + GRACE);
+    expect((await state()).status).toBe('on_break');
+  });
 });

@@ -234,7 +234,7 @@ export default function CauldronPage() {
   }).catch(noteFailure('cauldron:getState')), [noteFailure]);
 
   /** Los frascos del estante, paginados hacia atrás. Nunca se vacía. */
-  const loadSessions = useCallback((offset = 0) => window.api.cauldronGetSessions(offset, 20)
+  const loadSessions = useCallback((offset = 0) => window.api.cauldronGetSessions(offset, 15)
     .then((result) => {
       const page = result.sessions as unknown as CauldronShelfSession[];
       if (offset === 0) {
@@ -711,6 +711,15 @@ export default function CauldronPage() {
     }
   });
 
+  /**
+   * Una receta de fábrica SÍ se abre para editar, pero lo único suyo es el
+   * auto-inicio: las duraciones y los ciclos son el contrato de la receta y el
+   * backend los ignora aunque viajen en el payload. Deshabilitar los campos dice
+   * eso ANTES, en vez de dejar que el usuario escriba 30, guarde, y descubra que
+   * la receta sigue en 25.
+   */
+  const lockedDefault = !isCreating && !!editingPreset?.isDefault;
+
   /* -- Weekly chart data: rebuilt inline it was a new array on every 1 s tick -- */
   const weeklyChartData = useMemo(
     () => weeklyFocus.map((d) => ({ label: d.label, value: d.value, status: 'ok' as const })),
@@ -875,23 +884,30 @@ export default function CauldronPage() {
         <button className="cauldron-preset-pill add" onClick={handleCreatePreset}>
           + {t('cauldron.presets.createRecipe', 'New Recipe')}
         </button>
+        {/* «Editar» está SIEMPRE, también en las recetas de fábrica: ahí abre el
+            modal con las duraciones bloqueadas y los toggles de auto-inicio
+            vivos. Antes el único botón era «Duplicar y editar», así que apagar
+            el arranque automático del descanso exigía descubrir que primero
+            había que clonar la receta — una perilla escondida detrás de un
+            trámite. «Duplicar» sigue al lado, para lo que sí sigue protegido. */}
         {selectedPreset && (
-          selectedPreset.isDefault ? (
-            <button
-              className="cauldron-edit-btn"
-              onClick={() => handleDuplicatePreset(selectedPreset)}
-              title={t('cauldron.presets.duplicateHelp', 'Las recetas por defecto no se editan: esto crea una copia tuya que sí podés ajustar.')}
-            >
-              {t('cauldron.presets.duplicate', 'Duplicar y editar')}
-            </button>
-          ) : (
+          <>
             <button
               className="cauldron-edit-btn"
               onClick={() => handleEditPreset(selectedPreset)}
             >
               {t('cauldron.presets.editRecipe', 'Edit Recipe')}
             </button>
-          )
+            {selectedPreset.isDefault && (
+              <button
+                className="cauldron-edit-btn"
+                onClick={() => handleDuplicatePreset(selectedPreset)}
+                title={t('cauldron.presets.duplicateHelp', 'Las duraciones de las recetas de fábrica no se editan: esto crea una copia tuya que sí podés ajustar entera.')}
+              >
+                {t('cauldron.presets.duplicate', 'Duplicar y editar')}
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -1371,17 +1387,37 @@ export default function CauldronPage() {
               </button>
             </div>
             <div className="cauldron-form-grid">
+              {lockedDefault && (
+                <p className="full cauldron-autostart-hint">
+                  {t(
+                    'cauldron.presets.defaultLocked',
+                    'Las duraciones de las recetas de fábrica no se editan. Duplicala si querés cambiarlas.',
+                  )}
+                </p>
+              )}
               <div className="full">
                 <label className="cauldron-kv-key">
                   {t('cauldron.presets.name', 'Brew Name')}
                 </label>
                 <input
                   className="cauldron-input"
-                  value={editingPreset.name || ''}
+                  /* Las recetas de fábrica se siembran con el nombre en inglés
+                     («Classic») y la píldora las muestra traducidas. Atar el
+                     campo al nombre crudo hacía que un usuario en español
+                     apretara «Editar» sobre «Clásico» y leyera «Classic» en un
+                     campo deshabilitado: la misma receta con dos nombres en la
+                     misma pantalla. Es SOLO lo que se muestra — el campo está
+                     bloqueado y nada de esto llega a la base. */
+                  value={
+                    lockedDefault
+                      ? presetLabel(editingPreset as CauldronPreset)
+                      : editingPreset.name || ''
+                  }
                   onChange={(e) =>
                     setEditingPreset({ ...editingPreset, name: e.target.value })
                   }
                   maxLength={32}
+                  disabled={lockedDefault}
                   autoFocus
                 />
               </div>
@@ -1401,6 +1437,7 @@ export default function CauldronPage() {
                       workMinutes: Math.max(1, parseInt(e.target.value, 10) || 1),
                     })
                   }
+                  disabled={lockedDefault}
                 />
               </div>
               <div>
@@ -1419,6 +1456,7 @@ export default function CauldronPage() {
                       breakMinutes: Math.max(1, parseInt(e.target.value, 10) || 1),
                     })
                   }
+                  disabled={lockedDefault}
                 />
               </div>
               <div>
@@ -1437,6 +1475,7 @@ export default function CauldronPage() {
                       longBreakMinutes: Math.max(1, parseInt(e.target.value, 10) || 1),
                     })
                   }
+                  disabled={lockedDefault}
                 />
               </div>
               <div>
@@ -1452,6 +1491,7 @@ export default function CauldronPage() {
                       cyclesBeforeLong: parseInt(e.target.value, 10),
                     })
                   }
+                  disabled={lockedDefault}
                 >
                   {[2, 3, 4, 5, 6, 8].map((n) => (
                     <option key={n} value={n}>
@@ -1476,6 +1516,7 @@ export default function CauldronPage() {
                       extensionMinutes: Math.max(1, parseInt(e.target.value, 10) || 1),
                     })
                   }
+                  disabled={lockedDefault}
                 />
               </div>
               {/* Auto-chaining: the whole point of the technique is that the rest

@@ -93,8 +93,8 @@ function stub(opts: StubOpts = {}) {
     cauldronGetStats: () => Promise.resolve({ today: 6, week: 23, total: 481, streak: 12, longestStreak: 31, totalMinutes: 12_025 }),
     cauldronGetState: () => Promise.resolve(opts.state ?? IDLE_STATE),
     cauldronGetSessions: (offset: number) => Promise.resolve({
-      sessions: (opts.sessions ?? SESSIONS).slice(Number(offset) || 0, (Number(offset) || 0) + 20),
-      hasMore: (opts.sessions ?? SESSIONS).length > 20,
+      sessions: (opts.sessions ?? SESSIONS).slice(Number(offset) || 0, (Number(offset) || 0) + 15),
+      hasMore: (opts.sessions ?? SESSIONS).length > 15,
     }),
     cauldronGetWeeklyFocusTime: () => Promise.resolve([
       { label: 'Lun', value: 125 }, { label: 'Mar', value: 75 }, { label: 'Mié', value: 200 },

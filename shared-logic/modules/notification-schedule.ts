@@ -42,6 +42,25 @@ export const CAULDRON_END_TAG = 'cauldron:end';
 export const CAULDRON_ONGOING_TAG = 'cauldron:ongoing';
 
 /**
+ * Los dos juegos de botones del aviso persistente. Son identidades DISTINTAS
+ * (no un solo tipo que se re-registra) porque el aviso corriendo y el pausado
+ * conviven en el tiempo: el usuario aprieta «Pausar» y el mismo id de
+ * notificación se reemplaza por el pausado. Un solo actionTypeId obligaría a
+ * re-registrar en cada transición y a confiar en que el sistema ya vio la
+ * versión nueva antes de publicar.
+ */
+export const CAULDRON_ACTION_RUNNING = 'cauldron-running';
+export const CAULDRON_ACTION_PAUSED = 'cauldron-paused';
+/**
+ * El id de cada botón ES el canal IPC que dispara. No hay tabla de mapeo que se
+ * pueda desincronizar: el listener (src/mobile/install-api.ts) valida contra su
+ * lista blanca y llama al canal con ese mismo string.
+ */
+export const CAULDRON_ACTION_PAUSE = 'cauldron:pause';
+export const CAULDRON_ACTION_RESUME = 'cauldron:resume';
+export const CAULDRON_ACTION_STOP = 'cauldron:stop';
+
+/**
  * Cuántos días de recordatorios de hábitos se dejan armados por adelantado.
  * No es un lujo: si la app no se abre en tres días, esos tres recordatorios
  * tienen que salir igual. `computeHabits` sabe contestar "¿este hábito querría
@@ -76,6 +95,15 @@ export interface CauldronLabels {
   minutesShort: string;    // «min»
   /** Cuerpo del aviso persistente: «Termina a las 15:42». */
   endsAt: string;
+  /** Título del aviso persistente con el reloj detenido: «Enfoque — Pausado». */
+  paused: string;
+  /** Cuerpo del mismo: «Quedan 12 min». */
+  remaining: string;
+  // Los tres botones del aviso persistente. Van traducidos DENTRO del plan: el
+  // host los registra tal cual llegan, porque el idioma lo sabe el renderer.
+  pause: string;
+  resume: string;
+  stop: string;
 }
 
 export const DEFAULT_CAULDRON_LABELS: CauldronLabels = {
@@ -90,6 +118,11 @@ export const DEFAULT_CAULDRON_LABELS: CauldronLabels = {
   next: 'Siguiente',
   minutesShort: 'min',
   endsAt: 'Termina a las',
+  paused: 'Pausado',
+  remaining: 'Quedan',
+  pause: 'Pausar',
+  resume: 'Reanudar',
+  stop: 'Detener',
 };
 
 export type CauldronSegmentType = 'work' | 'break' | 'long_break';
@@ -141,10 +174,12 @@ function clockTime(epochMs: number): string {
 export interface CauldronPlanInput {
   /** El toggle de Ajustes → Notificaciones → Caldero. */
   enabled: boolean;
-  /** `work` / `on_break` son los únicos estados con reloj corriendo. */
+  /** `work` / `on_break` corren; `work_paused` / `break_paused` están detenidos. */
   status: string;
-  /** Reloj de pared del fin del segmento. */
+  /** Reloj de pared del fin del segmento. Sin sentido con el reloj detenido. */
   targetEndTime: number;
+  /** Lo que queda del segmento. Es lo ÚNICO que sabe la hora en pausa. */
+  remainingMs: number;
   now: number;
   end: CauldronEndContext;
   labels: CauldronLabels;
@@ -153,10 +188,19 @@ export interface CauldronPlanInput {
 /**
  * Qué avisos debe tener armados el Caldero AHORA.
  *
- * Con el reloj corriendo: la alarma de fin a `targetEndTime` y el aviso
- * persistente con la hora de término. Pausado, detenido, en `awaiting_next` o
- * con el módulo apagado: nada — y como el plan gobierna los dos tags, "nada"
- * significa que el host los cancela.
+ * | estado                       | ongoing | alarma  | botones           |
+ * | ---------------------------- | ------- | ------- | ----------------- |
+ * | `work` / `on_break`          | sí      | sí      | Pausar · Detener  |
+ * | `work_paused`/`break_paused` | sí      | no      | Reanudar · Detener|
+ * | `awaiting_next` / `idle`     | no      | no      | —                 |
+ *
+ * El aviso persistente SOBREVIVE a la pausa a propósito, y no es cosmético: es
+ * donde vive el botón «Reanudar». Cuando pausar borraba el aviso, el botón
+ * «Pausar» se suicidaba — lo apretabas y desaparecía la única superficie desde
+ * la que se podía volver sin abrir la app.
+ *
+ * Lo que la pausa SÍ retira es la alarma: `targetEndTime` quedó congelado y el
+ * SO la dispararía igual, con el reloj detenido y la app cerrada.
  */
 export function planCauldronNotifications(input: CauldronPlanInput): NotificationPlan {
   const owned = [CAULDRON_END_TAG, CAULDRON_ONGOING_TAG];
@@ -167,22 +211,59 @@ export function planCauldronNotifications(input: CauldronPlanInput): Notificatio
     schedule: [],
   };
 
-  const running = input.status === 'work' || input.status === 'on_break';
-  // `targetEndTime <= now` es un segmento que ya venció y todavía no se procesó:
-  // programarlo dispararía el aviso al instante (y otra vez en el próximo tick).
-  if (!input.enabled || !running || input.targetEndTime <= input.now) return base;
+  if (!input.enabled) return base;
 
-  const end = cauldronEndMessage(input.end, input.labels);
+  const running = input.status === 'work' || input.status === 'on_break';
+  const paused = input.status === 'work_paused' || input.status === 'break_paused';
+  if (!running && !paused) return base;
+
+  const segment = segmentLabel(input.end.sessionType, input.labels);
   const cycleInfo = `${input.labels.cycle} ${input.end.currentCycle}/${input.end.totalCycles}`;
   const presetLabel = input.end.presetName ? ` (${input.end.presetName})` : '';
 
+  if (paused) {
+    // Redondeo hacia ARRIBA: con 40 s en el reloj, «Quedan 0 min» sería mentira
+    // y además leería como «ya está», que es justo lo contrario.
+    const minutesLeft = Math.max(1, Math.ceil(input.remainingMs / 60000));
+    return {
+      ...base,
+      schedule: [
+        {
+          tag: CAULDRON_ONGOING_TAG,
+          title: `${segment} — ${input.labels.paused}`,
+          body: `${input.labels.remaining} ${minutesLeft} ${input.labels.minutesShort}${presetLabel}`,
+          ongoing: true,
+          actionTypeId: CAULDRON_ACTION_PAUSED,
+          actions: [
+            { id: CAULDRON_ACTION_RESUME, title: input.labels.resume },
+            { id: CAULDRON_ACTION_STOP, title: input.labels.stop },
+          ],
+        },
+      ],
+    };
+  }
+
+  // `targetEndTime <= now` es un segmento que ya venció y todavía no se procesó:
+  // programarlo dispararía el aviso al instante (y otra vez en el próximo tick).
+  // Solo aplica al caso corriendo — en pausa no hay alarma que pueda vencer.
+  if (input.targetEndTime <= input.now) return base;
+
+  const end = cauldronEndMessage(input.end, input.labels);
+
   const schedule: ScheduledNotification[] = [
+    // El aviso de fin NO lleva botones: cuando suena, el segmento terminó y
+    // «Pausar» o «Reanudar» ya no significan nada.
     { tag: CAULDRON_END_TAG, title: end.title, body: end.body, at: input.targetEndTime },
     {
       tag: CAULDRON_ONGOING_TAG,
-      title: `${segmentLabel(input.end.sessionType, input.labels)} — ${cycleInfo}`,
+      title: `${segment} — ${cycleInfo}`,
       body: `${input.labels.endsAt} ${clockTime(input.targetEndTime)}${presetLabel}`,
       ongoing: true,
+      actionTypeId: CAULDRON_ACTION_RUNNING,
+      actions: [
+        { id: CAULDRON_ACTION_PAUSE, title: input.labels.pause },
+        { id: CAULDRON_ACTION_STOP, title: input.labels.stop },
+      ],
     },
   ];
   return { ...base, schedule };
