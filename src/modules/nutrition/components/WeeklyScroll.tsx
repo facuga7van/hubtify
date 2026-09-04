@@ -76,7 +76,13 @@ function ScrollDetail({
           <div className="nutri-scroll-stat-label">{t('nutrify.weeklyWeightDelta', 'Variación de peso')}</div>
           <div className="nutri-scroll-stat-val">
             {hasWeight ? (
-              <span className={weightDelta! < 0 ? 'nutri-green' : weightDelta! > 0 ? 'nutri-red' : ''}>
+              // Sin color: el juicio de valor (subir es bueno/malo) depende del objetivo
+              // vigente, y ese objetivo lo conoce la tira de KPIs de NutritionCharts, no
+              // este pergamino. Un WeekReport queda sellado con el objetivo de la semana
+              // en que se cerró — pintarlo hoy recolorearía una semana pasada con el
+              // objetivo de HOY (ej. un aumento de junio se vería "bien" si hoy estás
+              // en déficit). La flecha es solo dirección, nunca veredicto.
+              <span>
                 {weightDelta! > 0 ? (
                   <ArrowUp width={12} height={12} />
                 ) : weightDelta! < 0 ? (
@@ -168,7 +174,12 @@ export default function WeeklyScroll() {
   }, [load]);
 
   useEffect(() => {
-    const handler = () => load();
+    const handler = () => {
+      // Cambiar de cuenta cambia los datos por completo: una preview cacheada
+      // de la cuenta anterior no sirve para la nueva.
+      setReportCache({});
+      load();
+    };
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
   }, [load]);
@@ -176,6 +187,14 @@ export default function WeeklyScroll() {
   const togglePending = async (weekStart: string) => {
     if (expandedPending === weekStart) {
       setExpandedPending(null);
+      // Al colapsar se descarta la preview: si algo cambió en esta semana
+      // mientras estaba plegada (otro día cerrado, etc.), reabrirla debe
+      // pedirla de nuevo en vez de mostrar un XP/promedio que el sello
+      // podría no pagar.
+      setReportCache((prev) => {
+        const { [weekStart]: _discard, ...rest } = prev;
+        return rest;
+      });
       return;
     }
     setExpandedPending(weekStart);

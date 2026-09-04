@@ -1426,7 +1426,7 @@
     "weeklyAvgIntake": "Consumo promedio",
     "weeklyBalance": "Balance semanal (kcal)",
     "weeklyCompliance": "Días dentro del objetivo",
-    "weeklyComplianceHelp": "Cuenta los días que cumplieron el objetivo exacto, sin indulto. La racha, en cambio, perdona un día por semana — por eso pueden no coincidir.",
+    "weeklyComplianceHelp": "Cuenta los días que cumplieron el objetivo exacto, sin indulto. La racha, en cambio, perdona un día por semana y también los días con un evento registrado — por eso pueden no coincidir.",
     "weeklyHabits": "Pasos y gimnasio",
     "weeklyHabitsDetail": "{{steps}} días con pasos, {{gym}} de gimnasio",
     "weeklyNoClosedDays": "Esta semana no tiene ningún día cerrado.",
