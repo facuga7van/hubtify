@@ -17,6 +17,7 @@ import { getEventDays } from '../event-api';
 import type { StreakInfo } from '../nutrition-day';
 import type { NutritionProfile, DailySummary, MacroTargets } from '../types';
 import { MacroHistory } from './MacroHistory';
+import WeeklyScroll from './WeeklyScroll';
 
 interface WeightEntry {
   date: string;
@@ -408,6 +409,9 @@ export default function NutritionCharts() {
           </button>
         </div>
       </div>
+
+      {/* Pergamino semanal -- ritual de cierre, arriba de todo lo demás */}
+      <WeeklyScroll />
 
       {/* KPI strip */}
       <div className="nutri-kpi-strip">

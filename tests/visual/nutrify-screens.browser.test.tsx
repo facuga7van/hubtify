@@ -163,6 +163,9 @@ function installApi() {
     // NutritionCharts
     nutritionGetSummaryRange: async () => SUMMARY_RANGE,
     nutritionGetStreak: async () => 9,
+    // WeeklyScroll (montado dentro de NutritionCharts)
+    nutritionGetPendingWeeks: async () => [],
+    nutritionGetClosedWeeks: async () => [],
   };
 }
 

@@ -184,6 +184,10 @@ function installApi(over: ApiOverrides = {}) {
     nutritionGetSummaryRange: async () => SUMMARY_RANGE,
     nutritionGetStreak: async () => ({ streak: 9, todayPending: true }),
     nutritionGetEventDays: async () => [],
+    // WeeklyScroll (montado dentro de NutritionCharts): sin esto el Proxy
+    // permisivo de abajo resuelve `null` y el componente rompe en `.length`.
+    nutritionGetPendingWeeks: async () => [],
+    nutritionGetClosedWeeks: async () => [],
     nutritionSearchHistory: async () => HISTORY,
     nutritionGetCachedEstimate: async () => null,
     nutritionCacheEstimate: async () => ({ cached: true }),
