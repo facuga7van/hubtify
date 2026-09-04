@@ -736,14 +736,13 @@ export default function Transactions() {
       </div>
 
       {/* Search */}
-      <div style={{ marginBottom: 8 }}>
+      <div className="coin-tx-search">
         <input
           className="rpg-input"
           type="search"
           placeholder={t('coinify.searchTransactions')}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          style={{ width: '100%' }}
         />
       </div>
 

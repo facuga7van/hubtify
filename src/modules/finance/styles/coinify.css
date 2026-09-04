@@ -926,6 +926,25 @@ button.coin-sort-header--amount {
   font-size: var(--fs-label);
 }
 
+/* ── Buscador del libro mayor ─────────────────────────
+   Llevaba `marginBottom: 8` inline y nada arriba, y el hermano de arriba es
+   el acordeón de «Carga rápida», que tampoco tiene margen inferior: con la
+   tarjeta abierta, su borde de abajo y el input quedaban a 0 px.
+   El aire va SÓLO cuando la tarjeta está desplegada, de ahí el hermano
+   adyacente: cerrada, el acordeón mide 0 px de alto y un margen fijo abriría
+   un hueco contra la fila de botones de arriba, que ya trae sus 16 px. */
+.coin-tx-search {
+  margin-bottom: 8px;
+}
+
+.coin-tx-search .rpg-input {
+  width: 100%;
+}
+
+.coin-quick-add-form--open + .coin-tx-search {
+  margin-top: 16px;
+}
+
 /* ── «Monto de la cuota» vs «Monto total» ─────────────
    Un plan en cuotas se piensa por el total («salió 900 mil en 12»), pero el
    backend guarda el monto de cada cuota. El rótulo «Monto» a secas hacía que
