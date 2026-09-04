@@ -13,6 +13,76 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.8',
+    date: '2026-09-04',
+    changes: [
+      {
+        category: 'feat',
+        scope: 'cauldron',
+        text: {
+          es: 'En el teléfono, el aviso del Caldero ahora tiene botones: pausás, reanudás o detenés sin abrir la app. Y al pausar ya no desaparece — se queda con el botón para retomar, incluso si Android se lleva puesta la app mientras tanto',
+          en: 'On the phone, the Cauldron notice now has buttons: pause, resume or stop without opening the app. And pausing no longer makes it vanish — it stays there with the button to pick things back up, even if Android reclaims the app in the meantime',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'cauldron',
+        text: {
+          es: 'Ya podés apagar el arranque automático del descanso en las recetas que vienen con la app, sin tener que duplicarlas primero. Las duraciones siguen siendo las de fábrica',
+          en: 'You can now turn off the automatic break start on the recipes that ship with the app, without having to duplicate them first. The durations stay the way they came',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'El paso de página ahora te deja en la página que pediste. Ir a Logros o a Recompensas daba vuelta la hoja hacia una página en blanco, y el resto de las veces el libro se daba vuelta hacia una copia de la que estabas dejando',
+          en: 'Page turns now land you on the page you asked for. Going to Achievements or Rewards flipped the sheet onto a blank page, and the rest of the time the book turned onto a copy of the one you were leaving',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'Y el resto del mismo gesto: la hoja va para el lado que corresponde según el orden de la barra, dos clicks seguidos ya no encinan dos animaciones, y el sonido arranca junto con el movimiento en vez de adelantársele',
+          en: 'And the rest of that same gesture: the sheet turns the way it should according to the sidebar order, two quick clicks no longer stack two animations, and the sound starts with the movement instead of running ahead of it',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'cauldron',
+        text: {
+          es: 'Si un enfoque terminaba con el teléfono guardado, al volver el descanso arrancaba solo a los cinco segundos: la ventana para decir «Esperá» se abría cuando ya no había nadie para verla. Ahora, si el segmento venció mientras no estabas, el Caldero te espera',
+          en: 'If a focus block ended with your phone in your pocket, the break started on its own five seconds after you came back: the window to say "Hold on" opened when there was nobody left to see it. Now, if the segment ran out while you were away, the Cauldron waits for you',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'cauldron',
+        text: {
+          es: 'Una sesión pausada ahora sobrevive a que cierres la app: al volver te espera donde la dejaste, con los minutos que le quedaban. Antes se perdía',
+          en: 'A paused session now survives closing the app: when you come back it is waiting right where you left it, with the minutes it had left. It used to be lost',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'cauldron',
+        text: {
+          es: 'El estante del Caldero abre con los últimos quince frascos en vez de con todo lo que hiciste desde siempre. El botón «Cargar más» sigue trayendo el resto',
+          en: 'The Cauldron shelf now opens with the last fifteen jars instead of everything you have ever brewed. The "Load more" button still brings the rest',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'La bajada de cada página se partía en dos renglones a media pantalla y comía alto de cabecera al pedo. Ahora usa el ancho que tiene',
+          en: 'The subtitle on each page broke into two lines halfway across the screen and ate header height for nothing. Now it uses the width it actually has',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.7',
     date: '2026-09-04',
     changes: [
