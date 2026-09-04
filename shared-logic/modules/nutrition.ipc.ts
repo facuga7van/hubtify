@@ -910,9 +910,15 @@ export function registerNutritionIpcHandlers(): void {
   /** Las semanas selladas, más recientes primero. Para releer el archivo. */
   ipcHandle('nutrition:getClosedWeeks', (_e, limit?: number) => {
     const db = getDb();
+    // Mismo guard que nutrition:getRecentLoggedDays: en SQLite un LIMIT
+    // negativo es "sin límite" y uno no entero tira 'datatype mismatch', así
+    // que se acota a un entero positivo antes de que llegue a la query.
+    const n = Number.isFinite(limit) && (limit as number) > 0
+      ? Math.min(Math.floor(limit as number), 200)
+      : 52;
     const rows = db.prepare(
       'SELECT week_start FROM nutrition_weekly_closed ORDER BY week_start DESC LIMIT ?',
-    ).all(Math.min(limit ?? 52, 200)) as Array<{ week_start: string }>;
+    ).all(n) as Array<{ week_start: string }>;
     return rows.map(r => buildWeekReport(db, r.week_start)).filter((r): r is WeekReport => r !== null);
   });
 
@@ -1531,17 +1537,23 @@ export function calculateTDEEWithFactor(bmr: number, factor: number): number {
  *
  * Sellada → se lee la fila archivada sin recalcular nada (§Inmutabilidad).
  * Sin sellar → se agrega en vivo desde `nutrition_daily_closed`.
- * Sin perfil → null: `scoreNutritionDay` leería un déficit 0 y re-puntuaría la
- * semana en banda de mantenimiento, mintiendo sobre quien está en déficit.
+ * Sin perfil → null EN LA RAMA VIVA: `scoreNutritionDay` leería un déficit 0
+ * y re-puntuaría la semana en banda de mantenimiento, mintiendo sobre quien
+ * está en déficit.
+ *
+ * El orden de los guards es deliberado: primero se mira si la semana está
+ * sellada, y sólo si NO lo está se exige el perfil. Un pergamino sellado es
+ * autosuficiente — todo quedó congelado en la fila de `nutrition_weekly_closed`
+ * al momento de cerrar — y tiene que sobrevivir a un perfil borrado, porque es
+ * dato archivado que nunca se vuelve a calcular. Pedir el perfil ANTES del
+ * sello hacía que una semana ya sellada devolviera null sin perfil, y como
+ * `nutrition:getClosedWeeks` filtra los null, el pergamino desaparecía del
+ * archivo en silencio.
  */
 export function buildWeekReport(
   db: ReturnType<typeof getDb>,
   weekStart: string,
 ): WeekReport | null {
-  const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1')
-    .get() as { deficit_target_kcal: number } | undefined;
-  if (!profile) return null;
-
   const weekEnd = weekEndOf(weekStart);
 
   const sealed = db.prepare('SELECT * FROM nutrition_weekly_closed WHERE week_start = ?')
@@ -1563,6 +1575,10 @@ export function buildWeekReport(
       closedAt: sealed.closed_at as string | null,
     };
   }
+
+  const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1')
+    .get() as { deficit_target_kcal: number } | undefined;
+  if (!profile) return null;
 
   const rows = db.prepare(`
     SELECT date, consumed, target FROM nutrition_daily_closed

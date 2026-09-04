@@ -194,6 +194,36 @@ describe('nutrition:getWeekReport', () => {
     expect(r.xpTotal).toBe(29);
   });
 
+  // Finding 1 de la revisión: un pergamino sellado no necesita el perfil —
+  // todo está congelado en la fila archivada. Antes, buildWeekReport pedía el
+  // perfil ANTES de mirar el sello, así que borrar el perfil hacía desaparecer
+  // en silencio una semana ya sellada (y getClosedWeeks filtra los null).
+  it('la rama sellada sobrevive sin perfil: el pergamino no depende de él', () => {
+    testDb.prepare(`
+      INSERT INTO nutrition_weekly_closed
+        (week_start, days_closed, days_compliant, avg_consumed, avg_target,
+         weight_start, weight_end, days_steps, days_gym, streak_end, xp_total,
+         closed_at, updated_at)
+      VALUES (?, 6, 5, 1777, 1888, 79.1, 78.4, 4, 3, 21, 29, ?, ?)
+    `).run(WEEK, '2026-09-08T10:00:00Z', '2026-09-08T10:00:00Z');
+
+    testDb.prepare('DELETE FROM nutrition_profile').run();
+
+    const r = report(WEEK);
+    expect(r).not.toBeNull();
+    expect(r.sealed).toBe(true);
+    expect(r.daysClosed).toBe(6);
+    expect(r.daysCompliant).toBe(5);
+    expect(r.avgConsumed).toBe(1777);
+    expect(r.avgTarget).toBe(1888);
+    expect(r.weightStart).toBe(79.1);
+    expect(r.weightEnd).toBe(78.4);
+    expect(r.daysSteps).toBe(4);
+    expect(r.daysGym).toBe(3);
+    expect(r.streakEnd).toBe(21);
+    expect(r.xpTotal).toBe(29);
+  });
+
   // Spec test 12: guarda del BORDE de la banda. Con déficit > 0 la banda es
   // `consumed <= target`, así que consumido == objetivo CUMPLE.
   it('el borde exacto de la banda cumple', () => {

@@ -174,4 +174,52 @@ describe('nutrition:getClosedWeeks', () => {
   it('sin semanas selladas devuelve una lista vacía', () => {
     expect(closed()).toEqual([]);
   });
+
+  // Finding 1 de la revisión: buildWeekReport pedía el perfil antes de mirar
+  // el sello, así que borrar el perfil hacía desaparecer en silencio una
+  // semana YA sellada del archivo (getClosedWeeks filtra los null).
+  it('una semana sellada sigue en el archivo aunque se borre el perfil', () => {
+    sealAt('2026-08-31', '2026-08-31');
+    testDb.prepare('DELETE FROM nutrition_profile').run();
+    const rows = closed();
+    expect(rows.map(r => r.weekStart)).toEqual(['2026-08-31']);
+    expect(rows[0].sealed).toBe(true);
+  });
+
+  // Finding 2 de la revisión: en SQLite un LIMIT negativo devuelve TODAS las
+  // filas (unbounded), lo opuesto de un límite. getRecentLoggedDays y
+  // searchHistory ya se defienden así; getClosedWeeks no lo hacía. Con sólo un
+  // par de semanas selladas en el fixture, contar filas no distingue "todo el
+  // archivo" de "acotado a 52" (ambos dan el mismo número), así que se espía
+  // el valor de LIMIT que realmente llega a SQLite.
+  it('un limit negativo no le pide a SQLite un LIMIT negativo (unbounded)', () => {
+    sealAt('2026-08-24', '2026-08-24');
+    sealAt('2026-08-31', '2026-08-31');
+
+    const originalPrepare = testDb.prepare.bind(testDb);
+    let capturedLimit: unknown;
+    vi.spyOn(testDb, 'prepare').mockImplementation((sql: string) => {
+      const stmt = originalPrepare(sql);
+      if (sql.includes('FROM nutrition_weekly_closed') && sql.includes('LIMIT')) {
+        const originalAll = stmt.all.bind(stmt);
+        (stmt as any).all = (...args: unknown[]) => {
+          capturedLimit = args[0];
+          return originalAll(...(args as []));
+        };
+      }
+      return stmt;
+    });
+
+    closed(-1);
+    expect(typeof capturedLimit).toBe('number');
+    expect(capturedLimit as number).toBeGreaterThan(0);
+  });
+
+  // Finding 2: en SQLite un LIMIT no entero tira 'datatype mismatch'.
+  it('un limit no entero no explota y devuelve un conteo sensato', () => {
+    sealAt('2026-08-24', '2026-08-24');
+    sealAt('2026-08-31', '2026-08-31');
+    expect(() => closed(1.5)).not.toThrow();
+    expect(closed(1.5).length).toBe(1);
+  });
 });
