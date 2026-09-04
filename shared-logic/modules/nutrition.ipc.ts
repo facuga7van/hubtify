@@ -15,6 +15,7 @@ import { estimateAdaptiveTdee, ADAPTIVE_LOOKBACK_DAYS } from '../../shared/adapt
 import { normalizeDescription } from '../../src/modules/nutrition/normalize';
 import { rankSuggestions, SEARCH_HISTORY_LIMIT } from '../../src/modules/nutrition/history-search';
 import type { RankableSuggestion } from '../../src/modules/nutrition/history-search';
+import { weekEndOf, shiftDay, countCompliantDays, weeklyXp } from '../../shared/week-report';
 // The prompt's identity, from the same file the Cloud Function ships. A cached
 // model answer is only a hit while the prompt that produced it is the current
 // one (migration v17). gemini.ts has no imports, so this is safe in the worker.
@@ -816,6 +817,18 @@ export function registerNutritionIpcHandlers(): void {
     `).all(start, end);
   });
 
+  // ── Pergamino semanal ──────────────────────────────
+
+  /**
+   * El veredicto de una semana. Idéntico esté sellada o en vista previa: si hay
+   * fila en `nutrition_weekly_closed` se devuelve TAL CUAL quedó archivada, y si
+   * no, se calcula en vivo. Un pergamino sellado nunca se recalcula.
+   */
+  ipcHandle('nutrition:getWeekReport', (_e, weekStart: string) => {
+    const db = getDb();
+    return buildWeekReport(db, weekStart);
+  });
+
   // Macro targets: profile override when all three set, otherwise auto from the helper.
   ipcHandle('nutrition:getMacroTargets', (_e, date?: string) => {
     const db = getDb();
@@ -1424,4 +1437,97 @@ export function calculateBMR(weight: number, height: number, age: number, sex: s
 
 export function calculateTDEEWithFactor(bmr: number, factor: number): number {
   return Math.round(bmr * factor);
+}
+
+/**
+ * Arma el `WeekReport` de una semana.
+ *
+ * Sellada → se lee la fila archivada sin recalcular nada (§Inmutabilidad).
+ * Sin sellar → se agrega en vivo desde `nutrition_daily_closed`.
+ * Sin perfil → null: `scoreNutritionDay` leería un déficit 0 y re-puntuaría la
+ * semana en banda de mantenimiento, mintiendo sobre quien está en déficit.
+ */
+export function buildWeekReport(
+  db: ReturnType<typeof getDb>,
+  weekStart: string,
+): Record<string, unknown> | null {
+  const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1')
+    .get() as { deficit_target_kcal: number } | undefined;
+  if (!profile) return null;
+
+  const weekEnd = weekEndOf(weekStart);
+
+  const sealed = db.prepare('SELECT * FROM nutrition_weekly_closed WHERE week_start = ?')
+    .get(weekStart) as Record<string, unknown> | undefined;
+  if (sealed) {
+    return {
+      weekStart, weekEnd,
+      daysClosed: sealed.days_closed, daysCompliant: sealed.days_compliant,
+      avgConsumed: sealed.avg_consumed, avgTarget: sealed.avg_target,
+      weightStart: sealed.weight_start ?? null, weightEnd: sealed.weight_end ?? null,
+      daysSteps: sealed.days_steps, daysGym: sealed.days_gym,
+      streakEnd: sealed.streak_end, xpTotal: sealed.xp_total,
+      sealed: true, closedAt: (sealed.closed_at as string | null) ?? null,
+    };
+  }
+
+  const rows = db.prepare(`
+    SELECT date, consumed, target FROM nutrition_daily_closed
+    WHERE date BETWEEN ? AND ? AND deleted_at IS NULL ORDER BY date ASC
+  `).all(weekStart, weekEnd) as Array<{ date: string; consumed: number; target: number }>;
+
+  const deficit = profile.deficit_target_kcal ?? 0;
+  const daysCompliant = countCompliantDays(rows, deficit);
+  const n = rows.length;
+
+  const weightAt = (from: string, to: string): number | null => {
+    const r = db.prepare(`
+      SELECT weight_kg FROM nutrition_weekly_metrics
+      WHERE weight_kg IS NOT NULL AND date BETWEEN ? AND ? ORDER BY date ASC LIMIT 1
+    `).get(from, to) as { weight_kg: number } | undefined;
+    return r?.weight_kg ?? null;
+  };
+
+  const habits = db.prepare(`
+    SELECT COALESCE(SUM(CASE WHEN steps > 0 THEN 1 ELSE 0 END), 0) AS steps,
+           COALESCE(SUM(CASE WHEN gym = 1 THEN 1 ELSE 0 END), 0) AS gym
+    FROM nutrition_daily_metrics WHERE date BETWEEN ? AND ?
+  `).get(weekStart, weekEnd) as { steps: number; gym: number };
+
+  return {
+    weekStart, weekEnd,
+    daysClosed: n,
+    daysCompliant,
+    avgConsumed: n ? Math.round(rows.reduce((s, r) => s + r.consumed, 0) / n) : 0,
+    avgTarget: n ? Math.round(rows.reduce((s, r) => s + r.target, 0) / n) : 0,
+    weightStart: weightAt(weekStart, weekEnd),
+    weightEnd: weightAt(shiftDay(weekStart, 7), shiftDay(weekEnd, 7)),
+    daysSteps: habits.steps,
+    daysGym: habits.gym,
+    streakEnd: weekStreakAt(db, weekEnd, deficit),
+    xpTotal: weeklyXp(daysCompliant),
+    sealed: false,
+    closedAt: null,
+  };
+}
+
+/**
+ * La racha AL DOMINGO de esa semana, no al momento de sellar.
+ *
+ * Sellar puede pasar hasta 4 semanas después; calcularla al sellar haría que
+ * cuatro pergaminos atrasados cerrados en la misma sesión registraran todos el
+ * mismo número, que no describe ninguna de las cuatro semanas.
+ */
+function weekStreakAt(
+  db: ReturnType<typeof getDb>,
+  weekEnd: string,
+  deficit: number,
+): number {
+  const rows = db.prepare(
+    `SELECT date, total_calories_in AS totalCaloriesIn, tdee
+     FROM nutrition_daily_summary
+     WHERE date <= ? AND total_calories_in > 0
+     ORDER BY date DESC LIMIT 366`,
+  ).all(weekEnd) as StreakDay[];
+  return computeNutritionStreak(rows, weekEnd, deficit).streak;
 }
