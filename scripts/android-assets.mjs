@@ -57,6 +57,36 @@ const LEATHER_DARK = '#2a1d0e';
 
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
+/**
+ * Construye un comentario XML VÁLIDO.
+ *
+ * XML 1.0 §2.5 prohíbe la secuencia de dos guiones seguidos dentro de un
+ * comentario (el parser no puede saber si arranca el cierre `->`). aapt2 lo
+ * hace cumplir y aborta `:app:mergeReleaseResources` con
+ * `Error: The string "--" is not permitted within comments.`
+ *
+ * Eso ROMPIÓ el release v0.9.6: el comentario generado acá nombraba el token
+ * CSS con su prefijo literal de dos guiones. `build-android` falló y `publish`
+ * quedó salteado. Por eso los comentarios se escriben con esta función y no a
+ * mano: si el texto vuelve a traer la secuencia prohibida, el script explota
+ * ACÁ (barato, local) en vez de en el runner de CI (caro, y ya con el tag
+ * puesto).
+ *
+ * Regla práctica al redactar: los tokens de tema se nombran SIN el prefijo
+ * (`parch-2`, no el nombre literal del custom property).
+ */
+function xmlComment(text) {
+  if (text.includes('--')) {
+    throw new Error(
+      `Comentario XML inválido: ${JSON.stringify(text)}\n` +
+        'Un comentario XML no puede contener dos guiones seguidos (XML 1.0 §2.5); ' +
+        'aapt2 corta el build con «The string "--" is not permitted within comments». ' +
+        'Nombrá el token de tema sin su prefijo de dos guiones.'
+    );
+  }
+  return `<!-- ${text} -->`;
+}
+
 const ICON = 1024;
 const SPLASH = 2732;
 
@@ -191,8 +221,14 @@ async function writeBackgroundColor() {
   await writeFile(
     resolve(dir, 'ic_launcher_background.xml'),
     `<?xml version="1.0" encoding="utf-8"?>\n` +
-      `<!-- Generado por scripts/android-assets.mjs. --parch-2 de src/hub/styles/theme.css. -->\n` +
-      `<resources>\n    <color name="ic_launcher_background">${PARCH_2}</color>\n</resources>\n`,
+      xmlComment(
+        'Generado por scripts/android-assets.mjs. El color es el token de tema ' +
+          'parch-2 de src/hub/styles/theme.css (en CSS el nombre lleva delante el ' +
+          'prefijo de dos guiones de los custom properties; acá va sin prefijo a ' +
+          'propósito, porque un comentario XML no puede contener dos guiones seguidos ' +
+          'y aapt2 corta el build).'
+      ) +
+      `\n<resources>\n    <color name="ic_launcher_background">${PARCH_2}</color>\n</resources>\n`,
     'utf8'
   );
   // Los PNG de fondo de la versión anterior ya no se usan.
@@ -208,7 +244,8 @@ async function writeAdaptiveIconXml() {
   await mkdir(dir, { recursive: true });
   const xml =
     `<?xml version="1.0" encoding="utf-8"?>\n` +
-    `<!-- Generado por scripts/android-assets.mjs. -->\n` +
+    xmlComment('Generado por scripts/android-assets.mjs.') +
+    `\n` +
     `<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n` +
     `    <background android:drawable="@color/ic_launcher_background" />\n` +
     `    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n` +

@@ -14,15 +14,26 @@
  * RESULTADO en `android/app/src/main/res`, no el script: si alguien regenera
  * con otra herramienta (por ejemplo @capacitor/assets, que recorta el margen
  * transparente del foreground) o toca un XML a mano, acá se cae.
+ *
+ * El bloque «XML bien formado» del final existe por el release v0.9.6, que se
+ * cayó con estos mismos 2075 tests en verde: el comentario generado en
+ * `values/ic_launcher_background.xml` nombraba el token CSS con su prefijo
+ * literal de dos guiones, y XML 1.0 §2.5 lo prohíbe dentro de un comentario.
+ * Este archivo leía ese XML CON UNA REGEX (`backgroundColor()`), así que el
+ * color matcheaba igual y el documento roto pasaba de largo. `build-android`
+ * murió en `:app:mergeReleaseResources` y `publish` quedó salteado.
  */
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 // La fórmula WCAG no se duplica: es la misma que usa la auditoría visual.
 import { contrast } from '../visual/audit-hub-harness';
 
-const RES = fileURLToPath(new URL('../../android/app/src/main/res/', import.meta.url));
+const MAIN = fileURLToPath(new URL('../../android/app/src/main/', import.meta.url));
+const RES = `${MAIN}res/`;
 
 /** Escala de cada carpeta de densidad de Android. */
 const DENSITIES = { ldpi: 0.75, mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 } as const;
@@ -187,5 +198,226 @@ describe('icono de launcher de Android', () => {
           `duplica la fuente de verdad del color y encima se reescala`
       ).toBe(false);
     });
+  });
+
+});
+
+/* ── XML bien formado ─────────────────────────────────────────────────────
+ *
+ * QUÉ VALIDA ESTE BLOQUE Y QUÉ NO.
+ *
+ * Valida (dos pasadas, sobre TODOS los .xml de `android/app/src/main`, que es
+ * lo que Gradle fusiona: `res/`, `res/xml/` y el AndroidManifest):
+ *
+ *   1. `commentDefect()` — la producción `Comment` de XML 1.0 §2.5, a mano:
+ *      el cuerpo de un comentario no puede contener dos guiones seguidos ni
+ *      terminar en guion, y todo `<!--` tiene que cerrar. Está separada de la
+ *      pasada 2 sólo para dar el mensaje EXACTO de la regla que rompió v0.9.6;
+ *      `sax` también la caza, pero la reporta como «Malformed comment» a secas.
+ *   2. `parseDefect()` — una pasada completa de `sax` en modo estricto, que es
+ *      un parser XML de verdad (el mismo que usa `xml2js`, y por lo tanto el
+ *      grueso del tooling de Cordova/Capacitor). Caza tags mal cerrados o sin
+ *      cerrar, atributos sin comillas, `<` sin escapar, texto fuera de la raíz,
+ *      entidades inválidas y el resto de las reglas de buena formación.
+ *      Más un chequeo propio de «exactamente un elemento raíz», que `sax` no
+ *      hace (verificado: `<a/><b/>` le pasa limpio).
+ *
+ * NO valida: nada de lo que va MÁS ALLÁ de la buena formación XML. No hay
+ * DTD ni XSD ni resolución de entidades externas; no chequea namespaces, ni
+ * atributos duplicados, ni el rango legal de caracteres XML, ni que la
+ * declaración `encoding=` coincida con los bytes del archivo. Tampoco es un
+ * validador de recursos de Android: que un `@color/…` exista, que un `<style>`
+ * herede de un parent real o que el manifest declare permisos coherentes se lo
+ * sigue diciendo aapt2 en el build, no este test.
+ *
+ * `sax` llega hoy como dependencia transitiva de @capacitor/cli
+ * (`xml2js` -> `sax`) y de `native-run` (`elementtree` -> `sax`). Se usa tal
+ * cual, sin instalar nada nuevo. Si algún día desaparece del árbol, el
+ * `require` de abajo tira un error explícito y ESTE ARCHIVO ENTERO no colecta:
+ * el guard falla ruidoso, nunca se apaga en silencio.
+ */
+
+type SaxParser = {
+  line: number;
+  column: number;
+  error: Error | null;
+  onerror: ((err: Error) => void) | null;
+  onopentag: ((tag: { name: string }) => void) | null;
+  onclosetag: ((tagName: string) => void) | null;
+  write(chunk: string | null): SaxParser;
+  close(): SaxParser;
+  resume(): SaxParser;
+};
+
+const nodeRequire = createRequire(import.meta.url);
+let sax: { parser(strict: boolean, opt?: Record<string, unknown>): SaxParser };
+try {
+  sax = nodeRequire('sax');
+} catch (cause) {
+  throw new Error(
+    'No se pudo cargar `sax`, el parser con el que este archivo valida los XML de Android. ' +
+      'Hoy llega como dependencia transitiva de @capacitor/cli (xml2js -> sax); si ese árbol ' +
+      'cambió, agregá `sax` a devDependencies y listo. NO borres la validación: sin ella un XML ' +
+      'mal formado recién se descubre en `:app:mergeReleaseResources`, o sea en CI y con el tag ' +
+      'de la versión ya puesto. Pasó en v0.9.6.',
+    { cause }
+  );
+}
+
+/** Todos los `.xml` de `android/app/src/main`, recursivo. */
+function androidXmlFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) androidXmlFiles(path, out);
+    else if (entry.name.endsWith('.xml')) out.push(path);
+  }
+  return out.sort();
+}
+
+const XML_FILES = androidXmlFiles(MAIN);
+const name = (path: string) => relative(MAIN, path).split(sep).join('/');
+const XML_NAMES = XML_FILES.map(name);
+
+type Defect = { line: number; column: number; rule: string };
+
+/** Línea (1-indexada) y columna (1-indexada) de un offset del documento. */
+function locate(text: string, offset: number): { line: number; column: number } {
+  const before = text.slice(0, offset);
+  const lastBreak = before.lastIndexOf('\n');
+  return { line: before.split('\n').length, column: offset - lastBreak };
+}
+
+/** Archivo, línea, columna, la línea ofensora con un cursor debajo, y la regla. */
+function report(path: string, text: string, defect: Defect): string {
+  const source = text.split('\n')[defect.line - 1] ?? '';
+  const gutter = ' '.repeat(String(defect.line).length);
+  return (
+    `\n${path}:${defect.line}:${defect.column}\n` +
+    `  XML mal formado: ${defect.rule}\n\n` +
+    `  ${defect.line} | ${source}\n` +
+    `  ${gutter} | ${' '.repeat(Math.max(0, defect.column - 1))}^\n`
+  );
+}
+
+/**
+ * Producción `Comment` de XML 1.0 §2.5. Separada del parser sólo para nombrar
+ * la regla con precisión: es la que voló el release v0.9.6.
+ */
+function commentDefect(text: string): Defect | null {
+  const OPEN = '<!--';
+  const CLOSE = '-->';
+  const CDATA = '<![CDATA[';
+  let i = 0;
+  for (;;) {
+    const open = text.indexOf(OPEN, i);
+    if (open === -1) return null;
+    // Dentro de un CDATA, `<!--` es texto literal y no abre nada.
+    const cdata = text.indexOf(CDATA, i);
+    if (cdata !== -1 && cdata < open) {
+      const end = text.indexOf(']]>', cdata + CDATA.length);
+      if (end === -1) {
+        return { ...locate(text, cdata), rule: 'sección CDATA sin cerrar: falta el `]]>`' };
+      }
+      i = end + 3;
+      continue;
+    }
+    const close = text.indexOf(CLOSE, open + OPEN.length);
+    if (close === -1) {
+      return { ...locate(text, open), rule: 'comentario sin cerrar: falta el `-->`' };
+    }
+    const body = text.slice(open + OPEN.length, close);
+    const dashes = body.indexOf('--');
+    if (dashes !== -1) {
+      return {
+        ...locate(text, open + OPEN.length + dashes),
+        rule:
+          'un comentario XML no puede contener dos guiones seguidos (XML 1.0 §2.5, producción ' +
+          '`Comment`). aapt2 aborta `:app:mergeReleaseResources` con «The string "--" is not ' +
+          'permitted within comments» y se cae el build de Android. Si querés nombrar un token ' +
+          'de tema, escribilo SIN el prefijo de custom property: `parch-2`, no el nombre literal',
+      };
+    }
+    if (body.endsWith('-')) {
+      return {
+        ...locate(text, close - 1),
+        rule: 'el cuerpo de un comentario XML no puede terminar en guion (queda `--->`)',
+      };
+    }
+    i = close + CLOSE.length;
+  }
+}
+
+/** Pasada de `sax` en estricto: buena formación general. Devuelve el PRIMER defecto. */
+function parseDefect(text: string): Defect | null {
+  const parser = sax.parser(true, { xmlns: false });
+  let first: Defect | null = null;
+  let depth = 0;
+  let roots = 0;
+
+  const record = (err: unknown) => {
+    if (first) return;
+    // `sax` cuenta líneas desde 0 y columnas desde 1.
+    first = {
+      line: parser.line + 1,
+      column: Math.max(1, parser.column),
+      rule: String((err as Error)?.message ?? err).split('\n')[0],
+    };
+  };
+
+  parser.onerror = (err) => {
+    record(err);
+    // Seguir parseando: si no, `close()` vuelve a tirar el ÚLTIMO error y se
+    // pierde la posición del primero, que es el que importa.
+    parser.resume();
+  };
+  parser.onopentag = () => {
+    if (depth === 0) roots++;
+    depth++;
+  };
+  parser.onclosetag = () => {
+    depth--;
+  };
+
+  try {
+    parser.write(text).close();
+  } catch (err) {
+    record(err);
+  }
+
+  if (!first && roots !== 1) {
+    return {
+      line: 1,
+      column: 1,
+      rule: `el documento tiene ${roots} elementos raíz y XML exige exactamente 1`,
+    };
+  }
+  return first;
+}
+
+describe('los XML de Android están bien formados', () => {
+  it('el barrido encuentra los recursos que Gradle fusiona', () => {
+    // Sin esto el guard se puede volver VACÍO en silencio: si el walk se rompe
+    // o alguien mueve la carpeta, `it.each([])` no prueba nada y todo pasa.
+    // 8 es el piso: los 8 XML versionados. `res/xml/config.xml` lo agrega
+    // `cap sync`, así que en un checkout limpio de CI todavía no está.
+    expect(XML_FILES.length, `no encontré XML bajo ${MAIN}`).toBeGreaterThanOrEqual(8);
+    for (const expected of [
+      'AndroidManifest.xml',
+      'res/values/ic_launcher_background.xml',
+      'res/values/strings.xml',
+      'res/values/styles.xml',
+      'res/layout/activity_main.xml',
+      'res/xml/file_paths.xml',
+      'res/mipmap-anydpi-v26/ic_launcher.xml',
+      'res/mipmap-anydpi-v26/ic_launcher_round.xml',
+    ]) {
+      expect(XML_NAMES, `${expected} se cayó del barrido`).toContain(expected);
+    }
+  });
+
+  it.each(XML_FILES.map((path) => [name(path), path]))('%s', (_name, path) => {
+    const text = readFileSync(path, 'utf8');
+    const defect = commentDefect(text) ?? parseDefect(text);
+    expect(defect === null, defect ? report(path, text, defect) : '').toBe(true);
   });
 });
