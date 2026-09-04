@@ -159,9 +159,8 @@ usuario que dejó de pesarse quede con pergaminos trabados para siempre: pasado
 ese punto se sella igual, sin peso.
 
 **El escape es `weekStart+14`, y el número no es negociable.** `weight_check_day`
-es configurable de 1 a 7 (`nutrition.ipc.ts:238` lo clampea, `NutritionSettings`
-lo expone) y `shouldAskWeight` solo pregunta cuando `dow >= checkDay`
-(`nutrition.ipc.ts:1145`). El usuario puede entonces RESPONDER en cualquier día
+es configurable de 1 a 7 (lo clampea `nutrition:saveProfile`, lo expone
+`NutritionSettings`) y `shouldAskWeight` solo pregunta cuando `dow >= checkDay`. El usuario puede entonces RESPONDER en cualquier día
 entre `weekStart+7` (lunes) y `weekStart+13` (domingo), según su configuración.
 Un escape más corto dispara antes que la respuesta para todo usuario con
 `weight_check_day >= 4`:
