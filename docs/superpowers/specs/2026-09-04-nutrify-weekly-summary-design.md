@@ -161,21 +161,28 @@ ese punto se sella igual, sin peso.
 **El escape es `weekStart+14`, y el número no es negociable.** `weight_check_day`
 es configurable de 1 a 7 (`nutrition.ipc.ts:238` lo clampea, `NutritionSettings`
 lo expone) y `shouldAskWeight` solo pregunta cuando `dow >= checkDay`
-(`nutrition.ipc.ts:1145`). El pesaje de la semana siguiente puede caer, entonces,
-en cualquier día entre `weekStart+7` (lunes) y `weekStart+13` (domingo). Un escape
-más corto dispara antes que el pesaje para todo usuario con `weight_check_day >= 4`:
+(`nutrition.ipc.ts:1145`). El usuario puede entonces RESPONDER en cualquier día
+entre `weekStart+7` (lunes) y `weekStart+13` (domingo), según su configuración.
+Un escape más corto dispara antes que la respuesta para todo usuario con
+`weight_check_day >= 4`:
 
-| `weight_check_day` | Pesaje cae en | Escape a `+10` |
+| `weight_check_day` | Usuario responde en | Escape a `+10` |
 | --- | --- | --- |
 | 1 (lunes, default) | `weekStart+7` | llega tarde, bien |
 | 2-3 | `+8`, `+9` | llega tarde, bien |
 | 4 (jueves) | `+10` | **empate el mismo día** |
 | 5-7 | `+11` … `+13` | **el escape gana** |
 
-Para más de la mitad de las configuraciones posibles el gate no haría su trabajo:
-retendría el pergamino tres días y después lo soltaría con `weight_end` en NULL
-igual. `weekStart+14` cubre el peor caso (`+13`) por construcción, sin leer la
-configuración y sin carreras.
+La fila en sí, sin embargo, no queda fechada el día que el usuario responde:
+`saveWeeklyMetrics` nunca recibe `date` desde `Today.tsx`, así que usa
+`getMondayOfWeek()`, que lee el reloj de pared y redondea para atrás — la fila
+SIEMPRE cae en `weekStart+7`, nunca en `+8`..`+13`. Eso no cambia la conclusión:
+el escape tiene que sobrevivir a la última RESPUESTA posible (`+13`), porque es
+la respuesta —no la fecha de la fila— la que determina cuándo `weight_end` deja
+de estar vacío. Para más de la mitad de las configuraciones posibles un escape
+más corto no haría su trabajo: retendría el pergamino tres días y después lo
+soltaría con `weight_end` en NULL igual. `weekStart+14` cubre el peor caso
+(`+13`) por construcción, sin leer la configuración y sin carreras.
 
 **El gate reduce el caso NULL, no lo elimina.** La condición 5 prueba que existe
 el pesaje de la semana SIGUIENTE (`weight_end`). No dice nada de `weight_start`:

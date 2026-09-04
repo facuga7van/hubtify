@@ -848,6 +848,10 @@ export function registerNutritionIpcHandlers(): void {
       WHERE c.deleted_at IS NULL AND c.date >= ? AND c.date < ?
     `).all(oldest, currentWeek) as Array<{ date: string }>;
 
+    // `oldest` y `currentWeek` son ambos lunes a exactamente 28 días de distancia,
+    // así que todo candidato ya viene acotado a `[oldest, currentWeek)` en la query
+    // de arriba y su `mondayOfWeek` cae siempre dentro del mismo rango. Este filter
+    // es defensivo — no debería recortar nada nunca; si lo hace, algo más se rompió.
     const weeks = [...new Set(candidates.map(r => mondayOfWeek(r.date)))]
       .filter(w => w >= oldest && w < currentWeek)
       .sort();
@@ -1548,11 +1552,15 @@ export function buildWeekReport(
  * Condición 5: ¿hay con qué medir el peso, o ya se esperó suficiente?
  *
  * El escape es `weekStart+14` y el número no es negociable. `weight_check_day`
- * va de 1 a 7 (`nutrition.ipc.ts:238` lo clampea) y `shouldAskWeight` solo
- * pregunta cuando `dow >= checkDay`, así que el pesaje de la semana siguiente
- * puede caer en cualquier día entre `+7` y `+13`. Un escape más corto —`+10`,
- * por ejemplo— dispara antes que el pesaje para todo `weight_check_day >= 4`:
- * retendría el pergamino tres días y lo soltaría con `weight_end` en NULL igual.
+ * va de 1 a 7 (clampeado en `nutrition:saveProfile`) y `shouldAskWeight` solo
+ * pregunta cuando `dow >= checkDay`, así que el usuario puede RESPONDER en
+ * cualquier día entre `+7` y `+13` según su configuración. Pero `saveWeeklyMetrics`
+ * no recibe `date` desde la UI: usa `getMondayOfWeek()`, que redondea al lunes de
+ * esa semana — la fila SIEMPRE queda fechada en `+7`, sin importar qué día contestó.
+ * El escape tiene que sobrevivir a la última RESPUESTA posible (`+13`), no a la
+ * fecha de la fila; por eso es `+14` y no algo más corto —`+10`, por ejemplo—
+ * dispararía antes que la respuesta para todo `weight_check_day >= 4`: retendría
+ * el pergamino tres días y lo soltaría con `weight_end` en NULL igual.
  */
 export function weeklyGateOpen(db: ReturnType<typeof getDb>, weekStart: string): boolean {
   const hasWeighIn = db.prepare(`

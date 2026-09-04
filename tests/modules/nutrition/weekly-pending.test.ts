@@ -78,10 +78,19 @@ describe('nutrition:getPendingWeeks', () => {
     expect(pending()).toContain(WEEK);
   });
 
-  it('con weight_check_day = 7 el pesaje cae en +13 y el escape NO gana', () => {
+  it('con weight_check_day = 7 el usuario responde el domingo y la fila queda en el lunes', () => {
+    // `saveWeeklyMetrics` no recibe `date` desde Today.tsx: usa `getMondayOfWeek()`,
+    // que lee el reloj de PARED y redondea para atrás. Sin importar qué día de la
+    // semana siguiente responda el usuario, la fila SIEMPRE queda fechada el lunes
+    // (weekStart+7) — nunca en +8..+13. Este test pasa por el escritor real en vez
+    // de insertar una fila que la app no puede producir.
     testDb.prepare('UPDATE nutrition_profile SET weight_check_day = 7').run();
-    weighIn('2026-09-13');   // domingo de la semana siguiente = weekStart+13
-    atNoon('2026-09-13');
+    atNoon('2026-09-13');   // domingo de la semana siguiente = weekStart+13, recién ahí se le pregunta
+    getHandler('nutrition:saveWeeklyMetrics')!({}, { weightKg: 80 });
+
+    const row = testDb.prepare('SELECT date FROM nutrition_weekly_metrics').get() as { date: string };
+    expect(row.date).toBe('2026-09-07');   // el lunes, no el domingo en que respondió
+
     expect(pending()).toContain(WEEK);
   });
 
@@ -96,6 +105,12 @@ describe('nutrition:getPendingWeeks', () => {
 
   it('una semana sin ningún cierre vivo no califica', () => {
     testDb.prepare('DELETE FROM nutrition_daily_closed').run();
+    atNoon('2026-09-14');
+    expect(pending()).not.toContain(WEEK);
+  });
+
+  it('un cierre con soft-delete no cuenta como candidato', () => {
+    testDb.prepare("UPDATE nutrition_daily_closed SET deleted_at = 'x' WHERE date = ?").run('2026-08-31');
     atNoon('2026-09-14');
     expect(pending()).not.toContain(WEEK);
   });
