@@ -1663,7 +1663,7 @@ function weekStreakAt(
   ).all(weekEnd) as StreakDay[];
 
   // ── Día con evento = presentarse ──────────────────────────────────────
-  // Mismo indulto que `nutrition:getStreak` (línea ~933): registrar el asado
+  // Mismo indulto que `nutrition:getStreak`: registrar el asado
   // ES cumplir con la racha, no gastar el día de gracia semanal en algo que
   // la app misma invitó a registrar. Si este remap se "simplifica" y se
   // borra, el pergamino sellado archiva una racha DISTINTA a la que la app

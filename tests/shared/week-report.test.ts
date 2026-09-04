@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mondayOfWeek, weekEndOf, countCompliantDays, weeklyXp, WEEK_DAYS } from '../../shared/week-report';
+import { mondayOfWeek, weekEndOf, countCompliantDays, weeklyXp, WEEK_DAYS, WEEKLY_XP_CAP } from '../../shared/week-report';
 import type { ClosedDayRow } from '../../shared/week-report';
 
 describe('mondayOfWeek', () => {
@@ -71,5 +71,19 @@ describe('weeklyXp — denominador SIEMPRE 7', () => {
 
   it('WEEK_DAYS es 7 y es el único denominador', () => {
     expect(WEEK_DAYS).toBe(7);
+  });
+
+  // `WEEKLY_XP_CAP` no tenía ningún llamador: el 50 de `weeklyXp` coincidía con
+  // el 50 del export por coincidencia aritmética, no porque el código los atara.
+  // Este test es lo que los ata: si alguien cambia el 40 o el +10 del bonus sin
+  // tocar `WEEKLY_XP_CAP`, o viceversa, algo de esto rompe.
+  it('una semana perfecta paga exactamente el techo declarado', () => {
+    expect(weeklyXp(WEEK_DAYS)).toBe(WEEKLY_XP_CAP);
+  });
+
+  it('ninguna cantidad de días cumplidos supera el techo declarado', () => {
+    for (let n = 0; n <= 7; n++) {
+      expect(weeklyXp(n)).toBeLessThanOrEqual(WEEKLY_XP_CAP);
+    }
   });
 });

@@ -64,10 +64,10 @@ Fuera (decisión explícita, YAGNI):
 **Lunes a domingo**, vía `getMondayOfWeek` (`shared/date-utils.ts:43`).
 
 No es arbitrario: `nutrition_weekly_metrics` ya se keyea por lunes. La evidencia
-fuerte es el **escritor** — `saveWeeklyMetrics` guarda en `getMondayOfWeek()`
-(`nutrition.ipc.ts:792`) — y el lector lo acompaña: `shouldAskWeight` consulta
-`getMondayOfWeek(today)` (`:1147`). Con cualquier otra frontera, el pesaje de "tu
-semana" caería en una semana distinta a la del resumen.
+fuerte es el **escritor** — `saveWeeklyMetrics` guarda en `getMondayOfWeek()` — y
+el lector lo acompaña: `shouldAskWeight` consulta `getMondayOfWeek(today)`. Con
+cualquier otra frontera, el pesaje de "tu semana" caería en una semana distinta a
+la del resumen.
 
 ### Trampa: reloj nutricional, no reloj de pared
 
@@ -80,7 +80,7 @@ ya apareció tres veces en el repo.
 
 ### El pesaje es la excepción, y es correcta
 
-`nutrition:saveWeeklyMetrics` (`nutrition.ipc.ts:792`) hace
+`nutrition:saveWeeklyMetrics` hace
 `metrics.date ?? getMondayOfWeek()` — sin argumento, o sea **reloj de pared** — y
 su único llamador (`Today.tsx:1014`) no pasa fecha. Esto **no** se toca.
 
@@ -97,7 +97,7 @@ esta feature. Lunes 01:00 con `day_cutoff_hour = 4`, semana V:
 | Reloj de pared (actual) | `vStart+7` | `weight_end(V)` — **correcto** |
 | Lunes nutricional | `vStart` | pisa `weight_start(V)` vía `INSERT OR REPLACE` |
 
-`saveWeeklyMetrics` hace `INSERT OR REPLACE` sobre `date` (`nutrition.ipc.ts:793`),
+`saveWeeklyMetrics` hace `INSERT OR REPLACE` sobre `date`,
 así que la clave decide **qué fila se sobreescribe**. Keyear por el lunes
 nutricional haría que el pesaje que el usuario entiende como "así terminé la
 semana" reemplace al del lunes anterior: `weight_start` con el valor equivocado,
@@ -108,7 +108,7 @@ cierre; el peso entra por el reloj de pared, a propósito, y las ventanas
 `[vStart, vStart+6]` / `[vStart+7, vStart+13]` lo recogen bien.
 
 **Asimetría preexistente, fuera de alcance — pero conviene nombrarla bien.**
-`shouldAskWeight` consulta el lunes NUTRICIONAL (`nutrition.ipc.ts:1147`) mientras
+`shouldAskWeight` consulta el lunes NUTRICIONAL mientras
 el escritor guarda en el de pared. El lunes `vStart+7` a la 01:00, para un usuario
 que no se pesó en toda la semana V: `shouldAskWeight` calcula
 `getMondayOfWeek(vStart+6) = vStart`, no encuentra nada y **pregunta**. El usuario
@@ -132,8 +132,8 @@ qué no hace falta.
 
 ## Cuándo hay pergamino pendiente
 
-`nutrition:getPendingWeeks`, calcado de `nutrition:getPendingDays`
-(`nutrition.ipc.ts:1242`). Una semana está pendiente cuando se cumplen las cinco:
+`nutrition:getPendingWeeks`, calcado de `nutrition:getPendingDays`.
+Una semana está pendiente cuando se cumplen las cinco:
 
 1. Ya terminó: `weekStart < getMondayOfWeek(nutritionToday(db))`
 2. Tiene ≥ 1 día cerrado vivo en `nutrition_daily_closed` (`deleted_at IS NULL`)
@@ -222,9 +222,9 @@ CREATE TABLE IF NOT EXISTS nutrition_weekly_closed (
 
 ### Sin `deleted_at`, a propósito
 
-`nutrition_daily_closed` tiene esa columna porque `reopenDay` la escribe
-(`nutrition.ipc.ts:1104`, vía `reopenDayRecord`; el `UPDATE … SET deleted_at`
-está en `:1337`). Acá **no hay ningún productor**:
+`nutrition_daily_closed` tiene esa columna porque `nutrition:reopenDay` la
+escribe vía `reopenDayRecord` (el `UPDATE … SET deleted_at` vive dentro de esa
+función). Acá **no hay ningún productor**:
 
 - No existe `reopenWeek` (§Inmutabilidad)
 - El cambio de cuenta no deja lápidas: `clearUserDataInto` hace
@@ -256,10 +256,10 @@ importar apenas se sella: el resultado queda escrito.
 **Sin perfil no hay veredicto.** `scoreNutritionDay` interpreta un
 `deficitTargetKcal` ausente como `0` → banda de mantenimiento, re-puntuando en
 silencio la semana de alguien que está en déficit. Por eso ambos handlers cortan
-antes, igual que `closeDay` (`nutrition.ipc.ts:1008`).
+antes, igual que `nutrition:closeDay`.
 
-**Nota de precisión.** `closeDay` guarda `Math.round(target)`
-(`nutrition.ipc.ts:1064`) pero puntúa con el valor sin redondear. Re-puntuar desde
+**Nota de precisión.** `nutrition:closeDay` guarda `Math.round(target)`
+pero puntúa con el valor sin redondear. Re-puntuar desde
 la fila puede voltear el resultado justo en el borde de la banda. La diferencia
 máxima es de 1 kcal sobre el objetivo; se acepta, cubierto por el test 12.
 
@@ -273,6 +273,17 @@ normal, `weight_end` existe antes de que el sello se ofrezca. Si el usuario dej�
 de pesarse y entra por el escape de 14 días —o si nunca registró el pesaje de
 apertura, que ya no puede aparecer— la columna queda NULL y el pergamino dice
 "sin pesaje". No se inventa un delta a partir de un solo punto.
+
+**El color del delta es neutro, a propósito (commit `b1a5667`).** `WeeklyScroll`
+pinta la flecha del delta de peso sin color de juicio (ni verde ni rojo). La tira
+de KPIs de `NutritionCharts`, en la misma pantalla, SÍ es goal-aware e invierte
+el color según el objetivo del usuario (bajar de peso es verde en déficit, rojo
+en superávit). Pintar el pergamino siempre en verde contradecía a los KPIs de al
+lado sobre el mismo hecho. Y la corrección obvia —consultar el perfil actual para
+elegir el color— está prohibida: el pergamino es una semana SELLADA, y reinterpretar
+un dato congelado con el objetivo de HOY es el mismo error de categoría que
+§Inmutabilidad prohíbe para el resto del reporte. El juicio de valor vive en los
+KPIs, que sí conocen el objetivo vigente; el pergamino solo informa el hecho.
 
 ### Hábitos
 
@@ -309,8 +320,8 @@ Se evaluó recortarlo en la primera semana del usuario —alta un jueves, cierra
 jueves a domingo perfecto, cobra `4/4` en vez de `4/7`— derivándolo de
 `MIN(date)` de `food_log`. Se descartó, y vale escribir por qué:
 
-- **Es gameable.** `nutrition:deleteFood` (`nutrition.ipc.ts:431`) y
-  `nutrition:deleteByDate` (`:697`) hacen soft-delete y están cableados a la UI.
+- **Es gameable.** `nutrition:deleteFood` y `nutrition:deleteByDate` hacen
+  soft-delete y están cableados a la UI.
   Borrar las comidas más viejas corre `MIN(date)` hacia adelante. Semana uno con
   lunes-miércoles arruinados: se reabren, se les borra la comida, `firstLog` pasa
   al jueves, y `4/4` paga 50 en vez de los 23 honestos. Es exactamente el
@@ -333,8 +344,9 @@ a siete fechas y `nutrition_daily_closed` tiene `date` como PRIMARY KEY, así qu
 `days_compliant <= 7` por construcción.
 
 **Efecto colateral bueno:** `deleteFood` y `deleteByDate` lanzan
-`'Cannot modify a closed day'` cuando `isDayClosed` (`nutrition.ipc.ts:428`,
-`:699`). Los días ya contados como cumplidos no se pueden vaciar. Eso refuerza
+`'Cannot modify a closed day'` cuando `isDayClosed(db, date)` es cierto — mismo
+guard en los dos handlers. Los días ya contados como cumplidos no se pueden
+vaciar. Eso refuerza
 §Inmutabilidad por debajo, sin código nuevo.
 
 ## Posada
@@ -389,15 +401,21 @@ el pergamino — eso no es un bug, es la definición del artefacto.
 Por eso no existe `reopenWeek`: reabrirlo abriría exactamente la puerta que el
 guard del motor cierra.
 
+Esto incluye a `xp_total`: la columna congela lo que el sello DECLARÓ pagar, no
+una reconciliación con lo que el motor efectivamente acreditó (ver §El toast no
+puede mentir); si `rpgFailed`, `xp_total` sigue leyendo 50 para siempre, y eso es
+el mismo contrato que `nutrition_daily_closed` ya tiene — no un bug de esta
+feature.
+
 ## XP
 
 ### Calibración
 
 Un día perfecto paga `30 (precisión) + 15 (bonus) + 5 (pasos) + 5 (gym) +
-5 (peso) = 60 XP` base (`nutrition.ipc.ts:1046-1049`), y encima corre el
-multiplicador de combo. Una semana perfecta de cierres diarios ronda los
-**420 XP base**, bastante más una vez aplicados combo (hasta 2.0×) y bonus
-aleatorio.
+5 (peso) = 60 XP` base (`xpPrecision + xpBonus + xpSteps + xpGym + xpWeight`
+en `nutrition:closeDay`), y encima corre el multiplicador de combo. Una semana
+perfecta de cierres diarios ronda los **420 XP base**, bastante más una vez
+aplicados combo (hasta 2.0×) y bonus aleatorio.
 
 `BUDGET_MONTH_MET` declara 100 de base (`rpg-handlers.ts:153`). **No es plano**:
 no está en `FLAT_XP_EVENTS` (`rpg-handlers.ts:105`) ni en
@@ -593,12 +611,30 @@ export interface WeekReport {
   closedAt: string | null;
 }
 
+/**
+ * Por qué `nutrition:closeWeek` NO selló. Extraído de `CloseWeekResult` para que
+ * el bridge del renderer (`weekly-api.ts`) pueda propagarlo sin redefinirlo.
+ */
+export type CloseWeekError =
+  | 'Already closed'
+  | 'No profile'
+  | 'No closed days'
+  | 'Week not finished'
+  | 'Waiting for weigh-in';
+
 export type CloseWeekResult =
   | { success: true; report: WeekReport }
-  | { success: false; alreadyClosed: true }
-  | { success: false; error: 'No profile' | 'No closed days'
-                           | 'Week not finished' | 'Waiting for weigh-in' };
+  | { success: false; error: CloseWeekError };
 ```
+
+**Un solo discriminante, no tres variantes.** La primera versión de este diseño
+tenía `alreadyClosed: true` en su propio miembro de la unión, separado del
+`error` union. Dos variantes de fallo compartiendo `success: false` obligaban al
+consumidor a chequear la PRESENCIA de una propiedad (`'alreadyClosed' in result`)
+en vez de hacer `switch (result.error)` sobre un único discriminante. Se plegó
+`alreadyClosed` en el mismo union como `'Already closed'` (commit `e72b409`)
+antes de que existiera un solo consumidor real de `CloseWeekResult` — plegarlo
+después, con UI ya escrita contra la forma vieja, cuesta más que hacerlo antes.
 
 | Canal | Parámetros | Devuelve |
 | --- | --- | --- |
@@ -609,11 +645,11 @@ export type CloseWeekResult =
 
 Casos de error, explícitos:
 
-- Sin perfil → `{ success: false, error: 'No profile' }` (espeja `closeDay:1008`)
+- Sin perfil → `{ success: false, error: 'No profile' }` (espeja `nutrition:closeDay`)
 - Sin ningún cierre diario vivo → `error: 'No closed days'`
 - La semana todavía no terminó → `error: 'Week not finished'`
 - **Gate de peso sin cumplir → `error: 'Waiting for weigh-in'`**
-- Ya sellada → `{ success: false, alreadyClosed: true }`
+- Ya sellada → `error: 'Already closed'`
 - `getWeekReport` sobre una semana sin datos o sin perfil → `null`
 
 **`closeWeek` revalida la condición 5, no confía en `getPendingWeeks`.** El gate
