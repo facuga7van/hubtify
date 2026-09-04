@@ -50,6 +50,14 @@ export const changelog: ChangelogEntry[] = [
       },
       {
         category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Con la ventana angosta, el título del Libro del Tesorero salía partido en tres renglones —una palabra cada uno— aplastado por sus propios botones, que además dejaban un montón de pergamino vacío al lado. Ahora los botones bajan solos a su renglón. Y el buscador de transacciones dejó de estar pegado a la tarjeta de arriba',
+          en: 'With a narrow window, the Treasurer\'s Book title came out split across three lines — one word each — crushed by its own buttons, which also left a lot of empty parchment beside them. Now the buttons drop to their own row. And the transaction search box is no longer glued to the card above it',
+        },
+      },
+      {
+        category: 'fix',
         scope: 'hub',
         text: {
           es: 'Ajustes aprovecha todo el ancho de la ventana en vez de apretarse en una columna angosta con medio pergamino vacío al lado',
