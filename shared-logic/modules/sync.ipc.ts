@@ -251,6 +251,7 @@ const USER_DATA_TABLES = [
   'nutrition_weekly_metrics',
   'nutrition_daily_summary',
   'nutrition_daily_closed',
+  'nutrition_weekly_closed',
   'favorite_foods',
   // Only its source = 'user' rows are exported/merged (they are the user's
   // corrections); listing it here also clears it on an account switch, so
@@ -1150,6 +1151,7 @@ export function registerSyncIpcHandlers(): void {
     const weeklyMetrics = db.prepare('SELECT date, weight_kg, waist_cm, updated_at FROM nutrition_weekly_metrics ORDER BY date DESC').all();
     const dailySummary = db.prepare('SELECT date, total_calories_in, bmr, tdee, balance, updated_at FROM nutrition_daily_summary ORDER BY date DESC').all();
     const dailyClosed = db.prepare('SELECT * FROM nutrition_daily_closed ORDER BY date DESC').all();
+    const weeklyClosed = db.prepare('SELECT * FROM nutrition_weekly_closed ORDER BY week_start DESC').all();
     const favoriteFoods = db.prepare('SELECT id, description, calories, source, ai_breakdown AS aiBreakdown, protein_g AS proteinG, carbs_g AS carbsG, fat_g AS fatG, created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt FROM favorite_foods ORDER BY created_at DESC').all();
     // The user's corrections ONLY. Model rows are a per-device network cache,
     // reconstructible for free, and stay local (nutrition migration v17).
@@ -1159,7 +1161,7 @@ export function registerSyncIpcHandlers(): void {
       FROM nutrition_ai_cache WHERE source = 'user' ORDER BY updated_at DESC
     `).all();
 
-    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, favoriteFoods, aiCorrections };
+    return { profile, foodLog, frequentFoods, dailyMetrics, weeklyMetrics, dailySummary, dailyClosed, weeklyClosed, favoriteFoods, aiCorrections };
   });
 
   // ── Nutrition bulk import (merge from Firestore) ──
@@ -1540,6 +1542,34 @@ export function mergeNutritionDataInto(db: SqlDatabase, data: Record<string, unk
           );
           changed = true;
         }
+      }
+    });
+
+    // Sin `deleted_at`: nada en la app puede producir una lápida semanal
+    // (no hay reopenWeek, clearUserData borra duro).
+    if (Array.isArray(d.weeklyClosed)) step(db, 'weeklyClosed', () => {
+      const getWC = db.prepare('SELECT week_start, updated_at FROM nutrition_weekly_closed WHERE week_start = ?');
+      const insertWC = db.prepare(`INSERT INTO nutrition_weekly_closed
+        (week_start, days_closed, days_compliant, avg_consumed, avg_target, weight_start,
+         weight_end, days_steps, days_gym, streak_end, xp_total, closed_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const updateWC = db.prepare(`UPDATE nutrition_weekly_closed SET
+        days_closed = ?, days_compliant = ?, avg_consumed = ?, avg_target = ?, weight_start = ?,
+        weight_end = ?, days_steps = ?, days_gym = ?, streak_end = ?, xp_total = ?,
+        closed_at = ?, updated_at = ? WHERE week_start = ?`);
+
+      for (const raw of d.weeklyClosed) {
+        // La clave es snake_case: el payload viene de un SELECT *, no de WeekReport.
+        if (!isUsableRow(raw, 'weeklyClosed', ['week_start'])) continue;
+        const c = withNormStamps(raw);
+        const local = getWC.get(c.week_start) as { week_start: string; updated_at: string | null } | undefined;
+        const vals = [
+          c.days_closed ?? 0, c.days_compliant ?? 0, c.avg_consumed ?? 0, c.avg_target ?? 0,
+          c.weight_start ?? null, c.weight_end ?? null, c.days_steps ?? 0, c.days_gym ?? 0,
+          c.streak_end ?? 0, c.xp_total ?? 0, c.closed_at ?? null, c.updated_at ?? null,
+        ];
+        if (!local) { insertWC.run(c.week_start, ...vals); changed = true; }
+        else if (isNewerStamp(c.updated_at, local.updated_at)) { updateWC.run(...vals, c.week_start); changed = true; }
       }
     });
 
