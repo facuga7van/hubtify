@@ -871,7 +871,7 @@ export function registerNutritionIpcHandlers(): void {
 
     return db.transaction(() => {
       if (db.prepare('SELECT 1 FROM nutrition_weekly_closed WHERE week_start = ?').get(weekStart)) {
-        return { success: false, alreadyClosed: true };
+        return { success: false, error: 'Already closed' };
       }
 
       const profile = db.prepare('SELECT deficit_target_kcal FROM nutrition_profile WHERE id = 1').get();

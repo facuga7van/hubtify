@@ -72,7 +72,7 @@ describe('nutrition:closeWeek', () => {
     expect(row.closed_at).toBeTruthy();
   });
 
-  it('sellar dos veces devuelve alreadyClosed y no escribe otra fila', () => {
+  it('sellar dos veces devuelve error Already closed y no escribe otra fila', () => {
     closeDay('2026-08-31', 1800);
     weighIn('2026-09-07');
     atNoon('2026-09-07');
@@ -80,7 +80,7 @@ describe('nutrition:closeWeek', () => {
 
     const second = closeWeek(WEEK);
     expect(second.success).toBe(false);
-    expect(second.alreadyClosed).toBe(true);
+    expect(second.error).toBe('Already closed');
 
     const count = testDb.prepare('SELECT COUNT(*) AS n FROM nutrition_weekly_closed').get() as { n: number };
     expect(count.n).toBe(1);

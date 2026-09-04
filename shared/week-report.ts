@@ -107,6 +107,5 @@ export function weeklyXp(daysCompliant: number): number {
  */
 export type CloseWeekResult =
   | { success: true; report: WeekReport }
-  | { success: false; alreadyClosed: true }
-  | { success: false; error: 'No profile' | 'No closed days'
+  | { success: false; error: 'Already closed' | 'No profile' | 'No closed days'
                            | 'Week not finished' | 'Waiting for weigh-in' };
