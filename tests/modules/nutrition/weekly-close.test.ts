@@ -186,33 +186,39 @@ describe('nutrition:getClosedWeeks', () => {
     expect(rows[0].sealed).toBe(true);
   });
 
+  /**
+   * Sella N semanas directo en `nutrition_weekly_closed`, sin pasar por
+   * `closeWeek` (que exigiría día cerrado + pesaje + gate de 7 días por cada
+   * una — 55 veces sería un test lentísimo). El handler bajo prueba sólo LEE
+   * esta tabla, así que sembrarla a mano es fiel al contrato.
+   */
+  function sealDirect(n: number): void {
+    const stmt = testDb.prepare(`
+      INSERT INTO nutrition_weekly_closed (week_start, closed_at, updated_at)
+      VALUES (?, ?, ?)
+    `);
+    testDb.transaction(() => {
+      for (let i = 0; i < n; i++) {
+        const week = shiftDays('2020-01-06', i * 7); // lunes base, hacia adelante
+        stmt.run(week, week, week);
+      }
+    })();
+  }
+
   // Finding 2 de la revisión: en SQLite un LIMIT negativo devuelve TODAS las
   // filas (unbounded), lo opuesto de un límite. getRecentLoggedDays y
   // searchHistory ya se defienden así; getClosedWeeks no lo hacía. Con sólo un
-  // par de semanas selladas en el fixture, contar filas no distingue "todo el
-  // archivo" de "acotado a 52" (ambos dan el mismo número), así que se espía
-  // el valor de LIMIT que realmente llega a SQLite.
-  it('un limit negativo no le pide a SQLite un LIMIT negativo (unbounded)', () => {
-    sealAt('2026-08-24', '2026-08-24');
-    sealAt('2026-08-31', '2026-08-31');
-
-    const originalPrepare = testDb.prepare.bind(testDb);
-    let capturedLimit: unknown;
-    vi.spyOn(testDb, 'prepare').mockImplementation((sql: string) => {
-      const stmt = originalPrepare(sql);
-      if (sql.includes('FROM nutrition_weekly_closed') && sql.includes('LIMIT')) {
-        const originalAll = stmt.all.bind(stmt);
-        (stmt as any).all = (...args: unknown[]) => {
-          capturedLimit = args[0];
-          return originalAll(...(args as []));
-        };
-      }
-      return stmt;
-    });
-
-    closed(-1);
-    expect(typeof capturedLimit).toBe('number');
-    expect(capturedLimit as number).toBeGreaterThan(0);
+  // par de semanas selladas en el fixture, contar filas no distinguía "todo
+  // el archivo" de "acotado a 52" (ambos dan el mismo número) — por eso la
+  // versión anterior de este test espiaba el LIMIT que llegaba a SQLite,
+  // acoplándose a la forma exacta de la query. Sembrando más semanas que el
+  // clamp por defecto (52) y que el techo duro (200), un conteo de filas
+  // discrimina los tres casos sin tocar el statement.
+  it('acota el limit: negativo va al default 52, no a "todas"; el techo es 200', () => {
+    sealDirect(205);
+    expect(closed(-1)).toHaveLength(52);   // el default, no las 205 filas sembradas
+    expect(closed(10)).toHaveLength(10);
+    expect(closed(500)).toHaveLength(200); // el techo duro, no las 205 filas sembradas
   });
 
   // Finding 2: en SQLite un LIMIT no entero tira 'datatype mismatch'.

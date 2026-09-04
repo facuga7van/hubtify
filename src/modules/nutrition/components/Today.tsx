@@ -1086,6 +1086,11 @@ export default function Today() {
       });
       await loadData(date);
       loadPendingDays();
+      // Si este era el único día cerrado (vivo) de una semana pendiente sin
+      // sellar, la semana deja de calificar (requiere >=1 día cerrado) — sin
+      // esto el aviso del Códice quedaba colgado hasta el próximo evento
+      // ajeno (account:switched, settings, sync).
+      loadPendingWeeks();
       window.dispatchEvent(new Event('rpg:statsChanged'));
       notifyNutritionChanged();
     } catch (err) {

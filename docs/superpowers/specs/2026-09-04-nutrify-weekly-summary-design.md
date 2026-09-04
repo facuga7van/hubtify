@@ -1,7 +1,8 @@
 # Nutrify — Resumen semanal (Pergamino de la semana)
 
 Fecha: 2026-09-04
-Estado: diseño aprobado, pendiente de plan de implementación
+Estado: implementado en `feat/nutrify-weekly-summary`. Ver el plan en
+`docs/superpowers/plans/2026-09-04-nutrify-weekly-summary.md`.
 
 ## Problema
 
