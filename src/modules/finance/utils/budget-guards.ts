@@ -58,7 +58,7 @@ function addMonths(month: string, delta: number): string {
  *
  * @returns the category name when THIS load is the one that crossed its monthly
  *          limit and the crossing has not been announced yet; `null` otherwise
- *          (no budget, still inside it, already said, or no bridge).
+ *          (no budget, still inside it, already said, or the read failed).
  */
 export async function checkBudgetOverflow(
   month: string,
@@ -117,7 +117,7 @@ export async function checkBudgetMonthClose(
   if (readFlag(MONTH_MET_KEY(closedMonth))) return null;
 
   const status = await budgetStatus(closedMonth);
-  // No bridge, or a month with nothing to respect: a month cannot be "kept
+  // A failed read, or a month with nothing to respect: a month cannot be "kept
   // inside" limits that were never set, and paying 100 XP for an empty
   // configuration would make the reward worthless.
   if (!status || !Array.isArray(status.categories) || status.categories.length === 0) return null;

@@ -277,7 +277,7 @@ function ChestClickable({ onToggle }: { onToggle?: () => void }) {
     playCoinClink();
     setBounce(true);
     setTimeout(() => setBounce(false), 500);
-    // Opens the chest into its account rows once the accounts bridge is wired.
+    // Opens the chest into its account rows.
     onToggle?.();
   };
 
@@ -444,7 +444,7 @@ export default function Dashboard() {
   const [pendingCC, setPendingCC] = useState<{ ARS: number; USD: number }>({ ARS: 0, USD: 0 });
   const [monthlyExpenses, setMonthlyExpenses] = useState<number[]>([]);
   const [showPrevComparison, setShowPrevComparison] = useState(false);
-  /** Budget vs. reality for the navigated month. `null` = no budgets, or no bridge. */
+  /** Budget vs. reality for the navigated month. `null` = not applicable, or the read failed. */
   const [budgets, setBudgets] = useState<BudgetStatus | null>(null);
   /** Alguno de los cinco paneles del período no cargó. Un aviso, no cinco. */
   const [periodError, setPeriodError] = useState(false);
@@ -454,7 +454,7 @@ export default function Dashboard() {
   const [valued, setValued] = useState<ValuedView | null>(null);
   /** 30-day money-out timeline. `null` = bridge not wired (old chart shows). */
   const [upcoming, setUpcoming] = useState<UpcomingTimeline | null>(null);
-  /** The chest, opened: per-account balances. `null` = bridge not wired. */
+  /** The chest, opened: per-account balances. `null` = not loaded yet, or the read failed. */
   const [accountsOverview, setAccountsOverview] = useState<AccountsOverview | null>(null);
   /**
    * Whether the chest shows its rows. NOT sticky: the list floats over the

@@ -166,9 +166,9 @@ export default function DashboardWidget() {
         category: quickCategory || 'Otros',
         currency: quickCurrency,
         paymentMethod: quickPayment,
-        // Absent while the accounts bridge is not wired — the backend then
-        // applies its own cash→«Efectivo» default. Card purchases never belong
-        // to an account (the statement payment will).
+        // Absent while there are no live accounts — the backend then applies
+        // its own cash→«Efectivo» default. Card purchases never belong to an
+        // account (the statement payment will).
         ...(accountsSupported
           ? { accountId: quickPayment === 'credit_card' ? null : accountIdForSubmit(quickAccount) }
           : {}),
@@ -368,8 +368,8 @@ export default function DashboardWidget() {
             </select>
           </div>
 
-          {/* Which pocket the money leaves / enters. Renders nothing while the
-              accounts bridge is not wired. */}
+          {/* Which pocket the money leaves / enters. Renders nothing while
+              there are no live accounts. */}
           {quickPayment !== 'credit_card' && (
             <div className="coin-dash-quick__meta-row">
               <AccountSelect value={quickAccount} onChange={setQuickAccount} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />

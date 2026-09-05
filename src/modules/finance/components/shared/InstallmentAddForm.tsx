@@ -46,7 +46,7 @@ export default function InstallmentAddForm({ onCreated }: Props) {
   const userOverrodeCategory = useRef(false);
   const [creditCardId, setCreditCardId] = useState('');
   // Pocket every instalment leaves (non-card plans). '' = unresolved default;
-  // hidden and unsent while the accounts bridge is not wired.
+  // hidden and unsent while there are no live accounts.
   const [accountValue, setAccountValue] = useState('');
   const [seedAccountId, setSeedAccountId] = useState<string | null>(null);
   const [accountsSupported, setAccountsSupported] = useState(false);

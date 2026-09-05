@@ -39,8 +39,8 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
   const [payAmountUsd, setPayAmountUsd] = useState(statement.calculatedAmountUsd ?? 0);
   const [paying, setPaying] = useState(false);
   // Which pocket pays the statement. '' = unresolved: the AccountSelect picks
-  // the default (last account used, else «Efectivo»). Hidden while the
-  // accounts bridge is not wired, in which case no account is sent at all.
+  // the default (last account used, else «Efectivo»). Hidden while there are
+  // no live accounts, in which case no account is sent at all.
   const [accountValue, setAccountValue] = useState('');
   const [accountsSupported, setAccountsSupported] = useState(false);
 
@@ -204,7 +204,7 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
                   style={{ width: 110 }} step={0.01} min={0} />
               </>
             )}
-            {/* Renders nothing while the accounts bridge is not wired.
+            {/* Renders nothing while there are no live accounts.
                 El rótulo y su selector viajan juntos: sueltos en una fila que
                 envuelve, «Pagar desde:» terminaba solo al final de un renglón y
                 el desplegable arrancaba el siguiente. */}

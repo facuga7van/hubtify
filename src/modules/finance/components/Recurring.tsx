@@ -169,7 +169,7 @@ export default function Recurring() {
         name: formName, type: formType, amount: parsed, currency: formCurrency, category: formCategory, billingDay: formBillingDay,
         frequency: formFrequency,
         // Every generated instance inherits the account, so the chest sees
-        // the rent leave. Omitted while the accounts bridge is not wired.
+        // the rent leave. Omitted while there are no live accounts.
         ...(accountsSupported ? { accountId: accountIdForSubmit(formAccount) } : {}),
         // Monthly templates bill every month; the anchor only steers the others.
         ...(formFrequency !== 'monthly' && /^\d{4}-\d{2}$/.test(formAnchorMonth) ? { anchorMonth: formAnchorMonth } : {}),

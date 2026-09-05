@@ -9,8 +9,8 @@
  * The `finance:getValuedView` / `finance:getInflationSeries` /
  * `finance:getUpcoming` / `dollar:*` handlers exist in the main process but are
  * not on the context bridge yet (this module may not edit `electron/preload.ts`
- * / `shared/types.ts`). Same degrade-to-null contract as `api-ext.ts`: the UI
- * compiles today and lights up the moment the bridge catches up. What works
+ * / `shared/types.ts`). Degrade-to-null contract: the UI compiles today and
+ * lights up the moment the bridge catches up. What works
  * without the new bridge: cycling ARS↔USD and per-row ledger conversion (the
  * ledger rows already carry `fxRate`, and the current rate comes from the
  * long-exposed `dollarGetRates`).
@@ -70,7 +70,7 @@ export interface UpcomingTimeline {
   totals: { ARS: number; USD: number };
 }
 
-// ── Bridge (feature-detect, same pattern as api-ext.ts) ────────────────────
+// ── Bridge (feature-detect) ────────────────────────────────────────────────
 
 type MaybeApi = Record<string, unknown>;
 

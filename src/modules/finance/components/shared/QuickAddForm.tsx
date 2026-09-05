@@ -46,7 +46,7 @@ interface QuickAddFormProps {
      *  quien tipeaba el precio de vidriera creaba un plan N veces más grande. */
     amountMode: AmountMode;
     creditCardId?: string;
-    /** Omitted while the accounts bridge is not wired (backend maps cash→Efectivo). */
+    /** Omitted while there are no live accounts (backend maps cash→Efectivo). */
     accountId?: string | null;
   }) => void;
   defaultType?: TransactionType;
@@ -365,7 +365,7 @@ export function QuickAddForm({ onSubmit, defaultType = 'expense' }: QuickAddForm
           <option value="credit_card">{t('coinify.creditCard')}</option>
         </select>
         {/* Which pocket the money leaves / enters. Hidden (and harmless) while
-            the accounts bridge is not wired. Card purchases do not touch any
+            there are no live accounts. Card purchases do not touch any
             account until the statement is paid, so the picker steps aside. */}
         {paymentMethod !== 'credit_card' && (
           <AccountSelect value={accountValue} onChange={setAccountValue} onSupported={setAccountsSupported} seedAccountId={seedAccountId} />

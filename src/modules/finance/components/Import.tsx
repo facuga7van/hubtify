@@ -94,7 +94,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   const [cardTouched, setCardTouched] = useState(false);
   const [showCardManager, setShowCardManager] = useState(false);
   // Card-less imports leave a pocket. '' = unresolved (the selector picks the
-  // default); hidden and unsent while the accounts bridge is not wired.
+  // default); hidden and unsent while there are no live accounts.
   const [importAccount, setImportAccount] = useState('');
   const [accountsSupported, setAccountsSupported] = useState(false);
 
@@ -738,7 +738,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
                   )}
             </p>
             {/* No card → the rows leave a pocket right away: which one? The
-                selector renders nothing while the accounts bridge is not wired. */}
+                selector renders nothing while there are no live accounts. */}
             {!creditCardId && (
               <div className="coin-import-card" style={{ marginTop: 8 }}>
                 <label className="coin-import-card__label">

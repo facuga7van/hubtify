@@ -400,7 +400,7 @@ export default function Transactions() {
           date: data.date,
           paymentMethod: data.paymentMethod,
           creditCardId: data.creditCardId,
-          // Absent while the accounts bridge is not wired — the backend then
+          // Absent while there are no live accounts — the backend then
           // applies its own cash→«Efectivo» default.
           ...(data.accountId !== undefined ? { accountId: data.accountId } : {}),
         }));
@@ -809,8 +809,7 @@ export default function Transactions() {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-            {/* Account drill-down: only once the accounts bridge is wired and
-                there is something to drill into. */}
+            {/* Account drill-down: only when there is something to drill into. */}
             {accounts.length > 0 && (
               <select value={filterAccount} onChange={(e) => setFilterAccount(e.target.value)} className="rpg-select"
                 aria-label={t('coinify.accountLabel', 'Cuenta')}>
