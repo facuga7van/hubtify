@@ -28,6 +28,8 @@ export interface Transaction {
   accountId?: string | null;
   /** Las dos patas de una transferencia entre cuentas comparten este id. */
   transferGroupId?: string | null;
+  /** Fecha de COMPRA que imprime el papel (filas importadas). `date` es la del resumen. */
+  purchaseDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }

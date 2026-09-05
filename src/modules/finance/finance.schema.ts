@@ -588,4 +588,39 @@ export const financeMigrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_finance_cards_last4 ON finance_credit_cards(last4);
     `,
   },
+  {
+    namespace: 'finance',
+    version: 20,
+    up: `
+      -- Fecha de COMPRA de una fila importada: la que imprime el papel. Desde
+      -- ahora la fila importada (y la materializada) vive en el mes de su
+      -- statement_period (invariante 1: toda fila con tarjeta tiene date dentro
+      -- del mes de su resumen), y la fecha del papel queda acá para que la
+      -- deduplicación entre lotes siga matcheando (COALESCE(purchase_date, date)).
+      ALTER TABLE finance_transactions ADD COLUMN purchase_date TEXT DEFAULT NULL;
+
+      -- 1. Toda fila importada guarda su fecha de compra (con o sin tarjeta), para que dupCheck matchee.
+      UPDATE finance_transactions
+      SET purchase_date = date
+      WHERE source = 'import' AND purchase_date IS NULL;
+
+      -- 2. Solo las que tienen período y están en el mes equivocado se mueven al mes del resumen,
+      --    conservando el día de compra clampeado al último día del mes.
+      UPDATE finance_transactions
+      SET date = date(
+            statement_period || '-01',
+            '+' || (
+              min(
+                CAST(substr(date, 9, 2) AS INTEGER),
+                CAST(strftime('%d', date(statement_period || '-01', '+1 month', '-1 day')) AS INTEGER)
+              ) - 1
+            ) || ' days'
+          ),
+          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE deleted_at IS NULL
+        AND source = 'import'
+        AND statement_period IS NOT NULL
+        AND substr(date, 1, 7) <> statement_period;
+    `,
+  },
 ];

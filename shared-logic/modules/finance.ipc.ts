@@ -96,6 +96,7 @@ function transactionColumns(alias = ''): string {
   ${p}fx_rate AS fxRate,
   ${p}fx_rate_source AS fxRateSource,
   ${p}statement_period AS statementPeriod,
+  ${p}purchase_date AS purchaseDate,
   ${p}account_id AS accountId,
   ${p}transfer_group_id AS transferGroupId,
   ${p}created_at AS createdAt, ${p}updated_at AS updatedAt

@@ -1188,6 +1188,7 @@ export function registerSyncIpcHandlers(): void {
              account_id AS accountId,
              transfer_group_id AS transferGroupId,
              statement_period AS statementPeriod,
+             purchase_date AS purchaseDate,
              created_at AS createdAt, updated_at AS updatedAt,
              deleted_at AS deletedAt
       FROM finance_transactions ORDER BY date DESC
@@ -1796,9 +1797,9 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
            source, installments, installment_group_id, for_third_party,
            recurring_id, import_batch_id, credit_card_id, impacts_balance,
            installment_number, billed_amount_ars, fx_rate, fx_rate_source,
-           account_id, transfer_group_id, statement_period,
+           account_id, transfer_group_id, statement_period, purchase_date,
            created_at, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       // fx_rate_source follows fx_rate: a remote that brings no rate keeps the
       // local rate AND its provenance. statement_period (v18) uses the same
@@ -1814,6 +1815,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
           account_id = CASE WHEN ? THEN ? ELSE account_id END,
           transfer_group_id = COALESCE(?, transfer_group_id),
           statement_period = CASE WHEN ? THEN ? ELSE statement_period END,
+          purchase_date = CASE WHEN ? THEN ? ELSE purchase_date END,
           updated_at = ?,
           deleted_at = ?
         WHERE id = ?
@@ -1832,6 +1834,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
         const fxRate = t.fxRate ?? null;
         const fxRateSource = t.fxRateSource ?? t.fx_rate_source ?? null;
         const statementPeriod = t.statementPeriod ?? t.statement_period ?? null;
+        const purchaseDate = t.purchaseDate ?? t.purchase_date ?? null;
         if (!local) {
           const result = insertTx.run(
             t.id, t.type, t.amount, t.currency ?? 'ARS', t.category ?? 'Otros',
@@ -1840,7 +1843,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
             t.forThirdParty ?? 0, t.recurringId ?? null, t.importBatchId ?? null,
             t.creditCardId ?? null, t.impactsBalance ?? 1,
             t.installmentNumber ?? null, t.billedAmountArs ?? null, fxRate, fxRateSource,
-            t.accountId ?? null, t.transferGroupId ?? null, statementPeriod,
+            t.accountId ?? null, t.transferGroupId ?? null, statementPeriod, purchaseDate,
             t.createdAt ?? now, remoteUpdatedAt, remoteDeletedAt,
           );
           if (result.changes > 0) changed = true;
@@ -1857,6 +1860,7 @@ export function mergeFinanceDataInto(db: SqlDatabase, data: Record<string, unkno
             ('accountId' in t) ? 1 : 0, t.accountId ?? null,
             t.transferGroupId ?? null,
             ('statementPeriod' in t || 'statement_period' in t) ? 1 : 0, statementPeriod,
+            ('purchaseDate' in t || 'purchase_date' in t) ? 1 : 0, purchaseDate,
             remoteUpdatedAt,
             remoteDeletedAt, t.id,
           );
