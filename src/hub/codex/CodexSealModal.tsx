@@ -1,6 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { BookPage } from '../../shared/components/codex';
 import { QBDividerSection, Section } from '../../shared/components/codex/CodexPrimitives';
@@ -28,15 +27,11 @@ import {
   codexApiReady,
   equippedSealStyleId,
   getDaySummary,
-  getObolosBalance,
-  getRewards,
   getSeals,
   localDateISO,
-  rewardsApiReady,
   sealDay,
   setCodexModalOpen,
 } from './codexApi';
-import { purseHint } from './purse';
 import {
   closeNutritionDay,
   isNutritionDayClosed,
@@ -131,7 +126,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   const { t, i18n } = useTranslation();
   const locale = i18n.language === 'en' ? 'en-US' : 'es-AR';
   const { dialogProps, stopPropagation } = useModalA11y<HTMLDivElement>({ onClose });
-  const navigate = useNavigate();
 
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [seals, setSeals] = useState<DaySeal[]>([]);
@@ -190,23 +184,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   }, [available, date, today]);
 
   useEffect(() => { load(); }, [load]);
-
-  /* ── la bolsa ─────────────────────────────────────
-     Los óbolos se ganan ACÁ y hasta ahora se mencionaban una sola vez, en el
-     instante en que se acuñaban. En la base real: 132 ganados, 0 gastados. El
-     saldo vive donde se gana, y dice para qué alcanza. */
-  const [purse, setPurse] = useState<{ balance: number; rewards: Array<{ id: string; name: string; cost: number }> } | null>(null);
-  const loadPurse = useCallback(() => {
-    if (!rewardsApiReady()) { setPurse(null); return; }
-    Promise.all([getObolosBalance(), getRewards()])
-      .then(([b, r]) => {
-        if (!b) { setPurse(null); return; }
-        setPurse({ balance: b.balance, rewards: r.map((x) => ({ id: x.id, name: x.name, cost: x.cost })) });
-      })
-      .catch(() => setPurse(null));
-  }, []);
-
-  useEffect(() => { loadPurse(); }, [loadPurse]);
 
   /* ── un solo cierre de día ────────────────────────
      Había DOS rituales que pagaban XP por separado: este sello (anunciado en
@@ -267,10 +244,10 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   }, [date, nutriPending, nutriSteps, nutriGym]);
 
   useEffect(() => {
-    const handler = () => { load(); loadPurse(); };
+    const handler = () => load();
     window.addEventListener('account:switched', handler);
     return () => window.removeEventListener('account:switched', handler);
-  }, [load, loadPurse]);
+  }, [load]);
 
   // A different day means a fresh page: drop any previous outcome.
   useEffect(() => {
@@ -308,10 +285,9 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
       obolosGranted: typeof res.obolosGranted === 'number' ? res.obolosGranted : 0,
     });
     setPhase('sealing');
-    loadPurse();
     window.dispatchEvent(new Event('rpg:statsChanged'));
     window.dispatchEvent(new Event(CODEX_SEALED_EVENT));
-  }, [date, load, loadPurse, runNutritionClose]);
+  }, [date, load, runNutritionClose]);
 
   /* ── hold-to-seal (pointer + keyboard) ────────────── */
 
@@ -448,27 +424,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
         return t('rpg.codexUnavailable', 'El cierre del códice todavía no está disponible en esta versión.');
       default:
         return null;
-    }
-  })();
-
-  /** One line that turns the balance into a reason. Never invents a reward. */
-  const purseCopy = (() => {
-    if (!purse) return null;
-    const hint = purseHint(purse.balance, purse.rewards);
-    switch (hint.kind) {
-      case 'no-rewards':
-        return t('rpg.codexPurseNoRewards', 'Escribí en el mostrador qué querés comprarte.');
-      case 'affordable':
-        return t('rpg.codexPurseAffordable', {
-          name: hint.reward.name,
-          defaultValue: 'Te alcanza para «{{name}}».',
-        });
-      case 'closest':
-        return t('rpg.codexPurseClosest', {
-          name: hint.reward.name,
-          missing: hint.missing,
-          defaultValue: '«{{name}}» te queda a {{missing}} óbolos.',
-        });
     }
   })();
 
@@ -709,25 +664,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
             <p className="codex-problem" role="status">{problemCopy}</p>
           )}
         </div>
-
-        {/* ── la bolsa: el saldo, donde se gana ─────── */}
-        {purse && (
-          <div className="codex-purse">
-            <span className="codex-purse__coin" aria-hidden="true"><Obolus width={16} height={16} /></span>
-            <span className="codex-purse__balance">
-              <b className="qb-numeral">{purse.balance}</b>{' '}
-              <span className="qb-hand">{t('rpg.codexPurseUnit', 'óbolos en la bolsa')}</span>
-            </span>
-            <span className="qb-hand codex-purse__hint">{purseCopy}</span>
-            <button
-              type="button"
-              className="codex-purse__link tap-target"
-              onClick={() => { onClose(); navigate('/rewards'); }}
-            >
-              {t('rpg.codexPurseSpend', 'Ir al mostrador')}
-            </button>
-          </div>
-        )}
 
         {/* ── zona 4: el pie ───────────────────────── */}
         <QBDividerSection />
