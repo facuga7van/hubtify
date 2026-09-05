@@ -2,8 +2,6 @@
  * Migración finance v20 (spec 2026-09-05-coinify-integridad):
  *  - `purchase_date`: la fecha de COMPRA que imprime el papel. `date` pasa a
  *    vivir en el mes del resumen (invariante 1).
- *  - v21: un resumen pendiente no tiene «Pago Tarjeta» (invariante 6): las que
- *    generó la versión anterior se retiran (Task 8).
  *
  * Cada migración se corre sobre una base migrada hasta la anterior con filas
  * sembradas por SQL, que es exactamente lo que va a pasar en cada dispositivo.
@@ -117,6 +115,36 @@ describe('finance v20 — purchase_date y date en el mes del resumen', () => {
     seedTx(db, 'del', { date: '2025-05-20', statementPeriod: '2025-08', deletedAt: OLD_STAMP });
     db.exec(V20!.up);
     expect(readTx(db, 'del').date).toBe('2025-05-20');
+  });
+
+  it('una importada con statement_period inválido conserva su date y la migración no revienta', () => {
+    // Sync no valida el formato: '2025-13' pasa el GLOB pero date() da NULL;
+    // '' ni siquiera pasa el GLOB. Sin guards, date = NULL → NOT NULL constraint
+    // failed → rollback de TODA la migración y la app no arranca.
+    const db = dbUpTo(19);
+    seedTx(db, 'bad-month', { date: '2025-05-20', statementPeriod: '2025-13' });
+    seedTx(db, 'empty', { date: '2025-05-20', statementPeriod: '' });
+    seedTx(db, 'short', { date: '2025-05-20', statementPeriod: '2025-8' });
+    seedTx(db, 'imp', { date: '2025-05-20', statementPeriod: '2025-08' });
+    expect(() => db.exec(V20!.up)).not.toThrow();
+    for (const id of ['bad-month', 'empty', 'short']) {
+      const row = readTx(db, id);
+      expect(row.date, id).toBe('2025-05-20');
+      expect(row.purchaseDate, id).toBe('2025-05-20');
+      expect(row.updatedAt, id).toBe(OLD_STAMP);
+    }
+    // La sana del mismo lote sí se mueve: los guards no frenan la migración entera.
+    expect(readTx(db, 'imp').date).toBe('2025-08-20');
+  });
+
+  it('una importada con date no ISO no se toca', () => {
+    const db = dbUpTo(19);
+    seedTx(db, 'dmy', { date: '20/05/2025', statementPeriod: '2025-08' });
+    expect(() => db.exec(V20!.up)).not.toThrow();
+    const row = readTx(db, 'dmy');
+    expect(row.date).toBe('20/05/2025');
+    expect(row.purchaseDate).toBe('20/05/2025');
+    expect(row.updatedAt).toBe(OLD_STAMP);
   });
 
   it('es idempotente: la segunda corrida no cambia nada', () => {

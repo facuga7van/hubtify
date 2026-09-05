@@ -597,6 +597,10 @@ export const financeMigrations: Migration[] = [
       -- statement_period (invariante 1: toda fila con tarjeta tiene date dentro
       -- del mes de su resumen), y la fecha del papel queda acá para que la
       -- deduplicación entre lotes siga matcheando (COALESCE(purchase_date, date)).
+      --
+      -- Ventana conocida: si un dispositivo SIN migrar mergea filas ya migradas
+      -- por otro y recién después corre esta v20, el paso 1 guarda purchase_date
+      -- = date ya movida. Ventana chica y mismo dueño en ambos dispositivos.
       ALTER TABLE finance_transactions ADD COLUMN purchase_date TEXT DEFAULT NULL;
 
       -- 1. Toda fila importada guarda su fecha de compra (con o sin tarjeta), para que dupCheck matchee.
@@ -606,6 +610,10 @@ export const financeMigrations: Migration[] = [
 
       -- 2. Solo las que tienen período y están en el mes equivocado se mueven al mes del resumen,
       --    conservando el día de compra clampeado al último día del mes.
+      --    Los tres GLOB / IS NOT NULL son guards: sync no valida formato, y un
+      --    statement_period o date malformados harían date(...) = NULL →
+      --    NOT NULL constraint failed → rollback de TODA la migración y la app
+      --    no arranca. Esas filas conservan su fecha y no rompen nada.
       UPDATE finance_transactions
       SET date = date(
             statement_period || '-01',
@@ -620,6 +628,9 @@ export const financeMigrations: Migration[] = [
       WHERE deleted_at IS NULL
         AND source = 'import'
         AND statement_period IS NOT NULL
+        AND statement_period GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'
+        AND date(statement_period || '-01') IS NOT NULL
+        AND date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
         AND substr(date, 1, 7) <> statement_period;
     `,
   },
