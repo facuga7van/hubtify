@@ -174,3 +174,55 @@ describe('C8/C9 — el Pago Tarjeta existe solo cuando el resumen está pagado',
     expect(computeMonthlyBalance(harness.db, '2025-11').ARS.expenses).toBe(0);
   });
 });
+
+describe('revisión — LWW, cotización y resúmenes borrados', () => {
+  const OLD_STAMP = '2026-01-01T00:00:00.000Z';
+
+  function updatedAtOf(id: string): string {
+    return (harness.db.prepare('SELECT updated_at AS u FROM finance_credit_card_statements WHERE id = ?').get(id) as { u: string }).u;
+  }
+
+  it('generar dos veces sin cambios no mueve updated_at (si no, un panel offline pisa un pago por LWW)', async () => {
+    await purchase('2025-11-10', 15_000);
+    const id = await invoke<string>('finance:generateStatement', cardId, '2025-11');
+    harness.db.prepare('UPDATE finance_credit_card_statements SET updated_at = ? WHERE id = ?').run(OLD_STAMP, id);
+
+    expect(await invoke('finance:generateStatement', cardId, '2025-11')).toBe(id);
+    expect(updatedAtOf(id)).toBe(OLD_STAMP);
+  });
+
+  it('generar con un monto nuevo sí mueve updated_at', async () => {
+    await purchase('2025-11-10', 15_000);
+    const id = await invoke<string>('finance:generateStatement', cardId, '2025-11');
+    harness.db.prepare('UPDATE finance_credit_card_statements SET updated_at = ? WHERE id = ?').run(OLD_STAMP, id);
+
+    await purchase('2025-11-12', 5_000);
+    expect(await invoke('finance:generateStatement', cardId, '2025-11')).toBe(id);
+    expect(updatedAtOf(id)).not.toBe(OLD_STAMP);
+    expect(statementRow(id)).toMatchObject({ status: 'pending', transactionId: null });
+  });
+
+  it('un repago con otra fecha refresca la cotización congelada', async () => {
+    await purchase('2025-11-10', 15_000);
+    const id = await invoke<string>('finance:generateStatement', cardId, '2025-11');
+    await invoke('finance:payStatement', id, 15_000, 0, undefined, '2025-12-10');
+    expect(payments()[0].fxRate).toBe(1000);
+
+    harness.db.prepare(`INSERT OR REPLACE INTO dollar_cache (id, data, updated_at) VALUES ('rates', ?, datetime('now'))`)
+      .run(JSON.stringify([{ casa: 'blue', nombre: 'Blue', compra: 1190, venta: 1200 }]));
+    await invoke('finance:payStatement', id, 15_000, 0, undefined, '2025-12-12');
+
+    expect(payments()).toHaveLength(1);
+    expect(payments()[0]).toMatchObject({ date: '2025-12-12', fxRate: 1200, fxRateSource: 'process' });
+  });
+
+  it('pagar un resumen soft-borrado devuelve not_found', async () => {
+    await purchase('2025-11-10', 15_000);
+    const id = await invoke<string>('finance:generateStatement', cardId, '2025-11');
+    harness.db.prepare('UPDATE finance_credit_card_statements SET deleted_at = ? WHERE id = ?').run(OLD_STAMP, id);
+
+    expect(await invoke('finance:payStatement', id, 15_000, 0, undefined, '2025-12-10')).toEqual({ ok: false, reason: 'not_found' });
+    expect(payments()).toHaveLength(0);
+    expect(statementRow(id).status).toBe('pending');
+  });
+});

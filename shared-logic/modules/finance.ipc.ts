@@ -143,7 +143,7 @@ function settleStatement(
   const stmt = db.prepare(`
     SELECT id, period_month AS periodMonth,
            transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
-    FROM finance_credit_card_statements WHERE id = ?
+    FROM finance_credit_card_statements WHERE id = ? AND deleted_at IS NULL
   `).get(statementId) as
     { id: string; periodMonth: string; transactionId: string | null; transactionIdUsd: string | null } | undefined;
   if (!stmt) return false;
@@ -163,9 +163,11 @@ function settleStatement(
        import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, account_id, created_at, updated_at)
     VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?, ?)
   `);
+  // Un repago recaptura la cotización: la pata existente la refresca junto
+  // con la fecha, si no quedaría congelada la del primer pago.
   const updateTx = db.prepare(`
     UPDATE finance_transactions
-    SET amount = ?, date = ?, deleted_at = NULL,
+    SET amount = ?, date = ?, deleted_at = NULL, fx_rate = ?, fx_rate_source = ?,
         account_id = CASE WHEN ? THEN ? ELSE account_id END, updated_at = ?
     WHERE id = ?
   `);
@@ -180,7 +182,7 @@ function settleStatement(
     }
     const acc = accountFor(currency);
     if (currentId) {
-      const res = updateTx.run(amount, input.paidDate, acc !== null ? 1 : 0, acc, now, currentId);
+      const res = updateTx.run(amount, input.paidDate, input.fxRate, fxRateSource, acc !== null ? 1 : 0, acc, now, currentId);
       if (res.changes > 0) return currentId;
     }
     const id = genId();
@@ -868,11 +870,12 @@ export function registerFinanceIpcHandlers(): void {
 
     const trx = db.transaction(() => {
       const existing = db.prepare(`
-        SELECT id, status, transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
+        SELECT id, status, calculated_amount AS ars, calculated_amount_usd AS usd,
+               transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
         FROM finance_credit_card_statements
         WHERE credit_card_id = ? AND period_month = ? AND deleted_at IS NULL
       `).get(creditCardId, periodMonth) as
-        { id: string; status: string; transactionId: string | null; transactionIdUsd: string | null } | undefined;
+        { id: string; status: string; ars: number | null; usd: number | null; transactionId: string | null; transactionIdUsd: string | null } | undefined;
 
       // A paid statement is history — never rewrite it.
       if (existing && existing.status === 'paid') return existing.id;
@@ -881,6 +884,18 @@ export function registerFinanceIpcHandlers(): void {
       if (existing?.transactionIdUsd) retireTx.run(now, now, existing.transactionIdUsd);
 
       const { ars, usd } = computeStatementTotals(db, creditCardId, card.closingDay, periodMonth);
+
+      // Nothing changed → no write at all. The dashboard regenerates on every
+      // mount; stamping `updated_at` each time would let a device that is
+      // offline (still `pending`) win the LWW merge over one that already
+      // PAID the statement, reviving it and doubling the payment.
+      if (
+        existing && (ars > 0 || usd > 0)
+        && round2(existing.ars ?? 0) === ars && round2(existing.usd ?? 0) === usd
+        && existing.transactionId === null && existing.transactionIdUsd === null
+      ) {
+        return existing.id;
+      }
 
       if (!existing) {
         if (ars === 0 && usd === 0) return null;
@@ -1082,7 +1097,7 @@ export function registerFinanceIpcHandlers(): void {
     if (!isValidDateString(date)) return fail('invalid_date');
 
     const db = getDb();
-    const stmt = db.prepare('SELECT id FROM finance_credit_card_statements WHERE id = ?').get(statementId);
+    const stmt = db.prepare('SELECT id FROM finance_credit_card_statements WHERE id = ? AND deleted_at IS NULL').get(statementId);
     if (!stmt) return fail('not_found');
 
     const wantedAccount = typeof accountId === 'string' && accountId.trim() !== '' ? accountId.trim() : null;
