@@ -258,8 +258,9 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
       notifyNutritionDayClosed();
       window.dispatchEvent(new Event('rpg:statsChanged'));
     } catch {
-      // Un tropiezo de nutrición no puede impedir sellar el día.
-      setNutriPending(false);
+      // Un tropiezo de nutrición no puede impedir sellar el día. Mismo guard
+      // que arriba: si la página ya es otra, no se toca su formulario.
+      if (dateRef.current === date) setNutriPending(false);
     } finally {
       setNutriBusy(false);
     }
