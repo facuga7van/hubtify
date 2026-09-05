@@ -579,7 +579,7 @@
     "importTitle": "Import Bank Statement",
     "importToggleAll": "Select all / none",
     "importUndo": "Undo",
-    "importUndoConfirm": "Undo this import? {{count}} movements will be removed.",
+    "importUndoConfirm": "Undo this import? {{count}} statement lines will be reverted, along with their projected instalments.",
     "importUndoError": "The import could not be undone",
     "importUndone": "{{count}} movements undone",
     "in": "in",

@@ -579,7 +579,7 @@
     "importTitle": "Importar Resumen Bancario",
     "importToggleAll": "Marcar todo / ninguno",
     "importUndo": "Revertir",
-    "importUndoConfirm": "¿Revertir esta importación? Se eliminarán {{count}} movimientos.",
+    "importUndoConfirm": "¿Revertir esta importación? Se revertirán {{count}} líneas del resumen, con sus cuotas proyectadas.",
     "importUndoError": "No se pudo revertir la importación",
     "importUndone": "{{count}} movimientos revertidos",
     "in": "en",
