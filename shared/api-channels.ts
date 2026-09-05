@@ -233,12 +233,10 @@ export const API_CHANNELS = {
   financeUpdateInstallmentAmount: { channel: 'finance:updateInstallmentAmount', kind: 'invoke' },
   // Finance - Loans
   financeGetLoans: { channel: 'finance:getLoans', kind: 'invoke' },
-  financeGetLoansByPerson: { channel: 'finance:getLoansByPerson', kind: 'invoke' },
   financeAddLoan: { channel: 'finance:addLoan', kind: 'invoke' },
   financeSettleLoan: { channel: 'finance:settleLoan', kind: 'invoke' },
   financeAddLoanPayment: { channel: 'finance:addLoanPayment', kind: 'invoke' },
   financeGetLoanPayments: { channel: 'finance:getLoanPayments', kind: 'invoke' },
-  financeDeleteLoanPayment: { channel: 'finance:deleteLoanPayment', kind: 'invoke' },
   financeCreateThirdPartyPurchase: { channel: 'finance:createThirdPartyPurchase', kind: 'invoke' },
   financeGetActiveLoanSummary: { channel: 'finance:getActiveLoanSummary', kind: 'invoke' },
   // Finance - Recurring
@@ -277,11 +275,9 @@ export const API_CHANNELS = {
   // Finance - Dashboard (new)
   financeGetMonthlyExpenses: { channel: 'finance:getMonthlyExpenses', kind: 'invoke' },
   financeGetCategoryAverages: { channel: 'finance:getCategoryAverages', kind: 'invoke' },
-  financeGetPreviousMonthSummary: { channel: 'finance:getPreviousMonthSummary', kind: 'invoke' },
   // Finance - Backward compat
   financeGetMonthlyTotal: { channel: 'finance:getMonthlyTotal', kind: 'invoke' },
   financeGetActiveLoansCount: { channel: 'finance:getActiveLoansCount', kind: 'invoke' },
-  financeGetTodayTransactionsCount: { channel: 'finance:getTodayTransactionsCount', kind: 'invoke' },
   financeGetCategories: { channel: 'finance:getCategories', kind: 'invoke' },
   financeAddCategory: { channel: 'finance:addCategory', kind: 'invoke' },
   financeDeleteCategory: { channel: 'finance:deleteCategory', kind: 'invoke' },

@@ -862,27 +862,6 @@ describe('loan handlers', () => {
     expect(loan.settled).toBe(0);
   });
 
-  it('groups loans by person (getLoansByPerson)', () => {
-    addLoan(db, 'ln-p1a', { personName: 'Ana', direction: 'lent', amount: 3000, date: '2026-02-01' });
-    addLoan(db, 'ln-p1b', { personName: 'Ana', direction: 'lent', amount: 7000, date: '2026-03-01' });
-    addLoan(db, 'ln-p2', { personName: 'Luis', direction: 'borrowed', amount: 1000, date: '2026-03-05' });
-    // Settled loan for Ana — should not appear
-    addLoan(db, 'ln-p1c', { personName: 'Ana', direction: 'lent', amount: 500, date: '2026-01-01', settled: 1 });
-
-    const rows = db.prepare(`
-      SELECT id, person_name AS personName, direction, type, amount, settled
-      FROM finance_loans
-      WHERE person_name = ? AND settled = 0
-      ORDER BY date DESC
-    `).all('Ana') as Array<Record<string, unknown>>;
-
-    expect(rows).toHaveLength(2);
-    expect(rows.every((r) => r.personName === 'Ana')).toBe(true);
-    expect(rows.map((r) => r.id)).toContain('ln-p1a');
-    expect(rows.map((r) => r.id)).toContain('ln-p1b');
-    expect(rows.map((r) => r.id)).not.toContain('ln-p1c');
-  });
-
   it('settles a loan by setting settled=1 and settled_date', () => {
     addLoan(db, 'ln-settle', { personName: 'Pedro', direction: 'lent', amount: 2000, date: '2026-03-01' });
 

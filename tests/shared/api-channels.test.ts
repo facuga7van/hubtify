@@ -11,11 +11,11 @@ const DESKTOP_ONLY = [
 ].sort();
 
 describe('API_CHANNELS', () => {
-  it('covers the 269 methods of HubtifyApi (253 invoke, 3 send, 13 on)', () => {
-    expect(entries).toHaveLength(269);
+  it('covers the 265 methods of HubtifyApi (249 invoke, 3 send, 13 on)', () => {
+    expect(entries).toHaveLength(265);
     const byKind = { invoke: 0, send: 0, on: 0 };
     for (const [, s] of entries) byKind[s.kind]++;
-    expect(byKind).toEqual({ invoke: 253, send: 3, on: 13 });
+    expect(byKind).toEqual({ invoke: 249, send: 3, on: 13 });
   });
 
   it('never reuses a channel', () => {

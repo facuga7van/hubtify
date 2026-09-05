@@ -685,12 +685,10 @@ export interface HubtifyApi {
 
   // Finance - Loans
   financeGetLoans: (filter?: Record<string, unknown>) => Promise<unknown[]>;
-  financeGetLoansByPerson: (name: string) => Promise<unknown[]>;
   financeAddLoan: (loan: Record<string, unknown>) => Promise<string>;
   financeSettleLoan: (id: string) => Promise<void>;
   financeAddLoanPayment: (loanId: string, payment: Record<string, unknown>) => Promise<string | { ok: false; reason: string }>;
   financeGetLoanPayments: (loanId: string) => Promise<unknown[]>;
-  financeDeleteLoanPayment: (id: string) => Promise<void>;
   financeCreateThirdPartyPurchase: (data: Record<string, unknown>) => Promise<string>;
   financeGetActiveLoanSummary: (asOfMonth?: string) => Promise<unknown>;
 
@@ -784,7 +782,6 @@ export interface HubtifyApi {
   // Finance - Dashboard (new)
   financeGetMonthlyExpenses: (endMonth?: string) => Promise<number[]>;
   financeGetCategoryAverages: () => Promise<Record<string, number>>;
-  financeGetPreviousMonthSummary: () => Promise<{ income: number; expenses: number; month: string }>;
 
   // Finance - Backward compat
   financeGetCategories: () => Promise<string[]>;
@@ -792,7 +789,6 @@ export interface HubtifyApi {
   financeDeleteCategory: (name: string) => Promise<void>;
   financeGetMonthlyTotal: () => Promise<number>;
   financeGetActiveLoansCount: () => Promise<number>;
-  financeGetTodayTransactionsCount: () => Promise<number>;
 
   // Finance - Credit Cards
   financeGetCreditCards: () => Promise<unknown[]>;

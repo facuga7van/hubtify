@@ -1144,13 +1144,6 @@ export function registerFinanceIpcHandlers(): void {
     return result.c;
   });
 
-  ipcHandle('finance:getTodayTransactionsCount', () => {
-    const db = getDb();
-    const today = todayDateString();
-    const result = db.prepare('SELECT COUNT(*) AS c FROM finance_transactions WHERE deleted_at IS NULL AND date = ?').get(today) as { c: number };
-    return result.c;
-  });
-
   // ── Installment Groups ───────────────────────────────
 
   /**
@@ -1179,12 +1172,9 @@ export function registerFinanceIpcHandlers(): void {
              g.created_at AS createdAt,
              (SELECT l.person_name FROM finance_loans l
                WHERE l.installment_group_id = g.id AND l.deleted_at IS NULL
-               ORDER BY l.created_at ASC LIMIT 1) AS thirdPartyName,
-             COUNT(t.id) AS transactionCount
+               ORDER BY l.created_at ASC LIMIT 1) AS thirdPartyName
       FROM finance_installment_groups g
-      LEFT JOIN finance_transactions t ON t.installment_group_id = g.id AND t.deleted_at IS NULL
       WHERE ${conditions.join(' AND ')}
-      GROUP BY g.id
       ORDER BY g.date DESC, g.created_at DESC
     `).all(...params);
   });
@@ -1391,18 +1381,6 @@ export function registerFinanceIpcHandlers(): void {
     `).all(...params);
   });
 
-  ipcHandle('finance:getLoansByPerson', (_e, personName: string) => {
-    const db = getDb();
-    return db.prepare(`
-      SELECT id, person_name AS personName, direction, type, amount, currency,
-             date, description, settled, installment_group_id AS installmentGroupId,
-             settled_date AS settledDate, created_at AS createdAt
-      FROM finance_loans
-      WHERE person_name = ? AND settled = 0 AND deleted_at IS NULL
-      ORDER BY date DESC
-    `).all(personName);
-  });
-
   ipcHandle('finance:addLoan', (_e, loan: {
     personName: string;
     direction: 'lent' | 'borrowed';
@@ -1498,13 +1476,6 @@ export function registerFinanceIpcHandlers(): void {
       WHERE loan_id = ? AND deleted_at IS NULL
       ORDER BY date ASC
     `).all(loanId);
-  });
-
-  ipcHandle('finance:deleteLoanPayment', (_e, id: string) => {
-    const db = getDb();
-    const now = nowIso();
-    db.prepare('UPDATE finance_loan_payments SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
-      .run(now, now, id);
   });
 
   ipcHandle('finance:createThirdPartyPurchase', async (_e, data: {
@@ -1974,21 +1945,6 @@ export function registerFinanceIpcHandlers(): void {
       averages[row.category] = row.total / divisor;
     }
     return averages;
-  });
-
-  // ── C8: Previous month summary ────────────────────────────
-
-  ipcHandle('finance:getPreviousMonthSummary', () => {
-    const db = getDb();
-    const prevMonth = addMonthsToMonth(todayDateString().slice(0, 7), -1);
-    const { start, end } = monthRange(prevMonth);
-
-    const balance = sumIncomeExpenseByCurrency(db, {
-      start, end, currency: 'ARS', balanceScope: 'impacting',
-      excludeCategories: [TRANSFER_CATEGORY],
-    });
-
-    return { income: balance.ARS.income, expenses: balance.ARS.expenses, month: prevMonth };
   });
 
   // ── C5: Export CSV ──────────────────────────────────────────

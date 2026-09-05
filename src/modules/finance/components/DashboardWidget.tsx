@@ -57,13 +57,9 @@ export default function DashboardWidget() {
   const loadData = useCallback(() => {
     setLoadError(false);
     Promise.all([
-      // El total del mes no se pinta acá, pero es la primera lectura que se
-      // rompe cuando el puente no está: va en el mismo `Promise.all` para que
-      // el widget se entere y lo diga.
-      window.api.financeGetMonthlyTotal(),
       window.api.financeGetActiveLoansCount(),
       window.api.financeGetMonthlyBalance(),
-    ]).then(([, count, b]) => {
+    ]).then(([count, b]) => {
       setLoansCount(count);
       const data = b as { ARS?: { income: number; expenses: number }; USD?: { income: number; expenses: number } } | null;
       if (data) {

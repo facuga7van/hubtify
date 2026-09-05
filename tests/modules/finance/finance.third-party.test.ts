@@ -79,14 +79,12 @@ describe('third-party rows carry the person\'s name', () => {
     expect(rows[0].thirdPartyName).toBe('Malena');
   });
 
-  it('finance:getInstallmentGroups resolves it without inflating the row count', async () => {
+  it('finance:getInstallmentGroups resolves it too', async () => {
     await createPurchase();
-    const groups = await invoke<Array<{ thirdPartyName: string | null; transactionCount: number }>>(
-      'finance:getInstallmentGroups',
-    );
+    const groups = await invoke<Array<{ thirdPartyName: string | null }>>('finance:getInstallmentGroups');
     expect(groups).toHaveLength(1);
     expect(groups[0].thirdPartyName).toBe('Malena');
-    expect(groups[0].transactionCount).toBe(3);
+    expect(groups[0]).not.toHaveProperty('transactionCount');
   });
 
   it('leaves thirdPartyName null for an ordinary purchase', async () => {
