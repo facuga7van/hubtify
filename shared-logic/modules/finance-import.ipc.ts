@@ -2,6 +2,7 @@ import { registerHandler as ipcHandle } from '../registry';
 import { getDb } from '../db';
 import { genId } from '../ids';
 import { platform } from '../platform';
+import { todayDateString } from '../../shared/date-utils';
 import { parseGaliciaStatement } from './finance-statement';
 import {
   applyMapping,
@@ -654,7 +655,12 @@ export function registerFinanceImportIpcHandlers(): void {
           if (isPlan && groupId !== null) {
             // La cuota importada cae en el resumen que se está cargando; las que
             // siguen, uno por mes desde ahí, conservando el día de la compra.
-            const anchorMonth = statementPeriod ?? row.date.slice(0, 7);
+            // Sin tarjeta no se guarda statement_period, pero el mes del resumen
+            // sigue siendo el ancla (invariante 4): ninguna proyección nace en un
+            // mes anterior al del resumen que la origina.
+            const anchorMonth = isValidMonthString(statementMonth)
+              ? statementMonth
+              : todayDateString().slice(0, 7);
             const anchorDate = dateInMonthClamped(anchorMonth, Number(row.date.slice(8, 10)));
             for (let n = installmentNumber! + 1; n <= totalInstallments; n++) {
               // Los resúmenes pueden llegar desordenados (primero agosto, después

@@ -15,6 +15,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
+import { todayDateString } from '../../../shared/date-utils';
+import { addMonthsToMonth } from '../../../shared-logic/modules/finance.balance';
 
 const harness = vi.hoisted(() => ({ db: null as unknown as Database.Database }));
 
@@ -189,5 +191,26 @@ describe('C4 — dos unidades del mismo artículo', () => {
     const sept = liveRows().filter((r) => r.n === 2);
     expect(new Set(sept.map((r) => r.groupId)).size).toBe(2);
     expect(new Set(sept.map((r) => r.batchId)).size).toBe(1);
+  });
+});
+
+describe('C6 — sin tarjeta, la proyección se ancla en el mes del resumen', () => {
+  const CUOTA_3_DE_12 = { ...LINE, installmentCurrent: 3, installmentTotal: 12, amountARS: 25_000 };
+
+  it('con statementMonth, las proyectadas arrancan el mes siguiente al resumen', async () => {
+    await invoke('finance:importConfirm', [CUOTA_3_DE_12], '2025-08', 'agosto.pdf', null);
+    const rows = liveRows();
+    expect(rows.map((r) => r.n)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    // La importada sin tarjeta impacta en su fecha de compra (decisión explícita de la spec).
+    expect(rows[0].date).toBe('2025-05-20');
+    expect(rows[1].date).toBe('2025-09-20');
+    expect(rows.slice(1).every((r) => r.date >= '2025-09-01')).toBe(true);
+  });
+
+  it('sin statementMonth válido, el ancla es el mes actual', async () => {
+    await invoke('finance:importConfirm', [CUOTA_3_DE_12], '', 'suelto.pdf', null);
+    const rows = liveRows();
+    const nextMonth = addMonthsToMonth(todayDateString().slice(0, 7), 1);
+    expect(rows[1].date.slice(0, 7)).toBe(nextMonth);
   });
 });
