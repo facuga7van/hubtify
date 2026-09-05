@@ -244,6 +244,28 @@ export interface ExpenseBreakdown {
 
 export type ExpenseBreakdownByCurrency = Record<'ARS' | 'USD', ExpenseBreakdown>;
 
+/**
+ * One live account with its computed balance, as `finance:getAccounts` and
+ * `finance:getAccountsOverview` return it. `src/modules/finance/types.ts`
+ * re-exports it as `FinanceAccount`.
+ */
+export interface FinanceAccountDto {
+  id: string;
+  name: string;
+  kind: 'cash' | 'bank' | 'wallet';
+  currency: 'ARS' | 'USD';
+  initialBalance: number;
+  accountOrder: number;
+  /** initial_balance + ingresos − egresos vivos que impactan balance. */
+  balance: number;
+  /**
+   * Movimientos vivos que apuntan a esta cuenta. Cero = nunca se usó, que no es
+   * lo mismo que una cuenta usada que quedó en cero: el cofre esconde la
+   * primera. Opcional porque un main viejo no la manda.
+   */
+  movements?: number;
+}
+
 // ── Cauldron Types ────────────────────────────────────────
 
 export type CauldronTimerStatus = 'idle' | 'work' | 'work_paused' | 'on_break' | 'break_paused' | 'awaiting_next';
@@ -655,8 +677,8 @@ export interface HubtifyApi {
   financeGetValuedView: (month?: string) => Promise<Record<string, unknown>>;
   financeGetInflationSeries: () => Promise<{ ok: boolean; series: Array<{ month: string; index: number }> | null }>;
   financeGetUpcoming: (days?: number) => Promise<Record<string, unknown>>;
-  financeGetAccounts: () => Promise<Array<Record<string, unknown>>>;
-  financeGetAccountsOverview: () => Promise<{ accounts: Array<Record<string, unknown>>; totalArs: number; totalUsd: number }>;
+  financeGetAccounts: () => Promise<FinanceAccountDto[]>;
+  financeGetAccountsOverview: () => Promise<{ accounts: FinanceAccountDto[]; totalArs: number; totalUsd: number }>;
   financeSaveAccount: (input: Record<string, unknown>) => Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
   financeDeleteAccount: (id: string) => Promise<{ ok: boolean; reason?: string }>;
   financeTransferBetweenAccounts: (input: Record<string, unknown>) =>

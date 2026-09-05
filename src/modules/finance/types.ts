@@ -1,5 +1,7 @@
 // src/modules/finance/types.ts
 
+import type { FinanceAccountDto } from '../../../shared/types';
+
 export type TransactionType = 'expense' | 'income';
 export type PaymentMethod = 'cash' | 'debit' | 'transfer' | 'credit_card';
 export type TransactionSource = 'manual' | 'recurring' | 'import';
@@ -42,22 +44,8 @@ export type AccountKind = 'cash' | 'bank' | 'wallet';
  */
 export const DEFAULT_CASH_ACCOUNT_ID = 'account-cash-default';
 
-export interface FinanceAccount {
-  id: string;
-  name: string;
-  kind: AccountKind;
-  currency: Currency;
-  initialBalance: number;
-  accountOrder: number;
-  /** initial_balance + ingresos − egresos vivos que impactan balance. */
-  balance: number;
-  /**
-   * Movimientos vivos que apuntan a esta cuenta. Cero = nunca se usó, que no es
-   * lo mismo que una cuenta usada que quedó en cero: el cofre esconde la
-   * primera. Opcional porque un main viejo no la manda.
-   */
-  movements?: number;
-}
+/** La fila que devuelve el puente: la forma vive en `shared/types.ts`. */
+export type FinanceAccount = FinanceAccountDto;
 
 /** `finance:getAccountsOverview`: el cofre abierto, filas más totales por moneda. */
 export interface AccountsOverview {

@@ -599,7 +599,7 @@ export default function Dashboard() {
    */
   const loadAccountsOverview = useCallback(() => {
     window.api.financeGetAccountsOverview()
-      .then((overview) => setAccountsOverview(overview as unknown as AccountsOverview))
+      .then(setAccountsOverview)
       .catch(() => setAccountsOverview(null));
   }, []);
 

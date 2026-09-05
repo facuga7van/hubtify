@@ -72,7 +72,7 @@ export function AccountSelect({ value, onChange, onSupported, seedAccountId }: A
     const load = async () => {
       let live: FinanceAccount[] = [];
       try {
-        live = ((await window.api.financeGetAccounts()) as unknown as FinanceAccount[]) ?? [];
+        live = (await window.api.financeGetAccounts()) ?? [];
       } catch (err) {
         console.error('[AccountSelect] financeGetAccounts failed:', err);
       }

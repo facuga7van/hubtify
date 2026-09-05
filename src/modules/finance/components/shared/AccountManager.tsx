@@ -55,7 +55,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
 
   const loadAccounts = useCallback(() => {
     window.api.financeGetAccounts()
-      .then((rows) => setAccounts((rows as unknown as FinanceAccount[]) ?? []))
+      .then((rows) => setAccounts(rows ?? []))
       .catch((err) => { console.error('[AccountManager] financeGetAccounts failed:', err); setAccounts([]); });
   }, []);
 

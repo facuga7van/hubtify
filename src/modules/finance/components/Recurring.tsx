@@ -137,7 +137,7 @@ export default function Recurring() {
   /** Live accounts, to print the name next to each template. Empty when the call fails. */
   const loadAccounts = useCallback(() => {
     window.api.financeGetAccounts()
-      .then((rows) => setAccounts((rows as unknown as FinanceAccount[]) ?? []))
+      .then((rows) => setAccounts(rows ?? []))
       .catch((err) => { console.error('[Recurring] financeGetAccounts failed:', err); setAccounts([]); });
   }, []);
 

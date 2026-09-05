@@ -224,7 +224,7 @@ export default function Transactions() {
   /** Live accounts for the drill-down filter. Empty when the call fails. */
   const loadAccounts = useCallback(() => {
     window.api.financeGetAccounts()
-      .then((rows) => setAccounts((rows as unknown as FinanceAccount[]) ?? []))
+      .then((rows) => setAccounts(rows ?? []))
       .catch((err) => { console.error('[Transactions] financeGetAccounts failed:', err); setAccounts([]); });
   }, []);
 
