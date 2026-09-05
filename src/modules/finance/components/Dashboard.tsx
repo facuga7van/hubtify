@@ -12,18 +12,9 @@ import RpgNumberInput from '../../../shared/components/RpgNumberInput';
 import { formatCurrency, formatCurrencyCompact, currencyPrefix } from '../utils/format';
 import { sliceAngles, sliceShape, ringArc } from '../utils/wheel-paths';
 import { projectionCoords } from '../utils/projection-scale';
-import {
-  getExpenseBreakdown,
-  getExpenseBreakdownForRange,
-  getBudgetStatus,
-  setBudget,
-  hasBudgetSupport,
-  getAccountsOverview,
-  hasAccountsSupport,
-  type AccountsOverview,
-  type ExpenseBreakdownByCurrency,
-  type BudgetStatus,
-} from '../utils/api-ext';
+import { unwrap } from '../utils/result';
+import type { AccountsOverview, BudgetStatus } from '../types';
+import type { ExpenseBreakdownByCurrency } from '../../../../shared/types';
 import AccountManager from './shared/AccountManager';
 import CoinifyStart from './shared/CoinifyStart';
 import { AccountKindGlyph } from './shared/AccountGlyphs';
@@ -499,7 +490,7 @@ export default function Dashboard() {
             window.api.financeGetMonthlyBalance(month) as Promise<MonthlyBalance>,
             window.api.financeGetMonthlyBalance(prevMonth) as Promise<MonthlyBalance>,
             window.api.financeGetCategoryBreakdown(month) as Promise<CategoryBreakdown[]>,
-            getExpenseBreakdown(month),
+            window.api.financeGetExpenseBreakdown(month).catch(() => null),
           ]);
           setBalance(bal);
           setPrevBalance(prev);
@@ -509,7 +500,7 @@ export default function Dashboard() {
           const [bal, cats, bd] = await Promise.all([
             window.api.financeGetBalanceForRange(startMonth, endMonth) as Promise<MonthlyBalance>,
             window.api.financeGetCategoryBreakdownForRange(startMonth, endMonth) as Promise<CategoryBreakdown[]>,
-            getExpenseBreakdownForRange(startMonth, endMonth),
+            window.api.financeGetExpenseBreakdownForRange(startMonth, endMonth).catch(() => null),
           ]);
           setBalance(bal);
           setPrevBalance(null);
@@ -607,8 +598,9 @@ export default function Dashboard() {
    * with the rest of the dashboard and whenever the account manager writes.
    */
   const loadAccountsOverview = useCallback(() => {
-    if (!hasAccountsSupport()) { setAccountsOverview(null); return; }
-    getAccountsOverview().then(setAccountsOverview);
+    window.api.financeGetAccountsOverview()
+      .then((overview) => setAccountsOverview(overview as unknown as AccountsOverview))
+      .catch(() => setAccountsOverview(null));
   }, []);
 
   useEffect(() => { loadAccountsOverview(); }, [loadAccountsOverview, refreshKey]);
@@ -668,11 +660,11 @@ export default function Dashboard() {
    */
   // Budgets are an ARS promise: drawn over converted numbers they would lie,
   // so the whole budget UI only speaks in nominal-ARS mode.
-  const budgetsApply = rangeMode === 'month' && hasBudgetSupport() && mode === 'ars';
+  const budgetsApply = rangeMode === 'month' && mode === 'ars';
 
   const loadBudgets = useCallback((forMonth: string, apply: boolean) => {
     if (!apply) { setBudgets(null); return; }
-    getBudgetStatus(forMonth)
+    window.api.financeGetBudgetStatus(forMonth)
       .then(setBudgets)
       .catch((err) => {
         // Un presupuesto que desaparece de la pantalla sin decir nada es peor
@@ -817,9 +809,9 @@ export default function Dashboard() {
 
   /** `limit === null` clears the budget. Reloads so the wheel and the bars agree. */
   const commitBudget = async (category: string, limit: number | null) => {
-    const res = await setBudget(category, limit);
+    const res = await unwrap(window.api.financeSetBudget(category, limit));
     setEditingBudget(null);
-    if (res && res.ok === false) {
+    if (!res.ok) {
       toast({ type: 'warning', message: t('coinify.saveError', 'Error al guardar') });
       return;
     }

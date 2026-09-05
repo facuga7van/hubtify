@@ -34,11 +34,18 @@ function stubApi(accounts: unknown[]) {
     financeGetCreditCardStatements: () => Promise.resolve([]),
     financeGetActiveLoanSummary: () => Promise.resolve(null),
     financeGetBudgets: () => Promise.resolve([]),
-    financeGetBudgetStatus: () => Promise.resolve([]),
-    // Sin esto `hasAccountsSupport()` da false y el cofre nunca abre.
+    // Forma real del handler: antes devolvía `[]` y nadie lo leía porque el
+    // feature-detect escondía los presupuestos sin `financeSetBudget` en el stub.
+    financeGetBudgetStatus: () => Promise.resolve({ month: '', categories: [], totalLimit: 0, totalSpent: 0 }),
     financeGetAccounts: () => Promise.resolve(accounts),
     financeSaveAccount: () => Promise.resolve({ ok: true, id: 'x' }),
     financeGetAccountsOverview: () => Promise.resolve({ accounts, totalArs: 0, totalUsd: 0 }),
+    // Antes degradaban a null vía api-ext; ahora el dashboard los llama directo.
+    financeGetExpenseBreakdown: () => Promise.resolve(null),
+    financeGetExpenseBreakdownForRange: () => Promise.resolve(null),
+    financeSetBudget: () => Promise.resolve({ ok: true }),
+    financeDeleteAccount: () => Promise.resolve({ ok: true }),
+    financeTransferBetweenAccounts: () => Promise.resolve({ ok: true, transferGroupId: 'tg', expenseId: 'e', incomeId: 'i' }),
     // El dashboard dispara estos al montar; sin ellos revienta antes de pintar.
     financeGenerateRecurringForMonth: () => Promise.resolve({ created: 0 }),
     financeGetRecurring: () => Promise.resolve([]),

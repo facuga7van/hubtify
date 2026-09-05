@@ -18,7 +18,7 @@ import { CategorySelect } from './shared/CategorySelect';
 import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { ChevronUp, ChevronDown, ArrowRight, WarningTriangle, Pencil, CrossMark, Coin, Scroll, Compass } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
-import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../utils/api-ext';
+import { unwrap, failureMessage } from '../utils/result';
 import type { FinanceAccount } from '../types';
 import { rememberCategoryForMerchant } from '../utils/category-mapping';
 import { buildInstallmentGroupPayload, type AmountMode } from '../utils/installment-payload';
@@ -221,10 +221,11 @@ export default function Transactions() {
     setVisibleCount(50);
   }, [filterCategory, filterType, filterPayment, filterAccount, searchQuery]);
 
-  /** Live accounts for the drill-down filter. Empty while the bridge is not wired. */
+  /** Live accounts for the drill-down filter. Empty when the call fails. */
   const loadAccounts = useCallback(() => {
-    if (!hasAccountsSupport()) { setAccounts([]); return; }
-    getAccounts().then((rows) => setAccounts(rows ?? []));
+    window.api.financeGetAccounts()
+      .then((rows) => setAccounts((rows as unknown as FinanceAccount[]) ?? []))
+      .catch((err) => { console.error('[Transactions] financeGetAccounts failed:', err); setAccounts([]); });
   }, []);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);

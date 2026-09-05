@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getAccounts, hasAccountsSupport } from '../../utils/api-ext';
 import { DEFAULT_CASH_ACCOUNT_ID, type FinanceAccount } from '../../types';
 
 /**
  * Account picker for the transaction forms.
  *
- * Feature-detected end to end: while `finance:getAccounts` is not on the
- * context bridge (or there are no live accounts) the component renders nothing
- * and the forms behave exactly as before — the backend then applies its own
- * default mapping (cash → «Efectivo»).
+ * While there are no live accounts (or `finance:getAccounts` fails) the
+ * component renders nothing and the forms behave exactly as before — the
+ * backend then applies its own default mapping (cash → «Efectivo»).
  *
  * Select values: an account id, or {@link NO_ACCOUNT} for "sin cuenta".
  */
@@ -36,7 +34,7 @@ interface AccountSelectProps {
   /** '' = not resolved yet — the component picks the default once accounts load. */
   value: string;
   onChange: (value: string) => void;
-  /** Reports whether the selector is actually usable (bridge + accounts). */
+  /** Reports whether the selector is actually usable (there are live accounts). */
   onSupported?: (supported: boolean) => void;
   /**
    * La cuenta que el historial propone (`finance:getEntryDefaults`), si hay.
@@ -72,13 +70,13 @@ export function AccountSelect({ value, onChange, onSupported, seedAccountId }: A
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!hasAccountsSupport()) {
-        if (!cancelled) { setSupported(false); onSupportedRef.current?.(false); }
-        return;
+      let live: FinanceAccount[] = [];
+      try {
+        live = ((await window.api.financeGetAccounts()) as unknown as FinanceAccount[]) ?? [];
+      } catch (err) {
+        console.error('[AccountSelect] financeGetAccounts failed:', err);
       }
-      const rows = await getAccounts();
       if (cancelled) return;
-      const live = rows ?? [];
       const usable = live.length > 0;
       setAccounts(live);
       setSupported(usable);

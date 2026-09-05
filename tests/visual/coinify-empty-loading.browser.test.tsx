@@ -235,7 +235,7 @@ describe('Mientras carga no se miente: esqueleto, no vacío', () => {
   });
 
   test('el widget del tablero: esqueleto en vez de tres guiones', async () => {
-    stub({ financeGetMonthlyBalance: pending, financeGetMonthlyTotal: pending });
+    stub({ financeGetMonthlyBalance: pending });
     await page.viewport(420, 400);
     wrap(<DashboardWidget />);
     await settle(200);
@@ -248,7 +248,6 @@ describe('Mientras carga no se miente: esqueleto, no vacío', () => {
 describe('Un error se ve: nada se queda en guiones para siempre', () => {
   test('el widget del tablero avisa y ofrece reintentar', async () => {
     stub({
-      financeGetMonthlyTotal: () => Promise.reject(new Error('sin puente')),
       financeGetMonthlyBalance: () => Promise.reject(new Error('sin puente')),
       financeGetActiveLoansCount: () => Promise.reject(new Error('sin puente')),
     });

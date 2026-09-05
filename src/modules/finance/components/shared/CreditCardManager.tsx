@@ -7,7 +7,7 @@ import { useModalA11y } from '../../../../shared/hooks/useModalA11y';
 import { CrossMark, Pencil, Checkmark } from '../../../../shared/components/icons';
 import type { CreditCard } from '../../types';
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
-import { unwrap, failureMessage } from '../../utils/api-ext';
+import { unwrap, failureMessage } from '../../utils/result';
 
 interface Props {
   cards: CreditCard[];

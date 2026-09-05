@@ -5,7 +5,7 @@ import { AnimatedNumber } from './shared/AnimatedNumber';
 import { CategorySelect } from './shared/CategorySelect';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
 import { currencyPrefix, formatCurrency } from '../utils/format';
-import { unwrap, failureMessage } from '../utils/api-ext';
+import { unwrap, failureMessage } from '../utils/result';
 import type { PaymentMethod, Currency } from '../types';
 import { useToast } from '../../../shared/components/useToast';
 import { todayDateString } from '../../../../shared/date-utils';

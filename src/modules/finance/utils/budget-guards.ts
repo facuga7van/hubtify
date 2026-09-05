@@ -8,8 +8,18 @@
  * month starts clean, with no post-mortem of the failure.
  */
 
-import { getBudgetStatus } from './api-ext';
+import type { BudgetStatus } from '../types';
 import { emitBudgetMonthMet } from './rpg-events';
+
+/** `null` si el puente falla: un presupuesto que no se pudo leer no se anuncia. */
+async function budgetStatus(month: string): Promise<BudgetStatus | null> {
+  try {
+    return await window.api.financeGetBudgetStatus(month);
+  } catch (err) {
+    console.error('[budget-guards] financeGetBudgetStatus failed:', err);
+    return null;
+  }
+}
 
 /** One flag per category-month, so "you blew Delivery" is said once, not per load. */
 const OVERFLOW_KEY = (month: string, category: string) =>
@@ -57,7 +67,7 @@ export async function checkBudgetOverflow(
   const key = OVERFLOW_KEY(month, category);
   if (readFlag(key)) return null;
 
-  const status = await getBudgetStatus(month);
+  const status = await budgetStatus(month);
   // Un main viejo (o un handler que devuelve otra forma) hacía explotar esto
   // con «Cannot read properties of undefined (reading 'find')».
   const entry = Array.isArray(status?.categories)
@@ -106,7 +116,7 @@ export async function checkBudgetMonthClose(
   const closedMonth = addMonths(currentMonth, -1);
   if (readFlag(MONTH_MET_KEY(closedMonth))) return null;
 
-  const status = await getBudgetStatus(closedMonth);
+  const status = await budgetStatus(closedMonth);
   // No bridge, or a month with nothing to respect: a month cannot be "kept
   // inside" limits that were never set, and paying 100 XP for an empty
   // configuration would make the reward worthless.

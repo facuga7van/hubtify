@@ -12,7 +12,7 @@ import { resolveInstallmentAmounts, type AmountMode } from '../utils/installment
 import { Gauge, Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { Checkmark, ChevronUp, Scale } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
-import { unwrap, failureMessage } from '../utils/api-ext';
+import { unwrap, failureMessage } from '../utils/result';
 import { todayDateString } from '../../../../shared/date-utils';
 
 interface LoanRow {

@@ -59,6 +59,29 @@ export interface FinanceAccount {
   movements?: number;
 }
 
+/** `finance:getAccountsOverview`: el cofre abierto, filas más totales por moneda. */
+export interface AccountsOverview {
+  accounts: FinanceAccount[];
+  totalArs: number;
+  totalUsd: number;
+}
+
+export interface BudgetCategoryStatus {
+  category: string;
+  limit: number;
+  spent: number;
+  /** Sin clampear: más de 100 es un límite reventado. */
+  pct: number;
+}
+
+/** `finance:getBudgetStatus`. */
+export interface BudgetStatus {
+  month: string;
+  categories: BudgetCategoryStatus[];
+  totalLimit: number;
+  totalSpent: number;
+}
+
 export interface InstallmentGroup {
   id: string;
   description: string;

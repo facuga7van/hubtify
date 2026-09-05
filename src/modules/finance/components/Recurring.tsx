@@ -12,7 +12,7 @@ import { Rune } from '../../../shared/components/codex/CodexPrimitives';
 import { PlayIcon, PauseIcon, Pencil, CrossMark, Checkmark, Scroll } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
-import { unwrap, failureMessage, getAccounts, hasAccountsSupport } from '../utils/api-ext';
+import { unwrap, failureMessage } from '../utils/result';
 import { todayDateString } from '../../../../shared/date-utils';
 
 interface RecurringRow {
@@ -134,10 +134,11 @@ export default function Recurring() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Live accounts, to print the name next to each template. Empty while unwired. */
+  /** Live accounts, to print the name next to each template. Empty when the call fails. */
   const loadAccounts = useCallback(() => {
-    if (!hasAccountsSupport()) { setAccounts([]); return; }
-    getAccounts().then((rows) => setAccounts(rows ?? []));
+    window.api.financeGetAccounts()
+      .then((rows) => setAccounts((rows as unknown as FinanceAccount[]) ?? []))
+      .catch((err) => { console.error('[Recurring] financeGetAccounts failed:', err); setAccounts([]); });
   }, []);
 
   useEffect(() => { load(); loadAccounts(); }, [load, loadAccounts]);

@@ -8,14 +8,7 @@ import { CrossMark, Pencil, Checkmark } from '../../../../shared/components/icon
 import RpgNumberInput from '../../../../shared/components/RpgNumberInput';
 import { AccountKindGlyph } from './AccountGlyphs';
 import { formatCurrency } from '../../utils/format';
-import {
-  deleteAccount,
-  getAccounts,
-  hasTransferSupport,
-  saveAccount,
-  transferBetweenAccounts,
-  failureMessage,
-} from '../../utils/api-ext';
+import { unwrap, failureMessage } from '../../utils/result';
 import type { AccountKind, Currency, FinanceAccount } from '../../types';
 
 interface Props {
@@ -61,7 +54,9 @@ export default function AccountManager({ onClose, onSaved }: Props) {
   const { dialogProps, stopPropagation } = useModalA11y({ onClose });
 
   const loadAccounts = useCallback(() => {
-    getAccounts().then((rows) => setAccounts(rows ?? []));
+    window.api.financeGetAccounts()
+      .then((rows) => setAccounts((rows as unknown as FinanceAccount[]) ?? []))
+      .catch((err) => { console.error('[AccountManager] financeGetAccounts failed:', err); setAccounts([]); });
   }, []);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
@@ -88,13 +83,13 @@ export default function AccountManager({ onClose, onSaved }: Props) {
   const handleCreate = async () => {
     if (!newName.trim()) return;
     const initial = parseFloat(newInitial);
-    const result = await saveAccount({
+    const result = await unwrap(window.api.financeSaveAccount({
       name: newName.trim(),
       kind: newKind,
       currency: newCurrency,
       initialBalance: Number.isFinite(initial) ? initial : 0,
-    });
-    if (result && result.ok === false) {
+    }));
+    if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
       return;
     }
@@ -115,7 +110,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
     const account = accounts.find((a) => a.id === editingId);
     if (!account) return;
     const initial = parseFloat(editInitial);
-    const result = await saveAccount({
+    const result = await unwrap(window.api.financeSaveAccount({
       id: editingId,
       name: editName.trim(),
       kind: editKind,
@@ -124,8 +119,8 @@ export default function AccountManager({ onClose, onSaved }: Props) {
       currency: account.currency,
       initialBalance: Number.isFinite(initial) ? initial : 0,
       order: account.accountOrder,
-    });
-    if (result && result.ok === false) {
+    }));
+    if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
       return;
     }
@@ -140,8 +135,8 @@ export default function AccountManager({ onClose, onSaved }: Props) {
       confirmText: t('coinify.delete'),
     });
     if (!ok) return;
-    const result = await deleteAccount(id);
-    if (result && result.ok === false) {
+    const result = await unwrap(window.api.financeDeleteAccount(id));
+    if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
       return;
     }
@@ -157,9 +152,9 @@ export default function AccountManager({ onClose, onSaved }: Props) {
     }
     setTransferring(true);
     try {
-      const result = await transferBetweenAccounts({ fromId: transferFrom, toId: transferTo, amount });
-      if (!result || result.ok === false) {
-        toast({ type: 'warning', message: failureMessage(result?.reason ?? 'ipc_error', t) });
+      const result = await unwrap(window.api.financeTransferBetweenAccounts({ fromId: transferFrom, toId: transferTo, amount }));
+      if (!result.ok) {
+        toast({ type: 'warning', message: failureMessage(result.reason, t) });
         return;
       }
       toast({ type: 'success', message: t('coinify.transferSuccess', 'Transferencia registrada') });
@@ -172,7 +167,7 @@ export default function AccountManager({ onClose, onSaved }: Props) {
     }
   };
 
-  const canTransfer = hasTransferSupport() && accounts.length >= 2;
+  const canTransfer = accounts.length >= 2;
 
   // Portal clicks bubble up the React tree: stop them here so a host overlay
   // (the importer's) never sees the click that closed this manager.

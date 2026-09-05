@@ -4,7 +4,7 @@ import HelpBubble from '../../../shared/components/HelpBubble';
 import { useToast } from '../../../shared/components/useToast';
 import { useConfirm } from '../../../shared/components/ConfirmDialog';
 import { CARD_TAX_CATEGORY, CATEGORIES, type CreditCard, type ImportParsedRow } from '../types';
-import type { StatementHeaderDto } from '../../../../shared/types';
+import type { StatementHeaderDto, FinanceImportBatch as ImportBatch } from '../../../../shared/types';
 import { reconcile, reconStatus } from '../utils/statement-recon';
 import StatementSummary from './shared/StatementSummary';
 import TableImport from './shared/TableImport';
@@ -13,13 +13,7 @@ import CreditCardManager from './shared/CreditCardManager';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './shared/AccountSelect';
 import { ChevronDown, ChevronRight } from '../../../shared/components/icons';
 import { formatCurrency } from '../utils/format';
-import {
-  getImportBatches,
-  importConfirm,
-  undoImportBatch,
-  hasImportBatchSupport,
-  type ImportBatch,
-} from '../utils/api-ext';
+import { unwrap } from '../utils/result';
 
 interface RowState extends ImportParsedRow {
   included: boolean;
@@ -104,8 +98,6 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   const [importAccount, setImportAccount] = useState('');
   const [accountsSupported, setAccountsSupported] = useState(false);
 
-  const batchSupport = hasImportBatchSupport();
-
   const resetPreview = useCallback(() => {
     setFileName('');
     setRows([]);
@@ -118,9 +110,8 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   }, []);
 
   const loadBatches = useCallback(() => {
-    if (!batchSupport) return;
-    getImportBatches().then((data) => setBatches(data ?? []));
-  }, [batchSupport]);
+    window.api.financeGetImportBatches().then(setBatches).catch(() => setBatches([]));
+  }, []);
 
   useEffect(() => { loadBatches(); }, [loadBatches]);
 
@@ -343,7 +334,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
       // one they leave the chosen account right away.
       const useAccount = accountsSupported && !creditCardId;
       if (useAccount) rememberLastAccountId(importAccount === '' ? NO_ACCOUNT : importAccount);
-      const result = await importConfirm(
+      const result = await window.api.financeImportConfirm(
         toImport, statementMonth, fileName, creditCardId || null,
         useAccount ? accountIdForSubmit(importAccount) : undefined,
       );
@@ -449,12 +440,12 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
 
     setUndoingId(batch.id);
     try {
-      const res = await undoImportBatch(batch.id);
-      if (!res || res.ok === false) {
+      const res = await unwrap(window.api.financeUndoImportBatch(batch.id));
+      if (!res.ok) {
         toast({ type: 'warning', message: t('coinify.importUndoError', 'No se pudo revertir la importación') });
         return;
       }
-      toast({ type: 'coin', message: t('coinify.importUndone', '{{count}} movimientos revertidos', { count: res.deleted }) });
+      toast({ type: 'coin', message: t('coinify.importUndone', '{{count}} movimientos revertidos', { count: res.value.deleted ?? 0 }) });
       // The green "N imported" banner must not outlive the batch it announced.
       setSuccessCount(null);
       loadBatches();
@@ -826,7 +817,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
       {rows.length === 0 && <TableImport onImported={(n) => onImported?.(n)} />}
 
       {/* Previous imports — undo a batch that already landed. */}
-      {batchSupport && batches.length > 0 && (
+      {batches.length > 0 && (
         <div className="coin-import-batches">
           <button
             type="button"

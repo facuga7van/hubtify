@@ -5,7 +5,7 @@ import { useToast } from '../../../../shared/components/useToast';
 import { useConfirm } from '../../../../shared/components/ConfirmDialog';
 import { useModalA11y } from '../../../../shared/hooks/useModalA11y';
 import { CrossMark } from '../../../../shared/components/icons';
-import { unwrap, failureMessage } from '../../utils/api-ext';
+import { unwrap, failureMessage } from '../../utils/result';
 
 interface Props {
   categories: string[];

@@ -11,7 +11,7 @@ import { Section, Gauge, Rune, Cartouche } from '../../../shared/components/code
 import { Compass, CrossMark, ArrowRight, Checkmark, Pencil, Bag } from '../../../shared/components/icons';
 import HelpBubble from '../../../shared/components/HelpBubble';
 import { formatCurrency } from '../utils/format';
-import { unwrap, failureMessage } from '../utils/api-ext';
+import { unwrap, failureMessage } from '../utils/result';
 import { emitMovementDeleted } from '../utils/rpg-events';
 
 interface InstallmentRow {

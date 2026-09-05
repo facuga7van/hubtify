@@ -6,7 +6,7 @@ import { useModalA11y } from '../../../../shared/hooks/useModalA11y';
 import { useToast } from '../../../../shared/components/useToast';
 import { CrossMark } from '../../../../shared/components/icons';
 import { formatCurrency } from '../../utils/format';
-import { unwrap, failureMessage, payStatement } from '../../utils/api-ext';
+import { unwrap, failureMessage } from '../../utils/result';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
 import { todayDateString } from '../../../../../shared/date-utils';
 
@@ -90,7 +90,7 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
     // the chest only ever saw manual entries. The `Pago Tarjeta` row is born
     // here, dated the day it is paid: the modal offers no date, so today.
     const result = await unwrap(
-      payStatement(
+      window.api.financePayStatement(
         statement.id,
         payAmount,
         hasUsd ? payAmountUsd : undefined,
