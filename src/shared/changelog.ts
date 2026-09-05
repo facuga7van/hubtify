@@ -13,6 +13,72 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.10.0',
+    date: '2026-09-05',
+    changes: [
+      {
+        category: 'feat',
+        text: {
+          es: 'El estante de logros pasó de 40 a 184 medallones, y esta vez los nombres van de frente: Una Flecha en la Rodilla, Oghma Infinium, Señor de la Ceniza, Un Lannister Siempre Paga sus Deudas, FUS RO DAH. Si jugaste, los vas a reconocer al toque; si no, la descripción te cuenta igual qué hiciste para ganarlo',
+          en: 'The achievement shelf grew from 40 to 184 medallions, and this time the names come straight at you: Arrow in the Knee, Oghma Infinium, Lord of Cinder, A Lannister Always Pays His Debts, FUS RO DAH. If you have played, you will spot them instantly; if not, the description still tells you what you did to earn it',
+        },
+      },
+      {
+        category: 'feat',
+        text: {
+          es: 'Las medallas ahora vienen en escaleras — Gremio de Aventureros I, II y III, Hoguera Encendida, El Banco de Hierro, Los Nueve Divinos — y los peldaños de arriba se miden en meses y en días distintos del calendario, no en una tarde de entusiasmo. Varios logros que ya tenías subieron de exigencia: la primera semana regalaba demasiado, y una medalla que llega antes de que te importe no premia nada',
+          en: 'Medals now come in ladders — Adventurers Guild I, II and III, Bonfire Lit, The Iron Bank, The Nine Divines — and the upper rungs are measured in months and distinct calendar days, not in one enthusiastic afternoon. Several achievements you already had got harder: the first week was giving away too much, and a medal that lands before you care rewards nothing',
+        },
+      },
+      {
+        category: 'feat',
+        text: {
+          es: 'Ochenta y siete de esos medallones son huevos de pascua: se muestran como «???» y no se persiguen, se encuentran. Un 29 de febrero, un martes 13 con el dado del 2%, un monto capicúa, cuarenta y dos días exactos de silencio. Algunos no le van a caer a nadie en años. Está bien así: el que lo vea va a sacar una captura',
+          en: 'Eighty-seven of those medallions are easter eggs: they show as "???" and you do not chase them, you stumble into them. A February 29th, a Tuesday the 13th with the 2% die, a palindrome amount, exactly forty-two days of silence. Some will not land on anyone for years. That is fine: whoever finds one will take a screenshot',
+        },
+      },
+      {
+        category: 'feat',
+        scope: 'ui',
+        text: {
+          es: 'El sello del Códice se rediseñó de arriba a abajo: un solo veredicto bajo el sello, el cierre de comidas como una línea más del libro con el XP que de verdad pagó el motor, y la salida en el pie. Se fueron los cartuchos, las runas y la bolsa. Entra mejor en el teléfono y se lee de un vistazo',
+          en: 'The Codex seal was redesigned top to bottom: a single verdict under the seal, the meal close as one more line in the ledger showing the XP the engine actually paid, and the exit in the footer. Cartridges, runes and the purse are gone. It fits the phone better and reads at a glance',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Coinify cerró catorce agujeros de integridad. Los que más se sentían: las compras importadas de un resumen aparecían en el mes equivocado, editar una compra con tarjeta la desenganchaba de la tarjeta y del período, y el Pago Tarjeta nacía en cualquier fecha menos la del pago. Ahora la fila importada vive en el mes del resumen, editar conserva tarjeta, saldo y período, y el pago se fecha el día que pagaste',
+          en: 'Coinify closed fourteen integrity holes. The ones you felt most: purchases imported from a statement showed up in the wrong month, editing a card purchase unhooked it from the card and the period, and the Card Payment was born on any date but the payment date. Now the imported row lives in the statement month, editing keeps card, balance and period, and the payment is dated the day you paid',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'finance',
+        text: {
+          es: 'Más ajustes finos en cuotas y resúmenes: materializar una cuota conserva la categoría que corregiste a mano, la proyección sin tarjeta se ancla en el mes del resumen y nunca en el pasado, el contador de vigentes del lote cuenta líneas del papel y no cuotas proyectadas, y saldar un préstamo o actualizar una recurrente fechan en tu día local, no en el de Greenwich',
+          en: 'More fine tuning on installments and statements: materialising an installment keeps the category you fixed by hand, the projection without a card anchors on the statement month and never in the past, the batch counter counts lines on the paper rather than projected installments, and settling a loan or updating a recurring entry is dated on your local day, not Greenwich\'s',
+        },
+      },
+      {
+        category: 'fix',
+        text: {
+          es: 'El Regreso del Héroe ahora se dispara siempre que volvés después de dos semanas. Antes, si en medio del hueco habías tirado una tarea suelta al QuickAdd sin volver a entrar, el reloj se reiniciaba y el logro que existe justamente para recibirte no llegaba nunca',
+          en: 'The Hero\'s Return now fires every time you come back after two weeks. Before, if you had tossed a stray task into QuickAdd mid-gap without really coming back, the clock reset and the achievement that exists precisely to welcome you never arrived',
+        },
+      },
+      {
+        category: 'fix',
+        scope: 'ui',
+        text: {
+          es: 'El cierre de comidas del Códice ya no pinta en otra página si cambiaste de día mientras estaba abierto, y la página del día se aprieta bien por debajo de 640px en vez de desbordar',
+          en: 'The Codex meal close no longer paints onto another page if you changed days while it was open, and the day page squeezes properly below 640px instead of overflowing',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.9',
     date: '2026-09-04',
     changes: [
