@@ -849,7 +849,7 @@ describe('C2 — editar una compra con tarjeta no la desengancha', () => {
       paymentMethod: editFields.paymentMethod,
       // Contrato explícito: la tarjeta que la fila ya tiene. El handler la
       // conserva igual sin este campo; mandarla deja claro que no se toca.
-      creditCardId: original?.creditCardId ?? null,
+      creditCardId: original?.creditCardId,
     }));
     ```
     (`original` ya existe en `:501`.)
