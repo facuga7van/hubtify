@@ -1447,7 +1447,7 @@ export function registerFinanceIpcHandlers(): void {
     const db = getDb();
     const now = nowIso();
     db.prepare('UPDATE finance_loans SET settled = 1, settled_date = ?, updated_at = ? WHERE id = ?')
-      .run(now.slice(0, 10), now, id);
+      .run(todayDateString(), now, id);
   });
 
   /**
@@ -1754,7 +1754,7 @@ export function registerFinanceIpcHandlers(): void {
 
     const db = getDb();
     const now = nowIso();
-    const today = now.slice(0, 10);
+    const today = todayDateString();
     const historyId = genId();
     const current = db.prepare('SELECT amount FROM finance_recurring WHERE id = ?').get(id) as { amount: number } | undefined;
     if (!current) return fail('not_found');
