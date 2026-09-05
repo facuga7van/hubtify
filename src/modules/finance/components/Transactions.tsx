@@ -421,7 +421,13 @@ export default function Transactions() {
       // `utils/rpg-events.ts` for the full list of paths that deliberately stay
       // silent (import, recurring generation, statement payments, edits).
       // The row / group id rides along as ref_id so a delete can reverse it.
-      const rpg = await emitMovementLogged(data.type, newId);
+      const isPlan = data.paymentMethod === 'credit_card' && data.installments > 1;
+      const rpg = await emitMovementLogged(data.type, newId, {
+        // Un plan es UNA compra: viaja el total, no la cuota.
+        amount: isPlan ? buildInstallmentGroupPayload(data).totalAmount : data.amount,
+        currency: data.currency,
+        ...(isPlan ? { installments: data.installments } : {}),
+      });
 
       // One toast, not two: the success message and the XP are the same event.
       const formatted = formatCurrency(data.amount, { currency: data.currency });

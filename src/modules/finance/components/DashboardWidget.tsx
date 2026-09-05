@@ -182,7 +182,7 @@ export default function DashboardWidget() {
       // recurring generation, statement payments and edits deliberately do not —
       // see `utils/rpg-events.ts`. The new row's id is the event's ref, so a
       // later delete from the ledger can reverse exactly this XP.
-      const rpg = await emitMovementLogged(quickType, result.value);
+      const rpg = await emitMovementLogged(quickType, result.value, { amount, currency: quickCurrency });
       const xpSuffix = rpg ? ` · +${rpg.xpGained} XP` : '';
       toast({
         type: 'coin',

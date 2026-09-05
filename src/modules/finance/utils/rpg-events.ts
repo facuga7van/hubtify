@@ -56,6 +56,17 @@ export interface FinanceRpgResult {
 }
 
 /**
+ * What the movement WAS, for the achievement matcher (`the_mirror`,
+ * `lead_into_gold`, the instalment eggs). `amount` is always positive;
+ * `installments` travels only when the alta is an instalment plan.
+ */
+export interface MovementDetails {
+  amount: number;
+  currency: string;
+  installments?: number;
+}
+
+/**
  * Emits `EXPENSE_LOGGED` / `INCOME_LOGGED` for a movement the user typed by hand
  * and returns the XP the engine actually granted (combo + bonus applied), so the
  * caller can put the real number in its toast instead of the base 5.
@@ -73,6 +84,7 @@ export interface FinanceRpgResult {
 export async function emitMovementLogged(
   type: 'expense' | 'income',
   transactionId?: string,
+  details?: MovementDetails,
 ): Promise<FinanceRpgResult | null> {
   try {
     const result = await window.api.processRpgEvent({
@@ -81,6 +93,8 @@ export async function emitMovementLogged(
       payload: {
         xp: MANUAL_MOVEMENT_XP, hp: 0, movementType: type,
         ...(transactionId ? { transactionId } : {}),
+        ...(details ? { amount: Math.abs(details.amount), currency: details.currency } : {}),
+        ...(details?.installments && details.installments > 1 ? { installments: details.installments } : {}),
       },
       timestamp: Date.now(),
     });
