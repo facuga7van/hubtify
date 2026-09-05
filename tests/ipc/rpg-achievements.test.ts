@@ -55,7 +55,7 @@ describe('achievement backfill', () => {
   let db: Database.Database;
   beforeEach(() => { db = setupDb(); });
 
-  it('starts an existing account at 2 / 40, not 0', () => {
+  it('starts an existing account at 3 / N, not 0', () => {
     seedEvent(db, 'quests', 'TASK_COMPLETED', 3);
     db.prepare("UPDATE user_profile SET character_name = 'Aldric'").run();
 
@@ -209,7 +209,7 @@ describe('rpg:getAchievements shape', () => {
 
     const list = getAchievements(db);
     expect(list).toHaveLength(ACHIEVEMENTS_TOTAL);
-    expect(list.filter((a) => a.hidden)).toHaveLength(8);
+    expect(list.filter((a) => a.hidden)).toHaveLength(ACHIEVEMENTS.filter((a) => a.hidden).length);
 
     const firstStep = list.find((a) => a.id === 'first_step')!;
     expect(firstStep.unlocked).toBe(true);

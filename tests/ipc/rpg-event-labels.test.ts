@@ -32,7 +32,9 @@ function walk(dir: string, out: string[] = []): string[] {
 /** Every type handed to processRpgEvent from anywhere, plus the engine's own. */
 function emittedTypes(): Set<string> {
   const types = new Set<string>();
-  for (const file of [...walk('src'), ...walk('electron')]) {
+  // `shared-logic` too: the cauldron handlers emit their own rows
+  // (CAULDRON_LAP_COMPLETED, POMODORO_EXTENDED) without passing through src/.
+  for (const file of [...walk('src'), ...walk('electron'), ...walk('shared-logic')]) {
     // Por línea, no por literal suelto: el tipo puede venir de un ternario
     // (`type: kind === 'income' ? 'INCOME_LOGGED' : 'EXPENSE_LOGGED'`), y un
     // scan de `type: 'X'` a secas se lo pierde y reporta logros muertos falsos.
@@ -78,9 +80,15 @@ describe('ningún logro espera un evento que nadie emite', () => {
   it('todo tipo nombrado por un matcher del catálogo se emite en algún lado', () => {
     const src = read('shared/achievements.ts');
     const referenced = new Set<string>();
-    // `n(c.countByType, 'X')` y `c.byType['X']` son las dos formas de mirar tipos.
-    for (const m of src.matchAll(/countByType,\s*'([A-Z][A-Z_]{3,})'/g)) referenced.add(m[1]);
+    // Las formas de mirar tipos: los contadores (`n(c.countByType, 'X')`,
+    // `n(c.countByTypeToday, 'X')`, `c.byType['X']`) y el evento en curso
+    // (`c.event?.type === 'X'`, `c.event.type === 'X'`).
+    for (const m of src.matchAll(/countByType(?:Today)?,\s*'([A-Z][A-Z_]{3,})'/g)) referenced.add(m[1]);
     for (const m of src.matchAll(/byType\[\s*'([A-Z][A-Z_]{3,})'\s*\]/g)) referenced.add(m[1]);
+    for (const m of src.matchAll(/\.type\s*===\s*'([A-Z][A-Z_]{3,})'/g)) referenced.add(m[1]);
+    for (const m of src.matchAll(/MOVEMENT_TYPES[^\n]*=\s*\[([^\]]*)\]/g)) {
+      for (const t of m[1].matchAll(/'([A-Z][A-Z_]{3,})'/g)) referenced.add(t[1]);
+    }
 
     expect(referenced.size, 'el scan no encontró ningún matcher por tipo').toBeGreaterThan(0);
 

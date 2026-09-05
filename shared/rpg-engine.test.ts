@@ -24,6 +24,7 @@ import {
   ACHIEVEMENTS,
   ACHIEVEMENTS_BY_ID,
   EVENT_MODULES,
+  isFullMoon,
   type AchievementContext,
   type AchievementEventContext,
 } from './achievements';
@@ -48,6 +49,37 @@ function blankContext(overrides: Partial<AchievementContext>): AchievementContex
     distinctHabits: 0,
     sealsCount: 0,
     hasCharacterName: false,
+    bestiaryCategories: 0,
+    budgetsActive: 0,
+    statementImportMonths: 0,
+    loansSettledAged: 0,
+    financeActiveMonths: 0,
+    statementsPaid: 0,
+    financeMovementsToday: [],
+    daysSinceLastInModule: 0,
+    firstEventDateInModule: null,
+    sealsWithFinance: 0,
+    sealsWithAllModules: 0,
+    checksPerHabit: [],
+    epicTasksTotal: 0,
+    repeatedTasksTotal: 0,
+    overdueClosedTotal: 0,
+    habitShieldsSpent: 0,
+    pendingTasks: 0,
+    daysSinceThisHabit: 0,
+    pomodoroDays: 0,
+    pomodoroHoursToday: [],
+    daysSinceLastPomodoro: 0,
+    pomodorosWithTask: 0,
+    firstHourToday: null,
+    lastHourToday: null,
+    gapBeforeToday: 0,
+    daysSinceFirstEvent: 0,
+    mealSlotsToday: [],
+    rewardsRedeemed: 0,
+    obolosSpent: 0,
+    obolosBalance: 0,
+    innNightsLastStay: 0,
     ...overrides,
   };
 }
@@ -244,16 +276,107 @@ describe('sealWindowStatus', () => {
 
 // ── Phase 2: achievement catalogue calibration ─────────────────────────────
 
+/**
+ * Everything at once, with NO event: the backfill sweep over an account that
+ * has done it all. Rule 6 says only tier I and identity states may light up.
+ */
+function maxedOutSweep(): AchievementContext {
+  const thousand = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, 1000]));
+  const TYPES = [
+    'TASK_COMPLETED', 'SUBTASK_COMPLETED', 'HABIT_CHECKED', 'HABIT_SKIPPED', 'TASK_UNCOMPLETED',
+    'TASK_CREATED', 'MEAL_LOGGED', 'DAY_SUMMARY', 'WEEK_SUMMARY', 'DAY_REOPENED', 'EXPENSE_LOGGED',
+    'INCOME_LOGGED', 'LOAN_SETTLED', 'BUDGET_MONTH_MET', 'STATEMENT_IMPORTED', 'POMODORO_COMPLETED',
+    'POMODORO_ABANDONED', 'CAULDRON_LAP_COMPLETED', 'POMODORO_EXTENDED', 'DAY_SEALED', 'ACHIEVEMENT_UNLOCKED',
+  ];
+  return blankContext({
+    stats: { level: 99, xp: 1e6, hp: 100, streak: 999, bestStreak: 999, innSince: '2026-01-01' },
+    totalEvents: 5000,
+    countByType: thousand(TYPES),
+    countByModule: thousand([...EVENT_MODULES]),
+    eventsToday: 50,
+    countByTypeToday: thousand(TYPES),
+    modulesToday: [...EVENT_MODULES],
+    typesToday: TYPES,
+    epicsToday: 9,
+    xpToday: 999,
+    maxComboToday: 2.0,
+    distinctHabits: 50,
+    sealsCount: 1000,
+    hasCharacterName: true,
+    bestiaryCategories: 50,
+    budgetsActive: 10,
+    statementImportMonths: 60,
+    loansSettledAged: 50,
+    financeActiveMonths: 60,
+    statementsPaid: 50,
+    financeMovementsToday: [{ type: 'expense', amount: 1221 }, { type: 'income', amount: 1221 }],
+    sealsWithFinance: 100,
+    sealsWithAllModules: 100,
+    checksPerHabit: Array(20).fill(100),
+    epicTasksTotal: 50,
+    repeatedTasksTotal: 50,
+    overdueClosedTotal: 50,
+    habitShieldsSpent: 5,
+    pomodoroDays: 500,
+    pomodoroHoursToday: [8, 10, 22, 22, 23, 23],
+    pomodorosWithTask: 50,
+    firstHourToday: 5,
+    lastHourToday: 23,
+    gapBeforeToday: 20,
+    daysSinceFirstEvent: 365,
+    mealSlotsToday: ['breakfast', 'lunch', 'snack', 'dinner'],
+    rewardsRedeemed: 10,
+    obolosSpent: 9000,
+    obolosBalance: 9000,
+    innNightsLastStay: 5,
+  });
+}
+
+/** Tier I and identity-state entries: the ONLY ids a sweep may recognise. */
+const SWEEP_ALLOWED = [
+  'first_step', 'awakening', 'first_quest', 'first_habit', 'first_meal', 'first_coin', 'first_brew', 'first_seal',
+  'debt_free', 'ledger_closed', 'scribe_of_accounts',
+  'iron_bank_i', 'lannister_i', 'winter_i', 'bestiary_i', 'path_i',
+  'fighters_guild_i', 'endless_stair_i', 'nine_divines_i', 'rewritten', 'marginalia', 'raised_shield', 'day_off',
+  'isengard_i', 'beacons_i', 'broken_flask', 'full_circle',
+  'second_chance', 'ferrymans_coin', 'deserved_rest', 'long_rest', 'chronicler_i',
+  'squire', 'knight_errant', 'dragonborn', 'steadfast', 'monthly_vow', 'centenary_vow', 'lord_of_cinder',
+];
+
 describe('achievement catalogue', () => {
-  it('has ~40 entries with unique ids', () => {
-    expect(ACHIEVEMENTS.length).toBe(40);
-    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(40);
+  it('has 182 entries with unique ids', () => {
+    expect(ACHIEVEMENTS.length).toBe(182);
+    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(182);
   });
 
-  it('keeps ~20% hidden', () => {
+  it('hides the coincidence tail: 87 hidden, roughly half the catalogue', () => {
     const hidden = ACHIEVEMENTS.filter((a) => a.hidden).length;
-    expect(hidden).toBe(8);
-    expect(hidden / ACHIEVEMENTS.length).toBeCloseTo(0.2, 2);
+    expect(hidden).toBe(87);
+    expect(hidden / ACHIEVEMENTS.length).toBeCloseTo(0.48, 1);
+  });
+
+  it('the backfill recognises only tier I and identity states (rule 6)', () => {
+    const hits = ACHIEVEMENTS.filter((a) => a.check(maxedOutSweep())).map((a) => a.id).sort();
+    expect(hits).toEqual([...SWEEP_ALLOWED].sort());
+  });
+
+  it('every entry above tier I lights up once the same account has an event', () => {
+    const ctx = { ...maxedOutSweep(), event: blankEvent() };
+    const hits = new Set(ACHIEVEMENTS.filter((a) => a.check(ctx)).map((a) => a.id));
+    for (const id of [
+      'iron_bank_iii', 'lannister_iii', 'winter_iii', 'bestiary_iii', 'path_iii', 'master_of_coin',
+      'fighters_guild_iii', 'endless_stair_iii', 'nine_divines_iii', 'the_company', 'isengard_iii',
+      'beacons_iii', 'library_unending', 'tome_of_clear_thought', 'oghma_infinium', 'horn_of_valhalla',
+      'chronicler_iii', 'fellowship', 'dawn_to_dusk', 'sun_to_sun', 'midnight_oil', 'long_table',
+      'sealed_with_gold', 'seal_of_four_hands', 'labelled_potion',
+    ]) {
+      expect(hits.has(id), id).toBe(true);
+    }
+    // The ledger pair eggs additionally need the event itself to be a movement.
+    const onMovement = { ...maxedOutSweep(), event: blankEvent({ type: 'INCOME_LOGGED', moduleId: 'finance' }) };
+    expect(ACHIEVEMENTS_BY_ID.get('the_mirror')!.check(onMovement)).toBe(true);
+    expect(ACHIEVEMENTS_BY_ID.get('lead_into_gold')!.check(onMovement)).toBe(true);
+    expect(ACHIEVEMENTS_BY_ID.get('the_mirror')!.check(ctx)).toBe(false);
   });
 
   it('derives every i18nKey from the id', () => {
@@ -289,19 +412,63 @@ describe('achievement catalogue', () => {
 
   it('needs all four event-emitting modules for Día Perfecto', () => {
     expect(ACHIEVEMENTS_BY_ID.get('perfect_day')!.check(
-      blankContext({ modulesToday: ['quests', 'nutrition', 'finance'] }),
+      blankContext({ modulesToday: ['quests', 'nutrition', 'finance'], event: blankEvent() }),
     )).toBe(false);
     expect(ACHIEVEMENTS_BY_ID.get('perfect_day')!.check(
-      blankContext({ modulesToday: [...EVENT_MODULES, 'rpg'] }),
+      blankContext({ modulesToday: [...EVENT_MODULES, 'rpg'], event: blankEvent() }),
     )).toBe(true);
+    // A day-scoped conjunction is earned in the act, never by the sweep.
+    expect(ACHIEVEMENTS_BY_ID.get('perfect_day')!.check(
+      blankContext({ modulesToday: [...EVENT_MODULES] }),
+    )).toBe(false);
   });
 
   it('never asks for more than 2000 of anything (no grind)', () => {
     // The Cronista family is the single sanctioned counting ladder.
     const counting = ACHIEVEMENTS.filter((a) => a.id.startsWith('chronicler_'));
     expect(counting).toHaveLength(3);
-    expect(ACHIEVEMENTS_BY_ID.get('chronicler_iii')!.check(blankContext({ totalEvents: 1999 }))).toBe(false);
-    expect(ACHIEVEMENTS_BY_ID.get('chronicler_iii')!.check(blankContext({ totalEvents: 2000 }))).toBe(true);
+    const live = (totalEvents: number) => blankContext({ totalEvents, event: blankEvent() });
+    expect(ACHIEVEMENTS_BY_ID.get('chronicler_iii')!.check(live(1999))).toBe(false);
+    expect(ACHIEVEMENTS_BY_ID.get('chronicler_iii')!.check(live(2000))).toBe(true);
+    // Cronista II and III are earned in the act, never handed out by the sweep.
+    expect(ACHIEVEMENTS_BY_ID.get('chronicler_iii')!.check(blankContext({ totalEvents: 2000 }))).toBe(false);
+  });
+
+  it('floors the XP before comparing (two decimals in storage)', () => {
+    const beast = ACHIEVEMENTS_BY_ID.get('the_number')!;
+    expect(beast.check(blankContext({ xpToday: 666.37, event: blankEvent() }))).toBe(true);
+    expect(beast.check(blankContext({ xpToday: 665.99, event: blankEvent() }))).toBe(false);
+    expect(beast.check(blankContext({ xpToday: 666 }))).toBe(false);
+  });
+
+  it('reads the ledger eggs off the movement payload', () => {
+    const move = (amount: number, extra: Partial<AchievementEventContext> = {}) => blankContext({
+      event: blankEvent({ type: 'EXPENSE_LOGGED', moduleId: 'finance', payload: { amount }, ...extra }),
+    });
+    expect(ACHIEVEMENTS_BY_ID.get('capicua')!.check(move(1221))).toBe(true);
+    expect(ACHIEVEMENTS_BY_ID.get('capicua')!.check(move(121))).toBe(false);
+    expect(ACHIEVEMENTS_BY_ID.get('perfect_figure')!.check(move(7777))).toBe(true);
+    expect(ACHIEVEMENTS_BY_ID.get('perfect_figure')!.check(move(7778))).toBe(false);
+    expect(ACHIEVEMENTS_BY_ID.get('a_single_coin')!.check(move(1))).toBe(true);
+    // 2026-03-21 → DDMM = 2103.
+    expect(ACHIEVEMENTS_BY_ID.get('the_date_in_the_sum')!.check(move(2103))).toBe(true);
+    expect(ACHIEVEMENTS_BY_ID.get('the_date_in_the_sum')!.check(move(321))).toBe(false);
+    // A task is never a movement, whatever its payload says.
+    expect(ACHIEVEMENTS_BY_ID.get('a_single_coin')!.check(
+      blankContext({ event: blankEvent({ payload: { amount: 1 } }) }),
+    )).toBe(false);
+  });
+
+  it('the moon helper knows a full moon from a new one', () => {
+    expect(isFullMoon('2026-03-03')).toBe(true);   // full moon 2026-03-03 11:38 UTC
+    expect(isFullMoon('2000-01-21')).toBe(true);   // full moon 2000-01-21 04:40 UTC
+    expect(isFullMoon('2026-02-17')).toBe(false);  // new moon
+    expect(isFullMoon('2026-03-10')).toBe(false);  // last quarter
+    // About two nights per synodic month.
+    let nights = 0;
+    for (let d = 1; d <= 30; d++) if (isFullMoon(`2026-04-${String(d).padStart(2, '0')}`)) nights++;
+    expect(nights).toBeGreaterThanOrEqual(1);
+    expect(nights).toBeLessThanOrEqual(3);
   });
 
   it('survives an empty context without throwing', () => {
@@ -313,7 +480,7 @@ describe('achievement catalogue', () => {
 
   it('unlocks exactly the two backfill entries on a used-but-unmigrated account', () => {
     // What every existing install already satisfies: some history, a named
-    // character, and nothing else. The shelf must read 2 / 40.
+    // character, and nothing else. The shelf must read 2 / N.
     const ctx = blankContext({ totalEvents: 12, hasCharacterName: true });
     const hits = ACHIEVEMENTS.filter((a) => a.check(ctx)).map((a) => a.id);
     expect(hits.sort()).toEqual(['awakening', 'first_step']);

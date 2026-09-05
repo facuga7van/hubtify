@@ -14,6 +14,7 @@ import {
   backfillAchievements,
 } from '../../shared-logic/modules/rpg-handlers';
 import { sealXp, MAX_VIGOR, isMeaningfulEvent } from '../../shared/rpg-engine';
+import { ACHIEVEMENT_XP } from '../../shared/achievements';
 import { setEventSink } from '../../shared-logic/events';
 import { pinClockToNoon } from '../helpers/pin-clock';
 
@@ -430,10 +431,15 @@ describe('[bajo] the post-commit reward layer never writes a duplicate 0-XP row'
     expect(rows[0].xp).toBe(result.xpGained);
     expect(stats(db).xp).toBe(result.xpGained);
 
-    // And the undo now reverses the real row, not a phantom.
+    // And the undo now reverses the real row, not a phantom. The undo is also
+    // the first TASK_UNCOMPLETED of the account, so the reward layer (which
+    // the spy silenced on the first event) now pays its flat +25 per unlock —
+    // `rewritten` among them, the onboarding egg that teaches undo is free.
+    // What must be exactly zero is the EVENT economy, not the shelf's.
     const undo = untask(db, 't1');
     expect(undo.xpGained).toBe(-result.xpGained);
-    expect(stats(db).xp).toBe(0);
+    expect(undo.achievementIds).toContain('rewritten');
+    expect(stats(db).xp).toBe(ACHIEVEMENT_XP * undo.achievementIds.length);
   });
 });
 
