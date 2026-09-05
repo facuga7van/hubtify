@@ -177,14 +177,9 @@ export interface AchievementContext {
   readonly daysSinceLastInModule: number;
   /** Local date (YYYY-MM-DD) of the first event of the current event's module, or null. */
   readonly firstEventDateInModule: string | null;
-  /** Day seals whose `modules` include 'finance'. */
-  // TODO(achv2-catalog): not in the contract table — ENGINE: COUNT(*) FROM day_seals
-  // WHERE modules carries 'finance' (the column is the JSON array the seal payload
-  // also ships). Needed by `sealed_with_gold`.
+  /** Day seals whose `modules` (JSON array) include 'finance'. */
   readonly sealsWithFinance: number;
   /** Day seals whose `modules` include all four EVENT_MODULES. */
-  // TODO(achv2-catalog): not in the contract table — ENGINE: COUNT(*) FROM day_seals
-  // whose modules include every id in EVENT_MODULES. Needed by `seal_of_four_hands`.
   readonly sealsWithAllModules: number;
 
   // ── Questify ─────────────────────────────────────────────────────────────
@@ -214,9 +209,6 @@ export interface AchievementContext {
   /** Whole days since the previous POMODORO_COMPLETED, measured before the insert. 0 if none. */
   readonly daysSinceLastPomodoro: number;
   /** POMODORO_COMPLETED rows that carried a payload.taskId. */
-  // TODO(achv2-catalog): not in the contract table — ENGINE: COUNT(*) FROM rpg_events
-  // WHERE event_type='POMODORO_COMPLETED' AND json_extract(payload,'$.taskId') IS NOT NULL.
-  // Needed by `labelled_potion`.
   readonly pomodorosWithTask: number;
 
   // ── Transversales ────────────────────────────────────────────────────────

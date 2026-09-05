@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Códice de Logros — Selección v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#2b2118; --ink-soft:#4a3c2e; --ink-faded:#7a6a58;
+  --parch-0:#f4e9d2; --parch-1:#ece0c4; --parch-2:#e0d1ae; --parch-3:#cfbd93;
+  --gold:#b8912f; --gold-light:#d9b558; --gold-dark:#8a6c1f;
+  --leather:#6b4d2e; --leather-light:#8a6740; --leather-dark:#4a3520;
+  --rubric:#9b2c2c; --moss:#4f6b3a;
+  --ff-display:'UnifrakturCook',serif; --ff-body:'IM Fell English',Georgia,serif;
+  --ff-accent:'IM Fell English SC',Georgia,serif; --ff-mono:'Fira Code',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--ff-body);color:var(--ink);background:var(--parch-1);
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(255,255,255,.5),transparent 60%),
+                   radial-gradient(ellipse at 80% 100%,rgba(107,77,46,.12),transparent 55%);
+  background-attachment:fixed;font-size:17px;line-height:1.5}
+header{position:sticky;top:0;z-index:10;background:var(--leather-dark);
+  border-bottom:3px solid var(--gold-dark);color:var(--parch-0);
+  padding:.6rem 1.1rem;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+h1{font-family:var(--ff-display);font-size:1.75rem;margin:0 0 .3rem;color:var(--gold-light);font-weight:400}
+.bar{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+button{font-family:var(--ff-accent);font-size:.92rem;cursor:pointer;background:var(--parch-2);
+  color:var(--ink);border:2px solid var(--leather);border-radius:3px;padding:.24rem .62rem;transition:.12s}
+button:hover{background:var(--gold-light);border-color:var(--gold-dark)}
+button.on{background:var(--gold);border-color:var(--gold-dark);color:#fff}
+.count{font-family:var(--ff-mono);font-size:.92rem;color:var(--gold-light);margin-left:auto;white-space:nowrap}
+.count b{color:#fff;font-size:1.15rem}
+main{max-width:1010px;margin:0 auto;padding:1.2rem 1rem 6rem}
+h2{font-family:var(--ff-display);font-weight:400;font-size:1.55rem;color:var(--leather-dark);
+  border-bottom:2px solid var(--gold);padding-bottom:.2rem;margin:2.1rem 0 .85rem}
+h2:first-of-type{margin-top:.5rem}
+.intro{background:var(--parch-0);border-left:5px solid var(--rubric);padding:.8rem 1rem;
+  margin-bottom:1.3rem;border-radius:0 4px 4px 0}
+.intro p{margin:.4rem 0}
+.intro b{color:var(--leather-dark)}
+.card{background:var(--parch-0);border:1px solid var(--parch-3);border-left:5px solid var(--parch-3);
+  border-radius:0 5px 5px 0;padding:.6rem .85rem;margin-bottom:.5rem;transition:.12s}
+.card.sel{border-left-color:var(--moss);background:#f7f1e0;box-shadow:0 2px 8px rgba(79,107,58,.18)}
+.card.warn{border-left-color:var(--rubric)}
+.card.sel.warn{border-left-color:var(--moss)}
+.card.fam{margin-left:1.6rem;border-left-style:dashed}
+.head{display:flex;align-items:flex-start;gap:.55rem}
+.head input[type=checkbox]{width:21px;height:21px;margin-top:.18rem;accent-color:var(--moss);cursor:pointer;flex:0 0 auto}
+.num{font-family:var(--ff-mono);font-size:.82rem;color:var(--ink-faded);flex:0 0 auto;padding-top:.32rem;min-width:2.5em}
+.titlewrap{flex:1 1 auto;min-width:0}
+.title{width:100%;font-family:var(--ff-accent);font-size:1.15rem;color:var(--leather-dark);
+  background:transparent;border:1px solid transparent;border-radius:3px;padding:.14rem .3rem}
+.title:hover{border-color:var(--parch-3)}
+.title:focus{outline:none;background:#fff;border-color:var(--gold)}
+.tags{display:flex;gap:.28rem;flex-wrap:wrap;margin-top:.18rem}
+.tag{font-family:var(--ff-mono);font-size:.66rem;padding:.05rem .36rem;border-radius:2px;
+  background:var(--parch-2);color:var(--ink-soft);border:1px solid var(--parch-3)}
+.tag.hid{background:var(--leather);color:var(--parch-0);border-color:var(--leather-dark)}
+.tag.cost{background:var(--gold-light);border-color:var(--gold-dark)}
+.tag.tier{background:var(--leather-light);color:#fff;border-color:var(--leather-dark);font-weight:500}
+.tag.when{background:#dfe8d4;border-color:#a9bd97}
+.tag.rar{background:#e8dcc0}
+.tag.w{background:var(--rubric);color:#fff;border-color:#6d1f1f}
+.tag.nw{background:#2f5d8a;color:#fff;border-color:#1d3c5c}
+.body{margin:.35rem 0 0 calc(21px + .55rem + 2.5em + .55rem)}
+label.f{font-family:var(--ff-accent);font-size:.74rem;color:var(--ink-faded);display:block;margin:.32rem 0 .08rem}
+textarea{width:100%;font-family:var(--ff-body);font-size:.95rem;color:var(--ink);line-height:1.4;
+  background:transparent;border:1px solid transparent;border-radius:3px;padding:.18rem .3rem;
+  resize:vertical;overflow:hidden}
+textarea:hover{border-color:var(--parch-3)}
+textarea:focus{outline:none;background:#fff;border-color:var(--gold)}
+textarea.trig{font-family:var(--ff-mono);font-size:.83rem;color:var(--ink-soft)}
+.wink{font-style:italic;color:var(--ink-faded);font-size:.88rem;margin-top:.3rem}
+.warnmsg{background:#f6e3e3;border-left:3px solid var(--rubric);padding:.32rem .6rem;
+  font-size:.85rem;margin-top:.35rem;border-radius:0 3px 3px 0}
+.edited{font-family:var(--ff-mono);font-size:.68rem;color:var(--moss)}
+.famhdr{font-family:var(--ff-accent);font-size:1.05rem;color:var(--leather);margin:1.1rem 0 .35rem;
+  padding-left:.2rem;border-left:4px solid var(--gold)}
+#out{position:fixed;inset:5% 5%;z-index:50;display:none;flex-direction:column;background:var(--parch-0);
+  border:3px solid var(--leather);border-radius:6px;box-shadow:0 12px 50px rgba(0,0,0,.5);padding:1rem}
+#out.show{display:flex}
+#out textarea{flex:1;font-family:var(--ff-mono);font-size:.8rem;background:#fff;
+  border:1px solid var(--parch-3);overflow:auto;resize:none;white-space:pre}
+#veil{position:fixed;inset:0;background:rgba(43,33,24,.6);z-index:40;display:none}
+#veil.show{display:block}
+.hidden{display:none !important}
+@media(max-width:640px){.body{margin-left:0}body{font-size:16px}.card.fam{margin-left:.5rem}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Códice de Logros — Selección v2</h1>
+  <div class="bar">
+    <button data-f="all" class="on">Todas</button>
+    <button data-f="sel">Marcadas</button>
+    <button data-f="unsel">Sin marcar</button>
+    <button data-f="A">Vía de progresión</button>
+    <button data-f="B">Huevos</button>
+    <button data-f="tier">Solo escaleras</button>
+    <button data-f="new">Nuevas de esta ronda</button>
+    <button data-f="hidden">Ocultas</button>
+    <button data-f="free">Costo cero</button>
+    <button data-f="warn">Con aviso</button>
+    <button id="exp" style="background:var(--gold);border-color:var(--gold-dark);color:#fff">Exportar</button>
+    <button id="clr">Limpiar</button>
+    <span class="count"><b id="n">0</b> / <span id="tot">0</span></span>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <p><b>Versión 2 — recalibrada.</b> Umbrales subidos, 20 escaleras nuevas, nombres a referencia
+    directa, y 23 entradas eliminadas. Medición previa: la semana 1 daba el <b>27%</b> del catálogo
+    contra un 6% objetivo — sobrepaso de 4,6×.</p>
+    <p>Marcá lo que entra. Editá título, descripción y trigger haciendo clic encima; se guarda solo.
+    Al terminar, <b>Exportar</b> y pegámelo en el chat.</p>
+    <p style="font-size:.9rem;color:var(--ink-soft)"><b>La regla que manda</b> no es ningún porcentaje:
+    <i>ningún período de 30 días del primer año puede terminar sin un solo desbloqueo.</i></p>
+  </div>
+  <div id="list"></div>
+</main>
+
+<div id="veil"></div>
+<div id="out">
+  <div class="bar" style="margin-bottom:.6rem">
+    <button id="cp" style="background:var(--gold);border-color:var(--gold-dark);color:#fff">Copiar</button>
+    <button id="cls">Cerrar</button>
+    <span class="count" style="color:var(--ink-soft)">Pegá esto en el chat</span>
+  </div>
+  <textarea id="outtxt" readonly></textarea>
+</div>
+
+<script>
+// p: A=vía de progresión, B=huevo, X=cambio a una entrada ya publicada
+// n nuevo de esta ronda · h oculto · c costo · f familia · T tier · k cuándo cae
+const D=[
+// ══ CAMBIOS A LAS 40 YA PUBLICADAS ══
+{n:1,p:"X",g:"Cambios a lo ya publicado",id:"polymath",h:0,c:"0",k:"mes 1",t:"Polímata",d:"Sin cambio de copy. Solo sube el umbral.",x:"typesToday >= 5  →  >= 7",w:"Caía en la semana 1. Siete tipos distintos en un día ya exige cruzar módulos."},
+{n:2,p:"X",g:"Cambios a lo ya publicado",id:"golden_day",h:0,c:"0",k:"mes 1",t:"Día Dorado",d:"Sin cambio de copy. Solo sube el umbral.",x:"xpToday >= 200  →  >= 350",w:"200 XP se junta en una tarde de entusiasmo."},
+{n:3,p:"X",g:"Cambios a lo ya publicado",id:"epic_quest",h:0,c:"0",k:"mes 1",t:"Gesta Épica",d:"Sin cambio de copy. Solo sube el umbral.",x:"TASK_COMPLETED hoy >= 10  →  >= 12",w:"Ajuste fino para dejarle sitio al Gremio de Guerreros I (8)."},
+{n:4,p:"X",g:"Cambios a lo ya publicado",id:"deep_work",h:0,c:"0",k:"semana 3",t:"Trabajo Profundo",d:"Sin cambio de copy. Solo sube el umbral.",x:"POMODORO_COMPLETED hoy >= 4  →  >= 6",w:"Cuatro pomodoros es un martes cualquiera."},
+{n:5,p:"X",g:"Cambios a lo ya publicado",id:"chronicler_i",h:0,c:"0",k:"mes 1",t:"Cronista I",d:"Sin cambio de copy. Solo sube el umbral.",x:"totalEvents >= 100  →  >= 200",w:"El peldaño I de la única escalera que el diseño ya permitía estaba muy bajo."},
+{n:6,p:"X",g:"Cambios a lo ya publicado",id:"chronicler_ii",h:0,c:"0",k:"mes 5",t:"Cronista II",d:"Sin cambio de copy. Solo sube el umbral.",x:"totalEvents >= 500  →  >= 750",w:"Corre el medio de la escalera para que el III (2000) no quede tan lejos."},
+{n:7,p:"X",g:"Cambios a lo ya publicado",id:"lucky_strike",h:1,c:"0",k:"semana 1",t:"Golpe de Suerte",d:"Sacaste el dado más alto de la tabla. No pasa seguido, pero tampoco es un milagro.",x:"SIN cambio de umbral — solo se reescribe la descripción",w:"No está mal calibrado: está mal ETIQUETADO. Con ~15 eventos/día es 1-0.98^105 = 88% en la primera semana. La desc actual promete 'dos por ciento de probabilidad' y le cae el martes. La rareza real vive en Dados Cargados y La Hora Bruja.",v:"Es la única entrada de esta lista donde NO se toca el predicado. Solo el copy."},
+
+// ══ COINIFY — escaleras ══
+{n:8,p:"A",g:"Coinify",f:"El Banco de Hierro",T:"I",id:"iron_bank_i",h:0,c:"C",k:"mes 3",nw:1,t:"Escriba de Braavos",d:"Tres meses distintos archivando resúmenes. En Braavos los libros se llevan al día.",x:"3 meses calendario distintos con al menos un resumen archivado",w:"ASOIAF — Braavos, sede del Banco de Hierro."},
+{n:9,p:"A",g:"Coinify",f:"El Banco de Hierro",T:"II",id:"iron_bank_ii",h:0,c:"C",k:"año 1",nw:1,t:"Contador del Banco de Hierro",d:"Doce meses distintos. Un año entero de papeles archivados.",x:"12 meses calendario distintos",w:"ASOIAF."},
+{n:10,p:"A",g:"Coinify",f:"El Banco de Hierro",T:"III",id:"iron_bank_iii",h:0,c:"C",k:"año 2,5+",nw:1,t:"El Banco de Hierro Tendrá lo Suyo",d:"Treinta meses distintos archivando resúmenes. Nadie lleva los libros como Braavos. Ahora vos tampoco.",x:"30 meses calendario distintos",w:"ASOIAF — la frase, textual."},
+{n:11,p:"A",g:"Coinify",f:"Las deudas",T:"I",id:"lannister_i",h:0,c:"C",k:"mes 2-6",t:"Un Lannister Siempre Paga sus Deudas",d:"Tres préstamos saldados, ninguno de un día para el otro. La frase se dice como amenaza, pero es una promesa.",x:"3 préstamos saldados, cada uno abierto 7+ días",w:"ASOIAF — la frase, textual. Antes era 'Toda Deuda se Paga'.",v:"Los 7 días de antigüedad son el anti-farmeo: sin eso se crean tres préstamos y se saldan en un minuto. Lee finance_loans, que no se poda."},
+{n:12,p:"A",g:"Coinify",f:"Las deudas",T:"II",id:"lannister_ii",h:0,c:"C",k:"año 1-2",nw:1,t:"El Oro de Roca Casterly",d:"Diez préstamos saldados. La montaña de oro no era un cuento.",x:"10 préstamos saldados con 7+ días de antigüedad",w:"ASOIAF — Roca Casterly, nombre canónico."},
+{n:13,p:"A",g:"Coinify",f:"Las deudas",T:"III",id:"lannister_iii",h:0,c:"C",k:"año 3+",nw:1,t:"Escuchad mi Rugido",d:"Veinticinco préstamos saldados. A esta altura ya no hace falta que lo digas.",x:"25 préstamos saldados con 7+ días de antigüedad",w:"ASOIAF — el lema real de la casa, textual."},
+{n:14,p:"A",g:"Coinify",f:"El invierno",T:"I",id:"winter_i",h:0,c:"0",k:"mes 4",t:"Se Acerca el Invierno",d:"Tres meses cerrados dentro del presupuesto. El invierno no asusta a quien guardó grano.",x:"BUDGET_MONTH_MET >= 3",w:"ASOIAF — lema de los Stark. Antes era 'El Granero Lleno'.",v:"El motor de-duplica por ref_id = month: uno por mes calendario, sin excepción. No se puede apurar."},
+{n:15,p:"A",g:"Coinify",f:"El invierno",T:"II",id:"winter_ii",h:0,c:"0",k:"mes 7-10",nw:1,t:"El Largo Verano",d:"Seis meses cerrados dentro del presupuesto. Cuanto más largo el verano, más largo lo que viene: por eso se guarda.",x:"BUDGET_MONTH_MET >= 6",w:"ASOIAF."},
+{n:16,p:"A",g:"Coinify",f:"El invierno",T:"III",id:"winter_iii",h:0,c:"0",k:"mes 11+",nw:1,t:"El Invierno Llegó",d:"Diez meses cerrados dentro del presupuesto. Que venga.",x:"BUDGET_MONTH_MET >= 10",w:"ASOIAF.",v:"Tope 10 y no más: rpg_events se poda a 365 días, así que nunca puede haber más de 12 filas vivas de este tipo. Un umbral de 20 sería inalcanzable."},
+{n:17,p:"A",g:"Coinify",f:"El bestiario",T:"I",id:"bestiary_i",h:0,c:"C",k:"mes 2-3",t:"Aprendiz de Vesemir",d:"Ocho categorías con movimientos de verdad. No se pelea contra lo que no tiene nombre.",x:"8 categorías de gasto con 3+ movimientos cada una",w:"The Witcher — Vesemir, el viejo maestro de Kaer Morhen.",v:"El 'con 3+ movimientos cada una' es el anti-farmeo: sin eso se crean ocho categorías y se anota $1 en cada una."},
+{n:18,p:"A",g:"Coinify",f:"El bestiario",T:"II",id:"bestiary_ii",h:0,c:"C",k:"mes 8-14",nw:1,t:"Cazador de Novigrado",d:"Catorce categorías con movimientos de verdad. El bestiario ya no entra en una alforja.",x:"14 categorías con 3+ movimientos cada una",w:"The Witcher — Novigrado."},
+{n:19,p:"A",g:"Coinify",f:"El bestiario",T:"III",id:"bestiary_iii",h:0,c:"C",k:"año 2+",nw:1,t:"El Bestiario de Kaer Morhen",d:"Veintidós categorías. Está todo nombrado. Ya no queda nada anónimo.",x:"22 categorías con 3+ movimientos cada una",w:"The Witcher — Kaer Morhen, la fortaleza de los lobos."},
+{n:20,p:"A",g:"Coinify",f:"La Senda",T:"I",id:"path_i",h:0,c:"C",k:"mes 6",nw:1,t:"La Senda",d:"Seis meses distintos con movimientos anotados. El camino se hace andando y se anota andando.",x:"6 meses calendario distintos con movimientos",w:"The Witcher — la Senda del brujo."},
+{n:21,p:"A",g:"Coinify",f:"La Senda",T:"II",id:"path_ii",h:0,c:"C",k:"año 1,5",nw:1,t:"Kaer Morhen",d:"Dieciocho meses distintos. Ya volviste a casa más de una vez.",x:"18 meses calendario distintos",w:"The Witcher."},
+{n:22,p:"A",g:"Coinify",f:"La Senda",T:"III",id:"path_iii",h:0,c:"C",k:"año 3",nw:1,t:"El Lobo Blanco",d:"Treinta y seis meses distintos con movimientos anotados. Tres años en la Senda. No hay atajo, y ese es el punto.",x:"36 meses calendario distintos",w:"The Witcher — el apodo de Geralt.",v:"Imposible de apurar por construcción: los meses llegan de a uno."},
+// ══ COINIFY — sueltas ══
+{n:23,p:"A",g:"Coinify",id:"master_of_coin",h:0,c:"0",k:"mes 3+",t:"Consejero de la Moneda",d:"Los cuatro oficios cumplidos dos veces cada uno: anotar, saldar, cerrar el mes y archivar.",x:"DOS de cada uno (era uno de cada uno)",w:"ASOIAF — el cargo del Consejo Privado, nombre exacto de la traducción."},
+{n:24,p:"A",g:"Coinify",id:"heavy_tome",h:1,c:"0",k:"mes 3+",t:"El Libro Mayor del Banco de Hierro",d:"Un resumen con ciento veinte renglones o más. Un mes de esos.",x:"payload.count >= 120 (era 50)",w:"ASOIAF.",v:"50 caía en el primer PDF real: un resumen argentino típico trae 20-80 renglones."},
+{n:25,p:"A",g:"Coinify",id:"contract_collected",h:1,c:"0",k:"mes 2+",t:"El Tablón de Novigrado",d:"Cerraste una cuenta con el multiplicador al máximo. La paga llega al final del trabajo.",x:"combo >= 2.0 Y el evento es LOAN_SETTLED o BUDGET_MONTH_MET",w:"The Witcher — los tablones de contratos.",v:"El combo x2 solo se alcanza la primera semana con cinco acciones cualesquiera. Atarlo a los dos eventos que no se fabrican lo saca de la zona de farmeo."},
+{n:26,p:"A",g:"Coinify",id:"sealed_with_gold",h:0,c:"0",k:"mes 2-4",t:"Acta del Consejo Privado",d:"Diez días del Códice cerrados con las cuentas adentro.",x:"10 DAY_SEALED con 'finance' en payload.modules (era 1)",w:"ASOIAF — el Consejo Privado y sus actas."},
+{n:27,p:"A",g:"Coinify",id:"drawn_ward",h:0,c:"C",k:"mes 2+",t:"La Señal de Quen",d:"Tres límites puestos y un mes cumplido dentro de todos. El escudo se traza antes de la pelea.",x:"3 presupuestos activos Y al menos un BUDGET_MONTH_MET",w:"The Witcher — Quen, la señal-escudo.",v:"Antes premiaba CONFIGURAR: un presupuesto de $1 era medalla del día 1."},
+{n:28,p:"A",g:"Coinify",id:"coin_from_overseas",h:1,c:"P",k:"raro",t:"Coronas de Temeria",d:"Anotaste un movimiento en moneda extranjera.",x:"payload.currency !== 'ARS' — sin cambio",w:"The Witcher — la moneda de Temeria."},
+{n:29,p:"A",g:"Coinify",id:"statement_settled",h:0,c:"C",k:"mes 6",t:"Las Cuentas de Braavos",d:"Seis resúmenes de tarjeta pagados. Los libros quedaron parejos seis veces.",x:"6 resúmenes con status='paid' en finance_credit_card_statements (era 1)",w:"ASOIAF.",v:"BAJA DE COSTO: ya no hace falta el evento nuevo STATEMENT_PAID. La tabla guarda el estado y no se poda."},
+{n:30,p:"A",g:"Coinify",id:"twelve_moons",h:1,c:"P",k:"raro",t:"Dieciocho Lunas",d:"Anotaste un plan de dieciocho cuotas o más. En Poniente el tiempo también se cuenta en lunas, y dieciocho son muchas.",x:"payload.installments >= 18 (era 12)",w:"ASOIAF — 'lunas' como unidad de tiempo.",v:"En Argentina 12 cuotas es el default de cualquier compra."},
+
+// ══ QUESTIFY — escaleras ══
+{n:31,p:"A",g:"Questify",f:"Gremio de Guerreros",T:"I",id:"fighters_guild_i",h:0,c:"0",k:"mes 1",nw:1,t:"Gremio de Guerreros I",d:"Ocho misiones cerradas en un mismo día.",x:"8 TASK_COMPLETED el mismo día",w:"TES — el Gremio de Guerreros, el que reparte los encargos."},
+{n:32,p:"A",g:"Questify",f:"Gremio de Guerreros",T:"II",id:"fighters_guild_ii",h:0,c:"0",k:"año 1",nw:1,t:"Gremio de Guerreros II",d:"Quince misiones en un mismo día. El tablón quedó vacío y todavía era temprano.",x:"15 TASK_COMPLETED el mismo día",w:"TES."},
+{n:33,p:"A",g:"Questify",f:"Gremio de Guerreros",T:"III",id:"fighters_guild_iii",h:0,c:"0",k:"cola larga",nw:1,t:"Gremio de Guerreros III",d:"Veinticinco misiones en un solo día. Alguien va a preguntar cómo.",x:"25 TASK_COMPLETED el mismo día",w:"TES.",v:"Es la única escalera con superficie de farmeo real (ensuciar el tablero con tareas basura). Mitigación: cae una sola vez, y el tablero sucio lo mirás vos todos los días después. Si incomoda, bajar a 20."},
+{n:34,p:"A",g:"Questify",f:"La Escalera Interminable",T:"I",id:"endless_stair_i",h:0,c:"0",k:"mes 1",nw:1,t:"La Escalera Interminable I",d:"Diez pasos marcados dentro de tus misiones en un mismo día.",x:"10 SUBTASK_COMPLETED el mismo día",w:"LotR — la Escalera Interminable de Khazad-dûm."},
+{n:35,p:"A",g:"Questify",f:"La Escalera Interminable",T:"II",id:"endless_stair_ii",h:0,c:"0",k:"año 1",nw:1,t:"La Escalera Interminable II",d:"Veinte pasos en un mismo día. Sigue subiendo.",x:"20 SUBTASK_COMPLETED el mismo día",w:"LotR."},
+{n:36,p:"A",g:"Questify",f:"La Escalera Interminable",T:"III",id:"endless_stair_iii",h:0,c:"0",k:"cola larga",nw:1,t:"La Escalera Interminable III",d:"Treinta y cinco pasos en un mismo día. Arriba de todo hay una puerta.",x:"35 SUBTASK_COMPLETED el mismo día",w:"LotR.",v:"Regalo del esquema: MAX_SUBTASKS = 30 por misión, así que 35 EXIGE tocar al menos dos misiones distintas. Anti-farmeo por construcción."},
+{n:37,p:"A",g:"Questify",f:"Los Nueve Divinos",T:"I",id:"nine_divines_i",h:0,c:"0",k:"mes 1",t:"Los Nueve Divinos I",d:"Nueve ritos distintos marcados alguna vez. Cada uno con su altar.",x:"distinctHabits >= 9",w:"TES — los Nueve Divinos y sus nueve santuarios. Antes era 'Los Nueve Ritos'."},
+{n:38,p:"A",g:"Questify",f:"Los Nueve Divinos",T:"II",id:"nine_divines_ii",h:0,c:"C",k:"año 1",nw:1,t:"Los Nueve Divinos II",d:"Cinco ritos con quince marcas cada uno. No alcanza con visitar el altar una vez.",x:"5 hábitos con 15+ marcas CADA UNO",w:"TES.",v:"Pide PROFUNDIDAD, no cantidad: crear quince hábitos falsos te da el tier I y nada más. Cierra su propio vector de farmeo."},
+{n:39,p:"A",g:"Questify",f:"Los Nueve Divinos",T:"III",id:"nine_divines_iii",h:0,c:"C",k:"cola larga",nw:1,t:"Los Nueve Divinos III",d:"Diez ritos con treinta marcas cada uno. La peregrinación entera, dos veces.",x:"10 hábitos con 30+ marcas CADA UNO",w:"TES."},
+// ══ QUESTIFY — sueltas ══
+{n:40,p:"A",g:"Questify",id:"the_company",h:0,c:"0",k:"mes 1-2",t:"La Compañía",d:"Cinco misiones, cinco pasos y cinco ritos en un mismo día. Tres caminos, una sola marcha.",x:"5 + 5 + 5 el mismo día (era 1+1+1)",w:"LotR. La colisión con #57 se resolvió: aquella pasa a 'La Comunidad del Anillo'."},
+{n:41,p:"A",g:"Questify",id:"great_undertaking",h:0,c:"C",k:"mes 1-2",t:"A Mordor No Se Entra Caminando",d:"Cinco misiones épicas cerradas. Ninguna de las cinco fue fácil.",x:"5 TASK_COMPLETED con tier 3 acumuladas (era 1)",w:"LotR — la frase, en la forma en que la cita el fandom."},
+{n:42,p:"A",g:"Questify",id:"dawn_ride",h:0,c:"0",k:"mes 1",t:"Al Amanecer, Mirad al Este",d:"Cinco misiones cerradas antes de las nueve de la mañana.",x:"5 TASK_COMPLETED antes de las 9 (era 3)",w:"LotR — la línea de Gandalf antes de la carga."},
+{n:43,p:"A",g:"Questify",id:"turning_wheel",h:0,c:"C",k:"mes 1",t:"La Rueda de Akatosh",d:"Diez vueltas de una misión que vuelve sola. El relato no termina: se repite.",x:"10 cierres de tareas recurrentes acumulados (era 1)",w:"TES — Akatosh, dios dragón del tiempo, y su Rueda.",v:"Una recurrente diaria da diez vueltas en diez días: el umbral se auto-limita en el tiempo y es imposible de farmear."},
+{n:44,p:"A",g:"Questify",id:"rewritten",h:1,c:"0",k:"semana 1",t:"Pergamino Ancestral",d:"Reabriste una misión que ya habías cerrado. Ni lo que está escrito es definitivo.",x:"primer TASK_UNCOMPLETED — SIN cambio",w:"TES — los Elder Scrolls: profecía que cambia al leerse.",v:"CUPO DE ONBOARDING (decisión tomada). Le enseña al usuario que deshacer no rompe nada. Un descubrimiento con umbral deja de ser descubrimiento."},
+{n:45,p:"A",g:"Questify",id:"marginalia",h:1,c:"0",k:"semana 1",t:"El Libro Rojo",d:"Anotaste una misión al vuelo, sin abrir el tablero. Los libros grandes empiezan a mano alzada.",x:"primer TASK_CREATED — SIN cambio",w:"LotR — el Libro Rojo de la Frontera del Oeste.",v:"CUPO DE ONBOARDING. Revela que el QuickAdd existe; retrasarlo anula el propósito."},
+{n:46,p:"A",g:"Questify",id:"raised_shield",h:1,c:"C",k:"mes 1+",t:"Escudo de Auri-El",d:"Un escudo mantuvo tu rito en pie el día que faltaste.",x:"al menos un habit_checks con kind='shield' — sin cambio",w:"TES (Dawnguard) — el escudo que absorbe el golpe.",v:"Ya está time-gated por el motor: los escudos se ganan cruzando múltiplos de racha, así que no puede caer en la semana 1 aunque quiera."},
+{n:47,p:"A",g:"Questify",id:"cleared_board",h:0,c:"C",k:"mes 1",t:"Despejado",d:"Cinco misiones cerradas hoy y no queda ninguna abierta. El salón quedó en silencio.",x:"pendingTasks === 0 Y 5 cierres hoy (antes bastaba con 0 pendientes)",w:"Skyrim — la etiqueta del marcador de mapa, tal cual la localización española.",v:"Un usuario nuevo con dos tareas vaciaba el tablero el primer día. Exigir cinco cierres convierte 'vacío' en 'vaciado'."},
+{n:48,p:"A",g:"Questify",id:"in_its_own_hour",h:1,c:"C",k:"mes 2",t:"Un Mago Nunca Llega Tarde",d:"Cerraste tres misiones vencidas. Ninguna llegó tarde: llegaron cuando tenían que llegar.",x:"3 TASK_COMPLETED con payload.overdue (era 1)",w:"LotR — la frase de Gandalf, en su forma citada."},
+
+// ══ CALDERO — escaleras ══
+{n:49,p:"A",g:"Caldero",f:"Las Fraguas de Isengard",T:"I",id:"isengard_i",h:0,c:"0",k:"mes 1",nw:1,t:"Las Fraguas de Isengard I",d:"Seis pociones al fuego en un mismo día.",x:"6 POMODORO_COMPLETED el mismo día",w:"LotR — las fraguas que no se apagan."},
+{n:50,p:"A",g:"Caldero",f:"Las Fraguas de Isengard",T:"II",id:"isengard_ii",h:0,c:"0",k:"año 1",nw:1,t:"Las Fraguas de Isengard II",d:"Nueve pociones en un mismo día. El fuego no se apagó ni para comer.",x:"9 POMODORO_COMPLETED el mismo día",w:"LotR. Absorbe el viejo 'La Larga Vigilia' (8)."},
+{n:51,p:"A",g:"Caldero",f:"Las Fraguas de Isengard",T:"III",id:"isengard_iii",h:0,c:"0",k:"cola larga",nw:1,t:"Las Fraguas de Isengard III",d:"Trece pociones en un solo día. Cinco horas y veinte de reloj, sin descontar nada.",x:"13 POMODORO_COMPLETED el mismo día",w:"LotR.",v:"El costo es irreducible: son ~5h20 de reloj de pared real. No hay atajo posible."},
+{n:52,p:"A",g:"Caldero",f:"Las Almenaras de Gondor",T:"I",id:"beacons_i",h:0,c:"C",k:"mes 1",t:"Las Almenaras de Gondor I",d:"Siete días distintos con el caldero encendido. Un fuego llama al siguiente.",x:"7 días DISTINTOS con pomodoro",w:"LotR — las almenaras. Días distintos a propósito: no hay racha que romper."},
+{n:53,p:"A",g:"Caldero",f:"Las Almenaras de Gondor",T:"II",id:"beacons_ii",h:0,c:"C",k:"año 1",nw:1,t:"Las Almenaras de Gondor II",d:"Treinta días distintos. La cadena de fuegos ya cruza el reino.",x:"30 días distintos con pomodoro",w:"LotR."},
+{n:54,p:"A",g:"Caldero",f:"Las Almenaras de Gondor",T:"III",id:"beacons_iii",h:0,c:"C",k:"cola larga",nw:1,t:"Las Almenaras de Gondor III",d:"Cien días distintos con el fuego encendido. Gondor llamó y alguien respondió cien veces.",x:"100 días DISTINTOS con pomodoro",w:"LotR.",v:"La mejor entrada anti-farmeo del catálogo: cien fechas distintas del calendario. El techo es el tiempo, no el esfuerzo."},
+// ══ CALDERO — sueltas ══
+{n:55,p:"A",g:"Caldero",id:"midnight_oil",h:0,c:"0",k:"mes 1-2",t:"Los Fuegos de Orodruin",d:"Cuatro pociones al fuego pasadas las diez de la noche.",x:"4 pomodoros a las 22 o después (era 3)",w:"LotR — la montaña cuyo fuego no se apaga nunca."},
+{n:56,p:"A",g:"Caldero",id:"perfect_boil",h:0,c:"0",k:"mes 2",t:"Alquimia 100",d:"Una poción con el multiplicador al tope y la tirada acompañando. La mezcla justa.",x:"combo >= 2.0 Y bonus >= 2.0 (antes solo combo)",w:"Skyrim — la habilidad al máximo, como lo dice el fandom.",v:"El combo al tope solo lo saca cualquier día activo. Sumarle la tirada lo convierte en conjunción, que es lo que el título promete."},
+{n:57,p:"A",g:"Caldero",id:"anvil_and_edge",h:0,c:"0",k:"mes 1-2",t:"La Fragua Celeste",d:"Cinco pociones y cinco misiones el mismo día. Primero se forja, después se usa.",x:"5 pomodoros + 5 tareas el mismo día (era 3+3)",w:"Skyrim — la Skyforge de Carrera Blanca."},
+{n:58,p:"A",g:"Caldero",id:"broken_flask",h:1,c:"0",k:"semana 1",t:"El Cuerno de Boromir",d:"Un enfoque cortado dejó su marca en el estante. Lo que se parte también se guarda.",x:"primer POMODORO_ABANDONED — SIN cambio",w:"LotR — el cuerno partido en dos que igual se guarda como reliquia.",v:"CUPO DE ONBOARDING (decisión tomada). Es la entrada que le enseña al usuario que abandonar no cuesta XP — algo que nadie adivinaría solo."},
+{n:59,p:"A",g:"Caldero",id:"labelled_potion",h:1,c:"P",k:"mes 1",t:"El Mortero de Sinderion",d:"Cinco pociones terminadas con la misión escrita en el frasco.",x:"5 POMODORO_COMPLETED con payload.taskId (era 1)",w:"TES — Sinderion, el alquimista que anota todo.",v:"Revela el puente Caldero↔Questify, pero el puente hay que cruzarlo más de una vez para que signifique algo."},
+{n:60,p:"A",g:"Caldero",id:"embers",h:1,c:"0",k:"mes 1-2",t:"El Hogar de Bolsón Cerrado",d:"Sellaste un día con cinco pociones ya en el estante. El fuego se tapa cuando el trabajo terminó.",x:"DAY_SEALED con 5 pomodoros ese día (era 3)",w:"LotR — la chimenea de Bag End, nombre de la traducción española."},
+{n:61,p:"A",g:"Caldero",id:"full_circle",h:0,c:"E",k:"semana 2-3",t:"Ida y Vuelta",d:"Una vuelta entera del caldero, descanso largo incluido.",x:"evento nuevo CAULDRON_LAP_COMPLETED — sin cambio de umbral",w:"LotR — 'Historia de una ida y una vuelta', el libro de Bilbo.",v:"No necesita subir: una vuelta entera con descanso largo son ~2h30 de reloj. Ya cae en la segunda o tercera semana por física, no por umbral."},
+{n:62,p:"A",g:"Caldero",id:"one_more_log",h:1,c:"E",k:"semana 1-2",t:"La Leña de Ithilien",d:"Pediste tiempo extra en vez de cortar. El fuego aguanta si lo alimentás.",x:"evento nuevo POMODORO_EXTENDED (xp: 0) — sin cambio",w:"LotR — el fuego que Sam insiste en encender en Ithilien.",v:"Descubrimiento de una perilla hoy invisible. Mismo argumento que El Libro Rojo."},
+{n:63,p:"A",g:"Caldero",id:"sun_to_sun",h:0,c:"C",k:"mes 1",t:"De Magnus a Masser",d:"Una poción con luz y otra con la noche encima, el mismo día.",x:"pomodoros antes de las 12 Y después de las 20 — sin cambio",w:"TES — Magnus es el sol, Masser la luna mayor. Literalmente 'del sol a la luna'. Resuelve la colisión de título con #58 viejo.",v:"No necesita subir: la conjunción ya se auto-calibra, exige que el día tenga dos extremos."},
+
+// ══ TRANSVERSALES ══
+{n:64,p:"A",g:"Transversales",id:"fellowship",h:0,c:"0",k:"mes 1",t:"La Comunidad del Anillo",d:"Los cuatro módulos conocen tu letra. No hizo falta que fuera el mismo día.",x:"al menos un evento de por vida en cada uno de los 4 módulos",w:"LotR — título canónico del primer volumen. Resuelve la colisión con #40."},
+{n:65,p:"A",g:"Transversales",id:"dawn_to_dusk",h:0,c:"C",k:"mes 1-2",t:"El Camino Sigue y Sigue",d:"Abriste el día antes de las siete y lo cerraste después de las diez de la noche.",x:"primer evento antes de las 7 y último después de las 22",w:"LotR — traducción canónica de la canción de Bilbo. Título liberado al matar el viejo 'El Camino Sigue'."},
+{n:66,p:"A",g:"Transversales",id:"critical_hit",h:1,c:"0",k:"mes 2",t:"Veinte Natural",d:"Un solo hecho pagó ciento cincuenta de experiencia. Los dados aplaudieron.",x:"bonus >= 2.0 y xpGained >= 150 (era 100)",w:"D&D — como lo dice la mesa hispanohablante, textual."},
+{n:67,p:"A",g:"Transversales",id:"million_to_one",h:1,c:"0",k:"raro",t:"Nueve de Cada Diez Veces",d:"El dado más alto sobre el combo más alto. Lo improbable se cansó de esperar.",x:"bonus >= 3.0 y combo >= 2.0",w:"Discworld — la ley de Pratchett sobre las probabilidades de una en un millón."},
+{n:68,p:"A",g:"Transversales",id:"second_breakfast",h:1,c:"0",k:"mes 1",t:"¿Y el Segundo Desayuno?",d:"Dos comidas anotadas antes de las once. Alguien acá entiende de medias mañanas.",x:"2 MEAL_LOGGED antes de las 11",w:"LotR — la línea de Pippin, tal como se cita."},
+{n:69,p:"A",g:"Transversales",id:"cold_trail",h:1,c:"0",k:"mes 1",t:"Sentido de Brujo",d:"Marcaste un hábito de un día que ya había pasado. El rastro seguía tibio.",x:"HABIT_CHECKED con payload.date distinto del día del evento",w:"The Witcher — nombre exacto de la mecánica en la versión española."},
+{n:70,p:"A",g:"Transversales",id:"long_night",h:1,c:"0",k:"raro",t:"La Larga Noche",d:"Cinco hechos y todavía no amaneció.",x:"evento antes de las 5 con 5 hechos ese día",w:"ASOIAF — orden de palabras canónico de la traducción española."},
+{n:71,p:"A",g:"Transversales",id:"last_ember",h:1,c:"0",k:"mes 1-2",t:"Brasa",d:"Anotaste un hecho con el Vigor casi apagado. Los días duros también se registran.",x:"evento con XP > 0 y stats.hp <= 40",w:"Dark Souls III — nombre literal del objeto en español."},
+{n:72,p:"A",g:"Transversales",id:"unlucky_thirteen",h:1,c:"0",k:"año 1",t:"Ni te Cases ni te Embarques",d:"Cerraste algo un martes 13. Los dados no se enteraron.",x:"weekday === 2 y día del mes 13",w:"Refrán rioplatense completo. Ya era cita directa."},
+{n:73,p:"A",g:"Transversales",id:"suns_edge",h:1,c:"0",k:"año 1",t:"Cénit del Sol",d:"Un hecho anotado en un solsticio. El sol también lleva su cuenta.",x:"fecha 06-21 o 12-21",w:"TES — nombre del mes en el calendario tamriélico, traducción oficial."},
+{n:74,p:"A",g:"Transversales",id:"medallion_night",h:1,c:"0",k:"mes 1",t:"El Estante de Apocrypha",d:"Tres medallones en un mismo día. El estante hizo ruido.",x:"3 ACHIEVEMENT_UNLOCKED el mismo día",w:"TES — la biblioteca de Hermaeus Mora.",v:"Verificado: no se autodispara en el backfill (mode='live' guarda la escritura de filas), pero el contexto se arma ANTES de escribirlas, así que cae en el evento siguiente, no en el tercero."},
+
+// ══ NUTRIFY ══
+{n:75,p:"A",g:"Nutrify",f:"Pergaminos",T:"II",id:"scroll_keeper",h:0,c:"0",k:"mes 3-4",t:"El Escriba de Apocrypha",d:"Doce pergaminos sellados. El archivo ya no cabe en un estante.",x:"WEEK_SUMMARY >= 12 (era 4)",w:"TES — Apocrypha, la biblioteca infinita de Hermaeus Mora. Tier I = 'El Primer Pergamino', ya existe."},
+{n:76,p:"A",g:"Nutrify",f:"Pergaminos",T:"III",id:"library_unending",h:0,c:"0",k:"15-18 meses",nw:1,t:"La Biblioteca que No Termina",d:"Cincuenta y dos pergaminos. Un año entero de semanas cerradas, y el estante ya tiene gravedad propia.",x:"WEEK_SUMMARY >= 52",w:"TES — Apocrypha.",v:"52 semanas es el piso teórico: imposible de apurar."},
+{n:77,p:"A",g:"Nutrify",f:"Días cerrados",T:"III",id:"tome_of_clear_thought",h:0,c:"0",k:"8-9 meses",nw:1,t:"El Tomo de la Comprensión Clara",d:"Ciento ochenta días cerrados. Los libros que cambian a alguien se leen despacio.",x:"DAY_SUMMARY >= 180",w:"TES — los Tomos de habilidad. Tiers I (7) y II (30) ya existen.",v:"Cuenta CIERRES, no cumplimientos. Es crónica, no dieta."},
+{n:78,p:"A",g:"Nutrify",id:"seven_nights_written",h:0,c:"P",k:"mes 2+",t:"Bitácora de Campaña",d:"Una semana con los siete días cerrados. Ninguna noche quedó en blanco.",x:"WEEK_SUMMARY con payload.daysClosed >= 7",w:"D&D — el objeto literal de mesa.",v:"Premia REGISTRAR, jamás cumplir."},
+{n:79,p:"A",g:"Nutrify",id:"the_pact_kept",h:0,c:"P",k:"mes 1",t:"El Pacto del Brujo",d:"Cerraste un día dentro del objetivo que vos mismo elegiste. El pacto era con vos.",x:"DAY_SUMMARY con payload.onTarget === true, donde onTarget = xpBonus > 0",w:"D&D — el pacto del Warlock: vale porque VOS lo redactaste.",v:"DECLARADO SIN DESCENDENCIA. No puede recibir un tier II nunca — una escalera de cumplimiento alimentario es el mecanismo dañino. Queda escrito para que una pasada futura no 'complete la familia' por prolijidad. Y NO usar hp > 0: en déficit, comer 800 sobre 3000 cura HP igual."},
+{n:80,p:"A",g:"Nutrify",id:"yesterdays_pantry",h:1,c:"0",k:"mes 1",t:"Raciones de Viaje",d:"Repetiste el día de ayer entero. Son iguales todos los días y nadie se murió por eso.",x:"MEAL_LOGGED con payload.source === 'copy_day'",w:"D&D — el ítem de equipo, literal.",v:"Verificar que el repeatDay de Today.tsx:826 también setee source. Hoy solo se confirmó el botón de la línea 702."},
+{n:81,p:"A",g:"Nutrify",id:"the_feast",h:0,c:"P",k:"mes 1-2",t:"Festín de Héroes",d:"Registraste un festín. En la mesa larga nadie lleva la cuenta.",x:"MEAL_LOGGED con payload.isEvent === true",w:"D&D — el conjuro Heroes' Feast, que cura y quita el miedo.",v:"Visible a propósito: el mensaje 'el asado paga igual' tiene que verse."},
+{n:82,p:"A",g:"Nutrify",id:"honest_scales",h:1,c:"P",k:"mes 1",t:"El Fiel de la Balanza",d:"Te pesaste y lo anotaste. El número no importa: importa que lo mirás de frente.",x:"DAY_SUMMARY con payload.weighed === true",w:"D&D — la balanza pesa, no juzga.",v:"SIN RENOMBRE A PROPÓSITO: cualquier referencia más directa empuja el título hacia un chiste sobre pesarse. UNA SOLA, nunca escalera. Premia el acto de medir, jamás el valor ni la dirección."},
+{n:83,p:"A",g:"Nutrify",id:"archive_caught_up",h:1,c:"0",k:"mes 3+",t:"Hermaeus Mora Puede Esperar",d:"Tres pergaminos atrasados de una sentada. El que colecciona todo el conocimiento del mundo también hace cola.",x:"3 WEEK_SUMMARY el mismo día",w:"TES — el príncipe daédrico del conocimiento."},
+
+// ══ EL CÓDICE ══
+{n:84,p:"A",g:"El Códice",f:"Sellos",T:"IV",id:"bound_volume",h:0,c:"0",k:"mes 4-5",t:"Los Pergaminos Ancestrales",d:"Cien días sellados. Lo que empezó como hojas sueltas ya es un libro.",x:"sealsCount >= 100",w:"TES — los Elder Scrolls. Tiers I (1), II (7) y III (30) ya existen en el catálogo."},
+{n:85,p:"A",g:"El Códice",f:"Sellos",T:"V",id:"oghma_infinium",h:0,c:"0",k:"~17 meses",nw:1,t:"Oghma Infinium",d:"Trescientos sesenta y cinco días sellados. Un tomo que no se termina de leer nunca.",x:"sealsCount >= 365",w:"TES — el libro daédrico de Hermaeus Mora.",v:"El nombre se le asignó al Códice y no a Questify: el Oghma es un LIBRO, y el Códice es literalmente el libro de la app."},
+{n:86,p:"A",g:"El Códice",f:"Racha",T:"III",id:"centenary_vow",h:0,c:"0",k:"mes 4+",t:"Vínculo del Fuego",d:"Cien días de racha. Alguien tiene que mantener el fuego prendido.",x:"streak >= 100 || bestStreak >= 100",w:"Dark Souls — 'Link the Fire'. Calza con el hito 100 de STREAK_MILESTONES. Anticipa el tier IV sin nombrarlo."},
+{n:87,p:"A",g:"El Códice",f:"Racha",T:"IV",id:"lord_of_cinder",h:0,c:"0",k:"12+ meses",nw:1,t:"Señor de la Ceniza",d:"Un año sin cortar la racha. El fuego no se mantiene solo: lo mantuviste vos.",x:"streak >= 365 || bestStreak >= 365",w:"Dark Souls III — Lord of Cinder, traducción oficial.",v:"Lee bestStreak, que no se resetea nunca: una vez ganado no se pierde."},
+{n:88,p:"A",g:"El Códice",f:"Nivel",T:"II",id:"knight_errant",h:0,c:"0",k:"~2,5 meses",t:"Caballero Andante",d:"Nivel veinte. El título ya no es de cortesía.",x:"level >= 20  (xpThreshold(20) = 10.733 XP)",w:"SIN RENOMBRE A PROPÓSITO: calza con TITLE_THRESHOLDS[20] = 'Caballero'. Esa coherencia interna vale más que un guiño de franquicia."},
+{n:89,p:"A",g:"El Códice",f:"Nivel",T:"III",id:"dragonborn",h:0,c:"0",k:"9-14 meses",nw:1,t:"Sangre de Dragón",d:"Nivel cincuenta. Ya no subís de nivel: subís de leyenda.",x:"level >= 50  (xpThreshold(50) = 42.426 XP)",w:"Skyrim — Dovahkiin, traducción oficial.",v:"Calza con TITLE_THRESHOLDS[50] = 'Leyenda': el medallón y el título caen el mismo día."},
+{n:90,p:"A",g:"El Códice",f:"Óbolos gastados",T:"I",id:"ferrymans_coin",h:0,c:"C",k:"mes 1-2",t:"El Primer Trago",d:"Gastaste tus primeros óbolos en algo tuyo. El frasco no cura a nadie por estar lleno.",x:"al menos un canje",w:"Dark Souls — el frasco de Estus.",v:"Ataca la métrica de fracaso declarada en rpg-handlers: 'un saldo que nadie gasta en 30 días'."},
+{n:91,p:"A",g:"El Códice",f:"Óbolos gastados",T:"II",id:"bag_of_tricks",h:0,c:"C",k:"mes 4-6",nw:1,t:"La Bolsa de los Trucos",d:"Quinientos óbolos gastados en cosas tuyas. La bolsa se usa, no se mira.",x:"obolosSpent >= 500",w:"D&D — Bag of Tricks.",v:"Verificado no farmeable: el gasto nunca puede superar lo ganado, y el faucet está capado por el sellado (6-28/día). Una recompensa de costo 0 escribe delta=0 y no mueve el contador."},
+{n:92,p:"A",g:"El Códice",f:"Óbolos gastados",T:"III",id:"horn_of_valhalla",h:0,c:"C",k:"12-18 meses",nw:1,t:"El Cuerno de Valhalla",d:"Dos mil quinientos óbolos que salieron del bolsillo. Los objetos legendarios se tocan.",x:"obolosSpent >= 2500",w:"D&D — Horn of Valhalla, objeto legendario."},
+{n:93,p:"A",g:"El Códice",id:"seal_of_four_hands",h:0,c:"0",k:"mes 2",t:"Sitio de Gracia",d:"Tres días sellados donde los cuatro oficios dejaron huella. La gracia se marca donde uno se sienta.",x:"3 DAY_SEALED con payload.modules.length >= 4 (era 1)",w:"Elden Ring — nombre literal en la localización española."},
+{n:94,p:"A",g:"El Códice",id:"overflowing_page",h:1,c:"0",k:"mes 1-2",t:"Página Desbordada",d:"Veinte hechos en una sola jornada. No entraron en la página.",x:"DAY_SEALED con payload.eventsCount >= 20 (= SEAL_EVENT_CAP)",w:"D&D — las notas del máster cuando la sesión se le fue de las manos. El título ya es la imagen; forzar un nombre propio le sacaría el remate."},
+{n:95,p:"A",g:"El Códice",id:"long_rest",h:0,c:"0",k:"mes 1-2",t:"Cama de Posada",d:"Tres días en la Posada y la app te siguió esperando.",x:"innSince !== null y 3+ días desde el check-in",w:"Skyrim — el bono 'Bien descansado' de dormir en una posada.",v:"RENOMBRE COLATERAL: cede el término 'Descanso Largo' a #113, que es el huevo que se ríe de él. Pide importar daysDiff (verificado: sin ciclo)."},
+{n:96,p:"A",g:"El Códice",id:"saving_throw",h:1,c:"0",k:"mes 2+",t:"Tiro de Salvación",d:"El indulto llegó con treinta días en juego. Los salvó todos.",x:"pardonUsed con streak >= 30",w:"D&D — la forma más usada en español."},
+{n:97,p:"A",g:"El Códice",id:"well_rested",h:1,c:"M",k:"mes 2+",t:"Bien Descansado",d:"Volviste de la Posada y el primer día de vuelta rindió.",x:"2+ noches en la Posada, ya saliste, y xpToday >= 60",w:"TES — es la localización española literal del bono de dormir en cama. Ya era directo.",v:"ÚNICA entrada del catálogo que pide persistencia nueva: columna inn_last_stay_days en player_stats."},
+{n:98,p:"A",g:"El Códice",id:"ashless_flame",h:1,c:"0",k:"raro",t:"Ascua",d:"Una jornada larga sellada con el Vigor entero. Ni una brasa de menos.",x:"DAY_SEALED con vigor === 100 y eventsCount >= 10",w:"Dark Souls III — el ítem que te devuelve la vida entera."},
+
+// ══════════ HUEVOS ══════════
+{n:99,p:"B",g:"Huevos · El regreso",id:"gate_guard",h:1,c:"0",r:"~3%",t:"Una Flecha en la Rodilla",d:"Treinta días de racha alguna vez. Treinta de silencio después. Todo guardia de puerta fue aventurero — la diferencia es que vos volviste.",x:"volver tras 30 días con bestStreak >= 30",w:"Skyrim — la cita textual. El remate invierte la tragedia: al guardia le pasó que nunca volvió.",v:"Depende del arreglo de previousEventAt (rpg-handlers.ts:565). Sin él, los 10 huevos de regreso son código muerto."},
+{n:100,p:"B",g:"Huevos · El regreso",id:"knee_healed",h:1,c:"C",r:"~20%",t:"Yo Antes Era Como Vos",d:"Un rito que tenías abandonado hace más de un mes volvió a marcarse. Antes hacías esto todos los días. Después pasó lo que pasa. Nadie preguntó nada.",x:"HABIT_CHECKED de un hábito sin marcar hace 30+ días",w:"Skyrim — la primera mitad de la frase. Par de #99.",v:"Depende del arreglo de previousEventAt."},
+{n:101,p:"B",g:"Huevos · El regreso",id:"no_haste",h:1,c:"0",r:"~12%",t:"La Cámara de los Ents",d:"Dos meses sin aparecer. Los que viven mil años tampoco se apuran, y nadie les dice nada.",x:"60 días o más de hueco",w:"LotR — traducción canónica de 'Entmoot'."},
+{n:102,p:"B",g:"Huevos · El regreso",id:"seat_kept",h:1,c:"0",r:"~2%",t:"El Póney Pisador",d:"Casi un año de silencio. El fuego seguía encendido y tu banquito seguía libre. Como si te hubieras ido a fumar.",x:"300 días o más de hueco",w:"LotR — nombre canónico de la posada de Bree.",v:"300 y NO 365: el sync poda rpg_events a los 365 días y el getter devuelve 0, no infinito. Con 365 sería inalcanzable por construcción."},
+{n:103,p:"B",g:"Huevos · El regreso",id:"cold_hearth",h:1,c:"C",r:"~15%",t:"Bolsón Cerrado",d:"Mes y medio sin encender el fuego. Volviste, soplaste una vez y arrancó. Los calderos buenos no se ofenden.",x:"POMODORO_COMPLETED tras 45 días sin ninguno",w:"LotR — Bag End. Volver a un hogar apagado."},
+{n:104,p:"B",g:"Huevos · El regreso",id:"hundred_days_gone",h:1,c:"C",r:"~0,4%",t:"El Banco de Hierro",d:"Volviste a anotar un movimiento exactamente cien días después del último. Vos también llevabas las cuentas al día, una vez. El libro no preguntó nada.",x:"movimiento de finanzas EXACTAMENTE 100 días después del anterior",w:"ASOIAF — el que siempre cobra, sin apuro.",v:"Decisión abierta: === 100 exacto (lo hace huevo) vs >= 100 && <= 102 (~1,2%, más piadoso)."},
+{n:105,p:"B",g:"Huevos · El regreso",id:"the_answer",h:1,c:"0",r:"~0,3%",t:"Cuarenta y Dos",d:"Cuarenta y dos días de silencio exactos. No preguntes cuál era la pregunta.",x:"hueco de EXACTAMENTE 42 días",w:"Adams — el número ES la referencia. La igualdad estricta es el chiste: 41 no, 43 tampoco."},
+{n:106,p:"B",g:"Huevos · El regreso",id:"the_same_bell",h:1,c:"0",r:"~7%",t:"Los Relojes de Ankh-Morpork",d:"Volviste el mismo día de la semana en que te fuiste. El calendario no se movió de la silla.",x:"hueco >= 7 días y múltiplo exacto de 7",w:"Discworld — todos mal, pero de acuerdo entre ellos."},
+{n:107,p:"B",g:"Huevos · El regreso",id:"back_through_the_forge",h:1,c:"0",r:"~6%",t:"El Santuario del Enlace del Fuego",d:"Una semana afuera y lo primero que tocaste fue el fuego. Sabías por dónde se entra.",x:"hueco >= 7 días y el evento de vuelta es del caldero",w:"Dark Souls — Firelink Shrine, traducción oficial."},
+{n:108,p:"B",g:"Huevos · El regreso",id:"like_nothing_happened",h:1,c:"C",r:"~2%",t:"Nueve Páginas de Trasfondo",d:"Dos semanas sin aparecer y volviste con doscientos XP en un día. Nadie te va a preguntar nada. Se nota que preparaste la entrada.",x:"día de vuelta tras 14+ días, con xpToday >= 200",w:"Cultura de mesa — el chiste, textual.",v:"NO usar daysSinceLastActivity: es código muerto acá (solo lo ve el primer evento del regreso, donde el combo arranca en 1.0 y xpToday no puede valer 200). Necesita gapBeforeToday, hueco a nivel DÍA."},
+
+{n:109,p:"B",g:"Huevos · Números",id:"capicua",h:1,c:"P",r:"~2%",t:"Los Dados de Novigrado",d:"El monto se lee igual de ida que de vuelta. No lo buscaste. Por eso cuenta.",x:"monto capicúa de 4 dígitos o más",w:"The Witcher — el póker de dados y la ciudad de las apuestas."},
+{n:110,p:"B",g:"Huevos · Números",id:"perfect_figure",h:1,c:"P",r:"~0,6%",t:"El Gremio de Alquimistas",d:"Cuatro dígitos, todos el mismo. Cobran fortunas por números así y nunca los consiguen.",x:"monto de 4+ dígitos idénticos",w:"ASOIAF — el Gremio de Alquimistas de Desembarco del Rey."},
+{n:111,p:"B",g:"Huevos · Números",id:"the_mirror",h:1,c:"P+C",r:"~4%",t:"El Salón de los Rostros",d:"Dos movimientos distintos, el mismo monto exacto, el mismo día. Dos caras, la misma cara.",x:"dos movimientos del día con monto idéntico",w:"ASOIAF — la Casa de Blanco y Negro."},
+{n:112,p:"B",g:"Huevos · Números",id:"lead_into_gold",h:1,c:"P+C",r:"~1%",t:"Fuego Valyrio",d:"Un gasto y un ingreso por el mismo monto el mismo día. Prometían oro y entregaban humo verde.",x:"un gasto y un ingreso del mismo monto, el mismo día",w:"ASOIAF — la sustancia del Gremio de Alquimistas."},
+{n:113,p:"B",g:"Huevos · Números",id:"a_single_coin",h:1,c:"P",r:"~1%",t:"Échale una Moneda a tu Brujo",d:"Anotaste un movimiento de exactamente una unidad. Alguien, en algún camino, le debe una canción a eso.",x:"monto igual a 1",w:"The Witcher — la cita más repetida del fandom hispanohablante."},
+{n:114,p:"B",g:"Huevos · Números",id:"the_blessed_penny",h:1,c:"P",r:"~0,2%",t:"La Suerte de Jaskier",d:"El dado sacó un x3 sobre un movimiento de menos de diez. Dos por ciento, gastados en monedas.",x:"bonus >= 3.0 sobre un monto < 10",w:"The Witcher — el bardo que sobrevive de pura suerte."},
+{n:115,p:"B",g:"Huevos · Números",id:"the_date_in_the_sum",h:1,c:"P",r:"~0,8%",t:"Un Cuervo de Poniente",d:"El monto salió idéntico al día y al mes en que lo anotaste. Los cuervos también traen mensajes que nadie mandó.",x:"monto redondeado === DDMM de la fecha",w:"ASOIAF — los cuervos mensajeros."},
+{n:116,p:"B",g:"Huevos · Números",id:"the_ledgers_name_day",h:1,c:"C",r:"~1,5%",t:"El Día del Nombre",d:"Anotaste un movimiento el mismo día y mes que el primero de todos, un año o más después. El libro cumple años y nunca lo menciona.",x:"mismo día y mes que el primer movimiento, en un año posterior",w:"ASOIAF — 'name day', término canónico. Ya era directo."},
+{n:117,p:"B",g:"Huevos · Números",id:"the_number",h:1,c:"0",r:"~1%",t:"El Número de la Bestia",d:"El día pasó por seiscientos sesenta y seis de experiencia. Nadie lo buscaba y ahí está. No lo digas en voz alta.",x:"Math.floor(xpToday) === 666",w:"Cultura general. El deadpan queda intacto.",v:"El Math.floor es OBLIGATORIO: el XP guarda dos decimales (rpg-handlers.ts:500), así que === 666 no se cumpliría jamás."},
+{n:118,p:"B",g:"Huevos · Números",id:"the_thousandth",h:1,c:"0",r:"~1 de 50",t:"Frame Perfecto",d:"El hecho número mil de tu crónica sacó el dado del dos por ciento. Ni el novecientos noventa y nueve. El mil.",x:"totalEvents === 1000 con bonus >= 3.0",w:"Speedrun — término de la comunidad, textual.",v:"Un merge de sync que inserte varias filas de golpe puede saltear el 1000. Que se pierda también es parte de ser un huevo."},
+
+{n:119,p:"B",g:"Huevos · Calendario y reloj",id:"day_that_isnt",h:1,c:"0",r:"0% / ~35% bisiesto",t:"La Ruptura del Dragón",d:"Encendiste el caldero un veintinueve de febrero. Ese día el calendario miente y todo lo que pasó, pasó todo junto. Volvé en cuatro años.",x:"fecha 02-29",w:"TES — 'Dragon Break', traducción oficial. El deep cut exacto del registro pedido.",v:"Decisión abierta: restringir al caldero (más raro, guiño más nítido) o cualquier módulo."},
+{n:120,p:"B",g:"Huevos · Calendario y reloj",id:"eleventy_one",h:1,c:"0",r:"~2%",t:"El Cumpleaños de Bilbo",d:"Once del once, a las once. El calendario y el reloj se pusieron de acuerdo una sola vez, y fue con vos.",x:"11-11 a las 11 en punto",w:"LotR — 'ciento once', el número dicho raro a propósito."},
+{n:121,p:"B",g:"Huevos · Calendario y reloj",id:"three_sevens",h:1,c:"0",r:"~0,5%",t:"Los Tres Días",d:"El número del mes, el del día y el de la hora salieron iguales. Pasa una hora al año, y justo estabas despierto haciendo algo.",x:"mes === día === hora",w:"Majora's Mask — el ciclo de tres días."},
+{n:122,p:"B",g:"Huevos · Calendario y reloj",id:"palindrome_day",h:1,c:"0",r:"~1 por década",t:"El Día Capicúa",d:"La fecha se lee igual de ida y de vuelta. La próxima tarda años en llegar. Estabas.",x:"YYYYMMDD capicúa",w:"Rioplatense. La próxima en formato ISO es 2030-03-02; después, 2040-04-02."},
+{n:123,p:"B",g:"Huevos · Calendario y reloj",id:"long_expected",h:1,c:"C",r:"~10%",t:"Una Fiesta Muy Esperada",d:"Hace exactamente un año registraste tu primer hecho. En los libros esto se festeja con fuegos artificiales y un discurso que nadie termina de escuchar.",x:"daysSinceFirstEvent === 365",w:"LotR — título canónico del capítulo uno.",v:"NO sacarlo de rpg_events: la poda al año se lleva justo la fila que se necesita. Tiene que salir de una fecha de alta que no se pode (user_profile o player_stats). Si no, el huevo se autodestruye el día exacto en que tiene que salir."},
+{n:124,p:"B",g:"Huevos · Calendario y reloj",id:"still_standing",h:1,c:"0",r:"~2%",t:"Papá Puerco",d:"Primero de enero, antes de que salga el sol, y anotaste algo. Nadie pregunta si dormiste.",x:"01-01 antes de las 6",w:"Discworld — título de la edición española de Hogfather."},
+{n:125,p:"B",g:"Huevos · Calendario y reloj",id:"last_two_hours",h:1,c:"0",r:"~2%",t:"La Última Tirada de la Sesión",d:"Faltaban menos de dos horas para que terminara el año y vos tachando cosas. Había tiempo hasta mañana. No lo usaste.",x:"TASK_COMPLETED el 12-31 a las 22 o después",w:"Cultura de mesa — frase textual."},
+{n:126,p:"B",g:"Huevos · Calendario y reloj",id:"omens_and_portents",h:1,c:"0",r:"~6%",t:"Viernes Trece",d:"Un movimiento anotado un viernes trece. No pasó nada. Igual quedó anotado.",x:"movimiento de finanzas un viernes 13",w:"Cultura popular. El deadpan del cuerpo se refuerza."},
+{n:127,p:"B",g:"Huevos · Calendario y reloj",id:"dice_did_notice",h:1,c:"0",r:"~0,3%",t:"Martes Trece",d:"Sacaste un x3 un martes 13. Alguien mintió sobre la mala suerte, o te tocó el único dado honesto de la bolsa.",x:"martes 13 con bonus >= 3.0",w:"Superstición rioplatense. Hermano raro de #72."},
+{n:128,p:"B",g:"Huevos · Calendario y reloj",id:"hour_of_the_wolf",h:1,c:"0",r:"~2%",t:"La Hora del Lobo",d:"Un gasto anotado a las cuatro de la mañana. Ni el libro pregunta a esa hora.",x:"EXPENSE_LOGGED a las 4",w:"ASOIAF — término canónico de los libros.",v:"SIN RENOMBRE A PROPÓSITO: el remate ('ni el libro pregunta a esa hora') es la garantía anti-moraleja. El chiste está en la hora, nunca en qué compraste."},
+{n:129,p:"B",g:"Huevos · Calendario y reloj",id:"night_watch",h:1,c:"0",r:"~3%",t:"La Guardia de la Noche",d:"Un pomodoro entre las dos y las cinco de la mañana. La guardia no la pidió nadie, pero alguien la hace.",x:"pomodoro entre las 2 y las 5",w:"ASOIAF — nombre propio canónico.",v:"Absorbió a 'Las Cuatro de la Mañana', que estaba contenido matemáticamente (2<=h<5 incluye h=4)."},
+{n:130,p:"B",g:"Huevos · Calendario y reloj",id:"blood_moon",h:1,c:"0",r:"~1%",t:"Luna de Sangre",d:"Luna llena, pasada la medianoche, y vos anotando. En ciertos reinos, a esta hora vuelve todo lo que diste por terminado.",x:"hora >= 23 y luna llena",w:"Zelda BotW — nombre canónico en español.",v:"Helper puro de 6 líneas: edad lunar sinódica sobre event.date, sin DB ni reloj. Deriva unas horas por década, irrelevante."},
+
+{n:131,p:"B",g:"Huevos · Los dados",id:"full_word",h:1,c:"0",r:"~8%",t:"FUS RO DAH",d:"Misión épica, multiplicador al tope y un x3, todo en la misma tirada. Los tres factores al máximo a la vez. No suele pasar.",x:"TASK_COMPLETED tier 3 + combo >= 2.0 + bonus >= 3.0",w:"Skyrim — el Grito de tres palabras, textual.",v:"El cuerpo se reescribió: la versión anterior decía 'las tres sílabas salieron juntas', que sin la referencia no significa nada."},
+{n:132,p:"B",g:"Huevos · Los dados",id:"loaded_dice",h:1,c:"0",r:"~1%",t:"Dados Cargados",d:"Cinco tiradas de x3 en un mismo día. Nadie te está acusando de nada. Nadie te va a pedir los dados prestados tampoco.",x:"epicsToday >= 5",w:"Cultura de mesa. La segunda frase retracta y la tercera reinstala."},
+{n:133,p:"B",g:"Huevos · Los dados",id:"witching_hour",h:1,c:"0",r:"~1 de 10.000",t:"La Hora Bruja",d:"El dado del dos por ciento, a las tres de la mañana. A esa hora los dados no le responden a nadie.",x:"hora === 3 con bonus >= 3.0",w:"Folklore / Discworld — la hora en que las cosas se deciden solas."},
+
+{n:134,p:"B",g:"Huevos · El estado contradictorio",id:"enemies_nearby",h:1,c:"0",r:"~10%",t:"No Puedes Esperar con Enemigos Cerca",d:"Encendiste el caldero desde la Posada. Ibas a descansar. El cartel de siempre apareció igual.",x:"POMODORO_COMPLETED con innSince !== null",w:"TES (Morrowind/Oblivion) — string exacto del menú en español."},
+{n:135,p:"B",g:"Huevos · El estado contradictorio",id:"working_holiday",h:1,c:"0",r:"~5%",t:"Descanso Largo",d:"Los cuatro oficios en un mismo día. Técnicamente estabas descansando en la Posada. Técnicamente.",x:"los 4 módulos el mismo día con innSince !== null",w:"D&D — el descanso largo que en la mesa siempre termina en combate. Título liberado al renombrar #95.",v:"Imposible de perseguir: nadie se va a la Posada con el plan de laburar."},
+{n:136,p:"B",g:"Huevos · El estado contradictorio",id:"shall_we_rest",h:1,c:"0",r:"~8%",t:"¿Descansamos?",d:"Fuiste a la Posada antes de encadenar cuatro días. Todo grupo tiene uno que propone acampar, y el grupo siempre acepta.",x:"innSince !== null con bestStreak <= 3",w:"Cultura de mesa — la frase textual.",v:"bestStreak no baja nunca: es una ventana de principiante que se cierra sola y no vuelve a abrirse jamás."},
+{n:137,p:"B",g:"Huevos · El estado contradictorio",id:"always_the_same_trick",h:1,c:"0",r:"~6%",t:"Arquero Sigiloso",d:"Diez hechos en un día y todos del mismo tipo. Empezaste con mil formas posibles de jugar esto y terminaste con una. Como todo el mundo.",x:"10 hechos en el día, un solo tipo distinto",w:"Skyrim — la build con la que todos terminan."},
+{n:138,p:"B",g:"Huevos · El estado contradictorio",id:"no_name_on_the_door",h:1,c:"0",r:"~6%",t:"El Sinnombre",d:"Nivel diez y tu personaje sigue llamándose como vino de fábrica. A esta altura ya no es un olvido: es un estilo.",x:"level >= 10 sin nombre de personaje",w:"Planescape: Torment — nombre canónico del protagonista.",v:"Borde declarado: es lo más cerca de 'premiar no hacer algo'. Lo salva que nadie planifica llegar a nivel 10 sin nombre, que el remate reencuadra la omisión como decisión, y que ponerle nombre después no lo revoca."},
+{n:139,p:"B",g:"Huevos · El estado contradictorio",id:"takes_no_notes",h:1,c:"0",r:"~12%",t:"Sin Hoja de Personaje",d:"Quinientos hechos en la crónica y tres sellos. Jugás como alguien que se acuerda de todo. Ojalá.",x:"totalEvents >= 500 con sealsCount <= 3  Y  !!c.event",w:"Cultura de mesa.",v:"El !!c.event es nuevo y obligatorio: sin él dispara en el backfill. Demostrablemente no punitivo: saltear el sello no cuesta nada por diseño, y este huevo PAGA 25 XP y 15 óbolos por haberlo salteado."},
+{n:140,p:"B",g:"Huevos · El estado contradictorio",id:"just_in_case",h:1,c:"C",r:"~10%",t:"Los Megaelixires",d:"Quinientos óbolos y ni uno gastado. Los estás guardando para la pelea importante. Nadie llegó nunca al final del juego con los elixires usados.",x:"saldo >= 500 óbolos con cero canjes",w:"Final Fantasy — el chiste universal del RPG."},
+{n:141,p:"B",g:"Huevos · El estado contradictorio",id:"door_never_opened",h:1,c:"0",r:"~5%",t:"¿Qué Puede Cambiar la Naturaleza de un Hombre?",d:"Quinientos hechos en la crónica y este módulo lo estrenaste hoy. Estaba sin llave todo el tiempo.",x:"primer evento de un módulo con totalEvents >= 500",w:"Planescape: Torment — la pregunta central, cita textual."},
+
+{n:142,p:"B",g:"Huevos · Coincidencias del juego",id:"solvent_crown",h:1,c:"0",r:"~1%",t:"La Corona Solvente",d:"Saldaste una deuda el mismo día que un mes cerró dentro del presupuesto. Reinos enteros se hundieron por no lograr las dos cosas juntas.",x:"LOAN_SETTLED y BUDGET_MONTH_MET el mismo día",w:"ASOIAF — la corona endeudada con la banca de ultramar.",v:"El agente de Coinify propuso dejarlo así o cambiarlo; queda a tu criterio."},
+{n:143,p:"B",g:"Huevos · Coincidencias del juego",id:"a_hundred_lines",h:1,c:"0",r:"~0,3%",t:"Cartas en el Asunto",d:"El resumen que importaste traía exactamente cien renglones. Ni noventa y nueve ni ciento uno.",x:"STATEMENT_IMPORTED con payload.count === 100",w:"Discworld — título de la edición española de Going Postal.",v:"Alternativa propuesta por el agente de Coinify: 'El Escriba de Desembarco' (ASOIAF). Elegí."},
+{n:144,p:"B",g:"Huevos · Coincidencias del juego",id:"buzzer_pardon",h:1,c:"0",r:"~4%",t:"Tirada de Muerte",d:"Salvaste la racha faltando menos de una hora para que se cerrara el día. No había público. Hubo testigo.",x:"pardonUsed con hora >= 23",w:"D&D 5e — 'death saving throw', término oficial en español. Distinto de #96 ('Tiro de Salvación')."},
+
+{n:145,p:"B",g:"Huevos · Papeles y tinta",id:"a_single_line",h:1,c:"0",r:"~30%",t:"Comprar Cuerda",d:"Un hecho en todo el día, y lo sellaste igual. Hay sesiones enteras que se van en comprar cuerda, y esas también se anotan.",x:"DAY_SEALED con eventsCount === 1",w:"Cultura de mesa — el chiste de la sesión que se va en logística.",v:"El huevo tierno del lote: dice en voz alta lo mismo que el mood gentle de codexPhrases.ts."},
+{n:146,p:"B",g:"Huevos · Papeles y tinta",id:"session_notes",h:1,c:"0",r:"~4%",t:"El Resumen del Máster",d:"Cuatro de la mañana, sellando el día de ayer. El máster también escribe el resumen cuando ya se durmieron todos.",x:"DAY_SEALED retro antes de las 5",w:"Cultura de mesa.",v:"Co-dispara con late_memory y early_bird la primera vez: tres desbloqueos de un saque."},
+{n:147,p:"B",g:"Huevos · Papeles y tinta",id:"three_keys",h:1,c:"0",r:"~20%",t:"Las Tres Piedras Espirituales",d:"El día cerrado, la semana sellada y el códice firmado, todo en la misma noche. Alguien acá disfruta ordenar.",x:"DAY_SEALED con un DAY_SUMMARY y un WEEK_SUMMARY ese mismo día",w:"Ocarina of Time — nombre canónico en español.",v:"Verificado: countByTypeToday es RAW, así que ve WEEK_SUMMARY pese a ser NON_MEANINGFUL. El sello se exige como event y no como conteo para que el orden de inserción no importe."},
+{n:148,p:"B",g:"Huevos · Papeles y tinta",id:"hole_in_the_sheet",h:1,c:"0",r:"~8%",t:"El Agujero en la Ficha",d:"Abriste el día dos veces en la misma jornada. Esa parte de la hoja ya no tiene papel de tanto borrar.",x:"2 DAY_REOPENED el mismo día",w:"Cultura de mesa — la ficha a lápiz gastada. Ya era directo.",v:"Habla de papel y de goma, nunca de lo que se anotó. Misma familia afectiva que second_chance: corregirse es gratis."},
+{n:149,p:"B",g:"Huevos · Papeles y tinta",id:"long_table",h:1,c:"C",r:"~10%",t:"El Salón de Hidromiel",d:"Los cuatro turnos de la mesa, anotados el mismo día. La página quedó sin un solo hueco.",x:"los 4 slots de comida distintos registrados el mismo día",w:"Skyrim / TES — nombre canónico.",v:"El sujeto de la frase es LA PÁGINA, no la persona: no hay cantidad, no hay dirección, no hay logro corporal. Si aun así te hace ruido, vetalo sin discusión."}
+];
+
+const KEY='hubtify-eggs-v2';
+let S=JSON.parse(localStorage.getItem(KEY)||'{}');
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const st=n=>S[n]||(S[n]={});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const val=(n,f)=>st(n)[f]!==undefined?st(n)[f]:D.find(e=>e.n===n)[f];
+document.getElementById('tot').textContent=D.length;
+
+const list=document.getElementById('list');
+let html='',lastG='',lastF='';
+for(const e of D){
+  if(e.g!==lastG){ html+=`<h2>${esc(e.g)}</h2>`; lastG=e.g; lastF=''; }
+  if(e.f&&e.f!==lastF){ html+=`<div class="famhdr">Escalera · ${esc(e.f)}</div>`; lastF=e.f; }
+  if(!e.f) lastF='';
+  const s=st(e.n), on=s.sel?' sel':'', wc=e.v?' warn':'', fc=e.f?' fam':'';
+  html+=`<div class="card${on}${wc}${fc}" data-n="${e.n}" data-p="${e.p}" data-h="${e.h}" data-c="${e.c}" data-w="${e.v?1:0}" data-t="${e.T?1:0}" data-nw="${e.nw?1:0}">
+    <div class="head">
+      <input type="checkbox" ${s.sel?'checked':''} data-k="sel">
+      <span class="num">#${e.n}</span>
+      <div class="titlewrap">
+        <input class="title" value="${esc(val(e.n,'t'))}" data-k="t">
+        <div class="tags">
+          <span class="tag">${esc(e.id)}</span>
+          ${e.T?`<span class="tag tier">tier ${e.T}</span>`:''}
+          ${e.nw?'<span class="tag nw">NUEVA</span>':''}
+          ${e.h?'<span class="tag hid">oculto</span>':''}
+          <span class="tag cost">costo ${e.c}</span>
+          ${e.k?`<span class="tag when">${esc(e.k)}</span>`:''}
+          ${e.r?`<span class="tag rar">${esc(e.r)}</span>`:''}
+          ${e.v?'<span class="tag w">aviso</span>':''}
+          <span class="edited" data-k="ed"></span>
+        </div>
+      </div>
+    </div>
+    <div class="body">
+      <label class="f">Descripción</label>
+      <textarea rows="2" data-k="d">${esc(val(e.n,'d'))}</textarea>
+      <label class="f">Trigger</label>
+      <textarea class="trig" rows="2" data-k="x">${esc(val(e.n,'x'))}</textarea>
+      <div class="wink">${esc(e.w)}</div>
+      ${e.v?`<div class="warnmsg"><b>Aviso —</b> ${esc(e.v)}</div>`:''}
+    </div>
+  </div>`;
+}
+list.innerHTML=html;
+
+const grow=t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px'};
+document.querySelectorAll('textarea[data-k]').forEach(grow);
+const mark=n=>{
+  const e=D.find(x=>x.n===n), s=st(n);
+  const ed=['t','d','x'].filter(f=>s[f]!==undefined&&s[f]!==e[f]);
+  document.querySelector(`.card[data-n="${n}"] [data-k=ed]`).textContent=ed.length?'· editado':'';
+};
+D.forEach(e=>mark(e.n));
+const cnt=()=>document.getElementById('n').textContent=D.filter(e=>st(e.n).sel).length;
+cnt();
+
+list.addEventListener('input',ev=>{
+  const el=ev.target,k=el.dataset.k; if(!k)return;
+  const card=el.closest('.card'),n=+card.dataset.n;
+  if(k==='sel'){ st(n).sel=el.checked; card.classList.toggle('sel',el.checked); cnt(); }
+  else { st(n)[k]=el.value; if(el.tagName==='TEXTAREA')grow(el); mark(n); }
+  save();
+});
+
+let F='all';
+document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-f]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); F=b.dataset.f;
+  document.querySelectorAll('.card').forEach(c=>{
+    const n=+c.dataset.n,s=st(n).sel;
+    const ok = F==='all'||(F==='sel'&&s)||(F==='unsel'&&!s)||
+      (F==='A'&&c.dataset.p==='A')||(F==='B'&&c.dataset.p==='B')||
+      (F==='tier'&&c.dataset.t==='1')||(F==='new'&&c.dataset.nw==='1')||
+      (F==='hidden'&&c.dataset.h==='1')||(F==='free'&&c.dataset.c==='0')||
+      (F==='warn'&&c.dataset.w==='1');
+    c.classList.toggle('hidden',!ok);
+  });
+  document.querySelectorAll('h2,.famhdr').forEach(h=>{
+    let el=h.nextElementSibling,any=false;
+    while(el&&el.tagName!=='H2'&&!(h.className==='famhdr'&&el.className==='famhdr')){
+      if(el.classList.contains('card')&&!el.classList.contains('hidden'))any=true;
+      el=el.nextElementSibling;
+    }
+    h.classList.toggle('hidden',!any);
+  });
+});
+
+document.getElementById('clr').onclick=()=>{
+  if(!confirm('Borra todas las marcas Y todas las ediciones. ¿Seguro?'))return;
+  S={};save();location.reload();
+};
+document.getElementById('exp').onclick=()=>{
+  const sel=D.filter(e=>st(e.n).sel);
+  let o=`# Selección v2 — ${sel.length} de ${D.length}\n\n`;
+  if(!sel.length)o+='(ninguna marcada)\n';
+  let g='',f='';
+  for(const e of sel){
+    if(e.g!==g){o+=`\n## ${e.g}\n`;g=e.g;f='';}
+    if(e.f&&e.f!==f){o+=`\n### Escalera: ${e.f}\n`;f=e.f;}
+    const s=st(e.n);
+    const ed=['t','d','x'].filter(k=>s[k]!==undefined&&s[k]!==e[k]);
+    o+=`\n#${e.n} ${e.id}${e.T?' [tier '+e.T+']':''}${ed.length?'  [EDITADO: '+ed.map(k=>({t:'título',d:'desc',x:'trigger'}[k])).join(', ')+']':''}\n`;
+    o+=`  título:  ${val(e.n,'t')}\n`;
+    o+=`  desc:    ${val(e.n,'d')}\n`;
+    o+=`  trigger: ${val(e.n,'x')}\n`;
+  }
+  const no=D.filter(e=>!st(e.n).sel).map(e=>e.n);
+  o+=`\n\n---\nDescartadas (${no.length}): ${no.join(', ')}\n`;
+  document.getElementById('outtxt').value=o;
+  document.getElementById('out').classList.add('show');
+  document.getElementById('veil').classList.add('show');
+};
+const close=()=>{document.getElementById('out').classList.remove('show');document.getElementById('veil').classList.remove('show')};
+document.getElementById('cls').onclick=close;
+document.getElementById('veil').onclick=close;
+document.getElementById('cp').onclick=()=>{
+  const t=document.getElementById('outtxt');t.select();
+  navigator.clipboard.writeText(t.value).then(()=>{
+    const b=document.getElementById('cp'),o=b.textContent;
+    b.textContent='Copiado';setTimeout(()=>b.textContent=o,1200);
+  }).catch(()=>document.execCommand('copy'));
+};
+</script>
+</body>
+</html>
