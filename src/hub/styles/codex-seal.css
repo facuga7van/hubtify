@@ -1294,13 +1294,6 @@
   margin-top: 10px;
 }
 
-.codex-nutri__award {
-  margin-top: 10px;
-  text-align: center;
-  font-size: var(--fs-body);
-  color: var(--moss-dark);
-}
-
 [data-shell="mobile"] .codex-nutri__fields {
   gap: 12px;
 }

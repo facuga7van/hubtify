@@ -13,10 +13,18 @@
  * migración: nada se reescribe.
  */
 
-/** Lo que el backend devuelve al cerrar; sólo nos importan estos dos números. */
+/**
+ * Lo que el cierre dejó anotado.
+ *
+ * `xpTotal` es el XP CRUDO del desglose de Nutrify (lo que va en el payload).
+ * `xpGained` es lo que el motor pagó de verdad: el crudo pasado por combo,
+ * bonus y milestone (`DAY_SUMMARY` no es un evento flat). Es el número que el
+ * ledger va a mostrar al reabrir la página, así que es el que se pinta hoy.
+ */
 export interface NutritionCloseBreakdown {
   xpTotal: number;
   hpChange: number;
+  xpGained: number;
 }
 
 /**
@@ -83,11 +91,14 @@ export async function closeNutritionDay(
   const xp = b.xpTotal ?? 0;
   const hp = b.hpChange ?? 0;
   // `date` es lo que DAY_REOPENED usa para revertir exactamente este evento.
-  await window.api.processRpgEvent({
+  const paid = await window.api.processRpgEvent({
     type: 'DAY_SUMMARY',
     moduleId: 'nutrition',
     payload: { xp, hp, date },
     timestamp: Date.now(),
   });
-  return { xpTotal: xp, hpChange: hp };
+  // Un main que no devuelva el resultado (stub, versión vieja) no puede dejar
+  // la fila en NaN: se cae al crudo, que es lo que había hasta hoy.
+  const xpGained = typeof paid?.xpGained === 'number' && Number.isFinite(paid.xpGained) ? paid.xpGained : xp;
+  return { xpTotal: xp, hpChange: hp, xpGained };
 }

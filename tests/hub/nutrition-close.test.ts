@@ -30,7 +30,8 @@ function installApi(over: Record<string, unknown> = {}): Calls {
     },
     nutritionIsDayClosed: () => Promise.resolve(false),
     nutritionGetDailyMetrics: () => Promise.resolve({ steps: 8000, gym: 1 }),
-    processRpgEvent: (e: unknown) => { calls.rpg.push(e); return Promise.resolve({ xpGained: 42 }); },
+    // El motor paga MÁS que el crudo (combo, bonus, milestone): 57 contra 42.
+    processRpgEvent: (e: unknown) => { calls.rpg.push(e); return Promise.resolve({ xpGained: 57 }); },
     ...over,
   };
   (globalThis as { window?: unknown }).window = { api };
@@ -94,7 +95,10 @@ describe('closeNutritionDay', () => {
     const calls = installApi();
     const result = await closeNutritionDay('2026-09-03', '8420', true);
 
-    expect(result).toEqual({ xpTotal: 42, hpChange: 10 });
+    // `xpTotal` es el crudo del payload; `xpGained` es lo que el motor pagó de
+    // verdad. El Códice pinta el segundo: es el número que va a reaparecer al
+    // reabrir la página.
+    expect(result).toEqual({ xpTotal: 42, hpChange: 10, xpGained: 57 });
     expect(calls.saveDailyMetrics).toEqual([{ date: '2026-09-03', steps: 8420, gym: true }]);
     expect(calls.closeDay).toEqual(['2026-09-03']);
     expect(calls.rpg).toHaveLength(1);
@@ -103,6 +107,11 @@ describe('closeNutritionDay', () => {
       moduleId: 'nutrition',
       payload: { xp: 42, hp: 10, date: '2026-09-03' },
     });
+  });
+
+  it('si el motor no contesta un número, la fila cae al crudo antes que a NaN', async () => {
+    installApi({ processRpgEvent: () => Promise.resolve(null) });
+    expect(await closeNutritionDay('2026-09-03', '', false)).toEqual({ xpTotal: 42, hpChange: 10, xpGained: 42 });
   });
 
   // Este es el guard que hace seguro encadenar el cierre al sello.

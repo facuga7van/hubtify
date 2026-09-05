@@ -437,6 +437,112 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     expect(box.offLeft).toBeLessThanOrEqual(1);
     expect(box.offRight).toBeLessThanOrEqual(1);
   });
+
+  /* El cierre de comidas hecho desde acá es un hecho del día: una fila del
+     ledger con su hora y el XP que pagó el MOTOR (no el crudo del payload),
+     dentro de la sección de nutrición y con la misma etiqueta que va a tener
+     al reabrir («Resumen del día»); no un párrafo suelto bajo el formulario. */
+  const nutriDay = () => ({
+    ...fourModules(), canSeal: false, sealBlockedReason: 'too_old',
+    totalXp: 148, eventsCount: 7, maxCombo: 3, modules: ['quests', 'nutrition'],
+    events: [deed('quests', 'TASK_COMPLETED', 15, '09:12')],
+  });
+  const nutriStubs = {
+    rpgGetSeals: () => Promise.resolve([]),
+    nutritionIsDayClosed: () => Promise.resolve(false),
+    nutritionGetDailyMetrics: () => Promise.resolve({ steps: 4200, gym: 0 }),
+    nutritionSaveDailyMetrics: () => Promise.resolve(true),
+    // El crudo es 12; el motor paga 18. La fila tiene que decir 18.
+    nutritionCloseDay: () => Promise.resolve({ success: true, breakdown: { xpTotal: 12, hpChange: 0 } }),
+    processRpgEvent: () => Promise.resolve({ xpGained: 18 }),
+  };
+
+  test('el cierre de comidas se anota como una fila más de la sección de nutrición', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    // Sin lacre (fuera de ventana) para que exista el botón «Cerrar la
+    // jornada»; `modules` trae nutrition pero los hechos no: así se ejercita
+    // la rama que CREA la sección.
+    installApi({ ...nutriStubs, rpgGetDaySummary: () => Promise.resolve(nutriDay()) });
+    mountCodex();
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    expect(dlg.querySelector('[data-codex-row="nutrition-close"]')).toBeNull();
+    await page.getByRole('button', { name: 'Cerrar la jornada' }).click();
+    await settle(500);
+
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-codex-05-fila-nutricion.png` });
+    resetCapture();
+
+    // Ya no hay párrafo suelto…
+    expect(dlg.querySelector('.codex-nutri__award')).toBeNull();
+    // …hay una fila, dentro de la sección de nutrición, con hora, etiqueta y XP.
+    const row = dlg.querySelector('[data-codex-row="nutrition-close"]') as HTMLElement;
+    expect(row).not.toBeNull();
+    const section = row.closest('.qb-section') as HTMLElement;
+    // El rótulo sale de `dashboard.moduleNutrition` («Diario de Provisiones»).
+    expect(section.querySelector('.qb-section-title')?.textContent).toContain('PROVISIONES');
+    expect(row.querySelector('.codex-marginalia__text')?.textContent).toBe('Resumen del día');
+    expect(row.querySelector('.codex-marginalia__xp')?.textContent).toBe('+18');
+    // HH:mm de 24 h, el mismo registro que las filas del handler; sin «a. m.»
+    // que se parta en dos líneas al lado de un «09:12».
+    expect(row.querySelector('.codex-marginalia__time')?.textContent).toMatch(/^\d{2}:\d{2}$/);
+    // El anuncio accesible vive en la lista, no en la fila.
+    expect(section.querySelector('.codex-marginalia__list')?.getAttribute('aria-live')).toBe('polite');
+    // La sección nueva se ordena como todas: Misiones, después nutrición.
+    const titles = [...dlg.querySelectorAll('.codex-marginalia .qb-section-title')]
+      .map((el) => el.textContent?.replace(/\d+$/, '').trim());
+    expect(titles).toEqual(['LIBRO DE MISIONES', 'DIARIO DE PROVISIONES']);
+    // Y la línea de cierre suma lo que el motor acaba de pagar.
+    expect(dlg.querySelector('.codex-ledger-total__xp')?.textContent).toBe('+166');
+    expect(dlg.querySelector('.codex-ledger-total')?.textContent?.replace(/\s+/g, ' ')).toContain('8 hechos');
+  });
+
+  /* `load()` se vuelve a llamar en `account:switched` y cuando el sello
+     rebota con `already_sealed`; el summary recargado ya trae el DAY_SUMMARY
+     real. La fila sintética tiene que irse con la recarga, o se ve dos veces. */
+  test('recargar la página no duplica el cierre de comidas', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    let reads = 0;
+    installApi({
+      ...nutriStubs,
+      rpgGetDaySummary: () => {
+        reads += 1;
+        const base = nutriDay();
+        if (reads === 1) return Promise.resolve(base);
+        // Segunda lectura: el handler real ya devuelve el evento del cierre.
+        return Promise.resolve({
+          ...base, totalXp: 166, eventsCount: 8,
+          events: [...base.events, deed('nutrition', 'DAY_SUMMARY', 18, '17:05')],
+        });
+      },
+    });
+    mountCodex();
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    await page.getByRole('button', { name: 'Cerrar la jornada' }).click();
+    await settle(500);
+    expect(dlg.querySelector('[data-codex-row="nutrition-close"]')).not.toBeNull();
+
+    window.dispatchEvent(new Event('account:switched'));
+    await settle(800);
+
+    // La sintética se fue; queda UNA fila de nutrición, la real.
+    expect(dlg.querySelector('[data-codex-row="nutrition-close"]')).toBeNull();
+    const nutriSection = [...dlg.querySelectorAll('.codex-marginalia .qb-section')]
+      .find((s) => s.querySelector('.qb-section-title')?.textContent?.includes('PROVISIONES')) as HTMLElement;
+    const rows = nutriSection.querySelectorAll('.codex-marginalia__row');
+    expect(rows.length).toBe(1);
+    expect(rows[0].querySelector('.codex-marginalia__text')?.textContent).toBe('Resumen del día');
+    expect(rows[0].querySelector('.codex-marginalia__xp')?.textContent).toBe('+18');
+    // Y el total no se suma dos veces.
+    expect(dlg.querySelector('.codex-ledger-total__xp')?.textContent).toBe('+166');
+    expect(dlg.querySelector('.codex-ledger-total')?.textContent?.replace(/\s+/g, ' ')).toContain('8 hechos');
+  });
 });
 
 describe('Avisos de actualización', () => {

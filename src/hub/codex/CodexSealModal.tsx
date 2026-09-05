@@ -58,6 +58,22 @@ type Problem = SealFailReason | 'unavailable' | null;
 
 const MODULE_ORDER = ['quests', 'nutrition', 'finance', 'cauldron'];
 
+/** Una fila del ledger, ya formateada para pintar. */
+interface LedgerRow {
+  key: string;
+  time: string;
+  text: string;
+  xp: number;
+  /** Anotada desde acá (el cierre de comidas), no leída del summary. */
+  synthetic?: boolean;
+}
+
+function byModuleOrder(a: string, b: string): number {
+  const ia = MODULE_ORDER.indexOf(a);
+  const ib = MODULE_ORDER.indexOf(b);
+  return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+}
+
 function moduleIcon(moduleId: string, size = 13) {
   switch (moduleId) {
     case 'quests': return <Sword width={size} height={size} />;
@@ -78,12 +94,15 @@ function moduleLabel(moduleId: string, t: TFunction): string {
   }
 }
 
-/** The contract allows either an ISO timestamp or a plain HH:mm. */
+/** The contract allows either an ISO timestamp or a plain HH:mm.
+    The handler sends HH:mm (24h); an ISO stamp — the row the meal close writes
+    from here — has to come out in the same register, or the column gets a
+    «04:19 a. m.» that wraps next to a «09:12». */
 function formatTime(time: string, locale: string): string {
   if (/^\d{1,2}:\d{2}/.test(time)) return time.slice(0, 5);
   const d = new Date(time);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 }
 
 function formatLongDate(iso: string, locale: string): string {
@@ -148,12 +167,19 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
     return () => setCodexModalOpen(false);
   }, []);
 
+  /* ── lo que el cierre de comidas dejó anotado en esta sesión ──
+     Va ANTES de `load` porque `load` lo resetea: el summary recargado (por
+     `account:switched` o por un sello que rebota con `already_sealed`) ya
+     trae el DAY_SUMMARY real, y la fila sintética no puede seguir viva al
+     lado de la real. `xp` es lo que pagó el MOTOR, no el crudo del payload. */
+  const [nutriAward, setNutriAward] = useState<{ xp: number; at: string } | null>(null);
+
   const load = useCallback(() => {
     if (!available) { setLoading(false); return; }
     setLoading(true);
     const from = addDaysISO(today, -(STRIP_DAYS - 1));
     Promise.all([getDaySummary(date), getSeals(from, today)])
-      .then(([s, sl]) => { setSummary(s); setSeals(sl); })
+      .then(([s, sl]) => { setSummary(s); setSeals(sl); setNutriAward(null); })
       .finally(() => setLoading(false));
   }, [available, date, today]);
 
@@ -189,7 +215,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   const [nutriPending, setNutriPending] = useState(false);
   const [nutriSteps, setNutriSteps] = useState('');
   const [nutriGym, setNutriGym] = useState(false);
-  const [nutriAward, setNutriAward] = useState<number | null>(null);
   const [nutriBusy, setNutriBusy] = useState(false);
 
   const dayHasNutrition = !!summary?.modules.includes('nutrition');
@@ -217,7 +242,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
     try {
       const breakdown = await closeNutritionDay(date, nutriSteps, nutriGym);
       setNutriPending(false);
-      if (breakdown) setNutriAward(breakdown.xpTotal);
+      if (breakdown) setNutriAward({ xp: breakdown.xpGained, at: new Date().toISOString() });
       notifyNutritionChanged();
       // Nutrify tiene que pasar a solo lectura sin recargar (NUT-02).
       notifyNutritionDayClosed();
@@ -337,22 +362,43 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
 
   /* ── derived ──────────────────────────────────────── */
 
-  const grouped = useMemo(() => {
-    if (!summary) return [] as Array<{ moduleId: string; events: DaySummary['events'] }>;
-    const map = new Map<string, DaySummary['events']>();
-    for (const ev of summary.events) {
-      const list = map.get(ev.moduleId) ?? [];
-      list.push(ev);
-      map.set(ev.moduleId, list);
+  /* ── el ledger ──
+     Los hechos del día agrupados por módulo, y —si el cierre de comidas se
+     hizo desde acá— una fila más dentro de la sección de nutrición. Antes ese
+     cierre era un párrafo suelto debajo del formulario: un hecho del día con
+     su hora y su XP es una fila del ledger, no un aviso. La página no se
+     recarga después de cerrar (nunca lo hizo), así que la fila se anota acá,
+     con la MISMA etiqueta que va a tener cuando el summary la traiga de
+     verdad (`events.DAY_SUMMARY`), y muere con el próximo `load()`. */
+  const ledger = useMemo(() => {
+    if (!summary) return [] as Array<{ moduleId: string; rows: LedgerRow[] }>;
+    const map = new Map<string, LedgerRow[]>();
+    summary.events.forEach((ev, i) => {
+      const label = t(`events.${ev.eventType}`);
+      const rows = map.get(ev.moduleId) ?? [];
+      rows.push({
+        key: `${ev.moduleId}-${i}`,
+        time: formatTime(ev.time, locale),
+        text: label !== `events.${ev.eventType}` ? label : ev.eventType,
+        xp: ev.xpGained,
+      });
+      map.set(ev.moduleId, rows);
+    });
+    if (nutriAward) {
+      const rows = map.get('nutrition') ?? [];
+      rows.push({
+        key: 'nutrition-close',
+        time: formatTime(nutriAward.at, locale),
+        text: t('events.DAY_SUMMARY', 'Resumen del día'),
+        xp: nutriAward.xp,
+        synthetic: true,
+      });
+      map.set('nutrition', rows);
     }
     return [...map.entries()]
-      .sort((a, b) => {
-        const ia = MODULE_ORDER.indexOf(a[0]);
-        const ib = MODULE_ORDER.indexOf(b[0]);
-        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-      })
-      .map(([moduleId, events]) => ({ moduleId, events }));
-  }, [summary]);
+      .sort((a, b) => byModuleOrder(a[0], b[0]))
+      .map(([moduleId, rows]) => ({ moduleId, rows }));
+  }, [summary, nutriAward, t, locale]);
 
   const strip = useMemo(() => {
     const sealedSet = new Map(seals.map((s) => [s.date, s]));
@@ -443,30 +489,36 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
     return (
       <>
         {/* ── zona 2: el ledger, los hechos del día por módulo ── */}
-        {grouped.length > 0 ? (
+        {ledger.length > 0 ? (
           <>
             <div className="codex-marginalia">
-              {grouped.map(({ moduleId, events }) => (
+              {ledger.map(({ moduleId, rows }) => (
                 <Section
                   key={moduleId}
                   title={moduleLabel(moduleId, t).toUpperCase()}
                   icon={<span className="codex-marginalia__icon">{moduleIcon(moduleId)}</span>}
-                  rightSlot={<span className="qb-numeral codex-marginalia__count">{events.length}</span>}
+                  rightSlot={<span className="qb-numeral codex-marginalia__count">{rows.length}</span>}
                 >
-                  <ul className="codex-marginalia__list">
-                    {events.map((ev, i) => {
-                      const label = t(`events.${ev.eventType}`);
-                      const text = label !== `events.${ev.eventType}` ? label : ev.eventType;
-                      return (
-                        <li key={`${moduleId}-${i}`} className="codex-marginalia__row">
-                          <span className="qb-hand codex-marginalia__time">{formatTime(ev.time, locale)}</span>
-                          <span className="codex-marginalia__text" title={text}>{text}</span>
-                          <span className="qb-numeral codex-marginalia__xp">
-                            {ev.xpGained >= 0 ? '+' : ''}{Math.round(ev.xpGained)}
-                          </span>
-                        </li>
-                      );
-                    })}
+                  {/* La región viva va en la LISTA de nutrición, que ya existe
+                      cuando la fila del cierre entra; un <li> que se monta con
+                      su contenido no se anuncia. */}
+                  <ul
+                    className="codex-marginalia__list"
+                    aria-live={moduleId === 'nutrition' ? 'polite' : undefined}
+                  >
+                    {rows.map((row) => (
+                      <li
+                        key={row.key}
+                        className="codex-marginalia__row"
+                        data-codex-row={row.synthetic ? 'nutrition-close' : undefined}
+                      >
+                        <span className="qb-hand codex-marginalia__time">{row.time}</span>
+                        <span className="codex-marginalia__text" title={row.text}>{row.text}</span>
+                        <span className="qb-numeral codex-marginalia__xp">
+                          {row.xp >= 0 ? '+' : ''}{Math.round(row.xp)}
+                        </span>
+                      </li>
+                    ))}
                   </ul>
                 </Section>
               ))}
@@ -477,15 +529,20 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
                 (tests/ipc) busca esa clave en este fuente y lee el campo del
                 summary que viene a menos de 200 caracteres: no separar el
                 `title` del número, y no repetir la clave ni el campo en ningún
-                comentario (la regex los matchearía acá). El vigor no está: ya
-                vive en la barra lateral. */}
+                comentario (la regex los matchearía acá). Suma la fila de
+                comidas anotada en esta sesión —lo que pagó el motor— para no
+                contradecir lo que tiene arriba. El vigor no está: ya vive en
+                la barra lateral. */}
             <p className="qb-small-caps codex-ledger-total">
               <span className="codex-ledger-total__xp" title={t('rpg.codexXpToday', 'XP DEL DÍA')}>
-                +{Math.round(summary.totalXp)}
+                +{Math.round(summary.totalXp + (nutriAward?.xp ?? 0))}
               </span>
               {' '}{t('rpg.codexXpUnit', 'XP')}
               {' · '}
-              {t('rpg.codexLedgerDeeds', { count: summary.eventsCount, defaultValue: '{{count}} hechos' })}
+              {t('rpg.codexLedgerDeeds', {
+                count: summary.eventsCount + (nutriAward && nutriAward.xp > 0 ? 1 : 0),
+                defaultValue: '{{count}} hechos',
+              })}
               {' · '}
               {t('rpg.codexLedgerCombo', { n: summary.maxCombo, defaultValue: 'combo ×{{n}}' })}
             </p>
@@ -544,15 +601,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
               </button>
             )}
           </div>
-        )}
-
-        {nutriAward !== null && (
-          <p className="codex-nutri__award" role="status">
-            {t('rpg.codexNutriClosed', {
-              n: Math.round(nutriAward),
-              defaultValue: 'Jornada de comidas cerrada · +{{n}} XP',
-            })}
-          </p>
         )}
 
         {/* ── the wax ───────────────────────────────── */}
