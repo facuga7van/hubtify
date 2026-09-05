@@ -57,8 +57,13 @@ SET date = date(
 WHERE deleted_at IS NULL
   AND source = 'import'
   AND statement_period IS NOT NULL
+  AND statement_period GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'
+  AND date(statement_period || '-01') IS NOT NULL
+  AND date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
   AND substr(date, 1, 7) <> statement_period;
 ```
+
+Los tres guards evitan que una fila con `statement_period` o `date` malformados (posibles vía sync, que no valida el formato) produzca `date(...) = NULL` y tumben la migración entera con `NOT NULL constraint failed` al arrancar la app. Esas filas conservan su fecha y no revientan nada.
 
 Idempotente: la segunda corrida no encuentra filas (la 1 por `purchase_date IS NULL`, la 2 porque `substr(date,1,7) = statement_period`). `updated_at` nuevo para que LWW propague la corrección a los otros dispositivos.
 
