@@ -113,6 +113,10 @@ export const NON_MEANINGFUL_EVENT_TYPES: readonly string[] = [
   'DAY_REOPENED',
   'STATEMENT_IMPORTED',
   'POMODORO_ABANDONED',
+  // Registro puro del Caldero (xp 0): la vuelta cerrada y la prórroga. Si
+  // contaran como "evento del día", el sello y el Cronista se autoalimentarían.
+  'CAULDRON_LAP_COMPLETED',
+  'POMODORO_EXTENDED',
   'DAY_SEALED',
   'ACHIEVEMENT_UNLOCKED',
   // El pergamino semanal es DERIVADO de días que ya contaron. Si fuese
