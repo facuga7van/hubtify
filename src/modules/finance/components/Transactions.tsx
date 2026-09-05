@@ -516,9 +516,11 @@ export default function Transactions() {
       category: editFields.category,
       date: editFields.date,
       paymentMethod: editFields.paymentMethod,
-      // Contrato explícito: la tarjeta que la fila ya tiene. El handler la
-      // conserva igual sin este campo; mandarla deja claro que no se toca.
-      creditCardId: original?.creditCardId ?? null,
+      // Contrato explícito: la tarjeta que la fila ya tiene. Si la lista se
+      // recargó entre abrir la edición y guardar (cambio de mes,
+      // account:switched) y `original` no está, queda `undefined`, que para el
+      // handler significa CONSERVAR la tarjeta. Nunca `null`: eso es «sacarla».
+      creditCardId: original?.creditCardId,
     }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
