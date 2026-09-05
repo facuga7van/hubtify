@@ -7,8 +7,9 @@
  * de ahí metería el plugin nativo en el bundle de escritorio.
  *
  * Por qué existen: en el WebView de Android, tapar la app con otra Activity NO
- * dispara `blur` en window ni `visibilitychange` en document (ver el comentario
- * de `src/mobile/AndroidUpdateBanner.tsx`). Sin estos dos eventos, la sync
+ * dispara `blur` en window ni `visibilitychange` en document — Chromium-en-
+ * WebView no trata otra Activity encima como "documento oculto", a diferencia
+ * de una pestaña tapada en el escritorio. Sin estos dos eventos, la sync
  * diferida se pierde entera cuando el sistema mata el proceso.
  */
 

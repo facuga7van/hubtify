@@ -34,7 +34,7 @@ export async function bindNativeShell(): Promise<() => void> {
   });
 
   /* Ciclo de vida → sync. `blur`/`focus` de window NO llegan cuando otra
-     Activity tapa el WebView (mismo hallazgo que AndroidUpdateBanner.tsx:70-75),
+     Activity tapa el WebView (ver el porqué en app-lifecycle-events.ts),
      así que el push diferido moría con el proceso y el pull al volver no
      ocurría nunca: con las dos apps abiertas y quietas, el dato no cruzaba.
      Acá no hay lógica de sync a propósito — se emiten dos eventos de window y

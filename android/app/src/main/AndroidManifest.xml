@@ -38,7 +38,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Update in-app (ApkInstallerPlugin): sin esto, canRequestPackageInstalls()
-         es siempre false en API 26+ y el intent de instalación no hace nada. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- NO reponer REQUEST_INSTALL_PACKAGES. Estuvo acá para el instalador
+         in-app del APK (ApkInstallerPlugin, borrado): la política de Play
+         reserva ese permiso a las apps cuyo propósito CENTRAL es instalar
+         paquetes, y declararlo sin calificar no cuesta un rechazo del release
+         sino la suspensión de la cuenta. Actualizar es tarea de Obtainium (app
+         aparte del usuario, sigue los releases de GitHub); Hubtify solo avisa
+         que hay versión nueva y abre la página del release. -->
 </manifest>

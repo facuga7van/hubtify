@@ -450,11 +450,12 @@
   flex-shrink: 0;
 }
 
-/* Update in-app de Android (AndroidUpdateBanner.tsx): mismo .update-chip de
-   arriba, más ancho para que quepan la barra de progreso y el botón. La
-   barra reusa la paleta de `.rpg-bar` (moss sobre negro translúcido) en vez
-   de la clase en sí — `.rpg-bar` trae su propio marco/textura pensado para
-   stats de personaje, que desentona en un chip flotante compacto. */
+/* Aviso de versión nueva en Android (AndroidUpdateBanner.tsx): mismo
+   .update-chip de arriba, más ancho para que el texto y el botón entren en
+   dos renglones. Acá vivían `.update-chip__bar`, `__bar-fill`, `__error` y
+   `__permission`, de cuando el banner bajaba el APK e invocaba al instalador
+   nativo: ese camino se sacó entero (política de Play sobre
+   REQUEST_INSTALL_PACKAGES; actualiza Obtainium). */
 .update-chip--android {
   flex-direction: column;
   align-items: stretch;
@@ -474,35 +475,6 @@
 .update-chip__text {
   flex: 1;
   min-width: 0;
-}
-
-.update-chip__bar {
-  height: 5px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.update-chip__bar-fill {
-  height: 100%;
-  background: var(--moss);
-  transition: width 0.3s ease;
-}
-
-/* Sobre cuero no hay rojo legible: --rubric-light da 2.09:1. Se usa el mismo
-   recurso que el chip de sincronizacion (sync-status-chip.css): pildora llena
-   de --rubric con tinta --parch-0, 8.4:1, y el rojo se conserva. */
-.update-chip__error {
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--rubric);
-  color: var(--parch-0);
-}
-
-.update-chip__permission {
-  font-size: var(--fs-label);
-  color: var(--gold-light);
-  line-height: 1.35;
 }
 
 /* ══ DASHBOARD BRIEF + EMPTY STATE ════════════════════ */

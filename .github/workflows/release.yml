@@ -210,6 +210,32 @@ jobs:
             }).catch(err => { console.log('Changelog extraction failed: ' + err.message); });
           "
 
+      # The landing serves the APK from its OWN origin, so whoever downloads it
+      # there has no way to tell it is the file this workflow signed and
+      # published. The hash goes in the release notes, which only this workflow
+      # can write. No `|| true` anywhere on purpose: a missing APK or a failing
+      # sha256sum must break the step. The notes already shipped empty once
+      # because an error was swallowed, and nobody noticed for several releases.
+      - name: Append the APK checksum to the release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(artifacts/android/Hubtify-*.apk)
+          if [ ${#apks[@]} -ne 1 ]; then
+            echo "::error::expected exactly 1 APK under artifacts/android, found ${#apks[@]}"
+            exit 1
+          fi
+          sha=$(sha256sum "${apks[0]}" | cut -d' ' -f1)
+          echo "APK SHA-256: $sha"
+          if [ -f RELEASE_NOTES.md ]; then
+            printf '\n\n`%s` — SHA-256: `%s`\n' "$(basename "${apks[0]}")" "$sha" >> RELEASE_NOTES.md
+          else
+            # No changelog entry for this version: the release falls back to
+            # GitHub's auto-generated notes and there is no file to append to.
+            echo "::warning::RELEASE_NOTES.md is missing, the APK SHA-256 will not be published"
+          fi
+
       - name: Check release notes
         id: notes
         shell: bash

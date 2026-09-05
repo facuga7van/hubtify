@@ -58,11 +58,12 @@ const LAST_PULL_KEY = 'hubtify_last_pull_at';
 const IS_ANDROID_BUILD = typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android';
 
 /**
- * Update in-app de Android (AndroidUpdateBanner.tsx): autocontenido, baja el
- * APK con progreso y abre el instalador nativo en vez del flujo viejo de
- * abrir Chrome. El `lazy(() => import(...))` queda condicionado al literal
- * de arriba para que esbuild pueda eliminar todo el módulo — y con él
- * `@capacitor/filesystem` y el plugin `ApkInstaller` — del bundle desktop.
+ * Aviso de versión nueva en Android (AndroidUpdateBanner.tsx): autocontenido,
+ * chequea el release y abre su página en el navegador (instalar el APK desde
+ * la app se sacó: política de Play sobre REQUEST_INSTALL_PACKAGES). El
+ * `lazy(() => import(...))` queda condicionado al literal de arriba para que
+ * esbuild pueda eliminar todo el módulo — y con él `@capacitor/browser` — del
+ * bundle desktop.
  */
 const AndroidUpdateBanner = typeof __HUBTIFY_PLATFORM__ !== 'undefined' && __HUBTIFY_PLATFORM__ === 'android'
   ? lazy(() => import('../mobile/AndroidUpdateBanner'))
@@ -306,9 +307,9 @@ export default function Layout() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showUpdateDetails, setShowUpdateDetails] = useState(false);
 
-  // Desktop-only: Android ya no pasa por acá — tiene su propio flujo
-  // autocontenido en AndroidUpdateBanner.tsx (descarga in-app + instalador
-  // nativo, en vez de abrir Chrome). Ver el render más abajo.
+  // Desktop-only: Android no pasa por acá — su aviso es autocontenido en
+  // AndroidUpdateBanner.tsx (abre la página del release en el navegador; el
+  // APK lo instala el usuario o su gestor de sideload). Ver el render abajo.
   const handleUpdate = useCallback(async () => {
     setUpdateState('downloading');
     setUpdateError(null);
@@ -788,7 +789,7 @@ export default function Layout() {
         entries={patchEntries}
       />
 
-      {/* Android: banner autocontenido (descarga in-app + instalador nativo).
+      {/* Android: aviso autocontenido que abre la página del release.
           Desktop: banner discreto + modal de novedades de siempre. */}
       {IS_ANDROID_BUILD && AndroidUpdateBanner ? (
         <Suspense fallback={null}>
