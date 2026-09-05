@@ -292,11 +292,18 @@ export function registerFinanceIpcHandlers(): void {
     if (fields.paymentMethod !== undefined) {
       sets.push('payment_method = ?'); vals.push(fields.paymentMethod);
       if (fields.paymentMethod === 'credit_card') {
-        sets.push('impacts_balance = ?'); vals.push(0);
-        sets.push('credit_card_id = ?'); vals.push(fields.creditCardId ?? null);
+        // Sin creditCardId explícito la tarjeta, impacts_balance y el período
+        // existentes se conservan: editar el monto de una compra con tarjeta no
+        // puede desengancharla de su resumen. Con creditCardId (incluido null)
+        // se respeta lo que vino, como siempre.
+        if (fields.creditCardId !== undefined) {
+          sets.push('impacts_balance = ?'); vals.push(0);
+          sets.push('credit_card_id = ?'); vals.push(fields.creditCardId);
+        }
       } else {
         sets.push('impacts_balance = ?'); vals.push(1);
         sets.push('credit_card_id = ?'); vals.push(null);
+        sets.push('statement_period = ?'); vals.push(null);
       }
     } else if (fields.creditCardId !== undefined) {
       sets.push('credit_card_id = ?'); vals.push(fields.creditCardId);

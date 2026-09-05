@@ -44,6 +44,8 @@ interface TransactionRow {
   /** Resolved from the loan that shares the instalment group. */
   thirdPartyName?: string | null;
   impactsBalance?: number;
+  /** Tarjeta de una compra con tarjeta; se reenvía al editar para no desengancharla. */
+  creditCardId?: string | null;
   /** Venta rate frozen the day the movement was recorded. NULL = none available. */
   fxRate?: number | null;
   /** `day` | `process` | `backfill` — only `day` reads without the `~`. */
@@ -514,6 +516,9 @@ export default function Transactions() {
       category: editFields.category,
       date: editFields.date,
       paymentMethod: editFields.paymentMethod,
+      // Contrato explícito: la tarjeta que la fila ya tiene. El handler la
+      // conserva igual sin este campo; mandarla deja claro que no se toca.
+      creditCardId: original?.creditCardId ?? null,
     }));
     if (!result.ok) {
       toast({ type: 'warning', message: failureMessage(result.reason, t) });
