@@ -93,13 +93,14 @@ function plans() {
 
 function planRows(groupId: string) {
   return harness.db.prepare(
-    `SELECT installment_number AS n, date, amount, statement_period AS statementPeriod,
+    `SELECT installment_number AS n, date, purchase_date AS purchaseDate, amount,
+            statement_period AS statementPeriod,
             credit_card_id AS creditCardId, impacts_balance AS impactsBalance,
             payment_method AS paymentMethod, source, import_batch_id AS batchId
      FROM finance_transactions WHERE installment_group_id = ? AND deleted_at IS NULL
      ORDER BY installment_number`,
   ).all(groupId) as Array<{
-    n: number; date: string; amount: number; statementPeriod: string | null;
+    n: number; date: string; purchaseDate: string | null; amount: number; statementPeriod: string | null;
     creditCardId: string | null; impactsBalance: number; paymentMethod: string;
     source: string; batchId: string | null;
   }>;
@@ -125,7 +126,10 @@ describe('finance:importConfirm — cuotas del resumen', () => {
     expect(rows.map((r) => r.n)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
     const imported = rows[0];
-    expect(imported.date).toBe('2025-05-20');
+    // Invariante 1: la fila importada vive en el mes del resumen; la fecha del
+    // papel queda en purchase_date.
+    expect(imported.date).toBe('2025-08-20');
+    expect(imported.purchaseDate).toBe('2025-05-20');
     expect(imported.statementPeriod).toBe('2025-08');
 
     // Cada cuota futura cae en el resumen del mes siguiente al anterior.
@@ -183,11 +187,41 @@ describe('finance:importConfirm — cuotas del resumen', () => {
     const rows = planRows(plan.id);
     expect(rows.map((r) => r.n)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
-    // La cuota 4 pasó de proyectada a real: monto del papel y fecha de compra.
+    // La cuota 4 pasó de proyectada a real: monto del papel (el banco ajusta
+    // entre resúmenes), fecha en el mes del resumen de septiembre y la fecha
+    // de compra del papel.
     const cuatro = rows.find((r) => r.n === 4)!;
     expect(cuatro.amount).toBeCloseTo(25_400);
-    expect(cuatro.date).toBe('2025-05-20');
+    expect(cuatro.date).toBe('2025-09-20');
+    expect(cuatro.purchaseDate).toBe('2025-05-20');
     expect(cuatro.statementPeriod).toBe('2025-09');
+  });
+
+  it('la cuota importada aparece en la pestaña Cuotas del mes del resumen, con su fecha de compra', async () => {
+    await invoke('finance:importConfirm', [CUOTA_3_DE_12], '2025-08', 'agosto.pdf', cardId);
+
+    const agosto = await invoke<Array<{ installmentNumber: number; date: string }>>(
+      'finance:getInstallmentsForMonth', '2025-08',
+    );
+    expect(agosto).toHaveLength(1);
+    expect(agosto[0].installmentNumber).toBe(3);
+    expect(agosto[0].date).toBe('2025-08-20');
+
+    // Nada en mayo: la fecha del papel no arrastra la cuota al mes de la compra.
+    expect(await invoke('finance:getInstallmentsForMonth', '2025-05')).toHaveLength(0);
+
+    // Solo la fila del papel (y las que materialice un resumen siguiente)
+    // llevan purchase_date. Las proyectadas quedan en NULL: si la tuvieran,
+    // dupCheck las tomaría por la cuota real del resumen siguiente cuando el
+    // banco no ajusta el monto, y esa cuota nunca se materializaría.
+    const [plan] = plans();
+    const rows = planRows(plan.id);
+    expect(rows.find((r) => r.n === 3)!.purchaseDate).toBe('2025-05-20');
+    expect(rows.filter((r) => r.n > 3).every((r) => r.purchaseDate === null)).toBe(true);
+
+    // Y el ledger la expone como purchaseDate.
+    const [row] = await invoke<Array<{ purchaseDate: string | null }>>('finance:getTransactions', { month: '2025-08' });
+    expect(row.purchaseDate).toBe('2025-05-20');
   });
 
   it('una compra sin cuotas sigue siendo una transacción suelta', async () => {

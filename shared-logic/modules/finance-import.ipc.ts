@@ -457,20 +457,23 @@ export function registerFinanceImportIpcHandlers(): void {
       // silently dropped — $275.000 of a 12-instalment fridge never entered.
       // The current batch is excluded so two identical lines in ONE PDF (two
       // `DB IVA 21%` of 71,75 the same day) both land.
+      // The key compares the date printed ON THE PAPER, which since v20 lives
+      // in `purchase_date` (`date` moved to the statement month). `COALESCE`
+      // covers rows synced from a device that has not migrated yet.
       const dupCheck = db.prepare(
         `SELECT COUNT(*) as cnt FROM finance_transactions
          WHERE deleted_at IS NULL AND source = 'import'
-           AND date = ? AND description = ? AND amount = ? AND currency = ?
+           AND COALESCE(purchase_date, date) = ? AND description = ? AND amount = ? AND currency = ?
            AND installment_number IS ?
            AND (import_batch_id IS NULL OR import_batch_id <> ?)`,
       );
 
       const insertTx = db.prepare(
         `INSERT INTO finance_transactions
-         (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
+         (id, type, amount, currency, category, description, date, purchase_date, payment_method, source, import_batch_id,
           installments, installment_number, billed_amount_ars, credit_card_id, impacts_balance,
           statement_period, fx_rate, fx_rate_source, account_id, installment_group_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
 
       // ── Planes de cuotas ────────────────────────────
@@ -504,11 +507,11 @@ export function registerFinanceImportIpcHandlers(): void {
         `SELECT id FROM finance_transactions
           WHERE installment_group_id = ? AND installment_number = ? AND deleted_at IS NULL LIMIT 1`,
       );
-      // La cuota proyectada pasa a ser la del papel: monto real, fecha de compra
-      // y el resumen al que pertenece. No se agrega otra fila.
+      // La cuota proyectada pasa a ser la del papel: monto real, fecha en el mes
+      // del resumen, fecha de compra y el resumen al que pertenece. No se agrega otra fila.
       const materialise = db.prepare(
         `UPDATE finance_transactions
-            SET type = ?, amount = ?, currency = ?, category = ?, description = ?, date = ?,
+            SET type = ?, amount = ?, currency = ?, category = ?, description = ?, date = ?, purchase_date = ?,
                 billed_amount_ars = ?, statement_period = ?, import_batch_id = ?,
                 fx_rate = ?, fx_rate_source = ?, account_id = ?, updated_at = ?
           WHERE id = ?`,
@@ -534,6 +537,13 @@ export function registerFinanceImportIpcHandlers(): void {
           // USD lines: keep the peso amount the card actually billed.
           const billedArs = isUsd && row.amountARS != null ? Math.abs(row.amountARS) : null;
           const installmentNumber = Number.isInteger(row.installmentCurrent) ? row.installmentCurrent! : null;
+
+          // Invariante 1: con tarjeta la fila vive en el mes del resumen (mismo día
+          // de compra, clampeado); la fecha del papel queda en purchase_date. Sin
+          // tarjeta es un gasto en efectivo que ya ocurrió: impacta en su fecha real.
+          const rowDate = statementPeriod === null
+            ? row.date
+            : dateInMonthClamped(statementPeriod, Number(row.date.slice(8, 10)));
 
           const existing = dupCheck.get(row.date, row.merchant, amount, currency, installmentNumber, batchId) as { cnt: number };
           if (existing.cnt > 0) {
@@ -561,7 +571,7 @@ export function registerFinanceImportIpcHandlers(): void {
               const projected = findInstallment.get(groupId, installmentNumber) as { id: string } | undefined;
               if (projected) {
                 materialise.run(
-                  type, amount, currency, row.suggestedCategory, row.merchant, row.date,
+                  type, amount, currency, row.suggestedCategory, row.merchant, rowDate, row.date,
                   billedArs, statementPeriod, batchId,
                   fxRate, fxRate === null ? null : 'process', rowAccountId, now,
                   projected.id,
@@ -592,6 +602,7 @@ export function registerFinanceImportIpcHandlers(): void {
             currency,
             row.suggestedCategory,
             row.merchant,
+            rowDate,
             row.date,
             paymentMethod,
             batchId,
@@ -624,6 +635,11 @@ export function registerFinanceImportIpcHandlers(): void {
               // junio): la cuota que ya existe en el plan no se vuelve a escribir.
               if (findInstallment.get(groupId, n)) continue;
               const offset = n - installmentNumber!;
+              // purchase_date queda NULL hasta que materialise la escriba con la
+              // fecha del papel. Si la proyectada la tuviera, dupCheck (que además
+              // filtra source='import', amount, installment_number y otro lote) la
+              // confundiría con la cuota real del resumen siguiente cuando el banco
+              // no ajusta el monto, y esa cuota nunca se materializaría.
               insertTx.run(
                 genId(),
                 type,
@@ -632,6 +648,7 @@ export function registerFinanceImportIpcHandlers(): void {
                 row.suggestedCategory,
                 row.merchant,
                 addMonthsClamped(anchorDate, offset),
+                null,
                 paymentMethod,
                 batchId,
                 totalInstallments,

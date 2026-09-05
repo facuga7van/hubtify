@@ -116,13 +116,19 @@ describe('finance:importConfirm — dedup keeps instalments 2..N (#1)', () => {
     expect(rows.slice(0, 3).map((r) => r.statementPeriod)).toEqual(['2026-06', '2026-07', '2026-08']);
   });
 
-  it('re-importing the SAME statement is still a duplicate', async () => {
+  it('re-importing the SAME statement is still a duplicate (dedup por purchase_date)', async () => {
     await invoke('finance:importConfirm', [fridge(4)], '2026-09', 'sep.pdf', cardId);
     const again = await invoke<ImportResult>('finance:importConfirm', [fridge(4)], '2026-09', 'sep.pdf', cardId);
     expect(again.count).toBe(0);
     expect(again.duplicateCount).toBe(1);
-    // La 4 del papel y las 9 que faltan del plan; el segundo import no suma nada.
+    // La 4 del papel y las 8 que faltan del plan; el segundo import no suma nada.
     expect(liveImportRows()).toHaveLength(9);
+    // La fila guardada ya NO tiene la fecha del papel en `date`: dupCheck matchea por purchase_date.
+    const row = harness.db.prepare(
+      "SELECT date, purchase_date AS purchaseDate FROM finance_transactions WHERE installment_number = 4 AND deleted_at IS NULL",
+    ).get() as { date: string; purchaseDate: string };
+    expect(row.date).toBe('2026-09-10');
+    expect(row.purchaseDate).toBe('2026-05-10');
   });
 
   it('los resúmenes desordenados no duplican cuotas del mismo plan', async () => {
