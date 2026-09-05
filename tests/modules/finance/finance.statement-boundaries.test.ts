@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { statementPeriodForWithBoundaries } from '../../../shared-logic/modules/finance.balance';
+import { loadStatementBoundaries, statementPeriodForWithBoundaries } from '../../../shared-logic/modules/finance.balance';
 
 const harness = vi.hoisted(() => ({ db: null as unknown as Database.Database }));
 
@@ -52,6 +52,10 @@ describe('statementPeriodForWithBoundaries (pura)', () => {
   it('con papeles consecutivos, una compra entre dos cierres cae en el segundo', () => {
     expect(statementPeriodForWithBoundaries({ date: '2025-11-27' }, 28, NOV_DEC)).toBe('2025-12');
     expect(statementPeriodForWithBoundaries({ date: '2025-12-28' }, 28, NOV_DEC)).toBe('2025-12');
+  });
+
+  it('una compra EL DÍA del cierre entra en ese resumen, no en el siguiente', () => {
+    expect(statementPeriodForWithBoundaries({ date: '2025-11-26' }, 28, NOV_DEC)).toBe('2025-11');
   });
 
   it('el primer papel absorbe solo un mes hacia atrás', () => {
@@ -141,6 +145,33 @@ describe('C7 — el papel completa closing_day, nunca lo pisa; el detalle usa lo
     expect(await detailDates(dec)).toEqual(['2025-11-27', '2025-12-10']);
     const decRow = harness.db.prepare('SELECT calculated_amount AS c FROM finance_credit_card_statements WHERE id = ?').get(dec) as { c: number };
     expect(decRow.c).toBe(1500);
+  });
+
+  it('un closing_date malformado (OCR, sync) se ignora y la siguiente frontera válida manda', async () => {
+    const insert = harness.db.prepare(`
+      INSERT INTO finance_credit_card_statements
+        (id, credit_card_id, period_month, calculated_amount, status, closing_date, created_at, updated_at)
+      VALUES (?, ?, ?, 1, 'pending', ?, 'now', 'now')
+    `);
+    insert.run('s-nov', cardId, '2025-11', '27/11/2025');
+    insert.run('s-dic', cardId, '2025-12', '2025-12-28');
+    insert.run('s-ene', cardId, '2026-01', '2026-01-28');
+
+    expect(loadStatementBoundaries(harness.db, cardId)).toEqual([
+      { periodMonth: '2025-12', closingDate: '2025-12-28' },
+      { periodMonth: '2026-01', closingDate: '2026-01-28' },
+    ]);
+  });
+
+  it('dos resúmenes con el mismo cierre salen ordenados por período', async () => {
+    const insert = harness.db.prepare(`
+      INSERT INTO finance_credit_card_statements
+        (id, credit_card_id, period_month, calculated_amount, status, closing_date, created_at, updated_at)
+      VALUES (?, ?, ?, 1, 'pending', ?, 'now', 'now')
+    `);
+    insert.run('s-b', cardId, '2025-12', '2025-11-28');
+    insert.run('s-a', cardId, '2025-11', '2025-11-28');
+    expect(loadStatementBoundaries(harness.db, cardId).map((b) => b.periodMonth)).toEqual(['2025-11', '2025-12']);
   });
 
   it('sin papeles, la derivación sigue siendo por closing_day', async () => {

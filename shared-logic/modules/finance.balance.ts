@@ -210,14 +210,19 @@ export interface StatementBoundary {
   closingDate: string;
 }
 
-/** Fronteras de una tarjeta, ordenadas por cierre. Solo resúmenes vivos con papel. */
+/**
+ * Fronteras de una tarjeta, ordenadas por cierre. Solo resúmenes vivos con
+ * papel. Un `closing_date` que no sea `YYYY-MM-DD` (OCR, sync sin validar) se
+ * ignora: comparado como string taparía las fronteras reales.
+ */
 export function loadStatementBoundaries(db: SqlDatabase, creditCardId: string): StatementBoundary[] {
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT period_month AS periodMonth, closing_date AS closingDate
     FROM finance_credit_card_statements
     WHERE credit_card_id = ? AND deleted_at IS NULL AND closing_date IS NOT NULL
-    ORDER BY closing_date ASC
+    ORDER BY closing_date ASC, period_month ASC
   `).all(creditCardId) as StatementBoundary[];
+  return rows.filter((b) => isValidDateString(b.closingDate));
 }
 
 /**
