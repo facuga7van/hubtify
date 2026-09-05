@@ -559,11 +559,13 @@ export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResul
       const oldLevel = stats.level as number;
 
       const now = localTimestamp();
-      // The last event BEFORE this one — read before the insert, so the
-      // achievement matcher can measure the silence the player just broke
-      // ("El Regreso del Héroe") without a second scan.
+      // The last MEANINGFUL event BEFORE this one — read before the insert, so
+      // the achievement matcher can measure the silence the player just broke
+      // ("El Regreso del Héroe") without a second scan. Meaningful only: a
+      // QuickAdd (TASK_CREATED, 0 XP) in the middle of the gap is not the
+      // player showing up, and before this filter it reset the clock.
       const previousEvent = db.prepare(
-        'SELECT created_at AS createdAt FROM rpg_events ORDER BY id DESC LIMIT 1'
+        `SELECT created_at AS createdAt FROM rpg_events WHERE ${MEANINGFUL_EVENT_SQL} ORDER BY id DESC LIMIT 1`
       ).get() as { createdAt: string } | undefined;
       // Undo events: store 0 xp_gained in the log (the original event is already deleted,
       // so storing negative XP here would double-count the reversal in SUM queries)
