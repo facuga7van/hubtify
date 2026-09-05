@@ -203,6 +203,52 @@ export function statementPeriodFor(
   return getStatementPeriod(tx.date, closingDay);
 }
 
+/** Cierre REAL de un resumen guardado: el papel manda sobre el `closing_day` fijo. */
+export interface StatementBoundary {
+  periodMonth: string;
+  /** `finance_credit_card_statements.closing_date` (YYYY-MM-DD). */
+  closingDate: string;
+}
+
+/** Fronteras de una tarjeta, ordenadas por cierre. Solo resúmenes vivos con papel. */
+export function loadStatementBoundaries(db: SqlDatabase, creditCardId: string): StatementBoundary[] {
+  return db.prepare(`
+    SELECT period_month AS periodMonth, closing_date AS closingDate
+    FROM finance_credit_card_statements
+    WHERE credit_card_id = ? AND deleted_at IS NULL AND closing_date IS NOT NULL
+    ORDER BY closing_date ASC
+  `).all(creditCardId) as StatementBoundary[];
+}
+
+/**
+ * The statement period of a card purchase, using the REAL closing dates of the
+ * statements the user saved (`closing_date`) before the card's fixed
+ * `closing_day`. Rules, in order:
+ *  1. an explicit `statementPeriod` wins;
+ *  2. no boundary closes on or after the purchase → `getStatementPeriod`;
+ *  3. the previous boundary `a` closed before the purchase and is the
+ *     consecutive month of `b` → `b.periodMonth`;
+ *  4. otherwise (first paper, or a gap) → `b.periodMonth` only if the purchase
+ *     is at most one month older than `b`'s closing;
+ *  5. anything else → `getStatementPeriod`.
+ */
+export function statementPeriodForWithBoundaries(
+  tx: { date: string; statementPeriod?: string | null },
+  closingDay: number,
+  boundaries: StatementBoundary[],
+): string {
+  if (isValidMonthString(tx.statementPeriod)) return tx.statementPeriod;
+  const idx = boundaries.findIndex((b) => b.closingDate >= tx.date);
+  if (idx === -1) return getStatementPeriod(tx.date, closingDay);
+  const b = boundaries[idx];
+  const a = idx > 0 ? boundaries[idx - 1] : null;
+  if (a && a.closingDate < tx.date && a.periodMonth === addMonthsToMonth(b.periodMonth, -1)) {
+    return b.periodMonth;
+  }
+  if (tx.date > addMonthsClamped(b.closingDate, -1)) return b.periodMonth;
+  return getStatementPeriod(tx.date, closingDay);
+}
+
 // ── Validation ─────────────────────────────────────────────────────────────
 
 /** Returns the amount as a positive finite number, or null when unusable. */

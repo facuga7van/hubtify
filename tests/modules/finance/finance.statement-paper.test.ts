@@ -104,7 +104,7 @@ describe('finance:saveStatementPaper', () => {
     expect(JSON.parse(row.forecast_json as string)).toHaveLength(2);
   });
 
-  it('completa el cierre, el vencimiento, los últimos 4 y el emisor de la tarjeta', async () => {
+  it('completa vencimiento, últimos 4 y emisor; el cierre del usuario NO se pisa', async () => {
     await purchase('2025-11-10', 15_000);
     await invoke('finance:generateStatement', cardId, '2025-11');
     await invoke('finance:saveStatementPaper', cardId, PAPER);
@@ -112,11 +112,22 @@ describe('finance:saveStatementPaper', () => {
     const card = harness.db.prepare(
       'SELECT closing_day, due_day, last4, issuer FROM finance_credit_cards WHERE id = ?',
     ).get(cardId) as Record<string, unknown>;
-    // Se tipeaban a mano, tarjeta por tarjeta. Están impresos.
-    expect(card.closing_day).toBe(27);
-    expect(card.due_day).toBe(5);
+    expect(card.closing_day).toBe(25); // configuración del usuario: el papel (27) no la pisa
+    expect(card.due_day).toBe(5);      // estaba vacío: se completa
     expect(card.last4).toBe('1234');
     expect(card.issuer).toBe('galicia_visa');
+  });
+
+  it('un cierre vacío sí se completa desde el papel', async () => {
+    await purchase('2025-11-10', 15_000);
+    await invoke('finance:generateStatement', cardId, '2025-11');
+    // Después de generar: con cierre 0 la compra del 10/11 caería a diciembre y
+    // el resumen de noviembre no existiría (`statement_not_found`).
+    harness.db.prepare('UPDATE finance_credit_cards SET closing_day = 0 WHERE id = ?').run(cardId);
+    const res = await invoke<{ ok: boolean }>('finance:saveStatementPaper', cardId, PAPER);
+    expect(res.ok).toBe(true);
+    const card = harness.db.prepare('SELECT closing_day FROM finance_credit_cards WHERE id = ?').get(cardId) as { closing_day: number };
+    expect(card.closing_day).toBe(27);
   });
 
   it('no borra lo que el papel no trae', async () => {

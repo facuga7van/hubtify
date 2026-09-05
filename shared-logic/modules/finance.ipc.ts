@@ -28,10 +28,12 @@ import {
   getIpcSeries,
   isRecurringDueInMonth,
   listBudgets,
+  loadStatementBoundaries,
   recurringAnchorMonth,
   round2,
   setBudget,
-  statementPeriodFor,
+  statementPeriodForWithBoundaries,
+  type StatementBoundary,
   isValidDateString,
   isValidMonthString,
   monthRange,
@@ -791,9 +793,11 @@ export function registerFinanceIpcHandlers(): void {
       ORDER BY date DESC, created_at DESC
     `).all(statement.creditCardId);
 
-    // The explicit statement_period (imports) wins over the closing-day math.
+    // The explicit statement_period (imports) wins; then the real closing dates
+    // of the saved papers; only then the card's fixed closing day.
+    const boundaries = loadStatementBoundaries(db, statement.creditCardId);
     const filtered = (transactions as Array<{ date: string; statementPeriod?: string | null; [key: string]: unknown }>).filter((tx) => {
-      return statementPeriodFor(tx, statement.closingDay) === statement.periodMonth;
+      return statementPeriodForWithBoundaries(tx, statement.closingDay, boundaries) === statement.periodMonth;
     });
 
     return { statement, transactions: filtered };
@@ -807,6 +811,7 @@ export function registerFinanceIpcHandlers(): void {
     creditCardId: string,
     closingDay: number,
     periodMonth: string,
+    boundaries: StatementBoundary[],
   ): { ars: number; usd: number } {
     const rows = db.prepare(`
       SELECT date, type, amount, currency, billed_amount_ars AS billedAmountArs,
@@ -822,8 +827,9 @@ export function registerFinanceIpcHandlers(): void {
     let usd = 0;
     for (const tx of rows) {
       // An imported row carries the period the user chose for the PDF; a manual
-      // card purchase falls into the period its date implies.
-      if (statementPeriodFor(tx, closingDay) !== periodMonth) continue;
+      // card purchase falls into the period the real closing dates (or, failing
+      // those, the card's closing day) imply.
+      if (statementPeriodForWithBoundaries(tx, closingDay, boundaries) !== periodMonth) continue;
       // A refund (a reversed purchase, a `DEV.IMP` tax credit) is stored as an
       // `income` row with a positive amount. Summing it blind used to make the
       // statement bigger than the paper by twice the refund.
@@ -883,7 +889,8 @@ export function registerFinanceIpcHandlers(): void {
       if (existing?.transactionId) retireTx.run(now, now, existing.transactionId);
       if (existing?.transactionIdUsd) retireTx.run(now, now, existing.transactionIdUsd);
 
-      const { ars, usd } = computeStatementTotals(db, creditCardId, card.closingDay, periodMonth);
+      const boundaries = loadStatementBoundaries(db, creditCardId);
+      const { ars, usd } = computeStatementTotals(db, creditCardId, card.closingDay, periodMonth, boundaries);
 
       // Nothing changed → no write at all. The dashboard regenerates on every
       // mount; stamping `updated_at` each time would let a device that is
@@ -972,8 +979,8 @@ export function registerFinanceIpcHandlers(): void {
     if (!isValidMonthString(period)) return fail('invalid_period');
 
     const card = db.prepare(
-      'SELECT id FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL',
-    ).get(creditCardId) as { id: string } | undefined;
+      'SELECT id, closing_day AS closingDay, due_day AS dueDay FROM finance_credit_cards WHERE id = ? AND deleted_at IS NULL',
+    ).get(creditCardId) as { id: string; closingDay: number | null; dueDay: number | null } | undefined;
     if (!card) return fail('credit_card_not_found');
 
     const statement = db.prepare(`
@@ -1021,14 +1028,17 @@ export function registerFinanceIpcHandlers(): void {
         reconciled, forecastJson, now, statement.id,
       );
 
-      // La tarjeta: solo lo que el papel efectivamente trae. Lo que no viene se
-      // deja como está — el silencio no borra.
+      // La tarjeta: solo lo que el papel efectivamente trae, y el cierre y el
+      // vencimiento SOLO si estaban vacíos (invariante 5: closing_day es
+      // configuración del usuario; el papel la completa, nunca la pisa). Un
+      // vacío solo aparece en filas insertadas por SQL o por sync: el alta
+      // rechaza < 1. Lo que no viene se deja como está — el silencio no borra.
       const sets: string[] = [];
       const vals: unknown[] = [];
       const closingDay = dayOf(paper.closingDate);
       const dueDay = dayOf(paper.dueDate);
-      if (closingDay !== null) { sets.push('closing_day = ?'); vals.push(closingDay); }
-      if (dueDay !== null) { sets.push('due_day = ?'); vals.push(dueDay); }
+      if (closingDay !== null && !(Number(card.closingDay) >= 1)) { sets.push('closing_day = ?'); vals.push(closingDay); }
+      if (dueDay !== null && !(Number(card.dueDay) >= 1)) { sets.push('due_day = ?'); vals.push(dueDay); }
       if (typeof paper.last4 === 'string' && /^\d{4}$/.test(paper.last4)) {
         sets.push('last4 = ?'); vals.push(paper.last4);
       }
