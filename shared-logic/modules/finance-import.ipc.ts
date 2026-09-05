@@ -487,15 +487,35 @@ export function registerFinanceImportIpcHandlers(): void {
       // Identidad del plan: comercio + fecha de compra + moneda + total de
       // cuotas + tarjeta. Galicia imprime la fecha ORIGINAL de la compra en cada
       // cuota, así que la clave es estable entre resúmenes consecutivos y el
-      // segundo import encuentra el plan del primero en vez de duplicarlo.
+      // segundo import encuentra el plan del primero en vez de duplicarlo. El
+      // monto NO es identidad (el banco lo ajusta entre resúmenes): es DESEMPATE.
+      // Los candidatos se ordenan por cercanía entre el monto de la línea y el de
+      // la cuota n ya proyectada en el plan (o el promedio del plan si esa cuota
+      // no existe todavía, resúmenes desordenados), y se toma el primero que no
+      // haya absorbido una línea de ESTE lote: un plan absorbe a lo sumo una
+      // línea por resumen (invariante 2). Dos artículos distintos de la misma
+      // tienda, el mismo día y en la misma cantidad de cuotas → dos planes, y en
+      // el resumen siguiente cada cuota vuelve al suyo por monto.
       // La tarjeta no vive en el grupo, así que se mira en sus filas.
       const findGroup = db.prepare(
-        `SELECT g.id AS id FROM finance_installment_groups g
+        `SELECT g.id AS id, g.category AS category FROM finance_installment_groups g
           WHERE g.deleted_at IS NULL AND g.description = ? AND g.currency = ?
             AND g.total_installments = ? AND g.date = ?
             AND EXISTS (SELECT 1 FROM finance_transactions t
                          WHERE t.installment_group_id = g.id AND t.deleted_at IS NULL
                            AND t.credit_card_id IS ?)
+            AND NOT EXISTS (SELECT 1 FROM finance_transactions t
+                             WHERE t.installment_group_id = g.id AND t.import_batch_id = ?)
+          ORDER BY abs(
+              COALESCE(
+                (SELECT t.amount FROM finance_transactions t
+                  WHERE t.installment_group_id = g.id AND t.installment_number = ?
+                    AND t.deleted_at IS NULL
+                  ORDER BY t.created_at ASC LIMIT 1),
+                g.total_amount / g.total_installments
+              ) - ?
+            ) ASC,
+            g.created_at ASC
           LIMIT 1`,
       );
       const insertGroup = db.prepare(
@@ -503,9 +523,13 @@ export function registerFinanceImportIpcHandlers(): void {
            (id, description, total_amount, currency, total_installments, category, date, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
+      // Nunca materializa sobre una fila de este mismo lote: solo las que vienen
+      // de lotes anteriores (o de ninguno) cuentan como «ya existe».
       const findInstallment = db.prepare(
-        `SELECT id FROM finance_transactions
-          WHERE installment_group_id = ? AND installment_number = ? AND deleted_at IS NULL LIMIT 1`,
+        `SELECT id, category FROM finance_transactions
+          WHERE installment_group_id = ? AND installment_number = ? AND deleted_at IS NULL
+            AND (import_batch_id IS NULL OR import_batch_id <> ?)
+          LIMIT 1`,
       );
       // La cuota proyectada pasa a ser la del papel: monto real, fecha en el mes
       // del resumen, fecha de compra y el resumen al que pertenece. No se agrega otra fila.
@@ -563,12 +587,13 @@ export function registerFinanceImportIpcHandlers(): void {
           let groupId: string | null = null;
           if (isPlan) {
             const found = findGroup.get(
-              row.merchant, currency, totalInstallments, row.date, cardId,
-            ) as { id: string } | undefined;
+              row.merchant, currency, totalInstallments, row.date, cardId, batchId, installmentNumber, amount,
+            ) as { id: string; category: string } | undefined;
 
             if (found) {
               groupId = found.id;
-              const projected = findInstallment.get(groupId, installmentNumber) as { id: string } | undefined;
+              const projected = findInstallment.get(groupId, installmentNumber, batchId) as
+                { id: string; category: string } | undefined;
               if (projected) {
                 materialise.run(
                   type, amount, currency, row.suggestedCategory, row.merchant, rowDate, row.date,
@@ -633,7 +658,7 @@ export function registerFinanceImportIpcHandlers(): void {
             for (let n = installmentNumber! + 1; n <= totalInstallments; n++) {
               // Los resúmenes pueden llegar desordenados (primero agosto, después
               // junio): la cuota que ya existe en el plan no se vuelve a escribir.
-              if (findInstallment.get(groupId, n)) continue;
+              if (findInstallment.get(groupId, n, batchId)) continue;
               const offset = n - installmentNumber!;
               // purchase_date queda NULL hasta que materialise la escriba con la
               // fecha del papel. Si la proyectada la tuviera, dupCheck (que además
