@@ -32,6 +32,21 @@ describe('sealWeek', () => {
     }));
   });
 
+  // Logros v2: el matcher lee cuántos días de la semana quedaron cerrados.
+  it('el payload lleva daysClosed del report', async () => {
+    const processRpgEvent = vi.fn().mockResolvedValue({ xpGained: 50 });
+    (window as any).api = {
+      nutritionCloseWeek: vi.fn().mockResolvedValue({ success: true, report: { ...report, daysClosed: 5 } }),
+      processRpgEvent,
+    };
+
+    await sealWeek('2026-08-31');
+
+    expect(processRpgEvent).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({ daysClosed: 5 }),
+    }));
+  });
+
   it('devuelve el XP que PAGÓ el motor, no el que declaró el sello', async () => {
     (window as any).api = {
       nutritionCloseWeek: vi.fn().mockResolvedValue({ success: true, report }),

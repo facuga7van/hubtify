@@ -658,7 +658,7 @@ export default function Today() {
       // inventa un tipo nuevo ni se paga dos veces.
       await window.api.processRpgEvent({
         type: 'MEAL_LOGGED', moduleId: 'nutrition',
-        payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+        payload: { xp: 10, hp: 0, isEvent: true }, timestamp: Date.now(),
       });
       toast({ type: 'nutri', message: t('nutrify.eventLogged', 'Evento registrado: {{name}} (~{{kcal}} kcal)', { name, kcal: midpoint }) });
       setEventOpen(false);
@@ -823,7 +823,7 @@ export default function Today() {
         for (let i = 0; i < copied; i++) {
           await window.api.processRpgEvent({
             type: 'MEAL_LOGGED', moduleId: 'nutrition',
-            payload: { xp: 10, hp: 0 }, timestamp: Date.now(),
+            payload: { xp: 10, hp: 0, source: 'copy_day' }, timestamp: Date.now(),
           });
         }
         toast({ type: 'nutri', message: t('nutrify.repeatDaySuccess', { count: copied, defaultValue: 'Se repitieron {{count}} comidas' }) });

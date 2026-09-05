@@ -45,7 +45,7 @@ export async function sealWeek(weekStart: string): Promise<SealOutcome> {
     const rpg = await window.api.processRpgEvent({
       type: 'WEEK_SUMMARY',
       moduleId: 'nutrition',
-      payload: { xp: report.xpTotal, hp: 0, weekStart: report.weekStart },
+      payload: { xp: report.xpTotal, hp: 0, weekStart: report.weekStart, daysClosed: report.daysClosed },
       timestamp: Date.now(),
     });
     return { ok: true, report, xpGained: rpg?.xpGained ?? 0, rpgFailed: false };

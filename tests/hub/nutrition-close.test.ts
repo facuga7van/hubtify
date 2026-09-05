@@ -26,7 +26,7 @@ function installApi(over: Record<string, unknown> = {}): Calls {
     nutritionSaveDailyMetrics: (m: unknown) => { calls.saveDailyMetrics.push(m); return Promise.resolve(); },
     nutritionCloseDay: (d: unknown) => {
       calls.closeDay.push(d);
-      return Promise.resolve({ success: true, breakdown: { xpTotal: 42, hpChange: 10 } });
+      return Promise.resolve({ success: true, breakdown: { xpTotal: 42, hpChange: 10, xpBonus: 15, xpWeight: 5 } });
     },
     nutritionIsDayClosed: () => Promise.resolve(false),
     nutritionGetDailyMetrics: () => Promise.resolve({ steps: 8000, gym: 1 }),
@@ -105,8 +105,26 @@ describe('closeNutritionDay', () => {
     expect(calls.rpg[0]).toMatchObject({
       type: 'DAY_SUMMARY',
       moduleId: 'nutrition',
-      payload: { xp: 42, hp: 10, date: '2026-09-03' },
+      payload: { xp: 42, hp: 10, date: '2026-09-03', onTarget: true, weighed: true },
     });
+  });
+
+  // Logros v2: el matcher lee del payload si el día cumplió y si hubo pesaje.
+  // `xpBonus` solo paga cuando el objetivo se cumplió; `xpWeight` solo con peso.
+  it('un día fuera de objetivo y sin pesaje viaja con onTarget/weighed en false', async () => {
+    const calls = installApi({
+      nutritionCloseDay: () => Promise.resolve({ success: true, breakdown: { xpTotal: 8, hpChange: -10, xpBonus: 0, xpWeight: 0 } }),
+    });
+    await closeNutritionDay('2026-09-03', '', false);
+    expect(calls.rpg[0]).toMatchObject({ payload: { onTarget: false, weighed: false } });
+  });
+
+  it('un desglose viejo sin esos campos no rompe: ambos en false', async () => {
+    const calls = installApi({
+      nutritionCloseDay: () => Promise.resolve({ success: true, breakdown: { xpTotal: 30, hpChange: 10 } }),
+    });
+    await closeNutritionDay('2026-09-03', '', false);
+    expect(calls.rpg[0]).toMatchObject({ payload: { xp: 30, onTarget: false, weighed: false } });
   });
 
   it('si el motor no contesta un número, la fila cae al crudo antes que a NaN', async () => {

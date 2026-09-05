@@ -87,14 +87,16 @@ export async function closeNutritionDay(
   const result = await window.api.nutritionCloseDay(date);
   if (!result?.success || !result.breakdown) return null;
 
-  const b = result.breakdown as { xpTotal?: number; hpChange?: number };
+  const b = result.breakdown as { xpTotal?: number; hpChange?: number; xpBonus?: number; xpWeight?: number };
   const xp = b.xpTotal ?? 0;
   const hp = b.hpChange ?? 0;
   // `date` es lo que DAY_REOPENED usa para revertir exactamente este evento.
+  // `onTarget`/`weighed` son para los logros: `xpBonus` solo paga si el día
+  // cumplió el objetivo (meal-utils `scoreNutritionDay`), `xpWeight` si se pesó.
   const paid = await window.api.processRpgEvent({
     type: 'DAY_SUMMARY',
     moduleId: 'nutrition',
-    payload: { xp, hp, date },
+    payload: { xp, hp, date, onTarget: (b.xpBonus ?? 0) > 0, weighed: (b.xpWeight ?? 0) > 0 },
     timestamp: Date.now(),
   });
   // Un main que no devuelva el resultado (stub, versión vieja) no puede dejar
