@@ -54,6 +54,29 @@ beforeAll(() => {
 
 const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 
+/** Cuatro módulos con tres hechos cada uno: la página más ancha que el ledger
+    puede pedir. Mismos nombres de campo que devuelve `rpg:getDaySummary`. */
+const fourModules = () => ({
+  date: today, isToday: true, sealed: false, seal: null,
+  canSeal: true, sealBlockedReason: null, byModule: [],
+  totalXp: 144, eventsCount: 12, maxCombo: 2,
+  modules: ['quests', 'nutrition', 'finance', 'cauldron'], vigor: 84, streak: 9,
+  events: [
+    ...['09:12', '11:40', '18:05'].map((time) => ({ moduleId: 'quests', eventType: 'TASK_COMPLETED', xpGained: 15, time })),
+    ...['08:30', '13:40', '21:10'].map((time) => ({ moduleId: 'nutrition', eventType: 'MEAL_LOGGED', xpGained: 5, time })),
+    ...['10:02', '15:30', '19:45'].map((time) => ({ moduleId: 'finance', eventType: 'EXPENSE_LOGGED', xpGained: 3, time })),
+    ...['09:00', '10:00', '16:02'].map((time) => ({ moduleId: 'cauldron', eventType: 'POMODORO_COMPLETED', xpGained: 25, time })),
+  ],
+});
+
+function mountCodex(onClose: () => void = () => {}) {
+  render(
+    <MemoryRouter><ToastProvider><ConfirmProvider>
+      <CodexSealModal date={today} onClose={onClose} onSelectDate={() => {}} />
+    </ConfirmProvider></ToastProvider></MemoryRouter>,
+  );
+}
+
 function report(tag: string, root: ParentNode) {
   // eslint-disable-next-line no-console
   console.log(tag, JSON.stringify({
@@ -308,6 +331,61 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     await settle(120);
     expect(closed).toBe(true);
   });
+
+  /* ── el ledger a cuatro módulos ──
+     `.codex-marginalia` es `auto-fit`: con minmax(240px) y 816 px de página
+     salían TRES columnas de ~250 px, y `.qb-section` sin `min-width: 0` no
+     cedía. A 900 px de ventana tienen que ser dos como máximo; a 600, una.
+     La tercera corrida sube `--font-scale` a 1.3 (theme.css:13): el usuario
+     puede tener la escala configurada y eso es lo que muestra su captura. Y
+     la X tiene disco propio: el título termina antes de donde ella empieza. */
+  for (const [width, maxCols, scale] of [[900, 2, '1'], [600, 1, '1'], [900, 2, '1.3']] as const) {
+    test(`el ledger de cuatro módulos entra a ${width}px (escala ${scale}) y no pasa de ${maxCols} columna(s)`, async () => {
+      await page.viewport(width, 720);
+      resetCapture();
+      document.documentElement.style.setProperty('--font-scale', scale);
+      installApi({ rpgGetDaySummary: () => Promise.resolve(fourModules()), rpgGetSeals: () => Promise.resolve([]) });
+      mountCodex();
+      await settle(1400);
+
+      try {
+        const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+        const scroller = dlg.querySelector('.codex-modal__scroll') as HTMLElement;
+        const ledger = dlg.querySelector('.codex-marginalia') as HTMLElement;
+        expect(ledger).not.toBeNull();
+        const tracks = getComputedStyle(ledger).gridTemplateColumns.trim().split(/\s+/);
+        // eslint-disable-next-line no-console
+        console.log(`CODEX LEDGER ${width} x${scale}`, JSON.stringify({
+          tracks, scrollW: scroller.scrollWidth, clientW: scroller.clientWidth,
+          overflow: overflowingNodes(dlg).slice(0, 8),
+        }, null, 1));
+
+        fitCapture();
+        await page.screenshot({ path: `${SCREENS}/audit-hub-codex-03-ledger-${width}-x${scale}.png` });
+        resetCapture();
+
+        // Nada se sale a lo ancho del scroller.
+        expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth);
+        // Ni una columna de más.
+        expect(tracks.length).toBeLessThanOrEqual(maxCols);
+        // Cada sección cede y queda dentro del ledger. El `minWidth` es un
+        // assert de IMPLEMENTACIÓN a propósito: es la causa raíz que se fija.
+        const ledgerRight = ledger.getBoundingClientRect().right;
+        for (const section of ledger.querySelectorAll('.qb-section')) {
+          expect(getComputedStyle(section).minWidth).toBe('0px');
+          expect(section.getBoundingClientRect().right).toBeLessThanOrEqual(ledgerRight + 1);
+        }
+        // La X es un disco con fondo, y el título le deja el lugar.
+        const close = dlg.querySelector('.codex-modal__close') as HTMLElement;
+        const title = dlg.querySelector('.qb-title') as HTMLElement;
+        expect(getComputedStyle(close).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+        expect(getComputedStyle(close).borderTopLeftRadius).toBe('50%');
+        expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(close.getBoundingClientRect().left + 1);
+      } finally {
+        document.documentElement.style.removeProperty('--font-scale');
+      }
+    });
+  }
 });
 
 describe('Avisos de actualización', () => {

@@ -91,13 +91,16 @@
   z-index: 20;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   color: var(--ink-soft);
+  /* Un disco con pergamino atrás: la X es absoluta contra el marco y el
+     contenido scrollea por debajo; sin fondo se mezclaba con el título. */
   background: var(--parch-1);
-  border: 1px solid rgba(74, 55, 32, 0.4);
-  border-radius: 3px;
+  border: 1px solid var(--gold-dark);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(42, 29, 14, 0.25);
   cursor: pointer;
 }
 
@@ -108,6 +111,12 @@
 
 .codex-book {
   padding-top: 20px;
+}
+
+/* El título nunca arranca debajo del disco de la X. Con prefijo a propósito:
+   `.qb-header-text` es del sistema y en las páginas normales no hay X. */
+.codex-book .qb-header-text {
+  padding-right: 48px;
 }
 
 /* ── the day's numbers ────────────────────────────── */
@@ -139,7 +148,12 @@
 
 .codex-marginalia {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* Dos columnas como máximo, sin hardcodear `repeat(2, …)`: la página mide
+     816 px como mucho (880 de marco − 2 de borde − 8 de scrollbar − 56 de
+     padding), así que entran dos de 320 y nunca tres; y con un solo módulo la
+     sección ocupa la página entera. Antes minmax(240px) daba tres columnas de
+     ~250 px: una bitácora a tres columnas es una tabla, no un ledger. */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 4px 20px;
 }
 

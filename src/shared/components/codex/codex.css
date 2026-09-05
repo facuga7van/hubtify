@@ -152,6 +152,11 @@
 .qb-section {
   position: relative;
   margin-bottom: 10px;
+  /* Como ítem de grilla (el ledger del Códice a dos columnas) el mínimo
+     automático es el min-content del contenido: la sección empuja la columna
+     en vez de ceder. Con cero, la columna manda y el texto de cada fila cede
+     con sus puntos suspensivos. */
+  min-width: 0;
 }
 
 .qb-section-title {
