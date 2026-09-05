@@ -137,7 +137,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   const [seals, setSeals] = useState<DaySeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<Phase>('page');
-  const [award, setAward] = useState<{ xpAwarded: number; vigor: number; achievementIds: string[]; obolosGranted: number } | null>(null);
+  const [award, setAward] = useState<{ xpAwarded: number; achievementIds: string[]; obolosGranted: number } | null>(null);
   const [problem, setProblem] = useState<Problem>(null);
   const [holdPct, setHoldPct] = useState(0);
 
@@ -303,7 +303,6 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
     }
     setAward({
       xpAwarded: res.xpAwarded,
-      vigor: res.vigor,
       achievementIds: res.achievementIds ?? [],
       obolosGranted: typeof res.obolosGranted === 'number' ? res.obolosGranted : 0,
     });
@@ -426,6 +425,9 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
   /** Sin lacre que apretar (ya sellado o fuera de ventana), el cierre de
       comidas necesita su propio botón. */
   const nutriStandalone = sealedNow || !!(summary && !summary.canSeal);
+  /** Lo que pagó el sello: recién estampado (`award`) o releído de la tira. */
+  const sealXp = award ? award.xpAwarded : thisSeal ? thisSeal.xpAwarded : null;
+  const obolos = award?.obolosGranted ?? 0;
 
   const dayLabel = formatLongDate(date, locale);
   const isYesterday = date === addDaysISO(today, -1);
@@ -613,7 +615,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
           </div>
         )}
 
-        {/* ── the wax ───────────────────────────────── */}
+        {/* ── zona 3: el lacre ─────────────────────── */}
         <div className="codex-wax-zone">
           {sealedNow ? (
             <div className="codex-sealed" ref={stageRef}>
@@ -623,75 +625,50 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
                   {sealStyleIcon(sealStyle, 34)}
                 </span>
               </div>
+              {/* UNA línea: «Sellado · +29 XP · +15 óbolos». El +29 es el único
+                  número héroe de la página. La fecha ya está en el título y el
+                  vigor en la barra lateral: ninguno de los dos vuelve acá. */}
               <div className="codex-sealed__text" data-seal="result">
-                <div className="qb-small-caps codex-sealed__label">
-                  {t('rpg.codexSealedOn', 'Sellado')} {'·'} {dayLabel}
-                </div>
-                {award ? (
-                  <>
-                    <div className="codex-award">
-                      +{Math.round(award.xpAwarded)} {t('rpg.codexXpUnit', 'XP')}
-                    </div>
-                    <div className="qb-hand codex-award__breakdown">
-                      {t('rpg.codexAwardBreakdown', {
-                        vigor: award.vigor,
-                        defaultValue: 'día vivo × vigor {{vigor}}',
-                      })}
-                    </div>
-                    {award.obolosGranted > 0 && (
-                      <div className="codex-obolos">
-                        <span className="codex-obolos__coins" aria-hidden="true">
-                          <span className="codex-obolos__coin"><Obolus width={15} height={15} /></span>
-                          <span className="codex-obolos__coin"><Obolus width={13} height={13} /></span>
-                          <span className="codex-obolos__coin"><Obolus width={15} height={15} /></span>
+                {sealXp !== null && (
+                  <p className="codex-sealed__line">
+                    <span className="qb-small-caps">{t('rpg.codexSealedOn', 'Sellado')}</span>
+                    {' '}
+                    <span className="codex-sealed__dot" aria-hidden="true">·</span>
+                    {' '}
+                    <span className="codex-sealed__xp">+{Math.round(sealXp)}</span>
+                    {' '}
+                    <span className="qb-small-caps">{t('rpg.codexXpUnit', 'XP')}</span>
+                    {obolos > 0 && (
+                      <>
+                        {' '}
+                        <span className="codex-sealed__dot" aria-hidden="true">·</span>
+                        {' '}
+                        <span className="qb-small-caps codex-sealed__obolos">
+                          <Obolus width={13} height={13} aria-hidden="true" />
+                          {t('rpg.codexSealedObolos', { n: obolos, defaultValue: '+{{n}} óbolos' })}
                         </span>
-                        <span className="codex-obolos__text">
-                          {t('rpg.codexObolosGranted', {
-                            n: award.obolosGranted,
-                            defaultValue: '+{{n}} óbolos a la bolsa',
-                          })}
-                        </span>
-                      </div>
+                      </>
                     )}
-                    {award.achievementIds.length > 0 && (
-                      <div className="codex-unlocks">
-                        <div className="qb-small-caps codex-unlocks__title">
-                          {t('rpg.codexUnlocked', 'Desbloqueaste')}
-                        </div>
-                        <ul className="codex-unlocks__list">
-                          {award.achievementIds.map((id) => (
-                            <li key={id} className="codex-unlocks__item">
-                              <SealRosette width={13} height={13} />
-                              <span>{t(titleKey(id), humanise(id))}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </>
-                ) : thisSeal ? (
-                  <div className="codex-award">
-                    +{Math.round(thisSeal.xpAwarded)} {t('rpg.codexXpUnit', 'XP')}
-                  </div>
-                ) : null}
-
-                {/* La salida del ritual, acá abajo, donde te deja la ceremonia.
-                    Durante 'sealing' no: el lacre todavía se está estampando y
-                    el botón entra con el resto del bloque [data-seal="result"]. */}
-                {phase !== 'sealing' && (
-                  <button
-                    type="button"
-                    className="codex-sealed__exit tap-target"
-                    onClick={onClose}
-                  >
-                    {t('rpg.codexCloseBook', 'Cerrar el libro')}
-                  </button>
+                  </p>
+                )}
+                {/* Los `{' '}` entre spans no se pintan (flex descarta los
+                    text runs de sólo blancos) pero sí se LEEN: sin ellos un
+                    lector de pantalla junta «DesbloqueasteMemoria Tardía». */}
+                {award && award.achievementIds.length > 0 && (
+                  <p className="qb-small-caps codex-unlocks">
+                    <SealRosette width={13} height={13} aria-hidden="true" />
+                    <span>{t('rpg.codexUnlocked', 'Desbloqueaste')}</span>
+                    {' '}
+                    <span className="codex-sealed__dot" aria-hidden="true">·</span>
+                    {' '}
+                    <span>{award.achievementIds.map((id) => t(titleKey(id), humanise(id))).join(' · ')}</span>
+                  </p>
                 )}
               </div>
             </div>
           ) : emptyDay ? (
-            /* The marginalia above already says "el codice registra dias
-               vividos"; the rule is only that there is NO button here. */
+            /* El ledger de arriba ya dice «el códice registra días vividos»;
+               la regla es sólo que acá NO hay botón. */
             null
           ) : (
             <>
@@ -751,7 +728,7 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
           </div>
         )}
 
-        {/* ── the 14 day strip ──────────────────────── */}
+        {/* ── zona 4: el pie ───────────────────────── */}
         <QBDividerSection />
         <Section
           title={t('rpg.codexStrip', 'ÚLTIMOS XIV DÍAS').toUpperCase()}
@@ -799,6 +776,23 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
             {t('rpg.codexStripLegend', 'Un día sin sellar no es una falta — es una página que quedó abierta.')}
           </div>
         </Section>
+
+        {/* La única salida escrita de la página, al pie, en los dos estados.
+            Durante 'sealing' no: el lacre se está estampando y nada invita a
+            irse a mitad de la ceremonia. Sin timer, a propósito: el subtítulo
+            promete «podés irte cuando quieras», y un modal que se cierra solo
+            decide por vos. */}
+        {phase !== 'sealing' && (
+          <div className="codex-sealed__foot">
+            <button
+              type="button"
+              className="codex-sealed__exit tap-target"
+              onClick={onClose}
+            >
+              {t('rpg.codexCloseBook', 'Cerrar el libro')}
+            </button>
+          </div>
+        )}
       </>
     );
   })();

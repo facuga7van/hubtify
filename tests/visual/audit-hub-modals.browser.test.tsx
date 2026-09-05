@@ -335,6 +335,14 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     const exit = dlg.querySelector('.codex-sealed__exit') as HTMLButtonElement;
     expect(exit).not.toBeNull();
     expect(exit.textContent?.trim()).toBeTruthy();
+    // Un solo veredicto: «Sellado · +20 XP», sin fecha (está en el título),
+    // sin desglose de vigor, sin logros (no hubo estampado en esta sesión).
+    const line = dlg.querySelector('.codex-sealed__line') as HTMLElement;
+    expect(line.textContent?.replace(/\s+/g, '')).toBe('Sellado·+20XP');
+    expect(dlg.querySelector('.codex-unlocks, .codex-award, .codex-award__breakdown, .codex-sealed__label, .codex-obolos')).toBeNull();
+    // La salida vive en el pie, después de la tira.
+    const strip = dlg.querySelector('.codex-strip') as HTMLElement;
+    expect(strip.compareDocumentPosition(exit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     fitCapture();
     await page.screenshot({ path: `${SCREENS}/audit-hub-codex-02-salida.png` });
@@ -581,6 +589,64 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     expect(dlg.querySelector('[data-codex-row="nutrition-close"]')).toBeNull();
     expect(dlg.querySelector('.codex-ledger-total__xp')?.textContent).toBe('+148');
     expect(dlg.querySelector('.codex-ledger-total')?.textContent?.replace(/\s+/g, ' ')).toContain('7 hechos');
+  });
+
+  /* El veredicto completo (óbolos, logros) sólo existe después de estampar:
+     hay que apretar el lacre. Se estampa con el teclado (espacio sostenido
+     ≥ 1,5 s), igual que lo haría alguien sin mouse; la ceremonia GSAP dura
+     ~1,6 s más. */
+  test('estampar deja UNA línea de veredicto: XP héroe, óbolos y logros en small caps', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    installApi({
+      rpgGetDaySummary: () => Promise.resolve(fourModules()),
+      rpgGetSeals: () => Promise.resolve([]),
+      rpgSealDay: () => Promise.resolve({
+        ok: true, date: today, xpAwarded: 29, vigor: 84, eventsCount: 12,
+        modules: ['quests', 'nutrition', 'finance', 'cauldron'],
+        achievementIds: ['late_memory'], obolosGranted: 15,
+      }),
+    });
+    mountCodex();
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    const wax = dlg.querySelector('.codex-wax') as HTMLButtonElement;
+    expect(wax).not.toBeNull();
+    wax.focus();
+    wax.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    await settle(1700);
+    await settle(2500);
+
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-codex-04-veredicto.png` });
+    resetCapture();
+
+    const line = dlg.querySelector('.codex-sealed__line') as HTMLElement;
+    expect(line).not.toBeNull();
+    expect(line.textContent?.replace(/\s+/g, '')).toBe('Sellado·+29XP·+15óbolos');
+
+    // El +29 es el ÚNICO número héroe del cuerpo de la página.
+    const content = dlg.querySelector('.qb-content') as HTMLElement;
+    const heroes = [...content.querySelectorAll('*')]
+      .filter((el) => el.children.length === 0 && (el.textContent ?? '').trim() !== '')
+      .filter((el) => parseFloat(getComputedStyle(el).fontSize) >= 24)
+      .map((el) => (typeof el.className === 'string' ? el.className : el.tagName));
+    expect(heroes).toEqual(['codex-sealed__xp']);
+
+    expect(dlg.querySelector('.codex-award, .codex-award__breakdown, .codex-obolos, .codex-sealed__label')).toBeNull();
+
+    // Los logros: una línea, sin marco ni fondo.
+    const unlocks = dlg.querySelector('.codex-unlocks') as HTMLElement;
+    expect(unlocks.textContent?.replace(/\s+/g, ' ').trim()).toMatch(/^Desbloqueaste · /);
+    expect(getComputedStyle(unlocks).borderTopWidth).toBe('0px');
+    expect(getComputedStyle(unlocks).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+
+    // La salida, en el pie, después de la tira.
+    const exit = dlg.querySelector('.codex-sealed__exit') as HTMLElement;
+    const strip = dlg.querySelector('.codex-strip') as HTMLElement;
+    expect(exit).not.toBeNull();
+    expect(strip.compareDocumentPosition(exit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
