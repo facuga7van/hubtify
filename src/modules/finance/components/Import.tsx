@@ -441,7 +441,7 @@ export default function Import({ embedded, onDirtyChange, onDiscard, onImported 
   /** Reverts a confirmed import — soft-deletes every row of that batch. */
   const handleUndoBatch = async (batch: ImportBatch) => {
     const ok = await confirm({
-      message: t('coinify.importUndoConfirm', '¿Revertir esta importación? Se eliminarán {{count}} movimientos.', { count: batch.liveCount }),
+      message: t('coinify.importUndoConfirm', '¿Revertir esta importación? Se revertirán {{count}} líneas del resumen, con sus cuotas proyectadas.', { count: batch.liveCount }),
       danger: true,
       confirmText: t('coinify.importUndo', 'Revertir'),
     });
