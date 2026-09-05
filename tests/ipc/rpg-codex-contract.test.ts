@@ -49,11 +49,12 @@ function seedEvent(db: Database.Database, xp: number, hhmm: string): void {
 }
 
 /**
- * El nombre del campo que la cartela «XP DEL DÍA» del modal lee de `summary`,
- * sacado del propio código fuente: si alguien lo renombra en el modal, el test
- * lo sigue; si el handler deja de devolverlo, el test lo denuncia.
+ * El nombre del campo que la línea de cierre del ledger del modal
+ * (`.codex-ledger-total__xp`, con `rpg.codexXpToday` como `title`) lee de
+ * `summary`, sacado del propio código fuente: si alguien lo renombra en el
+ * modal, el test lo sigue; si el handler deja de devolverlo, el test lo denuncia.
  */
-function fieldReadByCodexXpCartouche(): string {
+function fieldReadByCodexLedgerTotal(): string {
   const src = readFileSync(resolve(__dirname, '../../src/hub/codex/CodexSealModal.tsx'), 'utf8');
   const m = /rpg\.codexXpToday[\s\S]{0,200}?summary\.(\w+)/.exec(src);
   if (!m) throw new Error('no se encontró la cartela de XP en CodexSealModal.tsx');
@@ -74,7 +75,7 @@ describe('rpg:getDaySummary — contrato con el Cierre del Códice', () => {
     seedEvent(harness.db, 12.5, '13:15');
 
     const summary = await invoke<Record<string, unknown>>('rpg:getDaySummary', TODAY);
-    const field = fieldReadByCodexXpCartouche();
+    const field = fieldReadByCodexLedgerTotal();
 
     expect(summary).toHaveProperty(field);
     const value = summary[field];

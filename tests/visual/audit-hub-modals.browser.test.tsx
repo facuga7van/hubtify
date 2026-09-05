@@ -249,10 +249,13 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       await page.screenshot({ path: `${SCREENS}/audit-hub-codex-01-${name}.png` });
       resetCapture();
 
-      // «XP DEL DÍA» pinta un número, no «+NaN» (el modal leía un campo que
-      // el handler no devuelve).
-      const xpValue = dlg.querySelector('.codex-cartouches .qb-cartouche-value') as HTMLElement;
+      // La línea de cierre del ledger pinta un número, no «+NaN» (el modal
+      // leía un campo que el handler no devuelve).
+      const xpValue = dlg.querySelector('.codex-ledger-total__xp') as HTMLElement;
       expect(xpValue.textContent).toBe('+148');
+      expect(dlg.querySelector('.codex-ledger-total')?.textContent?.replace(/\s+/g, ' ')).toContain('7 hechos');
+      // Un número por dato: no quedan cartuchos ni runas de módulo.
+      expect(dlg.querySelector('.codex-cartouches, .codex-module-seals, .qb-cartouche')).toBeNull();
       expect(dlg.textContent).not.toMatch(/NaN/);
 
       const box = insideViewport(dlg);

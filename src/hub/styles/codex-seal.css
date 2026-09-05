@@ -120,28 +120,18 @@
 }
 
 /* ── the day's numbers ────────────────────────────── */
-
-.codex-cartouches {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 12px;
+/* La línea de cierre del ledger: UNA vez el total, en el registro de las
+   filas (small caps a --fs-label). Los cuatro cartuchos que había arriba
+   decían lo mismo a 28 px y competían con el +XP del sello, también a 28 px
+   y también en musgo; las runas de módulo repetían los títulos de sección. */
+.codex-ledger-total {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--ink-soft);
 }
 
-@media (max-width: 720px) {
-  .codex-cartouches { grid-template-columns: repeat(2, 1fr); }
-}
-
-.codex-module-seals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.codex-module-seal {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.codex-ledger-total__xp {
+  color: var(--moss);
 }
 
 /* ── marginalia (events grouped by module) ────────── */
@@ -1147,12 +1137,8 @@
 }
 
 /* ── Mobile (390 px; Fase 3) ────────────────────────
-   Va en esta hoja y no en layout.css: el @media de 720 px de arriba tiene la
+   Va en esta hoja y no en layout.css: el @media de 640 px de arriba tiene la
    misma especificidad y se carga después. */
-/* 4 → 2 a 720 px no alcanza: a 366 px cada cartucho tiene 153 px. */
-[data-shell="mobile"] .codex-cartouches {
-  grid-template-columns: 1fr;
-}
 
 /* Control segmentado de ~285 px: con --font-scale 1.15 no entraba. */
 [data-shell="mobile"] .ach-filter {

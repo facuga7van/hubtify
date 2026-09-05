@@ -3,18 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { BookPage } from '../../shared/components/codex';
-import {
-  Cartouche,
-  QBDividerSection,
-  Rune,
-  Section,
-} from '../../shared/components/codex/CodexPrimitives';
+import { QBDividerSection, Section } from '../../shared/components/codex/CodexPrimitives';
 import {
   Cauldron,
   Dagger,
   FloralHeart,
-  Flame,
-  Quill,
   Scroll,
   Sparkle,
   Sword,
@@ -449,82 +442,54 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
 
     return (
       <>
-        {/* ── the day's numbers ────────────────────── */}
-        <div className="codex-cartouches">
-          <Cartouche
-            label={t('rpg.codexXpToday', 'XP DEL DÍA')}
-            value={`+${Math.round(summary.totalXp)}`}
-            foot={t('rpg.codexXpFoot', 'anotados al margen')}
-            icon={<Sword width={14} height={14} />}
-            tone="sage"
-          />
-          <Cartouche
-            label={t('rpg.codexMaxCombo', 'COMBO MÁXIMO')}
-            value={`×${summary.maxCombo}`}
-            foot={t('rpg.codexComboFoot', 'en un mismo día')}
-            icon={<Flame width={14} height={14} />}
-          />
-          <Cartouche
-            label={t('rpg.codexDeeds', 'HECHOS')}
-            value={summary.eventsCount}
-            foot={t('rpg.codexDeedsFoot', 'entradas del día')}
-            icon={<Quill width={14} height={14} />}
-          />
-          <Cartouche
-            label={t('rpg.vigor', 'VIGOR')}
-            value={summary.vigor}
-            foot={`${t('rpg.streak', 'Racha')} ${summary.streak}`}
-            icon={<Sparkle width={14} height={14} />}
-            tone="rubric"
-          />
-        </div>
-
-        {/* ── the modules touched, as little seals ──── */}
-        {summary.modules.length > 0 && (
-          <div className="codex-module-seals">
-            {summary.modules.map((m) => (
-              /* `tone="gold"` pinta el rótulo en --gold (#a88a3c) sobre
-                 pergamino: 2.27:1. Los tres sellos de módulo se veían
-                 fantasmales, como si estuvieran deshabilitados. */
-              <Rune key={m} tone="ink">
-                <span className="codex-module-seal">
-                  {moduleIcon(m, 11)} {moduleLabel(m, t)}
-                </span>
-              </Rune>
-            ))}
-          </div>
-        )}
-
-        <QBDividerSection />
-
-        {/* ── marginalia, grouped by module ─────────── */}
+        {/* ── zona 2: el ledger, los hechos del día por módulo ── */}
         {grouped.length > 0 ? (
-          <div className="codex-marginalia">
-            {grouped.map(({ moduleId, events }) => (
-              <Section
-                key={moduleId}
-                title={moduleLabel(moduleId, t).toUpperCase()}
-                icon={<span className="codex-marginalia__icon">{moduleIcon(moduleId)}</span>}
-                rightSlot={<span className="qb-numeral codex-marginalia__count">{events.length}</span>}
-              >
-                <ul className="codex-marginalia__list">
-                  {events.map((ev, i) => {
-                    const label = t(`events.${ev.eventType}`);
-                    const text = label !== `events.${ev.eventType}` ? label : ev.eventType;
-                    return (
-                      <li key={`${moduleId}-${i}`} className="codex-marginalia__row">
-                        <span className="qb-hand codex-marginalia__time">{formatTime(ev.time, locale)}</span>
-                        <span className="codex-marginalia__text" title={text}>{text}</span>
-                        <span className="qb-numeral codex-marginalia__xp">
-                          {ev.xpGained >= 0 ? '+' : ''}{Math.round(ev.xpGained)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Section>
-            ))}
-          </div>
+          <>
+            <div className="codex-marginalia">
+              {grouped.map(({ moduleId, events }) => (
+                <Section
+                  key={moduleId}
+                  title={moduleLabel(moduleId, t).toUpperCase()}
+                  icon={<span className="codex-marginalia__icon">{moduleIcon(moduleId)}</span>}
+                  rightSlot={<span className="qb-numeral codex-marginalia__count">{events.length}</span>}
+                >
+                  <ul className="codex-marginalia__list">
+                    {events.map((ev, i) => {
+                      const label = t(`events.${ev.eventType}`);
+                      const text = label !== `events.${ev.eventType}` ? label : ev.eventType;
+                      return (
+                        <li key={`${moduleId}-${i}`} className="codex-marginalia__row">
+                          <span className="qb-hand codex-marginalia__time">{formatTime(ev.time, locale)}</span>
+                          <span className="codex-marginalia__text" title={text}>{text}</span>
+                          <span className="qb-numeral codex-marginalia__xp">
+                            {ev.xpGained >= 0 ? '+' : ''}{Math.round(ev.xpGained)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Section>
+              ))}
+            </div>
+            {/* La línea de cierre del ledger: el total del día, UNA vez, en el
+                registro de las filas. El `title` del número es el rótulo de la
+                cartela de antes («XP DEL DÍA»); el test de contrato del Códice
+                (tests/ipc) busca esa clave en este fuente y lee el campo del
+                summary que viene a menos de 200 caracteres: no separar el
+                `title` del número, y no repetir la clave ni el campo en ningún
+                comentario (la regex los matchearía acá). El vigor no está: ya
+                vive en la barra lateral. */}
+            <p className="qb-small-caps codex-ledger-total">
+              <span className="codex-ledger-total__xp" title={t('rpg.codexXpToday', 'XP DEL DÍA')}>
+                +{Math.round(summary.totalXp)}
+              </span>
+              {' '}{t('rpg.codexXpUnit', 'XP')}
+              {' · '}
+              {t('rpg.codexLedgerDeeds', { count: summary.eventsCount, defaultValue: '{{count}} hechos' })}
+              {' · '}
+              {t('rpg.codexLedgerCombo', { n: summary.maxCombo, defaultValue: 'combo ×{{n}}' })}
+            </p>
+          </>
         ) : (
           <p className="codex-note">
             {t('rpg.codexEmptyDay', 'El códice registra días vividos. Volvé cuando haya algo que anotar.')}
