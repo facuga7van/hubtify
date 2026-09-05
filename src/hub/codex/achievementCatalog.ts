@@ -148,7 +148,9 @@ const ID_GROUPS: Record<string, AchievementGroup> = {
   sun_to_sun: 'cauldron',
   // Nutrify
   table_guardian: 'nutrition',
+  thirty_nights_at_table: 'nutrition',
   tome_of_clear_thought: 'nutrition',
+  first_scroll: 'nutrition',
   scroll_keeper: 'nutrition',
   library_unending: 'nutrition',
   seven_nights_written: 'nutrition',

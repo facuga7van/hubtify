@@ -2023,6 +2023,10 @@
         "desc": "Completaste tu primera misión.",
         "title": "Primera Misión"
       },
+      "first_scroll": {
+        "desc": "Sellaste tu primer pergamino semanal. La semana ya es historia escrita.",
+        "title": "El Primer Pergamino"
+      },
       "first_seal": {
         "desc": "Cerraste tu primer día en el Códice.",
         "title": "Primer Sello"
@@ -2098,15 +2102,15 @@
         "title": "El Banco de Hierro Tendrá lo Suyo"
       },
       "isengard_i": {
-        "desc": "Seis pociones al fuego en un mismo día.",
+        "desc": "Siete pociones al fuego en un mismo día.",
         "title": "Las Fraguas de Isengard I"
       },
       "isengard_ii": {
-        "desc": "Nueve pociones en un mismo día. El fuego no se apagó ni para comer.",
+        "desc": "Diez pociones en un mismo día. El fuego no se apagó ni para comer.",
         "title": "Las Fraguas de Isengard II"
       },
       "isengard_iii": {
-        "desc": "Trece pociones en un solo día. Cinco horas y veinte de reloj, sin descontar nada.",
+        "desc": "Catorce pociones en un solo día. Casi seis horas de reloj, sin descontar nada.",
         "title": "Las Fraguas de Isengard III"
       },
       "just_in_case": {
@@ -2448,6 +2452,10 @@
       "the_thousandth": {
         "desc": "El hecho número mil de tu crónica sacó el dado del dos por ciento. Ni el novecientos noventa y nueve. El mil.",
         "title": "Frame Perfecto"
+      },
+      "thirty_nights_at_table": {
+        "desc": "Treinta días cerrados en Nutrify. Un mes entero anotado.",
+        "title": "Treinta Noches en la Mesa"
       },
       "three_epics": {
         "desc": "Tres tiradas de x3 en un mismo día. Los dados te aman.",

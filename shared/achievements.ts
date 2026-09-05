@@ -497,10 +497,11 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   // ── Caldero ───────────────────────────────────────────────────────────────
   ach('deep_work', false, (c) => !!c.event && n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 6),
   ach('cauldron_master', false, (c) => !!c.event && n(c.countByType, 'POMODORO_COMPLETED') >= 100),
-  // Las Fraguas de Isengard: pomodoros on one day. III is ~5h20 of wall clock.
-  ach('isengard_i', false, (c) => n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 6),
-  ach('isengard_ii', false, (c) => !!c.event && n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 9),
-  ach('isengard_iii', false, (c) => !!c.event && n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 13),
+  // Las Fraguas de Isengard: pomodoros on one day, one step above deep_work (6)
+  // so the two never pop together. III is ~5h50 of wall clock.
+  ach('isengard_i', false, (c) => n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 7),
+  ach('isengard_ii', false, (c) => !!c.event && n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 10),
+  ach('isengard_iii', false, (c) => !!c.event && n(c.countByTypeToday, 'POMODORO_COMPLETED') >= 14),
   // Hoguera Encendida: DISTINCT calendar days, on purpose — no streak to break.
   ach('beacons_i', false, (c) => c.pomodoroDays >= 7),
   ach('beacons_ii', false, (c) => !!c.event && c.pomodoroDays >= 30),
@@ -528,8 +529,12 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     !!c.event && c.pomodoroHoursToday.some((h) => h < 12) && c.pomodoroHoursToday.some((h) => h >= 20)),
 
   // ── Nutrify: archive only, never food, weight or compliance ladders ───────
+  // Días cerrados: 7 / 30 / 180. Counts CLOSINGS, not compliance — chronicle, not diet.
   ach('table_guardian', false, (c) => !!c.event && n(c.countByType, 'DAY_SUMMARY') >= 7),
+  ach('thirty_nights_at_table', false, (c) => !!c.event && n(c.countByType, 'DAY_SUMMARY') >= 30),
   ach('tome_of_clear_thought', false, (c) => !!c.event && n(c.countByType, 'DAY_SUMMARY') >= 180),
+  // Pergaminos: 1 / 12 / 52. Weekly scrolls are the module's only first time.
+  ach('first_scroll', false, (c) => n(c.countByType, 'WEEK_SUMMARY') >= 1),
   ach('scroll_keeper', false, (c) => !!c.event && n(c.countByType, 'WEEK_SUMMARY') >= 12),
   ach('library_unending', false, (c) => !!c.event && n(c.countByType, 'WEEK_SUMMARY') >= 52),
   // Rewards RECORDING, never compliance.

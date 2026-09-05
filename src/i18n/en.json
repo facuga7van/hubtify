@@ -2023,6 +2023,10 @@
         "desc": "You completed your first quest.",
         "title": "First Quest"
       },
+      "first_scroll": {
+        "desc": "You sealed your first weekly scroll. The week is written history now.",
+        "title": "The First Scroll"
+      },
       "first_seal": {
         "desc": "You closed your first day in the Codex.",
         "title": "First Seal"
@@ -2098,15 +2102,15 @@
         "title": "The Iron Bank Will Have Its Due"
       },
       "isengard_i": {
-        "desc": "Six brews on the fire in one day.",
+        "desc": "Seven brews on the fire in one day.",
         "title": "The Forges of Isengard I"
       },
       "isengard_ii": {
-        "desc": "Nine brews in one day. The fire did not go out even to eat.",
+        "desc": "Ten brews in one day. The fire did not go out even to eat.",
         "title": "The Forges of Isengard II"
       },
       "isengard_iii": {
-        "desc": "Thirteen brews in a single day. Five hours and twenty minutes on the clock, nothing deducted.",
+        "desc": "Fourteen brews in a single day. Nearly six hours on the clock, nothing deducted.",
         "title": "The Forges of Isengard III"
       },
       "just_in_case": {
@@ -2448,6 +2452,10 @@
       "the_thousandth": {
         "desc": "The thousandth deed of your chronicle rolled the two-percent die. Not the nine hundred and ninety-ninth. The thousandth.",
         "title": "Frame Perfect"
+      },
+      "thirty_nights_at_table": {
+        "desc": "Thirty days closed in Nutrify. A whole month written down.",
+        "title": "Thirty Nights at the Table"
       },
       "three_epics": {
         "desc": "Three x3 rolls in one day. The dice love you.",

@@ -339,20 +339,29 @@ const SWEEP_ALLOWED = [
   'iron_bank_i', 'lannister_i', 'winter_i', 'bestiary_i', 'path_i',
   'fighters_guild_i', 'endless_stair_i', 'nine_divines_i', 'rewritten', 'marginalia', 'raised_shield', 'day_off',
   'isengard_i', 'beacons_i', 'broken_flask', 'full_circle',
-  'second_chance', 'ferrymans_coin', 'deserved_rest', 'long_rest', 'chronicler_i',
+  'first_scroll', 'second_chance', 'ferrymans_coin', 'deserved_rest', 'long_rest', 'chronicler_i',
   'squire', 'knight_errant', 'dragonborn', 'steadfast', 'monthly_vow', 'centenary_vow', 'lord_of_cinder',
 ];
 
 describe('achievement catalogue', () => {
-  it('has 182 entries with unique ids', () => {
-    expect(ACHIEVEMENTS.length).toBe(182);
-    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(182);
+  it('has 184 entries with unique ids', () => {
+    expect(ACHIEVEMENTS.length).toBe(184);
+    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(184);
   });
 
   it('hides the coincidence tail: 87 hidden, roughly half the catalogue', () => {
     const hidden = ACHIEVEMENTS.filter((a) => a.hidden).length;
     expect(hidden).toBe(87);
-    expect(hidden / ACHIEVEMENTS.length).toBeCloseTo(0.48, 1);
+    expect(hidden / ACHIEVEMENTS.length).toBeCloseTo(0.47, 1);
+  });
+
+  it('no two entries share a predicate outcome on the same day-count (no duplicate medals)', () => {
+    // deep_work (6 pomodoros) and isengard_i must NOT pop on the same event.
+    const six = blankContext({ countByTypeToday: { POMODORO_COMPLETED: 6 }, event: blankEvent() });
+    expect(ACHIEVEMENTS_BY_ID.get('deep_work')!.check(six)).toBe(true);
+    expect(ACHIEVEMENTS_BY_ID.get('isengard_i')!.check(six)).toBe(false);
+    const seven = blankContext({ countByTypeToday: { POMODORO_COMPLETED: 7 }, event: blankEvent() });
+    expect(ACHIEVEMENTS_BY_ID.get('isengard_i')!.check(seven)).toBe(true);
   });
 
   it('the backfill recognises only tier I and identity states (rule 6)', () => {
@@ -366,7 +375,7 @@ describe('achievement catalogue', () => {
     for (const id of [
       'iron_bank_iii', 'lannister_iii', 'winter_iii', 'bestiary_iii', 'path_iii', 'master_of_coin',
       'fighters_guild_iii', 'endless_stair_iii', 'nine_divines_iii', 'the_company', 'isengard_iii',
-      'beacons_iii', 'library_unending', 'tome_of_clear_thought', 'oghma_infinium', 'horn_of_valhalla',
+      'beacons_iii', 'library_unending', 'thirty_nights_at_table', 'tome_of_clear_thought', 'oghma_infinium', 'horn_of_valhalla',
       'chronicler_iii', 'fellowship', 'dawn_to_dusk', 'sun_to_sun', 'midnight_oil', 'long_table',
       'sealed_with_gold', 'seal_of_four_hands', 'labelled_potion',
     ]) {
