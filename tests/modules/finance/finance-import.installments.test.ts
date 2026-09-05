@@ -262,6 +262,14 @@ describe('finance:importConfirm — cuotas del resumen', () => {
       expect(row.impactsBalance).toBe(1);
       expect(row.statementPeriod).toBeNull();
     }
+
+    // Sin resumen no hay mes al que mover la fila: es un gasto en efectivo que
+    // ya ocurrió y pega en el saldo en su fecha real. purchase_date igual se
+    // guarda, para que el dedupe entre lotes tenga la misma clave que con tarjeta.
+    const three = rows.find((r) => r.n === 3)!;
+    expect(three.date).toBe('2025-05-20');
+    expect(three.purchaseDate).toBe('2025-05-20');
+    expect(rows.filter((r) => r.n > 3).every((r) => r.purchaseDate === null)).toBe(true);
   });
 
   it('una cuota disparatada no genera un plan: la fila entra suelta', async () => {

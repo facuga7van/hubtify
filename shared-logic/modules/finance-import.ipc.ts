@@ -833,11 +833,14 @@ export function registerFinanceImportIpcHandlers(): void {
            AND date = ? AND description = ? AND amount = ? AND currency = ?
            AND (import_batch_id IS NULL OR import_batch_id <> ?)`,
       );
+      // Sin tarjeta ni resumen no hay mes al que mover la fila: `date` es la del
+      // extracto y `purchase_date` la acompaña, la misma invariante que el PDF
+      // («toda fila importada guarda su fecha de compra»).
       const insertTx = db.prepare(
         `INSERT INTO finance_transactions
-         (id, type, amount, currency, category, description, date, payment_method, source, import_batch_id,
+         (id, type, amount, currency, category, description, date, purchase_date, payment_method, source, import_batch_id,
           installments, impacts_balance, fx_rate, fx_rate_source, account_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, 1, 1, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, 1, 1, ?, ?, ?, ?, ?)`,
       );
 
       const run = db.transaction(() => {
@@ -867,7 +870,7 @@ export function registerFinanceImportIpcHandlers(): void {
           if (existing.cnt > 0) { duplicateCount++; continue; }
 
           insertTx.run(
-            genId(), type, round2(amount), currency, category, description, date,
+            genId(), type, round2(amount), currency, category, description, date, date,
             paymentMethod, batchId, fxRate, fxRate === null ? null : 'process',
             accountId, now, now,
           );

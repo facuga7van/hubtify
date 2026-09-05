@@ -240,3 +240,23 @@ describe('finance:importConfirm — account for card-less imports (#3)', () => {
     expect(liveImportRows()).toHaveLength(0);
   });
 });
+
+describe('finance:importConfirmTable — extracto de billetera', () => {
+  it('toda fila importada guarda su fecha de compra, también por el camino de la tabla', async () => {
+    const banco = saveAccount(harness.db, { name: 'Banco', kind: 'bank' });
+    if (!banco.ok) throw new Error('setup failed');
+
+    const res = await invoke<{ count: number }>('finance:importConfirmTable', [
+      { date: '2026-01-05', description: 'Kiosco', amount: 1500, raw: -1500, currency: 'ARS' },
+    ], { fileName: 'extracto.csv', accountId: banco.id });
+    expect(res.count).toBe(1);
+
+    // Sin tarjeta ni resumen: `date` es la fecha del extracto y purchase_date la
+    // acompaña, la misma invariante que la fila del PDF sin tarjeta.
+    const row = harness.db.prepare(
+      "SELECT date, purchase_date AS purchaseDate FROM finance_transactions WHERE deleted_at IS NULL AND source = 'import'",
+    ).get() as { date: string; purchaseDate: string | null };
+    expect(row.date).toBe('2026-01-05');
+    expect(row.purchaseDate).toBe('2026-01-05');
+  });
+});
