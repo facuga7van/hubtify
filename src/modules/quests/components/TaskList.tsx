@@ -271,6 +271,8 @@ export default function TaskList() {
     const newStatus = !task.status;
     try {
       if (newStatus) {
+        // Evaluado ANTES de completar: una vez cerrada, la tarea ya no "vence".
+        const overdue = !!task.dueDate && getDueDateStatus(task.dueDate) === 'overdue';
         // Sequential on purpose: the status answer decides whether XP is owed.
         // `paysXp === false` means another instance of this recurring chain was
         // already completed today (one payment per chain per local day). An
@@ -281,7 +283,7 @@ export default function TaskList() {
         } else {
           const result = await window.api.processRpgEvent({
             type: 'TASK_COMPLETED', moduleId: 'quests',
-            payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
+            payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier, repeated: !!statusResult?.repeated, overdue },
             timestamp: Date.now(),
           });
           toast({ type: 'xp', message: `+${result.xpGained} XP`, details: { xp: result.xpGained, bonusTier: bonusMultiplierToTier(result.bonusMultiplier), comboMultiplier: result.comboMultiplier, streakMilestone: result.milestoneXp || undefined } });
@@ -321,11 +323,12 @@ export default function TaskList() {
     const tasksToComplete = ids.map(id => pending.find(t => t.id === id)).filter(Boolean) as Task[];
     await Promise.all(tasksToComplete.map(async (task) => {
       // Same gate as the single tick: a recurring chain pays once per day.
+      const overdue = !!task.dueDate && getDueDateStatus(task.dueDate) === 'overdue';
       const status = await questsApi().questsSetTaskStatus(task.id, true);
       if (status && status.paysXp === false) return;
       await window.api.processRpgEvent({
         type: 'TASK_COMPLETED', moduleId: 'quests',
-        payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier },
+        payload: { xp: XP_MAP[task.tier], hp: 0, taskId: task.id, tier: task.tier, repeated: !!status?.repeated, overdue },
         timestamp: Date.now(),
       });
     }));
