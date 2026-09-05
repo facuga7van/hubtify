@@ -235,3 +235,38 @@ describe('C11 — materializar no pisa una categoría corregida a mano', () => {
     expect(byNumber.get(6)).toBe('Compras');  // una proyectada intacta sigue con el default
   });
 });
+
+describe('C14 — el contador del lote cuenta líneas del papel', () => {
+  const CUOTA_3_DE_12 = { ...LINE, installmentCurrent: 3, installmentTotal: 12, amountARS: 25_000 };
+  const CONTADO = { date: '2025-08-04', merchant: 'RAPPIPRO', amountARS: 8_000, isExcluded: false, suggestedCategory: 'Delivery' };
+  type Batch = { id: string; rowCount: number; liveCount: number };
+
+  it('un lote de una línea 3/12 → 1 de 1 vigentes', async () => {
+    await invoke('finance:importConfirm', [CUOTA_3_DE_12], '2025-08', 'agosto.pdf', cardId);
+    const [batch] = await invoke<Batch[]>('finance:getImportBatches');
+    expect(batch.rowCount).toBe(1);
+    expect(batch.liveCount).toBe(1);
+  });
+
+  it('una línea en cuotas + una al contado → 2; revertir → 0', async () => {
+    const res = await invoke<{ batchId: string }>('finance:importConfirm', [CUOTA_3_DE_12, CONTADO], '2025-08', 'agosto.pdf', cardId);
+    expect((await invoke<Batch[]>('finance:getImportBatches'))[0].liveCount).toBe(2);
+    await invoke('finance:undoImportBatch', res.batchId);
+    expect((await invoke<Batch[]>('finance:getImportBatches'))[0].liveCount).toBe(0);
+  });
+
+  it('borrar a mano una línea suelta baja el contador; borrar la importada de un plan con proyectadas vivas no (límite conocido)', async () => {
+    await invoke('finance:importConfirm', [CUOTA_3_DE_12, CONTADO], '2025-08', 'agosto.pdf', cardId);
+    const loose = harness.db.prepare(
+      `SELECT id FROM finance_transactions WHERE installment_group_id IS NULL AND deleted_at IS NULL`,
+    ).get() as { id: string };
+    await invoke('finance:deleteTransaction', loose.id);
+    expect((await invoke<Batch[]>('finance:getImportBatches'))[0].liveCount).toBe(1);
+
+    const imported = harness.db.prepare(
+      `SELECT id FROM finance_transactions WHERE installment_number = 3 AND deleted_at IS NULL`,
+    ).get() as { id: string };
+    await invoke('finance:deleteTransaction', imported.id);
+    expect((await invoke<Batch[]>('finance:getImportBatches'))[0].liveCount).toBe(1);
+  });
+});

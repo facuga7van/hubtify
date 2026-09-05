@@ -749,13 +749,28 @@ export function registerFinanceImportIpcHandlers(): void {
     return { ok: true, deleted: run() };
   });
 
+  /**
+   * «N de M vigentes»: M son las líneas del papel (`row_count`), N las que
+   * siguen vivas. Una línea en cuotas escribe 1 + las proyectadas, y contarlas
+   * todas daba «10 de 1». Regla: filas vivas sueltas (sin plan) más UNA por cada
+   * plan que este lote tocó y que conserva alguna fila viva del lote — la de
+   * menor `installment_number`, que es la importada o materializada (las
+   * proyectadas siempre tienen un número mayor). Límite conocido: si el usuario
+   * borra a mano la fila importada y quedan proyectadas vivas, cuenta 1 igual.
+   */
   ipcHandle('finance:getImportBatches', () => {
     const db = getDb();
     return db
       .prepare(
         `SELECT b.id, b.source, b.filename, b.row_count AS rowCount, b.created_at AS createdAt,
                 (SELECT COUNT(*) FROM finance_transactions t
-                  WHERE t.import_batch_id = b.id AND t.deleted_at IS NULL) AS liveCount
+                  WHERE t.import_batch_id = b.id AND t.deleted_at IS NULL
+                    AND t.installment_group_id IS NULL)
+              + (SELECT COUNT(*) FROM (
+                    SELECT t.installment_group_id FROM finance_transactions t
+                     WHERE t.import_batch_id = b.id AND t.deleted_at IS NULL
+                       AND t.installment_group_id IS NOT NULL
+                     GROUP BY t.installment_group_id)) AS liveCount
          FROM finance_import_batches b
          ORDER BY b.created_at DESC`,
       )
