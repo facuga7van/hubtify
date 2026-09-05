@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { page } from 'vitest/browser';
@@ -542,6 +543,44 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     // Y el total no se suma dos veces.
     expect(dlg.querySelector('.codex-ledger-total__xp')?.textContent).toBe('+166');
     expect(dlg.querySelector('.codex-ledger-total')?.textContent?.replace(/\s+/g, ' ')).toContain('8 hechos');
+  });
+
+  /* El cierre de comidas resuelve en una promesa. Si mientras está en vuelo
+     el usuario se va a otra página desde la tira, el award pertenece al día
+     que se cerró, no al que está abierto ahora: no se pinta. */
+  function CodexHost() {
+    const [d, setD] = useState(today);
+    return <CodexSealModal date={d} onClose={() => {}} onSelectDate={setD} />;
+  }
+
+  test('el cierre de comidas no pinta en otra página si el usuario cambió de día', async () => {
+    await page.viewport(...NARROW);
+    resetCapture();
+    installApi({
+      ...nutriStubs,
+      rpgGetDaySummary: () => Promise.resolve(nutriDay()),
+      // El backend tarda: la promesa sigue en vuelo cuando la página cambia.
+      nutritionCloseDay: () => new Promise((resolve) => {
+        setTimeout(() => resolve({ success: true, breakdown: { xpTotal: 12, hpChange: 0 } }), 600);
+      }),
+    });
+    render(
+      <MemoryRouter><ToastProvider><ConfirmProvider><CodexHost /></ConfirmProvider></ToastProvider></MemoryRouter>,
+    );
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    await page.getByRole('button', { name: 'Cerrar la jornada' }).click();
+    // Antes de que resuelva: a otra página desde la tira (la última celda
+    // abierta y no actual es ayer).
+    const cells = [...dlg.querySelectorAll<HTMLButtonElement>('.codex-strip__cell:not([disabled])')];
+    cells[cells.length - 1].click();
+    await settle(1800);
+
+    expect(dlg.querySelector('[aria-current="date"]')?.textContent).not.toBe(String(Number(today.slice(8, 10))));
+    expect(dlg.querySelector('[data-codex-row="nutrition-close"]')).toBeNull();
+    expect(dlg.querySelector('.codex-ledger-total__xp')?.textContent).toBe('+148');
+    expect(dlg.querySelector('.codex-ledger-total')?.textContent?.replace(/\s+/g, ' ')).toContain('7 hechos');
   });
 });
 

@@ -143,6 +143,12 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
 
   const available = codexApiReady();
   const today = localDateISO();
+  /* La página que está abierta AHORA. `runNutritionClose` cierra sobre el
+     `date` de su closure; si mientras la promesa está en vuelo el usuario se
+     fue a otro día desde la tira, lo que vuelve pertenece al día que se cerró
+     y no se pinta en el que está abierto. */
+  const dateRef = useRef(date);
+  dateRef.current = date;
 
   /* ── which matrix stamps the wax ──
      The equipped seal style lives as a data attribute on <html> (stamped by
@@ -241,8 +247,12 @@ export default function CodexSealModal({ date, onClose, onSelectDate }: CodexSea
     setNutriBusy(true);
     try {
       const breakdown = await closeNutritionDay(date, nutriSteps, nutriGym);
-      setNutriPending(false);
-      if (breakdown) setNutriAward({ xp: breakdown.xpGained, at: new Date().toISOString() });
+      // Sólo si seguimos en la página que se cerró: un `pending=false` o un
+      // award tardíos irían a parar a la página de otro día.
+      if (dateRef.current === date) {
+        setNutriPending(false);
+        if (breakdown) setNutriAward({ xp: breakdown.xpGained, at: new Date().toISOString() });
+      }
       notifyNutritionChanged();
       // Nutrify tiene que pasar a solo lectura sin recargar (NUT-02).
       notifyNutritionDayClosed();
