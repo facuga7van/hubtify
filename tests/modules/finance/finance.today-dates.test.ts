@@ -2,31 +2,21 @@
  * A las 23:30 hora local, `nowIso().slice(0, 10)` (UTC) ya es MAÑANA en
  * cualquier huso al oeste de Greenwich (ART = UTC-3). La fecha de un hecho del
  * usuario (saldar un préstamo, cambiar el monto de un recurrente) es la del
- * reloj de pared, no la del meridiano de Greenwich. En un CI en UTC este test
- * pasa antes y después del fix; en la máquina del usuario (ART) falla antes.
+ * reloj de pared, no la del meridiano de Greenwich.
+ *
+ * El huso se fija con `process.env.TZ` (Node lo honra para `Date` nuevos) ANTES
+ * de construir el instante, así el test discrimina también en un CI en UTC.
+ * Precedente: `tests/shared/local-day-roundtrip.test.ts`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { financeMigrations } from '@modules/finance/finance.schema';
-import { todayDateString } from '../../../shared/date-utils';
-
-type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 const harness = vi.hoisted(() => ({
-  handlers: new Map<string, Handler>(),
   db: null as unknown as Database.Database,
 }));
 
 import { getHandler } from '../../../shared-logic/registry';
-
-vi.mock('electron', () => ({
-  ipcMain: {
-    handle: (channel: string, fn: Handler) => harness.handlers.set(channel, fn),
-  },
-  app: { getPath: () => '.' },
-  dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn() },
-  BrowserWindow: { getFocusedWindow: () => null },
-}));
 
 vi.mock('../../../shared-logic/db', () => ({ getDb: () => harness.db }));
 
@@ -47,8 +37,11 @@ function setupDb(): Database.Database {
   return db;
 }
 
-/** "Hoy" para todo el archivo: 4 de septiembre de 2026, 23:30 hora LOCAL. */
+const originalTz = process.env.TZ;
+
+/** "Hoy" para todo el archivo: 4 de septiembre de 2026, 23:30 en Buenos Aires (02:30 del 5 en UTC). */
 beforeEach(() => {
+  process.env.TZ = 'America/Argentina/Buenos_Aires';
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 8, 4, 23, 30, 0));
   harness.db = setupDb();
@@ -56,6 +49,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  if (originalTz === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTz;
 });
 
 describe('C12 — fechas del día local, no del UTC', () => {
@@ -70,7 +65,6 @@ describe('C12 — fechas del día local, no del UTC', () => {
     const row = harness.db
       .prepare('SELECT settled_date AS d FROM finance_loans WHERE id = ?')
       .get(id) as { d: string };
-    expect(row.d).toBe(todayDateString());
     expect(row.d).toBe('2026-09-04');
   });
 
@@ -80,7 +74,6 @@ describe('C12 — fechas del día local, no del UTC', () => {
     const row = harness.db
       .prepare('SELECT effective_date AS d FROM finance_recurring_amount_history WHERE recurring_id = ?')
       .get(id) as { d: string };
-    expect(row.d).toBe(todayDateString());
     expect(row.d).toBe('2026-09-04');
   });
 });
