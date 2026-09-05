@@ -21,6 +21,7 @@ import {
   type CauldronSessionEndResultEx,
 } from '../types';
 import { cancelAutoStart } from '../api';
+import { emitLapCompleted, emitPomodoroExtended } from '../rpg-events';
 import { formatTime } from '../utils';
 
 export default function CauldronFloatingTimer() {
@@ -104,12 +105,15 @@ export default function CauldronFloatingTimer() {
         }
       }
 
+      // Registro (xp 0) de la vuelta cerrada; mismo punto único que los otros dos.
+      void emitLapCompleted(result);
+
       if (isRealPomodoro) {
         window.api
           .processRpgEvent({
             type: 'POMODORO_COMPLETED',
             moduleId: 'cauldron',
-            payload: { xp: 8, hp: 0 },
+            payload: { xp: 8, hp: 0, taskId: result.taskId ?? null },
             timestamp: Date.now(),
           })
           .then((rpgResult) => {
@@ -259,6 +263,7 @@ export default function CauldronFloatingTimer() {
   const handleExtend = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await window.api.cauldronExtend(extMin);
+    void emitPomodoroExtended(timerState.sessionType, extMin, timerState.taskId);
   };
 
   const handleSkip = async (e: React.MouseEvent) => {

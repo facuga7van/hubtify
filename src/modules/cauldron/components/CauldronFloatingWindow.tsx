@@ -15,6 +15,7 @@ import {
   type CauldronSessionEndResultEx,
 } from '../types';
 import { cancelAutoStart } from '../api';
+import { emitPomodoroExtended } from '../rpg-events';
 import { useTimerPresetName } from '../hooks';
 import { formatTime } from '../utils';
 import '../styles/cauldron-window.css';
@@ -149,6 +150,7 @@ export default function CauldronFloatingWindow() {
 
   const handleExtend = async () => {
     await window.api.cauldronExtend(extMin);
+    void emitPomodoroExtended(timerState.sessionType, extMin, timerState.taskId);
   };
 
   /**

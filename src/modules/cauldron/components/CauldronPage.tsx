@@ -50,8 +50,9 @@ import {
 // Completar la misión desde el caldero DEBE pagar exactamente lo mismo que
 // tildarla en Questify: mismos XP por tier, mismo combo, mismo toast. Por eso se
 // reusan los helpers de quests en vez de reimplementar la tabla acá.
-import { tierXp, bonusMultiplierToTier } from '../../quests/utils';
+import { tierXp, bonusMultiplierToTier, getDueDateStatus } from '../../quests/utils';
 import { questsApi } from '../../quests/api';
+import { emitPomodoroExtended } from '../rpg-events';
 import type {
   CauldronPreset,
   CauldronStats,
@@ -454,7 +455,7 @@ export default function CauldronPage() {
 
     // Se relee la tarea en el momento del click: pudo borrarse o completarse en
     // Questify mientras el pomodoro corría. Vincularse no es adueñarse.
-    const tasks = (await window.api.questsGetTasks()) as Array<{ id: string; status: number; tier: number }>;
+    const tasks = (await window.api.questsGetTasks()) as Array<{ id: string; status: number; tier: number; dueDate?: string | null }>;
     const task = tasks.find((x) => x.id === taskId);
     if (!task || task.status) {
       toast({
@@ -466,6 +467,8 @@ export default function CauldronPage() {
     }
 
     const xp = tierXp(task.tier);
+    // Mismo payload que TaskList: `overdue` se evalúa ANTES de completar.
+    const overdue = !!task.dueDate && getDueDateStatus(task.dueDate) === 'overdue';
     try {
       // Status FIRST, then XP: paid in parallel, a refused status left the XP
       // banked and the mission still open. The status answer also says whether
@@ -477,7 +480,7 @@ export default function CauldronPage() {
       } else {
         const result = await window.api.processRpgEvent({
           type: 'TASK_COMPLETED', moduleId: 'quests',
-          payload: { xp, hp: 0, taskId: task.id, tier: task.tier },
+          payload: { xp, hp: 0, taskId: task.id, tier: task.tier, repeated: !!status?.repeated, overdue },
           timestamp: Date.now(),
         });
         toast({
@@ -533,6 +536,7 @@ export default function CauldronPage() {
   const handleExtend = guarded(async () => {
     const state = await window.api.cauldronExtend(extMin);
     setTimerState(state);
+    void emitPomodoroExtended(state.sessionType, extMin, timerState?.taskId);
   });
 
   const handleStop = async () => {
