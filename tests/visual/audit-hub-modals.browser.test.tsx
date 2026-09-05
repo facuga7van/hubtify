@@ -15,6 +15,8 @@ import {
   overflowingNodes, clippedText, unlabelledButtons, lowContrastText, PARCH_WORST,
 } from './audit-hub-harness';
 
+import type { DaySummary, DaySummaryEvent } from '../../shared/types';
+
 import '../../src/i18n';
 import '../../src/hub/styles/theme.css';
 import '../../src/hub/styles/components.css';
@@ -54,20 +56,27 @@ beforeAll(() => {
 
 const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 
+/** Un hecho del día con la forma exacta que devuelve `rpg:getDaySummary`. */
+const deed = (moduleId: string, eventType: string, xpGained: number, time: string): DaySummaryEvent => ({
+  id: 0, moduleId, eventType, xpGained, hpChange: 0, comboMultiplier: 1, bonusMultiplier: 1,
+  payload: null, createdAt: `${today}T${time}:00.000Z`, time,
+});
+
 /** Cuatro módulos con tres hechos cada uno: la página más ancha que el ledger
-    puede pedir. Mismos nombres de campo que devuelve `rpg:getDaySummary`. */
+    puede pedir. `satisfies` contra el tipo real del handler: el stub no puede
+    inventar campos que el main process no manda. */
 const fourModules = () => ({
   date: today, isToday: true, sealed: false, seal: null,
   canSeal: true, sealBlockedReason: null, byModule: [],
   totalXp: 144, eventsCount: 12, maxCombo: 2,
   modules: ['quests', 'nutrition', 'finance', 'cauldron'], vigor: 84, streak: 9,
   events: [
-    ...['09:12', '11:40', '18:05'].map((time) => ({ moduleId: 'quests', eventType: 'TASK_COMPLETED', xpGained: 15, time })),
-    ...['08:30', '13:40', '21:10'].map((time) => ({ moduleId: 'nutrition', eventType: 'MEAL_LOGGED', xpGained: 5, time })),
-    ...['10:02', '15:30', '19:45'].map((time) => ({ moduleId: 'finance', eventType: 'EXPENSE_LOGGED', xpGained: 3, time })),
-    ...['09:00', '10:00', '16:02'].map((time) => ({ moduleId: 'cauldron', eventType: 'POMODORO_COMPLETED', xpGained: 25, time })),
-  ],
-});
+    ...['09:12', '11:40', '18:05'].map((time) => deed('quests', 'TASK_COMPLETED', 15, time)),
+    ...['08:30', '13:40', '21:10'].map((time) => deed('nutrition', 'MEAL_LOGGED', 5, time)),
+    ...['10:02', '15:30', '19:45'].map((time) => deed('finance', 'EXPENSE_LOGGED', 3, time)),
+    ...['09:00', '10:00', '16:02'].map((time) => deed('cauldron', 'POMODORO_COMPLETED', 25, time)),
+  ].map((e, i) => ({ ...e, id: i + 1 })),
+} satisfies DaySummary);
 
 function mountCodex(onClose: () => void = () => {}) {
   render(
@@ -343,12 +352,14 @@ describe('Cierre del Códice (CodexSealModal)', () => {
     test(`el ledger de cuatro módulos entra a ${width}px (escala ${scale}) y no pasa de ${maxCols} columna(s)`, async () => {
       await page.viewport(width, 720);
       resetCapture();
-      document.documentElement.style.setProperty('--font-scale', scale);
-      installApi({ rpgGetDaySummary: () => Promise.resolve(fourModules()), rpgGetSeals: () => Promise.resolve([]) });
-      mountCodex();
-      await settle(1400);
-
+      // El `try` arranca ANTES de tocar la escala: si el mount falla, el
+      // `finally` la restaura igual y el siguiente test no la hereda.
       try {
+        document.documentElement.style.setProperty('--font-scale', scale);
+        installApi({ rpgGetDaySummary: () => Promise.resolve(fourModules()), rpgGetSeals: () => Promise.resolve([]) });
+        mountCodex();
+        await settle(1400);
+
         const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
         const scroller = dlg.querySelector('.codex-modal__scroll') as HTMLElement;
         const ledger = dlg.querySelector('.codex-marginalia') as HTMLElement;
