@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   // newest first
   {
+    version: '0.9.9',
+    date: '2026-09-04',
+    changes: [
+      {
+        category: 'chore',
+        scope: 'updater',
+        text: {
+          es: 'Hubtify ya no se actualiza sola en Android. El permiso que hacía falta para instalar el APK desde adentro de la app está restringido por Google —es el mismo que usan las apps que instalan otras apps— y nos cerraba la puerta de la Play Store para siempre, así que lo sacamos. Seguís recibiendo el aviso cuando hay versión nueva, pero ahora te lleva a la descarga en vez de instalarla. Si querés que se siga actualizando sola, podés seguirla con Obtainium: está explicado en la página de descarga',
+          en: 'Hubtify no longer updates itself on Android. The permission needed to install the APK from inside the app is restricted by Google — it is the same one used by apps that install other apps — and it was closing the Play Store door for good, so it is gone. You still get the notice when a new version is out, but now it takes you to the download instead of installing it. If you want it to keep updating on its own, you can follow it with Obtainium: it is explained on the download page',
+        },
+      },
+    ],
+  },
+  {
     version: '0.9.8',
     date: '2026-09-04',
     changes: [
