@@ -147,6 +147,15 @@ describe('finance:saveStatementPaper', () => {
     expect(prev.status).toBe('paid');
     expect(prev.paid_amount).toBe(100_000);
     expect(prev.paid_date).toBe('2025-11-27');
+
+    // El «Pago Tarjeta» nace acá, fechado el cierre del papel (invariante 6).
+    // PAPER trae también priorPaymentUsd: 10, así que hay una pata USD aparte;
+    // este assert selecciona la ARS por transaction_id.
+    const pago = harness.db.prepare(`
+      SELECT date, amount, impacts_balance AS impactsBalance FROM finance_transactions
+      WHERE id = (SELECT transaction_id FROM finance_credit_card_statements WHERE period_month = '2025-10')
+    `).get() as { date: string; amount: number; impactsBalance: number };
+    expect(pago).toEqual({ date: '2025-11-27', amount: 100_000, impactsBalance: 1 });
   });
 
   it('NO fabrica el resumen anterior si nunca existió', async () => {

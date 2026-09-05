@@ -155,28 +155,14 @@ export function hasImportBatchSupport(): boolean {
   return bridge('financeGetImportBatches') !== null && bridge('financeUndoImportBatch') !== null;
 }
 
-/**
- * `finance:payStatement` takes an optional third `paidAmountUsd` and a fourth
- * `accountId` (the pocket the payment left, so the chest sees it), but the
- * declaration in `shared/types.ts` still stops at two arguments. Forwarding
- * them here keeps the extra arguments out of the type error while the bridge
- * catches up — `undefined` extras are harmless on the older handler, and
- * until `electron/preload.ts` forwards the fourth argument the account is
- * simply not recorded (same as before).
- */
 export function payStatement(
   id: string,
   paidAmount: number,
   paidAmountUsd?: number,
   accountId?: string | null,
-): Promise<unknown> {
-  const fn = window.api.financePayStatement as unknown as (
-    id: string,
-    paidAmount: number,
-    paidAmountUsd?: number,
-    accountId?: string | null,
-  ) => Promise<unknown>;
-  return fn(id, paidAmount, paidAmountUsd, accountId);
+  paidDate?: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  return window.api.financePayStatement(id, paidAmount, paidAmountUsd, accountId, paidDate);
 }
 
 /**

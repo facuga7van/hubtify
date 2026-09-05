@@ -124,6 +124,85 @@ function resolveAccountId(
   return def ? DEFAULT_CASH_ACCOUNT_ID : null;
 }
 
+/**
+ * Salda un resumen: escribe (o actualiza) su «Pago Tarjeta» por moneda,
+ * fechado el DÍA DEL PAGO, y lo marca `paid`. Un resumen pendiente no tiene
+ * transacción (invariante 6); esta es la única función que la crea, así que
+ * nunca hay dos por moneda. Es síncrona y NO abre transacción: el llamador ya
+ * está adentro de una (`db.transaction`).
+ *
+ * `accountId` cae en la pata cuya moneda coincide con la cuenta (un banco en
+ * pesos no paga la pata en dólares). Una pata en cero no escribe nada; si
+ * existía de un pago anterior, se retira.
+ */
+function settleStatement(
+  db: ReturnType<typeof getDb>,
+  statementId: string,
+  input: { ars: number; usd: number; paidDate: string; accountId: string | null; fxRate: number | null },
+): boolean {
+  const stmt = db.prepare(`
+    SELECT id, period_month AS periodMonth,
+           transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
+    FROM finance_credit_card_statements WHERE id = ?
+  `).get(statementId) as
+    { id: string; periodMonth: string; transactionId: string | null; transactionIdUsd: string | null } | undefined;
+  if (!stmt) return false;
+
+  const now = nowIso();
+  const fxRateSource = input.fxRate === null ? null : fxRateSourceFor(input.paidDate);
+  const account = input.accountId
+    ? db.prepare('SELECT id, currency FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(input.accountId) as
+      { id: string; currency: string } | undefined
+    : undefined;
+  const accountFor = (currency: 'ARS' | 'USD') => (account && account.currency === currency ? account.id : null);
+
+  const insertTx = db.prepare(`
+    INSERT INTO finance_transactions
+      (id, type, amount, currency, category, description, date, payment_method,
+       source, installments, installment_group_id, for_third_party, recurring_id,
+       import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, account_id, created_at, updated_at)
+    VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?, ?)
+  `);
+  const updateTx = db.prepare(`
+    UPDATE finance_transactions
+    SET amount = ?, date = ?, deleted_at = NULL,
+        account_id = CASE WHEN ? THEN ? ELSE account_id END, updated_at = ?
+    WHERE id = ?
+  `);
+  const retireTx = db.prepare(
+    'UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+  );
+
+  const settleLeg = (currentId: string | null, amount: number, currency: 'ARS' | 'USD'): string | null => {
+    if (amount <= 0) {
+      if (currentId) retireTx.run(now, now, currentId);
+      return null;
+    }
+    const acc = accountFor(currency);
+    if (currentId) {
+      const res = updateTx.run(amount, input.paidDate, acc !== null ? 1 : 0, acc, now, currentId);
+      if (res.changes > 0) return currentId;
+    }
+    const id = genId();
+    insertTx.run(
+      id, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${stmt.periodMonth}`, input.paidDate,
+      input.fxRate, fxRateSource, acc, now, now,
+    );
+    return id;
+  };
+
+  const arsTxId = settleLeg(stmt.transactionId, input.ars, 'ARS');
+  const usdTxId = settleLeg(stmt.transactionIdUsd, input.usd, 'USD');
+
+  db.prepare(`
+    UPDATE finance_credit_card_statements
+    SET paid_amount = ?, paid_amount_usd = ?, status = 'paid', paid_date = ?,
+        transaction_id = ?, transaction_id_usd = ?, updated_at = ?
+    WHERE id = ?
+  `).run(input.ars, input.usd, input.paidDate, arsTxId, usdTxId, now, statementId);
+  return true;
+}
+
 const TRANSACTION_COLUMNS = transactionColumns();
 
 export function registerFinanceIpcHandlers(): void {
@@ -763,12 +842,14 @@ export function registerFinanceIpcHandlers(): void {
   /**
    * Creates or REFRESHES the statement for a period.
    *
-   * The dashboard auto-generates statements on mount, typically on the 1st or 2nd
-   * of the month. The old early-return meant every purchase made after that point
-   * mapped to the already-existing statement and was silently dropped forever.
-   * Now only a `paid` statement is frozen; a `pending` one is recalculated.
+   * Only a `paid` statement is frozen; a `pending` one is recalculated on every
+   * call (the dashboard auto-generates on mount). A pending statement carries NO
+   * `Pago Tarjeta` row (invariante 6): the payment is written by
+   * `settleStatement` on the day it is actually paid. A pending statement that
+   * still points at a transaction (synced from a device that never ran v21) is
+   * sanitised here, which also makes the v21 backfill idempotent by construction.
    */
-  ipcHandle('finance:generateStatement', async (_e, creditCardId: string, periodMonth: string) => {
+  ipcHandle('finance:generateStatement', (_e, creditCardId: string, periodMonth: string) => {
     const db = getDb();
     if (!isValidMonthString(periodMonth)) return null;
 
@@ -777,44 +858,13 @@ export function registerFinanceIpcHandlers(): void {
     ).get(creditCardId) as { id: string; closingDay: number } | undefined;
     if (!card) return null;
 
-    // Before the write transaction opens: async work inside db.transaction is not allowed.
-    const fxRate = await captureFxRate(db);
+    // Ya no captura cotización: no escribe ninguna transacción. Síncrono como
+    // el resto de las lecturas/escrituras sin red (los llamadores hacen `await`
+    // sobre el invoke igual, nada cambia para ellos).
     const now = nowIso();
-    const paymentDate = `${periodMonth}-01`;
-
-    // The payment row is written by a process on a date that is rarely the
-    // statement's: its frozen rate is a process rate. account_id stays NULL
-    // until `finance:payStatement` says which pocket paid.
-    const fxRateSource = fxRate === null ? null : fxRateSourceFor(paymentDate);
-    const insertPayment = (txId: string, amount: number, currency: string) => {
-      db.prepare(`
-        INSERT INTO finance_transactions
-          (id, type, amount, currency, category, description, date, payment_method,
-           source, installments, installment_group_id, for_third_party, recurring_id,
-           import_batch_id, credit_card_id, impacts_balance, fx_rate, fx_rate_source, created_at, updated_at)
-        VALUES (?, 'expense', ?, ?, ?, ?, ?, 'debit', 'manual', 1, NULL, 0, NULL, NULL, NULL, 1, ?, ?, ?, ?)
-      `).run(txId, amount, currency, CARD_PAYMENT_CATEGORY, `Pago tarjeta - ${periodMonth}`, paymentDate, fxRate, fxRateSource, now, now);
-    };
-
-    /** Keeps the payment transaction for one currency in sync with the recomputed total. */
-    const syncPayment = (currentId: string | null, amount: number, currency: string): string | null => {
-      if (amount > 0) {
-        if (currentId) {
-          const res = db.prepare(
-            'UPDATE finance_transactions SET amount = ?, currency = ?, deleted_at = NULL, updated_at = ? WHERE id = ?'
-          ).run(amount, currency, now, currentId);
-          if (res.changes > 0) return currentId;
-        }
-        const txId = genId();
-        insertPayment(txId, amount, currency);
-        return txId;
-      }
-      if (currentId) {
-        db.prepare('UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
-          .run(now, now, currentId);
-      }
-      return null;
-    };
+    const retireTx = db.prepare(
+      'UPDATE finance_transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    );
 
     const trx = db.transaction(() => {
       const existing = db.prepare(`
@@ -827,39 +877,39 @@ export function registerFinanceIpcHandlers(): void {
       // A paid statement is history — never rewrite it.
       if (existing && existing.status === 'paid') return existing.id;
 
+      if (existing?.transactionId) retireTx.run(now, now, existing.transactionId);
+      if (existing?.transactionIdUsd) retireTx.run(now, now, existing.transactionIdUsd);
+
       const { ars, usd } = computeStatementTotals(db, creditCardId, card.closingDay, periodMonth);
 
       if (!existing) {
         if (ars === 0 && usd === 0) return null;
         const statementId = genId();
-        const arsTxId = syncPayment(null, ars, 'ARS');
-        const usdTxId = syncPayment(null, usd, 'USD');
         db.prepare(`
           INSERT INTO finance_credit_card_statements
             (id, credit_card_id, period_month, calculated_amount, calculated_amount_usd,
              status, transaction_id, transaction_id_usd, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-        `).run(statementId, creditCardId, periodMonth, ars, usd, arsTxId, usdTxId, now, now);
+          VALUES (?, ?, ?, ?, ?, 'pending', NULL, NULL, ?, ?)
+        `).run(statementId, creditCardId, periodMonth, ars, usd, now, now);
         return statementId;
       }
 
-      // Every purchase that fed this statement is gone — retire it with its payments.
+      // Every purchase that fed this statement is gone — retire it.
       if (ars === 0 && usd === 0) {
-        syncPayment(existing.transactionId, 0, 'ARS');
-        syncPayment(existing.transactionIdUsd, 0, 'USD');
-        db.prepare('UPDATE finance_credit_card_statements SET deleted_at = ?, updated_at = ? WHERE id = ?')
-          .run(now, now, existing.id);
+        db.prepare(`
+          UPDATE finance_credit_card_statements
+          SET transaction_id = NULL, transaction_id_usd = NULL, deleted_at = ?, updated_at = ?
+          WHERE id = ?
+        `).run(now, now, existing.id);
         return null;
       }
 
-      const arsTxId = syncPayment(existing.transactionId, ars, 'ARS');
-      const usdTxId = syncPayment(existing.transactionIdUsd, usd, 'USD');
       db.prepare(`
         UPDATE finance_credit_card_statements
         SET calculated_amount = ?, calculated_amount_usd = ?,
-            transaction_id = ?, transaction_id_usd = ?, updated_at = ?
+            transaction_id = NULL, transaction_id_usd = NULL, updated_at = ?
         WHERE id = ?
-      `).run(ars, usd, arsTxId, usdTxId, now, existing.id);
+      `).run(ars, usd, now, existing.id);
       return existing.id;
     });
 
@@ -885,7 +935,7 @@ export function registerFinanceIpcHandlers(): void {
    * ya está `paid`, no se toca. Un resumen que la app no vio nunca no se puede
    * reconstruir desde una sola cifra sin adivinar qué había adentro.
    */
-  ipcHandle('finance:saveStatementPaper', (_e, creditCardId: string, paper: {
+  ipcHandle('finance:saveStatementPaper', async (_e, creditCardId: string, paper: {
     period?: string;
     closingDate?: string | null;
     dueDate?: string | null;
@@ -933,6 +983,9 @@ export function registerFinanceIpcHandlers(): void {
       ? JSON.stringify(paper.forecast)
       : null;
     const reconciled = paper.reconciled === true ? 1 : paper.reconciled === false ? 0 : null;
+
+    // Before the write transaction opens: async work inside db.transaction is not allowed.
+    const fxRate = await captureFxRate(db);
 
     const trx = db.transaction(() => {
       db.prepare(`
@@ -988,19 +1041,16 @@ export function registerFinanceIpcHandlers(): void {
       // No existe → no se fabrica. Ya pagado → es historia.
       if (!previous || previous.status === 'paid') return { settledPrevious: false };
 
-      db.prepare(`
-        UPDATE finance_credit_card_statements
-        SET paid_amount = ?, paid_amount_usd = ?, status = 'paid', paid_date = ?, updated_at = ?
-        WHERE id = ?
-      `).run(paidArs, paidUsd, typeof paper.closingDate === 'string' ? paper.closingDate : todayDateString(), now, previous.id);
-
-      // El «Pago Tarjeta» del resumen anterior pasa a valer lo que se pagó de
-      // verdad, no lo que la app había calculado.
-      const updateTx = db.prepare('UPDATE finance_transactions SET amount = ?, updated_at = ? WHERE id = ?');
-      if (previous.transactionId && paidArs > 0) updateTx.run(paidArs, now, previous.transactionId);
-      if (previous.transactionIdUsd && paidUsd > 0) updateTx.run(paidUsd, now, previous.transactionIdUsd);
-
-      return { settledPrevious: true };
+      // El «Pago Tarjeta» del resumen anterior nace acá, fechado el día del
+      // cierre del papel (el banco lo recibió antes de cerrar), sin cuenta: el
+      // papel no dice de qué bolsillo salió.
+      const paidDate = typeof paper.closingDate === 'string' && isValidDateString(paper.closingDate)
+        ? paper.closingDate
+        : todayDateString();
+      const settled = settleStatement(db, previous.id, {
+        ars: paidArs, usd: paidUsd, paidDate, accountId: null, fxRate,
+      });
+      return { settledPrevious: settled };
     });
 
     const result = trx();
@@ -1008,66 +1058,44 @@ export function registerFinanceIpcHandlers(): void {
   });
 
   /**
-   * Marks a statement paid and settles its `Pago Tarjeta` row(s).
+   * Marks a statement paid and writes its `Pago Tarjeta` row(s) dated the day
+   * it was paid (`paidDate`, default today). Until then the statement has no
+   * transaction at all, so the balance moves exactly once, on the right month.
    *
    * `accountId` (optional) is the pocket the money left: it lands on the
-   * payment row whose currency matches the account (an ARS bank cannot pay the
-   * USD leg), so the chest finally sees card payments. Omitted or `null` = no
-   * account, exactly as before. A dead/unknown account is refused rather than
-   * silently dropped.
+   * payment row whose currency matches the account. Omitted or `null` = no
+   * account. A dead/unknown account is refused rather than silently dropped.
    */
-  ipcHandle('finance:payStatement', (
+  ipcHandle('finance:payStatement', async (
     _e,
     statementId: string,
     paidAmount: number,
     paidAmountUsd?: number,
     accountId?: string | null,
+    paidDate?: string,
   ) => {
     const ars = Number(paidAmount ?? 0);
     const usd = Number(paidAmountUsd ?? 0);
     if (!Number.isFinite(ars) || !Number.isFinite(usd) || ars < 0 || usd < 0) return fail('invalid_amount');
     if (ars <= 0 && usd <= 0) return fail('invalid_amount');
+    const date = paidDate === undefined || paidDate === null ? todayDateString() : paidDate;
+    if (!isValidDateString(date)) return fail('invalid_date');
 
     const db = getDb();
-    const now = nowIso();
-    const today = todayDateString();
-
-    const stmt = db.prepare(`
-      SELECT transaction_id AS transactionId, transaction_id_usd AS transactionIdUsd
-      FROM finance_credit_card_statements WHERE id = ?
-    `).get(statementId) as { transactionId: string | null; transactionIdUsd: string | null } | undefined;
-
+    const stmt = db.prepare('SELECT id FROM finance_credit_card_statements WHERE id = ?').get(statementId);
     if (!stmt) return fail('not_found');
 
     const wantedAccount = typeof accountId === 'string' && accountId.trim() !== '' ? accountId.trim() : null;
-    const account = wantedAccount
-      ? db.prepare('SELECT id, currency FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(wantedAccount) as
-        { id: string; currency: string } | undefined
-      : undefined;
-    if (wantedAccount && !account) return fail('account_not_found');
+    if (wantedAccount) {
+      const alive = db.prepare('SELECT id FROM finance_accounts WHERE id = ? AND deleted_at IS NULL').get(wantedAccount);
+      if (!alive) return fail('account_not_found');
+    }
 
-    const trx = db.transaction(() => {
-      db.prepare(`
-        UPDATE finance_credit_card_statements
-        SET paid_amount = ?, paid_amount_usd = ?, status = 'paid', paid_date = ?, updated_at = ?
-        WHERE id = ?
-      `).run(round2(ars), round2(usd), today, now, statementId);
-
-      const updateTx = db.prepare(`
-        UPDATE finance_transactions
-        SET amount = ?, account_id = CASE WHEN ? THEN ? ELSE account_id END, updated_at = ?
-        WHERE id = ?
-      `);
-      const accountFor = (currency: 'ARS' | 'USD') => (account && account.currency === currency ? account.id : null);
-      if (stmt.transactionId) {
-        const acc = accountFor('ARS');
-        updateTx.run(round2(ars), acc !== null ? 1 : 0, acc, now, stmt.transactionId);
-      }
-      if (stmt.transactionIdUsd) {
-        const acc = accountFor('USD');
-        updateTx.run(round2(usd), acc !== null ? 1 : 0, acc, now, stmt.transactionIdUsd);
-      }
-    });
+    // Before the write transaction opens: async work inside db.transaction is not allowed.
+    const fxRate = await captureFxRate(db);
+    const trx = db.transaction(() => settleStatement(db, statementId, {
+      ars: round2(ars), usd: round2(usd), paidDate: date, accountId: wantedAccount, fxRate,
+    }));
     trx();
     return { ok: true };
   });

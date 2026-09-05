@@ -121,13 +121,15 @@ describe('finance:importConfirm — statement card assignment', () => {
   it('never counts an imported purchase twice against the balance', async () => {
     await invoke('finance:importConfirm', ROWS, '2026-03', 'resumen.pdf', cardId);
 
-    // Before the statement exists the purchases are off the balance entirely.
+    // Before the statement is PAID the purchases are off the balance entirely —
+    // generating the statement writes no transaction.
+    const statementId = await invoke<string>('finance:generateStatement', cardId, '2026-03');
     expect(computeMonthlyBalance(harness.db, '2026-03').ARS.expenses).toBe(0);
 
-    await invoke('finance:generateStatement', cardId, '2026-03');
+    await invoke('finance:payStatement', statementId, 20000, undefined, undefined, '2026-04-05');
 
     // Afterwards the ONLY impacting expense is the single statement payment —
-    // 20 000 once, not 20 000 as purchases plus 20 000 as the statement.
+    // 20 000 once, on the day it was paid, not as purchases plus statement.
     const impacting = harness.db
       .prepare(
         `SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS total
@@ -137,7 +139,8 @@ describe('finance:importConfirm — statement card assignment', () => {
       .get() as { c: number; total: number };
     expect(impacting.c).toBe(1);
     expect(impacting.total).toBe(20000);
-    expect(computeMonthlyBalance(harness.db, '2026-03').ARS.expenses).toBe(20000);
+    expect(computeMonthlyBalance(harness.db, '2026-03').ARS.expenses).toBe(0);
+    expect(computeMonthlyBalance(harness.db, '2026-04').ARS.expenses).toBe(20000);
   });
 
   it('falls back to cash — not a card-less card purchase — when no card is chosen', async () => {

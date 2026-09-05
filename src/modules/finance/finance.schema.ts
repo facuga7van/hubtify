@@ -634,4 +634,35 @@ export const financeMigrations: Migration[] = [
         AND substr(date, 1, 7) <> statement_period;
     `,
   },
+  {
+    namespace: 'finance',
+    version: 21,
+    up: `
+      -- El «Pago Tarjeta» existe solo cuando el resumen está pagado (invariante 6).
+      -- Un pendiente ya no tiene transacción: las que generó la versión anterior
+      -- se retiran, primero la pata ARS y después la USD. Idempotente por
+      -- construcción (transaction_id IS NOT NULL), y generateStatement sanea
+      -- igual lo que llegue por sync desde un dispositivo sin migrar.
+      UPDATE finance_transactions
+      SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'),
+          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+      WHERE deleted_at IS NULL AND id IN (
+        SELECT transaction_id FROM finance_credit_card_statements
+        WHERE status = 'pending' AND deleted_at IS NULL AND transaction_id IS NOT NULL
+      );
+      UPDATE finance_credit_card_statements
+      SET transaction_id = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+      WHERE status = 'pending' AND deleted_at IS NULL AND transaction_id IS NOT NULL;
+      UPDATE finance_transactions
+      SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'),
+          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+      WHERE deleted_at IS NULL AND id IN (
+        SELECT transaction_id_usd FROM finance_credit_card_statements
+        WHERE status = 'pending' AND deleted_at IS NULL AND transaction_id_usd IS NOT NULL
+      );
+      UPDATE finance_credit_card_statements
+      SET transaction_id_usd = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+      WHERE status = 'pending' AND deleted_at IS NULL AND transaction_id_usd IS NOT NULL;
+    `,
+  },
 ];

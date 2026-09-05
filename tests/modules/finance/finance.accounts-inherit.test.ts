@@ -82,7 +82,7 @@ describe('the chest sees every kind of movement', () => {
       paymentMethod: 'credit_card', creditCardId: cardId,
     });
     const statementId = await invoke<string>('finance:generateStatement', cardId, '2026-08');
-    expect(await invoke('finance:payStatement', statementId, 120000, undefined, bancoId)).toEqual({ ok: true });
+    expect(await invoke('finance:payStatement', statementId, 120000, undefined, bancoId, '2026-08-20')).toEqual({ ok: true });
 
     const overview = computeAccountsOverview(harness.db);
     expect(overview.accounts.find((a) => a.id === bancoId)?.balance).toBe(180000);

@@ -802,7 +802,7 @@ export interface HubtifyApi {
   financeGetCreditCardStatements: (filters?: Record<string, unknown>) => Promise<unknown[]>;
   financeGetStatementDetail: (id: string) => Promise<unknown>;
   financeGenerateStatement: (cardId: string, periodMonth: string) => Promise<string | null>;
-  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number, accountId?: string | null) => Promise<void>;
+  financePayStatement: (id: string, paidAmount: number, paidAmountUsd?: number, accountId?: string | null, paidDate?: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
   financeGetExpenseBreakdown: (month?: string) => Promise<ExpenseBreakdownByCurrency>;
   financeGetExpenseBreakdownForRange: (startMonth: string, endMonth: string) => Promise<ExpenseBreakdownByCurrency | null>;
 

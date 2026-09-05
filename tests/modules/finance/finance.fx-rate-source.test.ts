@@ -206,6 +206,7 @@ describe('writers stamp their provenance', () => {
     const cardId = await invoke<string>('finance:addCreditCard', { name: 'Visa', closingDay: 25 });
     await invoke('finance:addTransaction', { type: 'expense', amount: 5000, date: '2026-01-10', paymentMethod: 'credit_card', creditCardId: cardId });
     const statementId = await invoke<string>('finance:generateStatement', cardId, '2026-01');
+    await invoke('finance:payStatement', statementId, 5000, undefined, undefined, '2026-01-25');
     const payment = db.prepare(
       'SELECT fx_rate_source AS src FROM finance_transactions WHERE id = (SELECT transaction_id FROM finance_credit_card_statements WHERE id = ?)',
     ).get(statementId) as { src: string | null };

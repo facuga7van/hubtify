@@ -179,7 +179,7 @@ describe('finance:importConfirm — statementMonth is the statement period (#2)'
     expect(computeMonthlyBalance(harness.db, '2026-08').ARS.expenses).toBe(0);
 
     const augustId = await invoke<string>('finance:generateStatement', cardId, '2026-08');
-    expect(await invoke('finance:payStatement', augustId, 25000)).toEqual({ ok: true });
+    expect(await invoke('finance:payStatement', augustId, 25000, undefined, undefined, '2026-08-31')).toEqual({ ok: true });
 
     expect(computeMonthlyBalance(harness.db, '2026-08').ARS.expenses).toBe(25000);
     expect(computeMonthlyBalance(harness.db, '2026-05').ARS.expenses).toBe(0);

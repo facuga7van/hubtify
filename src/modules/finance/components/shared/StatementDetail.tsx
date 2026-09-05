@@ -8,6 +8,7 @@ import { CrossMark } from '../../../../shared/components/icons';
 import { formatCurrency } from '../../utils/format';
 import { unwrap, failureMessage, payStatement } from '../../utils/api-ext';
 import { AccountSelect, NO_ACCOUNT, accountIdForSubmit, rememberLastAccountId } from './AccountSelect';
+import { todayDateString } from '../../../../../shared/date-utils';
 
 interface StatementDetailRow {
   id: string;
@@ -86,13 +87,15 @@ export default function StatementDetail({ statement, onClose, onPaid }: Props) {
     if (accountsSupported) rememberLastAccountId(accountValue === '' ? NO_ACCOUNT : accountValue);
     // The handler rejects a zero/negative pair with `{ ok: false, reason }`.
     // The account makes the `Pago Tarjeta` row move a real balance — until now
-    // the chest only ever saw manual entries.
+    // the chest only ever saw manual entries. The `Pago Tarjeta` row is born
+    // here, dated the day it is paid: the modal offers no date, so today.
     const result = await unwrap(
       payStatement(
         statement.id,
         payAmount,
         hasUsd ? payAmountUsd : undefined,
         accountsSupported ? accountIdForSubmit(accountValue) : undefined,
+        todayDateString(),
       ),
     );
     setPaying(false);

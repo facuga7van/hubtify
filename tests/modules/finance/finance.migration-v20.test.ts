@@ -12,6 +12,7 @@ import { financeMigrations } from '@modules/finance/finance.schema';
 import type { Migration } from '../../../shared/types';
 
 const V20 = financeMigrations.find((m) => m.version === 20);
+const V21 = financeMigrations.find((m) => m.version === 21);
 
 function dbUpTo(version: number): Database.Database {
   const db = new Database(':memory:');
@@ -154,6 +155,48 @@ describe('finance v20 — purchase_date y date en el mes del resumen', () => {
     db.exec(V20!.up);
     const before = snapshot(db);
     rerunBackfill(db, V20!);
+    expect(snapshot(db)).toEqual(before);
+  });
+});
+
+describe('finance v21 — un resumen pendiente no tiene Pago Tarjeta', () => {
+  function seed(db: Database.Database) {
+    db.prepare("INSERT INTO finance_credit_cards (id, name, closing_day, created_at, updated_at) VALUES ('card', 'Visa', 25, ?, ?)").run(OLD_STAMP, OLD_STAMP);
+    for (const id of ['tx-pend', 'tx-pend-usd', 'tx-paid']) {
+      db.prepare(`
+        INSERT INTO finance_transactions (id, type, amount, currency, category, description, date, payment_method, source, impacts_balance, created_at, updated_at)
+        VALUES (?, 'expense', 100, 'ARS', 'Pago Tarjeta', '', '2025-11-01', 'debit', 'manual', 1, ?, ?)
+      `).run(id, OLD_STAMP, OLD_STAMP);
+    }
+    db.prepare(`
+      INSERT INTO finance_credit_card_statements (id, credit_card_id, period_month, calculated_amount, status, transaction_id, transaction_id_usd, created_at, updated_at)
+      VALUES ('s-pend', 'card', '2025-11', 100, 'pending', 'tx-pend', 'tx-pend-usd', ?, ?),
+             ('s-paid', 'card', '2025-10', 100, 'paid', 'tx-paid', NULL, ?, ?)
+    `).run(OLD_STAMP, OLD_STAMP, OLD_STAMP, OLD_STAMP);
+  }
+
+  it('existe, después de la v20', () => {
+    expect(V21).toBeDefined();
+    expect(financeMigrations.map((m) => m.version).slice(-2)).toEqual([20, 21]);
+  });
+
+  it('retira las transacciones del pendiente y conserva la del pagado', () => {
+    const db = dbUpTo(20);
+    seed(db);
+    db.exec(V21!.up);
+    expect(readTx(db, 'tx-pend').deletedAt).not.toBeNull();
+    expect(readTx(db, 'tx-pend-usd').deletedAt).not.toBeNull();
+    expect(readTx(db, 'tx-paid').deletedAt).toBeNull();
+    const rows = db.prepare('SELECT id, transaction_id AS t, transaction_id_usd AS u FROM finance_credit_card_statements ORDER BY id').all();
+    expect(rows).toEqual([{ id: 's-paid', t: 'tx-paid', u: null }, { id: 's-pend', t: null, u: null }]);
+  });
+
+  it('también es idempotente', () => {
+    const db = dbUpTo(20);
+    seed(db);
+    db.exec(V21!.up);
+    const before = snapshot(db);
+    rerunBackfill(db, V21!);
     expect(snapshot(db)).toEqual(before);
   });
 });

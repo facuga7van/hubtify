@@ -168,9 +168,11 @@ describe('#14 — round2 where sums are persisted or compared', () => {
       await invoke('finance:addTransaction', { type: 'expense', amount, date: '2026-08-10', paymentMethod: 'credit_card', creditCardId: cardId });
     }
     const statementId = await invoke<string>('finance:generateStatement', cardId, '2026-08');
-    const stmt = db.prepare('SELECT calculated_amount AS c, transaction_id AS txId FROM finance_credit_card_statements WHERE id = ?').get(statementId) as { c: number; txId: string };
+    const stmt = db.prepare('SELECT calculated_amount AS c, transaction_id AS txId FROM finance_credit_card_statements WHERE id = ?').get(statementId) as { c: number; txId: string | null };
     expect(stmt.c).toBe(15016.62);
-    const payment = db.prepare('SELECT amount FROM finance_transactions WHERE id = ?').get(stmt.txId) as { amount: number };
+    expect(stmt.txId).toBeNull();
+    await invoke('finance:payStatement', statementId, stmt.c);
+    const payment = db.prepare('SELECT amount FROM finance_transactions WHERE category = ? AND deleted_at IS NULL').get('Pago Tarjeta') as { amount: number };
     expect(payment.amount).toBe(15016.62);
   });
 
