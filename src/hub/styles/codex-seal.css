@@ -329,114 +329,72 @@
   text-align: center;
 }
 
-.codex-sealed__label {
-  color: var(--ink-faded);
+/* ── el veredicto: UNA línea ─────────────────────────
+   «Sellado · +29 XP · +15 óbolos». Antes eran cuatro cosas apiladas (rótulo
+   con la fecha, +XP a 28 px, «día vivo × vigor N», tres monedas animadas) y
+   competían con el +XP del cartucho de arriba, también a 28 px y también en
+   musgo. El único número héroe de la página es éste. */
+.codex-sealed__line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0 8px;
+  margin: 0;
+  color: var(--ink-soft);
 }
 
-.codex-award {
-  font-family: 'UnifrakturCook', cursive;
+.codex-sealed__xp {
+  font-family: var(--ff-display);
   font-size: var(--fs-hero);
+  line-height: 1;
   color: var(--moss);
-  line-height: 1.1;
-  margin-top: 2px;
 }
 
-.codex-award__breakdown {
-  font-size: var(--fs-label);
+.codex-sealed__dot {
   color: var(--ink-faded);
 }
 
-/* ── óbolos minted by the seal ────────────────────── */
-/* Lives inside [data-seal="result"], so the GSAP ceremony fades the block in;
-   these coins then take one small drop of their own — same quiet register as
-   the wax, never a jackpot. */
-
-.codex-obolos {
-  display: flex;
+.codex-sealed__obolos {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 4px;
 }
 
-.codex-obolos__coins {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 3px;
-  /* contrast-ok: fila de monedas dibujadas (svg), no texto; rige el 3:1 de
-     contenido no textual y da 3.84:1 sobre el pergamino */
-  color: var(--gold-dark);
-}
+/* contrast-ok: moneda dibujada al lado del número, contenido no textual (3:1); 3.84:1 sobre --parch-0 */
+.codex-sealed__obolos svg { color: var(--gold-dark); }
 
-.codex-obolos__coin {
-  display: inline-flex;
-  animation: codex-obolo-drop 0.5s cubic-bezier(0.3, 0.9, 0.4, 1.1) backwards;
-}
-
-.codex-obolos__coin:nth-child(1) { animation-delay: 1.0s; }
-.codex-obolos__coin:nth-child(2) { animation-delay: 1.15s; }
-.codex-obolos__coin:nth-child(3) { animation-delay: 1.3s; }
-
-@keyframes codex-obolo-drop {
-  from { transform: translateY(-14px) rotate(-18deg); opacity: 0; }
-  60%  { opacity: 1; }
-  to   { transform: none; opacity: 1; }
-}
-
-.codex-obolos__text {
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-body);
-  letter-spacing: 0.05em;
-  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .codex-obolos__coin { animation: none; }
-}
-
+/* Los logros: una línea en small caps, sin marco ni fondo. Con borde dorado y
+   fondo parecía un botón, y no lo era. */
 .codex-unlocks {
-  margin-top: 12px;
-  padding: 8px 14px;
-  border: 1px solid var(--gold-dark);
-  border-radius: 4px;
-  background: rgba(196, 168, 78, 0.1);
-  display: inline-block;
-}
-
-.codex-unlocks__title {
-  color: var(--ink-soft);  /* --gold-dark daba 3.84:1 sobre --parch-0 */
-}
-
-.codex-unlocks__list {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-}
-
-.codex-unlocks__item {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
-  font-family: 'IM Fell English SC', serif;
-  font-size: var(--fs-body);
+  align-items: center;
+  gap: 0 6px;
+  margin: 6px 0 0;
   color: var(--ink);
 }
 
-/* contrast-ok: ícono del ítem desbloqueado, no texto; el rótulo lo lleva
-   --ink al lado y el oro queda de ornamento (3.84:1, sobre el 3:1) */
-.codex-unlocks__item svg { color: var(--gold-dark); }
+/* contrast-ok: roseta del logro, ícono y no texto; el título va en --ink al lado (3.84:1 sobre pergamino) */
+.codex-unlocks svg { color: var(--gold-dark); }
 
 /* ── la salida del ritual ─────────────────────────
    Un ritual sin cierre no es un ritual, es un callejón: la ceremonia terminaba
    con el lacre, el XP y los óbolos, y después te dejaba parado ahí con la única
-   salida a 1000 px de scroll. Esta es la salida DONDE ESTÁS. Deliberadamente
-   sin timer: el subtítulo promete «podés irte cuando quieras», y un modal que
-   se cierra solo no cumple esa promesa —decide por vos. */
+   salida a 1000 px de scroll. Esta es la salida escrita de la página, al pie,
+   después de la tira, en los dos estados. Deliberadamente sin timer: el
+   subtítulo promete «podés irte cuando quieras», y un modal que se cierra solo
+   no cumple esa promesa —decide por vos. */
+.codex-sealed__foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
 .codex-sealed__exit {
-  margin-top: 16px;
   padding: 7px 20px;
-  font-family: 'IM Fell English SC', serif;
+  font-family: var(--ff-accent);
   font-size: var(--fs-body);
   letter-spacing: 0.06em;
   color: var(--ink);
@@ -1176,75 +1134,6 @@
 
 [data-shell="mobile"] .dash-brief__seal {
   min-height: var(--touch-min);
-}
-
-/* ══ LA BOLSA ══════════════════════════════════════
-   Los óbolos se ganan acá y hasta ahora se nombraban una sola vez, en el
-   instante en que se acuñaban (base real: 132 ganados, 0 gastados). El saldo
-   vive donde se gana y dice para qué alcanza. */
-.codex-purse {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 8px 12px;
-  border: 1px solid rgba(74, 55, 32, 0.28);
-  background: rgba(245, 231, 192, 0.35);
-}
-
-.codex-purse__coin {
-  display: inline-flex;
-  /* contrast-ok: moneda dibujada al lado del saldo, no texto (3.84:1 > 3:1) */
-  color: var(--gold-dark);
-  flex-shrink: 0;
-}
-
-.codex-purse__balance {
-  font-size: var(--fs-body);
-  color: var(--ink);
-  white-space: nowrap;
-}
-
-.codex-purse__balance .qb-numeral {
-  font-size: var(--fs-sub);
-}
-
-.codex-purse__hint {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
-}
-
-.codex-purse__link {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  padding: 2px 0;
-  font: inherit;
-  font-size: var(--fs-label);
-  color: var(--ink-soft);
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 3px;
-}
-
-.codex-purse__link:hover,
-.codex-purse__link:focus-visible {
-  color: var(--ink);
-}
-
-/* A 390 px la línea entra en tres renglones antes que desbordar. */
-[data-shell="mobile"] .codex-purse__hint {
-  flex-basis: 100%;
-}
-
-[data-shell="mobile"] .codex-purse__link {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
 }
 
 /* ══ LA JORNADA DE COMIDAS, DENTRO DEL MISMO RITUAL ══
