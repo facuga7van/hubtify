@@ -332,6 +332,10 @@
 }
 
 .codex-sealed__text {
+  /* Hijo de un flex column con `align-items: center`: sin ancho propio se
+     encogía a su contenido, y el `width: 100%` del botón de salida era el
+     100 % de una caja encogida. */
+  width: 100%;
   text-align: center;
 }
 
@@ -1127,6 +1131,19 @@
   margin-top: 2px;
   font-size: var(--fs-label);
   color: var(--ink-faded);
+}
+
+/* ── Angosto (≤ 640 px de ventana) ───────────────────
+   El modal es `position: fixed` y mide min(880px, 96vw): a diferencia del
+   shell, acá el ancho de ventana SÍ es el ancho del modal, así que la media
+   query es exacta. Cubre el teléfono (390) y la ventana angosta del arnés
+   (600). Va ANTES del bloque [data-shell="mobile"]: el teléfono sigue
+   ganando donde ya manda (X de 40 px, salida de 44 de alto). */
+@media (max-width: 640px) {
+  .codex-book { padding: 16px; }
+  .codex-marginalia { grid-template-columns: 1fr; }
+  .codex-seal-disc { width: 72px; height: 72px; }
+  .codex-sealed__exit { width: 100%; }
 }
 
 /* ── Mobile (390 px; Fase 3) ────────────────────────

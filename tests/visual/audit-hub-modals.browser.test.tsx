@@ -397,6 +397,43 @@ describe('Cierre del Códice (CodexSealModal)', () => {
       }
     });
   }
+
+  /* Bajo 640 px de ventana el modal se aprieta. Media query de VENTANA a
+     propósito: el modal es fixed y mide min(880px, 96vw), así que acá el
+     viewport SÍ es el ancho del modal (a diferencia del shell, donde la barra
+     lateral se come parte). */
+  test('a 600px la página se aprieta: 16px de margen, sello de 72 y salida a lo ancho', async () => {
+    await page.viewport(600, 720);
+    resetCapture();
+    installApi({
+      rpgGetDaySummary: () => Promise.resolve({ ...fourModules(), sealed: true, canSeal: false, sealBlockedReason: 'already_sealed' }),
+      rpgGetSeals: () => Promise.resolve([{ date: today, sealedAt: new Date().toISOString(), xpAwarded: 20 }]),
+    });
+    mountCodex();
+    await settle(1400);
+
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
+    const book = dlg.querySelector('.codex-book') as HTMLElement;
+    const disc = dlg.querySelector('.codex-seal-disc') as HTMLElement;
+    const exit = dlg.querySelector('.codex-sealed__exit') as HTMLElement;
+    expect(disc).not.toBeNull();
+    expect(exit).not.toBeNull();
+
+    fitCapture();
+    await page.screenshot({ path: `${SCREENS}/audit-hub-codex-03-ledger-600-sellado.png` });
+    resetCapture();
+
+    expect(getComputedStyle(book).paddingLeft).toBe('16px');
+    expect(getComputedStyle(book).paddingTop).toBe('16px');
+    // offsetWidth y no getBoundingClientRect: el sello está rotado -6°.
+    expect(disc.offsetWidth).toBe(72);
+    // La salida ocupa el ancho de la página (clientWidth incluye el padding).
+    const bookInner = book.clientWidth - 32;
+    expect(exit.getBoundingClientRect().width).toBeGreaterThanOrEqual(bookInner - 2);
+    const box = insideViewport(dlg);
+    expect(box.offLeft).toBeLessThanOrEqual(1);
+    expect(box.offRight).toBeLessThanOrEqual(1);
+  });
 });
 
 describe('Avisos de actualización', () => {
