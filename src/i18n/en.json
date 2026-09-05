@@ -957,6 +957,7 @@
   "events": {
     "ACHIEVEMENT_UNLOCKED": "Achievement unlocked",
     "BUDGET_MONTH_MET": "Month closed within budget",
+    "CAULDRON_LAP_COMPLETED": "Cauldron lap",
     "DAY_REOPENED": "Day reopened",
     "DAY_SEALED": "Day sealed",
     "DAY_SUMMARY": "Daily summary",
@@ -972,6 +973,7 @@
     "MOVEMENT_DELETED": "Movement deleted",
     "POMODORO_ABANDONED": "Cauldron abandoned",
     "POMODORO_COMPLETED": "Pomodoro completed",
+    "POMODORO_EXTENDED": "Brew extended",
     "RECURRING_UPDATED": "Recurring expense updated",
     "STATEMENT_IMPORTED": "Statement imported",
     "SUBTASK_COMPLETED": "Step completed",
@@ -1772,54 +1774,234 @@
     "achUnavailable": "Achievements are not available in this version yet.",
     "achUnlockedOn": "Earned",
     "achievements": {
+      "a_hundred_lines": {
+        "desc": "The statement you imported had exactly one hundred lines. Not ninety-nine, not a hundred and one.",
+        "title": "Going Postal"
+      },
+      "a_single_coin": {
+        "desc": "You logged a movement of exactly one unit. Someone, on some road, owes a song to that.",
+        "title": "Toss a Coin to Your Witcher"
+      },
+      "a_single_line": {
+        "desc": "One deed all day, and you sealed it anyway. Whole sessions go into buying rope, and those get written down too.",
+        "title": "Buying Rope"
+      },
+      "always_the_same_trick": {
+        "desc": "Ten deeds in a day, all of the same kind. You started with a thousand ways to play this and ended up with one. Like everybody else.",
+        "title": "Stealth Archer"
+      },
+      "anvil_and_edge": {
+        "desc": "Five brews and five quests on the same day. First you forge, then you wield.",
+        "title": "The Skyforge"
+      },
+      "archive_caught_up": {
+        "desc": "Three overdue scrolls in one sitting. Even the one who collects all the knowledge in the world waits in line.",
+        "title": "The Librarian"
+      },
+      "ashless_flame": {
+        "desc": "A long day sealed with your Vigor whole. Not one ember short.",
+        "title": "Ember"
+      },
       "awakening": {
         "desc": "Your character has a name. That is where the adventure starts.",
         "title": "The Awakening"
       },
+      "back_through_the_forge": {
+        "desc": "A week away and the first thing you touched was the fire. You knew where the door was.",
+        "title": "Firelink Shrine"
+      },
       "backfilledToast": "{{n}} achievements recognised from your history",
+      "bag_of_tricks": {
+        "desc": "Five hundred obols spent on things of your own. The bag is for using, not for looking at.",
+        "title": "Bag of Tricks"
+      },
+      "beacons_i": {
+        "desc": "Seven different days with the cauldron burning. One fire calls the next.",
+        "title": "Bonfire Lit I"
+      },
+      "beacons_ii": {
+        "desc": "Thirty different days. The chain of fires already crosses the realm.",
+        "title": "Bonfire Lit II"
+      },
+      "beacons_iii": {
+        "desc": "A hundred different days with the fire lit. Gondor called and someone answered a hundred times.",
+        "title": "Bonfire Lit III"
+      },
+      "bestiary_i": {
+        "desc": "Eight categories with real movements. You cannot fight what has no name.",
+        "title": "Witcher's Apprentice"
+      },
+      "bestiary_ii": {
+        "desc": "Fourteen categories with real movements. The bestiary no longer fits in a saddlebag.",
+        "title": "Monster Manual"
+      },
+      "bestiary_iii": {
+        "desc": "Twenty-two categories. Everything is named. Nothing anonymous is left.",
+        "title": "The Bestiary of Kaer Morhen"
+      },
+      "blood_moon": {
+        "desc": "Full moon, nearly midnight, and you writing things down. In certain kingdoms, this is the hour when everything you thought finished comes back.",
+        "title": "Blood Moon"
+      },
+      "bound_volume": {
+        "desc": "A hundred days sealed. What began as loose leaves is a book now.",
+        "title": "The Elder Scrolls"
+      },
+      "broken_flask": {
+        "desc": "A cut-short focus left its mark on the shelf. What breaks is kept too.",
+        "title": "The Horn of Boromir"
+      },
+      "buzzer_pardon": {
+        "desc": "You saved the streak with less than an hour before the day closed. There was no audience. There was a witness.",
+        "title": "Death Saving Throw"
+      },
+      "capicua": {
+        "desc": "The amount reads the same forwards and backwards. You did not look for it. That is why it counts.",
+        "title": "The Dice of Novigrad"
+      },
       "cauldron_master": {
         "desc": "One hundred pomodoros finished without letting the fire go out.",
         "title": "Cauldron Master"
       },
+      "centenary_vow": {
+        "desc": "A hundred-day streak. Someone has to keep the fire burning.",
+        "title": "Link the Fire"
+      },
       "chronicler_i": {
-        "desc": "One hundred deeds written into your chronicle.",
+        "desc": "Two hundred deeds written into your chronicle.",
         "title": "Chronicler I"
       },
       "chronicler_ii": {
-        "desc": "Five hundred deeds written into the chronicle.",
+        "desc": "Seven hundred and fifty deeds written into the chronicle.",
         "title": "Chronicler II"
       },
       "chronicler_iii": {
         "desc": "Two thousand deeds. The chronicle has weight now.",
         "title": "Chronicler III"
       },
+      "cleared_board": {
+        "desc": "Five quests closed today and none left open. The hall fell silent.",
+        "title": "Cleared"
+      },
+      "coin_from_overseas": {
+        "desc": "You logged a movement in a foreign currency.",
+        "title": "Temerian Orens"
+      },
+      "cold_hearth": {
+        "desc": "A month and a half without lighting the fire. You came back, blew once and it caught. Good cauldrons do not take offence.",
+        "title": "Winterfell"
+      },
+      "cold_trail": {
+        "desc": "You checked a habit for a day already gone. The trail was still warm.",
+        "title": "Witcher Senses"
+      },
       "combo_master": {
         "desc": "You hit the top multiplier (x2) in a single day.",
         "title": "Combo Master"
       },
+      "contract_collected": {
+        "desc": "You closed an account with the multiplier at its peak. Payment comes at the end of the job.",
+        "title": "The Novigrad Notice Board"
+      },
+      "critical_hit": {
+        "desc": "A single deed paid a hundred and fifty experience. The dice applauded.",
+        "title": "Natural Twenty"
+      },
+      "dawn_ride": {
+        "desc": "Five quests closed before nine in the morning.",
+        "title": "At Dawn, Look to the East"
+      },
+      "dawn_to_dusk": {
+        "desc": "You opened the day before seven and closed it after ten at night.",
+        "title": "The Road Goes Ever On"
+      },
       "day_off": {
         "desc": "You skipped a habit on purpose. Resting is a decision too.",
         "title": "Day Off"
+      },
+      "day_that_isnt": {
+        "desc": "You logged a deed on the twenty-ninth of February. That day the calendar lies and everything that happened, happened all at once. Come back in four years.",
+        "title": "Dragon Break"
       },
       "debt_free": {
         "desc": "You closed your first loan in Coinify.",
         "title": "Debt Settled"
       },
       "deep_work": {
-        "desc": "Four pomodoros in one day.",
+        "desc": "Six pomodoros in one day.",
         "title": "Deep Work"
       },
       "deserved_rest": {
         "desc": "You played from the Inn. The streak waited for you anyway.",
         "title": "Well-Earned Rest"
       },
+      "dice_did_notice": {
+        "desc": "You rolled a x3 on a Tuesday the 13th. Someone lied about bad luck, or you drew the only honest die in the bag.",
+        "title": "Tuesday the Thirteenth"
+      },
+      "door_never_opened": {
+        "desc": "Five hundred deeds in the chronicle and you opened this module for the first time today. It was unlocked the whole time.",
+        "title": "What Can Change the Nature of a Man?"
+      },
+      "dragonborn": {
+        "desc": "Level fifty. You no longer level up: you legend up.",
+        "title": "Dragonborn"
+      },
+      "drawn_ward": {
+        "desc": "Three limits set and one month kept inside all of them. The shield is drawn before the fight.",
+        "title": "The Quen Sign"
+      },
       "early_bird": {
         "desc": "A deed logged before 06:00.",
         "title": "Early Bird"
       },
+      "eleventy_one": {
+        "desc": "The eleventh of the eleventh, at eleven. The calendar and the clock agreed exactly once, and it was with you.",
+        "title": "Bilbo's Birthday"
+      },
+      "embers": {
+        "desc": "You sealed a day with five brews already on the shelf. The fire is banked when the work is done.",
+        "title": "The Hearth at Bag End"
+      },
+      "endless_stair_i": {
+        "desc": "Ten steps ticked inside your quests on the same day.",
+        "title": "The Endless Stair I"
+      },
+      "endless_stair_ii": {
+        "desc": "Twenty steps in one day. It keeps climbing.",
+        "title": "The Endless Stair II"
+      },
+      "endless_stair_iii": {
+        "desc": "Thirty-five steps in one day. At the very top there is a door.",
+        "title": "The Endless Stair III"
+      },
+      "enemies_nearby": {
+        "desc": "You lit the cauldron from the Inn. You were going to rest. The usual message showed up anyway.",
+        "title": "You Cannot Wait While Enemies Are Nearby"
+      },
       "epic_quest": {
-        "desc": "Ten quests completed in a single day.",
+        "desc": "Twelve quests completed in a single day.",
         "title": "Epic Journey"
+      },
+      "fellowship": {
+        "desc": "All four modules know your handwriting. It did not have to be the same day.",
+        "title": "The Fellowship of the Ring"
+      },
+      "ferrymans_coin": {
+        "desc": "You spent your first obols on something of your own. A full flask heals nobody.",
+        "title": "Estus Flask"
+      },
+      "fighters_guild_i": {
+        "desc": "Eight quests closed on the same day.",
+        "title": "Adventurers' Guild I"
+      },
+      "fighters_guild_ii": {
+        "desc": "Fifteen quests in one day. The board was empty and it was still early.",
+        "title": "Adventurers' Guild II"
+      },
+      "fighters_guild_iii": {
+        "desc": "Twenty-five quests in a single day. Someone is going to ask how.",
+        "title": "Adventurers' Guild III"
       },
       "first_brew": {
         "desc": "You finished your first pomodoro.",
@@ -1849,9 +2031,29 @@
         "desc": "Every hero starts somewhere. You already did.",
         "title": "First Step"
       },
+      "full_circle": {
+        "desc": "A full lap of the cauldron, long break included.",
+        "title": "There and Back Again"
+      },
+      "full_word": {
+        "desc": "An epic quest, the multiplier at its peak and a x3, all on the same roll. All three factors maxed at once. It does not happen often.",
+        "title": "FUS RO DAH"
+      },
+      "gate_guard": {
+        "desc": "A thirty-day streak once. Thirty days of silence after. Every gate guard used to be an adventurer — the difference is that you came back.",
+        "title": "An Arrow in the Knee"
+      },
       "golden_day": {
-        "desc": "Two hundred XP in a single day.",
+        "desc": "Three hundred and fifty XP in a single day.",
         "title": "Golden Day"
+      },
+      "great_undertaking": {
+        "desc": "Five epic quests closed. None of the five was easy.",
+        "title": "One Does Not Simply Walk into Mordor"
+      },
+      "heavy_tome": {
+        "desc": "A statement with a hundred and twenty lines or more. One of those months.",
+        "title": "The Book of Mazarbul"
       },
       "hero_return": {
         "desc": "You came back after two weeks. The tavern kept your seat.",
@@ -1859,17 +2061,157 @@
       },
       "hiddenDesc": "A secret you have not uncovered yet.",
       "hiddenTitle": "???",
+      "hole_in_the_sheet": {
+        "desc": "You reopened the day twice in the same day. That part of the sheet has no paper left from all the erasing.",
+        "title": "The Hole in the Sheet"
+      },
+      "honest_scales": {
+        "desc": "You weighed yourself and wrote it down. The number does not matter: looking it in the eye does.",
+        "title": "The Needle of the Scales"
+      },
+      "horn_of_valhalla": {
+        "desc": "Two thousand five hundred obols out of the purse. Legendary items are meant to be touched.",
+        "title": "Horn of Valhalla"
+      },
+      "hour_of_the_wolf": {
+        "desc": "An expense logged at four in the morning. Not even the ledger asks at that hour.",
+        "title": "The Hour of the Wolf"
+      },
+      "hundred_days_gone": {
+        "desc": "You logged a movement exactly a hundred days after the last one. You kept the books up to date too, once. The ledger asked nothing.",
+        "title": "The Iron Bank"
+      },
+      "in_its_own_hour": {
+        "desc": "You closed three overdue quests. None of them was late: they arrived precisely when they meant to.",
+        "title": "A Wizard Is Never Late"
+      },
+      "iron_bank_i": {
+        "desc": "Three different months archiving statements. In Braavos the books are kept up to date.",
+        "title": "Scribe of Braavos"
+      },
+      "iron_bank_ii": {
+        "desc": "Twelve different months. A whole year of papers archived.",
+        "title": "Accountant of the Iron Bank"
+      },
+      "iron_bank_iii": {
+        "desc": "Thirty different months archiving statements. Nobody keeps the books like Braavos. Now nobody keeps them like you either.",
+        "title": "The Iron Bank Will Have Its Due"
+      },
+      "isengard_i": {
+        "desc": "Six brews on the fire in one day.",
+        "title": "The Forges of Isengard I"
+      },
+      "isengard_ii": {
+        "desc": "Nine brews in one day. The fire did not go out even to eat.",
+        "title": "The Forges of Isengard II"
+      },
+      "isengard_iii": {
+        "desc": "Thirteen brews in a single day. Five hours and twenty minutes on the clock, nothing deducted.",
+        "title": "The Forges of Isengard III"
+      },
+      "just_in_case": {
+        "desc": "Five hundred obols and not one spent. You are saving them for the big fight. Nobody ever reached the end of the game with the elixirs used.",
+        "title": "The Megalixirs"
+      },
+      "knee_healed": {
+        "desc": "A rite you had left behind over a month ago got checked again. You used to do this every day. Then what happens, happened. Nobody asked.",
+        "title": "I Used to Be an Adventurer Like You"
+      },
+      "knight_errant": {
+        "desc": "Level twenty. The title is no longer a courtesy.",
+        "title": "Knight Errant"
+      },
+      "labelled_potion": {
+        "desc": "Five brews finished with the quest written on the flask.",
+        "title": "Swallow"
+      },
+      "lannister_i": {
+        "desc": "Three loans settled, none of them overnight. The line is said as a threat, but it is a promise.",
+        "title": "A Lannister Always Pays His Debts"
+      },
+      "lannister_ii": {
+        "desc": "Ten loans settled. The mountain of gold was not a tale.",
+        "title": "The Gold of Casterly Rock"
+      },
+      "lannister_iii": {
+        "desc": "Twenty-five loans settled. By now you no longer need to say it.",
+        "title": "Hear Me Roar"
+      },
+      "last_ember": {
+        "desc": "You logged a deed with your Vigor almost out. Hard days get written down too.",
+        "title": "Last Ember"
+      },
+      "last_two_hours": {
+        "desc": "Less than two hours left in the year and there you were, crossing things off. There was time until tomorrow. You did not use it.",
+        "title": "Last Roll of the Session"
+      },
       "late_memory": {
         "desc": "You sealed yesterday. It is never too late to close the book.",
         "title": "Late Memory"
+      },
+      "lead_into_gold": {
+        "desc": "An expense and an income for the same amount on the same day. They promised gold and delivered green smoke.",
+        "title": "Wildfire"
       },
       "ledger_closed": {
         "desc": "You closed a whole month inside your budget.",
         "title": "Ledger Closed"
       },
+      "library_unending": {
+        "desc": "Fifty-two scrolls. A whole year of weeks closed, and the shelf has a gravity of its own now.",
+        "title": "The Library Without End"
+      },
+      "like_nothing_happened": {
+        "desc": "Two weeks without showing up and you came back with two hundred XP in a day. Nobody is going to ask. You clearly rehearsed the entrance.",
+        "title": "Nine Pages of Backstory"
+      },
+      "loaded_dice": {
+        "desc": "Five x3 rolls in one day. Nobody is accusing you of anything. Nobody is going to borrow your dice either.",
+        "title": "Loaded Dice"
+      },
+      "long_expected": {
+        "desc": "Exactly one year ago you logged your first deed. In the books this is celebrated with fireworks and a speech nobody quite finishes listening to.",
+        "title": "A Long-Expected Party"
+      },
+      "long_night": {
+        "desc": "Five deeds and the sun is not up yet.",
+        "title": "The Long Night"
+      },
+      "long_rest": {
+        "desc": "Three days at the Inn and the app kept waiting for you.",
+        "title": "Meditation"
+      },
+      "long_table": {
+        "desc": "All four sittings of the table, logged on the same day. The page was left without a single gap.",
+        "title": "The Mead Hall"
+      },
+      "lord_of_cinder": {
+        "desc": "A year without breaking the streak. The fire does not keep itself: you kept it.",
+        "title": "Lord of Cinder"
+      },
       "lucky_strike": {
-        "desc": "You rolled a x3 bonus. Two percent odds.",
+        "desc": "You rolled the highest die on the table. It does not happen often, but it is no miracle either.",
         "title": "Lucky Strike"
+      },
+      "marginalia": {
+        "desc": "You jotted down a quest on the fly, without opening the board. The great books start freehand.",
+        "title": "The Red Book"
+      },
+      "master_of_coin": {
+        "desc": "All four trades done twice each: logging, settling, closing the month and archiving.",
+        "title": "Master of Coin"
+      },
+      "medallion_night": {
+        "desc": "Three medallions in one day. The shelf made a noise.",
+        "title": "The Shelf of Apocrypha"
+      },
+      "midnight_oil": {
+        "desc": "Four brews on the fire past ten at night.",
+        "title": "The Fires of Orodruin"
+      },
+      "million_to_one": {
+        "desc": "The highest die on the highest combo. The improbable got tired of waiting.",
+        "title": "Nine Times Out of Ten"
       },
       "monthly_vow": {
         "desc": "A thirty-day streak.",
@@ -1879,37 +2221,153 @@
         "desc": "A deed logged after 23:00.",
         "title": "Night Owl"
       },
+      "night_watch": {
+        "desc": "A pomodoro between two and five in the morning. Nobody asked for the watch, but someone stands it.",
+        "title": "The Night's Watch"
+      },
+      "nine_divines_i": {
+        "desc": "Nine different rites checked at some point. Each with its own shrine.",
+        "title": "The Nine Divines I"
+      },
+      "nine_divines_ii": {
+        "desc": "Five rites with fifteen checks each. Visiting the shrine once is not enough.",
+        "title": "The Nine Divines II"
+      },
+      "nine_divines_iii": {
+        "desc": "Ten rites with thirty checks each. The whole pilgrimage, twice.",
+        "title": "The Nine Divines III"
+      },
+      "no_haste": {
+        "desc": "Two months without showing up. Those who live a thousand years do not hurry either, and nobody says a word to them.",
+        "title": "The Entmoot"
+      },
+      "no_name_on_the_door": {
+        "desc": "Level ten and your character is still called whatever it came with. By now it is not an oversight: it is a style.",
+        "title": "The Nameless One"
+      },
+      "oghma_infinium": {
+        "desc": "Three hundred and sixty-five days sealed. A tome you never finish reading.",
+        "title": "Oghma Infinium"
+      },
+      "omens_and_portents": {
+        "desc": "A movement logged on a Friday the thirteenth. Nothing happened. It got written down anyway.",
+        "title": "Friday the Thirteenth"
+      },
+      "one_more_log": {
+        "desc": "You asked for extra time instead of cutting it short. The fire holds if you feed it.",
+        "title": "Piece of Heart"
+      },
+      "overflowing_page": {
+        "desc": "Twenty deeds in a single day. They did not fit on the page.",
+        "title": "Overflowing Page"
+      },
+      "palindrome_day": {
+        "desc": "The date reads the same forwards and backwards. The next one is years away. You were there.",
+        "title": "Palindrome Day"
+      },
+      "path_i": {
+        "desc": "Six different months with movements logged. The road is made by walking, and written down by walking.",
+        "title": "The Path"
+      },
+      "path_ii": {
+        "desc": "Eighteen different months. You have come home more than once by now.",
+        "title": "Tarnished"
+      },
+      "path_iii": {
+        "desc": "Thirty-six different months with movements logged. Three years on the Path. There is no shortcut, and that is the point.",
+        "title": "The White Wolf"
+      },
+      "perfect_boil": {
+        "desc": "A brew with the multiplier at its peak and the roll to match. The exact mix.",
+        "title": "Alchemy 100"
+      },
       "perfect_day": {
         "desc": "All four modules active on the same day.",
         "title": "Perfect Day"
       },
+      "perfect_figure": {
+        "desc": "Four digits, all the same. They charge fortunes for numbers like that and never get them.",
+        "title": "The Alchemists' Guild"
+      },
       "polymath": {
-        "desc": "Five different kinds of deed in one day.",
+        "desc": "Seven different kinds of deed in one day.",
         "title": "Polymath"
       },
       "radiant_seal": {
         "desc": "You sealed a day with your Vigor almost untouched.",
         "title": "Radiant Seal"
       },
+      "raised_shield": {
+        "desc": "A shield kept your rite standing on the day you missed.",
+        "title": "Hylian Shield"
+      },
+      "rewritten": {
+        "desc": "You reopened a quest you had already closed. Not even what is written is final.",
+        "title": "Elder Scroll"
+      },
       "ritualist": {
         "desc": "Five different habits checked over time.",
         "title": "Ritualist"
+      },
+      "saving_throw": {
+        "desc": "The pardon came with thirty days on the line. It saved them all.",
+        "title": "Saving Throw"
       },
       "scribe_of_accounts": {
         "desc": "You imported your first bank statement.",
         "title": "Scribe of Accounts"
       },
+      "scroll_keeper": {
+        "desc": "Twelve scrolls sealed. The archive no longer fits on one shelf.",
+        "title": "The Scribe of Apocrypha"
+      },
+      "seal_of_four_hands": {
+        "desc": "Three sealed days where all four trades left a mark. Grace is marked where you sit down.",
+        "title": "Site of Grace"
+      },
       "sealed_week": {
         "desc": "Seven days closed in the Codex.",
         "title": "Sealed Week"
+      },
+      "sealed_with_gold": {
+        "desc": "Ten Codex days sealed with the accounts inside.",
+        "title": "Minutes of the Small Council"
+      },
+      "seat_kept": {
+        "desc": "Almost a year of silence. The fire was still lit and your stool was still free. As if you had stepped out for a smoke.",
+        "title": "The Prancing Pony"
+      },
+      "second_breakfast": {
+        "desc": "Two meals logged before eleven. Someone here understands mid-mornings.",
+        "title": "What About Second Breakfast?"
       },
       "second_chance": {
         "desc": "You reopened a day in Nutrify. Closing is never final.",
         "title": "Second Chance"
       },
+      "session_notes": {
+        "desc": "Four in the morning, sealing yesterday. The game master also writes the recap once everyone is asleep.",
+        "title": "The Game Master's Recap"
+      },
+      "seven_nights_written": {
+        "desc": "A week with all seven days closed. Not one night left blank.",
+        "title": "Campaign Journal"
+      },
+      "shall_we_rest": {
+        "desc": "You went to the Inn before chaining four days. Every party has one who suggests camping, and the party always agrees.",
+        "title": "Shall We Rest?"
+      },
+      "solvent_crown": {
+        "desc": "You settled a debt the same day a month closed within budget. Whole kingdoms sank for failing to do both at once.",
+        "title": "The Solvent Crown"
+      },
       "squire": {
         "desc": "You reached level 5.",
         "title": "Squire"
+      },
+      "statement_settled": {
+        "desc": "Six card statements paid. The books came out even six times.",
+        "title": "The Accounts of Erebor"
       },
       "steadfast": {
         "desc": "A seven-day streak.",
@@ -1919,23 +2377,135 @@
         "desc": "Thirty days closed in the Codex.",
         "title": "Steady Hand"
       },
+      "still_standing": {
+        "desc": "The first of January, before sunrise, and you logged something. Nobody asks whether you slept.",
+        "title": "Hogfather"
+      },
+      "sun_to_sun": {
+        "desc": "One brew in daylight and another with night overhead, the same day.",
+        "title": "From Magnus to Masser"
+      },
       "sunday_guardian": {
         "desc": "Five deeds on a Sunday. Resting is optional.",
         "title": "Sunday Guardian"
+      },
+      "suns_edge": {
+        "desc": "A deed logged on a solstice. The sun keeps its own tally too.",
+        "title": "Sun's Height"
       },
       "table_guardian": {
         "desc": "Seven days closed in Nutrify.",
         "title": "Guardian of the Table"
       },
+      "takes_no_notes": {
+        "desc": "Five hundred deeds in the chronicle and three seals. You play like someone who remembers everything. If only.",
+        "title": "No Character Sheet"
+      },
+      "the_answer": {
+        "desc": "Exactly forty-two days of silence. Do not ask what the question was.",
+        "title": "Forty-Two"
+      },
+      "the_blessed_penny": {
+        "desc": "The die rolled a x3 on a movement under ten. Two percent, spent on pocket change.",
+        "title": "Bard's Luck"
+      },
+      "the_company": {
+        "desc": "Five quests, five steps and five rites on the same day. Three roads, a single march.",
+        "title": "The Company"
+      },
+      "the_date_in_the_sum": {
+        "desc": "The amount came out identical to the day and month you logged it. Ravens carry messages nobody sent, too.",
+        "title": "A Raven from Westeros"
+      },
+      "the_feast": {
+        "desc": "You logged a feast. At the long table nobody keeps count.",
+        "title": "Heroes' Feast"
+      },
+      "the_ledgers_name_day": {
+        "desc": "You logged a movement on the same day and month as the very first one, a year or more later. The ledger has birthdays and never mentions them.",
+        "title": "Name Day"
+      },
+      "the_mirror": {
+        "desc": "Two different movements, the exact same amount, the same day. Two faces, the same face.",
+        "title": "The Hall of Faces"
+      },
+      "the_number": {
+        "desc": "The day passed through six hundred and sixty-six experience. Nobody was looking for it and there it is. Do not say it out loud.",
+        "title": "The Number of the Beast"
+      },
+      "the_pact_kept": {
+        "desc": "You closed a day inside the goal you chose yourself. The pact was with you.",
+        "title": "The Warlock's Pact"
+      },
       "the_pardon": {
         "desc": "A missed day did not cost you the streak.",
         "title": "The Pardon"
+      },
+      "the_same_bell": {
+        "desc": "You came back on the same weekday you left. The calendar never got up from its chair.",
+        "title": "The Clocks of Ankh-Morpork"
+      },
+      "the_thousandth": {
+        "desc": "The thousandth deed of your chronicle rolled the two-percent die. Not the nine hundred and ninety-ninth. The thousandth.",
+        "title": "Frame Perfect"
       },
       "three_epics": {
         "desc": "Three x3 rolls in one day. The dice love you.",
         "title": "Three Epics"
       },
-      "unlockedToast": "Achievement unlocked: {{title}}"
+      "three_keys": {
+        "desc": "The day closed, the week sealed and the codex signed, all on the same night. Someone here enjoys tidying up.",
+        "title": "The Three Spiritual Stones"
+      },
+      "three_sevens": {
+        "desc": "The month, the day and the hour all came out the same. It happens twelve hours a year, and you happened to be up for one of them.",
+        "title": "The Three Days"
+      },
+      "tome_of_clear_thought": {
+        "desc": "A hundred and eighty days closed. The books that change someone are read slowly.",
+        "title": "Tome of Clear Thought"
+      },
+      "turning_wheel": {
+        "desc": "Ten turns of a quest that comes back on its own. The tale does not end: it repeats.",
+        "title": "The Wheel of Time"
+      },
+      "twelve_moons": {
+        "desc": "You logged a plan of eighteen instalments or more. In Westeros time is counted in moons too, and eighteen is a lot.",
+        "title": "Eighteen Moons"
+      },
+      "unlockedToast": "Achievement unlocked: {{title}}",
+      "unlucky_thirteen": {
+        "desc": "You closed something on a Tuesday the 13th. The dice never noticed.",
+        "title": "Neither Marry nor Set Sail"
+      },
+      "well_rested": {
+        "desc": "You came back from the Inn and the first day back paid off.",
+        "title": "Well Rested"
+      },
+      "winter_i": {
+        "desc": "Three months closed within budget. Winter does not frighten those who stored grain.",
+        "title": "Winter Is Coming"
+      },
+      "winter_ii": {
+        "desc": "Six months closed within budget. The longer the summer, the longer what follows: that is why you store.",
+        "title": "The Long Summer"
+      },
+      "winter_iii": {
+        "desc": "Ten months closed within budget. Let it come.",
+        "title": "Winter Came"
+      },
+      "witching_hour": {
+        "desc": "The two-percent die, at three in the morning. At that hour the dice answer to nobody.",
+        "title": "The Witching Hour"
+      },
+      "working_holiday": {
+        "desc": "All four trades on the same day. Technically you were resting at the Inn. Technically.",
+        "title": "Long Rest"
+      },
+      "yesterdays_pantry": {
+        "desc": "You repeated all of yesterday. They are the same every day and nobody ever died of it.",
+        "title": "Trail Rations"
+      }
     },
     "bestShort": "best",
     "bestStreak": "Best streak",

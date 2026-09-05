@@ -957,6 +957,7 @@
   "events": {
     "ACHIEVEMENT_UNLOCKED": "Logro desbloqueado",
     "BUDGET_MONTH_MET": "Mes cerrado dentro del presupuesto",
+    "CAULDRON_LAP_COMPLETED": "Vuelta del caldero",
     "DAY_REOPENED": "Jornada reabierta",
     "DAY_SEALED": "Día sellado",
     "DAY_SUMMARY": "Resumen del día",
@@ -972,6 +973,7 @@
     "MOVEMENT_DELETED": "Movimiento borrado",
     "POMODORO_ABANDONED": "Caldero abandonado",
     "POMODORO_COMPLETED": "Pomodoro completado",
+    "POMODORO_EXTENDED": "Poción prolongada",
     "RECURRING_UPDATED": "Gasto recurrente actualizado",
     "STATEMENT_IMPORTED": "Resumen importado",
     "SUBTASK_COMPLETED": "Paso completado",
@@ -1772,54 +1774,234 @@
     "achUnavailable": "Los logros todavía no están disponibles en esta versión.",
     "achUnlockedOn": "Obtenido",
     "achievements": {
+      "a_hundred_lines": {
+        "desc": "El resumen que importaste traía exactamente cien renglones. Ni noventa y nueve ni ciento uno.",
+        "title": "Cartas en el Asunto"
+      },
+      "a_single_coin": {
+        "desc": "Anotaste un movimiento de exactamente una unidad. Alguien, en algún camino, le debe una canción a eso.",
+        "title": "Échale una Moneda a tu Brujo"
+      },
+      "a_single_line": {
+        "desc": "Un hecho en todo el día, y lo sellaste igual. Hay sesiones enteras que se van en comprar cuerda, y esas también se anotan.",
+        "title": "Comprar Cuerda"
+      },
+      "always_the_same_trick": {
+        "desc": "Diez hechos en un día y todos del mismo tipo. Empezaste con mil formas posibles de jugar esto y terminaste con una. Como todo el mundo.",
+        "title": "Arquero Sigiloso"
+      },
+      "anvil_and_edge": {
+        "desc": "Cinco pociones y cinco misiones el mismo día. Primero se forja, después se usa.",
+        "title": "La Fragua Celeste"
+      },
+      "archive_caught_up": {
+        "desc": "Tres pergaminos atrasados de una sentada. El que colecciona todo el conocimiento del mundo también hace cola.",
+        "title": "El Bibliotecario"
+      },
+      "ashless_flame": {
+        "desc": "Una jornada larga sellada con el Vigor entero. Ni una brasa de menos.",
+        "title": "Ascua"
+      },
       "awakening": {
         "desc": "Tu personaje ya tiene nombre. La aventura empieza ahí.",
         "title": "El Despertar"
       },
+      "back_through_the_forge": {
+        "desc": "Una semana afuera y lo primero que tocaste fue el fuego. Sabías por dónde se entra.",
+        "title": "El Santuario del Enlace del Fuego"
+      },
       "backfilledToast": "{{n}} logros reconocidos de tu historia",
+      "bag_of_tricks": {
+        "desc": "Quinientos óbolos gastados en cosas tuyas. La bolsa se usa, no se mira.",
+        "title": "La Bolsa de los Trucos"
+      },
+      "beacons_i": {
+        "desc": "Siete días distintos con el caldero encendido. Un fuego llama al siguiente.",
+        "title": "Hoguera Encendida I"
+      },
+      "beacons_ii": {
+        "desc": "Treinta días distintos. La cadena de fuegos ya cruza el reino.",
+        "title": "Hoguera Encendida II"
+      },
+      "beacons_iii": {
+        "desc": "Cien días distintos con el fuego encendido. Gondor llamó y alguien respondió cien veces.",
+        "title": "Hoguera Encendida III"
+      },
+      "bestiary_i": {
+        "desc": "Ocho categorías con movimientos de verdad. No se pelea contra lo que no tiene nombre.",
+        "title": "Aprendiz del Brujo"
+      },
+      "bestiary_ii": {
+        "desc": "Catorce categorías con movimientos de verdad. El bestiario ya no entra en una alforja.",
+        "title": "Manual de Monstruos"
+      },
+      "bestiary_iii": {
+        "desc": "Veintidós categorías. Está todo nombrado. Ya no queda nada anónimo.",
+        "title": "El Bestiario de Kaer Morhen"
+      },
+      "blood_moon": {
+        "desc": "Luna llena, casi medianoche, y vos anotando. En ciertos reinos, a esta hora vuelve todo lo que diste por terminado.",
+        "title": "Luna de Sangre"
+      },
+      "bound_volume": {
+        "desc": "Cien días sellados. Lo que empezó como hojas sueltas ya es un libro.",
+        "title": "Los Pergaminos Ancestrales"
+      },
+      "broken_flask": {
+        "desc": "Un enfoque cortado dejó su marca en el estante. Lo que se parte también se guarda.",
+        "title": "El Cuerno de Boromir"
+      },
+      "buzzer_pardon": {
+        "desc": "Salvaste la racha faltando menos de una hora para que se cerrara el día. No había público. Hubo testigo.",
+        "title": "Tirada de Muerte"
+      },
+      "capicua": {
+        "desc": "El monto se lee igual de ida que de vuelta. No lo buscaste. Por eso cuenta.",
+        "title": "Los Dados de Novigrado"
+      },
       "cauldron_master": {
         "desc": "Cien pomodoros completados sin dejar que el fuego se apague.",
         "title": "Maestro del Caldero"
       },
+      "centenary_vow": {
+        "desc": "Cien días de racha. Alguien tiene que mantener el fuego prendido.",
+        "title": "Vínculo del Fuego"
+      },
       "chronicler_i": {
-        "desc": "Cien hechos anotados en la crónica de tu cuenta.",
+        "desc": "Doscientos hechos anotados en la crónica de tu cuenta.",
         "title": "Cronista I"
       },
       "chronicler_ii": {
-        "desc": "Quinientos hechos anotados en la crónica.",
+        "desc": "Setecientos cincuenta hechos anotados en la crónica.",
         "title": "Cronista II"
       },
       "chronicler_iii": {
         "desc": "Dos mil hechos anotados. La crónica ya pesa.",
         "title": "Cronista III"
       },
+      "cleared_board": {
+        "desc": "Cinco misiones cerradas hoy y no queda ninguna abierta. El salón quedó en silencio.",
+        "title": "Despejado"
+      },
+      "coin_from_overseas": {
+        "desc": "Anotaste un movimiento en moneda extranjera.",
+        "title": "Coronas de Temeria"
+      },
+      "cold_hearth": {
+        "desc": "Mes y medio sin encender el fuego. Volviste, soplaste una vez y arrancó. Los calderos buenos no se ofenden.",
+        "title": "Invernalia"
+      },
+      "cold_trail": {
+        "desc": "Marcaste un hábito de un día que ya había pasado. El rastro seguía tibio.",
+        "title": "Sentido de Brujo"
+      },
       "combo_master": {
         "desc": "Alcanzaste el multiplicador máximo (x2) en un mismo día.",
         "title": "Maestro del Combo"
       },
+      "contract_collected": {
+        "desc": "Cerraste una cuenta con el multiplicador al máximo. La paga llega al final del trabajo.",
+        "title": "El Tablón de Novigrado"
+      },
+      "critical_hit": {
+        "desc": "Un solo hecho pagó ciento cincuenta de experiencia. Los dados aplaudieron.",
+        "title": "Veinte Natural"
+      },
+      "dawn_ride": {
+        "desc": "Cinco misiones cerradas antes de las nueve de la mañana.",
+        "title": "Al Amanecer, Mirad al Este"
+      },
+      "dawn_to_dusk": {
+        "desc": "Abriste el día antes de las siete y lo cerraste después de las diez de la noche.",
+        "title": "El Camino Sigue y Sigue"
+      },
       "day_off": {
         "desc": "Salteaste un hábito a propósito. Descansar también es decidir.",
         "title": "Día Libre"
+      },
+      "day_that_isnt": {
+        "desc": "Anotaste un hecho un veintinueve de febrero. Ese día el calendario miente y todo lo que pasó, pasó todo junto. Volvé en cuatro años.",
+        "title": "La Ruptura del Dragón"
       },
       "debt_free": {
         "desc": "Cerraste tu primer préstamo en Coinify.",
         "title": "Deuda Saldada"
       },
       "deep_work": {
-        "desc": "Cuatro pomodoros en un mismo día.",
+        "desc": "Seis pomodoros en un mismo día.",
         "title": "Inmersión"
       },
       "deserved_rest": {
         "desc": "Jugaste desde la Posada. La racha te esperaba igual.",
         "title": "Descanso Merecido"
       },
+      "dice_did_notice": {
+        "desc": "Sacaste un x3 un martes 13. Alguien mintió sobre la mala suerte, o te tocó el único dado honesto de la bolsa.",
+        "title": "Martes Trece"
+      },
+      "door_never_opened": {
+        "desc": "Quinientos hechos en la crónica y este módulo lo estrenaste hoy. Estaba sin llave todo el tiempo.",
+        "title": "¿Qué Puede Cambiar la Naturaleza de un Hombre?"
+      },
+      "dragonborn": {
+        "desc": "Nivel cincuenta. Ya no subís de nivel: subís de leyenda.",
+        "title": "Sangre de Dragón"
+      },
+      "drawn_ward": {
+        "desc": "Tres límites puestos y un mes cumplido dentro de todos. El escudo se traza antes de la pelea.",
+        "title": "La Señal de Quen"
+      },
       "early_bird": {
         "desc": "Un hecho registrado antes de las 06:00.",
         "title": "Madrugador"
       },
+      "eleventy_one": {
+        "desc": "Once del once, a las once. El calendario y el reloj se pusieron de acuerdo una sola vez, y fue con vos.",
+        "title": "El Cumpleaños de Bilbo"
+      },
+      "embers": {
+        "desc": "Sellaste un día con cinco pociones ya en el estante. El fuego se tapa cuando el trabajo terminó.",
+        "title": "El Hogar de Bolsón Cerrado"
+      },
+      "endless_stair_i": {
+        "desc": "Diez pasos marcados dentro de tus misiones en un mismo día.",
+        "title": "La Escalera Interminable I"
+      },
+      "endless_stair_ii": {
+        "desc": "Veinte pasos en un mismo día. Sigue subiendo.",
+        "title": "La Escalera Interminable II"
+      },
+      "endless_stair_iii": {
+        "desc": "Treinta y cinco pasos en un mismo día. Arriba de todo hay una puerta.",
+        "title": "La Escalera Interminable III"
+      },
+      "enemies_nearby": {
+        "desc": "Encendiste el caldero desde la Posada. Ibas a descansar. El cartel de siempre apareció igual.",
+        "title": "No Puedes Esperar con Enemigos Cerca"
+      },
       "epic_quest": {
-        "desc": "Diez misiones completadas en un mismo día.",
+        "desc": "Doce misiones completadas en un mismo día.",
         "title": "Jornada Épica"
+      },
+      "fellowship": {
+        "desc": "Los cuatro módulos conocen tu letra. No hizo falta que fuera el mismo día.",
+        "title": "La Comunidad del Anillo"
+      },
+      "ferrymans_coin": {
+        "desc": "Gastaste tus primeros óbolos en algo tuyo. El frasco no cura a nadie por estar lleno.",
+        "title": "Frasco de Estus"
+      },
+      "fighters_guild_i": {
+        "desc": "Ocho misiones cerradas en un mismo día.",
+        "title": "Gremio de Aventureros I"
+      },
+      "fighters_guild_ii": {
+        "desc": "Quince misiones en un mismo día. El tablón quedó vacío y todavía era temprano.",
+        "title": "Gremio de Aventureros II"
+      },
+      "fighters_guild_iii": {
+        "desc": "Veinticinco misiones en un solo día. Alguien va a preguntar cómo.",
+        "title": "Gremio de Aventureros III"
       },
       "first_brew": {
         "desc": "Completaste tu primer pomodoro.",
@@ -1849,9 +2031,29 @@
         "desc": "Todo héroe empieza por algo. Vos ya empezaste.",
         "title": "Primer Paso"
       },
+      "full_circle": {
+        "desc": "Una vuelta entera del caldero, descanso largo incluido.",
+        "title": "Ida y Vuelta"
+      },
+      "full_word": {
+        "desc": "Misión épica, multiplicador al tope y un x3, todo en la misma tirada. Los tres factores al máximo a la vez. No suele pasar.",
+        "title": "FUS RO DAH"
+      },
+      "gate_guard": {
+        "desc": "Treinta días de racha alguna vez. Treinta de silencio después. Todo guardia de puerta fue aventurero — la diferencia es que vos volviste.",
+        "title": "Una Flecha en la Rodilla"
+      },
       "golden_day": {
-        "desc": "Doscientos XP en un solo día.",
+        "desc": "Trescientos cincuenta XP en un solo día.",
         "title": "Jornada Dorada"
+      },
+      "great_undertaking": {
+        "desc": "Cinco misiones épicas cerradas. Ninguna de las cinco fue fácil.",
+        "title": "A Mordor No Se Entra Caminando"
+      },
+      "heavy_tome": {
+        "desc": "Un resumen con ciento veinte renglones o más. Un mes de esos.",
+        "title": "El Libro de Mazarbul"
       },
       "hero_return": {
         "desc": "Volviste después de dos semanas. La taberna te guardó el lugar.",
@@ -1859,17 +2061,157 @@
       },
       "hiddenDesc": "Un secreto que todavía no revelaste.",
       "hiddenTitle": "???",
+      "hole_in_the_sheet": {
+        "desc": "Abriste el día dos veces en la misma jornada. Esa parte de la hoja ya no tiene papel de tanto borrar.",
+        "title": "El Agujero en la Ficha"
+      },
+      "honest_scales": {
+        "desc": "Te pesaste y lo anotaste. El número no importa: importa que lo mirás de frente.",
+        "title": "El Fiel de la Balanza"
+      },
+      "horn_of_valhalla": {
+        "desc": "Dos mil quinientos óbolos que salieron del bolsillo. Los objetos legendarios se tocan.",
+        "title": "El Cuerno de Valhalla"
+      },
+      "hour_of_the_wolf": {
+        "desc": "Un gasto anotado a las cuatro de la mañana. Ni el libro pregunta a esa hora.",
+        "title": "La Hora del Lobo"
+      },
+      "hundred_days_gone": {
+        "desc": "Volviste a anotar un movimiento exactamente cien días después del último. Vos también llevabas las cuentas al día, una vez. El libro no preguntó nada.",
+        "title": "El Banco de Hierro"
+      },
+      "in_its_own_hour": {
+        "desc": "Cerraste tres misiones vencidas. Ninguna llegó tarde: llegaron cuando tenían que llegar.",
+        "title": "Un Mago Nunca Llega Tarde"
+      },
+      "iron_bank_i": {
+        "desc": "Tres meses distintos archivando resúmenes. En Braavos los libros se llevan al día.",
+        "title": "Escriba de Braavos"
+      },
+      "iron_bank_ii": {
+        "desc": "Doce meses distintos. Un año entero de papeles archivados.",
+        "title": "Contador del Banco de Hierro"
+      },
+      "iron_bank_iii": {
+        "desc": "Treinta meses distintos archivando resúmenes. Nadie lleva los libros como Braavos. Ahora vos tampoco.",
+        "title": "El Banco de Hierro Tendrá lo Suyo"
+      },
+      "isengard_i": {
+        "desc": "Seis pociones al fuego en un mismo día.",
+        "title": "Las Fraguas de Isengard I"
+      },
+      "isengard_ii": {
+        "desc": "Nueve pociones en un mismo día. El fuego no se apagó ni para comer.",
+        "title": "Las Fraguas de Isengard II"
+      },
+      "isengard_iii": {
+        "desc": "Trece pociones en un solo día. Cinco horas y veinte de reloj, sin descontar nada.",
+        "title": "Las Fraguas de Isengard III"
+      },
+      "just_in_case": {
+        "desc": "Quinientos óbolos y ni uno gastado. Los estás guardando para la pelea importante. Nadie llegó nunca al final del juego con los elixires usados.",
+        "title": "Los Megaelixires"
+      },
+      "knee_healed": {
+        "desc": "Un rito que tenías abandonado hace más de un mes volvió a marcarse. Antes hacías esto todos los días. Después pasó lo que pasa. Nadie preguntó nada.",
+        "title": "Yo Antes Era Como Vos"
+      },
+      "knight_errant": {
+        "desc": "Nivel veinte. El título ya no es de cortesía.",
+        "title": "Caballero Andante"
+      },
+      "labelled_potion": {
+        "desc": "Cinco pociones terminadas con la misión escrita en el frasco.",
+        "title": "Golondrina"
+      },
+      "lannister_i": {
+        "desc": "Tres préstamos saldados, ninguno de un día para el otro. La frase se dice como amenaza, pero es una promesa.",
+        "title": "Un Lannister Siempre Paga sus Deudas"
+      },
+      "lannister_ii": {
+        "desc": "Diez préstamos saldados. La montaña de oro no era un cuento.",
+        "title": "El Oro de Roca Casterly"
+      },
+      "lannister_iii": {
+        "desc": "Veinticinco préstamos saldados. A esta altura ya no hace falta que lo digas.",
+        "title": "Escuchad mi Rugido"
+      },
+      "last_ember": {
+        "desc": "Anotaste un hecho con el Vigor casi apagado. Los días duros también se registran.",
+        "title": "Brasa"
+      },
+      "last_two_hours": {
+        "desc": "Faltaban menos de dos horas para que terminara el año y vos tachando cosas. Había tiempo hasta mañana. No lo usaste.",
+        "title": "La Última Tirada de la Sesión"
+      },
       "late_memory": {
         "desc": "Sellaste el día de ayer. Nunca es tarde para cerrar el libro.",
         "title": "Memoria Tardía"
+      },
+      "lead_into_gold": {
+        "desc": "Un gasto y un ingreso por el mismo monto el mismo día. Prometían oro y entregaban humo verde.",
+        "title": "Fuego Valyrio"
       },
       "ledger_closed": {
         "desc": "Cerraste un mes entero dentro del presupuesto.",
         "title": "Libro Mayor Cerrado"
       },
+      "library_unending": {
+        "desc": "Cincuenta y dos pergaminos. Un año entero de semanas cerradas, y el estante ya tiene gravedad propia.",
+        "title": "La Biblioteca que No Termina"
+      },
+      "like_nothing_happened": {
+        "desc": "Dos semanas sin aparecer y volviste con doscientos XP en un día. Nadie te va a preguntar nada. Se nota que preparaste la entrada.",
+        "title": "Nueve Páginas de Trasfondo"
+      },
+      "loaded_dice": {
+        "desc": "Cinco tiradas de x3 en un mismo día. Nadie te está acusando de nada. Nadie te va a pedir los dados prestados tampoco.",
+        "title": "Dados Cargados"
+      },
+      "long_expected": {
+        "desc": "Hace exactamente un año registraste tu primer hecho. En los libros esto se festeja con fuegos artificiales y un discurso que nadie termina de escuchar.",
+        "title": "Una Fiesta Muy Esperada"
+      },
+      "long_night": {
+        "desc": "Cinco hechos y todavía no amaneció.",
+        "title": "La Larga Noche"
+      },
+      "long_rest": {
+        "desc": "Tres días en la Posada y la app te siguió esperando.",
+        "title": "Meditación"
+      },
+      "long_table": {
+        "desc": "Los cuatro turnos de la mesa, anotados el mismo día. La página quedó sin un solo hueco.",
+        "title": "El Salón de Hidromiel"
+      },
+      "lord_of_cinder": {
+        "desc": "Un año sin cortar la racha. El fuego no se mantiene solo: lo mantuviste vos.",
+        "title": "Señor de la Ceniza"
+      },
       "lucky_strike": {
-        "desc": "Sacaste un x3 en la tirada de bonus. Dos por ciento de probabilidad.",
+        "desc": "Sacaste el dado más alto de la tabla. No pasa seguido, pero tampoco es un milagro.",
         "title": "Golpe de Suerte"
+      },
+      "marginalia": {
+        "desc": "Anotaste una misión al vuelo, sin abrir el tablero. Los libros grandes empiezan a mano alzada.",
+        "title": "El Libro Rojo"
+      },
+      "master_of_coin": {
+        "desc": "Los cuatro oficios cumplidos dos veces cada uno: anotar, saldar, cerrar el mes y archivar.",
+        "title": "Consejero de la Moneda"
+      },
+      "medallion_night": {
+        "desc": "Tres medallones en un mismo día. El estante hizo ruido.",
+        "title": "El Estante de Apocrypha"
+      },
+      "midnight_oil": {
+        "desc": "Cuatro pociones al fuego pasadas las diez de la noche.",
+        "title": "Los Fuegos de Orodruin"
+      },
+      "million_to_one": {
+        "desc": "El dado más alto sobre el combo más alto. Lo improbable se cansó de esperar.",
+        "title": "Nueve de Cada Diez Veces"
       },
       "monthly_vow": {
         "desc": "Treinta días de racha.",
@@ -1879,37 +2221,153 @@
         "desc": "Un hecho registrado después de las 23:00.",
         "title": "Trasnochador"
       },
+      "night_watch": {
+        "desc": "Un pomodoro entre las dos y las cinco de la mañana. La guardia no la pidió nadie, pero alguien la hace.",
+        "title": "La Guardia de la Noche"
+      },
+      "nine_divines_i": {
+        "desc": "Nueve ritos distintos marcados alguna vez. Cada uno con su altar.",
+        "title": "Los Nueve Divinos I"
+      },
+      "nine_divines_ii": {
+        "desc": "Cinco ritos con quince marcas cada uno. No alcanza con visitar el altar una vez.",
+        "title": "Los Nueve Divinos II"
+      },
+      "nine_divines_iii": {
+        "desc": "Diez ritos con treinta marcas cada uno. La peregrinación entera, dos veces.",
+        "title": "Los Nueve Divinos III"
+      },
+      "no_haste": {
+        "desc": "Dos meses sin aparecer. Los que viven mil años tampoco se apuran, y nadie les dice nada.",
+        "title": "La Cámara de los Ents"
+      },
+      "no_name_on_the_door": {
+        "desc": "Nivel diez y tu personaje sigue llamándose como vino de fábrica. A esta altura ya no es un olvido: es un estilo.",
+        "title": "El Sinnombre"
+      },
+      "oghma_infinium": {
+        "desc": "Trescientos sesenta y cinco días sellados. Un tomo que no se termina de leer nunca.",
+        "title": "Oghma Infinium"
+      },
+      "omens_and_portents": {
+        "desc": "Un movimiento anotado un viernes trece. No pasó nada. Igual quedó anotado.",
+        "title": "Viernes Trece"
+      },
+      "one_more_log": {
+        "desc": "Pediste tiempo extra en vez de cortar. El fuego aguanta si lo alimentás.",
+        "title": "Pieza de Corazón"
+      },
+      "overflowing_page": {
+        "desc": "Veinte hechos en una sola jornada. No entraron en la página.",
+        "title": "Página Desbordada"
+      },
+      "palindrome_day": {
+        "desc": "La fecha se lee igual de ida y de vuelta. La próxima tarda años en llegar. Estabas.",
+        "title": "El Día Capicúa"
+      },
+      "path_i": {
+        "desc": "Seis meses distintos con movimientos anotados. El camino se hace andando y se anota andando.",
+        "title": "La Senda"
+      },
+      "path_ii": {
+        "desc": "Dieciocho meses distintos. Ya volviste a casa más de una vez.",
+        "title": "Sinluz"
+      },
+      "path_iii": {
+        "desc": "Treinta y seis meses distintos con movimientos anotados. Tres años en la Senda. No hay atajo, y ese es el punto.",
+        "title": "El Lobo Blanco"
+      },
+      "perfect_boil": {
+        "desc": "Una poción con el multiplicador al tope y la tirada acompañando. La mezcla justa.",
+        "title": "Alquimia 100"
+      },
       "perfect_day": {
         "desc": "Los cuatro módulos con actividad en un mismo día.",
         "title": "Día Perfecto"
       },
+      "perfect_figure": {
+        "desc": "Cuatro dígitos, todos el mismo. Cobran fortunas por números así y nunca los consiguen.",
+        "title": "El Gremio de Alquimistas"
+      },
       "polymath": {
-        "desc": "Cinco tipos distintos de hecho en un mismo día.",
+        "desc": "Siete tipos distintos de hecho en un mismo día.",
         "title": "Polímata"
       },
       "radiant_seal": {
         "desc": "Sellaste un día con el Vigor casi intacto.",
         "title": "Sello Radiante"
       },
+      "raised_shield": {
+        "desc": "Un escudo mantuvo tu rito en pie el día que faltaste.",
+        "title": "Escudo Hyliano"
+      },
+      "rewritten": {
+        "desc": "Reabriste una misión que ya habías cerrado. Ni lo que está escrito es definitivo.",
+        "title": "Pergamino Ancestral"
+      },
       "ritualist": {
         "desc": "Cinco hábitos distintos marcados alguna vez.",
         "title": "Ritualista"
+      },
+      "saving_throw": {
+        "desc": "El indulto llegó con treinta días en juego. Los salvó todos.",
+        "title": "Tiro de Salvación"
       },
       "scribe_of_accounts": {
         "desc": "Importaste tu primer resumen bancario.",
         "title": "Escriba de Cuentas"
       },
+      "scroll_keeper": {
+        "desc": "Doce pergaminos sellados. El archivo ya no cabe en un estante.",
+        "title": "El Escriba de Apocrypha"
+      },
+      "seal_of_four_hands": {
+        "desc": "Tres días sellados donde los cuatro oficios dejaron huella. La gracia se marca donde uno se sienta.",
+        "title": "Sitio de Gracia"
+      },
       "sealed_week": {
         "desc": "Siete días cerrados en el Códice.",
         "title": "Semana Sellada"
+      },
+      "sealed_with_gold": {
+        "desc": "Diez días del Códice cerrados con las cuentas adentro.",
+        "title": "Acta del Consejo Privado"
+      },
+      "seat_kept": {
+        "desc": "Casi un año de silencio. El fuego seguía encendido y tu banquito seguía libre. Como si te hubieras ido a fumar.",
+        "title": "El Póney Pisador"
+      },
+      "second_breakfast": {
+        "desc": "Dos comidas anotadas antes de las once. Alguien acá entiende de medias mañanas.",
+        "title": "¿Y el Segundo Desayuno?"
       },
       "second_chance": {
         "desc": "Reabriste un día en Nutrify. Cerrar nunca es definitivo.",
         "title": "Segunda Oportunidad"
       },
+      "session_notes": {
+        "desc": "Cuatro de la mañana, sellando el día de ayer. El máster también escribe el resumen cuando ya se durmieron todos.",
+        "title": "El Resumen del Máster"
+      },
+      "seven_nights_written": {
+        "desc": "Una semana con los siete días cerrados. Ninguna noche quedó en blanco.",
+        "title": "Bitácora de Campaña"
+      },
+      "shall_we_rest": {
+        "desc": "Fuiste a la Posada antes de encadenar cuatro días. Todo grupo tiene uno que propone acampar, y el grupo siempre acepta.",
+        "title": "¿Descansamos?"
+      },
+      "solvent_crown": {
+        "desc": "Saldaste una deuda el mismo día que un mes cerró dentro del presupuesto. Reinos enteros se hundieron por no lograr las dos cosas juntas.",
+        "title": "La Corona Solvente"
+      },
       "squire": {
         "desc": "Llegaste al nivel 5.",
         "title": "Escudero"
+      },
+      "statement_settled": {
+        "desc": "Seis resúmenes de tarjeta pagados. Los libros quedaron parejos seis veces.",
+        "title": "Las Cuentas de Erebor"
       },
       "steadfast": {
         "desc": "Siete días de racha.",
@@ -1919,23 +2377,135 @@
         "desc": "Treinta días cerrados en el Códice.",
         "title": "Mano Firme"
       },
+      "still_standing": {
+        "desc": "Primero de enero, antes de que salga el sol, y anotaste algo. Nadie pregunta si dormiste.",
+        "title": "Papá Puerco"
+      },
+      "sun_to_sun": {
+        "desc": "Una poción con luz y otra con la noche encima, el mismo día.",
+        "title": "De Magnus a Masser"
+      },
       "sunday_guardian": {
         "desc": "Cinco hechos un domingo. El descanso es opcional.",
         "title": "Guardián del Domingo"
+      },
+      "suns_edge": {
+        "desc": "Un hecho anotado en un solsticio. El sol también lleva su cuenta.",
+        "title": "Cénit del Sol"
       },
       "table_guardian": {
         "desc": "Siete días cerrados en Nutrify.",
         "title": "Guardián de la Mesa"
       },
+      "takes_no_notes": {
+        "desc": "Quinientos hechos en la crónica y tres sellos. Jugás como alguien que se acuerda de todo. Ojalá.",
+        "title": "Sin Hoja de Personaje"
+      },
+      "the_answer": {
+        "desc": "Cuarenta y dos días de silencio exactos. No preguntes cuál era la pregunta.",
+        "title": "Cuarenta y Dos"
+      },
+      "the_blessed_penny": {
+        "desc": "El dado sacó un x3 sobre un movimiento de menos de diez. Dos por ciento, gastados en monedas.",
+        "title": "La Suerte del Bardo"
+      },
+      "the_company": {
+        "desc": "Cinco misiones, cinco pasos y cinco ritos en un mismo día. Tres caminos, una sola marcha.",
+        "title": "La Compañía"
+      },
+      "the_date_in_the_sum": {
+        "desc": "El monto salió idéntico al día y al mes en que lo anotaste. Los cuervos también traen mensajes que nadie mandó.",
+        "title": "Un Cuervo de Poniente"
+      },
+      "the_feast": {
+        "desc": "Registraste un festín. En la mesa larga nadie lleva la cuenta.",
+        "title": "Festín de Héroes"
+      },
+      "the_ledgers_name_day": {
+        "desc": "Anotaste un movimiento el mismo día y mes que el primero de todos, un año o más después. El libro cumple años y nunca lo menciona.",
+        "title": "El Día del Nombre"
+      },
+      "the_mirror": {
+        "desc": "Dos movimientos distintos, el mismo monto exacto, el mismo día. Dos caras, la misma cara.",
+        "title": "El Salón de los Rostros"
+      },
+      "the_number": {
+        "desc": "El día pasó por seiscientos sesenta y seis de experiencia. Nadie lo buscaba y ahí está. No lo digas en voz alta.",
+        "title": "El Número de la Bestia"
+      },
+      "the_pact_kept": {
+        "desc": "Cerraste un día dentro del objetivo que vos mismo elegiste. El pacto era con vos.",
+        "title": "El Pacto del Brujo"
+      },
       "the_pardon": {
         "desc": "Un día perdido no te costó la racha.",
         "title": "El Indulto"
+      },
+      "the_same_bell": {
+        "desc": "Volviste el mismo día de la semana en que te fuiste. El calendario no se movió de la silla.",
+        "title": "Los Relojes de Ankh-Morpork"
+      },
+      "the_thousandth": {
+        "desc": "El hecho número mil de tu crónica sacó el dado del dos por ciento. Ni el novecientos noventa y nueve. El mil.",
+        "title": "Frame Perfecto"
       },
       "three_epics": {
         "desc": "Tres tiradas de x3 en un mismo día. Los dados te aman.",
         "title": "Tres Épicas"
       },
-      "unlockedToast": "Logro desbloqueado: {{title}}"
+      "three_keys": {
+        "desc": "El día cerrado, la semana sellada y el códice firmado, todo en la misma noche. Alguien acá disfruta ordenar.",
+        "title": "Las Tres Piedras Espirituales"
+      },
+      "three_sevens": {
+        "desc": "El número del mes, el del día y el de la hora salieron iguales. Pasa doce horas al año, y justo estabas despierto en una de esas.",
+        "title": "Los Tres Días"
+      },
+      "tome_of_clear_thought": {
+        "desc": "Ciento ochenta días cerrados. Los libros que cambian a alguien se leen despacio.",
+        "title": "Tomo del Pensamiento Claro"
+      },
+      "turning_wheel": {
+        "desc": "Diez vueltas de una misión que vuelve sola. El relato no termina: se repite.",
+        "title": "La Rueda del Tiempo"
+      },
+      "twelve_moons": {
+        "desc": "Anotaste un plan de dieciocho cuotas o más. En Poniente el tiempo también se cuenta en lunas, y dieciocho son muchas.",
+        "title": "Dieciocho Lunas"
+      },
+      "unlockedToast": "Logro desbloqueado: {{title}}",
+      "unlucky_thirteen": {
+        "desc": "Cerraste algo un martes 13. Los dados no se enteraron.",
+        "title": "Ni te Cases ni te Embarques"
+      },
+      "well_rested": {
+        "desc": "Volviste de la Posada y el primer día de vuelta rindió.",
+        "title": "Bien Descansado"
+      },
+      "winter_i": {
+        "desc": "Tres meses cerrados dentro del presupuesto. El invierno no asusta a quien guardó grano.",
+        "title": "Se Acerca el Invierno"
+      },
+      "winter_ii": {
+        "desc": "Seis meses cerrados dentro del presupuesto. Cuanto más largo el verano, más largo lo que viene: por eso se guarda.",
+        "title": "El Largo Verano"
+      },
+      "winter_iii": {
+        "desc": "Diez meses cerrados dentro del presupuesto. Que venga.",
+        "title": "El Invierno Llegó"
+      },
+      "witching_hour": {
+        "desc": "El dado del dos por ciento, a las tres de la mañana. A esa hora los dados no le responden a nadie.",
+        "title": "La Hora Bruja"
+      },
+      "working_holiday": {
+        "desc": "Los cuatro oficios en un mismo día. Técnicamente estabas descansando en la Posada. Técnicamente.",
+        "title": "Descanso Largo"
+      },
+      "yesterdays_pantry": {
+        "desc": "Repetiste el día de ayer entero. Son iguales todos los días y nadie se murió por eso.",
+        "title": "Raciones de Viaje"
+      }
     },
     "bestShort": "récord",
     "bestStreak": "Mejor racha",
