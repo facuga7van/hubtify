@@ -597,8 +597,14 @@ export function registerFinanceImportIpcHandlers(): void {
               const projected = findInstallment.get(groupId, installmentNumber, batchId) as
                 { id: string; category: string } | undefined;
               if (projected) {
+                // C11: si el usuario corrigió a mano la categoría de la proyectada
+                // (ya no es la del plan, el default con el que nació), esa corrección
+                // sobrevive. Solo sobre el default del import se fija la sugerida.
+                const category = projected.category === found.category
+                  ? row.suggestedCategory
+                  : projected.category;
                 materialise.run(
-                  type, amount, currency, row.suggestedCategory, row.merchant, rowDate, row.date,
+                  type, amount, currency, category, row.merchant, rowDate, row.date,
                   billedArs, statementPeriod, batchId,
                   fxRate, fxRate === null ? null : 'process', rowAccountId, now,
                   projected.id,

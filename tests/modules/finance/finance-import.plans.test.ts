@@ -214,3 +214,24 @@ describe('C6 — sin tarjeta, la proyección se ancla en el mes del resumen', ()
     expect(rows[1].date.slice(0, 7)).toBe(nextMonth);
   });
 });
+
+describe('C11 — materializar no pisa una categoría corregida a mano', () => {
+  const CUOTA_3_DE_12 = { ...LINE, installmentCurrent: 3, installmentTotal: 12, amountARS: 25_000 };
+
+  it('conserva la editada; fija la sugerida solo sobre la categoría por defecto del import', async () => {
+    await invoke('finance:importConfirm', [CUOTA_3_DE_12], '2025-08', 'agosto.pdf', cardId);
+    const [plan] = plans();
+    const four = harness.db.prepare(
+      'SELECT id FROM finance_transactions WHERE installment_group_id = ? AND installment_number = 4',
+    ).get(plan.id) as { id: string };
+    await invoke('finance:updateTransaction', four.id, { category: 'Hogar' });
+
+    await invoke('finance:importConfirm', [{ ...CUOTA_3_DE_12, installmentCurrent: 4 }], '2025-09', 'septiembre.pdf', cardId);
+    await invoke('finance:importConfirm', [{ ...CUOTA_3_DE_12, installmentCurrent: 5, suggestedCategory: 'Muebles' }], '2025-10', 'octubre.pdf', cardId);
+
+    const byNumber = new Map(liveRows(plan.id).map((r) => [r.n, r.category]));
+    expect(byNumber.get(4)).toBe('Hogar');    // la corrección del usuario sobrevive
+    expect(byNumber.get(5)).toBe('Muebles');  // la sugerida pisa el default del import
+    expect(byNumber.get(6)).toBe('Compras');  // una proyectada intacta sigue con el default
+  });
+});
