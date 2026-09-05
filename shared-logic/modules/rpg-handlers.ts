@@ -39,6 +39,7 @@ import {
   ACHIEVEMENTS_TOTAL,
   ACHIEVEMENT_OBOLOS,
   ACHIEVEMENT_XP,
+  EVENT_MODULES,
   type AchievementContext,
   type AchievementEventContext,
   type AchievementStatsContext,
@@ -1157,6 +1158,33 @@ export function buildAchievementContext(
     db,
     `SELECT COUNT(DISTINCT substr(created_at, 1, 10)) AS c FROM rpg_events
      WHERE event_type = 'POMODORO_COMPLETED'`,
+  ));
+  lazyField(ctx, 'pomodorosWithTask', () => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM rpg_events
+     WHERE event_type = 'POMODORO_COMPLETED'
+       AND (CASE WHEN payload IS NOT NULL AND json_valid(payload)
+                 THEN json_extract(payload, '$.taskId') END) IS NOT NULL`,
+  ));
+
+  // ── Sellos por composición ────────────────────────────────────────────────
+  // day_seals.modules is the JSON array sealDay wrote (sync copies the string
+  // verbatim, '[]' when missing), so json_each is the exact reader; a LIKE
+  // would let 'finance' match inside another id. Rows whose text is not valid
+  // JSON simply do not count.
+  const eventModulesIn = EVENT_MODULES.map((m) => `'${m}'`).join(', ');
+  lazyField(ctx, 'sealsWithFinance', () => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM day_seals
+     WHERE json_valid(modules)
+       AND EXISTS (SELECT 1 FROM json_each(day_seals.modules) WHERE value = 'finance')`,
+  ));
+  lazyField(ctx, 'sealsWithAllModules', () => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM day_seals
+     WHERE json_valid(modules)
+       AND (SELECT COUNT(DISTINCT value) FROM json_each(day_seals.modules)
+            WHERE value IN (${eventModulesIn})) = ${EVENT_MODULES.length}`,
   ));
 
   // ── Nutrify ───────────────────────────────────────────────────────────────

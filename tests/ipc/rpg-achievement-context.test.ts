@@ -482,6 +482,35 @@ describe('Caldero / óbolos / Posada getters', () => {
     expect(ctxFor(db).pomodoroDays).toBe(3);
   });
 
+  it('pomodorosWithTask counts completed pomodoros that name a task', () => {
+    seedEvent(db, 'cauldron', 'POMODORO_COMPLETED', dateAgo(3), { xp: 15, payload: { taskId: 't1' } });
+    seedEvent(db, 'cauldron', 'POMODORO_COMPLETED', dateAgo(2), { xp: 15, payload: { taskId: 't2' } });
+    seedEvent(db, 'cauldron', 'POMODORO_COMPLETED', dateAgo(1), { xp: 15, payload: {} });
+    seedEvent(db, 'cauldron', 'POMODORO_COMPLETED', dateAgo(1), { xp: 15, payload: { taskId: null } });
+    seedEvent(db, 'cauldron', 'POMODORO_COMPLETED', TODAY, { xp: 15, payload: 'not json' });
+    seedEvent(db, 'cauldron', 'POMODORO_ABANDONED', TODAY, { xp: 0, payload: { taskId: 't3' } });
+    expect(ctxFor(db).pomodorosWithTask).toBe(2);
+  });
+
+  it('sealsWithFinance / sealsWithAllModules read the JSON modules of each seal', () => {
+    const seal = db.prepare(`
+      INSERT INTO day_seals (date, sealed_at, xp_awarded, vigor, events_count, modules, updated_at)
+      VALUES (?, ?, 20, 100, 3, ?, ?)
+    `);
+    const at = (d: string) => `${d} 23:00:00`;
+    seal.run(dateAgo(6), at(dateAgo(6)), '["quests","finance"]', at(dateAgo(6)));
+    seal.run(dateAgo(5), at(dateAgo(5)), '["quests","nutrition","finance","cauldron"]', at(dateAgo(5)));
+    seal.run(dateAgo(4), at(dateAgo(4)), '["cauldron","finance","nutrition","quests","rpg"]', at(dateAgo(4)));
+    seal.run(dateAgo(3), at(dateAgo(3)), '["quests","nutrition","cauldron"]', at(dateAgo(3)));
+    seal.run(dateAgo(2), at(dateAgo(2)), '["financex"]', at(dateAgo(2)));   // a LIKE would count this
+    seal.run(dateAgo(1), at(dateAgo(1)), 'not json', at(dateAgo(1)));
+    seal.run(TODAY, at(TODAY), '[]', at(TODAY));
+
+    const ctx = ctxFor(db);
+    expect(ctx.sealsWithFinance).toBe(3);
+    expect(ctx.sealsWithAllModules).toBe(2);
+  });
+
   it('rewardsRedeemed / obolosSpent / obolosBalance read the ledger', () => {
     const l = db.prepare(`
       INSERT INTO obolos_ledger (id, delta, reason, ref_id, created_at, updated_at)
