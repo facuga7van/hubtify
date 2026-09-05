@@ -125,6 +125,33 @@ describe('C3 — dos artículos distintos de la misma tienda, mismo día, misma 
     expect(liveRows(planA.id).map((r) => [r.n, r.amount])).toEqual([[1, 10_000], [2, 10_100], [3, 10_000]]);
     expect(liveRows(planB.id).map((r) => [r.n, r.amount])).toEqual([[1, 20_000], [2, 20_200], [3, 20_000]]);
   });
+
+  it('resúmenes desordenados: una cuota que el plan no proyectó desempata por el promedio del plan', async () => {
+    // Agosto trae la cuota 3/6 de los dos artículos: cada plan nace con 3..6 y
+    // SIN las cuotas 1 y 2 (las pasadas no se inventan). No hay «cuota n
+    // proyectada» contra la cual comparar la línea 1/6 → cae al promedio.
+    const third = { ...LINE, installmentTotal: 6, installmentCurrent: 3 };
+    await invoke('finance:importConfirm', [third, { ...third, amountARS: 20_000 }], '2025-08', 'agosto.pdf', cardId);
+    const [planA, planB] = plans(); // 60.000 (10.000 × 6) y 120.000 (20.000 × 6)
+    expect(liveRows(planA.id).map((r) => r.n)).toEqual([3, 4, 5, 6]);
+    expect(liveRows(planB.id).map((r) => r.n)).toEqual([3, 4, 5, 6]);
+
+    // Después aparece junio con las cuotas 1/6, invertidas a propósito.
+    const first = { ...LINE, installmentTotal: 6, installmentCurrent: 1 };
+    const res = await invoke<{ count: number; duplicateCount: number }>(
+      'finance:importConfirm', [{ ...first, amountARS: 20_000 }, first], '2025-06', 'junio.pdf', cardId,
+    );
+    expect(res.count).toBe(2);
+    expect(res.duplicateCount).toBe(0);
+    expect(plans()).toHaveLength(2);
+
+    // Cada cuota 1 cayó en su plan (promedio 10.000 vs 20.000) y proyectó la 2
+    // que faltaba, sin volver a escribir la 3..6 que ya existían.
+    expect(liveRows(planA.id).map((r) => [r.n, r.amount]))
+      .toEqual([[1, 10_000], [2, 10_000], [3, 10_000], [4, 10_000], [5, 10_000], [6, 10_000]]);
+    expect(liveRows(planB.id).map((r) => [r.n, r.amount]))
+      .toEqual([[1, 20_000], [2, 20_000], [3, 20_000], [4, 20_000], [5, 20_000], [6, 20_000]]);
+  });
 });
 
 describe('C4 — dos unidades del mismo artículo', () => {

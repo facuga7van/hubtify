@@ -515,7 +515,8 @@ export function registerFinanceImportIpcHandlers(): void {
                 g.total_amount / g.total_installments
               ) - ?
             ) ASC,
-            g.created_at ASC
+            g.created_at ASC,
+            g.id ASC
           LIMIT 1`,
       );
       const insertGroup = db.prepare(
