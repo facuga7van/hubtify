@@ -396,6 +396,19 @@ export const coreMigrations: Migration[] = [
         WHERE NOT EXISTS (SELECT 1 FROM rewards WHERE id NOT LIKE 'seed-reward-%');
     `,
   },
+  {
+    namespace: 'core',
+    version: 9,
+    up: `
+      -- ── Logros v2: la última estadía en la Posada ────────────────────────────
+      -- inn_last_stay_days: noches de la ÚLTIMA estadía, escrito por
+      -- setInnMode(db, false) al hacer check-out (daysDiff(inn_since, today)).
+      -- inn_since se pone en NULL al salir, así que sin esta columna el logro
+      -- "Bien Descansado" no tendría de dónde leer cuánto duró el descanso
+      -- cuando llega la primera acción de vuelta. 0 = nunca se hizo check-out.
+      ALTER TABLE player_stats ADD COLUMN inn_last_stay_days INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 const DUPLICATE_COLUMN = 'duplicate column name';

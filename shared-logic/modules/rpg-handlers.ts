@@ -142,8 +142,13 @@ function asDateString(value: unknown): string | null {
  * jar on the shelf, Forest's withered tree — never numeric. Charging HP for
  * an interrupted focus session is exactly the debt-punishment phase 1 tore out.
  * The event exists so the Códice and the shelf can see it, nothing more.
+ *
+ * CAULDRON_LAP_COMPLETED and POMODORO_EXTENDED are pure registration too: the
+ * pomodoros of the lap already paid one by one, and extending a session is
+ * not a second session. Pinned here so the rule never depends on the emitter
+ * remembering `xp: 0` — the fragility POMODORO_ABANDONED had before this set.
  */
-const ZERO_IMPACT_EVENTS = new Set(['POMODORO_ABANDONED']);
+const ZERO_IMPACT_EVENTS = new Set(['POMODORO_ABANDONED', 'CAULDRON_LAP_COMPLETED', 'POMODORO_EXTENDED']);
 
 /**
  * Base XP used when the emitter does not spell out `payload.xp`.
@@ -320,6 +325,10 @@ export function setInnMode(db: SqlDatabase, on: boolean, today = getLocalDateStr
   }
 
   if (!row.inn_since) return { innSince: null };
+  // How long this stay lasted, kept for the shelf ("Bien Descansado" reads
+  // it on the first action back). Nights, not days: check in Monday, check
+  // out Wednesday → 2. A same-day round trip stores 0.
+  const stayNights = Math.max(0, daysDiff(row.inn_since, today));
   // Only rewind when the player has not already acted today — otherwise a
   // check-in/check-out round trip on the same day would let the streak tick twice.
   // With no last activity at all there is nothing to rewind either.
@@ -331,10 +340,12 @@ export function setInnMode(db: SqlDatabase, on: boolean, today = getLocalDateStr
     // Never move the date backwards: the pre-Inn gap can only be preserved, not
     // enlarged (relevant when the check-in date is later than the last action).
     const restored = rewound > lastDate ? rewound : lastDate;
-    db.prepare("UPDATE player_stats SET inn_since = NULL, streak_last_date = ? WHERE user_id = 'default'")
-      .run(restored);
+    db.prepare(
+      "UPDATE player_stats SET inn_since = NULL, inn_last_stay_days = ?, streak_last_date = ? WHERE user_id = 'default'"
+    ).run(stayNights, restored);
   } else {
-    db.prepare("UPDATE player_stats SET inn_since = NULL WHERE user_id = 'default'").run();
+    db.prepare("UPDATE player_stats SET inn_since = NULL, inn_last_stay_days = ? WHERE user_id = 'default'")
+      .run(stayNights);
   }
   return { innSince: null };
 }
@@ -559,14 +570,10 @@ export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResul
       const oldLevel = stats.level as number;
 
       const now = localTimestamp();
-      // The last MEANINGFUL event BEFORE this one — read before the insert, so
-      // the achievement matcher can measure the silence the player just broke
-      // ("El Regreso del Héroe") without a second scan. Meaningful only: a
-      // QuickAdd (TASK_CREATED, 0 XP) in the middle of the gap is not the
-      // player showing up, and before this filter it reset the clock.
-      const previousEvent = db.prepare(
-        `SELECT created_at AS createdAt FROM rpg_events WHERE ${MEANINGFUL_EVENT_SQL} ORDER BY id DESC LIMIT 1`
-      ).get() as { createdAt: string } | undefined;
+      // Everything the matcher measures as "days since the last X" is read
+      // BEFORE the insert: once this row is in, every MAX(created_at) is the
+      // event itself and every gap collapses to 0 (see AchievementPriorReads).
+      const priors = readAchievementPriors(db, event.type, event.moduleId, payload, today);
       // Undo events: store 0 xp_gained in the log (the original event is already deleted,
       // so storing negative XP here would double-count the reversal in SUM queries)
       const loggedXp = isUndo ? 0 : totalXpGained;
@@ -680,7 +687,7 @@ export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResul
           xpGained: totalXpGained,
           pardonUsed,
         } satisfies AchievementEventContext,
-        previousEventAt: previousEvent?.createdAt ?? null,
+        priors,
         today,
       };
     });
@@ -707,7 +714,7 @@ export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResul
       return { ...EMPTY_RESULT };
     }
 
-    const { result, seed, previousEventAt, today } = committed;
+    const { result, seed, priors, today } = committed;
     try {
       // Central broadcast: callers of processRpgEvent are scattered across four
       // modules; one listener in Layout turns this into the single, discreet
@@ -724,7 +731,7 @@ export function processRpgEvent(db: SqlDatabase, event: RpgEvent): RpgEventResul
       // ACHIEVEMENT_UNLOCKED rows are written directly rather than fed back
       // through processRpgEvent — that would recurse, and the reward would
       // re-enter the matcher that produced it.
-      result.achievementIds = evaluateAchievements(db, seed, today, previousEventAt);
+      result.achievementIds = evaluateAchievements(db, seed, today, priors);
       for (const id of result.achievementIds) emit('rpg:achievementUnlocked', { id });
     } catch (err) {
       // The XP is paid and logged; only the decoration failed.
@@ -767,6 +774,119 @@ function safeCount(db: SqlDatabase, sql: string, ...params: unknown[]): number {
   }
 }
 
+/** A single-value query (`SELECT … AS v`) that degrades to null. */
+function safeValue<T>(db: SqlDatabase, sql: string, ...params: unknown[]): T | null {
+  try {
+    const row = db.prepare(sql).get(...params as never[]) as { v: T | null } | undefined;
+    return row?.v ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A multi-row query that degrades to an empty list. */
+function safeRows<T>(db: SqlDatabase, sql: string, ...params: unknown[]): T[] {
+  try {
+    return db.prepare(sql).all(...params as never[]) as T[];
+  } catch {
+    return [];
+  }
+}
+
+/** Local YYYY-MM-DD of a stored timestamp, or null. Both stamp shapes start with the date. */
+function dateOf(stamp: string | null | undefined): string | null {
+  return typeof stamp === 'string' && stamp.length >= 10 ? stamp.slice(0, 10) : null;
+}
+
+/** Whole days from `from` (stamp or date) to `to` (date), floored at 0; 0 when `from` is missing. */
+function daysSince(from: string | null | undefined, to: string): number {
+  const d = dateOf(from);
+  return d ? Math.max(0, daysDiff(d, to)) : 0;
+}
+
+/**
+ * What the matcher must know about the log BEFORE the event was written.
+ *
+ * `buildAchievementContext` runs after the INSERT, so any "days since the last
+ * X" it computed itself would find the event under evaluation as the last X
+ * and answer 0 forever. These four are read inside the event transaction, just
+ * before the row lands, and handed to the context as data.
+ *
+ * `null` throughout means "no previous X" — a first time, never a homecoming.
+ * The backfill passes no priors at all: with no event in hand there is no gap
+ * to measure.
+ */
+export interface AchievementPriorReads {
+  /**
+   * created_at of the last MEANINGFUL event (see MEANINGFUL_EVENT_SQL). A
+   * QuickAdd (TASK_CREATED, 0 XP) in the middle of a silence is not the player
+   * showing up — before this filter it reset the clock and "El Regreso del
+   * Héroe" never fired for the one who earned it.
+   */
+  previousEventAt: string | null;
+  /** created_at of the last event of the SAME module, of any kind. */
+  lastInModuleAt: string | null;
+  /** created_at of the last POMODORO_COMPLETED. */
+  lastPomodoroAt: string | null;
+  /**
+   * habit_checks.date of the previous 'check' of THIS habit, strictly before
+   * the day being checked. Only read for HABIT_CHECKED; null otherwise.
+   */
+  lastThisHabitDate: string | null;
+}
+
+/** Reads the four priors. Every query degrades to null on a handle that lacks the table. */
+export function readAchievementPriors(
+  db: SqlDatabase,
+  type: string,
+  moduleId: string,
+  payload: Record<string, unknown> | null,
+  today: string,
+): AchievementPriorReads {
+  const previousEventAt = safeValue<string>(
+    db,
+    `SELECT created_at AS v FROM rpg_events WHERE ${MEANINGFUL_EVENT_SQL} ORDER BY id DESC LIMIT 1`,
+  );
+  const lastInModuleAt = safeValue<string>(
+    db, 'SELECT MAX(created_at) AS v FROM rpg_events WHERE module_id = ?', moduleId,
+  );
+  const lastPomodoroAt = safeValue<string>(
+    db, "SELECT MAX(created_at) AS v FROM rpg_events WHERE event_type = 'POMODORO_COMPLETED'",
+  );
+  let lastThisHabitDate: string | null = null;
+  if (type === 'HABIT_CHECKED' && typeof payload?.habitId === 'string' && payload.habitId) {
+    // The check row itself is already written by quests:checkHabit when the
+    // event arrives, hence the strict `date <`. A retro check names its day in
+    // `payload.date`; a live one belongs to today.
+    const checkDate = asDateString(payload.date) ?? today;
+    lastThisHabitDate = safeValue<string>(
+      db,
+      `SELECT MAX(date) AS v FROM habit_checks
+       WHERE habit_id = ? AND kind = 'check' AND deleted_at IS NULL AND date < ?`,
+      payload.habitId, checkDate,
+    );
+  }
+  return { previousEventAt, lastInModuleAt, lastPomodoroAt, lastThisHabitDate };
+}
+
+/** Parses a stored payload; `{}` for NULL or invalid JSON. */
+function parsePayload(raw: string | null): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Categories Coinify never reads as spending: a transfer moves money between
+ * the player's own pockets and a card payment settles a statement whose
+ * purchases were already logged one by one.
+ */
+const NON_SPENDING_CATEGORIES = ['Transferencia', 'Pago Tarjeta'] as const;
+
 /**
  * Assembles the context the catalogue's pure checks read.
  *
@@ -781,7 +901,7 @@ export function buildAchievementContext(
   db: SqlDatabase,
   event: AchievementEventContext | null,
   today: string = getLocalDateString(),
-  previousEventAt: string | null = null,
+  priors: AchievementPriorReads | null = null,
 ): AchievementContext {
   // Day-scoped fields follow the EVENT's day, not the wall clock: an event
   // written at 00:01 must not be measured against yesterday's totals.
@@ -827,15 +947,27 @@ export function buildAchievementContext(
   // sunday_guardian, perfect_day) see only meaningful rows, so an undo, a
   // QuickAdd or the engine's own ACHIEVEMENT_UNLOCKED can never pass as
   // "variety". `byType`, `xp`, `epics` and `maxCombo` stay raw.
+  //
+  // The same scan also yields the day's shape: the finance movements with
+  // their amounts (the_mirror, lead_into_gold), the hours the pomodoros landed
+  // at (sun_to_sun) and the first/last MEANINGFUL hour (dawn_to_dusk — a
+  // 05:00 QuickAdd is not a dawn).
   const day = memo(() => {
     const rows = db.prepare(
       `SELECT module_id AS m, event_type AS t, xp_gained AS xp,
-              combo_multiplier AS combo, bonus_multiplier AS bonus
+              combo_multiplier AS combo, bonus_multiplier AS bonus,
+              payload AS p, created_at AS at
        FROM rpg_events WHERE created_at >= ? AND created_at < ?`
-    ).all(refDay, dayEnd) as Array<{ m: string; t: string; xp: number; combo: number; bonus: number }>;
+    ).all(refDay, dayEnd) as Array<{
+      m: string; t: string; xp: number; combo: number; bonus: number; p: string | null; at: string;
+    }>;
     const byType: Record<string, number> = {};
     const modules = new Set<string>();
     const types = new Set<string>();
+    const movements: Array<{ type: 'expense' | 'income'; amount: number }> = [];
+    const pomodoroHours: number[] = [];
+    let firstHour: number | null = null;
+    let lastHour: number | null = null;
     let count = 0;
     let xp = 0;
     let epics = 0;
@@ -845,15 +977,28 @@ export function buildAchievementContext(
       xp += r.xp;
       if (r.bonus >= 3.0) epics++;
       if (r.combo > maxCombo) maxCombo = r.combo;
+      const hour = Number(r.at.slice(11, 13));
+      if (r.t === 'POMODORO_COMPLETED' && Number.isFinite(hour)) pomodoroHours.push(hour);
+      if (r.t === 'EXPENSE_LOGGED' || r.t === 'INCOME_LOGGED') {
+        const amount = parsePayload(r.p).amount;
+        if (typeof amount === 'number' && Number.isFinite(amount)) {
+          movements.push({ type: r.t === 'EXPENSE_LOGGED' ? 'expense' : 'income', amount });
+        }
+      }
       if (isMeaningfulEvent({ moduleId: r.m, eventType: r.t, xpGained: r.xp })) {
         count++;
         modules.add(r.m);
         types.add(r.t);
+        if (Number.isFinite(hour)) {
+          if (firstHour === null || hour < firstHour) firstHour = hour;
+          if (lastHour === null || hour > lastHour) lastHour = hour;
+        }
       }
     }
     return {
       count, byType, xp, epics, maxCombo,
       modules: [...modules], types: [...types],
+      movements, pomodoroHours, firstHour, lastHour,
     };
   });
 
@@ -871,8 +1016,8 @@ export function buildAchievementContext(
   lazyField(ctx, 'daysSinceLastActivity', () => {
     // 0, not Infinity, when there is no previous event: the very first action of
     // a brand new account is not a homecoming after an absence.
-    if (!event || !previousEventAt) return 0;
-    return daysDiff(previousEventAt.slice(0, 10), event.date);
+    if (!event || !priors?.previousEventAt) return 0;
+    return daysDiff(priors.previousEventAt.slice(0, 10), event.date);
   });
   lazyField(ctx, 'distinctHabits', () => safeCount(
     db,
@@ -892,6 +1037,152 @@ export function buildAchievementContext(
       return false;
     }
   });
+
+  // ── Day shape (from the `day()` scan) ─────────────────────────────────────
+  lazyField(ctx, 'financeMovementsToday', () => day().movements);
+  lazyField(ctx, 'pomodoroHoursToday', () => day().pomodoroHours);
+  lazyField(ctx, 'firstHourToday', () => day().firstHour);
+  lazyField(ctx, 'lastHourToday', () => day().lastHour);
+
+  // ── Gaps measured BEFORE the insert (see AchievementPriorReads) ───────────
+  lazyField(ctx, 'daysSinceLastInModule', () =>
+    event ? daysSince(priors?.lastInModuleAt, event.date) : 0);
+  lazyField(ctx, 'daysSinceLastPomodoro', () =>
+    event ? daysSince(priors?.lastPomodoroAt, event.date) : 0);
+  lazyField(ctx, 'daysSinceThisHabit', () => {
+    if (event?.type !== 'HABIT_CHECKED' || !priors?.lastThisHabitDate) return 0;
+    const checkDate = asDateString(event.payload.date) ?? event.date;
+    return daysSince(priors.lastThisHabitDate, checkDate);
+  });
+  // The last meaningful event strictly before the reference day. Unlike the
+  // priors this can be read after the insert: today's rows are excluded by the
+  // half-open bound, so the event under evaluation never answers for itself.
+  lazyField(ctx, 'gapBeforeToday', () => daysSince(safeValue<string>(
+    db,
+    `SELECT MAX(created_at) AS v FROM rpg_events WHERE created_at < ? AND ${MEANINGFUL_EVENT_SQL}`,
+    refDay,
+  ), refDay));
+
+  // ── Account age ───────────────────────────────────────────────────────────
+  // NOT from rpg_events: the log is pruned at 365 days, so MIN(created_at)
+  // would make a two-year account look one year old at most. player_stats has
+  // no created_at. The anchors that never get pruned:
+  //   - user_profile.created_at — the row initCoreTables writes on first boot.
+  //     It is UTC (datetime('now')) and it is re-minted on an account switch
+  //     (sync clears the table and re-inserts the row), so on its own it can
+  //     understate the age;
+  //   - MIN(day_seals.date) and MIN(achievements_unlocked.unlocked_at) — both
+  //     synced, never pruned, and `first_step` is unlocked by the very first
+  //     event (or by the first backfill of an old account).
+  // The earliest of the three wins, so a switch never rejuvenates the account.
+  lazyField(ctx, 'daysSinceFirstEvent', () => {
+    const anchors = [
+      dateOf(safeValue<string>(db, "SELECT created_at AS v FROM user_profile WHERE id = 'default'")),
+      dateOf(safeValue<string>(db, 'SELECT MIN(date) AS v FROM day_seals')),
+      dateOf(safeValue<string>(db, 'SELECT MIN(unlocked_at) AS v FROM achievements_unlocked')),
+    ].filter((d): d is string => d !== null);
+    if (anchors.length === 0) return 0;
+    return daysSince(anchors.sort()[0], refDay);
+  });
+  lazyField(ctx, 'firstEventDateInModule', () => {
+    if (!event) return null;
+    return dateOf(safeValue<string>(
+      db, 'SELECT MIN(created_at) AS v FROM rpg_events WHERE module_id = ?', event.moduleId,
+    ));
+  });
+
+  // ── Coinify ───────────────────────────────────────────────────────────────
+  const nonSpending = NON_SPENDING_CATEGORIES.map((c) => `'${c}'`).join(', ');
+  lazyField(ctx, 'bestiaryCategories', () => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM (
+       SELECT category FROM finance_transactions
+       WHERE type = 'expense' AND deleted_at IS NULL AND category NOT IN (${nonSpending})
+       GROUP BY category HAVING COUNT(*) >= 3
+     )`,
+  ));
+  lazyField(ctx, 'budgetsActive', () => safeCount(
+    db, 'SELECT COUNT(*) AS c FROM finance_budgets WHERE deleted_at IS NULL AND monthly_limit > 0',
+  ));
+  lazyField(ctx, 'statementImportMonths', () => safeCount(
+    db, 'SELECT COUNT(DISTINCT substr(created_at, 1, 7)) AS c FROM finance_import_batches',
+  ));
+  lazyField(ctx, 'loansSettledAged', () => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM finance_loans
+     WHERE deleted_at IS NULL AND settled = 1 AND settled_date IS NOT NULL
+       AND julianday(settled_date) - julianday(date) >= 7`,
+  ));
+  lazyField(ctx, 'financeActiveMonths', () => safeCount(
+    db, 'SELECT COUNT(DISTINCT substr(date, 1, 7)) AS c FROM finance_transactions WHERE deleted_at IS NULL',
+  ));
+  lazyField(ctx, 'statementsPaid', () => safeCount(
+    db, "SELECT COUNT(*) AS c FROM finance_credit_card_statements WHERE status = 'paid' AND deleted_at IS NULL",
+  ));
+
+  // ── Questify ──────────────────────────────────────────────────────────────
+  lazyField(ctx, 'checksPerHabit', () => safeRows<{ c: number }>(
+    db,
+    `SELECT COUNT(*) AS c FROM habit_checks
+     WHERE kind = 'check' AND deleted_at IS NULL GROUP BY habit_id`,
+  ).map((r) => r.c));
+  // `CASE WHEN json_valid` (not `AND json_valid`): SQL gives no evaluation
+  // order to AND, and one malformed payload would throw the whole count away.
+  const taskPayloadCount = (expr: string) => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM rpg_events
+     WHERE event_type = 'TASK_COMPLETED'
+       AND (CASE WHEN payload IS NOT NULL AND json_valid(payload)
+                 THEN json_extract(payload, '${expr}') END) = 1`,
+  );
+  lazyField(ctx, 'epicTasksTotal', () => safeCount(
+    db,
+    `SELECT COUNT(*) AS c FROM rpg_events
+     WHERE event_type = 'TASK_COMPLETED'
+       AND (CASE WHEN payload IS NOT NULL AND json_valid(payload)
+                 THEN json_extract(payload, '$.tier') END) = 3`,
+  ));
+  lazyField(ctx, 'repeatedTasksTotal', () => taskPayloadCount('$.repeated'));
+  lazyField(ctx, 'overdueClosedTotal', () => taskPayloadCount('$.overdue'));
+  lazyField(ctx, 'habitShieldsSpent', () => safeCount(
+    db, "SELECT COUNT(*) AS c FROM habit_checks WHERE kind = 'shield' AND deleted_at IS NULL",
+  ));
+  // Same query as quests:getPendingCount — the board the player sees.
+  lazyField(ctx, 'pendingTasks', () => safeCount(
+    db, 'SELECT COUNT(*) AS c FROM tasks WHERE status = 0 AND deleted_at IS NULL',
+  ));
+
+  // ── Caldero ───────────────────────────────────────────────────────────────
+  lazyField(ctx, 'pomodoroDays', () => safeCount(
+    db,
+    `SELECT COUNT(DISTINCT substr(created_at, 1, 10)) AS c FROM rpg_events
+     WHERE event_type = 'POMODORO_COMPLETED'`,
+  ));
+
+  // ── Nutrify ───────────────────────────────────────────────────────────────
+  lazyField(ctx, 'mealSlotsToday', () => safeRows<{ meal: string }>(
+    db,
+    'SELECT DISTINCT meal FROM food_log WHERE date = ? AND deleted_at IS NULL AND meal IS NOT NULL',
+    refDay,
+  ).map((r) => r.meal));
+
+  // ── Óbolos + Posada ───────────────────────────────────────────────────────
+  // By reason, not by sign: the ledger's only negative entries today are
+  // redemptions, but a future counter-entry must not read as a treat.
+  lazyField(ctx, 'rewardsRedeemed', () => safeCount(
+    db, "SELECT COUNT(*) AS c FROM obolos_ledger WHERE reason = 'reward_redeemed'",
+  ));
+  lazyField(ctx, 'obolosSpent', () => safeCount(
+    db, 'SELECT COALESCE(-SUM(delta), 0) AS c FROM obolos_ledger WHERE delta < 0',
+  ));
+  lazyField(ctx, 'obolosBalance', () => safeCount(
+    db, 'SELECT COALESCE(SUM(delta), 0) AS c FROM obolos_ledger',
+  ));
+  // Written by setInnMode(db, false); 0 until the first check-out (or on a
+  // handle that predates core v9).
+  lazyField(ctx, 'innNightsLastStay', () => safeCount(
+    db, "SELECT inn_last_stay_days AS c FROM player_stats WHERE user_id = 'default'",
+  ));
 
   return ctx as unknown as AchievementContext;
 }
@@ -923,7 +1214,7 @@ export function evaluateAchievements(
   db: SqlDatabase,
   event: AchievementEventContext | null,
   today: string = getLocalDateString(),
-  previousEventAt: string | null = null,
+  priors: AchievementPriorReads | null = null,
   mode: UnlockMode = 'live',
 ): string[] {
   let alreadyUnlocked: Set<string>;
@@ -939,7 +1230,7 @@ export function evaluateAchievements(
   const pending = ACHIEVEMENTS.filter((a) => !alreadyUnlocked.has(a.id));
   if (pending.length === 0) return [];
 
-  const ctx = buildAchievementContext(db, event, today, previousEventAt);
+  const ctx = buildAchievementContext(db, event, today, priors);
   const newly: string[] = [];
   for (const achievement of pending) {
     try {
